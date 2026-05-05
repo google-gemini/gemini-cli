@@ -200,7 +200,6 @@ describe('LegacyAgentSession', () => {
         expect.any(AbortSignal),
         'test-prompt',
         undefined,
-        false,
         'raw input',
       );
 
@@ -489,9 +488,10 @@ describe('LegacyAgentSession', () => {
       expect(toolResp?.content).toEqual([
         { type: 'text', text: 'Permission denied' },
       ]);
-      expect(toolResp?.displayContent).toEqual([
-        { type: 'text', text: 'Error display' },
-      ]);
+      expect(toolResp?.display?.result).toEqual({
+        type: 'text',
+        text: 'Error display',
+      });
     });
 
     it('stops on STOP_EXECUTION tool error', async () => {
@@ -646,7 +646,7 @@ describe('LegacyAgentSession', () => {
           e.type === 'error' && e._meta?.['code'] === 'AGENT_EXECUTION_BLOCKED',
       );
       expect(blocked?.fatal).toBe(false);
-      expect(blocked?.message).toBe('Agent execution blocked: Blocked by hook');
+      expect(blocked?.message).toBe('Blocked by hook');
 
       const messages = events.filter(
         (e): e is AgentEvent<'message'> =>

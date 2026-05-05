@@ -39,7 +39,7 @@ available combinations.
 | `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
 | `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
 | `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
-| `edit.undo`            | Undo the most recent text edit.                  | `Cmd/Win+Z`<br />`Alt+Z`                                 |
+| `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z`<br />`Alt+Z`<br />`Cmd/Win+Z`                   |
 | `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
 
 #### Scrolling
@@ -115,6 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+| `app.voiceModePTT`            | Hold to speak in Voice Mode.                                                                                                                       | `Space`            |
 
 #### Background Shell Controls
 

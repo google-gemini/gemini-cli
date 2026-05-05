@@ -507,7 +507,7 @@ events. For more information, see the [telemetry documentation](./telemetry.md).
 You can enforce a specific authentication method for all users by setting the
 `security.auth.enforcedType` in the system-level `settings.json` file. This
 prevents users from choosing a different authentication method. See the
-[Authentication docs](../get-started/authentication.md) for more details.
+[Authentication docs](../get-started/authentication.mdx) for more details.
 
 **Example:** Enforce the use of Google login for all users.
 

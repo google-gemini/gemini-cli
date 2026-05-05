@@ -5,10 +5,20 @@
  */
 
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { TestRig, PerfTestHarness } from '@google/gemini-cli-test-utils';
+import {
+  TestRig,
+  PerfTestHarness,
+  type PerfSnapshot,
+} from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
+} from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
@@ -98,6 +108,36 @@ describe('CPU Performance Tests', () => {
     }
   });
 
+  it('asian-language-conv: verify perf is acceptable ', async () => {
+    const result = await harness.runScenario(
+      'asian-language-conv',
+      async () => {
+        const rig = new TestRig();
+        try {
+          rig.setup('perf-asian-language', {
+            fakeResponsesPath: join(__dirname, 'perf.asian-language.responses'),
+          });
+
+          return await harness.measure('asian-language', async () => {
+            await rig.run({
+              args: ['嗨'],
+              timeout: 120000,
+              env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+            });
+          });
+        } finally {
+          await rig.cleanup();
+        }
+      },
+    );
+
+    if (UPDATE_BASELINES) {
+      harness.updateScenarioBaseline(result);
+    } else {
+      harness.assertWithinBaseline(result);
+    }
+  });
+
   it('skill-loading-time: startup with many skills within baseline', async () => {
     const SKILL_COUNT = 20;
 
@@ -165,7 +205,7 @@ describe('CPU Performance Tests', () => {
           const snapshot = await harness.measureWithEventLoop(
             'high-volume-output',
             async () => {
-              const runResult = await rig.run({
+              await rig.run({
                 args: ['Generate 1M lines of output'],
                 timeout: 120000,
                 env: {
@@ -176,7 +216,6 @@ describe('CPU Performance Tests', () => {
                   DEBUG: 'true',
                 },
               });
-              console.log(`  Child Process Output:`, runResult);
             },
           );
 
@@ -216,8 +255,7 @@ describe('CPU Performance Tests', () => {
               JSON.stringify(toolLatencyMetric),
             );
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const logs = (rig as any)._readAndParseTelemetryLog();
+          const logs = rig.readTelemetryLogs();
           console.log(`  Total telemetry log entries: ${logs.length}`);
           for (const logData of logs) {
             if (logData.scopeMetrics) {
@@ -242,10 +280,9 @@ describe('CPU Performance Tests', () => {
 
             const findValue = (percentile: string) => {
               const dp = eventLoopMetric.dataPoints.find(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (p: any) => p.attributes.percentile === percentile,
+                (p) => p.attributes?.['percentile'] === percentile,
               );
-              return dp ? dp.value.min : undefined;
+              return dp?.value?.min;
             };
 
             snapshot.childEventLoopDelayP50Ms = findValue('p50');
@@ -265,5 +302,359 @@ describe('CPU Performance Tests', () => {
     } else {
       harness.assertWithinBaseline(result);
     }
+  });
+
+  describe('long-conversation', () => {
+    let rig: TestRig;
+    const identifier = 'perf-long-conversation';
+    const SESSION_ID =
+      'anonymous_unique_id_577296e0eee5afecdcec05d11838e0cd1a851cd97a28119a4a876b11';
+    const LARGE_CHAT_SOURCE = join(
+      __dirname,
+      '..',
+      'memory-tests',
+      'large-chat-session.json',
+    );
+
+    beforeAll(async () => {
+      if (!existsSync(LARGE_CHAT_SOURCE)) {
+        throw new Error(
+          `Performance test fixture missing: ${LARGE_CHAT_SOURCE}.`,
+        );
+      }
+
+      rig = new TestRig();
+      rig.setup(identifier, {
+        fakeResponsesPath: join(__dirname, 'perf.long-chat.responses'),
+      });
+
+      const geminiDir = join(rig.homeDir!, '.gemini');
+      const projectTempDir = join(geminiDir, 'tmp', identifier);
+      const targetChatsDir = join(projectTempDir, 'chats');
+
+      mkdirSync(targetChatsDir, { recursive: true });
+      writeFileSync(
+        join(geminiDir, 'projects.json'),
+        JSON.stringify({
+          projects: { [rig.testDir!]: identifier },
+        }),
+      );
+      writeFileSync(join(projectTempDir, '.project_root'), rig.testDir!);
+      copyFileSync(
+        LARGE_CHAT_SOURCE,
+        join(targetChatsDir, `session-${SESSION_ID}.json`),
+      );
+    });
+
+    afterAll(async () => {
+      await rig.cleanup();
+    });
+
+    it('session-load: resume a 60MB chat history', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-resume',
+        async () => {
+          const snapshot = await harness.measureWithEventLoop(
+            'resume',
+            async () => {
+              const run = await rig.runInteractive({
+                args: ['--resume', 'latest'],
+                env: {
+                  GEMINI_API_KEY: 'fake-perf-test-key',
+                  GEMINI_TELEMETRY_ENABLED: 'true',
+                  GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+                  GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+                  DEBUG: 'true',
+                },
+              });
+              await run.kill();
+            },
+          );
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('typing: latency when typing into a large session', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-typing',
+        async () => {
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
+          });
+
+          const snapshot = await harness.measureWithEventLoop(
+            'typing',
+            async () => {
+              // On average, the expected latency per key is under 30ms.
+              for (const char of 'Hello') {
+                await run.type(char);
+              }
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('execution: response latency for a simple shell command', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-execution',
+        async () => {
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
+          });
+
+          await run.expectText('Type your message');
+
+          const snapshot = await harness.measureWithEventLoop(
+            'execution',
+            async () => {
+              await run.sendKeys('!echo hi\r');
+              await run.expectText('hi');
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('terminal-scrolling: latency when scrolling a large terminal buffer', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-terminal-scrolling',
+        async () => {
+          // Enable terminalBuffer to intentionally test CLI scrolling logic
+          const settingsPath = join(rig.homeDir!, '.gemini', 'settings.json');
+          writeFileSync(
+            settingsPath,
+            JSON.stringify({
+              security: { folderTrust: { enabled: false } },
+              ui: { terminalBuffer: true },
+            }),
+          );
+
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
+          });
+
+          await run.expectText('Type your message');
+
+          for (let i = 0; i < 5; i++) {
+            await run.sendKeys('\u001b[5~'); // PageUp
+          }
+
+          // Scroll to the very top
+          await run.sendKeys('\u001b[H'); // Home
+          // Verify top line of chat is visible.
+          await run.expectText('Authenticated with');
+
+          for (let i = 0; i < 5; i++) {
+            await run.sendKeys('\u001b[6~'); // PageDown
+          }
+
+          await rig.waitForTelemetryReady();
+          await run.kill();
+
+          const eventLoopMetric = rig.readMetric('event_loop.delay');
+          const cpuMetric = rig.readMetric('cpu.usage');
+
+          let p50Ms = 0;
+          let p95Ms = 0;
+          let maxMs = 0;
+          if (eventLoopMetric) {
+            const dataPoints = eventLoopMetric.dataPoints;
+            const p50Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p50',
+            );
+            const p95Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p95',
+            );
+            const maxData = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'max',
+            );
+
+            if (p50Data?.value?.sum) p50Ms = p50Data.value.sum;
+            if (p95Data?.value?.sum) p95Ms = p95Data.value.sum;
+            if (maxData?.value?.sum) maxMs = maxData.value.sum;
+          }
+
+          let cpuTotalUs = 0;
+          if (cpuMetric) {
+            const dataPoints = cpuMetric.dataPoints;
+            for (const dp of dataPoints) {
+              if (dp.value?.sum && dp.value.sum > 0) {
+                cpuTotalUs += dp.value.sum;
+              }
+            }
+          }
+          const cpuUserUs = cpuTotalUs;
+          const cpuSystemUs = 0;
+
+          const snapshot: PerfSnapshot = {
+            timestamp: Date.now(),
+            label: 'scrolling',
+            wallClockMs: Math.round(p50Ms * 10) / 10,
+            cpuTotalUs,
+            cpuUserUs,
+            cpuSystemUs,
+            eventLoopDelayP50Ms: p50Ms,
+            eventLoopDelayP95Ms: p95Ms,
+            eventLoopDelayMaxMs: maxMs,
+          };
+
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('alternate-scrolling: latency when scrolling a large alternate buffer', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-alternate-scrolling',
+        async () => {
+          // Enable useAlternateBuffer to intentionally test CLI scrolling logic
+          const settingsPath = join(rig.homeDir!, '.gemini', 'settings.json');
+          writeFileSync(
+            settingsPath,
+            JSON.stringify({
+              security: { folderTrust: { enabled: false } },
+              ui: { useAlternateBuffer: true },
+            }),
+          );
+
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
+          });
+
+          await run.expectText('Type your message');
+
+          for (let i = 0; i < 5; i++) {
+            await run.sendKeys('\u001b[5~'); // PageUp
+          }
+
+          // Scroll to the very top
+          await run.sendKeys('\u001b[H'); // Home
+          // Verify top line of chat is visible.
+          await run.expectText('Authenticated with');
+
+          for (let i = 0; i < 5; i++) {
+            await run.sendKeys('\u001b[6~'); // PageDown
+          }
+
+          await rig.waitForTelemetryReady();
+          await run.kill();
+
+          const eventLoopMetric = rig.readMetric('event_loop.delay');
+          const cpuMetric = rig.readMetric('cpu.usage');
+
+          let p50Ms = 0;
+          let p95Ms = 0;
+          let maxMs = 0;
+          if (eventLoopMetric) {
+            const dataPoints = eventLoopMetric.dataPoints;
+            const p50Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p50',
+            );
+            const p95Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p95',
+            );
+            const maxData = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'max',
+            );
+
+            if (p50Data?.value?.sum) p50Ms = p50Data.value.sum;
+            if (p95Data?.value?.sum) p95Ms = p95Data.value.sum;
+            if (maxData?.value?.sum) maxMs = maxData.value.sum;
+          }
+
+          let cpuTotalUs = 0;
+          if (cpuMetric) {
+            const dataPoints = cpuMetric.dataPoints;
+            for (const dp of dataPoints) {
+              if (dp.value?.sum && dp.value.sum > 0) {
+                cpuTotalUs += dp.value.sum;
+              }
+            }
+          }
+          const cpuUserUs = cpuTotalUs;
+          const cpuSystemUs = 0;
+
+          const snapshot: PerfSnapshot = {
+            timestamp: Date.now(),
+            label: 'scrolling',
+            wallClockMs: Math.round(p50Ms * 10) / 10,
+            cpuTotalUs,
+            cpuUserUs,
+            cpuSystemUs,
+            eventLoopDelayP50Ms: p50Ms,
+            eventLoopDelayP95Ms: p95Ms,
+            eventLoopDelayMaxMs: maxMs,
+          };
+
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
   });
 });

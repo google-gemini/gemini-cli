@@ -56,47 +56,47 @@
     <text x="0" y="291" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="291" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="308" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="308" fill="#ffffff" textLength="180" lengthAdjust="spacingAndGlyphs">Enable Notifications</text>
+    <text x="45" y="308" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs">Enable Terminal Notifications</text>
     <text x="828" y="308" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs">false</text>
     <text x="891" y="308" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="325" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="325" fill="#afafaf" textLength="738" lengthAdjust="spacingAndGlyphs">Enable run-event notifications for action-required prompts and session completion.</text>
+    <text x="45" y="325" fill="#afafaf" textLength="756" lengthAdjust="spacingAndGlyphs">Enable terminal run-event notifications for action-required prompts and session com…</text>
     <text x="891" y="325" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="359" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs">Enable Plan Mode</text>
-    <text x="837" y="359" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <text x="45" y="359" fill="#ffffff" textLength="252" lengthAdjust="spacingAndGlyphs">Terminal Notification Method</text>
+    <text x="837" y="359" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">Auto</text>
     <text x="891" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="376" fill="#afafaf" textLength="486" lengthAdjust="spacingAndGlyphs">Enable Plan Mode for read-only safety during planning.</text>
+    <text x="45" y="376" fill="#afafaf" textLength="315" lengthAdjust="spacingAndGlyphs">How to send terminal notifications.</text>
     <text x="891" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="410" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="410" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">Plan Directory</text>
-    <text x="792" y="410" fill="#afafaf" textLength="81" lengthAdjust="spacingAndGlyphs">undefined</text>
+    <text x="45" y="410" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs">Enable Plan Mode</text>
+    <text x="837" y="410" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="410" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="427" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="427" fill="#afafaf" textLength="720" lengthAdjust="spacingAndGlyphs">The directory where planning artifacts are stored. If not specified, defaults t…</text>
+    <text x="45" y="427" fill="#afafaf" textLength="486" lengthAdjust="spacingAndGlyphs">Enable Plan Mode for read-only safety during planning.</text>
     <text x="891" y="427" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="461" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Plan Model Routing</text>
-    <text x="837" y="461" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <text x="45" y="461" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">Plan Directory</text>
+    <text x="792" y="461" fill="#afafaf" textLength="81" lengthAdjust="spacingAndGlyphs">undefined</text>
     <text x="891" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="478" fill="#afafaf" textLength="765" lengthAdjust="spacingAndGlyphs">Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…</text>
+    <text x="45" y="478" fill="#afafaf" textLength="720" lengthAdjust="spacingAndGlyphs">The directory where planning artifacts are stored. If not specified, defaults t…</text>
     <text x="891" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="512" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Retry Fetch Errors</text>
+    <text x="45" y="512" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Plan Model Routing</text>
     <text x="837" y="512" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="529" fill="#afafaf" textLength="612" lengthAdjust="spacingAndGlyphs">Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.</text>
+    <text x="45" y="529" fill="#afafaf" textLength="765" lengthAdjust="spacingAndGlyphs">Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…</text>
     <text x="891" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

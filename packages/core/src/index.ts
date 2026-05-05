@@ -140,7 +140,11 @@ export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export { startMemoryService } from './services/memoryService.js';
+export {
+  startMemoryService,
+  validatePatches,
+} from './services/memoryService.js';
+export { isProjectSkillPatchTarget } from './services/memoryPatchUtils.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
@@ -194,6 +198,7 @@ export * from './agent/agent-session.js';
 export * from './agent/legacy-agent-session.js';
 export * from './agent/event-translator.js';
 export * from './agent/content-utils.js';
+export * from './agent/tool-display-utils.js';
 // Agent event types — namespaced to avoid collisions with existing exports
 export type {
   AgentEvent,
@@ -205,6 +210,7 @@ export type {
   AgentProtocol,
   AgentSend,
   AgentStart,
+  AgentMessage,
   ContentPart,
   ErrorData,
   StreamEndReason,
@@ -212,6 +218,13 @@ export type {
   Unsubscribe,
   Usage as AgentUsage,
   WithMeta,
+  ToolRequest,
+  ToolResponse,
+  ToolUpdate,
+  ToolDisplay,
+  DisplayText,
+  DisplayDiff,
+  DisplayContent,
 } from './agent/types.js';
 
 // Export specific tool logic
@@ -280,4 +293,21 @@ export type { Content, Part, FunctionCall } from '@google/genai';
 
 // Export context types and profiles
 export * from './context/types.js';
-export * from './context/profiles.js';
+
+export { generalistProfile as legacyGeneralistProfile } from './context/profiles.js';
+export {
+  generalistProfile,
+  stressTestProfile,
+} from './context/config/profiles.js';
+
+// Export trust utility
+export * from './utils/trust.js';
+
+// Export voice utilities
+export * from './voice/audioRecorder.js';
+export * from './voice/transcriptionProvider.js';
+export * from './voice/geminiLiveTranscriptionProvider.js';
+export * from './voice/whisperTranscriptionProvider.js';
+export * from './voice/transcriptionFactory.js';
+export * from './voice/whisperModelManager.js';
+export { isBinaryAvailable } from './utils/binaryCheck.js';

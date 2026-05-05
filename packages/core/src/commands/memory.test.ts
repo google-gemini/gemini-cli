@@ -12,8 +12,14 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import {
   addMemory,
+  applyInboxMemoryPatch,
   dismissInboxSkill,
+  dismissInboxMemoryPatch,
   listInboxSkills,
+  listInboxPatches,
+  listInboxMemoryPatches,
+  applyInboxPatch,
+  dismissInboxPatch,
   listMemoryFiles,
   moveInboxSkill,
   refreshMemory,
@@ -28,6 +34,7 @@ vi.mock('../utils/memoryDiscovery.js', () => ({
 vi.mock('../config/storage.js', () => ({
   Storage: {
     getUserSkillsDir: vi.fn(),
+    getGlobalGeminiDir: vi.fn(),
   },
 }));
 
@@ -312,6 +319,619 @@ describe('memory commands', () => {
     });
   });
 
+  describe('memory patch inbox', () => {
+    let tmpDir: string;
+    let memoryTempDir: string;
+    let projectRoot: string;
+    let globalMemoryDir: string;
+    let patchConfig: Config;
+
+    function buildUpdatePatch(
+      absoluteTargetPath: string,
+      original: string,
+      updated: string,
+    ): string {
+      // Minimal one-hunk patch that replaces `original` with `updated`.
+      const oldLines = original === '' ? 0 : original.split('\n').length - 1;
+      const newLines = updated === '' ? 0 : updated.split('\n').length - 1;
+      const removed = original
+        .split('\n')
+        .slice(0, oldLines)
+        .map((line) => `-${line}`);
+      const added = updated
+        .split('\n')
+        .slice(0, newLines)
+        .map((line) => `+${line}`);
+      return [
+        `--- ${absoluteTargetPath}`,
+        `+++ ${absoluteTargetPath}`,
+        `@@ -1,${oldLines} +1,${newLines} @@`,
+        ...removed,
+        ...added,
+        '',
+      ].join('\n');
+    }
+
+    function buildCreationPatch(
+      absoluteTargetPath: string,
+      content: string,
+    ): string {
+      const contentLines = content.split('\n');
+      const lineCount = content.endsWith('\n')
+        ? contentLines.length - 1
+        : contentLines.length;
+      const additions = (
+        content.endsWith('\n') ? contentLines.slice(0, -1) : contentLines
+      ).map((line) => `+${line}`);
+      return [
+        `--- /dev/null`,
+        `+++ ${absoluteTargetPath}`,
+        `@@ -0,0 +1,${lineCount} @@`,
+        ...additions,
+        '',
+      ].join('\n');
+    }
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-patch-test-'));
+      // Canonicalize so test-side paths match production's
+      // canonicalizeDirIfPresent → fs.realpath. On Windows runners
+      // os.tmpdir() returns the 8.3 short form (C:\Users\RUNNER~1\...) but
+      // fs.realpath expands it to the long form (C:\Users\runneradmin\...),
+      // which would otherwise break the auto-pointer absolute-path asserts.
+      tmpDir = await fs.realpath(tmpDir);
+      memoryTempDir = path.join(tmpDir, 'memory-temp');
+      projectRoot = path.join(tmpDir, 'project');
+      globalMemoryDir = path.join(tmpDir, 'global');
+      await fs.mkdir(memoryTempDir, { recursive: true });
+      await fs.mkdir(projectRoot, { recursive: true });
+      await fs.mkdir(globalMemoryDir, { recursive: true });
+
+      patchConfig = {
+        storage: {
+          getProjectMemoryTempDir: () => memoryTempDir,
+          getProjectMemoryDir: () => memoryTempDir,
+        },
+        isTrustedFolder: () => true,
+      } as unknown as Config;
+      vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(globalMemoryDir);
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('aggregates all .patch files of a kind into a single inbox entry', async () => {
+      // Multiple physical .patch files in the kind dir → ONE consolidated
+      // inbox entry per kind, with all hunks merged into entries[].
+      const target = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(target, '- old\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'a-update.patch'),
+        buildUpdatePatch(target, '- old\n', '- new\n'),
+      );
+      // Second source patch — same kind, different hunk.
+      const sibling = path.join(memoryTempDir, 'topic.md');
+      await fs.writeFile(sibling, 'topic A\n');
+      await fs.writeFile(
+        path.join(patchDir, 'b-topic.patch'),
+        buildUpdatePatch(sibling, 'topic A\n', 'topic B\n'),
+      );
+
+      const patches = await listInboxMemoryPatches(patchConfig);
+
+      expect(patches).toHaveLength(1);
+      const memoryPatch = patches[0];
+      expect(memoryPatch).toMatchObject({
+        kind: 'private',
+        relativePath: 'private',
+        name: 'Private memory',
+      });
+      // Both source files contributed their hunks.
+      expect(memoryPatch.entries).toHaveLength(2);
+      expect(memoryPatch.sourceFiles).toEqual([
+        'a-update.patch',
+        'b-topic.patch',
+      ]);
+      expect(memoryPatch.entries[0].targetPath).toBe(target);
+      expect(memoryPatch.entries[0].isNewFile).toBe(false);
+      expect(memoryPatch.entries[1].targetPath).toBe(sibling);
+      expect(memoryPatch.extractedAt).toBeDefined();
+    });
+
+    it('omits patches whose headers leave the allowed root from the listing', async () => {
+      // Bad patches must NOT show up in the inbox at all — listing filters
+      // them out so the user only ever sees actionable items. (They'd also
+      // be rejected at Apply time, but we don't want to surface them.)
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'escape.patch'),
+        buildCreationPatch(path.join(projectRoot, 'GEMINI.md'), 'Hi.\n'),
+      );
+
+      const patches = await listInboxMemoryPatches(patchConfig);
+      expect(patches).toHaveLength(0);
+
+      // Direct apply still rejects it (defense-in-depth).
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'escape.patch',
+      );
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/outside the private memory root/i);
+    });
+
+    it('omits global patches with disallowed targets from the listing', async () => {
+      // Same defense for the global tier: only ~/.gemini/GEMINI.md is allowed.
+      // memory.md (legacy lowercase), sibling .md files, and settings.json all
+      // get filtered out of the listing instead of confusing the user.
+      const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'wrong-name.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'memory.md'),
+          'rejected\n',
+        ),
+      );
+      await fs.writeFile(
+        path.join(patchDir, 'sibling.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'notes.md'),
+          'rejected\n',
+        ),
+      );
+      await fs.writeFile(
+        path.join(patchDir, 'settings.patch'),
+        buildCreationPatch(path.join(globalMemoryDir, 'settings.json'), '{}\n'),
+      );
+
+      const patches = await listInboxMemoryPatches(patchConfig);
+      expect(patches).toHaveLength(0);
+    });
+
+    it('applies a private update patch and removes it from the inbox', async () => {
+      const target = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(target, '- old\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'MEMORY.patch'),
+        buildUpdatePatch(target, '- old\n', '- accepted\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'MEMORY.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe('- accepted\n');
+      await expect(
+        fs.access(path.join(patchDir, 'MEMORY.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('applies a private creation patch with a paired MEMORY.md pointer', async () => {
+      // The auto-memory contract: creating a sibling .md file requires a
+      // hunk that adds a pointer to MEMORY.md (so the sibling becomes
+      // discoverable to future sessions).
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(memoryMd, '# Project Memory\n');
+
+      const target = path.join(memoryTempDir, 'topic.md');
+      await expect(fs.access(target)).rejects.toThrow();
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      const multiHunkPatch =
+        buildCreationPatch(target, '# Topic\n- new fact\n') +
+        buildUpdatePatch(
+          memoryMd,
+          '# Project Memory\n',
+          '# Project Memory\n- See topic.md for the new fact.\n',
+        );
+      await fs.writeFile(path.join(patchDir, 'topic.patch'), multiHunkPatch);
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'topic.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+        '# Topic\n- new fact\n',
+      );
+      await expect(fs.readFile(memoryMd, 'utf-8')).resolves.toContain(
+        'See topic.md',
+      );
+      await expect(
+        fs.access(path.join(patchDir, 'topic.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('auto-bundles a MEMORY.md pointer when the patch creates an orphan sibling', async () => {
+      // Sibling .md files in <memoryDir> are loaded by future sessions ONLY
+      // when MEMORY.md references them. To avoid orphans, applying a sibling
+      // creation patch with no MEMORY.md update auto-bundles a pointer line.
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(memoryMd, '# Project Memory\n');
+
+      const target = path.join(memoryTempDir, 'orphan-topic.md');
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'orphan-topic.patch'),
+        buildCreationPatch(target, '# Orphan Topic\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'orphan-topic.patch',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/auto-added MEMORY\.md pointer/i);
+      expect(result.message).toContain('"orphan-topic.md"');
+      // The sibling exists.
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+        '# Orphan Topic\n',
+      );
+      // MEMORY.md now references the sibling — using ABSOLUTE PATH so a
+      // future agent can `read_file` it without resolving relatives. We
+      // assert the line shape is `- See <absolute>/orphan-topic.md ...` and
+      // verify the path is absolute via path.isAbsolute (cross-platform —
+      // the previous /^- See \/.+\/.../ regex was Unix-only and broke on
+      // Windows where the absolute path is e.g. `C:\Users\...\orphan-topic.md`).
+      const memoryAfter = await fs.readFile(memoryMd, 'utf-8');
+      expect(memoryAfter).toContain(target);
+      const pointerLineMatch = memoryAfter.match(
+        /^- See (.+orphan-topic\.md) /m,
+      );
+      expect(pointerLineMatch).not.toBeNull();
+      expect(path.isAbsolute(pointerLineMatch![1])).toBe(true);
+      // The patch was committed and removed from inbox.
+      await expect(
+        fs.access(path.join(patchDir, 'orphan-topic.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('auto-creates MEMORY.md if it does not exist when bundling pointers', async () => {
+      // No MEMORY.md on disk + a creation patch for a sibling →
+      // auto-bundle should create MEMORY.md from scratch with the pointer.
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await expect(fs.access(memoryMd)).rejects.toThrow();
+
+      const target = path.join(memoryTempDir, 'fresh-topic.md');
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'fresh-topic.patch'),
+        buildCreationPatch(target, '# Fresh Topic\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'fresh-topic.patch',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/auto-added MEMORY\.md pointer/i);
+      const memoryAfter = await fs.readFile(memoryMd, 'utf-8');
+      expect(memoryAfter).toContain('Project Memory');
+      // Pointer must be absolute so the future agent can read_file directly.
+      expect(memoryAfter).toContain(target);
+    });
+
+    it('accepts a private creation patch when MEMORY.md already references the new file', async () => {
+      // If MEMORY.md was previously prepared with a pointer (e.g. by a
+      // separately-applied patch), the follow-up creation patch is fine.
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(
+        memoryMd,
+        '# Project Memory\n- See later-topic.md for details.\n',
+      );
+
+      const target = path.join(memoryTempDir, 'later-topic.md');
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'later-topic.patch'),
+        buildCreationPatch(target, '# Later Topic\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'later-topic.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+        '# Later Topic\n',
+      );
+    });
+
+    it('applies a global creation patch to ~/.gemini/GEMINI.md', async () => {
+      const target = path.join(globalMemoryDir, 'GEMINI.md');
+      // Sanity check: target does not exist before apply.
+      await expect(fs.access(target)).rejects.toThrow();
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'GEMINI.patch'),
+        buildCreationPatch(target, '# Personal preferences\n- prefer X\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'global',
+        'GEMINI.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+        '# Personal preferences\n- prefer X\n',
+      );
+      await expect(
+        fs.access(path.join(patchDir, 'GEMINI.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('applies a global update patch to ~/.gemini/GEMINI.md', async () => {
+      const target = path.join(globalMemoryDir, 'GEMINI.md');
+      await fs.writeFile(target, '- prefer X\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'GEMINI.patch'),
+        buildUpdatePatch(target, '- prefer X\n', '- prefer Y\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'global',
+        'GEMINI.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe('- prefer Y\n');
+      await expect(
+        fs.access(path.join(patchDir, 'GEMINI.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('dismisses a single memory patch from the inbox (legacy single-file mode)', async () => {
+      const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'GEMINI.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'GEMINI.md'),
+          'Prefer concise.\n',
+        ),
+      );
+
+      const result = await dismissInboxMemoryPatch(
+        patchConfig,
+        'global',
+        'GEMINI.patch',
+      );
+
+      expect(result.success).toBe(true);
+      await expect(
+        fs.access(path.join(patchDir, 'GEMINI.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('apply with relativePath = kind runs every source patch in sequence', async () => {
+      // Aggregate apply: pass `relativePath = kind`. Each .patch file under
+      // the kind dir is applied atomically in lexical order; the result
+      // message summarizes successes/failures.
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(memoryMd, '- old\n');
+      const sibling = path.join(memoryTempDir, 'topic.md');
+      await fs.writeFile(sibling, 'topic A\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'a-update.patch'),
+        buildUpdatePatch(memoryMd, '- old\n', '- new\n'),
+      );
+      await fs.writeFile(
+        path.join(patchDir, 'b-topic.patch'),
+        buildUpdatePatch(sibling, 'topic A\n', 'topic B\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'private', // ← aggregate mode
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/applied all 2 private memory patches/i);
+
+      // Both targets were updated, both source patches removed.
+      await expect(fs.readFile(memoryMd, 'utf-8')).resolves.toBe('- new\n');
+      await expect(fs.readFile(sibling, 'utf-8')).resolves.toBe('topic B\n');
+      await expect(
+        fs.access(path.join(patchDir, 'a-update.patch')),
+      ).rejects.toThrow();
+      await expect(
+        fs.access(path.join(patchDir, 'b-topic.patch')),
+      ).rejects.toThrow();
+    });
+
+    it('aggregate apply reports successes and failures when one source patch is stale', async () => {
+      const memoryMd = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(memoryMd, '- old\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      // Good patch: updates the existing line.
+      await fs.writeFile(
+        path.join(patchDir, 'a-good.patch'),
+        buildUpdatePatch(memoryMd, '- old\n', '- new\n'),
+      );
+      // Stale patch: context expects something that doesn't exist.
+      await fs.writeFile(
+        path.join(patchDir, 'b-stale.patch'),
+        buildUpdatePatch(memoryMd, '- never existed\n', '- attempted\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'private',
+      );
+
+      // Any failure → success=false so the dialog keeps the inbox entry
+      // visible. (The successful sub-patches were already removed from disk;
+      // the next listing will surface only the failures for retry.)
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/applied 1 of 2/i);
+      expect(result.message).toMatch(/b-stale\.patch/);
+
+      // Good patch committed and removed; stale patch stays in inbox.
+      await expect(fs.readFile(memoryMd, 'utf-8')).resolves.toBe('- new\n');
+      await expect(
+        fs.access(path.join(patchDir, 'a-good.patch')),
+      ).rejects.toThrow();
+      await expect(
+        fs.access(path.join(patchDir, 'b-stale.patch')),
+      ).resolves.toBeUndefined();
+    });
+
+    it('dismiss with relativePath = kind removes all source patches', async () => {
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'a.patch'),
+        buildCreationPatch(path.join(memoryTempDir, 'a.md'), 'a\n'),
+      );
+      await fs.writeFile(
+        path.join(patchDir, 'b.patch'),
+        buildCreationPatch(path.join(memoryTempDir, 'b.md'), 'b\n'),
+      );
+
+      const result = await dismissInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'private',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/dismissed 2/i);
+      await expect(fs.access(path.join(patchDir, 'a.patch'))).rejects.toThrow();
+      await expect(fs.access(path.join(patchDir, 'b.patch'))).rejects.toThrow();
+    });
+
+    it('rejects global patches that target anything other than ~/.gemini/GEMINI.md', async () => {
+      const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+      await fs.mkdir(patchDir, { recursive: true });
+
+      // memory.md (lowercase) is NOT a valid global memory file.
+      await fs.writeFile(
+        path.join(patchDir, 'wrong-name.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'memory.md'),
+          'Should be rejected.\n',
+        ),
+      );
+
+      // Sibling .md files in ~/.gemini/ are also not allowed.
+      await fs.writeFile(
+        path.join(patchDir, 'sibling.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'notes.md'),
+          'Should be rejected.\n',
+        ),
+      );
+
+      // Non-memory files (settings, credentials) must stay off-limits.
+      await fs.writeFile(
+        path.join(patchDir, 'settings.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'settings.json'),
+          '{"foo": 1}\n',
+        ),
+      );
+
+      for (const fileName of [
+        'wrong-name.patch',
+        'sibling.patch',
+        'settings.patch',
+      ]) {
+        const result = await applyInboxMemoryPatch(
+          patchConfig,
+          'global',
+          fileName,
+        );
+        expect(result.success).toBe(false);
+        expect(result.message).toMatch(/outside the global memory root/i);
+      }
+
+      // None of the bogus targets were created.
+      for (const orphan of ['memory.md', 'notes.md', 'settings.json']) {
+        await expect(
+          fs.access(path.join(globalMemoryDir, orphan)),
+        ).rejects.toThrow();
+      }
+    });
+
+    it('rejects invalid memory patch paths', async () => {
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        '../MEMORY.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Invalid memory patch path.');
+    });
+
+    it('rejects a creation patch whose target already exists', async () => {
+      const target = path.join(memoryTempDir, 'MEMORY.md');
+      await fs.writeFile(target, 'pre-existing\n');
+
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+      await fs.writeFile(
+        path.join(patchDir, 'MEMORY.patch'),
+        buildCreationPatch(target, 'replacement\n'),
+      );
+
+      const result = await applyInboxMemoryPatch(
+        patchConfig,
+        'private',
+        'MEMORY.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/declares a new file/);
+      await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+        'pre-existing\n',
+      );
+      await expect(
+        fs.access(path.join(patchDir, 'MEMORY.patch')),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe('moveInboxSkill', () => {
     let tmpDir: string;
     let skillsDir: string;
@@ -526,6 +1146,711 @@ describe('memory commands', () => {
 
       expect(result.success).toBe(false);
       expect(result.message).toBe('Invalid skill name.');
+    });
+  });
+
+  describe('listInboxPatches', () => {
+    let tmpDir: string;
+    let skillsDir: string;
+    let memoryTempDir: string;
+    let patchConfig: Config;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'patch-list-test-'));
+      skillsDir = path.join(tmpDir, 'skills-memory');
+      memoryTempDir = path.join(tmpDir, 'memory-temp');
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(memoryTempDir, { recursive: true });
+
+      patchConfig = {
+        storage: {
+          getProjectSkillsMemoryDir: () => skillsDir,
+          getProjectMemoryTempDir: () => memoryTempDir,
+        },
+      } as unknown as Config;
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('should return empty array when no patches exist', async () => {
+      const result = await listInboxPatches(patchConfig);
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when directory does not exist', async () => {
+      const badConfig = {
+        storage: {
+          getProjectSkillsMemoryDir: () => path.join(tmpDir, 'nonexistent-dir'),
+          getProjectMemoryTempDir: () => memoryTempDir,
+        },
+      } as unknown as Config;
+
+      const result = await listInboxPatches(badConfig);
+      expect(result).toEqual([]);
+    });
+
+    it('should return parsed patch entries', async () => {
+      const targetFile = path.join(tmpDir, 'target.md');
+      const patchContent = [
+        `--- ${targetFile}`,
+        `+++ ${targetFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' line1',
+        ' line2',
+        '+line2.5',
+        ' line3',
+        '',
+      ].join('\n');
+
+      await fs.writeFile(
+        path.join(skillsDir, 'update-skill.patch'),
+        patchContent,
+      );
+
+      const result = await listInboxPatches(patchConfig);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].fileName).toBe('update-skill.patch');
+      expect(result[0].name).toBe('update-skill');
+      expect(result[0].entries).toHaveLength(1);
+      expect(result[0].entries[0].targetPath).toBe(targetFile);
+      expect(result[0].entries[0].diffContent).toContain('+line2.5');
+    });
+
+    it('should use each patch file mtime for extractedAt', async () => {
+      const firstTarget = path.join(tmpDir, 'first.md');
+      const secondTarget = path.join(tmpDir, 'second.md');
+      const firstTimestamp = new Date('2025-01-15T10:00:00.000Z');
+      const secondTimestamp = new Date('2025-01-16T12:00:00.000Z');
+
+      await fs.writeFile(
+        path.join(memoryTempDir, '.extraction-state.json'),
+        JSON.stringify({
+          runs: [
+            {
+              runAt: '2025-02-01T00:00:00Z',
+              sessionIds: ['later-run'],
+              skillsCreated: [],
+            },
+          ],
+        }),
+      );
+
+      await fs.writeFile(
+        path.join(skillsDir, 'first.patch'),
+        [
+          `--- ${firstTarget}`,
+          `+++ ${firstTarget}`,
+          '@@ -1,1 +1,1 @@',
+          '-before',
+          '+after',
+          '',
+        ].join('\n'),
+      );
+      await fs.writeFile(
+        path.join(skillsDir, 'second.patch'),
+        [
+          `--- ${secondTarget}`,
+          `+++ ${secondTarget}`,
+          '@@ -1,1 +1,1 @@',
+          '-before',
+          '+after',
+          '',
+        ].join('\n'),
+      );
+
+      await fs.utimes(
+        path.join(skillsDir, 'first.patch'),
+        firstTimestamp,
+        firstTimestamp,
+      );
+      await fs.utimes(
+        path.join(skillsDir, 'second.patch'),
+        secondTimestamp,
+        secondTimestamp,
+      );
+
+      const result = await listInboxPatches(patchConfig);
+      const firstPatch = result.find(
+        (patch) => patch.fileName === 'first.patch',
+      );
+      const secondPatch = result.find(
+        (patch) => patch.fileName === 'second.patch',
+      );
+
+      expect(firstPatch?.extractedAt).toBe(firstTimestamp.toISOString());
+      expect(secondPatch?.extractedAt).toBe(secondTimestamp.toISOString());
+    });
+
+    it('should skip patches with no hunks', async () => {
+      await fs.writeFile(
+        path.join(skillsDir, 'empty.patch'),
+        'not a valid patch',
+      );
+
+      const result = await listInboxPatches(patchConfig);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('applyInboxPatch', () => {
+    let tmpDir: string;
+    let skillsDir: string;
+    let memoryTempDir: string;
+    let globalSkillsDir: string;
+    let projectSkillsDir: string;
+    let applyConfig: Config;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'patch-apply-test-'));
+      skillsDir = path.join(tmpDir, 'skills-memory');
+      memoryTempDir = path.join(tmpDir, 'memory-temp');
+      globalSkillsDir = path.join(tmpDir, 'global-skills');
+      projectSkillsDir = path.join(tmpDir, 'project-skills');
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(memoryTempDir, { recursive: true });
+      await fs.mkdir(globalSkillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      applyConfig = {
+        storage: {
+          getProjectSkillsMemoryDir: () => skillsDir,
+          getProjectMemoryTempDir: () => memoryTempDir,
+          getProjectSkillsDir: () => projectSkillsDir,
+        },
+        isTrustedFolder: () => true,
+      } as unknown as Config;
+
+      vi.mocked(Storage.getUserSkillsDir).mockReturnValue(globalSkillsDir);
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('should apply a valid patch and delete it', async () => {
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchContent = [
+        `--- ${targetFile}`,
+        `+++ ${targetFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' line1',
+        ' line2',
+        '+line2.5',
+        ' line3',
+        '',
+      ].join('\n');
+      const patchPath = path.join(skillsDir, 'good.patch');
+      await fs.writeFile(patchPath, patchContent);
+
+      const result = await applyInboxPatch(applyConfig, 'good.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Applied patch to 1 file');
+
+      // Verify target was modified
+      const modified = await fs.readFile(targetFile, 'utf-8');
+      expect(modified).toContain('line2.5');
+
+      // Verify patch was deleted
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('should apply a multi-file patch', async () => {
+      const file1 = path.join(globalSkillsDir, 'file1.md');
+      const file2 = path.join(projectSkillsDir, 'file2.md');
+      await fs.writeFile(file1, 'aaa\nbbb\nccc\n');
+      await fs.writeFile(file2, 'xxx\nyyy\nzzz\n');
+
+      const patchContent = [
+        `--- ${file1}`,
+        `+++ ${file1}`,
+        '@@ -1,3 +1,4 @@',
+        ' aaa',
+        ' bbb',
+        '+bbb2',
+        ' ccc',
+        `--- ${file2}`,
+        `+++ ${file2}`,
+        '@@ -1,3 +1,4 @@',
+        ' xxx',
+        ' yyy',
+        '+yyy2',
+        ' zzz',
+        '',
+      ].join('\n');
+      await fs.writeFile(path.join(skillsDir, 'multi.patch'), patchContent);
+
+      const result = await applyInboxPatch(applyConfig, 'multi.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('2 files');
+
+      expect(await fs.readFile(file1, 'utf-8')).toContain('bbb2');
+      expect(await fs.readFile(file2, 'utf-8')).toContain('yyy2');
+    });
+
+    it('should apply repeated file blocks against the cumulative patched content', async () => {
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'alpha\nbeta\ngamma\ndelta\n');
+
+      await fs.writeFile(
+        path.join(skillsDir, 'multi-section.patch'),
+        [
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -1,4 +1,5 @@',
+          ' alpha',
+          ' beta',
+          '+beta2',
+          ' gamma',
+          ' delta',
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -2,4 +2,5 @@',
+          ' beta',
+          ' beta2',
+          ' gamma',
+          '+gamma2',
+          ' delta',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'multi-section.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Applied patch to 1 file');
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'alpha\nbeta\nbeta2\ngamma\ngamma2\ndelta\n',
+      );
+    });
+
+    it('should reject /dev/null patches that target an existing skill file', async () => {
+      const targetFile = path.join(projectSkillsDir, 'existing-skill.md');
+      await fs.writeFile(targetFile, 'original content\n');
+
+      const patchPath = path.join(skillsDir, 'bad-new-file.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          '--- /dev/null',
+          `+++ ${targetFile}`,
+          '@@ -0,0 +1 @@',
+          '+replacement content',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'bad-new-file.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('target already exists');
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe('original content\n');
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should fail when patch does not exist', async () => {
+      const result = await applyInboxPatch(applyConfig, 'missing.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('not found');
+    });
+
+    it('should reject invalid patch file names', async () => {
+      const outsidePatch = path.join(tmpDir, 'outside.patch');
+      await fs.writeFile(outsidePatch, 'outside patch content');
+
+      const result = await applyInboxPatch(applyConfig, '../outside.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Invalid patch file name.');
+      await expect(fs.access(outsidePatch)).resolves.toBeUndefined();
+    });
+
+    it('should fail when target file does not exist', async () => {
+      const missingFile = path.join(projectSkillsDir, 'missing-target.md');
+      const patchContent = [
+        `--- ${missingFile}`,
+        `+++ ${missingFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' a',
+        ' b',
+        '+c',
+        ' d',
+        '',
+      ].join('\n');
+      await fs.writeFile(
+        path.join(skillsDir, 'bad-target.patch'),
+        patchContent,
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'bad-target.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Target file not found');
+    });
+
+    it('should reject targets outside the global and workspace skill roots', async () => {
+      const outsideFile = path.join(tmpDir, 'outside.md');
+      await fs.writeFile(outsideFile, 'line1\nline2\nline3\n');
+
+      const patchContent = [
+        `--- ${outsideFile}`,
+        `+++ ${outsideFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' line1',
+        ' line2',
+        '+line2.5',
+        ' line3',
+        '',
+      ].join('\n');
+      const patchPath = path.join(skillsDir, 'outside.patch');
+      await fs.writeFile(patchPath, patchContent);
+
+      const result = await applyInboxPatch(applyConfig, 'outside.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        'outside the global/workspace skill directories',
+      );
+      expect(await fs.readFile(outsideFile, 'utf-8')).not.toContain('line2.5');
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should reject targets that escape the skill root through a symlinked parent', async () => {
+      const outsideDir = path.join(tmpDir, 'outside-dir');
+      const linkDir = path.join(projectSkillsDir, 'linked');
+      await fs.mkdir(outsideDir, { recursive: true });
+      await fs.symlink(
+        outsideDir,
+        linkDir,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      const outsideFile = path.join(outsideDir, 'escaped.md');
+      await fs.writeFile(outsideFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'symlink.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${path.join(linkDir, 'escaped.md')}`,
+          `+++ ${path.join(linkDir, 'escaped.md')}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'symlink.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        'outside the global/workspace skill directories',
+      );
+      expect(await fs.readFile(outsideFile, 'utf-8')).not.toContain('line2.5');
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should reject patches that contain no hunks', async () => {
+      await fs.writeFile(
+        path.join(skillsDir, 'empty.patch'),
+        [
+          `--- ${path.join(projectSkillsDir, 'target.md')}`,
+          `+++ ${path.join(projectSkillsDir, 'target.md')}`,
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'empty.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('contains no valid hunks');
+    });
+
+    it('should reject project-scope patches when the workspace is untrusted', async () => {
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'workspace.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const untrustedConfig = {
+        storage: applyConfig.storage,
+        isTrustedFolder: () => false,
+      } as Config;
+      const result = await applyInboxPatch(untrustedConfig, 'workspace.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        'Project skill patches are unavailable until this workspace is trusted.',
+      );
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'line1\nline2\nline3\n',
+      );
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should reject project-scope patches through a symlinked project skills root when the workspace is untrusted', async () => {
+      const realProjectSkillsDir = path.join(tmpDir, 'project-skills-real');
+      const symlinkedProjectSkillsDir = path.join(
+        tmpDir,
+        'project-skills-link',
+      );
+      await fs.mkdir(realProjectSkillsDir, { recursive: true });
+      await fs.symlink(
+        realProjectSkillsDir,
+        symlinkedProjectSkillsDir,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      projectSkillsDir = symlinkedProjectSkillsDir;
+
+      const targetFile = path.join(realProjectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'workspace-symlink.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const untrustedConfig = {
+        storage: applyConfig.storage,
+        isTrustedFolder: () => false,
+      } as Config;
+      const result = await applyInboxPatch(
+        untrustedConfig,
+        'workspace-symlink.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        'Project skill patches are unavailable until this workspace is trusted.',
+      );
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'line1\nline2\nline3\n',
+      );
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should reject patches with mismatched diff headers', async () => {
+      const sourceFile = path.join(projectSkillsDir, 'source.md');
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(sourceFile, 'aaa\nbbb\nccc\n');
+      await fs.writeFile(targetFile, 'xxx\nyyy\nzzz\n');
+
+      const patchPath = path.join(skillsDir, 'mismatched-headers.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${sourceFile}`,
+          `+++ ${targetFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' xxx',
+          ' yyy',
+          '+yyy2',
+          ' zzz',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(
+        applyConfig,
+        'mismatched-headers.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('invalid diff headers');
+      expect(await fs.readFile(sourceFile, 'utf-8')).toBe('aaa\nbbb\nccc\n');
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe('xxx\nyyy\nzzz\n');
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('should strip git-style a/ and b/ prefixes and apply successfully', async () => {
+      const targetFile = path.join(projectSkillsDir, 'prefixed.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'git-prefix.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- a/${targetFile}`,
+          `+++ b/${targetFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'git-prefix.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Applied patch to 1 file');
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'line1\nline2\nline2.5\nline3\n',
+      );
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('should not write any files if one patch in a multi-file set fails', async () => {
+      const file1 = path.join(projectSkillsDir, 'file1.md');
+      await fs.writeFile(file1, 'aaa\nbbb\nccc\n');
+      const missingFile = path.join(projectSkillsDir, 'missing.md');
+
+      const patchContent = [
+        `--- ${file1}`,
+        `+++ ${file1}`,
+        '@@ -1,3 +1,4 @@',
+        ' aaa',
+        ' bbb',
+        '+bbb2',
+        ' ccc',
+        `--- ${missingFile}`,
+        `+++ ${missingFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' x',
+        ' y',
+        '+z',
+        ' w',
+        '',
+      ].join('\n');
+      await fs.writeFile(path.join(skillsDir, 'partial.patch'), patchContent);
+
+      const result = await applyInboxPatch(applyConfig, 'partial.patch');
+
+      expect(result.success).toBe(false);
+      // Verify file1 was NOT modified (dry-run failed)
+      const content = await fs.readFile(file1, 'utf-8');
+      expect(content).not.toContain('bbb2');
+    });
+
+    it('should roll back earlier file updates if a later commit step fails', async () => {
+      const file1 = path.join(projectSkillsDir, 'file1.md');
+      await fs.writeFile(file1, 'aaa\nbbb\nccc\n');
+
+      const conflictPath = path.join(projectSkillsDir, 'conflict');
+      const nestedNewFile = path.join(conflictPath, 'nested.md');
+
+      const patchPath = path.join(skillsDir, 'rollback.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${file1}`,
+          `+++ ${file1}`,
+          '@@ -1,3 +1,4 @@',
+          ' aaa',
+          ' bbb',
+          '+bbb2',
+          ' ccc',
+          '--- /dev/null',
+          `+++ ${conflictPath}`,
+          '@@ -0,0 +1 @@',
+          '+new file content',
+          '--- /dev/null',
+          `+++ ${nestedNewFile}`,
+          '@@ -0,0 +1 @@',
+          '+nested new file content',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'rollback.patch');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('could not be applied atomically');
+      expect(await fs.readFile(file1, 'utf-8')).toBe('aaa\nbbb\nccc\n');
+      expect((await fs.stat(conflictPath)).isDirectory()).toBe(true);
+      await expect(fs.access(nestedNewFile)).rejects.toThrow();
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('dismissInboxPatch', () => {
+    let tmpDir: string;
+    let skillsDir: string;
+    let dismissPatchConfig: Config;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'patch-dismiss-test-'));
+      skillsDir = path.join(tmpDir, 'skills-memory');
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      dismissPatchConfig = {
+        storage: {
+          getProjectSkillsMemoryDir: () => skillsDir,
+        },
+      } as unknown as Config;
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('should delete the patch file and return success', async () => {
+      const patchPath = path.join(skillsDir, 'old.patch');
+      await fs.writeFile(patchPath, 'some patch content');
+
+      const result = await dismissInboxPatch(dismissPatchConfig, 'old.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Dismissed');
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('should return error when patch does not exist', async () => {
+      const result = await dismissInboxPatch(
+        dismissPatchConfig,
+        'nonexistent.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('not found');
+    });
+
+    it('should reject invalid patch file names', async () => {
+      const outsidePatch = path.join(tmpDir, 'outside.patch');
+      await fs.writeFile(outsidePatch, 'outside patch content');
+
+      const result = await dismissInboxPatch(
+        dismissPatchConfig,
+        '../outside.patch',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Invalid patch file name.');
+      await expect(fs.access(outsidePatch)).resolves.toBeUndefined();
     });
   });
 });

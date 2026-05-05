@@ -10,6 +10,7 @@ import {
   MessageSenderType,
   debugLogger,
   geminiPartsToContentParts,
+  displayContentToString,
   parseThought,
   CoreToolCallStatus,
   type ApprovalMode,
@@ -35,11 +36,15 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
+import { useKeypress } from './useKeypress.js';
 
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
   addItem: UseHistoryManagerReturn['addItem'];
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
 }
@@ -119,13 +124,16 @@ export const useAgentStream = ({
     }
   }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
 
-  const cancelOngoingRequest = useCallback(async () => {
-    if (agent) {
-      await agent.abort();
-      setStreamingState(StreamingState.Idle);
-      onCancelSubmit(false);
-    }
-  }, [agent, onCancelSubmit]);
+  const cancelOngoingRequest = useCallback(
+    async (clearBuffer: boolean = true) => {
+      if (agent) {
+        await agent.abort();
+        setStreamingState(StreamingState.Idle);
+        onCancelSubmit(false, clearBuffer);
+      }
+    },
+    [agent, onCancelSubmit],
+  );
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
   const handleApprovalModeChange = useCallback(
@@ -197,6 +205,7 @@ export const useAgentStream = ({
             name: displayName,
             originalRequestName: event.name,
             description: desc,
+            display: event.display,
             status: CoreToolCallStatus.Scheduled,
             isClientInitiated: false,
             renderOutputAsMarkdown: isOutputMarkdown,
@@ -222,10 +231,9 @@ export const useAgentStream = ({
               else if (evtStatus === 'success')
                 status = CoreToolCallStatus.Success;
 
+              const display = event.display?.result;
               const liveOutput =
-                event.displayContent?.[0]?.type === 'text'
-                  ? event.displayContent[0].text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
               const progressMessage =
                 legacyState?.progressMessage ?? tc.progressMessage;
               const progress = legacyState?.progress ?? tc.progress;
@@ -237,6 +245,9 @@ export const useAgentStream = ({
               return {
                 ...tc,
                 status,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay: liveOutput,
                 progressMessage,
                 progress,
@@ -255,16 +266,18 @@ export const useAgentStream = ({
 
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
+              const display = event.display?.result;
               const resultDisplay =
-                event.displayContent?.[0]?.type === 'text'
-                  ? event.displayContent[0].text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
 
               return {
                 ...tc,
                 status: event.isError
                   ? CoreToolCallStatus.Error
                   : CoreToolCallStatus.Success,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay,
                 outputFile,
               };
@@ -273,12 +286,17 @@ export const useAgentStream = ({
           break;
         }
 
-        case 'error':
+        case 'error': {
+          const message =
+            event._meta?.['code'] === 'AGENT_EXECUTION_BLOCKED'
+              ? `Agent execution blocked: ${event.message}`
+              : event.message;
           addItem(
-            { type: MessageType.ERROR, text: event.message },
+            { type: MessageType.ERROR, text: message },
             userMessageTimestampRef.current,
           );
           break;
+        }
 
         case 'initialize':
         case 'session_update':
@@ -310,6 +328,21 @@ export const useAgentStream = ({
     const unsubscribe = agent?.subscribe(handleEvent);
     return () => unsubscribe?.();
   }, [agent, handleEvent]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape' && !isShellFocused) {
+        void cancelOngoingRequest(false);
+        return true;
+      }
+      return false;
+    },
+    {
+      isActive:
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation,
+    },
+  );
 
   const submitQuery = useCallback(
     async (
