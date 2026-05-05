@@ -496,11 +496,11 @@ function isAllowedPrivateMemoryFileName(fileName: string): boolean {
   if (fileName === PROJECT_MEMORY_INDEX_FILENAME) {
     return true;
   }
-  return (
-    fileName.length > '.md'.length &&
-    !fileName.startsWith('.') &&
-    hasMarkdownExtension(fileName)
-  );
+  return !fileName.startsWith('.') && hasMarkdownExtension(fileName);
+}
+
+function uniqueResolvedPaths(paths: readonly string[]): string[] {
+  return Array.from(new Set(paths.map((filePath) => path.resolve(filePath))));
 }
 
 function isAllowedPrivateMemoryDocumentPath(
@@ -509,10 +509,7 @@ function isAllowedPrivateMemoryDocumentPath(
 ): boolean {
   const resolvedTargetPath = path.resolve(targetPath);
   const targetDir = path.dirname(resolvedTargetPath);
-  const isDirectChild = memoryDirs.some(
-    (memoryDir) => path.resolve(memoryDir) === targetDir,
-  );
-  if (!isDirectChild) {
+  if (!memoryDirs.includes(targetDir)) {
     return false;
   }
   return isAllowedPrivateMemoryFileName(path.basename(resolvedTargetPath));
@@ -523,9 +520,7 @@ function isAllowedGlobalMemoryDocumentPath(
   globalMemoryFiles: readonly string[],
 ): boolean {
   const resolvedTargetPath = path.resolve(targetPath);
-  return globalMemoryFiles.some(
-    (memoryFile) => path.resolve(memoryFile) === resolvedTargetPath,
-  );
+  return globalMemoryFiles.includes(resolvedTargetPath);
 }
 
 async function getMemoryPatchTargetValidationContext(
@@ -545,9 +540,10 @@ async function getMemoryPatchTargetValidationContext(
       kind,
       allowedRoots,
       privateMemoryDirs: [],
-      globalMemoryFiles: Array.from(
-        new Set([rawGlobalMemoryFile, ...canonicalGlobalMemoryFiles]),
-      ),
+      globalMemoryFiles: uniqueResolvedPaths([
+        rawGlobalMemoryFile,
+        ...canonicalGlobalMemoryFiles,
+      ]),
     };
   }
 
@@ -557,9 +553,10 @@ async function getMemoryPatchTargetValidationContext(
   const canonicalPrivateMemoryDirs = await canonicalizeAllowedPatchRoots([
     rawPrivateMemoryDir,
   ]);
-  const privateMemoryDirs = Array.from(
-    new Set([rawPrivateMemoryDir, ...canonicalPrivateMemoryDirs]),
-  );
+  const privateMemoryDirs = uniqueResolvedPaths([
+    rawPrivateMemoryDir,
+    ...canonicalPrivateMemoryDirs,
+  ]);
 
   return { kind, allowedRoots, privateMemoryDirs, globalMemoryFiles: [] };
 }
