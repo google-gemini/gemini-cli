@@ -16,6 +16,8 @@ export class TFIDFEmbedder implements Embedder {
   private _vocab: Map<string, number> = new Map(); // term -> index
   private _docCount = 0;
   private _termDocFreq: Map<string, number> = new Map(); // term -> # docs containing it
+  private _docTokenSets: Map<number, Set<string>> = new Map(); // docId -> unique terms
+  private _nextDocId = 0;
 
   embed(text: string): number[] {
     const tokens = this._tokenize(text);
@@ -32,7 +34,9 @@ export class TFIDFEmbedder implements Embedder {
     }
 
     // Update document frequency
+    const docId = this._nextDocId++;
     this._docCount++;
+    this._docTokenSets.set(docId, uniqueTokens);
     for (const token of uniqueTokens) {
       this._termDocFreq.set(token, (this._termDocFreq.get(token) ?? 0) + 1);
     }
@@ -106,6 +110,25 @@ export class TFIDFEmbedder implements Embedder {
     }
 
     return vec;
+  }
+
+  removeDocument(docId: number): void {
+    const tokenSet = this._docTokenSets.get(docId);
+    if (!tokenSet) return;
+    for (const token of tokenSet) {
+      const count = this._termDocFreq.get(token) ?? 1;
+      if (count <= 1) {
+        this._termDocFreq.delete(token);
+      } else {
+        this._termDocFreq.set(token, count - 1);
+      }
+    }
+    this._docTokenSets.delete(docId);
+    this._docCount--;
+  }
+
+  get lastDocId(): number {
+    return this._nextDocId - 1;
   }
 
   getVocabulary(): string[] {

@@ -314,6 +314,11 @@ export class Forest {
     return [...this._children.keys()];
   }
 
+  maxMemberId(rootId: number): number {
+    const memberIds = this._children.get(rootId) ?? [rootId];
+    return Math.max(...memberIds);
+  }
+
   members(rootId: number): number[] {
     const root = this.find(rootId);
     return [...(this._children.get(root) ?? [root])];
@@ -450,18 +455,25 @@ export class ContextWindow {
     k: number = 3,
     minSim: number = 0.05,
   ): string[] {
-    let cold: string[];
+    let coldRoots: number[];
 
     if (query != null && this._forest.clusterCount() > 0) {
       // Use embedQuery (non-mutating) to avoid contaminating the TF-IDF corpus.
       // embed() would add query terms to the vocabulary, changing future embeddings.
       const embedFn = this._embedder.embedQuery ?? this._embedder.embed;
       const queryEmb = embedFn.call(this._embedder, query);
-      const topRoots = this._forest.nearest(queryEmb, k, minSim);
-      cold = topRoots.map((r) => this._forest.compact(r));
+      coldRoots = this._forest.nearest(queryEmb, k, minSim);
     } else {
-      cold = this._forest.roots().map((r) => this._forest.compact(r));
+      coldRoots = this._forest.roots();
     }
+
+    // Sort by max member ID (auto-incrementing) so cold summaries appear
+    // in chronological order. roots() returns Map-insertion order, which
+    // stops tracking recency once unions reparent clusters.
+    coldRoots.sort(
+      (a, b) => this._forest.maxMemberId(a) - this._forest.maxMemberId(b),
+    );
+    const cold = coldRoots.map((r) => this._forest.compact(r));
 
     const hot = this._hot.map((m) => m.content);
     return [...cold, ...hot];
