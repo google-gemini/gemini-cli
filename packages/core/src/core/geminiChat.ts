@@ -50,6 +50,7 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { scrubHistory } from '../utils/historyHardening.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
@@ -336,7 +337,7 @@ export class GeminiChat {
     });
     this.sendPromise = streamDonePromise;
 
-    const userContent = createUserContent(message);
+    let userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -366,6 +367,30 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
+    const binaryInjections = this.extractBinaryInjections(userContent.parts);
+    if (binaryInjections) {
+      // Turn 1: The original tool response (now cleaned)
+      this.agentHistory.push(userContent);
+
+      // Turn 2: Synthetic Model Acknowledgment
+      this.agentHistory.push({
+        role: 'model',
+        parts: [
+          {
+            text: 'Binary content received. Proceeding with analysis.',
+            thought: true,
+            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+          },
+        ],
+      });
+
+      // Turn 3: The actual binary data (becomes the current request message)
+      userContent = {
+        role: 'user',
+        parts: binaryInjections,
+      };
+    }
+
     this.agentHistory.push(userContent);
     const requestContents = this.getHistory(true);
 
@@ -508,6 +533,32 @@ export class GeminiChat {
     };
 
     return streamWithRetries.call(this);
+  }
+
+  private extractBinaryInjections(
+    parts: Part[] | undefined,
+  ): Part[] | undefined {
+    if (!parts) {
+      return undefined;
+    }
+
+    const binaryInjections: Part[] = [];
+
+    for (const part of parts) {
+      const response = part.functionResponse?.response;
+
+      if (response && BINARY_INJECTION_KEY in response) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const binaryParts = response[BINARY_INJECTION_KEY] as Part[];
+        delete response[BINARY_INJECTION_KEY];
+
+        if (Array.isArray(binaryParts)) {
+          binaryInjections.push(...binaryParts);
+        }
+      }
+    }
+
+    return binaryInjections.length > 0 ? binaryInjections : undefined;
   }
 
   private async makeApiCallAndProcessStream(

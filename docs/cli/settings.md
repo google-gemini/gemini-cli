@@ -158,6 +158,7 @@ they appear in the UI.
 | UI Label                          | Setting                        | Description                                                                                                                                                                                                           | Default |
 | --------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides. | `true`  |
+| Ignore Local .env                 | `advanced.ignoreLocalEnv`      | Whether to ignore generic .env files in the project directory.                                                                                                                                                        | `false` |
 
 ### Experimental
 

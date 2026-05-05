@@ -3031,6 +3031,13 @@
             "type": "string"
           }
         },
+        "ignoreLocalEnv": {
+          "title": "Ignore Local .env",
+          "description": "Whether to ignore generic .env files in the project directory.",
+          "markdownDescription": "Whether to ignore generic .env files in the project directory.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "bugCommand": {
           "title": "Bug Command",
           "description": "Configuration for the bug report command.",
