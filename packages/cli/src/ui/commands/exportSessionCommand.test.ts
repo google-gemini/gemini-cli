@@ -9,7 +9,7 @@ import { exportSessionCommand } from './exportSessionCommand.js';
 import * as fs from 'node:fs/promises';
 import { SessionSelector } from '../../utils/sessionUtils.js';
 import type { CommandContext } from './types.js';
-import { Storage } from '@google/gemini-cli-core';
+import { Storage, type ConversationRecord } from '@google/gemini-cli-core';
 
 vi.mock('node:fs/promises');
 vi.mock('../../utils/sessionUtils.js');
@@ -53,7 +53,7 @@ describe('exportSessionCommand', () => {
   });
 
   it('should return error if sessionId is missing', async () => {
-    mockContext.services.agentContext!.config.getSessionId = () => undefined as any;
+    mockContext.services.agentContext!.config.getSessionId = () => undefined;
     const result = await exportSessionCommand.action!(mockContext, '');
 
     expect(result).toEqual({
@@ -64,7 +64,7 @@ describe('exportSessionCommand', () => {
   });
 
   it('should export the session successfully', async () => {
-    const mockSessionData: any = {
+    const mockSessionData: ConversationRecord = {
       sessionId: 'test-session-id',
       messages: [],
       projectHash: 'hash',

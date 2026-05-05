@@ -233,7 +233,7 @@ export async function resolveSessionId(
         `session-${now}-${newSessionId.slice(0, 8)}.jsonl`
       );
 
-      const { messages, ...initialMetadata } = sessionData;
+      const { messages: _messages, ...initialMetadata } = sessionData;
 
       const lines = [JSON.stringify(initialMetadata)];
       if (sessionData.messages) {

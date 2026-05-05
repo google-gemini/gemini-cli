@@ -44,6 +44,7 @@ import {
   type Config,
   type ResumedSessionData,
   type StartupWarning,
+  type ConversationRecord,
   WarningPriority,
   debugLogger,
   coreEvents,
@@ -1083,7 +1084,7 @@ describe('resolveSessionId', () => {
       startTime: 'time',
       lastUpdated: 'time',
       messages: [],
-    } as any);
+    } as unknown as ConversationRecord);
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
