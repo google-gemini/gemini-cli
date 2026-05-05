@@ -2030,6 +2030,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
@@ -2099,7 +2109,11 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: false,
             default: 'gemini-live',
-            description: 'The backend to use for voice transcription.',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
             showInDialog: true,
             options: [
               { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
@@ -2406,7 +2420,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
       generalistProfile: {
