@@ -335,5 +335,41 @@ describe('ContextWorkingBufferImpl', () => {
         'p5',
       ]);
     });
+    it('should drop a non-pristine node if ANY of its multiple pristine roots are dropped from authoritative history', () => {
+      const p1 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p1',
+      );
+      const p2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p2',
+      );
+      let buffer = ContextWorkingBufferImpl.initialize([p1, p2]);
+
+      const s1 = createDummyNode(
+        'ep1',
+        NodeType.ROLLING_SUMMARY,
+        5,
+        undefined,
+        's1',
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s1 as any).abstractsIds = ['p1', 'p2'];
+      buffer = buffer.applyProcessorResult('Summarizer', [p1, p2], [s1]);
+
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['s1']);
+
+      // Upstream graph drops p1 but keeps p2
+      buffer = buffer.syncPristineHistory([p2]);
+
+      // s1 should be gone because one of its roots (p1) is gone
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p2']);
+    });
   });
 });

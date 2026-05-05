@@ -200,12 +200,19 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
     }
 
     // 2. Identify surviving current nodes
-    // A node survives if it's not a pristine node (e.g. summary/injected)
-    // OR if it IS a pristine node and it's in the authoritative list.
+    // A node survives if it's not a pristine node (e.g. summary)
+    // OR if it IS a pristine node and it's in the authoritative list
+    // OR if it's an injected node (it has no provenance roots).
     const survivingCurrentNodes = this.nodes
-      .filter(
-        (n) => authoritativeIds.has(n.id) || !this.pristineNodesMap.has(n.id),
-      )
+      .filter((n) => {
+        if (authoritativeIds.has(n.id)) return true;
+        if (!this.pristineNodesMap.has(n.id)) return true;
+
+        // If it's in pristineNodesMap but NOT in authoritativeIds,
+        // it only survives if it has no roots (e.g. it was system-injected).
+        const roots = newProvenanceMap.get(n.id);
+        return !roots || roots.size === 0;
+      })
       .filter((n) => {
         // Additional check for non-pristine nodes: they only survive if ALL their pristine roots survive.
         // E.g., if a mutated node 'm2' roots back to 'p2', and 'p2' is dropped from authoritativeIds, 'm2' must also drop.
@@ -270,14 +277,14 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       }
     }
 
-    // Add surviving non-pristine nodes
+    // Add surviving non-pristine nodes and injected nodes
     for (let i = 0; i < survivingCurrentNodes.length; i++) {
       const node = survivingCurrentNodes[i];
       if (!authoritativeIds.has(node.id)) {
         const baseSortKey = getPristineIndex(node.id);
         nodeOrder.push({
           node,
-          sortKey: baseSortKey + 0.5, // Interleave after pristine roots
+          sortKey: baseSortKey === -1 ? -1 : baseSortKey + 0.5, // Interleave after pristine roots, or at start if injected
           originalIndex: i,
         });
       }
@@ -286,7 +293,8 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
     // Sort
     nodeOrder.sort((a, b) => {
       if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
-      return a.originalIndex - b.originalIndex; // Stable sort fallback
+      // Tiebreak: preserve original order among nodes sharing the same pristine anchor
+      return a.originalIndex - b.originalIndex;
     });
 
     const newGraph = nodeOrder.map((item) => item.node);
@@ -326,6 +334,7 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       [...this.history],
     );
   }
+
   getPristineNodes(id: string): readonly ConcreteNode[] {
     const pristineIds = this.provenanceMap.get(id);
     if (!pristineIds) return [];

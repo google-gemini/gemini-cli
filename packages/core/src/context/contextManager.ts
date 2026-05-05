@@ -295,6 +295,7 @@ export class ContextManager {
       headerTokens,
       previewNodeIds,
     );
+
     // Structural validation in debug mode
     checkContextInvariants(this.buffer.nodes, 'RenderHistory');
 

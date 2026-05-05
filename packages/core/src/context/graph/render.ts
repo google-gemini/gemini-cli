@@ -59,9 +59,15 @@ export async function render(
   });
 
   if (currentTokens <= maxTokens) {
-    tracer.logEvent('Render', 'Budget is healthy. GC Backstop bypassed.');
+    tracer.logEvent(
+      'Render',
+      `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
+    );
     const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
     const contents = env.graphMapper.fromGraph(visibleNodes);
+    tracer.logEvent('Render', 'Render Context for LLM', {
+      renderedContext: contents,
+    });
     return { history: contents, didApplyManagement: false };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
