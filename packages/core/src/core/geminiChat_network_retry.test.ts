@@ -592,7 +592,9 @@ describe('GeminiChat Network Retries', () => {
     mockConfig.getRetryFetchErrors = vi.fn().mockReturnValue(true);
 
     const prematureCloseError = new Error('Premature close');
-    (prematureCloseError as any).code = 'ERR_STREAM_PREMATURE_CLOSE';
+    Object.defineProperty(prematureCloseError, 'code', {
+      value: 'ERR_STREAM_PREMATURE_CLOSE',
+    });
 
     vi.mocked(mockContentGenerator.generateContentStream)
       .mockResolvedValueOnce(
