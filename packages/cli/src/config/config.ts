@@ -240,8 +240,14 @@ export async function parseArguments(
         ? query.length > 0
         : !!query;
 
-      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
-        return 'Cannot use both --resume (-r) and --session-id together';
+      const sessionFlags = [
+        argv['resume'] !== undefined,
+        argv['session-id'] !== undefined,
+        argv['session-file'] !== undefined,
+      ].filter(Boolean).length;
+
+      if (sessionFlags > 1) {
+        return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
       }
 
       if (argv['prompt'] && hasPositionalQuery) {
