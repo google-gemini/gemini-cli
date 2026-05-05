@@ -8,6 +8,9 @@ import {
   type ApprovalMode,
   type ConversationRecord,
   CoreToolCallStatus,
+  coreEvents,
+  CoreEvent,
+  type ApprovalModeChangedPayload,
   logToolCall,
   convertToFunctionResponse,
   ToolConfirmationOutcome,
@@ -69,7 +72,31 @@ export class Session {
     private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
-  ) {}
+  ) {
+    coreEvents.on(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
+  }
+
+  private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
+    if (payload.sessionId === this.id) {
+      void this.sendUpdate({
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: `[MODE_UPDATE] ${payload.mode}`,
+        },
+      });
+    }
+  };
+
+  dispose(): void {
+    coreEvents.off(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
+  }
 
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {

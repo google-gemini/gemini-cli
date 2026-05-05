@@ -23,6 +23,7 @@ import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 import { ApprovalMode } from '../policy/types.js';
 import {
   HookType,
@@ -71,6 +72,10 @@ import {
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
+import {
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
+} from './scoped-config.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -202,6 +207,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitConsoleLog: vi.fn(),
   emitQuotaChanged: vi.fn(),
   on: vi.fn(),
+  emit: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
@@ -1940,6 +1946,70 @@ describe('Server Config (config.ts)', () => {
     expect(config.getSessionId()).toBe('session-two');
     expect(config.getApprovedPlanPath()).toBeUndefined();
   });
+
+  it('performs a comprehensive reset of all session-scoped state when sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+      tracker: true,
+    });
+
+    await config.initialize();
+
+    // 1. "Dirty" the session state
+    const oldTrackerService = config.getTrackerService();
+    config.setApprovedPlanPath('/tmp/plan.md');
+    config.topicState.setTopic('Old Topic', 'Old Intent');
+    config.getSkillManager().activateSkill('old-skill');
+    config.getModelAvailabilityService().markTerminal('model-1', 'quota');
+    config.setLatestApiRequest({} as never);
+
+    // Interface to access private fields without 'any'
+    interface PrivateConfig {
+      modelQuotas: Map<string, unknown>;
+      lastEmittedQuotaRemaining: number | undefined;
+      lastEmittedQuotaLimit: number | undefined;
+      lastQuotaFetchTime: number;
+      hasAccessToPreviewModel: boolean | null;
+    }
+    const configInternal = config as unknown as PrivateConfig;
+
+    // Mock internal quota state
+    configInternal.modelQuotas.set('model-1', { remaining: 0, limit: 100 });
+    configInternal.lastEmittedQuotaRemaining = 0;
+    configInternal.lastEmittedQuotaLimit = 100;
+    configInternal.lastQuotaFetchTime = 12345;
+    configInternal.hasAccessToPreviewModel = true;
+
+    // Listen for quota event
+    const emitQuotaSpy = vi.spyOn(coreEvents, 'emitQuotaChanged');
+
+    // 2. Trigger session change
+    config.setSessionId('session-two');
+
+    // 3. Verify EVERYTHING is reset
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+    expect(config.topicState.getTopic()).toBeUndefined();
+    expect(config.topicState.getIntent()).toBeUndefined();
+    expect(config.getSkillManager().isSkillActive('old-skill')).toBe(false);
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(
+      config.getModelAvailabilityService().snapshot('model-1').available,
+    ).toBe(true);
+    expect(config.getLatestApiRequest()).toBeUndefined();
+
+    // Quota resets
+    expect(configInternal.modelQuotas.size).toBe(0);
+    expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
+    expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
+    expect(configInternal.lastQuotaFetchTime).toBe(0);
+    expect(configInternal.hasAccessToPreviewModel).toBeNull();
+
+    // Event emission
+    expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
@@ -3589,6 +3659,168 @@ describe('Config JIT Initialization', () => {
       expect(
         config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
       ).toBe(false);
+    });
+
+    it('should NOT allow isPathAllowed to write into the auto-memory inbox', () => {
+      // <projectMemoryDir>/.inbox/ is owned by the extraction agent and the
+      // /memory inbox review flow. The main agent must not be able to drop
+      // patches in there directly, even though it falls inside <projectTempDir>.
+      // We bypass Config.initialize() (the GitService init path is independently
+      // flaky in this suite) by spying on the storage methods isPathAllowed
+      // actually consults.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+
+      // The inbox directory itself and any path under it are denied.
+      expect(config.isPathAllowed(inboxRoot)).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(inboxRoot, 'private', 'foo.patch')),
+      ).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(inboxRoot, 'global', 'bar.patch')),
+      ).toBe(false);
+
+      // Sibling files under <projectMemoryDir> stay reachable so the main
+      // agent can edit MEMORY.md and topic notes directly.
+      expect(
+        config.isPathAllowed(path.join(fakeMemoryTempDir, 'MEMORY.md')),
+      ).toBe(true);
+      expect(
+        config.isPathAllowed(path.join(fakeMemoryTempDir, 'some-topic.md')),
+      ).toBe(true);
+    });
+
+    it('should allow scoped extraction access only to canonical inbox patches', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+      const privateExtractionPatch = path.join(
+        inboxRoot,
+        'private',
+        'extraction.patch',
+      );
+      const globalExtractionPatch = path.join(
+        inboxRoot,
+        'global',
+        'extraction.patch',
+      );
+
+      expect(config.isPathAllowed(privateExtractionPatch)).toBe(false);
+
+      runWithScopedMemoryInboxAccess(() => {
+        expect(config.isPathAllowed(privateExtractionPatch)).toBe(true);
+        expect(config.validatePathAccess(privateExtractionPatch)).toBeNull();
+        expect(config.isPathAllowed(globalExtractionPatch)).toBe(true);
+        expect(
+          config.isPathAllowed(path.join(inboxRoot, 'private', 'other.patch')),
+        ).toBe(false);
+        expect(
+          config.isPathAllowed(
+            path.join(inboxRoot, 'private', 'nested', 'extraction.patch'),
+          ),
+        ).toBe(false);
+      });
+
+      expect(config.isPathAllowed(privateExtractionPatch)).toBe(false);
+    });
+
+    it('should restrict scoped auto-memory extraction writes to generated artifacts', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      const fakeSkillsMemoryDir = path.join(fakeMemoryTempDir, 'skills');
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectSkillsMemoryDir').mockReturnValue(
+        fakeSkillsMemoryDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+      const privateExtractionPatch = path.join(
+        inboxRoot,
+        'private',
+        'extraction.patch',
+      );
+      const skillArtifact = path.join(
+        fakeSkillsMemoryDir,
+        'my-skill',
+        'SKILL.md',
+      );
+      const activeMemoryPath = path.join(fakeMemoryTempDir, 'MEMORY.md');
+      const projectTempPath = path.join(fakeProjectTempDir, 'logs', 'run.log');
+      const workspaceMemoryPath = path.join('/tmp/test', 'GEMINI.md');
+
+      expect(config.validatePathAccess(activeMemoryPath)).toBeNull();
+
+      runWithScopedAutoMemoryExtractionWriteAccess(() => {
+        expect(config.validatePathAccess(skillArtifact)).toBeNull();
+        expect(config.validatePathAccess(activeMemoryPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+        expect(config.validatePathAccess(projectTempPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+        expect(config.validatePathAccess(workspaceMemoryPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+
+        // Reads still use the normal workspace/temp allowlists.
+        expect(config.validatePathAccess(activeMemoryPath, 'read')).toBeNull();
+      });
+
+      runWithScopedMemoryInboxAccess(() => {
+        runWithScopedAutoMemoryExtractionWriteAccess(() => {
+          expect(config.validatePathAccess(privateExtractionPatch)).toBeNull();
+        });
+      });
     });
   });
 

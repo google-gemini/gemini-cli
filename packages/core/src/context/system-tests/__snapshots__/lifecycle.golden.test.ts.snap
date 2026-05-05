@@ -6,6 +6,14 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
+          "text": "[Continuing from previous AI thoughts...]",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
           "text": "Nice diagram.",
         },
       ],
@@ -27,31 +35,39 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       ],
       "role": "model",
     },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 6,
-      "tokensBeforeBackground": 6,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 11,
-      "tokensBeforeBackground": 11,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 458,
-      "tokensBeforeBackground": 20170,
+      "tokensAfterBackground": 327,
+      "tokensBeforeBackground": 20172,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 61,
-      "tokensBeforeBackground": 3017,
+      "tokensAfterBackground": 93,
+      "tokensBeforeBackground": 3037,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 10,
-      "tokensBeforeBackground": 10,
+      "tokensAfterBackground": 27,
+      "tokensBeforeBackground": 27,
       "turnIndex": 4,
     },
   ],
@@ -93,16 +109,24 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
       ],
       "role": "model",
     },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 6,
-      "tokensBeforeBackground": 6,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 11,
-      "tokensBeforeBackground": 11,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
   ],
@@ -160,21 +184,29 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
       ],
       "role": "model",
     },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 25,
-      "tokensBeforeBackground": 25,
+      "tokensAfterBackground": 42,
+      "tokensBeforeBackground": 42,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 49,
-      "tokensBeforeBackground": 49,
+      "tokensAfterBackground": 84,
+      "tokensBeforeBackground": 84,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 73,
-      "tokensBeforeBackground": 73,
+      "tokensAfterBackground": 126,
+      "tokensBeforeBackground": 126,
       "turnIndex": 2,
     },
   ],
