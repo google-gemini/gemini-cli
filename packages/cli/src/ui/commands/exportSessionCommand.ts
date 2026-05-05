@@ -14,7 +14,6 @@ import {
 } from './types.js';
 import { MessageType } from '../types.js';
 import { SessionSelector } from '../../utils/sessionUtils.js';
-import { Storage } from '@google/gemini-cli-core';
 
 export const exportSessionCommand: SlashCommand = {
   name: 'export-session',
@@ -33,7 +32,7 @@ export const exportSessionCommand: SlashCommand = {
       };
     }
 
-    const sessionId = context.services.agentContext?.config.sessionId;
+    const sessionId = context.services.agentContext?.config.getSessionId();
     if (!sessionId) {
       return {
         type: 'message',

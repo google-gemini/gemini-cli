@@ -53,7 +53,7 @@ describe('exportSessionCommand', () => {
   });
 
   it('should return error if sessionId is missing', async () => {
-    mockContext.services.agentContext!.config.sessionId = undefined as any;
+    mockContext.services.agentContext!.config.getSessionId = () => undefined as any;
     const result = await exportSessionCommand.action!(mockContext, '');
 
     expect(result).toEqual({
@@ -64,7 +64,13 @@ describe('exportSessionCommand', () => {
   });
 
   it('should export the session successfully', async () => {
-    const mockSessionData = { sessionId: 'test-session-id', messages: [] };
+    const mockSessionData: any = {
+      sessionId: 'test-session-id',
+      messages: [],
+      projectHash: 'hash',
+      startTime: 'time',
+      lastUpdated: 'time',
+    };
     vi.mocked(SessionSelector.prototype.resolveSession).mockResolvedValue({
       sessionData: mockSessionData,
       sessionPath: '/tmp/mock-dir/chats/session.jsonl',
