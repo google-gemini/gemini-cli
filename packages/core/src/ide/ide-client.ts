@@ -495,6 +495,30 @@ export class IdeClient {
     }
   }
 
+  // Must be invoked before client.connect so that errors surfaced during
+  // connection setup or by a long-lived SSE stream are routed through
+  // onerror instead of becoming unhandled promise rejections.
+  private registerTransportHandlers() {
+    if (!this.client) {
+      return;
+    }
+    this.client.onerror = (_error) => {
+      const errorMessage = _error instanceof Error ? _error.message : `_error`;
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\n${errorMessage}`,
+        true,
+      );
+    };
+    this.client.onclose = () => {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `IDE connection closed. To reconnect, run /ide enable.`,
+        true,
+      );
+    };
+  }
+
   private registerClientHandlers() {
     if (!this.client) {
       return;
@@ -512,21 +536,6 @@ export class IdeClient {
         }
       },
     );
-    this.client.onerror = (_error) => {
-      const errorMessage = _error instanceof Error ? _error.message : `_error`;
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\n${errorMessage}`,
-        true,
-      );
-    };
-    this.client.onclose = () => {
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `IDE connection closed. To reconnect, run /ide enable.`,
-        true,
-      );
-    };
     this.client.setNotificationHandler(
       IdeDiffAcceptedNotificationSchema,
       (notification) => {
@@ -597,6 +606,7 @@ export class IdeClient {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         },
       });
+      this.registerTransportHandlers();
       await this.client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
@@ -630,6 +640,7 @@ export class IdeClient {
         command,
         args,
       });
+      this.registerTransportHandlers();
       await this.client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
