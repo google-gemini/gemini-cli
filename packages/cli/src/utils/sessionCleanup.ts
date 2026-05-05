@@ -15,6 +15,7 @@ import {
   type Config,
   deleteSessionArtifactsAsync,
   deleteSubagentSessionDirAndArtifactsAsync,
+  getSessionMetadataSidecarPath,
 } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
@@ -51,6 +52,20 @@ function isStringProperty<T extends string>(
 
 function isSessionIdRecord(record: unknown): record is { sessionId: string } {
   return isStringProperty(record, 'sessionId');
+}
+
+async function unlinkSidecarIfPresent(jsonlPath: string): Promise<void> {
+  try {
+    await fs.unlink(getSessionMetadataSidecarPath(jsonlPath));
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code !== 'ENOENT') {
+      debugLogger.warn(
+        `Failed to remove session metadata sidecar for ${path.basename(jsonlPath)}: ${
+          error.message
+        }`,
+      );
+    }
+  }
 }
 
 /**
@@ -131,7 +146,9 @@ export async function cleanupExpiredSessions(
       return { ...result, disabled: true };
     }
 
-    const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId());
+    const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId(), {
+      lazyMigrate: false,
+    });
     result.scanned = allFiles.length;
 
     if (allFiles.length === 0) {
@@ -216,6 +233,7 @@ export async function cleanupExpiredSessions(
               // Delete the session file
               if (!fullSessionId || fullSessionId !== config.getSessionId()) {
                 await fs.unlink(filePath);
+                await unlinkSidecarIfPresent(filePath);
 
                 if (fullSessionId) {
                   await cleanupSessionAndSubagentsAsync(fullSessionId, config);
@@ -244,6 +262,7 @@ export async function cleanupExpiredSessions(
           // Fallback to old logic
           const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
           await fs.unlink(sessionPath);
+          await unlinkSidecarIfPresent(sessionPath);
 
           const sessionId = sessionToDelete.sessionInfo?.id;
           if (sessionId) {

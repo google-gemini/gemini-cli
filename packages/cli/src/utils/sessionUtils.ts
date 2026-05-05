@@ -240,6 +240,13 @@ export const formatRelativeTime = (
 export interface GetSessionOptions {
   /** Whether to load full message content (needed for search) */
   includeFullContent?: boolean;
+  /**
+   * Whether to opportunistically write a metadata sidecar for sessions that
+   * don't have one yet. Defaults to true. Callers that scan the chats dir
+   * without intending to keep every session (e.g. retention cleanup) should
+   * pass `false` to avoid creating artifacts for soon-to-be-deleted sessions.
+   */
+  lazyMigrate?: boolean;
 }
 
 /**
@@ -352,8 +359,10 @@ const buildSessionInfoForFile = async (
   if (content.kind === 'subagent') return null;
 
   // Lazy migration: backfill the sidecar so future listings hit the fast
-  // path. Best-effort; failures are logged inside the helper.
-  if (!options.includeFullContent) {
+  // path. Best-effort; failures are logged inside the helper. Skip when the
+  // caller opts out (e.g. retention cleanup, which is about to delete some
+  // of the sessions anyway).
+  if (!options.includeFullContent && options.lazyMigrate !== false) {
     writeSessionMetadataSidecar(filePath, content);
   }
 
