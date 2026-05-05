@@ -2076,6 +2076,7 @@ describe('runNonInteractive', () => {
             session_id: 'test-session-id',
             response: 'Partial content',
             stats: MOCK_SESSION_METRICS,
+            warnings: ['Agent execution stopped: Stopped by hook'],
           },
           null,
           2,
