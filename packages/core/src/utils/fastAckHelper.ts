@@ -57,13 +57,15 @@ export const USER_STEERING_INSTRUCTION =
   'Do not cancel/skip tasks unless the user explicitly cancels them. ' +
   'Acknowledge the steering briefly and state the course correction.';
 
-const XML_TAG_REPLACE_RE = /<\/(\w+)>/g;
+const XML_CLOSING_TAG_RE = /<\/([^>]+)>/gi;
 const CONTEXT_BREAKER_RE = /\]/g;
+const NEWLINE_RE = /\r?\n/g;
 
 function sanitizeForWrapper(input: string): string {
   return input
-    .replace(XML_TAG_REPLACE_RE, '<\\/$1>')
-    .replace(CONTEXT_BREAKER_RE, '\\]');
+    .replace(XML_CLOSING_TAG_RE, '<\\/$1>')
+    .replace(CONTEXT_BREAKER_RE, '\\]')
+    .replace(NEWLINE_RE, '\\n');
 }
 
 function wrapInput(input: string): string {
