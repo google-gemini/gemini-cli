@@ -5,6 +5,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type {
   jsonSchemaValidator,
@@ -56,7 +57,7 @@ import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { OAuthUtils } from '../mcp/oauth-utils.js';
+import { OAuthUtils, FIVE_MIN_BUFFER_MS } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   getErrorMessage,
@@ -1045,6 +1046,8 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
   private clientInfo?: OAuthClientInformation;
   private readonly tokenStorage = new MCPOAuthTokenStorage();
   private readonly oauthProvider = new MCPOAuthProvider(this.tokenStorage);
+  private cachedToken?: OAuthTokens;
+  private tokenExpiryTime?: number;
 
   constructor(
     private readonly serverName: string,
@@ -1059,24 +1062,54 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
     this.clientInfo = clientInformation;
   }
 
+  private isCachedTokenValid(): boolean {
+    return !!(
+      this.cachedToken?.access_token &&
+      this.tokenExpiryTime &&
+      Date.now() < this.tokenExpiryTime - FIVE_MIN_BUFFER_MS
+    );
+  }
+
   async tokens(): Promise<OAuthTokens | undefined> {
+    if (this.isCachedTokenValid()) {
+      return this.cachedToken;
+    }
+
+    let token: string | null;
+
     if (this.serverConfig.oauth?.enabled && this.serverConfig.oauth) {
-      const token = await this.oauthProvider.getValidToken(
+      token = await this.oauthProvider.getValidToken(
         this.serverName,
         this.serverConfig.oauth,
       );
-      if (!token) return undefined;
-      return { access_token: token, token_type: 'Bearer' };
+    } else {
+      // Avoid redundant storage reads in fallback path by reading credentials once
+      // and reusing that clientId with getValidToken.
+      const credentials = await this.tokenStorage.getCredentials(
+        this.serverName,
+      );
+      if (!credentials) {
+        this.cachedToken = undefined;
+        this.tokenExpiryTime = undefined;
+        return undefined;
+      }
+
+      token = await this.oauthProvider.getValidToken(this.serverName, {
+        clientId: credentials.clientId,
+      });
     }
 
-    const credentials = await this.tokenStorage.getCredentials(this.serverName);
-    if (!credentials) return undefined;
+    if (!token) {
+      this.cachedToken = undefined;
+      this.tokenExpiryTime = undefined;
+      return undefined;
+    }
 
-    const token = await this.oauthProvider.getValidToken(this.serverName, {
-      clientId: credentials.clientId,
-    });
-    if (!token) return undefined;
-    return { access_token: token, token_type: 'Bearer' };
+    this.cachedToken = { access_token: token, token_type: 'Bearer' };
+    this.tokenExpiryTime =
+      OAuthUtils.parseTokenExpiry(token) ?? Date.now() + 60 * 60 * 1000;
+
+    return this.cachedToken;
   }
 
   saveTokens(_tokens: OAuthTokens): void {}

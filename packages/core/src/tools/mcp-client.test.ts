@@ -1841,6 +1841,49 @@ describe('mcp-client', () => {
         const tokens = await testableTransport._authProvider!.tokens();
         expect(tokens?.access_token).toBe('stored-fresh-token');
       });
+      it('caches OAuth tokens in dynamic authProvider and avoids repeated lookups', async () => {
+        const mockGetValidToken = vi.fn().mockResolvedValue('cached-token');
+        const mockGetCredentials = vi
+          .fn()
+          .mockResolvedValue({ clientId: 'cid' });
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidToken: mockGetValidToken,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = transport as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const t1 = await testableTransport._authProvider!.tokens();
+        const t2 = await testableTransport._authProvider!.tokens();
+
+        expect(t1?.access_token).toBe('cached-token');
+        expect(t2?.access_token).toBe('cached-token');
+
+        // one call from createTransport fallback detection + one call in first tokens();
+        // second tokens() should come from in-memory cache
+        expect(mockGetCredentials).toHaveBeenCalledTimes(2);
+        expect(mockGetValidToken).toHaveBeenCalledTimes(1);
+      });
     });
 
     describe('should connect via url', () => {
