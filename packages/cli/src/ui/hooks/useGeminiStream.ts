@@ -1995,10 +1995,7 @@ export const useGeminiStream = (
         (toolCall) => toolCall.response.responseParts,
       );
 
-      let pendingSteeringAck: {
-        hintText: string;
-        ackTimestamp: number;
-      } | null = null;
+      let pendingSteeringAck: { hintText: string } | null = null;
       if (consumeUserHint) {
         const userHint = consumeUserHint();
         if (userHint && userHint.trim().length > 0) {
@@ -2006,7 +2003,7 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
-          pendingSteeringAck = { hintText, ackTimestamp: Date.now() };
+          pendingSteeringAck = { hintText };
         }
       }
 
@@ -2026,11 +2023,13 @@ export const useGeminiStream = (
       }
 
       if (pendingSteeringAck) {
-        const { hintText, ackTimestamp } = pendingSteeringAck;
+        const { hintText } = pendingSteeringAck;
         // Defer until after submitQuery below has installed the new
-        // turn's AbortController; the signal captured here belongs to
-        // the continuation turn, not the one that just finished.
+        // turn's AbortController and assigned its own message timestamp.
+        // Capturing ackTimestamp here (inside the microtask) ensures it
+        // sorts after the hint in the history view.
         queueMicrotask(() => {
+          const ackTimestamp = Date.now();
           const signal = abortControllerRef.current?.signal;
           void generateSteeringAckMessage(config.getBaseLlmClient(), hintText, {
             signal,
