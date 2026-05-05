@@ -248,6 +248,27 @@ export async function applyParsedSkillPatches(
   parsedPatches: StructuredPatch[],
   config: Config,
 ): Promise<ApplyParsedSkillPatchesResult> {
+  const allowedRoots = await getCanonicalAllowedSkillPatchRoots(config);
+  return applyParsedPatchesWithAllowedRoots(parsedPatches, allowedRoots);
+}
+
+/**
+ * Applies parsed unified diff patches against any caller-supplied set of
+ * allowed root directories. This is the kind-agnostic core used by both the
+ * skill patch flow and the memory patch flow.
+ *
+ * The patch headers must reference absolute paths inside one of the allowed
+ * roots (after canonical resolution). Update patches must reference an
+ * existing target; creation patches (`/dev/null` source) must reference a path
+ * that does not yet exist.
+ *
+ * Returns the per-target before/after content so callers can stage commits
+ * and roll back on failure.
+ */
+export async function applyParsedPatchesWithAllowedRoots(
+  parsedPatches: StructuredPatch[],
+  allowedRoots: string[],
+): Promise<ApplyParsedSkillPatchesResult> {
   const results = new Map<string, AppliedSkillPatchTarget>();
   const patchedContentByTarget = new Map<string, string>();
   const originalContentByTarget = new Map<string, string>();
@@ -260,9 +281,9 @@ export async function applyParsedSkillPatches(
   for (const [index, patch] of parsedPatches.entries()) {
     const { targetPath, isNewFile } = validatedHeaders.patches[index];
 
-    const resolvedTargetPath = await resolveAllowedSkillPatchTarget(
+    const resolvedTargetPath = await resolveTargetWithinAllowedRoots(
       targetPath,
-      config,
+      allowedRoots,
     );
     if (!resolvedTargetPath) {
       return {
@@ -336,4 +357,47 @@ export async function applyParsedSkillPatches(
     success: true,
     results: Array.from(results.values()),
   };
+}
+
+/**
+ * Canonicalizes a caller-supplied allowed root list once so callers can pass
+ * raw `Storage` paths without each call doing realpath traversal.
+ */
+export async function canonicalizeAllowedPatchRoots(
+  roots: string[],
+): Promise<string[]> {
+  const canonicalRoots = await Promise.all(
+    roots.map((root) => resolvePathWithExistingAncestors(root)),
+  );
+  return Array.from(
+    new Set(
+      canonicalRoots.filter((root): root is string => typeof root === 'string'),
+    ),
+  );
+}
+
+/**
+ * Returns the canonical target path if it falls inside (or exactly equals)
+ * one of the supplied allowed roots, otherwise `undefined`. Allowed roots may
+ * be either directories (subtree allowlist) or single file paths
+ * (single-file allowlist) — `isSubpath(file, file)` returns true for the
+ * same-path case.
+ *
+ * Exported so that `listInboxMemoryPatches` can pre-filter patches whose
+ * headers escape the kind's allowed root, instead of surfacing them in the
+ * UI just to fail at Apply time.
+ */
+export async function resolveTargetWithinAllowedRoots(
+  targetPath: string,
+  allowedRoots: string[],
+): Promise<string | undefined> {
+  const canonicalTargetPath =
+    await resolvePathWithExistingAncestors(targetPath);
+  if (!canonicalTargetPath) {
+    return undefined;
+  }
+  if (allowedRoots.some((root) => isSubpath(root, canonicalTargetPath))) {
+    return canonicalTargetPath;
+  }
+  return undefined;
 }

@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings } from './settings.js';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
@@ -87,8 +88,9 @@ describe('ExtensionManager Settings Scope', () => {
     );
   });
 
-  afterEach(() => {
-    // Clean up files if needed, or rely on temp dir cleanup
+  afterEach(async () => {
+    await cleanupTmpDir(currentTempHome);
+    await cleanupTmpDir(tempWorkspace);
     vi.clearAllMocks();
   });
 
