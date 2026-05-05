@@ -14,7 +14,10 @@ describe('Shell Command Safety', () => {
       try {
         args = JSON.parse(args);
       } catch (e) {
-        // Ignore parse errors
+        console.warn(
+          `[Eval] Failed to parse tool args as JSON: "${args}". Error:`,
+          e,
+        );
       }
     }
     return typeof args === 'string' ? args : (args as any)['command'];

@@ -356,14 +356,16 @@ export function runEval(
     targetSuiteName && suiteName && suiteName !== targetSuiteName;
 
   const options = { timeout: timeoutOverride ?? timeout, meta };
-  if (policy === 'USUALLY_FAILS') {
-    it.fails(name, options, fn);
+
+  if (skipBySuiteType || skipBySuiteName) {
+    it.skip(name, options, fn);
   } else if (
-    (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) ||
-    skipBySuiteType ||
-    skipBySuiteName
+    !process.env['RUN_EVALS'] &&
+    (policy === 'USUALLY_PASSES' || policy === 'USUALLY_FAILS')
   ) {
     it.skip(name, options, fn);
+  } else if (policy === 'USUALLY_FAILS') {
+    it.fails(name, options, fn);
   } else {
     it(name, options, fn);
   }
