@@ -7,7 +7,7 @@ on:
       ref:
         description: 'The branch, tag, or SHA to build from.'
         required: true
-        type: string
+        type: 'string'
 
 permissions:
   contents: 'read'
