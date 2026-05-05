@@ -63,14 +63,9 @@ export async function getRipgrepPath(): Promise<string | null> {
 
   // Fallback: Check if ripgrep (rg) is available in the system PATH
   try {
-    const checkCmd = platform === 'win32' ? 'where' : 'which';
-    const { stdout } = await spawnAsync(checkCmd, ['rg']);
-    if (stdout) {
-      const systemPath = stdout.trim().split('\n')[0].trim();
-      if (await fileExists(systemPath)) {
-        return systemPath;
-      }
-    }
+    // Rely on spawnAsync's built-in error handling instead of manual which/where check
+    await spawnAsync('rg', ['--version']);
+    return 'rg';
   } catch {
     // Ripgrep not found in system PATH
   }

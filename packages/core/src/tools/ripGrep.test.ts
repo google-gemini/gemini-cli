@@ -699,7 +699,19 @@ describe('RipGrepTool', () => {
     });
 
     it('should throw an error if ripgrep is not available', async () => {
+      // Simulate that bundled binaries do not exist
       vi.mocked(fileExists).mockResolvedValue(false);
+
+      // Simulate that executing 'rg --version' fails synchronously
+      mockSpawn.mockImplementationOnce(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cp = new EventEmitter() as any;
+        cp.stdout = new Readable({ read() {} });
+        cp.stderr = new Readable({ read() {} });
+        // Emit the error immediately
+        process.nextTick(() => cp.emit('error', new Error('spawn rg ENOENT')));
+        return cp as ChildProcess;
+      });
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
@@ -707,7 +719,6 @@ describe('RipGrepTool', () => {
       const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Cannot find bundled ripgrep binary');
 
-      // restore the mock for subsequent tests
       vi.mocked(fileExists).mockResolvedValue(true);
     });
   });
