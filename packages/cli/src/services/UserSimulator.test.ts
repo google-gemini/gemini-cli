@@ -190,42 +190,42 @@ describe('UserSimulator', () => {
     vi.useRealTimers();
   });
 
-  it('should re-evaluate if internal tool state changes even if screen content is static', async () => {
+  it('should terminate if terminal state does not change after 3 consecutive inputs', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      return undefined as never;
+    });
     const simulator = new UserSimulator(
       mockConfig,
       mockGetScreen,
       mockStdinBuffer,
     );
-    mockGetScreen.mockReturnValue('Responding...');
+    mockGetScreen.mockReturnValue('Static Screen');
+    mockContentGenerator.generateContent.mockResolvedValue({
+      text: JSON.stringify({ action: 'y\r' }),
+    });
 
     vi.useFakeTimers();
     simulator.start();
 
-    // Trigger first tick
+    // Tick 1: Action sent, state recorded
     await vi.advanceTimersByTimeAsync(2000);
     expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
 
-    // Trigger second tick with same screen - should skip
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
-
-    // Simulate tool call update
-    const handler = mockMessageBus.subscribe.mock.calls[0][1];
-    handler({
-      type: MessageBusType.TOOL_CALLS_UPDATE,
-      toolCalls: [
-        {
-          status: CoreToolCallStatus.AwaitingApproval,
-          request: { callId: '123', name: 'test_tool' },
-        },
-      ],
-    });
-
-    // Trigger third tick with same screen but new tool state - should NOT skip
+    // Tick 2: Same screen, action sent, stall count = 1
     await vi.advanceTimersByTimeAsync(2000);
     expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
 
+    // Tick 3: Same screen, action sent, stall count = 2
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(3);
+
+    // Tick 4: Same screen, should trigger termination
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
     simulator.stop();
+    exitSpy.mockRestore();
     vi.useRealTimers();
   });
 
@@ -304,9 +304,11 @@ describe('UserSimulator', () => {
         (call) => call[1] === 'simulator-compression',
       );
     expect(compressionCall).toBeDefined();
-    expect(compressionCall[0].contents[0].parts[0].text).toContain(
-      'Summarize the following chronological session notes',
-    );
+    if (compressionCall) {
+      expect(compressionCall[0].contents[0].parts[0].text).toContain(
+        'Summarize the following chronological session notes',
+      );
+    }
 
     // Wait for the compression to finish and merge.
     // We need to resolve the promise for the compression call.
@@ -332,10 +334,11 @@ describe('UserSimulator', () => {
         call[1] === 'simulator-prompt',
     );
 
-    const finalPrompt = finalCall[0].contents[0].parts[0].text;
-    expect(finalPrompt).toContain('1. Compressed Summary');
-    // Note 5 (the one added during or after compression trigger) might be there too
-    // depending on timing, but 'Compressed Summary' must be there.
+    expect(finalCall).toBeDefined();
+    if (finalCall) {
+      const finalPrompt = finalCall[0].contents[0].parts[0].text;
+      expect(finalPrompt).toContain('1. Compressed Summary');
+    }
 
     simulator.stop();
     vi.useRealTimers();

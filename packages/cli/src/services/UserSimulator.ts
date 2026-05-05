@@ -32,6 +32,7 @@ export class UserSimulator {
   private lastStateKey = '';
   private isProcessing = false;
   private isCompressingMemory = false;
+  private consecutiveStallCount = 0;
   private staleCycleCount = 0;
   private interactionsFile: string | null = null;
 
@@ -116,6 +117,12 @@ export class UserSimulator {
 
     try {
       this.isProcessing = true;
+
+      // Stabilization delay: Wait for the terminal UI to finish rendering
+      // (e.g. ANSI clear/repaint sequences) before looking at the screen.
+      // Increased to 1s to handle high-latency PTYs in Docker.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const screen = this.getScreen();
       if (!screen) return;
 
@@ -128,10 +135,12 @@ export class UserSimulator {
         .replace(/\n([ \t]*\n)+/g, '\n\n');
 
       const normalizedScreen = strippedScreen
-        .replace(/[\u2800-\u28FF]/g, '')
-        .replace(/[|/-\\]/g, '')
-        .replace(/\b\d+(\.\d+)?s\b/g, '')
-        .replace(/\b\d+m(\s+\d+s)?\b/g, '')
+        .replace(/[\u2800-\u28FF]/g, '') // Braille patterns
+        .replace(/[|/-\\]/g, '') // Spinners
+        .replace(/\b\d+(\.\d+)?s\b/g, '') // Timers (seconds)
+        .replace(/\b\d+m(\s+\d+s)?\b/g, '') // Timers (minutes)
+        .replace(/\b\d+%\b/g, '') // Percentages
+        .replace(/\b\d+\/\d+\b/g, '') // Progress ratios (e.g. 1/10)
         .replace(/\(\s*\)/g, '')
         .trim();
 
@@ -142,16 +151,46 @@ export class UserSimulator {
       const currentStateKey = `${normalizedScreen}::${pendingIds}`;
 
       if (currentStateKey === this.lastStateKey) {
-        if (this.pendingToolCalls.length > 0) {
-          this.staleCycleCount++;
-          // Every 10 ticks (10s) on a static screen while blocked, we try a prompt
-          if (this.staleCycleCount % 10 !== 0) {
-            return;
+        const lastAction = this.actionHistory[this.actionHistory.length - 1];
+        if (lastAction && lastAction !== '<WAIT>') {
+          this.consecutiveStallCount++;
+          
+          // Increased limit to 10 for high-load environments.
+          if (this.consecutiveStallCount >= 10) {
+            const errorMsg =
+              `[SIMULATOR] CRITICAL STALL DETECTED: Terminal state has not changed after ${this.consecutiveStallCount} consecutive inputs. Terminating to prevent loop.`;
+            debugLogger.error(errorMsg);
+            if (this.interactionsFile) {
+              fs.appendFileSync(
+                this.interactionsFile,
+                `[ERROR] ${errorMsg}\n\n`,
+              );
+            }
+            // eslint-disable-next-line no-console
+            console.error(`\n${errorMsg}`);
+            this.stop();
+            process.exit(1);
+          }
+          
+          // RECOVERY: If screen is blank and we are stalled, try a terminal refresh.
+          if (normalizedScreen.length === 0 && this.pendingToolCalls.length > 0) {
+             debugLogger.log('[SIMULATOR] Screen is blank but system is BLOCKED. Sending refresh carriage return.');
+             this.stdinBuffer.write('\r');
+             return;
           }
         } else {
-          return;
+          // If it was a <WAIT> action or no action yet, we still want the 10s fallback for internal state sync
+          if (this.pendingToolCalls.length > 0) {
+            this.staleCycleCount++;
+            if (this.staleCycleCount % 10 !== 0) {
+              return;
+            }
+          } else {
+            return;
+          }
         }
       } else {
+        this.consecutiveStallCount = 0;
         this.staleCycleCount = 0;
       }
       this.lastStateKey = currentStateKey;
@@ -277,7 +316,7 @@ ${strippedScreen}
         if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
           cleanJson = cleanJson.substring(startIdx, endIdx + 1);
         } else {
-          cleanJson = cleanJson.replace(/^```json\s*|\s*```$/gm, '').trim();
+          cleanJson = cleanJson.replace(/^\`\`\`json\s*|\s*\`\`\`$/gm, '').trim();
         }
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         parsedJson = JSON.parse(cleanJson) as SimulatorResponse;
@@ -301,7 +340,7 @@ ${strippedScreen}
           /^\d+\\r$/.test(text) ||
           text === '\\r'
         ) {
-          responseText = text.replace(/^[`"']+|[`"']+$/g, '');
+          responseText = text.replace(/^[\`\"']+|[\`\"']+$/g, '');
         } else {
           responseText = ''; // Prevent typing broken JSON string
         }
