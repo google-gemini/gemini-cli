@@ -96,7 +96,7 @@ export class Task {
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
-  private pendingOutcomes: Map<string, string | undefined> = new Map(); // toolCallId --> outcome
+  private pendingOutcomes: Map<string, ToolConfirmationOutcome | undefined> = new Map(); // toolCallId --> outcome
   private toolsAlreadyConfirmed: Set<string> = new Set();
   private toolCompletionPromise?: Promise<void>;
   private toolCompletionNotifier?: {
