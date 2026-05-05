@@ -16,6 +16,7 @@ import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
+import { ExportSessionMessage } from './messages/ExportSessionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
@@ -203,6 +204,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'compression' && (
         <CompressionMessage compression={itemForDisplay.compression} />
+      )}
+      {itemForDisplay.type === 'export_session' && (
+        <ExportSessionMessage exportSession={itemForDisplay.exportSession} />
       )}
       {itemForDisplay.type === 'extensions_list' && (
         <ExtensionsList extensions={itemForDisplay.extensions} />

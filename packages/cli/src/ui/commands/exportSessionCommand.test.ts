@@ -40,6 +40,8 @@ describe('exportSessionCommand', () => {
       },
       ui: {
         addItem: vi.fn(),
+        setPendingItem: vi.fn(),
+        pendingItem: null,
       },
     } as unknown as CommandContext;
   });
@@ -87,17 +89,28 @@ describe('exportSessionCommand', () => {
 
     expect(result).toBeUndefined();
     expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringContaining('export.json'),
+      '/path/to/export.json',
       JSON.stringify(mockSessionData, null, 2),
       'utf-8',
     );
+    expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'export_session',
+        exportSession: { isPending: true },
+      }),
+    );
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('Successfully exported session to'),
+        type: 'export_session',
+        exportSession: {
+          isPending: false,
+          targetPath: expect.stringContaining('export.json'),
+        },
       }),
       expect.any(Number),
     );
-  });
+    expect(mockContext.ui.setPendingItem).toHaveBeenLastCalledWith(null);
+    });
 
   it('should return error if resolveSession fails', async () => {
     vi.mocked(SessionSelector.prototype.resolveSession).mockRejectedValue(

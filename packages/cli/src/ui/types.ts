@@ -148,6 +148,11 @@ export interface CompressionProps {
   compressionStatus: CompressionStatus | null;
 }
 
+export interface ExportSessionProps {
+  isPending: boolean;
+  targetPath?: string;
+}
+
 /**
  * For use when you want no icon.
  */
@@ -268,6 +273,11 @@ export type HistoryItemUserShell = HistoryItemBase & {
 export type HistoryItemCompression = HistoryItemBase & {
   type: 'compression';
   compression: CompressionProps;
+};
+
+export type HistoryItemExportSession = HistoryItemBase & {
+  type: 'export_session';
+  exportSession: ExportSessionProps;
 };
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
@@ -412,6 +422,7 @@ export type HistoryItemWithoutId =
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
+  | HistoryItemExportSession
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
@@ -439,6 +450,7 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXPORT_SESSION = 'export_session',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',

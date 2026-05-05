@@ -12,7 +12,7 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemExportSession } from '../types.js';
 import { SessionSelector } from '../../utils/sessionUtils.js';
 
 export const exportSessionCommand: SlashCommand = {
@@ -23,6 +23,7 @@ export const exportSessionCommand: SlashCommand = {
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn | void> => {
+    const { ui } = context;
     const args = context.invocation?.args.trim();
     if (!args) {
       return {
@@ -41,30 +42,42 @@ export const exportSessionCommand: SlashCommand = {
       };
     }
 
+    if (ui.pendingItem) {
+      ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: 'Operation already in progress, please wait.',
+        },
+        Date.now(),
+      );
+      return;
+    }
+
+    const pendingMessage: HistoryItemExportSession = {
+      type: MessageType.EXPORT_SESSION,
+      exportSession: {
+        isPending: true,
+      },
+    };
+
     try {
+      ui.setPendingItem(pendingMessage);
       const storage = context.services.agentContext!.config.storage;
       const sessionSelector = new SessionSelector(storage);
       const { sessionData } = await sessionSelector.resolveSession(sessionId);
 
       const targetPath = path.resolve(process.cwd(), args);
       
-      // Ensure we don't accidentally overwrite without some check, or just write it.
-      // The design says to write directly, but we can do a simple access check.
-      try {
-        await fs.access(targetPath);
-        // If it exists, let's just proceed as users can overwrite, or we can prompt.
-        // For simplicity and matching typical CLI tools, we just write.
-      } catch {
-        // File doesn't exist, which is fine
-      }
-
       await fs.writeFile(targetPath, JSON.stringify(sessionData, null, 2), 'utf-8');
 
-      context.ui.addItem(
+      ui.addItem(
         {
-          type: MessageType.INFO,
-          text: `Successfully exported session to ${targetPath}`,
-        },
+          type: MessageType.EXPORT_SESSION,
+          exportSession: {
+            isPending: false,
+            targetPath,
+          },
+        } as HistoryItemExportSession,
         Date.now(),
       );
     } catch (error) {
@@ -73,6 +86,8 @@ export const exportSessionCommand: SlashCommand = {
         messageType: 'error',
         content: `Failed to export session: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
+    } finally {
+      ui.setPendingItem(null);
     }
   },
 };
