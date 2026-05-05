@@ -39,7 +39,6 @@ describe('createContentGenerator', () => {
   beforeEach(() => {
     resetVersionCache();
     vi.clearAllMocks();
-    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
   });
 
   afterEach(() => {
@@ -851,6 +850,19 @@ describe('createContentGenerator', () => {
       ),
     ).rejects.toThrow('Invalid custom base URL: not-a-url');
   });
+
+  it('should reject non-https remote custom baseUrl values', async () => {
+    await expect(
+      createContentGenerator(
+        {
+          apiKey: 'test-api-key',
+          authType: AuthType.USE_GEMINI,
+          baseUrl: 'http://example.com',
+        },
+        mockConfig,
+      ),
+    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
+  });
 });
 
 describe('createContentGeneratorConfig', () => {
@@ -944,6 +956,22 @@ describe('createContentGeneratorConfig', () => {
     expect(config.apiKey).toBeUndefined();
   });
 
+  it('should prefer vertexLocation from config over GOOGLE_CLOUD_LOCATION env var', async () => {
+    vi.stubEnv('GOOGLE_API_KEY', undefined);
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-project');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+    const configWithVertexLocation = {
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getVertexLocation: () => 'global',
+    } as unknown as Config;
+    const config = await createContentGeneratorConfig(
+      configWithVertexLocation,
+      AuthType.USE_VERTEX_AI,
+    );
+    expect(config.vertexai).toBe(true);
+    expect(config.googleCloudLocation).toBe('global');
+    expect(config.googleCloudProject).toBe('my-project');
+  });
   it('should not configure for Vertex AI if required env vars are empty', async () => {
     vi.stubEnv('GOOGLE_API_KEY', '');
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
