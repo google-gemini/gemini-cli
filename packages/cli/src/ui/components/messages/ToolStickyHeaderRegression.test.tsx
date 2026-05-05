@@ -130,7 +130,7 @@ describe('ToolMessage Sticky Header Regression', () => {
 
     // Scroll further so tool-1 is completely gone and tool-2's header should be stuck
     await act(async () => {
-      listRef?.scrollBy(17);
+      listRef?.scrollBy(10);
     });
     await waitUntilReady();
 
