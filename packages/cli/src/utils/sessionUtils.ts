@@ -8,11 +8,14 @@ import {
   checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  SESSION_META_SUFFIX,
   CoreToolCallStatus,
   type Storage,
   type ConversationRecord,
   type MessageRecord,
   loadConversationRecord,
+  readSessionMetadataSidecar,
+  writeSessionMetadataSidecar,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -254,6 +257,7 @@ export const getAllSessionFiles = async (
       .filter(
         (f) =>
           f.startsWith(SESSION_FILE_PREFIX) &&
+          !f.endsWith(SESSION_META_SUFFIX) &&
           (f.endsWith('.json') || f.endsWith('.jsonl')),
       )
       .sort(); // Sort by filename, which includes timestamp
@@ -262,77 +266,13 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
-          const content = await loadConversationRecord(filePath, {
-            metadataOnly: !options.includeFullContent,
-          });
-          if (!content) {
-            return { fileName: file, sessionInfo: null };
-          }
-
-          // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
-            // Missing required fields - treat as corrupted
-            return { fileName: file, sessionInfo: null };
-          }
-
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
-            return { fileName: file, sessionInfo: null };
-          }
-
-          // Skip subagent sessions - these are implementation details of a tool call
-          // and shouldn't be surfaced for resumption in the main agent history.
-          if (content.kind === 'subagent') {
-            return { fileName: file, sessionInfo: null };
-          }
-
-          const firstUserMessage = content.firstUserMessage
-            ? cleanMessage(content.firstUserMessage)
-            : extractFirstUserMessage(content.messages);
-          const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
-            : false;
-
-          let fullContent: string | undefined;
-          let messages:
-            | Array<{ role: 'user' | 'assistant'; content: string }>
-            | undefined;
-
-          if (options.includeFullContent) {
-            fullContent = content.messages
-              .map((msg) => partListUnionToString(msg.content))
-              .join(' ');
-            messages = content.messages.map((msg) => ({
-              role:
-                msg.type === 'user'
-                  ? ('user' as const)
-                  : ('assistant' as const),
-              content: partListUnionToString(msg.content),
-            }));
-          }
-
-          const sessionInfo: SessionInfo = {
-            id: content.sessionId,
-            file: file.replace(/\.jsonl?$/, ''),
-            fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
-            messageCount: content.messageCount ?? content.messages.length,
-            displayName: content.summary
-              ? stripUnsafeCharacters(content.summary)
-              : firstUserMessage,
-            firstUserMessage,
-            isCurrentSession,
-            index: 0, // Will be set after sorting valid sessions
-            summary: content.summary,
-            fullContent,
-            messages,
-          };
-
+          const sessionInfo = await buildSessionInfoForFile(
+            chatsDir,
+            file,
+            filePath,
+            currentSessionId,
+            options,
+          );
           return { fileName: file, sessionInfo };
         } catch {
           // File is corrupted (can't read or parse JSON)
@@ -350,6 +290,109 @@ export const getAllSessionFiles = async (
     // For other errors (e.g., permissions), re-throw to be handled by the caller.
     throw error;
   }
+};
+
+const buildSessionInfoForFile = async (
+  _chatsDir: string,
+  file: string,
+  filePath: string,
+  currentSessionId: string | undefined,
+  options: GetSessionOptions,
+): Promise<SessionInfo | null> => {
+  const isCurrentSession = currentSessionId
+    ? file.includes(currentSessionId.slice(0, 8))
+    : false;
+
+  // Fast path: a sidecar carries the listing-required fields without needing
+  // to stream and parse the entire JSONL chat file.
+  if (!options.includeFullContent) {
+    const sidecar = await readSessionMetadataSidecar(filePath);
+    if (sidecar) {
+      if (sidecar.kind === 'subagent') return null;
+      if (!sidecar.hasUserOrAssistantMessage) return null;
+      const firstUserMessage = sidecar.firstUserMessage
+        ? cleanMessage(sidecar.firstUserMessage)
+        : '';
+      return {
+        id: sidecar.sessionId,
+        file: file.replace(/\.jsonl?$/, ''),
+        fileName: file,
+        startTime: sidecar.startTime,
+        lastUpdated: sidecar.lastUpdated,
+        messageCount: sidecar.messageCount,
+        displayName: sidecar.summary
+          ? stripUnsafeCharacters(sidecar.summary)
+          : firstUserMessage,
+        firstUserMessage,
+        isCurrentSession,
+        index: 0, // Will be set after sorting valid sessions
+        summary: sidecar.summary,
+      };
+    }
+  }
+
+  // Fall back to streaming the chat file. Sidecar may be missing (legacy
+  // sessions), corrupt, version-mismatched, or the caller asked for full
+  // content (search mode).
+  const content = await loadConversationRecord(filePath, {
+    metadataOnly: !options.includeFullContent,
+  });
+  if (!content) return null;
+
+  // Validate required fields
+  if (!content.sessionId || !content.startTime || !content.lastUpdated) {
+    return null;
+  }
+
+  // Skip sessions that only contain system messages (info, error, warning)
+  if (!content.hasUserOrAssistantMessage) return null;
+
+  // Skip subagent sessions — these are implementation details of a tool call
+  // and shouldn't be surfaced for resumption in the main agent history.
+  if (content.kind === 'subagent') return null;
+
+  // Lazy migration: backfill the sidecar so future listings hit the fast
+  // path. Best-effort; failures are logged inside the helper.
+  if (!options.includeFullContent) {
+    writeSessionMetadataSidecar(filePath, content);
+  }
+
+  const firstUserMessage = content.firstUserMessage
+    ? cleanMessage(content.firstUserMessage)
+    : extractFirstUserMessage(content.messages);
+
+  let fullContent: string | undefined;
+  let messages:
+    | Array<{ role: 'user' | 'assistant'; content: string }>
+    | undefined;
+
+  if (options.includeFullContent) {
+    fullContent = content.messages
+      .map((msg) => partListUnionToString(msg.content))
+      .join(' ');
+    messages = content.messages.map((msg) => ({
+      role: msg.type === 'user' ? ('user' as const) : ('assistant' as const),
+      content: partListUnionToString(msg.content),
+    }));
+  }
+
+  return {
+    id: content.sessionId,
+    file: file.replace(/\.jsonl?$/, ''),
+    fileName: file,
+    startTime: content.startTime,
+    lastUpdated: content.lastUpdated,
+    messageCount: content.messageCount ?? content.messages.length,
+    displayName: content.summary
+      ? stripUnsafeCharacters(content.summary)
+      : firstUserMessage,
+    firstUserMessage,
+    isCurrentSession,
+    index: 0, // Will be set after sorting valid sessions
+    summary: content.summary,
+    fullContent,
+    messages,
+  };
 };
 
 /**

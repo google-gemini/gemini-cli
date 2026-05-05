@@ -116,12 +116,15 @@ export async function loadConversationRecord(
     })
   | null
 > {
-  if (!fs.existsSync(filePath)) {
-    return null;
+  let fileStream: fs.ReadStream;
+  try {
+    fileStream = fs.createReadStream(filePath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') return null;
+    throw error;
   }
 
   try {
-    const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,
@@ -295,10 +298,182 @@ export async function loadConversationRecord(
           : hasUserOrAssistant,
     };
   } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') return null;
     debugLogger.error('Error loading conversation record from JSONL:', error);
     return null;
   }
 }
+
+/**
+ * Suffix for the per-session metadata sidecar file. The sidecar lives next to
+ * the JSONL chat file and contains only the fields needed to render the
+ * session list, so listings can avoid streaming and parsing the full chat.
+ */
+export const SESSION_META_SUFFIX = '.meta.json';
+
+const SESSION_META_VERSION = 1;
+
+interface SessionMetadataSidecar {
+  version: typeof SESSION_META_VERSION;
+  sessionId: string;
+  projectHash: string;
+  startTime: string;
+  lastUpdated: string;
+  kind?: 'main' | 'subagent';
+  summary?: string;
+  directories?: string[];
+  messageCount: number;
+  userMessageCount: number;
+  hasUserOrAssistantMessage: boolean;
+  firstUserMessage?: string;
+}
+
+export function getSessionMetadataSidecarPath(jsonlPath: string): string {
+  return jsonlPath.replace(/\.jsonl?$/, '') + SESSION_META_SUFFIX;
+}
+
+function extractFirstUserMessageText(
+  messages: MessageRecord[],
+): string | undefined {
+  for (const msg of messages) {
+    if (msg.type !== 'user') continue;
+    const c = msg.content;
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) {
+      return c.map((p) => (isTextPart(p) ? p.text : '')).join('');
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
+type ConversationRecordWithCounts = ConversationRecord & {
+  messageCount?: number;
+  userMessageCount?: number;
+  firstUserMessage?: string;
+  hasUserOrAssistantMessage?: boolean;
+};
+
+function buildSidecarFromConversation(
+  record: ConversationRecordWithCounts,
+): SessionMetadataSidecar {
+  // Prefer precomputed counts when present (e.g. when the record came from
+  // loadConversationRecord with metadataOnly:true, which strips `messages`
+  // but populates the count fields).
+  let messageCount = record.messageCount ?? record.messages.length;
+  let userCount = record.userMessageCount;
+  let hasUserOrAssistant = record.hasUserOrAssistantMessage;
+  if (
+    userCount === undefined ||
+    hasUserOrAssistant === undefined ||
+    record.messages.length > 0
+  ) {
+    let computedUser = 0;
+    let computedHasUserOrAssistant = false;
+    for (const msg of record.messages) {
+      if (msg.type === 'user') computedUser++;
+      if (msg.type === 'user' || msg.type === 'gemini') {
+        computedHasUserOrAssistant = true;
+      }
+    }
+    if (record.messages.length > 0) {
+      userCount = computedUser;
+      hasUserOrAssistant = computedHasUserOrAssistant;
+      messageCount = record.messages.length;
+    } else {
+      userCount = userCount ?? computedUser;
+      hasUserOrAssistant = hasUserOrAssistant ?? computedHasUserOrAssistant;
+    }
+  }
+  const firstUserMessage =
+    record.firstUserMessage ?? extractFirstUserMessageText(record.messages);
+  return {
+    version: SESSION_META_VERSION,
+    sessionId: record.sessionId,
+    projectHash: record.projectHash,
+    startTime: record.startTime,
+    lastUpdated: record.lastUpdated,
+    kind: record.kind,
+    summary: record.summary,
+    directories: record.directories ? [...record.directories] : undefined,
+    messageCount,
+    userMessageCount: userCount ?? 0,
+    hasUserOrAssistantMessage: hasUserOrAssistant ?? false,
+    firstUserMessage,
+  };
+}
+
+/**
+ * Atomically writes the sidecar metadata file for the session at `jsonlPath`.
+ * Sidecars are derivable from the chat file, so write failures are swallowed
+ * (ENOSPC) or logged but never thrown — listings fall back to parsing the
+ * chat file when the sidecar is missing.
+ */
+export function writeSessionMetadataSidecar(
+  jsonlPath: string,
+  conversation: ConversationRecordWithCounts,
+): void {
+  const sidecar = buildSidecarFromConversation(conversation);
+  const finalPath = getSessionMetadataSidecarPath(jsonlPath);
+  const tmpPath = finalPath + '.tmp';
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(sidecar));
+    fs.renameSync(tmpPath, finalPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOSPC') return;
+    debugLogger.error('Error writing session metadata sidecar:', error);
+  }
+}
+
+/**
+ * Reads the metadata sidecar for the JSONL chat file. Returns null if the
+ * sidecar is missing, malformed, or has an unknown version. Callers must
+ * fall back to parsing the JSONL chat file in that case.
+ */
+function isNumberProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: number } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'number';
+}
+
+function isBooleanProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: boolean } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'boolean';
+}
+
+function isSessionMetadataSidecar(
+  value: unknown,
+): value is SessionMetadataSidecar {
+  return (
+    hasProperty(value, 'version') &&
+    value.version === SESSION_META_VERSION &&
+    isStringProperty(value, 'sessionId') &&
+    isStringProperty(value, 'projectHash') &&
+    isStringProperty(value, 'startTime') &&
+    isStringProperty(value, 'lastUpdated') &&
+    isNumberProperty(value, 'messageCount') &&
+    isNumberProperty(value, 'userMessageCount') &&
+    isBooleanProperty(value, 'hasUserOrAssistantMessage')
+  );
+}
+
+export async function readSessionMetadataSidecar(
+  jsonlPath: string,
+): Promise<SessionMetadataSidecar | null> {
+  const sidecarPath = getSessionMetadataSidecarPath(jsonlPath);
+  try {
+    const content = await fs.promises.readFile(sidecarPath, 'utf8');
+    const parsed: unknown = JSON.parse(content);
+    return isSessionMetadataSidecar(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export type { SessionMetadataSidecar };
 
 export class ChatRecordingService {
   private conversationFile: string | null = null;
@@ -362,6 +537,7 @@ export class ChatRecordingService {
 
           // Update the session ID in the existing file
           this.updateMetadata({ sessionId: this.sessionId });
+          this.writeSidecar();
         } else {
           throw new Error('Failed to load resumed session data from file');
         }
@@ -433,6 +609,7 @@ export class ChatRecordingService {
           ...initialMetadata,
           messages: [],
         };
+        this.writeSidecar();
       }
 
       this.queuedThoughts = [];
@@ -464,10 +641,16 @@ export class ChatRecordingService {
     }
   }
 
+  private writeSidecar(): void {
+    if (!this.conversationFile || !this.cachedConversation) return;
+    writeSessionMetadataSidecar(this.conversationFile, this.cachedConversation);
+  }
+
   private updateMetadata(updates: Partial<ConversationRecord>): void {
     if (!this.cachedConversation) return;
     Object.assign(this.cachedConversation, updates);
     this.appendRecord({ $set: updates });
+    this.writeSidecar();
   }
 
   private pushMessage(msg: MessageRecord): void {
@@ -485,6 +668,7 @@ export class ChatRecordingService {
     } else {
       this.cachedConversation.messages.push(msg);
     }
+    this.writeSidecar();
   }
 
   private getLastMessage(
@@ -814,6 +998,18 @@ export class ChatRecordingService {
           debugLogger.error(`Error unlinking session file ${file}:`, error);
         }
       }
+
+      // Best-effort removal of the metadata sidecar.
+      try {
+        await fs.promises.unlink(getSessionMetadataSidecarPath(filePath));
+      } catch (error) {
+        if (isNodeError(error) && error.code !== 'ENOENT') {
+          debugLogger.error(
+            `Error unlinking session metadata sidecar for ${file}:`,
+            error,
+          );
+        }
+      }
     }
   }
 
@@ -834,6 +1030,13 @@ export class ChatRecordingService {
       await fs.promises.unlink(this.conversationFile).catch(() => {
         // File may not exist; ignore.
       });
+
+      // Best-effort removal of the metadata sidecar.
+      await fs.promises
+        .unlink(getSessionMetadataSidecarPath(this.conversationFile))
+        .catch(() => {
+          // File may not exist; ignore.
+        });
 
       // Delegate tool-output and log cleanup to the shared utility.
       await deleteSessionArtifactsAsync(this.sessionId, tempDir);
@@ -866,6 +1069,7 @@ export class ChatRecordingService {
       messageIndex,
     );
     this.appendRecord({ $rewindTo: messageId });
+    this.writeSidecar();
     return this.cachedConversation;
   }
 

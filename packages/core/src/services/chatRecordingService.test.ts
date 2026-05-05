@@ -41,6 +41,9 @@ vi.mock('node:fs', async (importOriginal) => {
 import {
   ChatRecordingService,
   loadConversationRecord,
+  getSessionMetadataSidecarPath,
+  readSessionMetadataSidecar,
+  writeSessionMetadataSidecar,
   type ConversationRecord,
   type ToolCallRecord,
   type MessageRecord,
@@ -1313,6 +1316,122 @@ describe('ChatRecordingService', () => {
       expect(lastMkdir).toBeLessThan(lastWrite);
 
       mkdirSyncSpy.mockRestore();
+    });
+  });
+
+  describe('metadata sidecar', () => {
+    it('writes a sidecar on initialize for a brand new session', async () => {
+      await chatRecordingService.initialize();
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const sidecarPath = getSessionMetadataSidecarPath(sessionFile);
+
+      expect(fs.existsSync(sidecarPath)).toBe(true);
+      const sidecar = await readSessionMetadataSidecar(sessionFile);
+      expect(sidecar).not.toBeNull();
+      expect(sidecar!.sessionId).toBe('test-session-id');
+      expect(sidecar!.messageCount).toBe(0);
+      expect(sidecar!.hasUserOrAssistantMessage).toBe(false);
+    });
+
+    it('rewrites the sidecar when a message is appended', async () => {
+      await chatRecordingService.initialize();
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'first user message',
+        model: 'm',
+      });
+
+      const sidecar = await readSessionMetadataSidecar(sessionFile);
+      expect(sidecar).not.toBeNull();
+      expect(sidecar!.messageCount).toBe(1);
+      expect(sidecar!.userMessageCount).toBe(1);
+      expect(sidecar!.hasUserOrAssistantMessage).toBe(true);
+      expect(sidecar!.firstUserMessage).toBe('first user message');
+    });
+
+    it('rewrites the sidecar when summary metadata changes', async () => {
+      await chatRecordingService.initialize();
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+
+      chatRecordingService.saveSummary('a short summary');
+
+      const sidecar = await readSessionMetadataSidecar(sessionFile);
+      expect(sidecar).not.toBeNull();
+      expect(sidecar!.summary).toBe('a short summary');
+    });
+
+    it('removes the sidecar alongside the chat file on deleteSession', async () => {
+      const shortId = 'sdcr1234';
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({
+          sessionId: 'sdcr-session',
+          projectHash: 'p',
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        }) + '\n',
+      );
+      writeSessionMetadataSidecar(sessionFile, {
+        sessionId: 'sdcr-session',
+        projectHash: 'p',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        messages: [],
+      });
+
+      const sidecarPath = getSessionMetadataSidecarPath(sessionFile);
+      expect(fs.existsSync(sidecarPath)).toBe(true);
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(sidecarPath)).toBe(false);
+    });
+
+    it('removes the sidecar on deleteCurrentSessionAsync', async () => {
+      await chatRecordingService.initialize();
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const sidecarPath = getSessionMetadataSidecarPath(sessionFile);
+      expect(fs.existsSync(sidecarPath)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionAsync();
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(sidecarPath)).toBe(false);
+    });
+
+    it('readSessionMetadataSidecar returns null for missing or malformed files', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-missing.jsonl');
+
+      expect(await readSessionMetadataSidecar(sessionFile)).toBeNull();
+
+      // Malformed
+      const badPath = getSessionMetadataSidecarPath(sessionFile);
+      fs.writeFileSync(badPath, 'not json');
+      expect(await readSessionMetadataSidecar(sessionFile)).toBeNull();
+
+      // Wrong version
+      fs.writeFileSync(badPath, JSON.stringify({ version: 99 }));
+      expect(await readSessionMetadataSidecar(sessionFile)).toBeNull();
+    });
+  });
+
+  describe('loadConversationRecord missing file', () => {
+    it('returns null without throwing when the file does not exist', async () => {
+      const missing = path.join(testTempDir, 'nope.jsonl');
+      const result = await loadConversationRecord(missing);
+      expect(result).toBeNull();
     });
   });
 });

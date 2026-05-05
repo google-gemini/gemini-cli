@@ -616,6 +616,204 @@ describe('SessionSelector', () => {
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(mainSessionId);
   });
+
+  describe('metadata sidecar fast path', () => {
+    it('listSessions uses the sidecar even when the chat file is unreadable', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const fileBase = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}`;
+      const jsonlPath = path.join(chatsDir, `${fileBase}.jsonl`);
+      const sidecarPath = path.join(chatsDir, `${fileBase}.meta.json`);
+
+      // Empty/unreadable chat content; sidecar is the source of truth here.
+      await fs.writeFile(jsonlPath, '');
+      await fs.writeFile(
+        sidecarPath,
+        JSON.stringify({
+          version: 1,
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:30:00.000Z',
+          kind: 'main',
+          summary: 'sidecar-summary',
+          messageCount: 3,
+          userMessageCount: 2,
+          hasUserOrAssistantMessage: true,
+          firstUserMessage: 'sidecar first user msg',
+        }),
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const sessions = await sessionSelector.listSessions();
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].id).toBe(sessionId);
+      expect(sessions[0].summary).toBe('sidecar-summary');
+      expect(sessions[0].messageCount).toBe(3);
+      expect(sessions[0].firstUserMessage).toBe('sidecar first user msg');
+    });
+
+    it('falls back to chat-file parsing and backfills the sidecar when missing', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const fileBase = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}`;
+      const jsonlPath = path.join(chatsDir, `${fileBase}.jsonl`);
+      const sidecarPath = path.join(chatsDir, `${fileBase}.meta.json`);
+
+      const header = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        kind: 'main',
+      };
+      const message = {
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+        type: 'user',
+        content: 'fallback first user',
+      };
+      await fs.writeFile(
+        jsonlPath,
+        JSON.stringify(header) + '\n' + JSON.stringify(message) + '\n',
+      );
+
+      // No sidecar yet
+      await expect(fs.stat(sidecarPath)).rejects.toThrow();
+
+      const sessionSelector = new SessionSelector(storage);
+      const sessions = await sessionSelector.listSessions();
+
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].id).toBe(sessionId);
+      expect(sessions[0].firstUserMessage).toBe('fallback first user');
+
+      // Lazy migration should have written the sidecar.
+      const sidecarContent = JSON.parse(
+        await fs.readFile(sidecarPath, 'utf8'),
+      ) as { sessionId: string; messageCount: number; version: number };
+      expect(sidecarContent.version).toBe(1);
+      expect(sidecarContent.sessionId).toBe(sessionId);
+      expect(sidecarContent.messageCount).toBe(1);
+    });
+
+    it('falls back when the sidecar version is unknown', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const fileBase = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}`;
+      const jsonlPath = path.join(chatsDir, `${fileBase}.jsonl`);
+      const sidecarPath = path.join(chatsDir, `${fileBase}.meta.json`);
+
+      const header = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        kind: 'main',
+      };
+      const message = {
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+        type: 'user',
+        content: 'fallback again',
+      };
+      await fs.writeFile(
+        jsonlPath,
+        JSON.stringify(header) + '\n' + JSON.stringify(message) + '\n',
+      );
+      // Sidecar with unknown version — must be ignored.
+      await fs.writeFile(sidecarPath, JSON.stringify({ version: 999 }));
+
+      const sessionSelector = new SessionSelector(storage);
+      const sessions = await sessionSelector.listSessions();
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].firstUserMessage).toBe('fallback again');
+    });
+
+    it('skips sidecars whose kind is subagent', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const fileBase = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}`;
+      const jsonlPath = path.join(chatsDir, `${fileBase}.jsonl`);
+      const sidecarPath = path.join(chatsDir, `${fileBase}.meta.json`);
+      await fs.writeFile(jsonlPath, '');
+      await fs.writeFile(
+        sidecarPath,
+        JSON.stringify({
+          version: 1,
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:30:00.000Z',
+          kind: 'subagent',
+          messageCount: 1,
+          userMessageCount: 1,
+          hasUserOrAssistantMessage: true,
+        }),
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const sessions = await sessionSelector.listSessions();
+      expect(sessions.length).toBe(0);
+    });
+
+    it('does not surface the sidecar file itself as a session entry', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const fileBase = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}`;
+      const jsonlPath = path.join(chatsDir, `${fileBase}.jsonl`);
+      const sidecarPath = path.join(chatsDir, `${fileBase}.meta.json`);
+
+      const header = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        kind: 'main',
+      };
+      const message = {
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+        type: 'user',
+        content: 'hi',
+      };
+      await fs.writeFile(
+        jsonlPath,
+        JSON.stringify(header) + '\n' + JSON.stringify(message) + '\n',
+      );
+      await fs.writeFile(
+        sidecarPath,
+        JSON.stringify({
+          version: 1,
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:30:00.000Z',
+          kind: 'main',
+          messageCount: 1,
+          userMessageCount: 1,
+          hasUserOrAssistantMessage: true,
+          firstUserMessage: 'hi',
+        }),
+      );
+
+      const sessionSelector = new SessionSelector(storage);
+      const sessions = await sessionSelector.listSessions();
+      // Exactly one entry — the sidecar must not be confused for a chat file.
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].fileName).toBe(`${fileBase}.jsonl`);
+    });
+  });
 });
 
 describe('extractFirstUserMessage', () => {
