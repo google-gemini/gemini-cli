@@ -466,6 +466,49 @@ describe('memory commands', () => {
       expect(result.message).toMatch(/outside the private memory root/i);
     });
 
+    it('rejects private patches that target in-root non-memory documents', async () => {
+      const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+      await fs.mkdir(patchDir, { recursive: true });
+
+      const rejectedTargets = [
+        ['state.patch', path.join(memoryTempDir, '.extraction-state.json')],
+        ['lock.patch', path.join(memoryTempDir, '.extraction.lock')],
+        [
+          'inbox.patch',
+          path.join(memoryTempDir, '.inbox', 'private', 'review.md'),
+        ],
+        [
+          'skills.patch',
+          path.join(memoryTempDir, 'skills', 'generated', 'SKILL.md'),
+        ],
+        ['text.patch', path.join(memoryTempDir, 'notes.txt')],
+        ['nested.patch', path.join(memoryTempDir, 'nested', 'topic.md')],
+      ] as const;
+
+      for (const [fileName, targetPath] of rejectedTargets) {
+        await fs.writeFile(
+          path.join(patchDir, fileName),
+          buildCreationPatch(targetPath, 'rejected\n'),
+        );
+      }
+
+      const patches = await listInboxMemoryPatches(patchConfig);
+      expect(patches).toHaveLength(0);
+
+      for (const [fileName, targetPath] of rejectedTargets) {
+        const result = await applyInboxMemoryPatch(
+          patchConfig,
+          'private',
+          fileName,
+        );
+        expect(result.success).toBe(false);
+        expect(result.message).toMatch(
+          /outside the private memory root or target allowlist/i,
+        );
+        await expect(fs.access(targetPath)).rejects.toThrow();
+      }
+    });
+
     it('omits global patches with disallowed targets from the listing', async () => {
       // Same defense for the global tier: only ~/.gemini/GEMINI.md is allowed.
       // memory.md (legacy lowercase), sibling .md files, and settings.json all
@@ -489,6 +532,13 @@ describe('memory commands', () => {
       await fs.writeFile(
         path.join(patchDir, 'settings.patch'),
         buildCreationPatch(path.join(globalMemoryDir, 'settings.json'), '{}\n'),
+      );
+      await fs.writeFile(
+        path.join(patchDir, 'nested.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'GEMINI.md', 'nested.md'),
+          'rejected\n',
+        ),
       );
 
       const patches = await listInboxMemoryPatches(patchConfig);
@@ -871,10 +921,20 @@ describe('memory commands', () => {
         ),
       );
 
+      // Child paths under the single allowed file path are not allowed either.
+      await fs.writeFile(
+        path.join(patchDir, 'nested.patch'),
+        buildCreationPatch(
+          path.join(globalMemoryDir, 'GEMINI.md', 'nested.md'),
+          'Should be rejected.\n',
+        ),
+      );
+
       for (const fileName of [
         'wrong-name.patch',
         'sibling.patch',
         'settings.patch',
+        'nested.patch',
       ]) {
         const result = await applyInboxMemoryPatch(
           patchConfig,
@@ -891,6 +951,9 @@ describe('memory commands', () => {
           fs.access(path.join(globalMemoryDir, orphan)),
         ).rejects.toThrow();
       }
+      await expect(
+        fs.access(path.join(globalMemoryDir, 'GEMINI.md', 'nested.md')),
+      ).rejects.toThrow();
     });
 
     it('rejects invalid memory patch paths', async () => {
