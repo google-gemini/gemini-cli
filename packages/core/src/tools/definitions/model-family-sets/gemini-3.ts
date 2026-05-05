@@ -355,7 +355,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage and simplifies code reviews. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
