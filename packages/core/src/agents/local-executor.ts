@@ -127,6 +127,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+  private cachedModelToUse?: string;
 
   private get executionContext(): AgentLoopContext {
     return {
@@ -951,24 +952,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let modelToUse: string;
     if (isAutoModel(requestedModel)) {
-      // TODO(joshualitt): This try / catch is inconsistent with the routing
-      // behavior for the main agent. Ideally, we would have a universal
-      // policy for routing failure. Given routing failure does not necessarily
-      // mean generation will fail, we may want to share this logic with
-      // other places we use model routing.
-      try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: message.parts || [],
-          signal,
-          requestedModel,
-        };
-        const router = this.context.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      } catch (error) {
-        debugLogger.warn(`Error during model routing: ${error}`);
-        modelToUse = DEFAULT_GEMINI_MODEL;
+      if (this.cachedModelToUse) {
+        modelToUse = this.cachedModelToUse;
+      } else {
+        // TODO(joshualitt): This try / catch is inconsistent with the routing
+        // behavior for the main agent. Ideally, we would have a universal
+        // policy for routing failure. Given routing failure does not necessarily
+        // mean generation will fail, we may want to share this logic with
+        // other places we use model routing.
+        try {
+          const routingContext: RoutingContext = {
+            history: chat.getHistory(/*curated=*/ true),
+            request: message.parts || [],
+            signal,
+            requestedModel,
+          };
+          const router = this.context.config.getModelRouterService();
+          const decision = await router.route(routingContext);
+          modelToUse = decision.model;
+          this.cachedModelToUse = modelToUse;
+        } catch (error) {
+          debugLogger.warn(`Error during model routing: ${error}`);
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
       }
     } else {
       modelToUse = requestedModel;
