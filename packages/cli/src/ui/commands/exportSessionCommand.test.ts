@@ -20,12 +20,15 @@ describe('exportSessionCommand', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(Storage.prototype, 'initialize').mockResolvedValue(undefined);
-    vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue('/tmp/mock-dir');
+    vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+      '/tmp/mock-dir',
+    );
     mockContext = {
       services: {
         agentContext: {
           config: {
             sessionId: 'test-session-id',
+            getSessionId: () => 'test-session-id',
             storage: new Storage(process.cwd()),
           },
         },
@@ -54,7 +57,7 @@ describe('exportSessionCommand', () => {
 
   it('should return error if sessionId is missing', async () => {
     mockContext.services.agentContext!.config.getSessionId = () =>
-      undefined as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+      undefined as unknown as string;
     const result = await exportSessionCommand.action!(mockContext, '');
 
     expect(result).toEqual({

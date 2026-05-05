@@ -218,7 +218,7 @@ export async function resolveSessionId(
       if (!sessionData) {
         throw new Error(`File not found or invalid format: ${sessionFileArg}`);
       }
-      
+
       const now = Date.now();
       const isoNow = new Date(now).toISOString();
       const newSessionId = createSessionId();
@@ -230,7 +230,7 @@ export async function resolveSessionId(
       const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
       const newSessionPath = path.join(
         chatsDir,
-        `session-${now}-${newSessionId.slice(0, 8)}.jsonl`
+        `session-${now}-${newSessionId.slice(0, 8)}.jsonl`,
       );
 
       const { messages: _messages, ...initialMetadata } = sessionData;
@@ -243,11 +243,18 @@ export async function resolveSessionId(
       }
 
       await fsPromises.mkdir(chatsDir, { recursive: true });
-      await fsPromises.writeFile(newSessionPath, lines.join('\n') + '\n', 'utf-8');
+      await fsPromises.writeFile(
+        newSessionPath,
+        lines.join('\n') + '\n',
+        'utf-8',
+      );
 
       return {
         sessionId: newSessionId,
-        resumedSessionData: { conversation: sessionData, filePath: newSessionPath },
+        resumedSessionData: {
+          conversation: sessionData,
+          filePath: newSessionPath,
+        },
       };
     } catch (error) {
       coreEvents.emitFeedback(
@@ -605,9 +612,8 @@ export async function main() {
     adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
+      const { setupInitialActivityLogger } =
+        await import('./utils/devtoolsService.js');
       setupInitialActivityLogger(config);
     }
 

@@ -829,14 +829,13 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          resolveSession: vi
-            .fn()
-            .mockRejectedValue(new Error('Session not found')),
-        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    );
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(new Error('Session not found')),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -885,14 +884,13 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          resolveSession: vi
-            .fn()
-            .mockRejectedValue(SessionError.noSessionsFound()),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(SessionError.noSessionsFound()),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -1070,12 +1068,11 @@ describe('resolveSessionId', () => {
   });
 
   it('should import from session file when sessionFile is provided', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          sessionExists: vi.fn().mockResolvedValue(false),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const coreModule = await import('@google/gemini-cli-core');
     vi.spyOn(coreModule, 'loadConversationRecord').mockResolvedValueOnce({
@@ -1115,12 +1112,11 @@ describe('resolveSessionId', () => {
   });
 
   it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          sessionExists: vi.fn().mockResolvedValue(true),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(true),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const processExitSpy = vi
@@ -1146,12 +1142,11 @@ describe('resolveSessionId', () => {
   });
 
   it('should return provided sessionId when it does not exist', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          sessionExists: vi.fn().mockResolvedValue(false),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
     const { sessionId, resumedSessionData } = await resolveSessionId(
       undefined,
       'new-id',
