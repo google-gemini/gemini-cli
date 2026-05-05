@@ -22,7 +22,7 @@ import {
   SettingScope,
   type LoadedSettings,
 } from '../../config/settings.js';
-import { getErrorMessage } from '../../utils/errors.js';
+import { getErrorMessage } from '@google/gemini-cli-core';
 
 // Mock dependencies
 const emitConsoleLog = vi.hoisted(() => vi.fn());
@@ -44,12 +44,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       emitConsoleLog,
     },
     debugLogger,
+    getErrorMessage: vi.fn(),
   };
 });
 
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));

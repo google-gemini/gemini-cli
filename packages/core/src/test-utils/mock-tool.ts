@@ -8,15 +8,14 @@ import type {
   ModifiableDeclarativeTool,
   ModifyContext,
 } from '../tools/modifiable-tool.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
-} from '../tools/tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -27,6 +26,7 @@ interface MockToolOptions {
   description?: string;
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
+  kind?: Kind;
   shouldConfirmExecute?: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
@@ -35,6 +35,7 @@ interface MockToolOptions {
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    options?: ExecuteOptions,
   ) => Promise<ToolResult>;
   params?: object;
   messageBus?: MessageBus;
@@ -52,15 +53,14 @@ class MockToolInvocation extends BaseToolInvocation<
     super(params, messageBus, tool.name, tool.displayName);
   }
 
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
-    if (updateOutput) {
-      return this.tool.execute(this.params, signal, updateOutput);
-    } else {
-      return this.tool.execute(this.params);
-    }
+  execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput as ((output: string) => void) | undefined,
+      options,
+    );
   }
 
   override shouldConfirmExecute(
@@ -81,14 +81,16 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  shouldConfirmExecute: (
+  readonly shouldConfirmExecute: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
-  execute: (
+
+  readonly execute: (
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    options?: ExecuteOptions,
   ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
@@ -96,7 +98,7 @@ export class MockTool extends BaseDeclarativeTool<
       options.name,
       options.displayName ?? options.name,
       options.description ?? options.name,
-      Kind.Other,
+      options.kind ?? Kind.Other,
       options.params,
       options.messageBus ?? createMockMessageBus(),
       options.isOutputMarkdown ?? false,
@@ -152,7 +154,10 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
     super(params, messageBus, tool.name, tool.displayName);
   }
 
-  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+  async execute({
+    abortSignal: _signal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
     const result = this.tool.executeFn(this.params);
     return (
       result ?? {

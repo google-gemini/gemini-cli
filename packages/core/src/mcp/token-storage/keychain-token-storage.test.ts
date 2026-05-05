@@ -5,54 +5,41 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { KeychainTokenStorage } from './keychain-token-storage.js';
+import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
+import { KeychainService } from '../../services/keychainService.js';
 import { coreEvents } from '../../utils/events.js';
-
-// Hoist the mock to be available in the vi.mock factory
-const mockKeytar = vi.hoisted(() => ({
-  getPassword: vi.fn(),
-  setPassword: vi.fn(),
-  deletePassword: vi.fn(),
-  findCredentials: vi.fn(),
-}));
-
-const mockServiceName = 'service-name';
-const mockCryptoRandomBytesString = 'random-string';
-
-// Mock the dynamic import of 'keytar'
-vi.mock('keytar', () => ({
-  default: mockKeytar,
-}));
-
-vi.mock('node:crypto', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:crypto')>();
-  return {
-    ...actual,
-    randomBytes: vi.fn(() => ({
-      toString: vi.fn(() => mockCryptoRandomBytesString),
-    })),
-  };
-});
-
-vi.mock('../../utils/events.js', () => ({
-  coreEvents: {
-    emitFeedback: vi.fn(),
-    emitTelemetryKeychainAvailability: vi.fn(),
-  },
-}));
+import { KEYCHAIN_TEST_PREFIX } from '../../services/keychainTypes.js';
 
 describe('KeychainTokenStorage', () => {
   let storage: KeychainTokenStorage;
+  const mockServiceName = 'service-name';
+  let storageState: Map<string, string>;
 
-  beforeEach(async () => {
-    vi.resetAllMocks();
-    // Reset the internal state of the keychain-token-storage module
-    vi.resetModules();
-    const { KeychainTokenStorage } = await import(
-      './keychain-token-storage.js'
-    );
+  beforeEach(() => {
+    vi.clearAllMocks();
     storage = new KeychainTokenStorage(mockServiceName);
+    storageState = new Map();
+
+    // Use stateful spies to verify logic behaviorally
+    vi.spyOn(KeychainService.prototype, 'getPassword').mockImplementation(
+      async (account) => storageState.get(account) ?? null,
+    );
+    vi.spyOn(KeychainService.prototype, 'setPassword').mockImplementation(
+      async (account, value) => {
+        storageState.set(account, value);
+      },
+    );
+    vi.spyOn(KeychainService.prototype, 'deletePassword').mockImplementation(
+      async (account) => storageState.delete(account),
+    );
+    vi.spyOn(KeychainService.prototype, 'findCredentials').mockImplementation(
+      async () =>
+        Array.from(storageState.entries()).map(([account, password]) => ({
+          account,
+          password,
+        })),
+    );
   });
 
   afterEach(() => {
@@ -70,375 +57,149 @@ describe('KeychainTokenStorage', () => {
     updatedAt: Date.now(),
   } as OAuthCredentials;
 
-  describe('checkKeychainAvailability', () => {
-    it('should return true if keytar is available and functional', async () => {
-      mockKeytar.setPassword.mockResolvedValue(undefined);
-      mockKeytar.getPassword.mockResolvedValue('test');
-      mockKeytar.deletePassword.mockResolvedValue(true);
-
-      const isAvailable = await storage.checkKeychainAvailability();
-      expect(isAvailable).toBe(true);
-      expect(mockKeytar.setPassword).toHaveBeenCalledWith(
-        mockServiceName,
-        `__keychain_test__${mockCryptoRandomBytesString}`,
-        'test',
-      );
-      expect(mockKeytar.getPassword).toHaveBeenCalledWith(
-        mockServiceName,
-        `__keychain_test__${mockCryptoRandomBytesString}`,
-      );
-      expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
-        mockServiceName,
-        `__keychain_test__${mockCryptoRandomBytesString}`,
-      );
-    });
-
-    it('should return false if keytar fails to set password', async () => {
-      const error = new Error('write error');
-      mockKeytar.setPassword.mockRejectedValue(error);
-      const isAvailable = await storage.checkKeychainAvailability();
-      expect(isAvailable).toBe(false);
-    });
-
-    it('should return false if retrieved password does not match', async () => {
-      mockKeytar.setPassword.mockResolvedValue(undefined);
-      mockKeytar.getPassword.mockResolvedValue('wrong-password');
-      mockKeytar.deletePassword.mockResolvedValue(true);
-      const isAvailable = await storage.checkKeychainAvailability();
-      expect(isAvailable).toBe(false);
-    });
-
-    it('should cache the availability result', async () => {
-      mockKeytar.setPassword.mockResolvedValue(undefined);
-      mockKeytar.getPassword.mockResolvedValue('test');
-      mockKeytar.deletePassword.mockResolvedValue(true);
-
-      await storage.checkKeychainAvailability();
-      await storage.checkKeychainAvailability();
-
-      expect(mockKeytar.setPassword).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('with keychain unavailable', () => {
-    beforeEach(async () => {
-      // Force keychain to be unavailable
-      mockKeytar.setPassword.mockRejectedValue(new Error('keychain error'));
-      await storage.checkKeychainAvailability();
-    });
-
-    it('getCredentials should throw', async () => {
-      await expect(storage.getCredentials('server')).rejects.toThrow(
-        'Keychain is not available',
-      );
-    });
-
-    it('setCredentials should throw', async () => {
-      await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
-        'Keychain is not available',
-      );
-    });
-
-    it('deleteCredentials should throw', async () => {
-      await expect(storage.deleteCredentials('server')).rejects.toThrow(
-        'Keychain is not available',
-      );
-    });
-
-    it('listServers should throw', async () => {
-      await expect(storage.listServers()).rejects.toThrow(
-        'Keychain is not available',
-      );
-    });
-
-    it('getAllCredentials should throw', async () => {
-      await expect(storage.getAllCredentials()).rejects.toThrow(
-        'Keychain is not available',
-      );
-    });
-  });
-
   describe('with keychain available', () => {
-    beforeEach(async () => {
-      mockKeytar.setPassword.mockResolvedValue(undefined);
-      mockKeytar.getPassword.mockResolvedValue('test');
-      mockKeytar.deletePassword.mockResolvedValue(true);
-      await storage.checkKeychainAvailability();
-      // Reset mocks after availability check
-      vi.resetAllMocks();
+    beforeEach(() => {
+      vi.spyOn(KeychainService.prototype, 'isAvailable').mockResolvedValue(
+        true,
+      );
     });
 
-    describe('getCredentials', () => {
-      it('should return null if no credentials are found', async () => {
-        mockKeytar.getPassword.mockResolvedValue(null);
-        const result = await storage.getCredentials('test-server');
-        expect(result).toBeNull();
-        expect(mockKeytar.getPassword).toHaveBeenCalledWith(
-          mockServiceName,
-          'test-server',
-        );
-      });
+    it('should store and retrieve credentials correctly', async () => {
+      await storage.setCredentials(validCredentials);
+      const retrieved = await storage.getCredentials('test-server');
 
-      it('should return credentials if found and not expired', async () => {
-        mockKeytar.getPassword.mockResolvedValue(
-          JSON.stringify(validCredentials),
-        );
-        const result = await storage.getCredentials('test-server');
-        expect(result).toEqual(validCredentials);
-      });
-
-      it('should return null if credentials have expired', async () => {
-        const expiredCreds = {
-          ...validCredentials,
-          token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
-        };
-        mockKeytar.getPassword.mockResolvedValue(JSON.stringify(expiredCreds));
-        const result = await storage.getCredentials('test-server');
-        expect(result).toBeNull();
-      });
-
-      it('should throw if stored data is corrupted JSON', async () => {
-        mockKeytar.getPassword.mockResolvedValue('not-json');
-        await expect(storage.getCredentials('test-server')).rejects.toThrow(
-          'Failed to parse stored credentials for test-server',
-        );
-      });
+      expect(retrieved?.token.accessToken).toBe('access-token');
+      expect(retrieved?.serverName).toBe('test-server');
     });
 
-    describe('setCredentials', () => {
-      it('should save credentials to keychain', async () => {
-        vi.useFakeTimers();
-        mockKeytar.setPassword.mockResolvedValue(undefined);
-        await storage.setCredentials(validCredentials);
-        expect(mockKeytar.setPassword).toHaveBeenCalledWith(
-          mockServiceName,
-          'test-server',
-          JSON.stringify({ ...validCredentials, updatedAt: Date.now() }),
-        );
-      });
+    it('should return null if no credentials are found or they are expired', async () => {
+      expect(await storage.getCredentials('missing')).toBeNull();
 
-      it('should throw if saving to keychain fails', async () => {
-        mockKeytar.setPassword.mockRejectedValue(
-          new Error('keychain write error'),
-        );
-        await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
-          'keychain write error',
-        );
-      });
+      const expiredCreds = {
+        ...validCredentials,
+        token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
+      };
+      await storage.setCredentials(expiredCreds);
+      expect(await storage.getCredentials('test-server')).toBeNull();
     });
 
-    describe('deleteCredentials', () => {
-      it('should delete credentials from keychain', async () => {
-        mockKeytar.deletePassword.mockResolvedValue(true);
-        await storage.deleteCredentials('test-server');
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
-          mockServiceName,
-          'test-server',
-        );
-      });
-
-      it('should throw if no credentials were found to delete', async () => {
-        mockKeytar.deletePassword.mockResolvedValue(false);
-        await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
-          'No credentials found for test-server',
-        );
-      });
-
-      it('should throw if deleting from keychain fails', async () => {
-        mockKeytar.deletePassword.mockRejectedValue(
-          new Error('keychain delete error'),
-        );
-        await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
-          'keychain delete error',
-        );
-      });
+    it('should throw if stored data is corrupted JSON', async () => {
+      storageState.set('bad-server', 'not-json');
+      await expect(storage.getCredentials('bad-server')).rejects.toThrow(
+        /Failed to parse/,
+      );
     });
 
-    describe('listServers', () => {
-      it('should return a list of server names', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: 'server1', password: '' },
-          { account: 'server2', password: '' },
-        ]);
-        const result = await storage.listServers();
-        expect(result).toEqual(['server1', 'server2']);
+    it('should list servers and filter internal keys', async () => {
+      await storage.setCredentials(validCredentials);
+      await storage.setCredentials({
+        ...validCredentials,
+        serverName: 'server2',
       });
+      storageState.set(`${KEYCHAIN_TEST_PREFIX}internal`, '...');
+      storageState.set('__secret__key', '...');
 
-      it('should not include internal test keys in the server list', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: 'server1', password: '' },
-          {
-            account: `__keychain_test__${mockCryptoRandomBytesString}`,
-            password: '',
-          },
-          { account: 'server2', password: '' },
-        ]);
-        const result = await storage.listServers();
-        expect(result).toEqual(['server1', 'server2']);
-      });
-
-      it('should return an empty array on error', async () => {
-        const error = new Error('find error');
-        mockKeytar.findCredentials.mockRejectedValue(error);
-        const result = await storage.listServers();
-        expect(result).toEqual([]);
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to list servers from keychain',
-          error,
-        );
-      });
+      const servers = await storage.listServers();
+      expect(servers).toEqual(['test-server', 'server2']);
     });
 
-    describe('getAllCredentials', () => {
-      it('should return a map of all valid credentials and emit feedback for invalid ones', async () => {
-        const creds2 = {
-          ...validCredentials,
-          serverName: 'server2',
-        };
-        const expiredCreds = {
-          ...validCredentials,
-          serverName: 'expired-server',
-          token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
-        };
-        const structurallyInvalidCreds = {
-          serverName: 'invalid-server',
-        };
+    it('should handle getAllCredentials with individual parse errors', async () => {
+      await storage.setCredentials(validCredentials);
+      storageState.set('bad', 'not-json');
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
-        mockKeytar.findCredentials.mockResolvedValue([
-          {
-            account: 'test-server',
-            password: JSON.stringify(validCredentials),
-          },
-          { account: 'server2', password: JSON.stringify(creds2) },
-          {
-            account: 'expired-server',
-            password: JSON.stringify(expiredCreds),
-          },
-          { account: 'bad-server', password: 'not-json' },
-          {
-            account: 'invalid-server',
-            password: JSON.stringify(structurallyInvalidCreds),
-          },
-        ]);
-
-        const result = await storage.getAllCredentials();
-        expect(result.size).toBe(2);
-        expect(result.get('test-server')).toEqual(validCredentials);
-        expect(result.get('server2')).toEqual(creds2);
-        expect(result.has('expired-server')).toBe(false);
-        expect(result.has('bad-server')).toBe(false);
-        expect(result.has('invalid-server')).toBe(false);
-
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to parse credentials for bad-server',
-          expect.any(SyntaxError),
-        );
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to parse credentials for invalid-server',
-          expect.any(Error),
-        );
-      });
-
-      it('should emit feedback and return empty map if findCredentials fails', async () => {
-        const error = new Error('find all error');
-        mockKeytar.findCredentials.mockRejectedValue(error);
-
-        const result = await storage.getAllCredentials();
-        expect(result.size).toBe(0);
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to get all credentials from keychain',
-          error,
-        );
-      });
+      const result = await storage.getAllCredentials();
+      expect(result.size).toBe(1);
+      expect(emitFeedbackSpy).toHaveBeenCalled();
     });
 
-    describe('clearAll', () => {
-      it('should delete all credentials for the service', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: 'server1', password: '' },
-          { account: 'server2', password: '' },
-        ]);
-        mockKeytar.deletePassword.mockResolvedValue(true);
+    it('should aggregate errors in clearAll', async () => {
+      storageState.set('s1', '...');
+      storageState.set('s2', '...');
 
-        await storage.clearAll();
+      // Aggregating a system error (rejection)
+      vi.spyOn(KeychainService.prototype, 'deletePassword')
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('system fail'));
 
-        expect(mockKeytar.deletePassword).toHaveBeenCalledTimes(2);
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
-          mockServiceName,
-          'server1',
-        );
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
-          mockServiceName,
-          'server2',
-        );
-      });
+      await expect(storage.clearAll()).rejects.toThrow(
+        /Failed to clear some credentials: system fail/,
+      );
 
-      it('should throw an aggregated error if deletions fail', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: 'server1', password: '' },
-          { account: 'server2', password: '' },
-        ]);
-        mockKeytar.deletePassword
-          .mockResolvedValueOnce(true)
-          .mockRejectedValueOnce(new Error('delete failed'));
+      // Aggregating a 'not found' error (returns false)
+      vi.spyOn(KeychainService.prototype, 'deletePassword')
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
 
-        await expect(storage.clearAll()).rejects.toThrow(
-          'Failed to clear some credentials: delete failed',
-        );
-      });
+      await expect(storage.clearAll()).rejects.toThrow(
+        /Failed to clear some credentials: No credentials found/,
+      );
     });
 
-    describe('Secrets', () => {
-      it('should set and get a secret', async () => {
-        mockKeytar.setPassword.mockResolvedValue(undefined);
-        mockKeytar.getPassword.mockResolvedValue('secret-value');
+    it('should manage secrets with prefix independently', async () => {
+      await storage.setSecret('key1', 'val1');
+      await storage.setCredentials(validCredentials);
 
-        await storage.setSecret('secret-key', 'secret-value');
-        const value = await storage.getSecret('secret-key');
+      expect(await storage.getSecret('key1')).toBe('val1');
+      expect(await storage.listSecrets()).toEqual(['key1']);
+      expect(await storage.listServers()).not.toContain('key1');
+    });
+  });
 
-        expect(mockKeytar.setPassword).toHaveBeenCalledWith(
-          mockServiceName,
-          '__secret__secret-key',
-          'secret-value',
-        );
-        expect(mockKeytar.getPassword).toHaveBeenCalledWith(
-          mockServiceName,
-          '__secret__secret-key',
-        );
-        expect(value).toBe('secret-value');
-      });
+  describe('unavailability handling', () => {
+    beforeEach(() => {
+      vi.spyOn(KeychainService.prototype, 'isAvailable').mockResolvedValue(
+        false,
+      );
+      vi.spyOn(KeychainService.prototype, 'getPassword').mockRejectedValue(
+        new Error('Keychain is not available'),
+      );
+      vi.spyOn(KeychainService.prototype, 'setPassword').mockRejectedValue(
+        new Error('Keychain is not available'),
+      );
+      vi.spyOn(KeychainService.prototype, 'deletePassword').mockRejectedValue(
+        new Error('Keychain is not available'),
+      );
+      vi.spyOn(KeychainService.prototype, 'findCredentials').mockRejectedValue(
+        new Error('Keychain is not available'),
+      );
+    });
 
-      it('should delete a secret', async () => {
-        mockKeytar.deletePassword.mockResolvedValue(true);
-        await storage.deleteSecret('secret-key');
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
-          mockServiceName,
-          '__secret__secret-key',
-        );
-      });
+    it.each([
+      { method: 'getCredentials', args: ['s'] },
+      { method: 'setCredentials', args: [validCredentials] },
+      { method: 'deleteCredentials', args: ['s'] },
+      { method: 'clearAll', args: [] },
+    ])(
+      '$method should propagate unavailability error',
+      async ({ method, args }) => {
+        await expect(
+          (
+            storage as unknown as Record<
+              string,
+              (...args: unknown[]) => Promise<unknown>
+            >
+          )[method](...args),
+        ).rejects.toThrow('Keychain is not available');
+      },
+    );
 
-      it('should list secrets', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: '__secret__secret1', password: '' },
-          { account: '__secret__secret2', password: '' },
-          { account: 'server1', password: '' },
-        ]);
-        const secrets = await storage.listSecrets();
-        expect(secrets).toEqual(['secret1', 'secret2']);
-      });
-
-      it('should not list secrets in listServers', async () => {
-        mockKeytar.findCredentials.mockResolvedValue([
-          { account: '__secret__secret1', password: '' },
-          { account: 'server1', password: '' },
-        ]);
-        const servers = await storage.listServers();
-        expect(servers).toEqual(['server1']);
-      });
+    it.each([
+      { method: 'listServers' },
+      { method: 'getAllCredentials' },
+      { method: 'listSecrets' },
+    ])('$method should emit feedback and return empty', async ({ method }) => {
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      expect(
+        await (storage as unknown as Record<string, () => Promise<unknown>>)[
+          method
+        ](),
+      ).toEqual(method === 'getAllCredentials' ? new Map() : []);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.any(String),
+        expect.any(Error),
+      );
     });
   });
 });

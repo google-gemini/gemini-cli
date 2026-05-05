@@ -13,9 +13,9 @@ import {
   recordGlobalActivity,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
+  type ActivityEvent,
 } from './activity-monitor.js';
 import { ActivityType } from './activity-types.js';
-import type { ActivityEvent } from './activity-monitor.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 

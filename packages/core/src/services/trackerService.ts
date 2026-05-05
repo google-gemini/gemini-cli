@@ -50,6 +50,15 @@ export class TrackerService {
       id,
     };
 
+    if (task.parentId) {
+      const parent = await this.getTask(task.parentId);
+      if (!parent) {
+        throw new Error(`Parent task with ID ${task.parentId} not found.`);
+      }
+    }
+
+    TrackerTaskSchema.parse(task);
+
     await this.saveTask(task);
     return task;
   }
@@ -70,7 +79,8 @@ export class TrackerService {
         error &&
         typeof error === 'object' &&
         'code' in error &&
-        error.code === 'ENOENT'
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
       ) {
         return null;
       }
@@ -130,25 +140,35 @@ export class TrackerService {
     id: string,
     updates: Partial<TrackerTask>,
   ): Promise<TrackerTask> {
+    const isClosing = updates.status === TaskStatus.CLOSED;
+    const changingDependencies = updates.dependencies !== undefined;
+
     const task = await this.getTask(id);
+
     if (!task) {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
-    const updatedTask = { ...task, ...updates };
+    const updatedTask = { ...task, ...updates, id: task.id };
 
-    // Validate status transition if closing
-    if (
-      updatedTask.status === TaskStatus.CLOSED &&
-      task.status !== TaskStatus.CLOSED
-    ) {
+    if (updatedTask.parentId) {
+      const parentExists = !!(await this.getTask(updatedTask.parentId));
+      if (!parentExists) {
+        throw new Error(
+          `Parent task with ID ${updatedTask.parentId} not found.`,
+        );
+      }
+    }
+
+    if (isClosing && task.status !== TaskStatus.CLOSED) {
       await this.validateCanClose(updatedTask);
     }
 
-    // Validate circular dependencies if dependencies changed
-    if (updates.dependencies) {
+    if (changingDependencies) {
       await this.validateNoCircularDependencies(updatedTask);
     }
+
+    TrackerTaskSchema.parse(updatedTask);
 
     await this.saveTask(updatedTask);
     return updatedTask;
@@ -185,17 +205,12 @@ export class TrackerService {
   private async validateNoCircularDependencies(
     task: TrackerTask,
   ): Promise<void> {
-    const allTasks = await this.listTasks();
-    const taskMap = new Map<string, TrackerTask>(
-      allTasks.map((t) => [t.id, t]),
-    );
-    // Ensure the current (possibly unsaved) task state is used
-    taskMap.set(task.id, task);
-
     const visited = new Set<string>();
     const stack = new Set<string>();
+    const cache = new Map<string, TrackerTask>();
+    cache.set(task.id, task);
 
-    const check = (currentId: string) => {
+    const check = async (currentId: string) => {
       if (stack.has(currentId)) {
         throw new Error(
           `Circular dependency detected involving task ${currentId}.`,
@@ -208,16 +223,23 @@ export class TrackerService {
       visited.add(currentId);
       stack.add(currentId);
 
-      const currentTask = taskMap.get(currentId);
-      if (currentTask) {
-        for (const depId of currentTask.dependencies) {
-          check(depId);
+      let currentTask = cache.get(currentId);
+      if (!currentTask) {
+        const fetched = await this.getTask(currentId);
+        if (!fetched) {
+          throw new Error(`Dependency ${currentId} not found.`);
         }
+        currentTask = fetched;
+        cache.set(currentId, currentTask);
+      }
+
+      for (const depId of currentTask.dependencies) {
+        await check(depId);
       }
 
       stack.delete(currentId);
     };
 
-    check(task.id);
+    await check(task.id);
   }
 }

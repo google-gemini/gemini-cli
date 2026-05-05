@@ -20,7 +20,9 @@ interface ThemeColors {
   consoleBg: string;
   rowBorder: string;
   errorBg: string;
+  errorText: string;
   warnBg: string;
+  warnText: string;
 }
 
 export default function App() {
@@ -36,6 +38,21 @@ export default function App() {
   const [importedSessionId, setImportedSessionId] = useState<string | null>(
     null,
   );
+
+  // --- Toast Logic ---
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 5000);
+  };
 
   // --- Theme Logic ---
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
@@ -69,7 +86,9 @@ export default function App() {
       consoleBg: isDark ? '#1e1e1e' : '#fff',
       rowBorder: isDark ? '#303134' : '#f0f0f0',
       errorBg: isDark ? '#3c1e1e' : '#fff0f0',
+      errorText: isDark ? '#f28b82' : '#a80000',
       warnBg: isDark ? '#302a10' : '#fff3cd',
+      warnText: isDark ? '#fdd663' : '#7a5d00',
     }),
     [isDark],
   );
@@ -302,21 +321,52 @@ export default function App() {
         >
           {selectedSessionId &&
             connectedSessions.includes(selectedSessionId) && (
-              <button
-                onClick={handleExport}
-                style={{
-                  fontSize: '11px',
-                  padding: '4px 8px',
-                  border: `1px solid ${t.border}`,
-                  background: t.bg,
-                  color: t.text,
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                📤 Export
-              </button>
+              <>
+                <button
+                  onClick={async () => {
+                    try {
+                      await fetch('/api/trigger-debugger', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: selectedSessionId }),
+                      });
+                      showToast(
+                        'Node debugger attached. Open chrome://inspect in Chrome to start debugging.',
+                      );
+                    } catch (e) {
+                      console.error('Failed to trigger debugger:', e);
+                    }
+                  }}
+                  style={{
+                    fontSize: '11px',
+                    padding: '4px 8px',
+                    border: `1px solid ${t.border}`,
+                    background: t.bg,
+                    color: t.text,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  title="Attach Node Debugger and open chrome://inspect"
+                >
+                  🐞 Debug Node
+                </button>
+                <button
+                  onClick={handleExport}
+                  style={{
+                    fontSize: '11px',
+                    padding: '4px 8px',
+                    border: `1px solid ${t.border}`,
+                    background: t.bg,
+                    color: t.text,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  📤 Export
+                </button>
+              </>
             )}
 
           <label
@@ -483,6 +533,38 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: t.accent,
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontSize: '13px',
+            fontWeight: 500,
+            zIndex: 1000,
+            animation: 'fadeInOut 5s ease forwards',
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translateY(10px); }
+          5% { opacity: 1; transform: translateY(0); }
+          95% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(10px); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -539,7 +621,7 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
   const isError = log.type === 'error';
   const isWarn = log.type === 'warn';
   const bg = isError ? t.errorBg : isWarn ? t.warnBg : 'transparent';
-  const color = isError ? '#f28b82' : isWarn ? '#fdd663' : t.text;
+  const color = isError ? t.errorText : isWarn ? t.warnText : t.text;
   const icon = isError ? '❌' : isWarn ? '⚠️' : ' ';
 
   let displayContent = content;

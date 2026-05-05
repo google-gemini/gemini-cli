@@ -8,22 +8,74 @@ import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import type { HistoryItem } from '../ui/types.js';
-import { MessageType } from '../ui/types.js';
+import { MessageType, type HistoryItem } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
+import {
+  debugLogger,
+  getChannelFromVersion,
+  RELEASE_CHANNEL_STABILITY,
+} from '@google/gemini-cli-core';
+
+let _updateInProgress = false;
+
+/** @internal */
+export function _setUpdateStateForTesting(value: boolean) {
+  _updateInProgress = value;
+}
+
+export function isUpdateInProgress() {
+  return _updateInProgress;
+}
+
+/**
+ * Returns a promise that resolves when the update process completes or times out.
+ */
+export async function waitForUpdateCompletion(
+  timeoutMs = 30000,
+): Promise<void> {
+  if (!_updateInProgress) {
+    return;
+  }
+
+  debugLogger.log(
+    '\nGemini CLI is waiting for a background update to complete before restarting...',
+  );
+
+  return new Promise((resolve) => {
+    // Re-check the condition inside the promise executor to avoid a race condition.
+    // If the update finished between the initial check and now, resolve immediately.
+    if (!_updateInProgress) {
+      resolve();
+      return;
+    }
+
+    const timer = setTimeout(cleanup, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timer);
+      updateEventEmitter.off('update-success', cleanup);
+      updateEventEmitter.off('update-failed', cleanup);
+      resolve();
+    }
+
+    updateEventEmitter.once('update-success', cleanup);
+    updateEventEmitter.once('update-failed', cleanup);
+  });
+}
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
   projectRoot: string,
+  isSandboxEnabled: boolean,
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
     return;
   }
 
-  if (settings.merged.tools.sandbox || process.env['GEMINI_SANDBOX']) {
+  if (isSandboxEnabled) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
     });
@@ -40,9 +92,12 @@ export function handleAutoUpdate(
   );
 
   if (
-    [PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX].includes(
-      installationInfo.packageManager,
-    )
+    [
+      PackageManager.NPX,
+      PackageManager.PNPX,
+      PackageManager.BUNX,
+      PackageManager.BINARY,
+    ].includes(installationInfo.packageManager)
   ) {
     return;
   }
@@ -52,16 +107,45 @@ export function handleAutoUpdate(
     combinedMessage += `\n${installationInfo.updateMessage}`;
   }
 
-  updateEventEmitter.emit('update-received', {
-    message: combinedMessage,
-  });
-
   if (
     !installationInfo.updateCommand ||
     !settings.merged.general.enableAutoUpdate
   ) {
+    updateEventEmitter.emit('update-received', {
+      ...info,
+      message: combinedMessage,
+      isUpdating: false,
+    });
     return;
   }
+  updateEventEmitter.emit('update-received', {
+    ...info,
+    message: combinedMessage,
+    isUpdating: true,
+  });
+  if (_updateInProgress) {
+    return;
+  }
+
+  const currentVersion = info.update.current;
+  if (!currentVersion) {
+    debugLogger.warn(
+      'Update check: current version is missing. Skipping automatic update for safety.',
+    );
+    return;
+  }
+
+  const currentChannel = getChannelFromVersion(currentVersion);
+  const targetChannel = getChannelFromVersion(info.update.latest);
+
+  // Defense-in-depth: prevent updates to a less stable channel
+  if (
+    RELEASE_CHANNEL_STABILITY[targetChannel] <
+    RELEASE_CHANNEL_STABILITY[currentChannel]
+  ) {
+    return;
+  }
+
   const isNightly = info.update.latest.includes('nightly');
 
   const updateCommand = installationInfo.updateCommand.replace(
@@ -73,10 +157,14 @@ export function handleAutoUpdate(
     shell: true,
     detached: true,
   });
+
+  _updateInProgress = true;
+
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();
 
   updateProcess.on('close', (code) => {
+    _updateInProgress = false;
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
         message:
@@ -84,14 +172,15 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        message: `Automatic update failed. Please try updating manually:\n\n${updateCommand}`,
       });
     }
   });
 
   updateProcess.on('error', (err) => {
+    _updateInProgress = false;
     updateEventEmitter.emit('update-failed', {
-      message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
+      message: `Automatic update failed. Please try updating manually. (error: ${err.message})\n\n${updateCommand}`,
     });
   });
   return updateProcess;
@@ -119,12 +208,14 @@ export function setUpdateHandler(
     }, 60000);
   };
 
-  const handleUpdateFailed = () => {
+  const handleUpdateFailed = (data?: { message: string }) => {
     setUpdateInfo(null);
     addItem(
       {
         type: MessageType.ERROR,
-        text: `Automatic update failed. Please try updating manually`,
+        text:
+          data?.message ||
+          `Automatic update failed. Please try updating manually`,
       },
       Date.now(),
     );

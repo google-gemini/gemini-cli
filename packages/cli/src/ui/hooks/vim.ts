@@ -9,7 +9,9 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from './useKeyMatchers.js';
+import { toCodePoints } from '../utils/textUtils.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -34,6 +36,9 @@ const CMD_TYPES = {
   CHANGE_BIG_WORD_BACKWARD: 'cB',
   CHANGE_BIG_WORD_END: 'cE',
   DELETE_CHAR: 'x',
+  DELETE_CHAR_BEFORE: 'X',
+  TOGGLE_CASE: '~',
+  REPLACE_CHAR: 'r',
   DELETE_LINE: 'dd',
   CHANGE_LINE: 'cc',
   DELETE_TO_EOL: 'D',
@@ -58,20 +63,35 @@ const CMD_TYPES = {
   DELETE_TO_LAST_LINE: 'dG',
   CHANGE_TO_FIRST_LINE: 'cgg',
   CHANGE_TO_LAST_LINE: 'cG',
+  YANK_LINE: 'yy',
+  YANK_WORD_FORWARD: 'yw',
+  YANK_BIG_WORD_FORWARD: 'yW',
+  YANK_WORD_END: 'ye',
+  YANK_BIG_WORD_END: 'yE',
+  YANK_TO_EOL: 'y$',
+  PASTE_AFTER: 'p',
+  PASTE_BEFORE: 'P',
 } as const;
 
-// Helper function to clear pending state
+type PendingFindOp = {
+  op: 'f' | 'F' | 't' | 'T' | 'r';
+  operator: 'd' | 'c' | undefined;
+  count: number; // captured at keypress time, before CLEAR_PENDING_STATES resets it
+};
+
 const createClearPendingState = () => ({
   count: 0,
   pendingOperator: null as 'g' | 'd' | 'c' | 'dg' | 'cg' | null,
+  pendingFindOp: undefined as PendingFindOp | undefined,
 });
 
-// State and action types for useReducer
 type VimState = {
   mode: VimMode;
   count: number;
-  pendingOperator: 'g' | 'd' | 'c' | 'dg' | 'cg' | null;
-  lastCommand: { type: string; count: number } | null;
+  pendingOperator: 'g' | 'd' | 'c' | 'y' | 'dg' | 'cg' | null;
+  pendingFindOp: PendingFindOp | undefined;
+  lastCommand: { type: string; count: number; char?: string } | null;
+  lastFind: { op: 'f' | 'F' | 't' | 'T'; char: string } | undefined;
 };
 
 type VimAction =
@@ -81,11 +101,16 @@ type VimAction =
   | { type: 'CLEAR_COUNT' }
   | {
       type: 'SET_PENDING_OPERATOR';
-      operator: 'g' | 'd' | 'c' | 'dg' | 'cg' | null;
+      operator: 'g' | 'd' | 'c' | 'y' | 'dg' | 'cg' | null;
+    }
+  | { type: 'SET_PENDING_FIND_OP'; pendingFindOp: PendingFindOp | undefined }
+  | {
+      type: 'SET_LAST_FIND';
+      find: { op: 'f' | 'F' | 't' | 'T'; char: string } | undefined;
     }
   | {
       type: 'SET_LAST_COMMAND';
-      command: { type: string; count: number } | null;
+      command: { type: string; count: number; char?: string } | null;
     }
   | { type: 'CLEAR_PENDING_STATES' }
   | { type: 'ESCAPE_TO_NORMAL' };
@@ -94,7 +119,9 @@ const initialVimState: VimState = {
   mode: 'INSERT',
   count: 0,
   pendingOperator: null,
+  pendingFindOp: undefined,
   lastCommand: null,
+  lastFind: undefined,
 };
 
 // Reducer function
@@ -114,6 +141,12 @@ const vimReducer = (state: VimState, action: VimAction): VimState => {
 
     case 'SET_PENDING_OPERATOR':
       return { ...state, pendingOperator: action.operator };
+
+    case 'SET_PENDING_FIND_OP':
+      return { ...state, pendingFindOp: action.pendingFindOp };
+
+    case 'SET_LAST_FIND':
+      return { ...state, lastFind: action.find };
 
     case 'SET_LAST_COMMAND':
       return { ...state, lastCommand: action.command };
@@ -152,6 +185,7 @@ const vimReducer = (state: VimState, action: VimAction): VimState => {
  * @returns Object with vim state and input handler
  */
 export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
+  const keyMatchers = useKeyMatchers();
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
 
@@ -193,7 +227,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
   /** Executes common commands to eliminate duplication in dot (.) repeat command */
   const executeCommand = useCallback(
-    (cmdType: string, count: number) => {
+    (cmdType: string, count: number, char?: string) => {
       switch (cmdType) {
         case CMD_TYPES.DELETE_WORD_FORWARD: {
           buffer.vimDeleteWordForward(count);
@@ -263,6 +297,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
         case CMD_TYPES.DELETE_CHAR: {
           buffer.vimDeleteChar(count);
+          break;
+        }
+
+        case CMD_TYPES.DELETE_CHAR_BEFORE: {
+          buffer.vimDeleteCharBefore(count);
+          break;
+        }
+
+        case CMD_TYPES.TOGGLE_CASE: {
+          buffer.vimToggleCase(count);
+          break;
+        }
+
+        case CMD_TYPES.REPLACE_CHAR: {
+          if (char) buffer.vimReplaceChar(char, count);
           break;
         }
 
@@ -367,6 +416,46 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           break;
         }
 
+        case CMD_TYPES.YANK_LINE: {
+          buffer.vimYankLine(count);
+          break;
+        }
+
+        case CMD_TYPES.YANK_WORD_FORWARD: {
+          buffer.vimYankWordForward(count);
+          break;
+        }
+
+        case CMD_TYPES.YANK_BIG_WORD_FORWARD: {
+          buffer.vimYankBigWordForward(count);
+          break;
+        }
+
+        case CMD_TYPES.YANK_WORD_END: {
+          buffer.vimYankWordEnd(count);
+          break;
+        }
+
+        case CMD_TYPES.YANK_BIG_WORD_END: {
+          buffer.vimYankBigWordEnd(count);
+          break;
+        }
+
+        case CMD_TYPES.YANK_TO_EOL: {
+          buffer.vimYankToEndOfLine(count);
+          break;
+        }
+
+        case CMD_TYPES.PASTE_AFTER: {
+          buffer.vimPasteAfter(count);
+          break;
+        }
+
+        case CMD_TYPES.PASTE_BEFORE: {
+          buffer.vimPasteBefore(count);
+          break;
+        }
+
         default:
           return false;
       }
@@ -394,7 +483,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // In INSERT mode, let InputPrompt handle completion keys and special commands
       if (
         normalizedKey.name === 'tab' ||
-        (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
+        (normalizedKey.name === 'enter' && !normalizedKey.ctrl) ||
         normalizedKey.name === 'up' ||
         normalizedKey.name === 'down' ||
         (normalizedKey.ctrl && normalizedKey.name === 'r')
@@ -422,7 +511,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
-        normalizedKey.name === 'return' &&
+        normalizedKey.name === 'enter' &&
         !normalizedKey.alt &&
         !normalizedKey.ctrl &&
         !normalizedKey.cmd
@@ -439,7 +528,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       return buffer.handleInput(normalizedKey);
     },
-    [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape],
+    [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape, keyMatchers],
   );
 
   /**
@@ -595,7 +684,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
         if (keyMatchers[Command.ESCAPE](normalizedKey)) {
-          if (state.pendingOperator) {
+          if (state.pendingOperator || state.pendingFindOp) {
             dispatch({ type: 'CLEAR_PENDING_STATES' });
             lastEscapeTimestampRef.current = 0;
             return true; // Handled by vim
@@ -624,6 +713,47 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         }
 
         const repeatCount = getCurrentCount();
+
+        // Handle pending find/till/replace — consume the next char as the target
+        if (state.pendingFindOp !== undefined) {
+          const targetChar = normalizedKey.sequence;
+          const { op, operator, count: findCount } = state.pendingFindOp;
+          dispatch({ type: 'SET_PENDING_FIND_OP', pendingFindOp: undefined });
+          dispatch({ type: 'CLEAR_COUNT' });
+          if (targetChar && toCodePoints(targetChar).length === 1) {
+            if (op === 'r') {
+              buffer.vimReplaceChar(targetChar, findCount);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: {
+                  type: CMD_TYPES.REPLACE_CHAR,
+                  count: findCount,
+                  char: targetChar,
+                },
+              });
+            } else {
+              const isBackward = op === 'F' || op === 'T';
+              const isTill = op === 't' || op === 'T';
+              if (operator === 'd' || operator === 'c') {
+                const del = isBackward
+                  ? buffer.vimDeleteToCharBackward
+                  : buffer.vimDeleteToCharForward;
+                del(targetChar, findCount, isTill);
+                if (operator === 'c') updateMode('INSERT');
+              } else {
+                const find = isBackward
+                  ? buffer.vimFindCharBackward
+                  : buffer.vimFindCharForward;
+                find(targetChar, findCount, isTill);
+                dispatch({
+                  type: 'SET_LAST_FIND',
+                  find: { op, char: targetChar },
+                });
+              }
+            }
+          }
+          return true;
+        }
 
         switch (normalizedKey.sequence) {
           case 'h': {
@@ -694,6 +824,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             if (state.pendingOperator === 'c') {
               return handleOperatorMotion('c', 'w');
             }
+            if (state.pendingOperator === 'y') {
+              const count = getCurrentCount();
+              executeCommand(CMD_TYPES.YANK_WORD_FORWARD, count);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_WORD_FORWARD, count },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
+            }
 
             // Normal word movement
             buffer.vimMoveWordForward(repeatCount);
@@ -708,6 +849,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
             if (state.pendingOperator === 'c') {
               return handleOperatorMotion('c', 'W');
+            }
+            if (state.pendingOperator === 'y') {
+              const count = getCurrentCount();
+              executeCommand(CMD_TYPES.YANK_BIG_WORD_FORWARD, count);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_BIG_WORD_FORWARD, count },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
             }
 
             // Normal big word movement
@@ -754,6 +906,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             if (state.pendingOperator === 'c') {
               return handleOperatorMotion('c', 'e');
             }
+            if (state.pendingOperator === 'y') {
+              const count = getCurrentCount();
+              executeCommand(CMD_TYPES.YANK_WORD_END, count);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_WORD_END, count },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
+            }
 
             // Normal word end movement
             buffer.vimMoveWordEnd(repeatCount);
@@ -768,6 +931,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             }
             if (state.pendingOperator === 'c') {
               return handleOperatorMotion('c', 'E');
+            }
+            if (state.pendingOperator === 'y') {
+              const count = getCurrentCount();
+              executeCommand(CMD_TYPES.YANK_BIG_WORD_END, count);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_BIG_WORD_END, count },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
             }
 
             // Normal big word end movement
@@ -787,8 +961,79 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'X': {
+            buffer.vimDeleteCharBefore(repeatCount);
+            dispatch({
+              type: 'SET_LAST_COMMAND',
+              command: {
+                type: CMD_TYPES.DELETE_CHAR_BEFORE,
+                count: repeatCount,
+              },
+            });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case '~': {
+            buffer.vimToggleCase(repeatCount);
+            dispatch({
+              type: 'SET_LAST_COMMAND',
+              command: { type: CMD_TYPES.TOGGLE_CASE, count: repeatCount },
+            });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case 'r': {
+            // Replace char: next keypress is the replacement. Not composable with d/c.
+            dispatch({ type: 'CLEAR_PENDING_STATES' });
+            dispatch({
+              type: 'SET_PENDING_FIND_OP',
+              pendingFindOp: {
+                op: 'r',
+                operator: undefined,
+                count: repeatCount,
+              },
+            });
+            return true;
+          }
+
+          case 'f':
+          case 'F':
+          case 't':
+          case 'T': {
+            const op = normalizedKey.sequence;
+            const operator =
+              state.pendingOperator === 'd' || state.pendingOperator === 'c'
+                ? state.pendingOperator
+                : undefined;
+            dispatch({ type: 'CLEAR_PENDING_STATES' });
+            dispatch({
+              type: 'SET_PENDING_FIND_OP',
+              pendingFindOp: { op, operator, count: repeatCount },
+            });
+            return true;
+          }
+
+          case ';':
+          case ',': {
+            if (state.lastFind) {
+              const { op, char } = state.lastFind;
+              const isForward = op === 'f' || op === 't';
+              const isTill = op === 't' || op === 'T';
+              const reverse = normalizedKey.sequence === ',';
+              const shouldMoveForward = reverse ? !isForward : isForward;
+              if (shouldMoveForward) {
+                buffer.vimFindCharForward(char, repeatCount, isTill);
+              } else {
+                buffer.vimFindCharBackward(char, repeatCount, isTill);
+              }
+            }
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case 'i': {
-            // Enter INSERT mode at current position
             buffer.vimInsertAtCursor();
             updateMode('INSERT');
             dispatch({ type: 'CLEAR_COUNT' });
@@ -872,6 +1117,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               dispatch({ type: 'CLEAR_COUNT' });
               dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
               updateMode('INSERT');
+              return true;
+            }
+            // Check if this is part of a yank command (y$)
+            if (state.pendingOperator === 'y') {
+              executeCommand(CMD_TYPES.YANK_TO_EOL, repeatCount);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_TO_EOL, count: repeatCount },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
               return true;
             }
 
@@ -1067,6 +1323,59 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'y': {
+            if (state.pendingOperator === 'y') {
+              // Second 'y' - yank N lines (yy command)
+              const repeatCount = getCurrentCount();
+              executeCommand(CMD_TYPES.YANK_LINE, repeatCount);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.YANK_LINE, count: repeatCount },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else if (state.pendingOperator === null) {
+              // First 'y' - wait for motion
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: 'y' });
+            } else {
+              // Another operator is pending; clear it
+              dispatch({ type: 'CLEAR_PENDING_STATES' });
+            }
+            return true;
+          }
+
+          case 'Y': {
+            // Y yanks from cursor to end of line (equivalent to y$)
+            const repeatCount = getCurrentCount();
+            executeCommand(CMD_TYPES.YANK_TO_EOL, repeatCount);
+            dispatch({
+              type: 'SET_LAST_COMMAND',
+              command: { type: CMD_TYPES.YANK_TO_EOL, count: repeatCount },
+            });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case 'p': {
+            executeCommand(CMD_TYPES.PASTE_AFTER, repeatCount);
+            dispatch({
+              type: 'SET_LAST_COMMAND',
+              command: { type: CMD_TYPES.PASTE_AFTER, count: repeatCount },
+            });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case 'P': {
+            executeCommand(CMD_TYPES.PASTE_BEFORE, repeatCount);
+            dispatch({
+              type: 'SET_LAST_COMMAND',
+              command: { type: CMD_TYPES.PASTE_BEFORE, count: repeatCount },
+            });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case 'D': {
             // Delete from cursor to end of line (with count, delete to end of N lines)
             executeCommand(CMD_TYPES.DELETE_TO_EOL, repeatCount);
@@ -1105,7 +1414,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               const count = state.count > 0 ? state.count : cmdData.count;
 
               // All repeatable commands are now handled by executeCommand
-              executeCommand(cmdData.type, count);
+              executeCommand(cmdData.type, count, cmdData.char);
             }
 
             dispatch({ type: 'CLEAR_COUNT' });
@@ -1192,7 +1501,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       state.mode,
       state.count,
       state.pendingOperator,
+      state.pendingFindOp,
       state.lastCommand,
+      state.lastFind,
       dispatch,
       getCurrentCount,
       handleChangeMovement,
@@ -1202,6 +1513,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       executeCommand,
       updateMode,
       checkDoubleEscape,
+      keyMatchers,
     ],
   );
 

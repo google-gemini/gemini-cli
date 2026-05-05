@@ -39,12 +39,12 @@ describe('<Header />', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the long logo on a wide terminal', () => {
+  it('renders the long logo on a wide terminal', async () => {
     vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
       columns: 120,
       rows: 20,
     });
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
         children: longAsciiLogo,
@@ -53,9 +53,9 @@ describe('<Header />', () => {
     );
   });
 
-  it('renders custom ASCII art when provided', () => {
+  it('renders custom ASCII art when provided', async () => {
     const customArt = 'CUSTOM ART';
-    render(
+    await render(
       <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
     );
     expect(Text).toHaveBeenCalledWith(
@@ -66,8 +66,8 @@ describe('<Header />', () => {
     );
   });
 
-  it('displays the version number when nightly is true', () => {
-    render(<Header version="1.0.0" nightly={true} />);
+  it('displays the version number when nightly is true', async () => {
+    await render(<Header version="1.0.0" nightly={true} />);
     const textCalls = (Text as Mock).mock.calls;
     const versionText = Array.isArray(textCalls[1][0].children)
       ? textCalls[1][0].children.join('')
@@ -75,8 +75,8 @@ describe('<Header />', () => {
     expect(versionText).toBe('v1.0.0');
   });
 
-  it('does not display the version number when nightly is false', () => {
-    render(<Header version="1.0.0" nightly={false} />);
+  it('does not display the version number when nightly is false', async () => {
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Text).not.toHaveBeenCalledWith(
       expect.objectContaining({
         children: 'v1.0.0',
@@ -98,16 +98,18 @@ describe('<Header />', () => {
         primary: '',
         message: '',
         input: '',
+        focus: '',
         diff: { added: '', removed: '' },
       },
       border: {
         default: '',
-        focused: '',
       },
       ui: {
         comment: '',
         symbol: '',
+        active: '',
         dark: '',
+        focus: '',
         gradient: undefined,
       },
       status: {
@@ -117,7 +119,7 @@ describe('<Header />', () => {
       },
     });
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
     expect(textCalls[0][0]).toHaveProperty('color', '#123456');
@@ -129,7 +131,7 @@ describe('<Header />', () => {
       ui: { gradient: [singleColor] },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
     expect(textCalls.length).toBe(1);
@@ -142,7 +144,7 @@ describe('<Header />', () => {
       ui: { gradient: gradientColors },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).toHaveBeenCalledWith(
       expect.objectContaining({
         colors: gradientColors,

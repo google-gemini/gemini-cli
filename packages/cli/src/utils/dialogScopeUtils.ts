@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  isLoadableSettingScope,
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
 } from '../config/settings.js';
-import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
-import { settingExistsInScope } from './settingsUtils.js';
+import { isInSettingsScope } from './settingsUtils.js';
 
 /**
  * Shared scope labels for dialog components that need to display setting scopes
@@ -43,7 +44,9 @@ export function getScopeItems(): Array<{
 export function getScopeMessageForSetting(
   settingKey: string,
   selectedScope: LoadableSettingScope,
-  settings: LoadedSettings,
+  settings: {
+    forScope: (scope: LoadableSettingScope) => { settings: Settings };
+  },
 ): string {
   const otherScopes = Object.values(SettingScope)
     .filter(isLoadableSettingScope)
@@ -51,7 +54,7 @@ export function getScopeMessageForSetting(
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {
     const scopeSettings = settings.forScope(scope).settings;
-    return settingExistsInScope(settingKey, scopeSettings);
+    return isInSettingsScope(settingKey, scopeSettings);
   });
 
   if (modifiedInOtherScopes.length === 0) {
@@ -60,7 +63,7 @@ export function getScopeMessageForSetting(
 
   const modifiedScopesStr = modifiedInOtherScopes.join(', ');
   const currentScopeSettings = settings.forScope(selectedScope).settings;
-  const existsInCurrentScope = settingExistsInScope(
+  const existsInCurrentScope = isInSettingsScope(
     settingKey,
     currentScopeSettings,
   );

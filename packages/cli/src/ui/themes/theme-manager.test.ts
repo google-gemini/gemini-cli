@@ -11,11 +11,10 @@ if (process.env['NO_COLOR'] !== undefined) {
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
+import { debugLogger, type CustomTheme } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import type * as osActual from 'node:os';
-import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('node:fs');
 vi.mock('node:os', async (importOriginal) => {
@@ -56,7 +55,8 @@ const validCustomTheme: CustomTheme = {
 
 describe('ThemeManager', () => {
   beforeEach(() => {
-    // Reset themeManager state
+    // Reset themeManager state and inject mocks
+    themeManager.reinitialize({ fs, homedir: os.homedir });
     themeManager.loadCustomThemes({});
     themeManager.setActiveTheme(DEFAULT_THEME.name);
     themeManager.setTerminalBackground(undefined);

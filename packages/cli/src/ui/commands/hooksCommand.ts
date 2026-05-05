@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
+import { createElement } from 'react';
+import type {
+  SlashCommand,
+  CommandContext,
+  OpenCustomDialogActionReturn,
+} from './types.js';
 import { CommandKind } from './types.js';
-import { MessageType, type HistoryItemHooksList } from '../types.js';
 import type {
   HookRegistryEntry,
   MessageActionReturn,
@@ -15,14 +19,16 @@ import { getErrorMessage } from '@google/gemini-cli-core';
 import { SettingScope, isLoadableSettingScope } from '../../config/settings.js';
 import { enableHook, disableHook } from '../../utils/hookSettings.js';
 import { renderHookActionFeedback } from '../../utils/hookUtils.js';
+import { HooksDialog } from '../components/HooksDialog.js';
 
 /**
- * Display a formatted list of hooks with their status
+ * Display a formatted list of hooks with their status in a dialog
  */
-async function panelAction(
+function panelAction(
   context: CommandContext,
-): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+): MessageActionReturn | OpenCustomDialogActionReturn {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -34,12 +40,13 @@ async function panelAction(
   const hookSystem = config.getHookSystem();
   const allHooks = hookSystem?.getAllHooks() || [];
 
-  const hooksListItem: HistoryItemHooksList = {
-    type: MessageType.HOOKS_LIST,
-    hooks: allHooks,
+  return {
+    type: 'custom_dialog',
+    component: createElement(HooksDialog, {
+      hooks: allHooks,
+      onClose: () => context.ui.removeComponent(),
+    }),
   };
-
-  context.ui.addItem(hooksListItem);
 }
 
 /**
@@ -49,7 +56,8 @@ async function enableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -102,7 +110,8 @@ async function disableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -157,7 +166,8 @@ function completeEnabledHookNames(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) return [];
 
   const hookSystem = config.getHookSystem();
@@ -177,7 +187,8 @@ function completeDisabledHookNames(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) return [];
 
   const hookSystem = config.getHookSystem();
@@ -203,7 +214,8 @@ function getHookDisplayName(hook: HookRegistryEntry): string {
 async function enableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -274,7 +286,8 @@ async function enableAllAction(
 async function disableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -343,6 +356,7 @@ const panelCommand: SlashCommand = {
   altNames: ['list', 'show'],
   description: 'Display all registered hooks with their status',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: panelAction,
 };
 
@@ -393,5 +407,5 @@ export const hooksCommand: SlashCommand = {
     enableAllCommand,
     disableAllCommand,
   ],
-  action: async (context: CommandContext) => panelCommand.action!(context, ''),
+  action: (context: CommandContext) => panelCommand.action!(context, ''),
 };

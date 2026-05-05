@@ -4,10 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { A2AAuthProviderFactory } from './factory.js';
 import type { AgentCard, SecurityScheme } from '@a2a-js/sdk';
 import type { A2AAuthConfig } from './types.js';
+
+// Mock token storage so OAuth2AuthProvider.initialize() works without disk I/O.
+vi.mock('../../mcp/oauth-token-storage.js', () => {
+  const MCPOAuthTokenStorage = vi.fn().mockImplementation(() => ({
+    getCredentials: vi.fn().mockResolvedValue(null),
+    saveToken: vi.fn().mockResolvedValue(undefined),
+    deleteCredentials: vi.fn().mockResolvedValue(undefined),
+    isTokenExpired: vi.fn().mockReturnValue(false),
+  }));
+  return { MCPOAuthTokenStorage };
+});
 
 describe('A2AAuthProviderFactory', () => {
   describe('validateAuthConfig', () => {
@@ -491,6 +502,63 @@ describe('A2AAuthProviderFactory', () => {
       expect(provider!.type).toBe('apiKey');
       const headers = await provider!.headers();
       expect(headers).toEqual({ 'X-API-Key': 'factory-test-key' });
+    });
+
+    it('should create an OAuth2AuthProvider for oauth2 config', async () => {
+      const provider = await A2AAuthProviderFactory.create({
+        agentName: 'my-oauth-agent',
+        authConfig: {
+          type: 'oauth2',
+          client_id: 'my-client',
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+          scopes: ['read'],
+        },
+      });
+
+      expect(provider).toBeDefined();
+      expect(provider!.type).toBe('oauth2');
+    });
+
+    it('should create an OAuth2AuthProvider with agent card defaults', async () => {
+      const provider = await A2AAuthProviderFactory.create({
+        agentName: 'card-oauth-agent',
+        authConfig: {
+          type: 'oauth2',
+          client_id: 'my-client',
+        },
+        agentCard: {
+          securitySchemes: {
+            oauth: {
+              type: 'oauth2',
+              flows: {
+                authorizationCode: {
+                  authorizationUrl: 'https://card.example.com/authorize',
+                  tokenUrl: 'https://card.example.com/token',
+                  scopes: { read: 'Read access' },
+                },
+              },
+            },
+          },
+        } as unknown as AgentCard,
+      });
+
+      expect(provider).toBeDefined();
+      expect(provider!.type).toBe('oauth2');
+    });
+
+    it('should use "unknown" as agent name when agentName is not provided for oauth2', async () => {
+      const provider = await A2AAuthProviderFactory.create({
+        authConfig: {
+          type: 'oauth2',
+          client_id: 'my-client',
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      });
+
+      expect(provider).toBeDefined();
+      expect(provider!.type).toBe('oauth2');
     });
   });
 });

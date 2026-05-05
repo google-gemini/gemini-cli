@@ -4,9 +4,12 @@
   </style>
   <rect width="920" height="88" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">ID   Name                                                                                           </text>
-    <text x="0" y="19" fill="#3d3f51" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
-    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">1    Alice                                                                                          </text>
-    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">2    Bob                                                                                            </text>
+    <text x="0" y="2" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">ID</text>
+    <text x="45" y="2" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs" font-weight="bold">Name</text>
+    <text x="0" y="19" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
+    <text x="0" y="36" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs">1</text>
+    <text x="45" y="36" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs">Alice</text>
+    <text x="0" y="53" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs">2</text>
+    <text x="45" y="53" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">Bob</text>
   </g>
 </svg>

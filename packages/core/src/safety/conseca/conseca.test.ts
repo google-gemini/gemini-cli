@@ -6,8 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConsecaSafetyChecker } from './conseca.js';
-import { SafetyCheckDecision } from '../protocol.js';
-import type { SafetyCheckInput } from '../protocol.js';
+import { SafetyCheckDecision, type SafetyCheckInput } from '../protocol.js';
 import {
   logConsecaPolicyGeneration,
   logConsecaVerdict,
@@ -37,12 +36,15 @@ describe('ConsecaSafetyChecker', () => {
     checker = ConsecaSafetyChecker.getInstance();
 
     mockConfig = {
+      get config() {
+        return this;
+      },
       enableConseca: true,
       getToolRegistry: vi.fn().mockReturnValue({
         getFunctionDeclarations: vi.fn().mockReturnValue([]),
       }),
     } as unknown as Config;
-    checker.setConfig(mockConfig);
+    checker.setContext(mockConfig);
     vi.clearAllMocks();
 
     // Default mock implementations
@@ -73,9 +75,12 @@ describe('ConsecaSafetyChecker', () => {
 
   it('should return ALLOW if enableConseca is false', async () => {
     const disabledConfig = {
+      get config() {
+        return this;
+      },
       enableConseca: false,
     } as unknown as Config;
-    checker.setConfig(disabledConfig);
+    checker.setContext(disabledConfig);
 
     const input: SafetyCheckInput = {
       protocolVersion: '1.0.0',

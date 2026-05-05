@@ -18,6 +18,7 @@ const { shell } = getShellConfiguration();
 function getLineCountCommand(): { command: string; tool: string } {
   switch (shell) {
     case 'powershell':
+      return { command: `Measure-Object -Line`, tool: 'Measure-Object' };
     case 'cmd':
       return { command: `find /c /v`, tool: 'find' };
     case 'bash':
@@ -57,12 +58,18 @@ function getDisallowedFileReadCommand(testFile: string): {
   const quotedPath = `"${testFile}"`;
   switch (shell) {
     case 'powershell':
-      return { command: `Get-Content ${quotedPath}`, tool: 'Get-Content' };
+      return {
+        command: `powershell -Command "Get-Content ${quotedPath}"`,
+        tool: 'powershell',
+      };
     case 'cmd':
-      return { command: `type ${quotedPath}`, tool: 'type' };
+      return { command: `cmd /c type ${quotedPath}`, tool: 'cmd' };
     case 'bash':
     default:
-      return { command: `cat ${quotedPath}`, tool: 'cat' };
+      return {
+        command: `node -e "console.log(require('fs').readFileSync('${testFile}', 'utf8'))"`,
+        tool: 'node',
+      };
   }
 }
 
@@ -238,8 +245,12 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed in yolo mode', async () => {
+    const isWindows = process.platform === 'win32';
     await rig.setup('should succeed in yolo mode', {
-      settings: { tools: { core: ['run_shell_command'] } },
+      settings: {
+        tools: { core: ['run_shell_command'] },
+        shell: isWindows ? { enableInteractiveShell: false } : undefined,
+      },
     });
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');

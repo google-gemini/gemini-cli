@@ -35,7 +35,7 @@ browser.
 
 This opens a searchable list of all your past sessions. You'll see:
 
-- A timestamp (e.g., "2 hours ago").
+- A timestamp (for example, "2 hours ago").
 - The first user message (helping you identify the topic).
 - The number of turns in the conversation.
 
@@ -60,6 +60,19 @@ gemini --list-sessions
 # Delete a specific session by ID or index
 gemini --delete-session 1
 ```
+
+### Scenario: Delete session on exit
+
+If you're doing a one-off task and don't want to leave any session history
+behind, use the `--delete` flag when exiting:
+
+```
+/exit --delete
+```
+
+This removes the current session's conversation history and tool output files
+before exiting. It's useful for privacy-sensitive tasks or quick one-off
+interactions.
 
 ## How to rewind time (Undo mistakes)
 
@@ -89,9 +102,9 @@ Gemini gives you granular control over the undo process. You can choose to:
 Sometimes you want to try two different approaches to the same problem.
 
 1.  Start a session and get to a decision point.
-2.  Save the current state with `/chat save decision-point`.
+2.  Save the current state with `/resume save decision-point`.
 3.  Try your first approach.
-4.  Later, use `/chat resume decision-point` to fork the conversation back to
+4.  Later, use `/resume resume decision-point` to fork the conversation back to
     that moment and try a different approach.
 
 This creates a new branch of history without losing your original work.
@@ -101,5 +114,5 @@ This creates a new branch of history without losing your original work.
 - Learn about [Checkpointing](../../cli/checkpointing.md) to understand the
   underlying safety mechanism.
 - Explore [Task planning](task-planning.md) to keep complex sessions organized.
-- See the [Command reference](../../reference/commands.md) for all `/chat` and
-  `/resume` options.
+- See the [Command reference](../../reference/commands.md) for `/resume`
+  options, grouped checkpoint menus, and `/chat` compatibility aliases.

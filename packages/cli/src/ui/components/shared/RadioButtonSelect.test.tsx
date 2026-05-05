@@ -6,9 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import type { Text } from 'ink';
-import { Box } from 'ink';
 import type React from 'react';
+import { Box, type Text } from 'ink';
 import {
   RadioButtonSelect,
   type RadioSelectItem,
@@ -27,6 +26,8 @@ vi.mock('./BaseSelectionList.js', () => ({
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { secondary: 'COLOR_SECONDARY' },
+    ui: { focus: 'COLOR_FOCUS' },
+    background: { focus: 'COLOR_FOCUS_BG' },
   },
 }));
 
@@ -69,7 +70,7 @@ describe('RadioButtonSelect', () => {
     { label: 'Option 3', value: 'three', disabled: true, key: 'three' },
   ];
 
-  const renderComponent = (
+  const renderComponent = async (
     props: Partial<RadioButtonSelectProps<string>> = {},
   ) => {
     const defaultProps: RadioButtonSelectProps<string> = {
@@ -85,7 +86,7 @@ describe('RadioButtonSelect', () => {
   });
 
   describe('Prop forwarding to BaseSelectionList', () => {
-    it('should forward all props correctly when provided', () => {
+    it('should forward all props correctly when provided', async () => {
       const props = {
         items: ITEMS,
         initialIndex: 1,
@@ -97,7 +98,7 @@ describe('RadioButtonSelect', () => {
         showNumbers: false,
       };
 
-      renderComponent(props);
+      await renderComponent(props);
 
       expect(BaseSelectionList).toHaveBeenCalledTimes(1);
       expect(BaseSelectionList).toHaveBeenCalledWith(
@@ -109,8 +110,8 @@ describe('RadioButtonSelect', () => {
       );
     });
 
-    it('should use default props if not provided', () => {
-      renderComponent({
+    it('should use default props if not provided', async () => {
+      await renderComponent({
         items: ITEMS,
         onSelect: mockOnSelect,
       });
@@ -136,8 +137,8 @@ describe('RadioButtonSelect', () => {
       numberColor: 'MOCK_NUMBER_COLOR',
     };
 
-    beforeEach(() => {
-      renderComponent();
+    beforeEach(async () => {
+      await renderComponent();
       renderItem = extractRenderItem();
     });
 

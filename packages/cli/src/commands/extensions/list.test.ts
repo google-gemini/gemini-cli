@@ -5,27 +5,23 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, getErrorMessage } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
-import { getErrorMessage } from '../../utils/errors.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const { mockCoreDebugLogger } = await import(
     '../../test-utils/mockDebugLogger.js'
   );
-  return mockCoreDebugLogger(
-    await importOriginal<typeof import('@google/gemini-cli-core')>(),
-    {
-      stripAnsi: false,
-    },
-  );
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mocked = mockCoreDebugLogger(actual, { stripAnsi: false });
+  return { ...mocked, getErrorMessage: vi.fn() };
 });
 
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));

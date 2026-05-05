@@ -4,13 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getToolGroupBorderAppearance } from './borderStyles.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import type { IndividualToolCallDisplay } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { MainContent } from '../components/MainContent.js';
+import { Text } from 'ink';
+
+vi.mock('../components/CliSpinner.js', () => ({
+  CliSpinner: () => <Text>⊶</Text>,
+}));
+
+const altBufferOptions = {
+  config: makeFakeConfig({ useAlternateBuffer: true }),
+  settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+};
 
 describe('getToolGroupBorderAppearance', () => {
   it('should use warning color for pending non-shell tools', () => {
@@ -60,7 +71,7 @@ describe('getToolGroupBorderAppearance', () => {
     expect(appearance.borderDimColor).toBe(true);
   });
 
-  it('should use symbol color for shell tools', () => {
+  it('should use active color for shell tools', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -73,14 +84,34 @@ describe('getToolGroupBorderAppearance', () => {
       ] as IndividualToolCallDisplay[],
     };
     const appearance = getToolGroupBorderAppearance(item, undefined, false, []);
-    expect(appearance.borderColor).toBe(theme.ui.symbol);
+    expect(appearance.borderColor).toBe(theme.ui.active);
     expect(appearance.borderDimColor).toBe(true);
+  });
+
+  it('should use focus color for focused shell tools', () => {
+    const ptyId = 123;
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.Executing,
+          resultDisplay: '',
+          callId: 'call-1',
+          ptyId,
+        },
+      ] as IndividualToolCallDisplay[],
+    };
+    const appearance = getToolGroupBorderAppearance(item, ptyId, true, []);
+    expect(appearance.borderColor).toBe(theme.ui.focus);
+    expect(appearance.borderDimColor).toBe(false);
   });
 });
 
 describe('MainContent tool group border SVG snapshots', () => {
   it('should render SVG snapshot for a pending search dialog (google_web_search)', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
+      ...altBufferOptions,
       uiState: {
         history: [],
         pendingHistoryItems: [
@@ -104,7 +135,8 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for an empty slice following a search tool', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
+      ...altBufferOptions,
       uiState: {
         history: [],
         pendingHistoryItems: [
@@ -132,7 +164,8 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for a shell tool', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
+      ...altBufferOptions,
       uiState: {
         history: [],
         pendingHistoryItems: [

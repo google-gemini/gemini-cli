@@ -5,15 +5,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type {
-  ServerGeminiToolCallRequestEvent,
-  ServerGeminiErrorEvent,
+import {
+  Turn,
+  GeminiEventType,
+  type ServerGeminiToolCallRequestEvent,
+  type ServerGeminiErrorEvent,
 } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
 import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
-import type { GeminiChat } from './geminiChat.js';
-import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import {
+  InvalidStreamError,
+  StreamEventType,
+  type GeminiChat,
+} from './geminiChat.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const mockSendMessageStream = vi.fn();
@@ -44,6 +48,7 @@ describe('Turn', () => {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
+    context: { config: { isContextManagementEnabled: () => boolean } };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -53,6 +58,11 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
       maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
+      context: {
+        config: {
+          isContextManagementEnabled: () => false,
+        },
+      },
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);

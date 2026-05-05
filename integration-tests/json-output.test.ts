@@ -81,7 +81,9 @@ describe('JSON output', () => {
     const message = (thrown as Error).message;
 
     // Use a regex to find the first complete JSON object in the string
-    const jsonMatch = message.match(/{[\s\S]*}/);
+    // We expect the JSON to start with a quote (e.g. {"error": ...}) to avoid
+    // matching random error objects printed to stderr (like ENOENT).
+    const jsonMatch = message.match(/{\s*"[\s\S]*}/);
 
     // Fail if no JSON-like text was found
     expect(

@@ -33,6 +33,19 @@ export interface ExtensionConfig {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Planning features configuration contributed by this extension.
+   */
+  plan?: {
+    /**
+     * The directory where planning artifacts are stored.
+     */
+    directory?: string;
+  };
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
+  migratedTo?: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -50,7 +63,7 @@ export function loadInstallMetadata(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const metadata = JSON.parse(configContent) as ExtensionInstallMetadata;
     return metadata;
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 }

@@ -7,7 +7,7 @@ progress with the todo list.
 ## Prerequisites
 
 - Gemini CLI installed and authenticated.
-- A complex task in mind (e.g., a multi-file refactor or new feature).
+- A complex task in mind (for example, a multi-file refactor or new feature).
 
 ## Why use task planning?
 
@@ -58,7 +58,7 @@ Tell the agent to proceed.
 As the agent works, you'll see the todo list update in real-time above the input
 box.
 
-- **Current focus:** The active task is highlighted (e.g.,
+- **Current focus:** The active task is highlighted (for example,
   `[IN_PROGRESS] Create tsconfig.json`).
 - **Progress:** Completed tasks are marked as done.
 
@@ -90,4 +90,4 @@ living document, not a static text block.
 - See the [Todo tool reference](../../tools/todos.md) for technical schema
   details.
 - Learn about [Memory management](memory-management.md) to persist planning
-  preferences (e.g., "Always create a test plan first").
+  preferences (for example, "Always create a test plan first").

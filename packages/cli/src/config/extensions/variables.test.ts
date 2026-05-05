@@ -124,4 +124,30 @@ describe('recursivelyHydrateStrings', () => {
     const result = recursivelyHydrateStrings(obj, context);
     expect(result).toEqual(obj);
   });
+
+  it('should not allow prototype pollution via __proto__', () => {
+    const payload = JSON.parse('{"__proto__": {"polluted": "yes"}}');
+    const result = recursivelyHydrateStrings(payload, context);
+
+    expect(result.polluted).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(result, 'polluted')).toBe(
+      false,
+    );
+  });
+
+  it('should not allow prototype pollution via constructor', () => {
+    const payload = JSON.parse(
+      '{"constructor": {"prototype": {"polluted": "yes"}}}',
+    );
+    const result = recursivelyHydrateStrings(payload, context);
+
+    expect(result.polluted).toBeUndefined();
+  });
+
+  it('should not allow prototype pollution via prototype', () => {
+    const payload = JSON.parse('{"prototype": {"polluted": "yes"}}');
+    const result = recursivelyHydrateStrings(payload, context);
+
+    expect(result.polluted).toBeUndefined();
+  });
 });

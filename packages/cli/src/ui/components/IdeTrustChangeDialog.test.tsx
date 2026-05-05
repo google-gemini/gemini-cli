@@ -17,10 +17,9 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('renders the correct message for CONNECTION_CHANGE', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
-    await waitUntilReady();
 
     const frameText = lastFrame();
     expect(frameText).toContain(
@@ -31,10 +30,9 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('renders the correct message for TRUST_CHANGE', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="TRUST_CHANGE" />,
     );
-    await waitUntilReady();
 
     const frameText = lastFrame();
     expect(frameText).toContain(
@@ -48,10 +46,9 @@ describe('IdeTrustChangeDialog', () => {
     const debugLoggerWarnSpy = vi
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
     );
-    await waitUntilReady();
 
     const frameText = lastFrame();
     expect(frameText).toContain('Workspace trust has changed.');
@@ -62,11 +59,12 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('calls relaunchApp when "r" is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('r');
@@ -78,11 +76,12 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('calls relaunchApp when "R" is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('R');
@@ -94,11 +93,12 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('does not call relaunchApp when another key is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('a');

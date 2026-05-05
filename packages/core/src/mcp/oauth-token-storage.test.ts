@@ -23,10 +23,14 @@ vi.mock('node:fs', () => ({
   },
 }));
 
-vi.mock('node:path', () => ({
-  dirname: vi.fn(),
-  join: vi.fn(),
-}));
+vi.mock('node:path', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:path')>();
+  return {
+    ...actual,
+    dirname: vi.fn(),
+    join: vi.fn(),
+  };
+});
 
 vi.mock('../config/storage.js', () => ({
   Storage: {
@@ -40,14 +44,14 @@ vi.mock('../utils/events.js', () => ({
   },
 }));
 
-const mockHybridTokenStorage = {
+const mockHybridTokenStorage = vi.hoisted(() => ({
   listServers: vi.fn(),
   setCredentials: vi.fn(),
   getCredentials: vi.fn(),
   deleteCredentials: vi.fn(),
   clearAll: vi.fn(),
   getAllCredentials: vi.fn(),
-};
+}));
 vi.mock('./token-storage/hybrid-token-storage.js', () => ({
   HybridTokenStorage: vi.fn(() => mockHybridTokenStorage),
 }));

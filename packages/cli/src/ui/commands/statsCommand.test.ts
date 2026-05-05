@@ -20,6 +20,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserAccountManager: vi.fn().mockImplementation(() => ({
       getCachedGoogleAccount: vi.fn().mockReturnValue('mock@example.com'),
     })),
+    getG1CreditBalance: vi.fn().mockReturnValue(undefined),
   };
 });
 
@@ -39,11 +40,21 @@ describe('statsCommand', () => {
     mockContext.session.stats.sessionStartTime = startTime;
   });
 
-  it('should display general session stats when run with no subcommand', () => {
+  it('should display general session stats when run with no subcommand', async () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    statsCommand.action(mockContext, '');
+    mockContext.services.agentContext = {
+      refreshUserQuota: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
+      getUserTierName: vi.fn(),
+      getUserPaidTier: vi.fn(),
+      getModel: vi.fn(),
+      get config() {
+        return this;
+      },
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
       endTime.getTime() - startTime.getTime(),
@@ -55,6 +66,7 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
+      creditBalance: undefined,
     });
   });
 
@@ -71,13 +83,18 @@ describe('statsCommand', () => {
       .fn()
       .mockReturnValue('2025-01-01T12:00:00Z');
 
-    mockContext.services.config = {
+    mockContext.services.agentContext = {
       refreshUserQuota: mockRefreshUserQuota,
       getUserTierName: mockGetUserTierName,
       getModel: mockGetModel,
       getQuotaRemaining: mockGetQuotaRemaining,
       getQuotaLimit: mockGetQuotaLimit,
       getQuotaResetTime: mockGetQuotaResetTime,
+      getUserPaidTier: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');

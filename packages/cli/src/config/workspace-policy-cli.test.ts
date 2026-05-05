@@ -54,6 +54,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Policy.setDisableWorkspacePolicies(false);
     // Default to MATCH for existing tests
     mockCheckIntegrity.mockResolvedValue({
       status: 'match',
@@ -87,6 +88,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -105,6 +108,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -129,6 +134,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -161,6 +168,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
           path.join('.gemini', 'policies'),
         ),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -200,6 +209,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -235,6 +246,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
           path.join('.gemini', 'policies'),
         ),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -276,6 +289,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         expect.objectContaining({
           workspacePoliciesDir: undefined,
         }),
+        expect.anything(),
+        undefined,
         expect.anything(),
       );
     } finally {

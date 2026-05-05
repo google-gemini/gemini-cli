@@ -23,6 +23,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { ColorsDisplay } from './ColorsDisplay.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -74,6 +76,16 @@ function generateThemeItem(
     isCompatible,
   };
 }
+
+import {
+  DIALOG_PADDING,
+  PREVIEW_PANE_FIXED_VERTICAL_SPACE,
+  PREVIEW_PANE_WIDTH_PERCENTAGE,
+  PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+  SELECTION_PANE_WIDTH_PERCENTAGE,
+  TAB_TO_SELECT_HEIGHT,
+  TOTAL_HORIZONTAL_PADDING,
+} from './ThemeDialog.constants.js';
 
 export function ThemeDialog({
   onSelect,
@@ -188,14 +200,6 @@ export function ThemeDialog({
     settings,
   );
 
-  // Constants for calculating preview pane layout.
-  // These values are based on the JSX structure below.
-  const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
-  // A safety margin to prevent text from touching the border.
-  // This is a complete hack unrelated to the 0.9 used in App.tsx
-  const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
-  // Combined horizontal padding from the dialog and preview pane.
-  const TOTAL_HORIZONTAL_PADDING = 4;
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
@@ -205,9 +209,7 @@ export function ThemeDialog({
     1,
   );
 
-  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
-  const TAB_TO_SELECT_HEIGHT = 2;
   availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
   availableTerminalHeight -= 2; // Top and bottom borders.
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
@@ -221,10 +223,6 @@ export function ThemeDialog({
     includePadding = false;
     totalLeftHandSideHeight -= DIALOG_PADDING;
   }
-
-  // Vertical space taken by elements other than the two code blocks in the preview pane.
-  // Includes "Preview" title, borders, and margin between blocks.
-  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
 
   // The right column doesn't need to ever be shorter than the left column.
   availableTerminalHeight = Math.max(
@@ -245,6 +243,14 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+
+  const previewTheme =
+    themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
+    DEFAULT_THEME;
+
+  const leftColumnWidth = `${SELECTION_PANE_WIDTH_PERCENTAGE * 100}%`;
+  const rightColumnWidth = `${PREVIEW_PANE_WIDTH_PERCENTAGE * 100}%`;
+
   return (
     <Box
       borderStyle="round"
@@ -259,7 +265,7 @@ export function ThemeDialog({
       {mode === 'theme' ? (
         <Box flexDirection="row">
           {/* Left Column: Selection */}
-          <Box flexDirection="column" width="45%" paddingRight={2}>
+          <Box flexDirection="column" width={leftColumnWidth} paddingRight={2}>
             <Text bold={mode === 'theme'} wrap="truncate">
               {mode === 'theme' ? '> ' : '  '}Select Theme{' '}
               <Text color={theme.text.secondary}>
@@ -280,11 +286,15 @@ export function ThemeDialog({
                 const itemWithExtras = item as typeof item & {
                   themeWarning?: string;
                   themeMatch?: string;
+                  themeNameDisplay?: string;
+                  themeTypeDisplay?: string;
                 };
 
-                if (item.themeNameDisplay && item.themeTypeDisplay) {
-                  const match = item.themeNameDisplay.match(/^(.*) \((.*)\)$/);
-                  let themeNamePart: React.ReactNode = item.themeNameDisplay;
+                if (itemWithExtras.themeNameDisplay) {
+                  const match =
+                    itemWithExtras.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode =
+                    itemWithExtras.themeNameDisplay;
                   if (match) {
                     themeNamePart = (
                       <>
@@ -296,10 +306,15 @@ export function ThemeDialog({
 
                   return (
                     <Text color={titleColor} wrap="truncate" key={item.key}>
-                      {themeNamePart}{' '}
-                      <Text color={theme.text.secondary}>
-                        {item.themeTypeDisplay}
-                      </Text>
+                      {themeNamePart}
+                      {itemWithExtras.themeTypeDisplay ? (
+                        <>
+                          {' '}
+                          <Text color={theme.text.secondary}>
+                            {itemWithExtras.themeTypeDisplay}
+                          </Text>
+                        </>
+                      ) : null}
                       {itemWithExtras.themeMatch && (
                         <Text color={theme.status.success}>
                           {itemWithExtras.themeMatch}
@@ -324,57 +339,52 @@ export function ThemeDialog({
           </Box>
 
           {/* Right Column: Preview */}
-          <Box flexDirection="column" width="55%" paddingLeft={2}>
+          <Box flexDirection="column" width={rightColumnWidth} paddingLeft={2}>
             <Text bold color={theme.text.primary}>
               Preview
             </Text>
-            {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
-            {(() => {
-              const previewTheme =
-                themeManager.getTheme(
-                  highlightedThemeName || DEFAULT_THEME.name,
-                ) || DEFAULT_THEME;
-
-              return (
-                <Box
-                  borderStyle="single"
-                  borderColor={theme.border.default}
-                  paddingTop={includePadding ? 1 : 0}
-                  paddingBottom={includePadding ? 1 : 0}
-                  paddingLeft={1}
-                  paddingRight={1}
-                  flexDirection="column"
-                >
-                  {colorizeCode({
-                    code: `# function
+            <Box
+              borderStyle="single"
+              borderColor={theme.border.default}
+              paddingTop={includePadding ? 1 : 0}
+              paddingBottom={includePadding ? 1 : 0}
+              paddingLeft={1}
+              paddingRight={1}
+              flexDirection="column"
+            >
+              {colorizeCode({
+                code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                    language: 'python',
-                    availableHeight:
-                      isAlternateBuffer === false ? codeBlockHeight : undefined,
-                    maxWidth: colorizeCodeWidth,
-                    settings,
-                  })}
-                  <Box marginTop={1} />
-                  <DiffRenderer
-                    diffContent={`--- a/util.py
+                language: 'python',
+                availableHeight:
+                  isAlternateBuffer === false ? codeBlockHeight : undefined,
+                maxWidth: colorizeCodeWidth,
+                settings,
+              })}
+              <Box marginTop={1} />
+              <DiffRenderer
+                diffContent={`--- a/util.py
 +++ b/util.py
 @@ -1,2 +1,2 @@
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={
-                      isAlternateBuffer === false ? diffHeight : undefined
-                    }
-                    terminalWidth={colorizeCodeWidth}
-                    theme={previewTheme}
-                  />
-                </Box>
-              );
-            })()}
+                availableTerminalHeight={
+                  isAlternateBuffer === false ? diffHeight : undefined
+                }
+                terminalWidth={colorizeCodeWidth}
+                theme={previewTheme}
+              />
+            </Box>
+            {isDevelopment && (
+              <Box marginTop={1}>
+                <ColorsDisplay activeTheme={previewTheme} />
+              </Box>
+            )}
           </Box>
         </Box>
       ) : (

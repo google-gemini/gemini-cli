@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`colorizeCode > does not let colors from ansi escape codes leak into colorized code 1`] = `
+"line 1
+line 2 with red background
+line 3"
+`;

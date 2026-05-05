@@ -72,7 +72,10 @@ describe('initializer', () => {
     vi.mocked(IdeClient.getInstance).mockResolvedValue(
       mockIdeClient as unknown as IdeClient,
     );
-    vi.mocked(performInitialAuth).mockResolvedValue(null);
+    vi.mocked(performInitialAuth).mockResolvedValue({
+      authError: null,
+      accountSuspensionInfo: null,
+    });
     vi.mocked(validateTheme).mockReturnValue(null);
   });
 
@@ -84,6 +87,7 @@ describe('initializer', () => {
 
     expect(result).toEqual({
       authError: null,
+      accountSuspensionInfo: null,
       themeError: null,
       shouldOpenAuthDialog: false,
       geminiMdFileCount: 5,
@@ -101,8 +105,12 @@ describe('initializer', () => {
       mockSettings,
     );
 
+    // Wait for the background promise to resolve
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     expect(result).toEqual({
       authError: null,
+      accountSuspensionInfo: null,
       themeError: null,
       shouldOpenAuthDialog: false,
       geminiMdFileCount: 5,
@@ -116,7 +124,10 @@ describe('initializer', () => {
   });
 
   it('should handle auth error', async () => {
-    vi.mocked(performInitialAuth).mockResolvedValue('Auth failed');
+    vi.mocked(performInitialAuth).mockResolvedValue({
+      authError: 'Auth failed',
+      accountSuspensionInfo: null,
+    });
     const result = await initializeApp(
       mockConfig as unknown as Config,
       mockSettings,

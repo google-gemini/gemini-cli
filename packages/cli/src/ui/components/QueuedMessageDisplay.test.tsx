@@ -10,20 +10,18 @@ import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 
 describe('QueuedMessageDisplay', () => {
   it('renders nothing when message queue is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={[]} />,
     );
-    await waitUntilReady();
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('displays single queued message', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={['First message']} />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -38,10 +36,9 @@ describe('QueuedMessageDisplay', () => {
       'Third queued message',
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -60,10 +57,9 @@ describe('QueuedMessageDisplay', () => {
       'Message 5',
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');
@@ -79,10 +75,9 @@ describe('QueuedMessageDisplay', () => {
   it('normalizes whitespace in messages', async () => {
     const messageQueue = ['Message   with\tmultiple\n  whitespace'];
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={messageQueue} />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Queued (press ↑ to edit):');

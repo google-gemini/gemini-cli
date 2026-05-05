@@ -5,7 +5,8 @@
  */
 
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
+
+import { spawnAsync } from './shell-utils.js';
 
 /** Default timeout for SIGKILL escalation on Unix systems. */
 export const SIGKILL_TIMEOUT_MS = 200;
@@ -31,7 +32,8 @@ export interface KillOptions {
  * or the PTY's built-in kill method.
  *
  * On Unix, it attempts to kill the process group (using -pid) with escalation
- * from SIGTERM to SIGKILL if requested.
+ * from SIGTERM to SIGKILL if requested. It also walks the process tree using pgrep
+ * to ensure all descendants are killed.
  */
 export async function killProcessGroup(options: KillOptions): Promise<void> {
   const { pid, escalate = false, isExited = () => false, pty } = options;
@@ -44,18 +46,69 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
       } catch {
         // Ignore errors for dead processes
       }
-    } else {
-      cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+    }
+    // Invoke taskkill to ensure the entire tree is terminated and any orphaned descendant processes are reaped.
+    try {
+      await spawnAsync('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+    } catch {
+      // Ignore errors if the process tree is already dead
     }
     return;
   }
 
-  // Unix logic
+  // Unix logic: Walk process tree to find all descendants
+  const getAllDescendants = async (parentPid: number): Promise<number[]> => {
+    let children: number[] = [];
+    try {
+      const { stdout } = await spawnAsync('pgrep', [
+        '-P',
+        parentPid.toString(),
+      ]);
+      const pids = stdout
+        .trim()
+        .split('\n')
+        .map((p: string) => parseInt(p, 10))
+        .filter((p: number) => !isNaN(p));
+      for (const p of pids) {
+        children.push(p);
+        const grandchildren = await getAllDescendants(p);
+        children = children.concat(grandchildren);
+      }
+    } catch {
+      // pgrep exits with 1 if no children are found
+    }
+    return children;
+  };
+
+  const descendants = await getAllDescendants(pid);
+  const allPidsToKill = [...descendants.reverse(), pid];
+
   try {
     const initialSignal = options.signal || (escalate ? 'SIGTERM' : 'SIGKILL');
 
     // Try killing the process group first (-pid)
-    process.kill(-pid, initialSignal);
+    try {
+      process.kill(-pid, initialSignal);
+    } catch {
+      // Ignore
+    }
+
+    // Kill individual processes in the tree to ensure detached descendants are caught
+    for (const targetPid of allPidsToKill) {
+      try {
+        process.kill(targetPid, initialSignal);
+      } catch {
+        // Ignore
+      }
+    }
+
+    if (pty) {
+      try {
+        pty.kill(typeof initialSignal === 'string' ? initialSignal : undefined);
+      } catch {
+        // Ignore
+      }
+    }
 
     if (escalate && !isExited()) {
       await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
@@ -65,33 +118,30 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
         } catch {
           // Ignore
         }
-      }
-    }
-  } catch (_e) {
-    // Fallback to specific process kill if group kill fails or on error
-    if (!isExited()) {
-      if (pty) {
-        if (escalate) {
+
+        for (const targetPid of allPidsToKill) {
           try {
-            pty.kill('SIGTERM');
-            await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-            if (!isExited()) pty.kill('SIGKILL');
+            process.kill(targetPid, 'SIGKILL');
           } catch {
             // Ignore
           }
-        } else {
+        }
+        if (pty) {
           try {
             pty.kill('SIGKILL');
           } catch {
             // Ignore
           }
         }
-      } else {
-        try {
-          process.kill(pid, 'SIGKILL');
-        } catch {
-          // Ignore
-        }
+      }
+    }
+  } catch {
+    // Ultimate fallback if something unexpected throws
+    if (!isExited()) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Ignore
       }
     }
   }

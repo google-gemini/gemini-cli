@@ -31,7 +31,7 @@ export interface RoutingDecision {
  */
 export interface RoutingContext {
   /** The full history of the conversation. */
-  history: Content[];
+  history: readonly Content[];
   /** The immediate request parts to be processed. */
   request: PartListUnion;
   /** An abort signal to cancel an LLM call during routing. */

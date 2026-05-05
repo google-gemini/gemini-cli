@@ -5,9 +5,9 @@
  */
 
 import { simpleGit } from 'simple-git';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   debugLogger,
+  getErrorMessage,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
@@ -151,7 +151,7 @@ export async function fetchReleaseFromGithub(
       return await fetchJson(
         `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
       );
-    } catch (_) {
+    } catch {
       // This can fail if there is no release marked latest. In that case
       // we want to just try the pre-release logic below.
     }
@@ -203,6 +203,24 @@ export async function checkForExtensionUpdate(
   ) {
     return ExtensionUpdateState.NOT_UPDATABLE;
   }
+
+  if (extension.migratedTo) {
+    const migratedState = await checkForExtensionUpdate(
+      {
+        ...extension,
+        installMetadata: { ...installMetadata, source: extension.migratedTo },
+        migratedTo: undefined,
+      },
+      extensionManager,
+    );
+    if (
+      migratedState === ExtensionUpdateState.UPDATE_AVAILABLE ||
+      migratedState === ExtensionUpdateState.UP_TO_DATE
+    ) {
+      return ExtensionUpdateState.UPDATE_AVAILABLE;
+    }
+  }
+
   try {
     if (installMetadata.type === 'git') {
       const git = simpleGit(extension.path);

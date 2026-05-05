@@ -8,13 +8,18 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-
+import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import {
+  DEFAULT_MAX_LINES_TEXT_FILE,
+  MAX_LINE_LENGTH_TEXT_FILE,
+  MAX_FILE_SIZE_MB,
+} from './constants.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -51,10 +56,6 @@ export async function loadWasmBinary(
     });
   }
 }
-
-// Constants for text file processing
-export const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
-const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 
 // Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
@@ -201,6 +202,72 @@ export function getSpecificMimeType(filePath: string): string | undefined {
   return typeof lookedUpMime === 'string' ? lookedUpMime : undefined;
 }
 
+const SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION = new Map<string, string>([
+  ['.mp3', 'audio/mpeg'],
+  ['.wav', 'audio/wav'],
+  ['.aiff', 'audio/aiff'],
+  ['.aif', 'audio/aiff'],
+  ['.aac', 'audio/aac'],
+  ['.ogg', 'audio/ogg'],
+  ['.flac', 'audio/flac'],
+]);
+
+const AUDIO_MIME_TYPE_NORMALIZATION: Record<string, string> = {
+  'audio/mp3': 'audio/mpeg',
+  'audio/x-mp3': 'audio/mpeg',
+  'audio/wave': 'audio/wav',
+  'audio/x-wav': 'audio/wav',
+  'audio/vnd.wave': 'audio/wav',
+  'audio/x-pn-wav': 'audio/wav',
+  'audio/x-aiff': 'audio/aiff',
+  'audio/aif': 'audio/aiff',
+  'audio/x-aac': 'audio/aac',
+};
+
+function formatSupportedAudioFormats(): string {
+  const displayNames = Array.from(
+    new Set(
+      Array.from(SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.keys()).map((ext) => {
+        if (ext === '.aif' || ext === '.aiff') {
+          return 'AIFF';
+        }
+        return ext.slice(1).toUpperCase();
+      }),
+    ),
+  );
+
+  if (displayNames.length <= 1) {
+    return displayNames[0] ?? '';
+  }
+
+  return `${displayNames.slice(0, -1).join(', ')}, and ${displayNames.at(-1)}`;
+}
+
+const SUPPORTED_AUDIO_FORMATS_DISPLAY = formatSupportedAudioFormats();
+
+function getSupportedAudioMimeTypeForFile(
+  filePath: string,
+): string | undefined {
+  const extension = path.extname(filePath).toLowerCase();
+  const extensionMimeType =
+    SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.get(extension);
+  const lookedUpMimeType = getSpecificMimeType(filePath)?.toLowerCase();
+  const normalizedMimeType = lookedUpMimeType
+    ? (AUDIO_MIME_TYPE_NORMALIZATION[lookedUpMimeType] ?? lookedUpMimeType)
+    : undefined;
+
+  if (
+    normalizedMimeType &&
+    [...SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.values()].includes(
+      normalizedMimeType,
+    )
+  ) {
+    return normalizedMimeType;
+  }
+
+  return extensionMimeType;
+}
+
 /**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
@@ -279,53 +346,17 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
 /**
  * Heuristic: determine if a file is likely binary.
- * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
- * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
+ * Delegates to the `isbinaryfile` package for UTF-8-aware detection.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
-  let fh: fs.promises.FileHandle | null = null;
   try {
-    fh = await fs.promises.open(filePath, 'r');
-    const stats = await fh.stat();
-    const fileSize = stats.size;
-    if (fileSize === 0) return false; // empty is not binary
-
-    // Sample up to 4KB from the head (previous behavior)
-    const sampleSize = Math.min(4096, fileSize);
-    const buf = Buffer.alloc(sampleSize);
-    const { bytesRead } = await fh.read(buf, 0, sampleSize, 0);
-    if (bytesRead === 0) return false;
-
-    // BOM → text (avoid false positives for UTF‑16/32 with nulls)
-    const bom = detectBOM(buf.subarray(0, Math.min(4, bytesRead)));
-    if (bom) return false;
-
-    let nonPrintableCount = 0;
-    for (let i = 0; i < bytesRead; i++) {
-      if (buf[i] === 0) return true; // strong indicator of binary when no BOM
-      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32)) {
-        nonPrintableCount++;
-      }
-    }
-    // If >30% non-printable characters, consider it binary
-    return nonPrintableCount / bytesRead > 0.3;
+    return await isBinaryFileCheck(filePath);
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
       error instanceof Error ? error.message : String(error),
     );
     return false;
-  } finally {
-    if (fh) {
-      try {
-        await fh.close();
-      } catch (closeError) {
-        debugLogger.warn(
-          `Failed to close file handle for: ${filePath}`,
-          closeError instanceof Error ? closeError.message : String(closeError),
-        );
-      }
-    }
   }
 }
 
@@ -368,6 +399,14 @@ export async function detectFileType(
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
     }
+  }
+
+  const supportedAudioMimeType = getSupportedAudioMimeTypeForFile(filePath);
+  if (supportedAudioMimeType) {
+    if (!(await isBinaryFile(filePath))) {
+      return 'text';
+    }
+    return 'audio';
   }
 
   // Stricter binary check for common non-text extensions before content check
@@ -434,11 +473,11 @@ export async function processSingleFileContent(
     }
 
     const fileSizeInMB = stats.size / (1024 * 1024);
-    if (fileSizeInMB > 20) {
+    if (fileSizeInMB > MAX_FILE_SIZE_MB) {
       return {
-        llmContent: 'File size exceeds the 20MB limit.',
-        returnDisplay: 'File size exceeds the 20MB limit.',
-        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        llmContent: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        returnDisplay: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        error: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
         errorType: ToolErrorType.FILE_TOO_LARGE,
       };
     }
@@ -472,7 +511,7 @@ export async function processSingleFileContent(
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
-        const lines = content.split('\n');
+        const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
         let sliceStart = 0;
@@ -532,17 +571,40 @@ export async function processSingleFileContent(
           linesShown: [actualStart + 1, sliceEnd],
         };
       }
-      case 'image':
-      case 'pdf':
-      case 'audio':
-      case 'video': {
+      case 'audio': {
+        const mimeType = getSupportedAudioMimeTypeForFile(filePath);
+        if (!mimeType) {
+          return {
+            llmContent: `Could not read audio file because its format is not supported. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
+            returnDisplay: `Unsupported audio file format: ${relativePathForDisplay}`,
+            error: `Unsupported audio file format for ${filePath}. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
+            errorType: ToolErrorType.READ_CONTENT_FAILURE,
+          };
+        }
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType,
+            },
+          },
+          returnDisplay: `Read audio file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'image':
+      case 'pdf':
+      case 'video': {
+        const mimeType =
+          getSpecificMimeType(filePath) ?? 'application/octet-stream';
+        const contentBuffer = await fs.promises.readFile(filePath);
+        const base64Data = contentBuffer.toString('base64');
+        return {
+          llmContent: {
+            inlineData: {
+              data: base64Data,
+              mimeType,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
@@ -576,7 +638,7 @@ export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fsPromises.access(filePath, fs.constants.F_OK);
     return true;
-  } catch (_: unknown) {
+  } catch {
     return false;
   }
 }

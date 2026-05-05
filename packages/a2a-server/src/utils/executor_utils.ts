@@ -8,8 +8,7 @@ import type { Message } from '@a2a-js/sdk';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CoderAgentEvent } from '../types.js';
-import type { StateChange } from '../types.js';
+import { CoderAgentEvent, type StateChange } from '../types.js';
 
 export async function pushTaskStateFailed(
   error: unknown,

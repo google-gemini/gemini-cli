@@ -5,8 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ModelConfigService } from './modelConfigService.js';
-import type { ModelConfigServiceConfig } from './modelConfigService.js';
+import {
+  ModelConfigService,
+  type ModelConfigServiceConfig,
+} from './modelConfigService.js';
 
 // This test suite is designed to validate the end-to-end logic of the
 // ModelConfigService with a complex, realistic configuration.

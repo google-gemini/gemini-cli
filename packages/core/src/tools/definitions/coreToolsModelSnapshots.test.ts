@@ -69,7 +69,7 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'list_directory', definition: LS_DEFINITION },
     {
       name: 'run_shell_command',
-      definition: getShellDefinition(true, true),
+      definition: getShellDefinition(true, true, true),
     },
     { name: 'replace', definition: EDIT_DEFINITION },
     { name: 'google_web_search', definition: WEB_SEARCH_DEFINITION },
@@ -82,7 +82,7 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'enter_plan_mode', definition: ENTER_PLAN_MODE_DEFINITION },
     {
       name: 'exit_plan_mode',
-      definition: getExitPlanModeDefinition('/mock/plans'),
+      definition: getExitPlanModeDefinition(),
     },
     {
       name: 'activate_skill',

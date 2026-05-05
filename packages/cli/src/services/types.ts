@@ -22,3 +22,12 @@ export interface ICommandLoader {
    */
   loadCommands(signal: AbortSignal): Promise<SlashCommand[]>;
 }
+
+export interface CommandConflict {
+  name: string;
+  losers: Array<{
+    command: SlashCommand;
+    renamedTo: string;
+    reason: SlashCommand;
+  }>;
+}

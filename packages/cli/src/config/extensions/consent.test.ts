@@ -59,8 +59,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 async function expectConsentSnapshot(consentString: string) {
-  const renderResult = render(React.createElement(Text, null, consentString));
-  await renderResult.waitUntilReady();
+  const renderResult = await render(
+    React.createElement(Text, null, consentString),
+  );
   await expect(renderResult).toMatchSvgSnapshot();
 }
 
@@ -148,6 +149,35 @@ describe('consent', () => {
         expect(consent).toBe(expected);
       },
     );
+
+    it('should clear the active confirmation request before resolving', async () => {
+      const clearConfirmationRequest = vi.fn();
+      const steps: string[] = [];
+      const addExtensionUpdateConfirmationRequest = vi
+        .fn()
+        .mockImplementation((request: ConfirmationRequest) => {
+          steps.push('prompted');
+          request.onConfirm(true);
+          steps.push('confirmed');
+        });
+
+      const consentPromise = requestConsentInteractive(
+        'Test consent',
+        addExtensionUpdateConfirmationRequest,
+        () => {
+          steps.push('cleared');
+          clearConfirmationRequest();
+        },
+      ).then((consent) => {
+        steps.push('resolved');
+        return consent;
+      });
+
+      expect(clearConfirmationRequest).toHaveBeenCalledTimes(1);
+      expect(steps).toEqual(['prompted', 'cleared', 'confirmed']);
+      await expect(consentPromise).resolves.toBe(true);
+      expect(steps).toEqual(['prompted', 'cleared', 'confirmed', 'resolved']);
+    });
   });
 
   describe('maybeRequestConsentOrFail', () => {
@@ -285,6 +315,25 @@ describe('consent', () => {
           false,
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if extension is migrated', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          { ...baseConfig, name: 'old-ext' },
+          false,
+          [],
+          [],
+          true,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        let consentString = requestConsent.mock.calls[0][0] as string;
+        consentString = normalizePathsForSnapshot(consentString, tempDir);
+        await expectConsentSnapshot(consentString);
       });
 
       it('should request consent if skills change', async () => {

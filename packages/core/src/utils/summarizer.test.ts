@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import {
@@ -54,6 +61,12 @@ describe('summarizers', () => {
     (mockConfigInstance.modelConfigService as unknown) = {
       getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
     } as unknown as ModelConfigService;
+
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfigInstance, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
 
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     (mockGeminiClient.generateContent as Mock) = vi.fn();

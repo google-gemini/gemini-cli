@@ -63,11 +63,58 @@ export function partToString(
       return `[Function Response: ${part.functionResponse.name}]`;
     }
     if (part.inlineData !== undefined) {
-      return `<${part.inlineData.mimeType}>`;
+      const mimeType = part.inlineData.mimeType ?? 'unknown';
+      const data = part.inlineData.data ?? '';
+      const bytes = Math.ceil((data.length * 3) / 4);
+      const kb = (bytes / 1024).toFixed(1);
+      const category = mimeType.startsWith('audio/')
+        ? 'Audio'
+        : mimeType.startsWith('video/')
+          ? 'Video'
+          : mimeType.startsWith('image/')
+            ? 'Image'
+            : 'Media';
+      return `[${category}: ${mimeType}, ${kb} KB]`;
     }
   }
 
   return part.text ?? '';
+}
+
+/**
+ * Safely clones a Part object.
+ * We use a local eslint-disable because the linter incorrectly identifies Part
+ * as a class instance and warns about losing the prototype during spread.
+ * In reality, Parts in the GenAI SDK are plain data objects.
+ */
+export function clonePart(part: Part): Part {
+  return { ...part };
+}
+
+/**
+ * Safely updates a Part object with new fields.
+ */
+export function updatePart(part: Part, updates: Partial<Part>): Part {
+  return { ...part, ...updates };
+}
+
+/**
+ * Safely clones a FunctionResponse object.
+ */
+export function cloneFunctionResponse(
+  resp: NonNullable<Part['functionResponse']>,
+): NonNullable<Part['functionResponse']> {
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
+  return { ...resp };
+}
+
+/**
+ * Safely clones a FunctionCall object.
+ */
+export function cloneFunctionCall(
+  call: NonNullable<Part['functionCall']>,
+): NonNullable<Part['functionCall']> {
+  return { ...call };
 }
 
 export function getResponseText(
@@ -167,4 +214,16 @@ export function appendToLastTextPart(
   }
 
   return newPrompt;
+}
+
+/**
+ * Type guard to determine if a Part is a TextPart.
+ */
+export function isTextPart(part: unknown): part is { text: string } {
+  return (
+    typeof part === 'object' &&
+    part !== null &&
+    'text' in part &&
+    typeof (part as { text: unknown }).text === 'string'
+  );
 }

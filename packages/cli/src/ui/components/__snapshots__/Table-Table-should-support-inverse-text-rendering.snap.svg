@@ -4,8 +4,8 @@
   </style>
   <rect width="920" height="71" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Status                                                                                              </text>
-    <text x="0" y="19" fill="#3d3f51" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
+    <text x="0" y="2" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">Status</text>
+    <text x="0" y="19" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
     <rect x="0" y="34" width="54" height="17" fill="#ffffff" />
     <text x="0" y="36" fill="#000000" textLength="54" lengthAdjust="spacingAndGlyphs">Active</text>
   </g>

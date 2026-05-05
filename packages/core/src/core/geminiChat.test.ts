@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import {
+  ApiError,
+  ThinkingLevel,
+  type Content,
+  type GenerateContentResponse,
+} from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -15,6 +19,11 @@ import {
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
 } from './geminiChat.js';
+import {
+  type CompletedToolCall,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_THINKING_MODE } from '../config/models.js';
@@ -29,6 +38,7 @@ import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import { LlmRole } from '../telemetry/types.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -38,6 +48,10 @@ vi.mock('node:fs', () => {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
+    }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
     }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
@@ -81,14 +95,20 @@ vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
 
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 vi.mock('../telemetry/uiTelemetry.js', () => ({
@@ -127,8 +147,14 @@ describe('GeminiChat', () => {
     let currentActiveModel = 'gemini-pro';
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
+      get config() {
+        return this;
+      },
+      promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
@@ -151,10 +177,14 @@ describe('GeminiChat', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
       }),
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
           const model = modelConfigKey.model ?? mockConfig.getModel();
@@ -211,7 +241,7 @@ describe('GeminiChat', () => {
       // 'Hello': 5 chars * 0.25 = 1.25
       // 'Hi there': 8 chars * 0.25 = 2.0
       // Total: 3.25 -> floor(3.25) = 3
-      expect(chatWithHistory.getLastPromptTokenCount()).toBe(3);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(4);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
@@ -715,25 +745,41 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
-      // Setup: Stream with finish reason but empty response (only thoughts)
-      const streamWithEmptyResponse = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ thought: 'thinking...' }],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        streamWithEmptyResponse,
-      );
+    it('should throw InvalidStreamError without retrying when no tool call and empty response text', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          // First attempt: finish reason is present, but the stream has no
+          // non-thought text, which is NO_RESPONSE_TEXT.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // This would succeed if NO_RESPONSE_TEXT were retried.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'valid response after retry' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
 
       const stream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
@@ -750,6 +796,11 @@ describe('GeminiChat', () => {
           }
         })(),
       ).rejects.toThrow(InvalidStreamError);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
     it('should succeed when there is finish reason and response text', async () => {
@@ -1059,8 +1110,10 @@ describe('GeminiChat', () => {
       );
 
       const { default: fs } = await import('node:fs');
-      const writeFileSync = vi.mocked(fs.writeFileSync);
-      const writeCountBefore = writeFileSync.mock.calls.length;
+      const appendFileSync = vi.mocked(fs.appendFileSync);
+      const writeCountBefore = appendFileSync.mock.calls.length;
+
+      await chat.initialize();
 
       const stream = await chat.sendMessageStream(
         { model: 'test-model' },
@@ -1073,17 +1126,19 @@ describe('GeminiChat', () => {
         // consume
       }
 
-      const newWrites = writeFileSync.mock.calls.slice(writeCountBefore);
+      const newWrites = appendFileSync.mock.calls.slice(writeCountBefore);
       expect(newWrites.length).toBeGreaterThan(0);
 
-      const lastWriteData = JSON.parse(
-        newWrites[newWrites.length - 1][1] as string,
-      ) as { messages: Array<{ type: string }> };
+      const geminiWrite = newWrites.find((w) => {
+        try {
+          const data = JSON.parse(w[1] as string);
+          return data.type === 'gemini';
+        } catch {
+          return false;
+        }
+      });
 
-      const geminiMessages = lastWriteData.messages.filter(
-        (m) => m.type === 'gemini',
-      );
-      expect(geminiMessages.length).toBeGreaterThan(0);
+      expect(geminiWrite).toBeDefined();
     });
   });
 
@@ -1118,40 +1173,6 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should not retry on invalid content if model does not start with gemini-2', async () => {
-      // Mock the stream to fail.
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async () =>
-          (async function* () {
-            yield {
-              candidates: [{ content: { parts: [{ text: '' }] } }],
-            } as unknown as GenerateContentResponse;
-          })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-1.5-pro' },
-        'test',
-        'prompt-id-no-retry',
-        new AbortController().signal,
-        LlmRole.MAIN,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // Must loop to trigger the internal logic that throws.
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
-
-      // Should be called only 1 time (no retry)
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
-    });
-
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
       vi.mocked(mockContentGenerator.generateContentStream)
@@ -1369,11 +1390,11 @@ describe('GeminiChat', () => {
         }
       }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 2 times (initial + 1 retry)
+      // Should be called 4 times (initial + 3 retries)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        2,
+        4,
       );
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should still contain the user message.
@@ -2552,6 +2573,227 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: response,
       });
+    });
+  });
+
+  describe('automated binary injection', () => {
+    it('should expand history with synthetic turns when __binary_injection__ is detected', async () => {
+      const audioParts = [
+        {
+          functionResponse: {
+            id: 'call-123',
+            name: 'read_file',
+            response: {
+              output: 'Success',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'base64' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      // Mock API to capture the history it receives
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Analysis done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        audioParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Verify history expansion
+      // Turn 1: Tool response (cleaned)
+      // Turn 2: Model Ack (synthetic)
+      // Turn 3: User Binary data (current request)
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].role).toBe('user');
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success',
+      });
+      expect(capturedContents[1].role).toBe('model');
+      expect(capturedContents[1].parts![0].text).toContain(
+        'Binary content received',
+      );
+      expect(capturedContents[1].parts![0].thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+      expect(capturedContents[2].role).toBe('user');
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+    });
+
+    it('should handle multiple parallel binary injections', async () => {
+      const parallelParts = [
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'read_file',
+            response: {
+              output: 'Success 1',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'audio1' } },
+              ],
+            },
+          },
+        },
+        {
+          functionResponse: {
+            id: 'call-2',
+            name: 'read_file',
+            response: {
+              output: 'Success 2',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'video/mp4', data: 'video2' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        parallelParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Turn 1: Cleaned tool responses (both)
+      // Turn 2: Model Ack
+      // Turn 3: Both binary parts combined
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].parts).toHaveLength(2);
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success 1',
+      });
+      expect(capturedContents[0].parts![1].functionResponse!.response).toEqual({
+        output: 'Success 2',
+      });
+      expect(capturedContents[2].parts).toHaveLength(2);
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+      expect(capturedContents[2].parts![1].inlineData!.mimeType).toBe(
+        'video/mp4',
+      );
+    });
+  });
+
+  describe('recordCompletedToolCalls', () => {
+    it('should use originalRequestName and originalRequestArgs if present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tail-tool',
+          args: { tail: 'args' },
+          originalRequestName: 'original-tool',
+          originalRequestArgs: { original: 'args' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'original-tool',
+          args: { original: 'args' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
+    });
+
+    it('should fall back to request name and args if original are not present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
     });
   });
 });

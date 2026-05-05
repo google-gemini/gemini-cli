@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { RewindViewer } from './RewindViewer.js';
@@ -13,6 +13,11 @@ import type {
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
+
+vi.mock('ink', async () => {
+  const actual = await vi.importActual<typeof import('ink')>('ink');
+  return { ...actual, useIsScreenReaderEnabled: vi.fn(() => false) };
+});
 
 vi.mock('./CliSpinner.js', () => ({
   CliSpinner: () => 'MockSpinner',
@@ -71,6 +76,34 @@ describe('RewindViewer', () => {
     vi.restoreAllMocks();
   });
 
+  describe('Screen Reader Accessibility', () => {
+    beforeEach(async () => {
+      const { useIsScreenReaderEnabled } = await import('ink');
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+    });
+
+    afterEach(async () => {
+      const { useIsScreenReaderEnabled } = await import('ink');
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
+    });
+
+    it('renders the rewind viewer with conversation items', async () => {
+      const conversation = createConversation([
+        { type: 'user', content: 'Hello', id: '1', timestamp: '1' },
+      ]);
+      const { lastFrame, unmount } = await renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={vi.fn()}
+        />,
+      );
+      expect(lastFrame()).toContain('Rewind');
+      expect(lastFrame()).toContain('Hello');
+      unmount();
+    });
+  });
+
   describe('Rendering', () => {
     it.each([
       { name: 'nothing interesting for empty conversation', messages: [] },
@@ -96,14 +129,13 @@ describe('RewindViewer', () => {
       const conversation = createConversation(messages as MessageRecord[]);
       const onExit = vi.fn();
       const onRewind = vi.fn();
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <RewindViewer
           conversation={conversation}
           onExit={onExit}
           onRewind={onRewind}
         />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -120,14 +152,14 @@ describe('RewindViewer', () => {
     ]);
     const onExit = vi.fn();
     const onRewind = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <RewindViewer
-        conversation={conversation}
-        onExit={onExit}
-        onRewind={onRewind}
-      />,
-    );
-    await waitUntilReady();
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={onExit}
+          onRewind={onRewind}
+        />,
+      );
 
     // Initial state
     expect(lastFrame()).toMatchSnapshot('initial-state');
@@ -154,14 +186,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
         { type: 'user', content: 'Q3', id: '3', timestamp: '1' },
       ]);
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
-      await waitUntilReady();
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={vi.fn()}
+          />,
+        );
 
       act(() => {
         stdin.write(sequence);
@@ -186,14 +218,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
         { type: 'user', content: 'Q3', id: '3', timestamp: '1' },
       ]);
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
-      await waitUntilReady();
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={vi.fn()}
+          />,
+        );
 
       // Up from first -> Last
       act(() => {
@@ -263,14 +295,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
       const onRewind = vi.fn();
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
-      await waitUntilReady();
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={onRewind}
+          />,
+        );
 
       // Select
       await act(async () => {
@@ -320,14 +352,14 @@ describe('RewindViewer', () => {
         },
       ]);
       const onRewind = vi.fn();
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
-      await waitUntilReady();
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={onRewind}
+          />,
+        );
 
       expect(lastFrame()).toMatchSnapshot();
 
@@ -364,14 +396,13 @@ describe('RewindViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot('initial');
 
@@ -383,20 +414,42 @@ describe('RewindViewer', () => {
     ];
     conversation = createConversation(newMessages);
 
-    const {
-      lastFrame: lastFrame2,
-      waitUntilReady: waitUntilReady2,
-      unmount: unmount2,
-    } = renderWithProviders(
-      <RewindViewer
-        conversation={conversation}
-        onExit={onExit}
-        onRewind={onRewind}
-      />,
-    );
-    await waitUntilReady2();
+    const { lastFrame: lastFrame2, unmount: unmount2 } =
+      await renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={onExit}
+          onRewind={onRewind}
+        />,
+      );
 
     expect(lastFrame2()).toMatchSnapshot('after-update');
     unmount2();
   });
+});
+it('renders accessible screen reader view when screen reader is enabled', async () => {
+  const { useIsScreenReaderEnabled } = await import('ink');
+  vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+
+  const messages: MessageRecord[] = [
+    { type: 'user', content: 'Hello world', id: '1', timestamp: '1' },
+    { type: 'user', content: 'Second message', id: '2', timestamp: '2' },
+  ];
+  const conversation = createConversation(messages);
+  const onExit = vi.fn();
+  const onRewind = vi.fn();
+
+  const { lastFrame, unmount } = await renderWithProviders(
+    <RewindViewer
+      conversation={conversation}
+      onExit={onExit}
+      onRewind={onRewind}
+    />,
+  );
+  const frame = lastFrame();
+  expect(frame).toContain('Rewind - Select a conversation point:');
+  expect(frame).toContain('Stay at current position');
+
+  vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
+  unmount();
 });

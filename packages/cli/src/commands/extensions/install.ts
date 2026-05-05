@@ -5,13 +5,14 @@
  */
 
 import type { CommandModule } from 'yargs';
+import * as path from 'node:path';
 import chalk from 'chalk';
 import {
   debugLogger,
   FolderTrustDiscoveryService,
   getRealPath,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
   promptForConsentNonInteractive,
@@ -36,6 +37,7 @@ interface InstallArgs {
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
   consent?: boolean;
+  skipSettings?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -51,12 +53,13 @@ export async function handleInstall(args: InstallArgs) {
     const settings = loadSettings(workspaceDir).merged;
 
     if (installMetadata.type === 'local' || installMetadata.type === 'link') {
-      const resolvedPath = getRealPath(source);
-      installMetadata.source = resolvedPath;
-      const trustResult = isWorkspaceTrusted(settings, resolvedPath);
+      const absolutePath = path.resolve(source);
+      const realPath = getRealPath(absolutePath);
+      installMetadata.source = absolutePath;
+      const trustResult = isWorkspaceTrusted(settings, absolutePath);
       if (trustResult.isTrusted !== true) {
         const discoveryResults =
-          await FolderTrustDiscoveryService.discover(resolvedPath);
+          await FolderTrustDiscoveryService.discover(realPath);
 
         const hasDiscovery =
           discoveryResults.commands.length > 0 ||
@@ -69,7 +72,7 @@ export async function handleInstall(args: InstallArgs) {
           '',
           chalk.bold('Do you trust the files in this folder?'),
           '',
-          `The extension source at "${resolvedPath}" is not trusted.`,
+          `The extension source at "${absolutePath}" is not trusted.`,
           '',
           'Trusting a folder allows Gemini CLI to load its local configurations,',
           'including custom commands, hooks, MCP servers, agent skills, and',
@@ -97,11 +100,15 @@ export async function handleInstall(args: InstallArgs) {
         if (hasDiscovery) {
           promptLines.push(chalk.bold('This folder contains:'));
           const groups = [
-            { label: 'Commands', items: discoveryResults.commands },
-            { label: 'MCP Servers', items: discoveryResults.mcps },
-            { label: 'Hooks', items: discoveryResults.hooks },
-            { label: 'Skills', items: discoveryResults.skills },
-            { label: 'Setting overrides', items: discoveryResults.settings },
+            { label: 'Commands', items: discoveryResults.commands ?? [] },
+            { label: 'MCP Servers', items: discoveryResults.mcps ?? [] },
+            { label: 'Hooks', items: discoveryResults.hooks ?? [] },
+            { label: 'Skills', items: discoveryResults.skills ?? [] },
+            { label: 'Agents', items: discoveryResults.agents ?? [] },
+            {
+              label: 'Setting overrides',
+              items: discoveryResults.settings ?? [],
+            },
           ].filter((g) => g.items.length > 0);
 
           for (const group of groups) {
@@ -127,10 +134,10 @@ export async function handleInstall(args: InstallArgs) {
         );
         if (confirmed) {
           const trustedFolders = loadTrustedFolders();
-          await trustedFolders.setValue(resolvedPath, TrustLevel.TRUST_FOLDER);
+          await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
         } else {
           throw new Error(
-            `Installation aborted: Folder "${resolvedPath}" is not trusted.`,
+            `Installation aborted: Folder "${absolutePath}" is not trusted.`,
           );
         }
       }
@@ -147,7 +154,7 @@ export async function handleInstall(args: InstallArgs) {
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
-      requestSetting: promptForSetting,
+      requestSetting: args.skipSettings ? null : promptForSetting,
       settings,
     });
     await extensionManager.loadExtensions();
@@ -190,6 +197,11 @@ export const installCommand: CommandModule = {
         type: 'boolean',
         default: false,
       })
+      .option('skip-settings', {
+        describe: 'Skip the configuration on install process.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -208,6 +220,8 @@ export const installCommand: CommandModule = {
       allowPreRelease: argv['pre-release'] as boolean | undefined,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      skipSettings: argv['skip-settings'] as boolean | undefined,
     });
     await exitCli();
   },

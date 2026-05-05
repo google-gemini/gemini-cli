@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Content } from '@google/genai';
 
 /**
  * A client for making single, non-streaming calls to a local Gemini-compatible API
@@ -26,6 +25,8 @@ export class LocalLiteRtLmClient {
     this.client = new GoogleGenAI({
       // The LiteRT-LM server does not require an API key, but the SDK requires one to be set even for local endpoints. This is a dummy value and is not used for authentication.
       apiKey: 'no-api-key-needed',
+      apiVersion: 'v1beta',
+      vertexai: false,
       httpOptions: {
         baseUrl: this.host,
         // If the LiteRT-LM server is started but the wrong port is set, there will be a lengthy TCP timeout (here fixed to be 10 seconds).

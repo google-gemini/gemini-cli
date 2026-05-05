@@ -6,16 +6,8 @@
 
 import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
-import type { ICommandLoader } from './types.js';
-
-export interface CommandConflict {
-  name: string;
-  winner: SlashCommand;
-  losers: Array<{
-    command: SlashCommand;
-    renamedTo: string;
-  }>;
-}
+import type { ICommandLoader, CommandConflict } from './types.js';
+import { SlashCommandResolver } from './SlashCommandResolver.js';
 
 /**
  * Orchestrates the discovery and loading of all slash commands for the CLI.
@@ -24,9 +16,9 @@ export interface CommandConflict {
  * with an array of `ICommandLoader` instances, each responsible for fetching
  * commands from a specific source (e.g., built-in code, local files).
  *
- * The CommandService is responsible for invoking these loaders, aggregating their
- * results, and resolving any name conflicts. This architecture allows the command
- * system to be extended with new sources without modifying the service itself.
+ * It uses a delegating resolver to reconcile name conflicts, ensuring that
+ * all commands are uniquely addressable via source-specific prefixes while
+ * allowing built-in commands to retain their primary names.
  */
 export class CommandService {
   /**
@@ -42,96 +34,71 @@ export class CommandService {
   /**
    * Asynchronously creates and initializes a new CommandService instance.
    *
-   * This factory method orchestrates the entire command loading process. It
-   * runs all provided loaders in parallel, aggregates their results, handles
-   * name conflicts for extension commands by renaming them, and then returns a
-   * fully constructed `CommandService` instance.
+   * This factory method orchestrates the loading process and delegates
+   * conflict resolution to the SlashCommandResolver.
    *
-   * Conflict resolution:
-   * - Extension commands that conflict with existing commands are renamed to
-   *   `extensionName.commandName`
-   * - Non-extension commands (built-in, user, project) override earlier commands
-   *   with the same name based on loader order
-   *
-   * @param loaders An array of objects that conform to the `ICommandLoader`
-   *   interface. Built-in commands should come first, followed by FileCommandLoader.
-   * @param signal An AbortSignal to cancel the loading process.
-   * @returns A promise that resolves to a new, fully initialized `CommandService` instance.
+   * @param loaders An array of loaders to fetch commands from.
+   * @param signal An AbortSignal to allow cancellation.
+   * @returns A promise that resolves to a fully initialized CommandService.
    */
   static async create(
     loaders: ICommandLoader[],
     signal: AbortSignal,
   ): Promise<CommandService> {
+    const allCommands = await this.loadAllCommands(loaders, signal);
+    const { finalCommands, conflicts } =
+      SlashCommandResolver.resolve(allCommands);
+
+    if (conflicts.length > 0) {
+      this.emitConflictEvents(conflicts);
+    }
+
+    return new CommandService(
+      Object.freeze(finalCommands),
+      Object.freeze(conflicts),
+    );
+  }
+
+  /**
+   * Invokes all loaders in parallel and flattens the results.
+   */
+  private static async loadAllCommands(
+    loaders: ICommandLoader[],
+    signal: AbortSignal,
+  ): Promise<SlashCommand[]> {
     const results = await Promise.allSettled(
       loaders.map((loader) => loader.loadCommands(signal)),
     );
 
-    const allCommands: SlashCommand[] = [];
+    const commands: SlashCommand[] = [];
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        allCommands.push(...result.value);
+        commands.push(...result.value);
       } else {
         debugLogger.debug('A command loader failed:', result.reason);
       }
     }
+    return commands;
+  }
 
-    const commandMap = new Map<string, SlashCommand>();
-    const conflictsMap = new Map<string, CommandConflict>();
-
-    for (const cmd of allCommands) {
-      let finalName = cmd.name;
-
-      // Extension commands get renamed if they conflict with existing commands
-      if (cmd.extensionName && commandMap.has(cmd.name)) {
-        const winner = commandMap.get(cmd.name)!;
-        let renamedName = `${cmd.extensionName}.${cmd.name}`;
-        let suffix = 1;
-
-        // Keep trying until we find a name that doesn't conflict
-        while (commandMap.has(renamedName)) {
-          renamedName = `${cmd.extensionName}.${cmd.name}${suffix}`;
-          suffix++;
-        }
-
-        finalName = renamedName;
-
-        if (!conflictsMap.has(cmd.name)) {
-          conflictsMap.set(cmd.name, {
-            name: cmd.name,
-            winner,
-            losers: [],
-          });
-        }
-
-        conflictsMap.get(cmd.name)!.losers.push({
-          command: cmd,
-          renamedTo: finalName,
-        });
-      }
-
-      commandMap.set(finalName, {
-        ...cmd,
-        name: finalName,
-      });
-    }
-
-    const conflicts = Array.from(conflictsMap.values());
-    if (conflicts.length > 0) {
-      coreEvents.emitSlashCommandConflicts(
-        conflicts.flatMap((c) =>
-          c.losers.map((l) => ({
-            name: c.name,
-            renamedTo: l.renamedTo,
-            loserExtensionName: l.command.extensionName,
-            winnerExtensionName: c.winner.extensionName,
-          })),
-        ),
-      );
-    }
-
-    const finalCommands = Object.freeze(Array.from(commandMap.values()));
-    const finalConflicts = Object.freeze(conflicts);
-    return new CommandService(finalCommands, finalConflicts);
+  /**
+   * Formats and emits telemetry for command conflicts.
+   */
+  private static emitConflictEvents(conflicts: CommandConflict[]): void {
+    coreEvents.emitSlashCommandConflicts(
+      conflicts.flatMap((c) =>
+        c.losers.map((l) => ({
+          name: c.name,
+          renamedTo: l.renamedTo,
+          loserExtensionName: l.command.extensionName,
+          winnerExtensionName: l.reason.extensionName,
+          loserMcpServerName: l.command.mcpServerName,
+          winnerMcpServerName: l.reason.mcpServerName,
+          loserKind: l.command.kind,
+          winnerKind: l.reason.kind,
+        })),
+      ),
+    );
   }
 
   /**

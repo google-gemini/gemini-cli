@@ -13,21 +13,35 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import type { Client } from '@a2a-js/sdk/client';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import {
-  A2AClientManager,
   type SendMessageResult,
+  type A2AClientManager,
 } from './a2a-client-manager.js';
-import type { RemoteAgentDefinition } from './types.js';
+
+import type { RemoteAgentDefinition, SubagentProgress } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { A2AAuthProvider } from './auth-provider/types.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Config } from '../config/config.js';
 
 // Mock A2AClientManager
-vi.mock('./a2a-client-manager.js', () => {
-  const A2AClientManager = {
-    getInstance: vi.fn(),
-  };
-  return { A2AClientManager };
-});
+vi.mock('./a2a-client-manager.js', () => ({
+  A2AClientManager: vi.fn().mockImplementation(() => ({
+    getClient: vi.fn(),
+    loadAgent: vi.fn(),
+    sendMessageStream: vi.fn(),
+  })),
+}));
+
+// Mock A2AAuthProviderFactory
+vi.mock('./auth-provider/factory.js', () => ({
+  A2AAuthProviderFactory: {
+    create: vi.fn(),
+  },
+}));
 
 describe('RemoteAgentInvocation', () => {
   const mockDefinition: RemoteAgentDefinition = {
@@ -41,16 +55,40 @@ describe('RemoteAgentInvocation', () => {
     },
   };
 
-  const mockClientManager = {
-    getClient: vi.fn(),
-    loadAgent: vi.fn(),
-    sendMessageStream: vi.fn(),
+  let mockClientManager: {
+    getClient: Mock<A2AClientManager['getClient']>;
+    loadAgent: Mock<A2AClientManager['loadAgent']>;
+    sendMessageStream: Mock<A2AClientManager['sendMessageStream']>;
   };
+  let mockContext: AgentLoopContext;
   const mockMessageBus = createMockMessageBus();
+
+  const mockClient = {
+    sendMessageStream: vi.fn(),
+    getTask: vi.fn(),
+    cancelTask: vi.fn(),
+  } as unknown as Client;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
+
+    mockClientManager = {
+      getClient: vi.fn(),
+      loadAgent: vi.fn(),
+      sendMessageStream: vi.fn(),
+    };
+
+    const mockConfig = {
+      getA2AClientManager: vi.fn().mockReturnValue(mockClientManager),
+      injectionService: {
+        getLatestInjectionIndex: vi.fn().mockReturnValue(0),
+      },
+    } as unknown as Config;
+
+    mockContext = {
+      config: mockConfig,
+    } as unknown as AgentLoopContext;
+
     (
       RemoteAgentInvocation as unknown as {
         sessionState?: Map<string, { contextId?: string; taskId?: string }>;
@@ -67,6 +105,7 @@ describe('RemoteAgentInvocation', () => {
       expect(() => {
         new RemoteAgentInvocation(
           mockDefinition,
+          mockContext,
           { query: 'valid' },
           mockMessageBus,
         );
@@ -75,12 +114,17 @@ describe('RemoteAgentInvocation', () => {
 
     it('accepts missing query (defaults to "Get Started!")', () => {
       expect(() => {
-        new RemoteAgentInvocation(mockDefinition, {}, mockMessageBus);
+        new RemoteAgentInvocation(
+          mockDefinition,
+          mockContext,
+          {},
+          mockMessageBus,
+        );
       }).not.toThrow();
     });
 
     it('uses "Get Started!" default when query is missing during execution', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -94,10 +138,11 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {},
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenCalledWith(
         'test-agent',
@@ -110,6 +155,7 @@ describe('RemoteAgentInvocation', () => {
       expect(() => {
         new RemoteAgentInvocation(
           mockDefinition,
+          mockContext,
           { query: 123 },
           mockMessageBus,
         );
@@ -118,7 +164,7 @@ describe('RemoteAgentInvocation', () => {
   });
 
   describe('Execution Logic', () => {
-    it('should lazy load the agent with ADCHandler if not present', async () => {
+    it('should lazy load the agent without auth handler when no auth configured', async () => {
       mockClientManager.getClient.mockReturnValue(undefined);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -133,25 +179,103 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'hi',
         },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
-        'http://test-agent/card',
-        expect.objectContaining({
-          headers: expect.any(Function),
-          shouldRetryWithHeaders: expect.any(Function),
-        }),
+        { type: 'url', url: 'http://test-agent/card' },
+        undefined,
+      );
+    });
+
+    it('should use A2AAuthProviderFactory when auth is present in definition', async () => {
+      const mockAuth = {
+        type: 'http' as const,
+        scheme: 'Basic' as const,
+        username: 'admin',
+        password: 'password',
+      };
+      const authDefinition: RemoteAgentDefinition = {
+        ...mockDefinition,
+        auth: mockAuth,
+      };
+
+      const mockHandler = {
+        type: 'http' as const,
+        headers: vi.fn().mockResolvedValue({ Authorization: 'Basic dGVzdA==' }),
+        shouldRetryWithHeaders: vi.fn(),
+      } as unknown as A2AAuthProvider;
+      (A2AAuthProviderFactory.create as Mock).mockResolvedValue(mockHandler);
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Hello' }],
+          };
+        },
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        authDefinition,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
+        authConfig: mockAuth,
+        agentName: 'test-agent',
+        targetUrl: 'http://test-agent/card',
+        agentCardUrl: 'http://test-agent/card',
+      });
+      expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
+        'test-agent',
+        { type: 'url', url: 'http://test-agent/card' },
+        mockHandler,
+      );
+    });
+
+    it('should return error when auth provider factory returns undefined for configured auth', async () => {
+      const authDefinition: RemoteAgentDefinition = {
+        ...mockDefinition,
+        auth: {
+          type: 'http' as const,
+          scheme: 'Bearer' as const,
+          token: 'secret-token',
+        },
+      };
+
+      (A2AAuthProviderFactory.create as Mock).mockResolvedValue(undefined);
+      mockClientManager.getClient.mockReturnValue(undefined);
+
+      const invocation = new RemoteAgentInvocation(
+        authDefinition,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        "Failed to create auth provider for agent 'test-agent'",
       );
     });
 
     it('should not load the agent if already present', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -165,18 +289,19 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'hi',
         },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
     });
 
     it('should persist contextId and taskId across invocations', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
 
       // First call return values
       mockClientManager.sendMessageStream.mockImplementationOnce(
@@ -194,6 +319,7 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation1 = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'first',
         },
@@ -201,8 +327,12 @@ describe('RemoteAgentInvocation', () => {
       );
 
       // Execute first time
-      const result1 = await invocation1.execute(new AbortController().signal);
-      expect(result1.returnDisplay).toBe('Response 1');
+      const result1 = await invocation1.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result1.returnDisplay).toMatchObject({
+        result: 'Response 1',
+      });
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
         'first',
@@ -225,13 +355,18 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation2 = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'second',
         },
         mockMessageBus,
       );
-      const result2 = await invocation2.execute(new AbortController().signal);
-      expect(result2.returnDisplay).toBe('Response 2');
+      const result2 = await invocation2.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result2.returnDisplay as SubagentProgress).result).toBe(
+        'Response 2',
+      );
 
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
@@ -255,12 +390,13 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation3 = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'third',
         },
         mockMessageBus,
       );
-      await invocation3.execute(new AbortController().signal);
+      await invocation3.execute({ abortSignal: new AbortController().signal });
 
       // Fourth call: Should start new task (taskId undefined)
       mockClientManager.sendMessageStream.mockImplementationOnce(
@@ -276,12 +412,13 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation4 = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'fourth',
         },
         mockMessageBus,
       );
-      await invocation4.execute(new AbortController().signal);
+      await invocation4.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
@@ -291,7 +428,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should handle streaming updates and reassemble output', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -312,17 +449,35 @@ describe('RemoteAgentInvocation', () => {
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
-      expect(updateOutput).toHaveBeenCalledWith('Hello');
-      expect(updateOutput).toHaveBeenCalledWith('Hello\n\nHello World');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'HelloHello World',
+        }),
+      );
     });
 
     it('should abort when signal is aborted during streaming', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       const controller = new AbortController();
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -345,17 +500,19 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(controller.signal);
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('Operation aborted');
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
     });
 
     it('should handle errors gracefully', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           if (Math.random() < 0) yield {} as unknown as SendMessageResult;
@@ -365,20 +522,24 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'hi',
         },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('Network error');
-      expect(result.returnDisplay).toContain('Network error');
+      expect(result.returnDisplay).toMatchObject({
+        state: 'error',
+        result: expect.stringContaining('Network error'),
+      });
     });
 
     it('should use a2a helpers for extracting text', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       // Mock a complex message part that needs extraction
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -396,19 +557,24 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'hi',
         },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Just check that text is present, exact formatting depends on helper
-      expect(result.returnDisplay).toContain('Extracted text');
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        'Extracted text',
+      );
     });
 
     it('should handle mixed response types during streaming (TaskStatusUpdateEvent + Message)', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -438,31 +604,51 @@ describe('RemoteAgentInvocation', () => {
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(
-        new AbortController().signal,
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
-      expect(updateOutput).toHaveBeenCalledWith('Thinking...');
-      expect(updateOutput).toHaveBeenCalledWith('Thinking...\n\nFinal Answer');
-      expect(result.returnDisplay).toBe('Thinking...\n\nFinal Answer');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'Thinking...Final Answer',
+        }),
+      );
+      expect(result.returnDisplay).toMatchObject({
+        result: 'Thinking...Final Answer',
+      });
     });
 
     it('should handle artifact reassembly with append: true', async () => {
-      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.getClient.mockReturnValue(mockClient);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
             kind: 'status-update',
             taskId: 'task-1',
+            contextId: 'ctx-1',
+            final: false,
             status: {
               state: 'working',
               message: {
                 kind: 'message',
                 role: 'agent',
+                messageId: 'm1',
                 parts: [{ kind: 'text', text: 'Generating...' }],
               },
             },
@@ -470,6 +656,7 @@ describe('RemoteAgentInvocation', () => {
           yield {
             kind: 'artifact-update',
             taskId: 'task-1',
+            contextId: 'ctx-1',
             append: false,
             artifact: {
               artifactId: 'art-1',
@@ -480,29 +667,44 @@ describe('RemoteAgentInvocation', () => {
           yield {
             kind: 'artifact-update',
             taskId: 'task-1',
+            contextId: 'ctx-1',
             append: true,
             artifact: {
               artifactId: 'art-1',
               parts: [{ kind: 'text', text: ' Part 2' }],
             },
           };
+          return;
         },
       );
 
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
-      expect(updateOutput).toHaveBeenCalledWith('Generating...');
       expect(updateOutput).toHaveBeenCalledWith(
-        'Generating...\n\nArtifact (Result):\nPart 1',
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
       );
       expect(updateOutput).toHaveBeenCalledWith(
-        'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
+        }),
       );
     });
   });
@@ -511,6 +713,7 @@ describe('RemoteAgentInvocation', () => {
     it('should return info confirmation details', async () => {
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
+        mockContext,
         {
           query: 'hi',
         },
@@ -532,6 +735,92 @@ describe('RemoteAgentInvocation', () => {
       } else {
         throw new Error('Expected confirmation to be of type info');
       }
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should use A2AAgentError.userMessage for structured errors', async () => {
+      const { AgentConnectionError } = await import('./a2a-errors.js');
+      const a2aError = new AgentConnectionError(
+        'test-agent',
+        'http://test-agent/card',
+        new Error('ECONNREFUSED'),
+      );
+
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.loadAgent.mockRejectedValue(a2aError);
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        a2aError.userMessage,
+      );
+    });
+
+    it('should use generic message for non-A2AAgentError errors', async () => {
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.loadAgent.mockRejectedValue(
+        new Error('something unexpected'),
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        'Error calling remote agent: something unexpected',
+      );
+    });
+
+    it('should include partial output when error occurs mid-stream', async () => {
+      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Partial response' }],
+          };
+          // Raw errors propagate from the A2A SDK — no wrapping or classification.
+          throw new Error('connection reset');
+        },
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      // Should contain both the partial output and the error message
+      expect(result.returnDisplay).toMatchObject({
+        result: expect.stringContaining('Partial response'),
+      });
+      expect(result.returnDisplay).toMatchObject({
+        result: expect.stringContaining('connection reset'),
+      });
     });
   });
 });

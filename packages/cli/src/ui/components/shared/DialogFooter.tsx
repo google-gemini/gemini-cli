@@ -11,7 +11,7 @@ import { theme } from '../../semantic-colors.js';
 export interface DialogFooterProps {
   /** The main shortcut (e.g., "Enter to submit") */
   primaryAction: string;
-  /** Secondary navigation shortcuts (e.g., "Tab/Shift+Tab to switch questions") */
+  /** Secondary navigation shortcuts (e.g., "Tab to switch questions") */
   navigationActions?: string;
   /** Exit shortcut (defaults to "Esc to cancel") */
   cancelAction?: string;

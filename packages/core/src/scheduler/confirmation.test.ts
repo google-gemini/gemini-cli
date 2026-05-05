@@ -28,8 +28,11 @@ import {
 } from '../tools/tools.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import type { ValidatingToolCall, WaitingToolCall } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import {
+  ROOT_SCHEDULER_ID,
+  type ValidatingToolCall,
+  type WaitingToolCall,
+} from './types.js';
 import type { Config } from '../config/config.js';
 import { type EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
@@ -352,6 +355,45 @@ describe('confirmation.ts', () => {
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
       expect(mockModifier.applyInlineModify).toHaveBeenCalled();
       expect(mockState.updateArgs).toHaveBeenCalled();
+    });
+
+    it('should pass payload to onConfirm callback', async () => {
+      const details = {
+        type: 'ask_user' as const,
+        questions: [],
+        title: 'Title',
+        onConfirm: vi.fn(),
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
+
+      const listenerPromise = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      await listenerPromise;
+
+      const payload = { answers: { '0': 'user choice' } };
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        payload,
+      });
+
+      await promise;
+      expect(details.onConfirm).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+        payload,
+      );
     });
 
     it('should resolve immediately if IDE confirmation resolves first', async () => {

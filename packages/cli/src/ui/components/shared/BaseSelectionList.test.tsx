@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act } from 'react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import {
   BaseSelectionList,
@@ -14,18 +15,22 @@ import {
 import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { Text } from 'ink';
 import type { theme } from '../../semantic-colors.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 vi.mock('../../hooks/useSelectionList.js');
+vi.mock('../../hooks/useMouseClick.js');
 
 const mockTheme = {
   text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
-  status: { success: 'COLOR_SUCCESS' },
+  ui: { focus: 'COLOR_FOCUS' },
+  background: { focus: 'COLOR_FOCUS_BG' },
 } as typeof theme;
 
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
-    status: { success: 'COLOR_SUCCESS' },
+    ui: { focus: 'COLOR_FOCUS' },
+    background: { focus: 'COLOR_FOCUS_BG' },
   },
 }));
 
@@ -33,6 +38,7 @@ describe('BaseSelectionList', () => {
   const mockOnSelect = vi.fn();
   const mockOnHighlight = vi.fn();
   const mockRenderItem = vi.fn();
+  const mockSetActiveIndex = vi.fn();
 
   const items = [
     { value: 'A', label: 'Item A', key: 'A' },
@@ -52,7 +58,7 @@ describe('BaseSelectionList', () => {
   ) => {
     vi.mocked(useSelectionList).mockReturnValue({
       activeIndex,
-      setActiveIndex: vi.fn(),
+      setActiveIndex: mockSetActiveIndex,
     });
 
     mockRenderItem.mockImplementation(
@@ -73,8 +79,9 @@ describe('BaseSelectionList', () => {
       ...props,
     };
 
-    const result = renderWithProviders(<BaseSelectionList {...defaultProps} />);
-    await result.waitUntilReady();
+    const result = await renderWithProviders(
+      <BaseSelectionList {...defaultProps} />,
+    );
     return result;
   };
 
@@ -161,8 +168,8 @@ describe('BaseSelectionList', () => {
       expect(mockRenderItem).toHaveBeenCalledWith(
         items[0],
         expect.objectContaining({
-          titleColor: mockTheme.status.success,
-          numberColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
+          numberColor: mockTheme.ui.focus,
           isSelected: true,
         }),
       );
@@ -207,8 +214,8 @@ describe('BaseSelectionList', () => {
       expect(mockRenderItem).toHaveBeenCalledWith(
         items[1],
         expect.objectContaining({
-          titleColor: mockTheme.status.success,
-          numberColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
+          numberColor: mockTheme.ui.focus,
           isSelected: true,
         }),
       );
@@ -267,7 +274,7 @@ describe('BaseSelectionList', () => {
         items[0],
         expect.objectContaining({
           isSelected: true,
-          titleColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
           numberColor: mockTheme.text.secondary,
         }),
       );
@@ -308,8 +315,7 @@ describe('BaseSelectionList', () => {
       );
 
       const { rerender, lastFrame, waitUntilReady, unmount } =
-        renderWithProviders(<BaseSelectionList {...componentProps} />);
-      await waitUntilReady();
+        await renderWithProviders(<BaseSelectionList {...componentProps} />);
 
       // Function to simulate the activeIndex changing over time
       const updateActiveIndex = async (newIndex: number) => {
@@ -445,6 +451,28 @@ describe('BaseSelectionList', () => {
       unmount();
     });
 
+    it('should correctly calculate scroll offset during the initial render phase', async () => {
+      // Verify that the component correctly calculates the scroll offset during the
+      // initial render pass when starting with a high activeIndex.
+      // List length 10, max items 3, activeIndex 9 (last item).
+      const { unmount } = await renderScrollableList(9);
+
+      const renderedItemValues = mockRenderItem.mock.calls.map(
+        (call) => call[0].value,
+      );
+
+      // Item 1 (index 0) should not be rendered if the scroll offset is correctly
+      // synchronized with the activeIndex from the start.
+      expect(renderedItemValues).not.toContain('Item 1');
+
+      // The items at the end of the list should be rendered.
+      expect(renderedItemValues).toContain('Item 8');
+      expect(renderedItemValues).toContain('Item 9');
+      expect(renderedItemValues).toContain('Item 10');
+
+      unmount();
+    });
+
     it('should handle maxItemsToShow larger than the list length', async () => {
       const { lastFrame, unmount } = await renderComponent(
         { items: longList, maxItemsToShow: 15 },
@@ -456,6 +484,79 @@ describe('BaseSelectionList', () => {
       expect(output).toContain('Item 1');
       expect(output).toContain('Item 10');
       expect(mockRenderItem).toHaveBeenCalledTimes(10);
+      unmount();
+    });
+  });
+
+  describe('Mouse Interaction', () => {
+    it('should register mouse click handler for each item', async () => {
+      const { unmount } = await renderComponent();
+
+      // items are A, B (disabled), C
+      expect(useMouseClick).toHaveBeenCalledTimes(3);
+      unmount();
+    });
+
+    it('should update activeIndex on first click and call onSelect on second click', async () => {
+      const { unmount, waitUntilReady } = await renderComponent();
+      await waitUntilReady();
+
+      // items[0] is 'A' (enabled)
+      // items[1] is 'B' (disabled)
+      // items[2] is 'C' (enabled)
+
+      // Get the mouse click handler for the third item (index 2)
+      const mouseClickHandler = (useMouseClick as Mock).mock.calls[2][1];
+
+      // First click on item C
+      act(() => {
+        mouseClickHandler();
+      });
+
+      expect(mockSetActiveIndex).toHaveBeenCalledWith(2);
+      expect(mockOnSelect).not.toHaveBeenCalled();
+
+      // Now simulate being on item C (isSelected = true)
+      // Rerender or update mocks for the next check
+      await renderComponent({}, 2);
+
+      // Get the updated mouse click handler for item C
+      // useMouseClick is called 3 more times on rerender
+      const updatedMouseClickHandler = (useMouseClick as Mock).mock.calls[5][1];
+
+      // Second click on item C
+      act(() => {
+        updatedMouseClickHandler();
+      });
+
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+      unmount();
+    });
+
+    it('should not call onSelect when a disabled item is clicked', async () => {
+      const { unmount, waitUntilReady } = await renderComponent();
+      await waitUntilReady();
+
+      // items[1] is 'B' (disabled)
+      const mouseClickHandler = (useMouseClick as Mock).mock.calls[1][1];
+
+      act(() => {
+        mouseClickHandler();
+      });
+
+      expect(mockSetActiveIndex).not.toHaveBeenCalled();
+      expect(mockOnSelect).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should pass isActive: isFocused to useMouseClick', async () => {
+      const { unmount } = await renderComponent({ isFocused: false });
+
+      expect(useMouseClick).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Function),
+        { isActive: false },
+      );
       unmount();
     });
   });
