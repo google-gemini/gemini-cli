@@ -39,7 +39,7 @@ export class ProjectIdRequiredError extends Error {
 export class InvalidNumericProjectIdError extends Error {
   constructor(projectId: string) {
     super(
-      `Invalid Google Cloud Project ID: "${projectId}". The GOOGLE_CLOUD_PROJECT environment variable must be set to your string-based Project ID (e.g., "my-project-123"), not your numeric Project Number. Please update your environment variables.`,
+      `Invalid Google Cloud Project ID: "${projectId}". The GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) environment variable must be set to your string-based Project ID (e.g., "my-project-123"), not your numeric Project Number. Please update your environment variables.`,
     );
     this.name = 'InvalidNumericProjectIdError';
   }

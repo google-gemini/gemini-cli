@@ -226,6 +226,13 @@ describe('setupUser', () => {
         InvalidNumericProjectIdError,
       );
     });
+
+    it('should throw InvalidNumericProjectIdError when GOOGLE_CLOUD_PROJECT_ID is numeric', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '1234567890');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidNumericProjectIdError,
+      );
+    });
   });
 
   describe('new user', () => {
