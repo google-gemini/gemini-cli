@@ -291,6 +291,7 @@ describe('Gemini Client (client.ts)', () => {
       isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
       isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
+      getCompressionStrategy: vi.fn().mockResolvedValue('flat'),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),

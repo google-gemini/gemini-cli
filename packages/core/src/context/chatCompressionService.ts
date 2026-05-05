@@ -619,7 +619,10 @@ export class ChatCompressionService {
     // renderer wraps cold summaries in. Trusted conversation text (p.text) is
     // passed through unchanged to preserve formatting in the reconstructed
     // history; the cold summaries themselves are sanitized at the wrap site.
-    for (const content of truncatedHistory) {
+    // Track which indices were appended so hotStart maps back correctly.
+    const appendedIndices: number[] = [];
+    for (let i = 0; i < truncatedHistory.length; i++) {
+      const content = truncatedHistory[i];
       const text = content.parts
         ?.map((p) => {
           if (p.text) return p.text;
@@ -648,6 +651,7 @@ export class ChatCompressionService {
         .trim();
       if (text) {
         contextWindow.append(text);
+        appendedIndices.push(i);
       }
     }
 
@@ -683,12 +687,15 @@ export class ChatCompressionService {
       });
     }
 
-    // Map hot messages back to their original Content objects
-    // Use the last N items from truncatedHistory where N = hotCount
-    const hotStart = Math.max(
-      0,
-      truncatedHistory.length - contextWindow.hotCount,
-    );
+    // Map hot messages back to their original Content objects.
+    // hotCount reflects only successfully appended items (empty-text items
+    // were skipped), so index through appendedIndices to find the correct
+    // slice point in truncatedHistory.
+    const hotAppendedStart = appendedIndices.length - contextWindow.hotCount;
+    const hotStart =
+      hotAppendedStart <= 0
+        ? 0
+        : (appendedIndices[hotAppendedStart] ?? truncatedHistory.length);
     extraHistory.push(...truncatedHistory.slice(hotStart));
 
     const fullNewHistory = await getInitialChatHistory(config, extraHistory);
