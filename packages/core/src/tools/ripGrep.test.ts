@@ -1330,7 +1330,6 @@ describe('RipGrepTool', () => {
       const result = await invocation.execute({ abortSignal });
 
       const spawnArgs = mockSpawn.mock.calls[0][1];
-      expect(spawnArgs).toContain('--hidden');
       expect(spawnArgs).toContain('--fixed-strings');
       expect(spawnArgs).toContain('--regexp');
       expect(spawnArgs).toContain('hello.world');
@@ -1778,7 +1777,6 @@ describe('RipGrepTool', () => {
       await invocation.execute({ abortSignal });
 
       const spawnArgs = mockSpawn.mock.calls[0][1];
-      expect(spawnArgs).toContain('--hidden');
       expect(spawnArgs).toContain('--max-count');
       expect(spawnArgs).toContain('1');
     });

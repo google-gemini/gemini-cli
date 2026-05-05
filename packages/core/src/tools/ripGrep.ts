@@ -402,7 +402,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     const searchPaths = Array.isArray(path) ? path : [path];
 
-    const rgArgs = ['--json', '--hidden'];
+    const rgArgs = ['--json'];
 
     if (!case_sensitive) {
       rgArgs.push('--ignore-case');

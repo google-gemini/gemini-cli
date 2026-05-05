@@ -179,24 +179,4 @@ describe('grep_search_functionality', () => {
       });
     },
   });
-
-  evalTest('USUALLY_PASSES', {
-    suiteName: 'default',
-    suiteType: 'behavioral',
-    name: 'should find files in hidden directories',
-    files: {
-      '.hidden_dir/system.md':
-        'Instructional Conversion and Integration Protocol',
-      'visible_dir/normal.txt': 'nothing to see here',
-    },
-    prompt: 'Find "Instructional Conversion and Integration Protocol"',
-    assert: async (rig: TestRig, result: string) => {
-      await rig.waitForToolCall('grep_search');
-      assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/\.hidden_dir\/system\.md/],
-        testName: `${TEST_PREFIX}hidden directory search`,
-      });
-    },
-  });
 });
