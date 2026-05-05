@@ -58,6 +58,7 @@ const RETRYABLE_NETWORK_CODES = [
   'UND_ERR_HEADERS_TIMEOUT',
   'UND_ERR_BODY_TIMEOUT',
   'UND_ERR_CONNECT_TIMEOUT',
+  'ERR_STREAM_PREMATURE_CLOSE',
 ];
 
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
