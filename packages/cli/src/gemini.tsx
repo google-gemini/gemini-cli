@@ -35,6 +35,7 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -44,6 +45,7 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
+import * as path from 'node:path';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   loadSettings,
@@ -194,11 +196,12 @@ ${reason.stack}`
 export async function resolveSessionId(
   resumeArg: string | undefined,
   sessionIdArg?: string | undefined,
+  sessionFileArg?: string | undefined,
 ): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg && !sessionIdArg) {
+  if (!resumeArg && !sessionIdArg && !sessionFileArg) {
     return { sessionId: createSessionId() };
   }
 
@@ -206,6 +209,36 @@ export async function resolveSessionId(
   await storage.initialize();
 
   const sessionSelector = new SessionSelector(storage);
+
+  if (sessionFileArg) {
+    try {
+      const sessionData = await loadConversationRecord(sessionFileArg);
+      if (!sessionData) {
+        throw new Error(`File not found or invalid format: ${sessionFileArg}`);
+      }
+      
+      const newSessionId = createSessionId();
+      sessionData.sessionId = newSessionId;
+      
+      const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+      const newSessionPath = path.join(
+        chatsDir,
+        `session-${Date.now()}-${newSessionId.slice(0, 8)}.jsonl`
+      );
+      
+      return {
+        sessionId: newSessionId,
+        resumedSessionData: { conversation: sessionData, filePath: newSessionPath },
+      };
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error importing session from file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
 
   if (sessionIdArg) {
     if (await sessionSelector.sessionExists(sessionIdArg)) {
@@ -340,6 +373,7 @@ export async function main() {
   const { sessionId, resumedSessionData } = await resolveSessionId(
     argv.resume,
     argv.sessionId,
+    argv.sessionFile,
   );
 
   if (

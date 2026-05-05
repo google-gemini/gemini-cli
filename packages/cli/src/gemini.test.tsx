@@ -1068,6 +1068,42 @@ describe('resolveSessionId', () => {
     expect(resumedSessionData).toBeUndefined();
   });
 
+  it('should import from session file when sessionFile is provided', async () => {
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          sessionExists: vi.fn().mockResolvedValue(false),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new MockProcessExitError(code);
+    });
+
+    try {
+      const { sessionId, resumedSessionData } = await resolveSessionId(
+        undefined,
+        undefined,
+        'dummy-session.json',
+      );
+      
+      expect(sessionId).toBeDefined();
+      expect(sessionId).not.toBe('old-session-id'); // A new session ID should be created
+      expect(resumedSessionData).toBeDefined();
+      expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
+      expect(resumedSessionData?.filePath).toContain(sessionId.slice(0, 8)); // New path
+    } catch (e) {
+      if (e instanceof MockProcessExitError) {
+        throw new Error("process.exit called with: " + JSON.stringify(emitFeedbackSpy.mock.calls));
+      }
+      throw e;
+    } finally {
+      emitFeedbackSpy.mockRestore();
+      processExitSpy.mockRestore();
+    }
+  });
+
   it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
     vi.mocked(SessionSelector).mockImplementation(
       () =>

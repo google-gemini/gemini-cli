@@ -412,6 +412,11 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-file', {
+          type: 'string',
+          nargs: 1,
+          description: 'Load a session from a JSON file',
+        })
         .option('session-id', {
           type: 'string',
           nargs: 1,
