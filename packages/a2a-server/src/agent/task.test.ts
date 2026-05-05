@@ -555,7 +555,6 @@ describe('Task', () => {
         schedulerId: 'other-task-id',
       };
 
-      // @ts-expect-error - Accessing private method
       task['handleEventDrivenToolCallsUpdate'](otherEvent);
 
       expect(handleEventDrivenToolCallSpy).not.toHaveBeenCalled();
@@ -568,7 +567,6 @@ describe('Task', () => {
         schedulerId: 'task-id',
       };
 
-      // @ts-expect-error - Accessing private method
       task['handleEventDrivenToolCallsUpdate'](ownEvent);
 
       expect(handleEventDrivenToolCallSpy).toHaveBeenCalled();
@@ -602,7 +600,6 @@ describe('Task', () => {
         tool: { name: 'test-tool' },
       };
 
-      // @ts-expect-error - Accessing private method
       const message = task['toolStatusMessage'](
         mockToolCall as unknown as ToolCall,
         'task-id',
@@ -643,14 +640,12 @@ describe('Task', () => {
       };
 
       // First update - should trigger change
-      // @ts-expect-error - Accessing private method
       const changed1 = task['handleEventDrivenToolCall'](
         toolCall1 as unknown as ToolCall,
       );
       expect(changed1).toBe(true);
 
       // Second update with same status - should NOT trigger change
-      // @ts-expect-error - Accessing private method
       const changed2 = task['handleEventDrivenToolCall'](
         toolCall1 as unknown as ToolCall,
       );
@@ -662,7 +657,6 @@ describe('Task', () => {
         status: 'awaiting_approval',
         outcome: 'accepted',
       };
-      // @ts-expect-error - Accessing private method
       const changed3 = task['handleEventDrivenToolCall'](
         toolCall2 as unknown as ToolCall,
       );
