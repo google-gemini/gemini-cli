@@ -65,7 +65,7 @@ function sanitizeForWrapper(input: string): string {
   return input
     .replace(XML_CLOSING_TAG_RE, '<\\/$1>')
     .replace(CONTEXT_BREAKER_RE, '\\]')
-    .replace(NEWLINE_RE, '\\n');
+    .replace(NEWLINE_RE, ' ');
 }
 
 function wrapInput(input: string): string {

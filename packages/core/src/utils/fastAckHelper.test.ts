@@ -231,10 +231,14 @@ describe('wrapper sanitization', () => {
     expect(mixed).toContain('<\\/User_Input>');
   });
 
-  it('escapes newlines in background output', () => {
+  it('strips newlines from background output (replaces with spaces)', () => {
     const result = formatBackgroundCompletionForModel('line1\nline2\r\nline3');
-    expect(result).toContain('line1\\nline2\\nline3');
-    expect(result).not.toMatch(/line1\nline2/);
+    expect(result).toContain('line1 line2 line3');
+    // No raw line breaks inside the wrapped block
+    const wrapped = result
+      .split('<background_output>')[1]
+      .split('</background_output>')[0];
+    expect(wrapped.replace(/^\n|\n$/g, '')).not.toMatch(/\r?\n/);
   });
 });
 

@@ -1995,6 +1995,10 @@ export const useGeminiStream = (
         (toolCall) => toolCall.response.responseParts,
       );
 
+      let pendingSteeringAck: {
+        hintText: string;
+        ackTimestamp: number;
+      } | null = null;
       if (consumeUserHint) {
         const userHint = consumeUserHint();
         if (userHint && userHint.trim().length > 0) {
@@ -2002,35 +2006,7 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
-          const ackTimestamp = Date.now();
-          // Defer until after submitQuery below has installed the new
-          // turn's AbortController; the signal captured here belongs to
-          // the continuation turn, not the one that just finished.
-          queueMicrotask(() => {
-            const signal = abortControllerRef.current?.signal;
-            void generateSteeringAckMessage(
-              config.getBaseLlmClient(),
-              hintText,
-              { signal },
-            )
-              .then((ackText) => {
-                if (signal?.aborted || turnCancelledRef.current) return;
-                addItem(
-                  {
-                    type: MessageType.INFO,
-                    icon: '· ',
-                    color: theme.text.secondary,
-                    marginBottom: 1,
-                    text: ackText,
-                  } as HistoryItemInfo,
-                  ackTimestamp,
-                );
-              })
-              .catch((err) => {
-                if (err?.name === 'AbortError') return;
-                // Silently ignore — steering ack is non-critical UI feedback.
-              });
-          });
+          pendingSteeringAck = { hintText, ackTimestamp: Date.now() };
         }
       }
 
@@ -2047,6 +2023,36 @@ export const useGeminiStream = (
       // Don't continue if model was switched due to quota error
       if (modelSwitchedFromQuotaError) {
         return;
+      }
+
+      if (pendingSteeringAck) {
+        const { hintText, ackTimestamp } = pendingSteeringAck;
+        // Defer until after submitQuery below has installed the new
+        // turn's AbortController; the signal captured here belongs to
+        // the continuation turn, not the one that just finished.
+        queueMicrotask(() => {
+          const signal = abortControllerRef.current?.signal;
+          void generateSteeringAckMessage(config.getBaseLlmClient(), hintText, {
+            signal,
+          })
+            .then((ackText) => {
+              if (signal?.aborted || turnCancelledRef.current) return;
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  icon: '· ',
+                  color: theme.text.secondary,
+                  marginBottom: 1,
+                  text: ackText,
+                } as HistoryItemInfo,
+                ackTimestamp,
+              );
+            })
+            .catch((err) => {
+              if (err?.name === 'AbortError') return;
+              // Silently ignore — steering ack is non-critical UI feedback.
+            });
+        });
       }
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
