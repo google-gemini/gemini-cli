@@ -409,9 +409,10 @@ export async function runNonInteractive(
                   responseText,
                   stats,
                   undefined,
-                  warnings,
+                  [...warnings, stopMessage],
                 ),
               );
+
             } else {
               textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
