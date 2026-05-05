@@ -35,6 +35,7 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  getProjectHash,
   loadConversationRecord,
 } from '@google/gemini-cli-core';
 
@@ -222,6 +223,7 @@ export async function resolveSessionId(
       const isoNow = new Date(now).toISOString();
       const newSessionId = createSessionId();
       sessionData.sessionId = newSessionId;
+      sessionData.projectHash = getProjectHash(storage.getProjectRoot());
       sessionData.startTime = isoNow;
       sessionData.lastUpdated = isoNow;
 
@@ -231,16 +233,7 @@ export async function resolveSessionId(
         `session-${now}-${newSessionId.slice(0, 8)}.jsonl`
       );
 
-      const initialMetadata = {
-        sessionId: sessionData.sessionId,
-        projectHash: sessionData.projectHash,
-        startTime: sessionData.startTime,
-        lastUpdated: sessionData.lastUpdated,
-        summary: sessionData.summary,
-        memoryScratchpad: sessionData.memoryScratchpad,
-        directories: sessionData.directories,
-        kind: sessionData.kind,
-      };
+      const { messages, ...initialMetadata } = sessionData;
 
       const lines = [JSON.stringify(initialMetadata)];
       if (sessionData.messages) {
@@ -252,7 +245,8 @@ export async function resolveSessionId(
       await fsPromises.mkdir(chatsDir, { recursive: true });
       await fsPromises.writeFile(newSessionPath, lines.join('\n') + '\n', 'utf-8');
 
-      return {        sessionId: newSessionId,
+      return {
+        sessionId: newSessionId,
         resumedSessionData: { conversation: sessionData, filePath: newSessionPath },
       };
     } catch (error) {
