@@ -528,7 +528,7 @@ export class Task {
         this.toolsAlreadyConfirmed.has(callId)
       ) {
         isExecuting = true;
-      } else if (status === 'awaiting_approval') {
+      } else if (status === CoreToolCallStatus.AwaitingApproval) {
         isAwaitingApproval = true;
       }
     }
