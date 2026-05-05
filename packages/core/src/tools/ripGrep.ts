@@ -30,7 +30,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, spawnAsync } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -59,6 +59,20 @@ export async function getRipgrepPath(): Promise<string | null> {
     if (await fileExists(candidate)) {
       return candidate;
     }
+  }
+
+  // Fallback: Check if ripgrep (rg) is available in the system PATH
+  try {
+    const checkCmd = platform === 'win32' ? 'where' : 'which';
+    const { stdout } = await spawnAsync(checkCmd, ['rg']);
+    if (stdout) {
+      const systemPath = stdout.trim().split('\n')[0].trim();
+      if (await fileExists(systemPath)) {
+        return systemPath;
+      }
+    }
+  } catch {
+    // Ripgrep not found in system PATH
   }
 
   return null;
