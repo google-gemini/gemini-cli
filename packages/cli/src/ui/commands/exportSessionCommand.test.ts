@@ -53,7 +53,8 @@ describe('exportSessionCommand', () => {
   });
 
   it('should return error if sessionId is missing', async () => {
-    mockContext.services.agentContext!.config.getSessionId = () => undefined;
+    mockContext.services.agentContext!.config.getSessionId = () =>
+      undefined as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     const result = await exportSessionCommand.action!(mockContext, '');
 
     expect(result).toEqual({
