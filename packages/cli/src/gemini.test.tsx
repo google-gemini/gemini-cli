@@ -1076,6 +1076,15 @@ describe('resolveSessionId', () => {
         }) as unknown as InstanceType<typeof SessionSelector>,
     );
 
+    const coreModule = await import('@google/gemini-cli-core');
+    vi.spyOn(coreModule, 'loadConversationRecord').mockResolvedValueOnce({
+      sessionId: 'old-session-id',
+      projectHash: 'hash',
+      startTime: 'time',
+      lastUpdated: 'time',
+      messages: [],
+    } as any);
+
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new MockProcessExitError(code);

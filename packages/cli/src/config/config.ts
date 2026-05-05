@@ -97,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionFile?: string | undefined;
   sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;

@@ -43,8 +43,7 @@ export const exportSessionCommand: SlashCommand = {
     }
 
     try {
-      const storage = new Storage(process.cwd());
-      await storage.initialize();
+      const storage = context.services.agentContext!.config.storage;
       const sessionSelector = new SessionSelector(storage);
       const { sessionData } = await sessionSelector.resolveSession(sessionId);
 

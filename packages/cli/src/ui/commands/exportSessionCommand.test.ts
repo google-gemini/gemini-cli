@@ -26,6 +26,7 @@ describe('exportSessionCommand', () => {
         agentContext: {
           config: {
             sessionId: 'test-session-id',
+            storage: new Storage(process.cwd()),
           },
         },
       },

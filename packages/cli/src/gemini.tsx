@@ -46,6 +46,7 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
 import * as path from 'node:path';
+import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   loadSettings,
@@ -217,17 +218,41 @@ export async function resolveSessionId(
         throw new Error(`File not found or invalid format: ${sessionFileArg}`);
       }
       
+      const now = Date.now();
+      const isoNow = new Date(now).toISOString();
       const newSessionId = createSessionId();
       sessionData.sessionId = newSessionId;
-      
+      sessionData.startTime = isoNow;
+      sessionData.lastUpdated = isoNow;
+
       const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
       const newSessionPath = path.join(
         chatsDir,
-        `session-${Date.now()}-${newSessionId.slice(0, 8)}.jsonl`
+        `session-${now}-${newSessionId.slice(0, 8)}.jsonl`
       );
-      
-      return {
-        sessionId: newSessionId,
+
+      const initialMetadata = {
+        sessionId: sessionData.sessionId,
+        projectHash: sessionData.projectHash,
+        startTime: sessionData.startTime,
+        lastUpdated: sessionData.lastUpdated,
+        summary: sessionData.summary,
+        memoryScratchpad: sessionData.memoryScratchpad,
+        directories: sessionData.directories,
+        kind: sessionData.kind,
+      };
+
+      const lines = [JSON.stringify(initialMetadata)];
+      if (sessionData.messages) {
+        for (const msg of sessionData.messages) {
+          lines.push(JSON.stringify(msg));
+        }
+      }
+
+      await fsPromises.mkdir(chatsDir, { recursive: true });
+      await fsPromises.writeFile(newSessionPath, lines.join('\n') + '\n', 'utf-8');
+
+      return {        sessionId: newSessionId,
         resumedSessionData: { conversation: sessionData, filePath: newSessionPath },
       };
     } catch (error) {
