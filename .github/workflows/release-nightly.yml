@@ -31,40 +31,10 @@ on:
 
 jobs:
   build-mac:
-    name: 'Build Unsigned (${{ matrix.arch }})'
     if: "github.repository == 'google-gemini/gemini-cli'"
-    runs-on: 'macos-latest'
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: ['x64', 'arm64']
-    steps:
-      - name: 'Checkout Ref'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-        with:
-          ref: '${{ github.event.inputs.ref }}'
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          architecture: '${{ matrix.arch }}'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build Binary'
-        env:
-          SKIP_SIGNING: 'true'
-        run: 'npm run build:binary'
-
-      - name: 'Upload Artifact'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'gemini-darwin-${{ matrix.arch }}-unsigned'
-          path: 'dist/darwin-${{ matrix.arch }}/gemini'
-          retention-days: 1
+    uses: './.github/workflows/build-unsigned-mac-binaries.yml'
+    with:
+      ref: '${{ github.event.inputs.ref }}'
 
   release:
     if: "github.repository == 'google-gemini/gemini-cli'"
@@ -99,19 +69,10 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
-      - name: 'Download macOS arm64 binary'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
-        continue-on-error: true
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
         with:
-          name: 'gemini-darwin-arm64-unsigned'
-          path: 'release/dist/darwin-arm64'
-
-      - name: 'Download macOS x64 binary'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: 'gemini-darwin-x64-unsigned'
-          path: 'release/dist/darwin-x64'
+          path: 'release/dist'
 
       - name: 'Print Inputs'
         shell: 'bash'
