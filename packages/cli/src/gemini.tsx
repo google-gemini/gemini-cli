@@ -222,10 +222,13 @@ export async function resolveSessionId(
       const now = Date.now();
       const isoNow = new Date(now).toISOString();
 
-      // Add an info message to the history to confirm the import
-      if (!sessionData.messages) {
-        sessionData.messages = [];
-      }
+      // Filter out old system/info messages that are specific to the previous run
+      // and only keep actual conversation messages (user/gemini).
+      sessionData.messages = (sessionData.messages || []).filter(
+        (m) => m.type === 'user' || m.type === 'gemini',
+      );
+
+      // Add a single info message to the history to confirm the import
       sessionData.messages.unshift({
         id: `import-${now}`,
         type: 'info',

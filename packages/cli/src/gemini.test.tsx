@@ -1080,7 +1080,12 @@ describe('resolveSessionId', () => {
       projectHash: 'hash',
       startTime: 'time',
       lastUpdated: 'time',
-      messages: [],
+      messages: [
+        { type: 'info', content: 'Old info', id: '1' },
+        { type: 'user', content: 'Hello', id: '2' },
+        { type: 'gemini', content: 'Hi', id: '3' },
+        { type: 'error', content: 'Old error', id: '4' },
+      ],
     } as unknown as ConversationRecord);
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
@@ -1099,6 +1104,22 @@ describe('resolveSessionId', () => {
       expect(sessionId).not.toBe('old-session-id'); // A new session ID should be created
       expect(resumedSessionData).toBeDefined();
       expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
+      
+      // Verify messages: should have 1 info (the new import confirmation) + 2 conversation messages
+      expect(resumedSessionData?.conversation.messages).toHaveLength(3);
+      expect(resumedSessionData?.conversation.messages![0]).toMatchObject({
+        type: 'info',
+        content: expect.stringContaining('Imported session from'),
+      });
+      expect(resumedSessionData?.conversation.messages![1]).toMatchObject({
+        type: 'user',
+        content: 'Hello',
+      });
+      expect(resumedSessionData?.conversation.messages![2]).toMatchObject({
+        type: 'gemini',
+        content: 'Hi',
+      });
+      
       expect(resumedSessionData?.filePath).toContain(sessionId.slice(0, 8)); // New path
     } catch (e) {
       if (e instanceof MockProcessExitError) {
