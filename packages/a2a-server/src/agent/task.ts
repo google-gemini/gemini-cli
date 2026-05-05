@@ -593,7 +593,7 @@ export class Task {
     );
 
     // Map internal 'validating' status to 'scheduled' for the client
-    if (serializableToolCall.status === 'validating') {
+    if (serializableToolCall.status === CoreToolCallStatus.Validating) {
       serializableToolCall.status = CoreToolCallStatus.Scheduled;
     }
 
