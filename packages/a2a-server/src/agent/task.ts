@@ -11,6 +11,7 @@ import {
   GeminiEventType,
   ToolConfirmationOutcome,
   ApprovalMode,
+  CoreToolCallStatus,
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
@@ -95,6 +96,8 @@ export class Task {
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
+  private pendingOutcomes: Map<string, ToolConfirmationOutcome | undefined> =
+    new Map(); // toolCallId --> outcome
   private toolsAlreadyConfirmed: Set<string> = new Set();
   private toolCompletionPromise?: Promise<void>;
   private toolCompletionNotifier?: {
@@ -413,7 +416,10 @@ export class Task {
   private handleEventDrivenToolCallsUpdate(
     event: ToolCallsUpdateMessage,
   ): void {
-    if (event.type !== MessageBusType.TOOL_CALLS_UPDATE) {
+    if (
+      event.type !== MessageBusType.TOOL_CALLS_UPDATE ||
+      event.schedulerId !== this.id
+    ) {
       return;
     }
 
@@ -426,7 +432,7 @@ export class Task {
     this.checkInputRequiredState();
   }
 
-  private handleEventDrivenToolCall(tc: ToolCall): void {
+  private handleEventDrivenToolCall(tc: ToolCall): boolean {
     const callId = tc.request.callId;
 
     // Do not process events for tools that have already been finalized.
@@ -436,11 +442,16 @@ export class Task {
       this.processedToolCallIds.has(callId) ||
       this.completedToolCalls.some((c) => c.request.callId === callId)
     ) {
-      return;
+      return false;
     }
 
     const previousStatus = this.pendingToolCalls.get(callId);
-    const hasChanged = previousStatus !== tc.status;
+    const previousOutcome = this.pendingOutcomes.get(callId);
+    const hasChanged =
+      previousStatus !== tc.status || previousOutcome !== tc.outcome;
+
+    // Update outcome tracking
+    this.pendingOutcomes.set(callId, tc.outcome);
 
     // 1. Handle Output
     if (tc.status === 'executing' && tc.liveOutput) {
@@ -454,6 +465,7 @@ export class Task {
       tc.status === 'cancelled'
     ) {
       this.toolsAlreadyConfirmed.delete(callId);
+      this.pendingOutcomes.delete(callId);
       if (hasChanged) {
         logger.info(
           `[Task] Tool call ${callId} completed with status: ${tc.status}`,
@@ -496,6 +508,8 @@ export class Task {
       );
       this.eventBus?.publish(statusUpdate);
     }
+
+    return hasChanged;
   }
 
   private checkInputRequiredState(): void {
@@ -508,12 +522,14 @@ export class Task {
     let isExecuting = false;
 
     for (const [callId, status] of this.pendingToolCalls.entries()) {
-      if (status === 'executing' || status === 'scheduled') {
-        isExecuting = true;
-      } else if (
-        status === 'awaiting_approval' &&
-        !this.toolsAlreadyConfirmed.has(callId)
+      if (
+        status === CoreToolCallStatus.Executing ||
+        status === CoreToolCallStatus.Scheduled ||
+        status === CoreToolCallStatus.Validating ||
+        this.toolsAlreadyConfirmed.has(callId)
       ) {
+        isExecuting = true;
+      } else if (status === CoreToolCallStatus.AwaitingApproval) {
         isAwaitingApproval = true;
       }
     }
@@ -574,7 +590,13 @@ export class Task {
       'confirmationDetails',
       'liveOutput',
       'response',
+      'outcome',
     );
+
+    // Map internal 'validating' status to 'scheduled' for the client
+    if (serializableToolCall.status === CoreToolCallStatus.Validating) {
+      serializableToolCall.status = CoreToolCallStatus.Scheduled;
+    }
 
     if (tc.tool) {
       const toolFields = this._pickFields(
