@@ -112,6 +112,38 @@ describe('TFIDFEmbedder', () => {
     expect(qvec.length).toBe(embedder.getVocabulary().length);
   });
 
+  it('should decrement doc frequency on removeDocument', () => {
+    const embedder = new TFIDFEmbedder();
+    embedder.embed('alpha beta');
+    embedder.embed('alpha gamma');
+    const docId = embedder.lastDocId;
+
+    // Before removal: 'alpha beta' vs 'alpha gamma' query
+    // 'alpha' in 2 docs, 'beta'/'gamma' in 1 each
+    const beforeSim = cosineSimilarity(
+      embedder.embedQuery('alpha beta'),
+      embedder.embedQuery('alpha gamma'),
+    );
+
+    embedder.removeDocument(docId);
+
+    // After removal: 'gamma' doc freq drops to 0, 'alpha' drops to 1
+    // Similarity should change because IDF weights shifted
+    const afterSim = cosineSimilarity(
+      embedder.embedQuery('alpha beta'),
+      embedder.embedQuery('alpha gamma'),
+    );
+
+    expect(afterSim).not.toBeCloseTo(beforeSim, 5);
+  });
+
+  it('removeDocument should be idempotent for unknown docId', () => {
+    const embedder = new TFIDFEmbedder();
+    embedder.embed('test');
+    // Should not throw
+    embedder.removeDocument(999);
+  });
+
   it('should normalize vectors', () => {
     const embedder = new TFIDFEmbedder();
     const vec = embedder.embed('test normalization vector');

@@ -781,6 +781,45 @@ describe('ContextWindow', () => {
     expect(cw.hotCount).toBe(4);
   });
 
+  it('should not duplicate graduated-but-not-evicted messages in render', () => {
+    const cw = new ContextWindow(stubEmbedder, stubSummarizer, {
+      graduateAt: 3,
+      evictAt: 5,
+      maxColdClusters: 10,
+      mergeThreshold: 0.0,
+    });
+
+    cw.append('msg0');
+    cw.append('msg1');
+    cw.append('msg2');
+    cw.append('msg3'); // msg0 graduates but stays in hot (overlap)
+
+    const rendered = cw.render();
+    const msg0Occurrences = rendered.filter((r) => r === 'msg0').length;
+    expect(msg0Occurrences).toBe(1);
+  });
+
+  it('should include fully evicted clusters in cold', () => {
+    const cw = new ContextWindow(stubEmbedder, stubSummarizer, {
+      graduateAt: 2,
+      evictAt: 3,
+      maxColdClusters: 10,
+      mergeThreshold: 2.0, // never merge (max cosine sim is 1.0)
+    });
+
+    cw.append('old');
+    cw.append('mid');
+    cw.append('hot1'); // 'old' graduates
+    cw.append('hot2'); // 'mid' graduates, 'old' evicted
+
+    const rendered = cw.render();
+    // 'old' was evicted from hot — should appear in cold as singleton
+    expect(rendered).toContain('old');
+    // 'mid' is graduated but still in hot — should appear once from hot, not cold
+    const midCount = rendered.filter((r) => r === 'mid').length;
+    expect(midCount).toBe(1);
+  });
+
   it('should return correct counts', () => {
     const cw = new ContextWindow(stubEmbedder, stubSummarizer, {
       graduateAt: 3,

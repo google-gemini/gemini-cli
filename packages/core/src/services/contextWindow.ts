@@ -467,6 +467,17 @@ export class ContextWindow {
       coldRoots = this._forest.roots();
     }
 
+    // Exclude clusters whose members are ALL still in the hot zone.
+    // A cluster with only hot members would duplicate content verbatim.
+    // Mixed clusters (some evicted, some hot) are kept because the
+    // evicted members' content is only accessible through the summary.
+    const evictedThreshold =
+      this._hot.length > 0 ? this._hot[0].id : this._nextId;
+    coldRoots = coldRoots.filter((r) => {
+      const memberIds = this._forest.members(r);
+      return Math.min(...memberIds) < evictedThreshold;
+    });
+
     // Sort by max member ID (auto-incrementing) so cold summaries appear
     // in chronological order. roots() returns Map-insertion order, which
     // stops tracking recency once unions reparent clusters.
