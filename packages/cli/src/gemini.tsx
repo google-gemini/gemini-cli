@@ -221,6 +221,18 @@ export async function resolveSessionId(
 
       const now = Date.now();
       const isoNow = new Date(now).toISOString();
+
+      // Add an info message to the history to confirm the import
+      if (!sessionData.messages) {
+        sessionData.messages = [];
+      }
+      sessionData.messages.unshift({
+        id: `import-${now}`,
+        type: 'info',
+        content: `Imported session from ${sessionFileArg}`,
+        timestamp: isoNow,
+      } as any);
+
       const newSessionId = createSessionId();
       sessionData.sessionId = newSessionId;
       sessionData.projectHash = getProjectHash(storage.getProjectRoot());
