@@ -12,6 +12,9 @@ import {
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
+  type ToolCall,
+  type ToolCallsUpdateMessage,
+  MessageBusType,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -538,32 +541,132 @@ describe('Task', () => {
       );
 
       const handleEventDrivenToolCallSpy = vi.spyOn(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        task as any,
+        task as unknown as {
+          handleEventDrivenToolCall: Task['handleEventDrivenToolCall'];
+        },
         'handleEventDrivenToolCall',
       );
 
-      const otherEvent = {
-        type: 'tool-calls-update',
-        toolCalls: [{ request: { callId: '1' }, status: 'executing' }],
+      const otherEvent: ToolCallsUpdateMessage = {
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [
+          { request: { callId: '1' }, status: 'executing' } as ToolCall,
+        ],
         schedulerId: 'other-task-id',
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      task['handleEventDrivenToolCallsUpdate'](otherEvent as any);
+      // @ts-expect-error - Accessing private method
+      task['handleEventDrivenToolCallsUpdate'](otherEvent);
 
       expect(handleEventDrivenToolCallSpy).not.toHaveBeenCalled();
 
-      const ownEvent = {
-        type: 'tool-calls-update',
-        toolCalls: [{ request: { callId: '1' }, status: 'executing' }],
+      const ownEvent: ToolCallsUpdateMessage = {
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [
+          { request: { callId: '1' }, status: 'executing' } as ToolCall,
+        ],
         schedulerId: 'task-id',
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      task['handleEventDrivenToolCallsUpdate'](ownEvent as any);
+      // @ts-expect-error - Accessing private method
+      task['handleEventDrivenToolCallsUpdate'](ownEvent);
 
       expect(handleEventDrivenToolCallSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('Serialization and Mapping', () => {
+    it('should map internal "validating" status to "scheduled" for the client and include outcome', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const mockToolCall = {
+        request: { callId: 'tool-1' },
+        status: 'validating',
+        outcome: 'accepted',
+        tool: { name: 'test-tool' },
+      };
+
+      // @ts-expect-error - Accessing private method
+      const message = task['toolStatusMessage'](
+        mockToolCall as unknown as ToolCall,
+        'task-id',
+        'context-id',
+      );
+      const serialized = (
+        message.parts![0] as {
+          data: { status: string; outcome: string };
+        }
+      ).data;
+
+      expect(serialized.status).toBe('scheduled');
+      expect(serialized.outcome).toBe('accepted');
+    });
+
+    it('should correctly detect changes when status or outcome changes', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const toolCall1 = {
+        request: { callId: 'tool-1' },
+        status: 'awaiting_approval',
+      };
+
+      // First update - should trigger change
+      // @ts-expect-error - Accessing private method
+      const changed1 = task['handleEventDrivenToolCall'](
+        toolCall1 as unknown as ToolCall,
+      );
+      expect(changed1).toBe(true);
+
+      // Second update with same status - should NOT trigger change
+      // @ts-expect-error - Accessing private method
+      const changed2 = task['handleEventDrivenToolCall'](
+        toolCall1 as unknown as ToolCall,
+      );
+      expect(changed2).toBe(false);
+
+      // Update with new outcome - SHOULD trigger change
+      const toolCall2 = {
+        request: { callId: 'tool-1' },
+        status: 'awaiting_approval',
+        outcome: 'accepted',
+      };
+      // @ts-expect-error - Accessing private method
+      const changed3 = task['handleEventDrivenToolCall'](
+        toolCall2 as unknown as ToolCall,
+      );
+      expect(changed3).toBe(true);
     });
   });
 });
