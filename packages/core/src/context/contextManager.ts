@@ -58,15 +58,8 @@ export class ContextManager {
     );
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      const newIds = new Set(event.nodes.map((n) => n.id));
-      const addedNodes = event.nodes.filter((n) => event.newNodes.has(n.id));
-
-      // Prune any pristine nodes that were dropped from the upstream history
-      this.buffer = this.buffer.prunePristineNodes(newIds);
-
-      if (addedNodes.length > 0) {
-        this.buffer = this.buffer.appendPristineNodes(addedNodes);
-      }
+      // Sync the entire pristine history chronologically
+      this.buffer = this.buffer.syncPristineHistory(event.nodes);
 
       this.evaluateTriggers(event.newNodes);
     });
@@ -141,15 +134,23 @@ export class ContextManager {
       }
 
       if (agedOutNodes.size > 0) {
-        this.env.tokenCalculator.garbageCollectCache(
-          new Set(this.buffer.nodes.map((n) => n.id)),
-        );
-        this.eventBus.emitConsolidationNeeded({
-          nodes: this.buffer.nodes,
-          targetDeficit:
-            currentTokens - this.sidecar.config.budget.retainedTokens,
-          targetNodeIds: agedOutNodes,
-        });
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.retainedTokens;
+
+        // Respect coalescing threshold for background work
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        if (targetDeficit >= threshold) {
+          this.env.tokenCalculator.garbageCollectCache(
+            new Set(this.buffer.nodes.map((n) => n.id)),
+          );
+          this.eventBus.emitConsolidationNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNodes,
+          });
+        }
       }
     }
   }
@@ -246,6 +247,7 @@ export class ContextManager {
     await this.orchestrator.waitForPipelines();
 
     let nodes = this.buffer.nodes;
+    const previewNodeIds = new Set<string>();
 
     // If we have a pending request, we need to build a 'preview' graph for this render.
     if (pendingRequest) {
@@ -253,6 +255,9 @@ export class ContextManager {
         type: 'PUSH',
         payload: [pendingRequest],
       });
+      for (const n of previewNodes) {
+        previewNodeIds.add(n.id);
+      }
       nodes = [...nodes, ...previewNodes];
     }
 
@@ -288,6 +293,7 @@ export class ContextManager {
       this.env,
       protectionReasons,
       headerTokens,
+      previewNodeIds,
     );
 
     // Structural validation in debug mode

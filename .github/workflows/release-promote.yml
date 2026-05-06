@@ -197,9 +197,15 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+  build-mac:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    uses: './.github/workflows/build-unsigned-mac-binaries.yml'
+    with:
+      ref: '${{ github.event.inputs.ref }}'
+
   publish-preview:
     name: 'Publish preview'
-    needs: ['calculate-versions', 'test']
+    needs: ['calculate-versions', 'test', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -228,6 +234,11 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -266,7 +277,7 @@ jobs:
 
   publish-stable:
     name: 'Publish stable'
-    needs: ['calculate-versions', 'test', 'publish-preview']
+    needs: ['calculate-versions', 'test', 'publish-preview', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -295,6 +306,11 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
