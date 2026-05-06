@@ -75,13 +75,10 @@ export function useVoiceMode({
     }
 
     const serviceToDisconnect = transcriptionServiceRef.current;
-    transcriptionServiceRef.current = null;
 
     if (serviceToDisconnect) {
       const isLive = settings.experimental.voice?.backend === 'gemini-live';
-      const gracePeriodMs =
-        settings.experimental.voice?.stopGracePeriodMs ??
-        (isLive ? 2000 : 1000);
+      const gracePeriodMs = isLive ? 4000 : 3000;
       debugLogger.debug(
         `[Voice] Draining transcription for ${gracePeriodMs}ms`,
       );
@@ -90,11 +87,16 @@ export function useVoiceMode({
       disconnectTimerRef.current = setTimeout(() => {
         debugLogger.debug('[Voice] Grace period ended, disconnecting service');
         serviceToDisconnect.disconnect();
+        if (transcriptionServiceRef.current === serviceToDisconnect) {
+          transcriptionServiceRef.current = null;
+        }
         disconnectTimerRef.current = null;
+        liveTranscriptionRef.current = '';
       }, gracePeriodMs);
+    } else {
+      liveTranscriptionRef.current = '';
     }
 
-    liveTranscriptionRef.current = '';
     pttStateRef.current = 'idle';
   }, [settings.experimental.voice]);
 
@@ -186,10 +188,7 @@ export function useVoiceMode({
       transcriptionServiceRef.current = currentService;
 
       currentService.on('transcription', (text) => {
-        if (
-          transcriptionServiceRef.current !== currentService &&
-          stopRequestedRef.current
-        ) {
+        if (transcriptionServiceRef.current !== currentService) {
           // If this is an orphaned service that was replaced by a new session, ignore its events
           return;
         }
@@ -217,11 +216,7 @@ export function useVoiceMode({
       });
 
       currentService.on('turnComplete', () => {
-        if (
-          transcriptionServiceRef.current !== currentService &&
-          stopRequestedRef.current
-        )
-          return;
+        if (transcriptionServiceRef.current !== currentService) return;
         // Advance the baseline so subsequent turns append after this turn's text
         turnBaselineRef.current = bufferRef.current.text;
         turnBaselineCursorOffsetRef.current = bufferRef.current.getOffset();
