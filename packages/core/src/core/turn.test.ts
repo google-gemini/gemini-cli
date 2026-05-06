@@ -48,6 +48,7 @@ describe('Turn', () => {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
+    context: { config: { isContextManagementEnabled: () => boolean } };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -57,6 +58,11 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
       maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
+      context: {
+        config: {
+          isContextManagementEnabled: () => false,
+        },
+      },
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);

@@ -173,7 +173,6 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   EXPAND_HINT_DURATION_MS,
 } from './constants.js';
-import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { parseSlashCommand } from '../utils/commands.js';
@@ -756,7 +755,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (authState === AuthState.Authenticated && authContext.requiresRestart) {
-      setAuthState(AuthState.AwaitingGoogleLoginRestart);
+      setAuthState(AuthState.AwaitingLoginRestart);
       setAuthContext({});
     }
   }, [authState, authContext, setAuthState]);
@@ -875,10 +874,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (apiKey: string) => {
       try {
         onAuthError(null);
-        if (!apiKey.trim() && apiKey.length > 1) {
-          onAuthError(
-            'API key cannot be empty string with length greater than 1.',
-          );
+        if (!apiKey.trim()) {
+          onAuthError('API key cannot be empty or whitespace only.');
           return;
         }
 
@@ -1130,18 +1127,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [config, historyManager]);
 
-  const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
-    () => {},
-  );
+  const cancelHandlerRef = useRef<
+    (shouldRestorePrompt?: boolean, clearBuffer?: boolean) => void
+  >(() => {});
 
-  const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
-    if (shouldRestorePrompt) {
-      setPendingRestorePrompt(true);
-    } else {
-      setPendingRestorePrompt(false);
-      cancelHandlerRef.current(false);
-    }
-  }, []);
+  const onCancelSubmit = useCallback(
+    (shouldRestorePrompt?: boolean, clearBuffer: boolean = false) => {
+      if (shouldRestorePrompt) {
+        setPendingRestorePrompt(true);
+      } else {
+        setPendingRestorePrompt(false);
+        cancelHandlerRef.current(false, clearBuffer);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (pendingRestorePrompt) {
@@ -1310,6 +1310,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isMcpReady } = useMcpStatus(config);
 
+  const isCompressing = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) =>
+          item.type === MessageType.COMPRESSION && item.compression.isPending,
+      ),
+    [pendingHistoryItems],
+  );
+
   const {
     messageQueue,
     addMessage,
@@ -1321,21 +1330,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
     isMcpReady,
+    isCompressing,
   });
 
   cancelHandlerRef.current = useCallback(
-    (shouldRestorePrompt: boolean = true) => {
-      if (isToolAwaitingConfirmation(pendingHistoryItems)) {
+    (shouldRestorePrompt: boolean = true, clearBuffer: boolean = false) => {
+      if (!clearBuffer && isToolAwaitingConfirmation(pendingHistoryItems)) {
         return; // Don't clear - user may be composing a follow-up message
       }
-      if (isToolExecuting(pendingHistoryItems)) {
-        buffer.setText(''); // Clear for Ctrl+C cancellation
-        return;
-      }
 
-      // If cancelling (shouldRestorePrompt=false), never modify the buffer
-      // User is in control - preserve whatever text they typed, pasted, or restored
+      // If cancelling (shouldRestorePrompt=false):
       if (!shouldRestorePrompt) {
+        // Clear the buffer if explicitly requested (e.g., Ctrl+C)
+        if (clearBuffer) {
+          buffer.setText('');
+        }
+        // Otherwise (e.g., Escape), user is in control - preserve whatever text they typed
         return;
       }
 
@@ -1415,7 +1425,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+      if (
+        (isSlash && isConfigInitialized) ||
+        (!isCompressing && isIdle && isMcpOrConfigReady)
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1438,7 +1451,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
+        if (
+          isIdle &&
+          !isCompressing &&
+          !isMcpOrConfigReady &&
+          messageQueue.length === 0
+        ) {
           coreEvents.emitFeedback(
             'info',
             !isConfigInitialized
@@ -1458,6 +1476,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       isMcpReady,
       streamingState,
+      isCompressing,
       messageQueue.length,
       pendingHistoryItems,
       config,
@@ -2187,8 +2206,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
+  const loginRestartMessage =
+    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
+
   const dialogsVisible =
-    shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
@@ -2216,6 +2240,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
+    isAwaitingLoginRestart ||
     !!newAgents;
 
   const hasPendingToolConfirmation = useMemo(
@@ -2449,6 +2474,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      isAwaitingLoginRestart,
+      loginRestartMessage,
       apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
@@ -2654,6 +2681,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       apiKeyDefaultValue,
       authState,
+      isAwaitingLoginRestart,
+      loginRestartMessage,
       transientMessage,
       bannerData,
       bannerVisible,
@@ -2728,6 +2757,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundTaskPid,
       setIsBackgroundTaskListOpen,
       setAuthContext,
+      dismissLoginRestart: () => {
+        setAuthContext({});
+        setAuthState(AuthState.Updating);
+      },
       onHintInput: () => {},
       onHintBackspace: () => {},
       onHintClear: () => {},
@@ -2833,18 +2866,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setVoiceModeEnabled,
     ],
   );
-
-  if (authState === AuthState.AwaitingGoogleLoginRestart) {
-    return (
-      <LoginWithGoogleRestartDialog
-        onDismiss={() => {
-          setAuthContext({});
-          setAuthState(AuthState.Updating);
-        }}
-        config={config}
-      />
-    );
-  }
 
   return (
     <UIStateContext.Provider value={uiState}>

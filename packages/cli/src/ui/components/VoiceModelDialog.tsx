@@ -18,6 +18,7 @@ import {
   type WhisperModelProgress,
 } from '@google/gemini-cli-core';
 import { CliSpinner } from './CliSpinner.js';
+import { WarningMessage } from './messages/WarningMessage.js';
 
 interface VoiceModelDialogProps {
   onClose: () => void;
@@ -68,6 +69,9 @@ export function VoiceModelDialog({
   const currentWhisperModel =
     settings.merged.experimental.voice?.whisperModel ?? 'ggml-base.en.bin';
 
+  const [highlightedBackend, setHighlightedBackend] =
+    useState<string>(currentBackend);
+
   const handleKeypress = useCallback(
     (key: Key) => {
       if (key.name === 'escape') {
@@ -100,6 +104,10 @@ export function VoiceModelDialog({
     },
     [setSetting, onClose],
   );
+
+  const handleBackendHighlight = useCallback((value: string) => {
+    setHighlightedBackend(value);
+  }, []);
 
   const handleWhisperModelSelect = useCallback(
     async (modelName: string) => {
@@ -203,14 +211,22 @@ export function VoiceModelDialog({
           </Box>
         </Box>
       ) : (
-        <Box marginTop={1}>
+        <Box marginTop={1} flexDirection="column">
           {view === 'backend' ? (
-            <DescriptiveRadioButtonSelect
-              items={backendOptions}
-              onSelect={handleBackendSelect}
-              initialIndex={currentBackend === 'whisper' ? 1 : 0}
-              showNumbers={true}
-            />
+            <>
+              <DescriptiveRadioButtonSelect
+                items={backendOptions}
+                onSelect={handleBackendSelect}
+                onHighlight={handleBackendHighlight}
+                initialIndex={currentBackend === 'whisper' ? 1 : 0}
+                showNumbers={true}
+              />
+              {highlightedBackend === 'gemini-live' && (
+                <Box marginTop={1}>
+                  <WarningMessage text="When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription. Enterprise users should verify this aligns with their data privacy and compliance requirements." />
+                </Box>
+              )}
+            </>
           ) : (
             <DescriptiveRadioButtonSelect
               items={whisperOptions}

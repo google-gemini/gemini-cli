@@ -12,6 +12,9 @@ import {
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
+  type ToolCall,
+  type ToolCallsUpdateMessage,
+  MessageBusType,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -458,6 +461,206 @@ describe('Task', () => {
 
       expect(task.promptCount).toBe(2);
       expect(task.currentPromptId).toBe(expectedPromptId2);
+    });
+  });
+
+  describe('Race Condition Fix', () => {
+    const mockConfig = createMockConfig();
+    const mockEventBus: ExecutionEventBus = {
+      publish: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      once: vi.fn(),
+      removeAllListeners: vi.fn(),
+      finished: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should NOT transition to input-required if a tool is still validating', async () => {
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      // Manually register two tool calls
+      task['_registerToolCall']('tool-1', 'awaiting_approval');
+      task['_registerToolCall']('tool-2', 'validating');
+
+      // Call checkInputRequiredState (private)
+      task['checkInputRequiredState']();
+
+      // Verify task state did NOT change to input-required
+      expect(task.taskState).not.toBe('input-required');
+      expect(mockEventBus.publish).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: expect.objectContaining({ state: 'input-required' }),
+        }),
+      );
+    });
+
+    it('should transition to input-required if all active tools are awaiting approval', async () => {
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      // Transition from submitted to working first to simulate normal flow
+      task.taskState = 'working';
+
+      // Manually register tool calls
+      task['_registerToolCall']('tool-1', 'awaiting_approval');
+
+      // Call checkInputRequiredState
+      task['checkInputRequiredState']();
+
+      // Verify task state changed to input-required
+      expect(task.taskState).toBe('input-required');
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: expect.objectContaining({ state: 'input-required' }),
+        }),
+      );
+    });
+
+    it('handleEventDrivenToolCallsUpdate should ignore events for other schedulers', async () => {
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const handleEventDrivenToolCallSpy = vi.spyOn(
+        task as unknown as {
+          handleEventDrivenToolCall: Task['handleEventDrivenToolCall'];
+        },
+        'handleEventDrivenToolCall',
+      );
+
+      const otherEvent: ToolCallsUpdateMessage = {
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [
+          { request: { callId: '1' }, status: 'executing' } as ToolCall,
+        ],
+        schedulerId: 'other-task-id',
+      };
+
+      task['handleEventDrivenToolCallsUpdate'](otherEvent);
+
+      expect(handleEventDrivenToolCallSpy).not.toHaveBeenCalled();
+
+      const ownEvent: ToolCallsUpdateMessage = {
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [
+          { request: { callId: '1' }, status: 'executing' } as ToolCall,
+        ],
+        schedulerId: 'task-id',
+      };
+
+      task['handleEventDrivenToolCallsUpdate'](ownEvent);
+
+      expect(handleEventDrivenToolCallSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('Serialization and Mapping', () => {
+    it('should map internal "validating" status to "scheduled" for the client and include outcome', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const mockToolCall = {
+        request: { callId: 'tool-1' },
+        status: 'validating',
+        outcome: 'accepted',
+        tool: { name: 'test-tool' },
+      };
+
+      const message = task['toolStatusMessage'](
+        mockToolCall as unknown as ToolCall,
+        'task-id',
+        'context-id',
+      );
+      const serialized = (
+        message.parts![0] as {
+          data: { status: string; outcome: string };
+        }
+      ).data;
+
+      expect(serialized.status).toBe('scheduled');
+      expect(serialized.outcome).toBe('accepted');
+    });
+
+    it('should correctly detect changes when status or outcome changes', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const toolCall1 = {
+        request: { callId: 'tool-1' },
+        status: 'awaiting_approval',
+      };
+
+      // First update - should trigger change
+      const changed1 = task['handleEventDrivenToolCall'](
+        toolCall1 as unknown as ToolCall,
+      );
+      expect(changed1).toBe(true);
+
+      // Second update with same status - should NOT trigger change
+      const changed2 = task['handleEventDrivenToolCall'](
+        toolCall1 as unknown as ToolCall,
+      );
+      expect(changed2).toBe(false);
+
+      // Update with new outcome - SHOULD trigger change
+      const toolCall2 = {
+        request: { callId: 'tool-1' },
+        status: 'awaiting_approval',
+        outcome: 'accepted',
+      };
+      const changed3 = task['handleEventDrivenToolCall'](
+        toolCall2 as unknown as ToolCall,
+      );
+      expect(changed3).toBe(true);
     });
   });
 });

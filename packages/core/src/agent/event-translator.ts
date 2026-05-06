@@ -210,7 +210,7 @@ export function translateEvent(
       out.push(
         makeEvent('error', state, {
           status: 'PERMISSION_DENIED',
-          message: `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`,
+          message: event.value.systemMessage?.trim() || event.value.reason,
           fatal: false,
           _meta: { code: 'AGENT_EXECUTION_BLOCKED' },
         }),

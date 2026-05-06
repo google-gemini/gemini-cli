@@ -2030,6 +2030,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
@@ -2057,8 +2067,8 @@ const SETTINGS_SCHEMA = {
         label: 'Gemma Models',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable access to Gemma 4 models (experimental).',
+        default: true,
+        description: 'Enable access to Gemma 4 models via Gemini API.',
         showInDialog: true,
       },
       voiceMode: {
@@ -2099,7 +2109,11 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: false,
             default: 'gemini-live',
-            description: 'The backend to use for voice transcription.',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
             showInDialog: true,
             options: [
               { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
@@ -2388,6 +2402,17 @@ const SETTINGS_SCHEMA = {
           'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
         showInDialog: true,
       },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
+      },
       autoMemory: {
         type: 'boolean',
         label: 'Auto Memory',
@@ -2395,7 +2420,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
       generalistProfile: {
@@ -3278,6 +3303,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           secondary: { type: 'string' },
           link: { type: 'string' },
           accent: { type: 'string' },
+          response: { type: 'string' },
         },
       },
       background: {

@@ -293,7 +293,12 @@ export type { Content, Part, FunctionCall } from '@google/genai';
 
 // Export context types and profiles
 export * from './context/types.js';
-export * from './context/profiles.js';
+
+export { generalistProfile as legacyGeneralistProfile } from './context/profiles.js';
+export {
+  generalistProfile,
+  stressTestProfile,
+} from './context/config/profiles.js';
 
 // Export trust utility
 export * from './utils/trust.js';
