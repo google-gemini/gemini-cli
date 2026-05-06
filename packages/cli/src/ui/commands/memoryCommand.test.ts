@@ -11,6 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
+  type Config,
   refreshMemory,
   refreshServerHierarchicalMemory,
   SimpleExtensionLoader,
@@ -61,10 +62,17 @@ const mockRefreshServerHierarchicalMemory =
 describe('memoryCommand', () => {
   let mockContext: CommandContext;
 
+  const buildMemoryCommand = (isMemoryV2 = false): SlashCommand => {
+    const config: Pick<Config, 'isMemoryV2Enabled'> = {
+      isMemoryV2Enabled: () => isMemoryV2,
+    };
+    return memoryCommand(config as Config);
+  };
+
   const getSubCommand = (
     name: 'show' | 'add' | 'reload' | 'list',
   ): SlashCommand => {
-    const subCommand = memoryCommand.subCommands?.find(
+    const subCommand = buildMemoryCommand().subCommands?.find(
       (cmd) => cmd.name === name,
     );
     if (!subCommand) {
@@ -72,6 +80,26 @@ describe('memoryCommand', () => {
     }
     return subCommand;
   };
+
+  describe('Memory v2', () => {
+    it('omits the /memory add subcommand when memoryV2 is enabled', () => {
+      const command = buildMemoryCommand(true);
+      const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
+      expect(names).not.toContain('add');
+    });
+
+    it('includes the /memory add subcommand by default', () => {
+      const command = buildMemoryCommand(false);
+      const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
+      expect(names).toContain('add');
+    });
+
+    it('includes the /memory add subcommand when no config is provided', () => {
+      const command = memoryCommand(null);
+      const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
+      expect(names).toContain('add');
+    });
+  });
 
   describe('/memory show', () => {
     let showCommand: SlashCommand;
@@ -462,7 +490,7 @@ describe('memoryCommand', () => {
     let inboxCommand: SlashCommand;
 
     beforeEach(() => {
-      inboxCommand = memoryCommand.subCommands!.find(
+      inboxCommand = buildMemoryCommand().subCommands!.find(
         (cmd) => cmd.name === 'inbox',
       )!;
       expect(inboxCommand).toBeDefined();
