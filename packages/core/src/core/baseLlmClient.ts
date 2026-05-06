@@ -230,11 +230,17 @@ export class BaseLlmClient {
     return text;
   }
 
-  async countTokens(options: CountTokenOptions): Promise<{ totalTokens: number }> {
-    const model = options.modelConfigKey ?
-        this.config.modelConfigService.getResolvedConfig(options.modelConfigKey).model :
-        this.config.getActiveModel();
-    const result = await this.contentGenerator.countTokens({ model, contents: options.contents });
+  async countTokens(
+    options: CountTokenOptions,
+  ): Promise<{ totalTokens: number }> {
+    const model = options.modelConfigKey
+      ? this.config.modelConfigService.getResolvedConfig(options.modelConfigKey)
+          .model
+      : this.config.getActiveModel();
+    const result = await this.contentGenerator.countTokens({
+      model,
+      contents: options.contents,
+    });
     return { totalTokens: result.totalTokens || 0 };
   }
 

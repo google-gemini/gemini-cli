@@ -60,15 +60,22 @@ export async function render(
   });
 
   // Fire-and-forget asynchronous calibration to track estimator drift
-  const performCalibration = (finalNodes: readonly ConcreteNode[], finalContents: Content[]) => {
+  const performCalibration = (
+    finalNodes: readonly ConcreteNode[],
+    finalContents: Content[],
+  ) => {
     void (async () => {
       try {
-        const exactResp = await env.llmClient.countTokens({contents: finalContents});
-        const exactTokens = typeof exactResp.totalTokens === 'number' ? exactResp.totalTokens : 0;
-        const estimatedTokens = env.tokenCalculator.calculateConcreteListTokens(finalNodes);
-        
+        const exactResp = await env.llmClient.countTokens({
+          contents: finalContents,
+        });
+        const exactTokens =
+          typeof exactResp.totalTokens === 'number' ? exactResp.totalTokens : 0;
+        const estimatedTokens =
+          env.tokenCalculator.calculateConcreteListTokens(finalNodes);
+
         const delta = Math.abs(exactTokens - estimatedTokens);
-        const tolerance = Math.max(exactTokens, estimatedTokens) * 0.20; // 20% tolerance
+        const tolerance = Math.max(exactTokens, estimatedTokens) * 0.2; // 20% tolerance
 
         tracer.logEvent('Render', 'Token Calibration Measurement', {
           exactTokens,
@@ -78,7 +85,9 @@ export async function render(
         });
 
         if (delta > tolerance) {
-          debugLogger.log(`[Token Calibration] Large deviation detected: exact ${exactTokens} vs estimated ${estimatedTokens} (delta: ${delta})`);
+          debugLogger.error(
+            `[Token Calibration] Large deviation detected: exact ${exactTokens} vs estimated ${estimatedTokens} (delta: ${delta})`,
+          );
         }
       } catch {
         // Ignore API failures during background calibration

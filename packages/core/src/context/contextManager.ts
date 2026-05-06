@@ -132,7 +132,7 @@ export class ContextManager {
         ]);
 
         // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
-        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are 
+        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
         // strictly *older* than the boundary node.
         if (priorTokens > this.sidecar.config.budget.retainedTokens) {
           // Only age out if not protected
