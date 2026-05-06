@@ -1449,17 +1449,17 @@ export class Config implements McpContext, AgentLoopContext {
         plansDir = this.storage.getPlansDir();
       } catch (error) {
         // Fallback to the default plan dir if any error occurs
-        if (error instanceof Error) {
-          coreEvents.emitFeedback(
-            'warning',
-            `Invalid custom plans directory: ${error.message}. Falling back to default project temp directory.`,
-          );
-          // Unset the invalid directory for this session to ensure subsequent tool calls use the fallback
-          this.storage.setCustomPlansDir(undefined);
-          plansDir = this.storage.getPlansDir();
-        } else {
-          throw error;
-        }
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        coreEvents.emitFeedback(
+          'warning',
+          'Invalid custom plans directory: ' +
+            errorMessage +
+            '. Falling back to default project temp directory.',
+          error,
+        );
+        this.storage.setCustomPlansDir(undefined);
+        plansDir = this.storage.getPlansDir();
       }
 
       try {
