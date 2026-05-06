@@ -62,12 +62,8 @@ describe('Task Race Condition', () => {
       ],
     });
 
-    // 3. Start waiting for tools. This will await the current toolCompletionPromise.
-    const waitPromise = task.waitForPendingTools();
-
-    // 4. Handle confirmation for Tool 1.
-    // Before the fix, this would call _resetToolCompletionPromise and overwrite the promise waitPromise is awaiting.
-    await task.acceptUserMessage(
+    // 3. Confirm Tool 1. This makes isAwaitingApprovalOnly() return false.
+    for await (const _ of task.acceptUserMessage(
       {
         userMessage: {
           parts: [
@@ -79,11 +75,15 @@ describe('Task Race Condition', () => {
         },
       } as unknown as RequestContext,
       new AbortController().signal,
-    );
+    )) {
+      // consume generator
+    }
 
-    // 5. Handle confirmation for Tool 2.
-    // Before the fix, this would overwrite the promise AGAIN.
-    await task.acceptUserMessage(
+    // 4. Start waiting. This should now block because Tool 1 is confirmed (so we are waiting for its execution).
+    const waitPromise = task.waitForPendingTools();
+
+    // 5. Confirm Tool 2 while waiting.
+    for await (const _ of task.acceptUserMessage(
       {
         userMessage: {
           parts: [
@@ -95,7 +95,9 @@ describe('Task Race Condition', () => {
         },
       } as unknown as RequestContext,
       new AbortController().signal,
-    );
+    )) {
+      // consume generator
+    }
 
     // 6. Both tools complete successfully
     updateHandler({
@@ -116,7 +118,6 @@ describe('Task Race Condition', () => {
     });
 
     // 7. Verify that the original waitPromise resolves.
-    // Without the fix, this would hang indefinitely (or timeout in the test).
     await expect(waitPromise).resolves.toBeUndefined();
   });
 
