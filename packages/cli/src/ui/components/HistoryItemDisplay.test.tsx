@@ -198,6 +198,22 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders ExportSessionMessage for "export_session" type', async () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'export_session',
+      exportSession: {
+        isPending: false,
+        targetPath: '/test/path.json',
+      },
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('Successfully exported session to /test/path.json');
+    unmount();
+  });
+
   it('should escape ANSI codes in text content', async () => {
     const historyItem: HistoryItem = {
       id: 1,

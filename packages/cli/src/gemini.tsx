@@ -224,8 +224,13 @@ export async function resolveSessionId(
 
       // Filter out old system/info messages that are specific to the previous run
       // and only keep actual conversation messages (user/gemini).
+      // Best effort parse: ensure message is an object and has required fields.
       sessionData.messages = (sessionData.messages || []).filter(
-        (m) => m.type === 'user' || m.type === 'gemini',
+        (m) =>
+          typeof m === 'object' &&
+          m !== null &&
+          (m.type === 'user' || m.type === 'gemini') &&
+          (m as any).content !== undefined,
       );
 
       // Add a single info message to the history to confirm the import

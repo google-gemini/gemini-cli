@@ -1085,6 +1085,9 @@ describe('resolveSessionId', () => {
         { type: 'user', content: 'Hello', id: '2' },
         { type: 'gemini', content: 'Hi', id: '3' },
         { type: 'error', content: 'Old error', id: '4' },
+        { type: 'user', id: '5' }, // Missing content
+        null, // Null object
+        { type: 'unknown', content: 'Something', id: '6' }, // Unknown type
       ],
     } as unknown as ConversationRecord);
 
@@ -1105,7 +1108,8 @@ describe('resolveSessionId', () => {
       expect(resumedSessionData).toBeDefined();
       expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
       
-      // Verify messages: should have 1 info (the new import confirmation) + 2 conversation messages
+      // Verify messages: should have 1 info (the new import confirmation) + 2 valid conversation messages
+      // Invalid messages (missing content, null, unknown type) and transient messages should be filtered out.
       expect(resumedSessionData?.conversation.messages).toHaveLength(3);
       expect(resumedSessionData?.conversation.messages![0]).toMatchObject({
         type: 'info',
