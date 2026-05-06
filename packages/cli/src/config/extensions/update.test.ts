@@ -319,6 +319,41 @@ describe('Extension Update Logic', () => {
       expect(fs.promises.rm).toHaveBeenCalled();
     });
 
+    it('should not rollback if backing up the extension fails', async () => {
+      vi.mocked(copyExtension).mockRejectedValueOnce(
+        new Error('Backup failed'),
+      );
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow(
+        'Failed to update extension test-extension: Backup failed',
+      );
+
+      expect(copyExtension).toHaveBeenCalledTimes(1);
+      expect(copyExtension).toHaveBeenCalledWith(
+        mockExtension.path,
+        '/tmp/mock-dir',
+      );
+      expect(mockExtensionManager.loadExtensionConfig).not.toHaveBeenCalled();
+      expect(
+        mockExtensionManager.installOrUpdateExtension,
+      ).not.toHaveBeenCalled();
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
+      expect(fs.promises.rm).toHaveBeenCalled();
+    });
+
     describe('Integrity Verification', () => {
       it('should fail update with security alert if integrity is invalid', async () => {
         vi.mocked(

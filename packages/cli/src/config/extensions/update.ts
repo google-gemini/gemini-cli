@@ -100,8 +100,10 @@ export async function updateExtension(
   const originalVersion = extension.version;
 
   const tempDir = await ExtensionStorage.createTmpDir();
+  let backupSuccessful = false;
   try {
     await copyExtension(extension.path, tempDir);
+    backupSuccessful = true;
     const previousExtensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
@@ -126,13 +128,17 @@ export async function updateExtension(
     };
   } catch (e) {
     debugLogger.error(
-      `Error updating extension, rolling back. ${getErrorMessage(e)}`,
+      backupSuccessful
+        ? `Error updating extension, rolling back. ${getErrorMessage(e)}`
+        : `Error backing up extension before update. ${getErrorMessage(e)}`,
     );
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
     });
-    await copyExtension(tempDir, extension.path);
+    if (backupSuccessful) {
+      await copyExtension(tempDir, extension.path);
+    }
     throw new Error(
       `Failed to update extension ${extension.name}: ${getErrorMessage(e)}`,
     );
