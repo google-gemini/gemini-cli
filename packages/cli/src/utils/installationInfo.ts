@@ -110,7 +110,7 @@ export function getInstallationInfo(
               'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
           };
         }
-      } catch (_error) {
+      } catch {
         // Brew is not installed or gemini-cli is not installed via brew.
         // Continue to the next check.
       }

@@ -8,6 +8,7 @@ import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { SkillsList } from './SkillsList.js';
 import { type SkillDefinition } from '@google/gemini-cli-core';
+import { SKILLS_DOCS_URL } from '../../constants.js';
 
 describe('SkillsList Component', () => {
   const mockSkills: SkillDefinition[] = [
@@ -74,9 +75,8 @@ describe('SkillsList Component', () => {
       <SkillsList skills={[]} showDescriptions={true} />,
     );
     const output = lastFrame();
-
-    expect(output).toContain('No skills available');
-
+    expect(output).toContain('No skills available.');
+    expect(output).toContain(`Learn how to add skills: ${SKILLS_DOCS_URL}`);
     unmount();
   });
 

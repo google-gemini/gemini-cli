@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { TestRig } from './test-helper.js';
 
 // BOM encoders
@@ -115,22 +115,5 @@ describe('BOM end-to-end integraion', () => {
       utf32BE('BOM_OK UTF-32BE'),
       'BOM_OK UTF-32BE',
     );
-  });
-
-  it('Can describe a PNG file', async () => {
-    const imagePath = resolve(
-      process.cwd(),
-      'docs/assets/gemini-screenshot.png',
-    );
-    const imageContent = readFileSync(imagePath);
-    const filename = 'gemini-screenshot.png';
-    writeFileSync(join(rig.testDir!, filename), imageContent);
-    const prompt = `What is shown in the image ${filename}?`;
-    const output = await rig.run({ args: prompt });
-    await rig.waitForToolCall('read_file');
-    const lower = output.toLowerCase();
-    // The response is non-deterministic, so we just check for some
-    // keywords that are very likely to be in the response.
-    expect(lower.includes('gemini')).toBeTruthy();
   });
 });

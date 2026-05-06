@@ -1,11 +1,14 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
   addMemory,
+  listInboxMemoryPatches,
+  listInboxSkills,
+  listInboxPatches,
   listMemoryFiles,
   refreshMemory,
   showMemory,
@@ -30,6 +33,7 @@ export class MemoryCommand implements Command {
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
     new AddMemoryCommand(),
+    new InboxMemoryCommand(),
   ];
   readonly requiresWorkspace = true;
 
@@ -120,5 +124,69 @@ export class AddMemoryCommand implements Command {
         data: `Error: Tool ${result.toolName} not found.`,
       };
     }
+  }
+}
+
+export class InboxMemoryCommand implements Command {
+  readonly name = 'memory inbox';
+  readonly description =
+    'Lists memory items extracted from past sessions that are pending review.';
+
+  async execute(
+    context: CommandContext,
+    _: string[],
+  ): Promise<CommandExecutionResponse> {
+    if (!context.agentContext.config.isAutoMemoryEnabled()) {
+      return {
+        name: this.name,
+        data: 'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
+      };
+    }
+
+    const [skills, patches, memoryPatches] = await Promise.all([
+      listInboxSkills(context.agentContext.config),
+      listInboxPatches(context.agentContext.config),
+      listInboxMemoryPatches(context.agentContext.config),
+    ]);
+
+    if (
+      skills.length === 0 &&
+      patches.length === 0 &&
+      memoryPatches.length === 0
+    ) {
+      return { name: this.name, data: 'No items in inbox.' };
+    }
+
+    const lines: string[] = [];
+    for (const s of skills) {
+      const date = s.extractedAt
+        ? ` (extracted: ${new Date(s.extractedAt).toLocaleDateString()})`
+        : '';
+      lines.push(`- **${s.name}**: ${s.description}${date}`);
+    }
+    for (const p of patches) {
+      const targets = p.entries.map((e) => e.targetPath).join(', ');
+      const date = p.extractedAt
+        ? ` (extracted: ${new Date(p.extractedAt).toLocaleDateString()})`
+        : '';
+      lines.push(`- **${p.name}** (update): patches ${targets}${date}`);
+    }
+    for (const memoryPatch of memoryPatches) {
+      const targets = memoryPatch.entries.map((e) => e.targetPath).join(', ');
+      const date = memoryPatch.extractedAt
+        ? ` (latest extract: ${new Date(memoryPatch.extractedAt).toLocaleDateString()})`
+        : '';
+      const sourceCount = memoryPatch.sourceFiles.length;
+      const sourceLabel = sourceCount === 1 ? 'patch' : 'patches';
+      lines.push(
+        `- **${memoryPatch.name}** (${sourceCount} source ${sourceLabel}, ${memoryPatch.entries.length} hunks): targets ${targets}${date}`,
+      );
+    }
+
+    const total = skills.length + patches.length + memoryPatches.length;
+    return {
+      name: this.name,
+      data: `Memory inbox (${total}):\n${lines.join('\n')}`,
+    };
   }
 }

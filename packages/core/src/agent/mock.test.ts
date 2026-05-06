@@ -34,7 +34,7 @@ describe('MockAgentProtocol', () => {
     const streamPromise = waitForStreamEnd(session);
 
     const { streamId } = await session.send({
-      message: [{ type: 'text', text: 'hi' }],
+      message: { content: [{ type: 'text', text: 'hi' }] },
     });
     expect(streamId).toBeDefined();
 

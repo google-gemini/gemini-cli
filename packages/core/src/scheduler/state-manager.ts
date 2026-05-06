@@ -517,7 +517,7 @@ export class SchedulerStateManager {
           {
             functionResponse: {
               id: call.request.callId,
-              name: call.request.name,
+              name: call.request.originalRequestName ?? call.request.name,
               response: { error: errorMessage },
             },
           },

@@ -513,6 +513,70 @@ describe('useSlashCompletion', () => {
       unmountResume();
     });
 
+    it('should NOT suggest the auto-list command when typing a non-matching partial after /chat', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat x', // 'x' does not match 'list'
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // It should NOT have the 'auto' section 'list' suggestion
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeUndefined();
+      });
+      unmount();
+    });
+
+    it('should STILL suggest the auto-list command when typing a matching partial after /chat', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat l', // 'l' matches 'list'
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeDefined();
+        expect(autoSuggestion?.label).toBe('list');
+      });
+      unmount();
+    });
+
     it('should sort exact altName matches to the top', async () => {
       const slashCommands = [
         createTestCommand({
@@ -688,6 +752,40 @@ describe('useSlashCompletion', () => {
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
         expect(result.current.suggestions[0].label).toBe('visible');
+      });
+      unmount();
+    });
+
+    it('should rank primary name prefix matches higher than alias prefix matches', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'footer',
+          altNames: ['statusline'],
+          description: 'Configure footer',
+        }),
+        createTestCommand({
+          name: 'stats',
+          altNames: ['usage'],
+          description: 'Check stats',
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stat',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // 'stats' should be first because 'stat' is a prefix match on its name
+        // while 'footer' only matches 'stat' via its alias 'statusline'
+        expect(result.current.suggestions[0].label).toBe('stats');
+        expect(result.current.suggestions[1].label).toBe('footer');
       });
       unmount();
     });

@@ -15,6 +15,7 @@ import {
   getEnvironmentMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
+  readGeminiMdFiles,
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
@@ -682,6 +683,97 @@ included directory memory
     expect(childOccurrences).toBe(1);
   });
 
+  describe('EISDIR handling for GEMINI.md as a directory', () => {
+    it('readGeminiMdFiles returns null content (without throwing) when path is a directory', async () => {
+      const dirAsFilePath = await createEmptyDir(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+      );
+
+      const results = await readGeminiMdFiles([dirAsFilePath]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].filePath).toBe(dirAsFilePath);
+      expect(results[0].content).toBeNull();
+    });
+
+    it('loadServerHierarchicalMemory ignores a GEMINI.md directory and returns empty memory', async () => {
+      // Create a directory named GEMINI.md where a regular file would be expected.
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // EISDIR is silently skipped, so memory is empty (no readable file
+      // contents) and no exception propagates.
+      expect(result.memoryContent).toBe('');
+    });
+
+    it('falls back to a real GEMINI.md file at a higher level when a directory shadows the same name lower in the tree', async () => {
+      // Lower in the tree (cwd): a directory named GEMINI.md (invalid).
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+      // Higher in the tree (projectRoot): a real GEMINI.md file (valid).
+      const projectContextFile = await createTestFile(
+        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+        'Project root memory content',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // The directory at cwd is silently skipped; the actual file at
+      // projectRoot is still discovered and loaded normally.
+      expect(result.memoryContent).toContain('Project root memory content');
+      expect(result.filePaths).toContain(projectContextFile);
+    });
+
+    it('silently skips a GEMINI.md symlink that points to a directory', async () => {
+      // Create a real directory elsewhere and symlink GEMINI.md to it.
+      const realDir = await createEmptyDir(path.join(cwd, '.geminimd-target'));
+      const symlinkPath = path.join(cwd, DEFAULT_CONTEXT_FILENAME);
+      try {
+        await fsPromises.symlink(realDir, symlinkPath, 'dir');
+      } catch (err) {
+        // Symlink creation may be unsupported on some Windows setups (no
+        // SeCreateSymbolicLinkPrivilege). Skip the test there rather than fail.
+        if (
+          err instanceof Error &&
+          (err as NodeJS.ErrnoException).code === 'EPERM'
+        ) {
+          return;
+        }
+        throw err;
+      }
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // A symlink resolving to a directory triggers EISDIR on read in the
+      // same way a plain directory does and must be skipped silently.
+      expect(result.memoryContent).toBe('');
+    });
+  });
+
   describe('getGlobalMemoryPaths', () => {
     it('should find global memory file if it exists', async () => {
       const globalMemoryFile = await createTestFile(
@@ -1269,6 +1361,96 @@ included directory memory
       expect(result.files[0].path).toBe(subDirMemory);
       expect(result.files[0].content).toBe('Content without git');
     });
+
+    it('should stop at a custom boundary marker instead of .git', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'custom_marker'),
+      );
+      // Use a custom marker file instead of .git
+      await createTestFile(path.join(rootDir, '.monorepo-root'), '');
+      const subDir = await createEmptyDir(path.join(rootDir, 'packages/app'));
+      const targetFile = path.join(subDir, 'file.ts');
+
+      const rootMemory = await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root rules',
+      );
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'App rules',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        ['.monorepo-root'],
+      );
+
+      expect(result.files).toHaveLength(2);
+      expect(result.files.find((f) => f.path === rootMemory)).toBeDefined();
+      expect(result.files.find((f) => f.path === subDirMemory)).toBeDefined();
+    });
+
+    it('should support multiple boundary markers', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'multi_marker'),
+      );
+      // Use a non-.git marker
+      await createTestFile(path.join(rootDir, 'package.json'), '{}');
+      const subDir = await createEmptyDir(path.join(rootDir, 'src'));
+      const targetFile = path.join(subDir, 'index.ts');
+
+      const rootMemory = await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root content',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        ['.git', 'package.json'],
+      );
+
+      // Should find the root because package.json is a marker
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].path).toBe(rootMemory);
+    });
+
+    it('should disable parent traversal when boundary markers array is empty', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'empty_markers'),
+      );
+      await createEmptyDir(path.join(rootDir, '.git'));
+      const subDir = await createEmptyDir(path.join(rootDir, 'subdir'));
+      const targetFile = path.join(subDir, 'target.txt');
+
+      await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root content',
+      );
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'Subdir content',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        [],
+      );
+
+      // With empty markers, no project root is found so the trusted root
+      // is used as the ceiling. Traversal still finds files between the
+      // target path and the trusted root.
+      expect(result.files).toHaveLength(2);
+      expect(result.files.find((f) => f.path === subDirMemory)).toBeDefined();
+    });
   });
 
   it('refreshServerHierarchicalMemory should refresh memory and update config', async () => {
@@ -1341,6 +1523,7 @@ included directory memory
       getImportFormat: vi.fn().mockReturnValue('tree'),
       getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
       getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),

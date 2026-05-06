@@ -42,6 +42,7 @@ describe('ToolConfirmationMessage Redirection', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}
+        toolName="shell"
       />,
     );
 

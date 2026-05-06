@@ -25,15 +25,18 @@ export async function discoverJitContext(
     return '';
   }
 
-  const contextManager = config.getContextManager();
-  if (!contextManager) {
+  const memoryContextManager = config.getMemoryContextManager();
+  if (!memoryContextManager) {
     return '';
   }
 
   const trustedRoots = [...config.getWorkspaceContext().getDirectories()];
 
   try {
-    return await contextManager.discoverContext(accessedPath, trustedRoots);
+    return await memoryContextManager.discoverContext(
+      accessedPath,
+      trustedRoots,
+    );
   } catch {
     // JIT context is supplementary — never fail the tool's primary operation.
     return '';

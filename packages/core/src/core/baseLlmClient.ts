@@ -147,7 +147,7 @@ export class BaseLlmClient {
         // We don't use the result, just check if it's valid JSON
         JSON.parse(this.cleanJsonResponse(text, model));
         return false; // It's valid, don't retry
-      } catch (_e) {
+      } catch {
         return true; // It's not valid, retry
       }
     };
@@ -339,7 +339,9 @@ export class BaseLlmClient {
         retryFetchErrors: this.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
-            availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+            getAvailabilityContext()?.policy.maxAttempts ??
+            maxAttempts ??
+            DEFAULT_MAX_ATTEMPTS;
           const modelName = getDisplayString(currentModel);
           const errorType = getRetryErrorType(error);
 

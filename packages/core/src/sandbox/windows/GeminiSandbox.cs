@@ -5,45 +5,38 @@
  */
 
 using System;
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Security.Principal;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Security;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Text;
 
+/**
+ * A native C# helper for the Gemini CLI sandbox on Windows.
+ * This helper uses Restricted Tokens and Job Objects to isolate processes.
+ * It also supports internal commands for safe file I/O within the sandbox.
+ */
 public class GeminiSandbox {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct STARTUPINFO {
-        public uint cb;
-        public string lpReserved;
-        public string lpDesktop;
-        public string lpTitle;
-        public uint dwX;
-        public uint dwY;
-        public uint dwXSize;
-        public uint dwYSize;
-        public uint dwXCountChars;
-        public uint dwYCountChars;
-        public uint dwFillAttribute;
-        public uint dwFlags;
-        public ushort wShowWindow;
-        public ushort cbReserved2;
-        public IntPtr lpReserved2;
-        public IntPtr hStdInput;
-        public IntPtr hStdOutput;
-        public IntPtr hStdError;
-    }
+    // --- P/Invoke Constants and Structures ---
+    private const int JobObjectExtendedLimitInformation = 9;
+    private const int JobObjectNetRateControlInformation = 32;
+    private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+    private const uint JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION = 0x00000400;
+    private const uint JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008;
+    
+    private const int TokenIntegrityLevel = 25;
+    private const uint SE_GROUP_INTEGRITY = 0x00000020;
+    private const uint TOKEN_ALL_ACCESS = 0xF01FF;
+    private const uint DISABLE_MAX_PRIVILEGE = 0x1;
+    
+    private const int SE_FILE_OBJECT = 1;
+    private const uint LABEL_SECURITY_INFORMATION = 0x00000010;
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct PROCESS_INFORMATION {
-        public IntPtr hProcess;
-        public IntPtr hThread;
-        public uint dwProcessId;
-        public uint dwThreadId;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+    struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
         public Int64 PerProcessUserTimeLimit;
         public Int64 PerJobUserTimeLimit;
         public uint LimitFlags;
@@ -56,17 +49,7 @@ public class GeminiSandbox {
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct IO_COUNTERS {
-        public ulong ReadOperationCount;
-        public ulong WriteOperationCount;
-        public ulong OtherOperationCount;
-        public ulong ReadTransferCount;
-        public ulong WriteTransferCount;
-        public ulong OtherTransferCount;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+    struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
         public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
         public IO_COUNTERS IoInfo;
         public UIntPtr ProcessMemoryLimit;
@@ -76,139 +59,198 @@ public class GeminiSandbox {
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct SID_AND_ATTRIBUTES {
+    struct IO_COUNTERS {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct JOBOBJECT_NET_RATE_CONTROL_INFORMATION {
+        public ulong MaxBandwidth;
+        public uint ControlFlags;
+        public byte DscpTag;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct STARTUPINFO {
+        public uint cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public uint dwX;
+        public uint dwY;
+        public uint dwXSize;
+        public uint dwYSize;
+        public uint dwXCountChars;
+        public uint dwYCountChars;
+        public uint dwFillAttribute;
+        public uint dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_INFORMATION {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public uint dwProcessId;
+        public uint dwThreadId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SID_AND_ATTRIBUTES {
         public IntPtr Sid;
         public uint Attributes;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct TOKEN_MANDATORY_LABEL {
+    struct TOKEN_MANDATORY_LABEL {
         public SID_AND_ATTRIBUTES Label;
     }
 
-    public enum JobObjectInfoClass {
-        ExtendedLimitInformation = 9
-    }
+    // --- Kernel32 P/Invokes ---
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GetCurrentProcess();
+    static extern bool SetInformationJobObject(IntPtr hJob, int JobObjectInfoClass, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern uint ResumeThread(IntPtr hThread);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr GetStdHandle(int nStdHandle);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern uint GetLongPathName(string lpszShortPath, [Out] StringBuilder lpszLongPath, uint cchBuffer);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr LocalFree(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+
+    // --- Advapi32 P/Invokes ---
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+    static extern bool DuplicateTokenEx(IntPtr hExistingToken, uint dwDesiredAccess, IntPtr lpTokenAttributes, uint ImpersonationLevel, uint TokenType, out IntPtr phNewToken);
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool CreateRestrictedToken(IntPtr ExistingTokenHandle, uint Flags, uint DisableSidCount, IntPtr SidsToDisable, uint DeletePrivilegeCount, IntPtr PrivilegesToDelete, uint RestrictedSidCount, IntPtr SidsToRestrict, out IntPtr NewTokenHandle);
+    static extern bool CreateRestrictedToken(IntPtr ExistingTokenHandle, uint Flags, uint DisableSidCount, IntPtr SidsToDisable, uint DeletePrivilegeCount, IntPtr PrivilegesToDelete, uint RestrictedSidCount, IntPtr SidsToRestrict, out IntPtr NewTokenHandle);
 
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern bool CreateProcessAsUser(IntPtr hToken, string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool SetInformationJobObject(IntPtr hJob, JobObjectInfoClass JobObjectInfoClass, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern uint ResumeThread(IntPtr hThread);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool CloseHandle(IntPtr hObject);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GetStdHandle(int nStdHandle);
-
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern bool ConvertStringSidToSid(string StringSid, out IntPtr Sid);
+    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    static extern bool CreateProcessAsUser(IntPtr hToken, string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength);
+    static extern bool ImpersonateLoggedOnUser(IntPtr hToken);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr LocalFree(IntPtr hMem);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool RevertToSelf();
 
-    public const uint TOKEN_DUPLICATE = 0x0002;
-    public const uint TOKEN_QUERY = 0x0008;
-    public const uint TOKEN_ASSIGN_PRIMARY = 0x0001;
-    public const uint TOKEN_ADJUST_DEFAULT = 0x0080;
-    public const uint DISABLE_MAX_PRIVILEGE = 0x1;
-    public const uint CREATE_SUSPENDED = 0x00000004;
-    public const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-    public const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
-    public const uint STARTF_USESTDHANDLES = 0x00000100;
-    public const int TokenIntegrityLevel = 25;
-    public const uint SE_GROUP_INTEGRITY = 0x00000020;
-    public const uint INFINITE = 0xFFFFFFFF;
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool ConvertStringSidToSid(string StringSid, out IntPtr ptrSid);
 
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(string StringSecurityDescriptor, uint StringSDRevision, out IntPtr SecurityDescriptor, out uint SecurityDescriptorSize);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern uint SetNamedSecurityInfo(string pObjectName, int ObjectType, uint SecurityInfo, IntPtr psidOwner, IntPtr psidGroup, IntPtr pDacl, IntPtr pSacl);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool GetSecurityDescriptorSacl(IntPtr pSecurityDescriptor, out bool lpbSaclPresent, out IntPtr pSacl, out bool lpbSaclDefaulted);
+
+    // --- Main Entry Point ---
     static int Main(string[] args) {
         if (args.Length < 3) {
-            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]");
-            Console.WriteLine("Internal commands: __read <path>, __write <path>");
+            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] [--allowed-manifest <path>] <command> [args...]");
+            Console.Error.WriteLine("Internal commands: __read <path>, __write <path>");
             return 1;
         }
 
         bool networkAccess = args[0] == "1";
         string cwd = args[1];
-        string command = args[2];
+        HashSet<string> forbiddenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> allowedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int argIndex = 2;
+
+        // 1. Parse Command Line Arguments & Manifests
+        while (argIndex < args.Length) {
+            if (args[argIndex] == "--forbidden-manifest") {
+                if (argIndex + 1 < args.Length) {
+                    ParseManifest(args[argIndex + 1], forbiddenPaths);
+                    argIndex += 2;
+                } else {
+                    break;
+                }
+            } else if (args[argIndex] == "--allowed-manifest") {
+                if (argIndex + 1 < args.Length) {
+                    ParseManifest(args[argIndex + 1], allowedPaths);
+                    argIndex += 2;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        // 2. Apply Bulk ACLs
+        ApplyBulkAcls(allowedPaths, forbiddenPaths);
+
+        if (argIndex >= args.Length) {
+            Console.Error.WriteLine("Error: Missing command");
+            return 1;
+        }
+
+        string command = args[argIndex];
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
         IntPtr hJob = IntPtr.Zero;
-        IntPtr pSidsToDisable = IntPtr.Zero;
-        IntPtr pSidsToRestrict = IntPtr.Zero;
-        IntPtr networkSid = IntPtr.Zero;
-        IntPtr restrictedSid = IntPtr.Zero;
-        IntPtr lowIntegritySid = IntPtr.Zero;
+        PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
 
         try {
-            // 1. Setup Token
-            IntPtr hCurrentProcess = GetCurrentProcess();
-            if (!OpenProcessToken(hCurrentProcess, TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_DEFAULT, out hToken)) {
-                Console.Error.WriteLine("Failed to open process token");
+            // 3. Duplicate Primary Token and Create Restricted Token
+            if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, out hToken)) {
+                Console.Error.WriteLine("Error: OpenProcessToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
-            uint sidCount = 0;
-            uint restrictCount = 0;
-
-            // "networkAccess == false" implies Strict Sandbox Level 1.
-            if (!networkAccess) {
-                if (ConvertStringSidToSid("S-1-5-2", out networkSid)) {
-                    sidCount = 1;
-                    int saaSize = Marshal.SizeOf(typeof(SID_AND_ATTRIBUTES));
-                    pSidsToDisable = Marshal.AllocHGlobal(saaSize);
-                    SID_AND_ATTRIBUTES saa = new SID_AND_ATTRIBUTES();
-                    saa.Sid = networkSid;
-                    saa.Attributes = 0;
-                    Marshal.StructureToPtr(saa, pSidsToDisable, false);
-                }
-
-                // S-1-5-12 is Restricted Code SID
-                if (ConvertStringSidToSid("S-1-5-12", out restrictedSid)) {
-                    restrictCount = 1;
-                    int saaSize = Marshal.SizeOf(typeof(SID_AND_ATTRIBUTES));
-                    pSidsToRestrict = Marshal.AllocHGlobal(saaSize);
-                    SID_AND_ATTRIBUTES saa = new SID_AND_ATTRIBUTES();
-                    saa.Sid = restrictedSid;
-                    saa.Attributes = 0;
-                    Marshal.StructureToPtr(saa, pSidsToRestrict, false);
-                }
-            }
-
-            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, sidCount, pSidsToDisable, 0, IntPtr.Zero, restrictCount, pSidsToRestrict, out hRestrictedToken)) {
-                Console.Error.WriteLine("Failed to create restricted token");
+            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, 0, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, out hRestrictedToken)) {
+                Console.Error.WriteLine("Error: CreateRestrictedToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
-            // 2. Set Integrity Level to Low
+            // 4. Lower Integrity Level to "Low" (S-1-16-4096)
+            IntPtr lowIntegritySid = IntPtr.Zero;
             if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
                 TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
                 tml.Label.Sid = lowIntegritySid;
@@ -217,154 +259,310 @@ public class GeminiSandbox {
                 IntPtr pTml = Marshal.AllocHGlobal(tmlSize);
                 try {
                     Marshal.StructureToPtr(tml, pTml, false);
-                    SetTokenInformation(hRestrictedToken, TokenIntegrityLevel, pTml, (uint)tmlSize);
+                    if (!SetTokenInformation(hRestrictedToken, TokenIntegrityLevel, pTml, (uint)tmlSize)) {
+                        Console.Error.WriteLine("Error: SetTokenInformation failed (" + Marshal.GetLastWin32Error() + ")");
+                        return 1;
+                    }
                 } finally {
                     Marshal.FreeHGlobal(pTml);
                 }
             }
 
-            // 3. Handle Internal Commands or External Process
+            // 5. Setup Job Object
+            hJob = CreateJobObject(IntPtr.Zero, null);
+            if (hJob == IntPtr.Zero) {
+                Console.Error.WriteLine("Error: CreateJobObject failed (" + Marshal.GetLastWin32Error() + ")");
+                return 1;
+            }
+
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+            jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+
+            IntPtr lpJobLimits = Marshal.AllocHGlobal(Marshal.SizeOf(jobLimits));
+            try {
+                Marshal.StructureToPtr(jobLimits, lpJobLimits, false);
+                if (!SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, lpJobLimits, (uint)Marshal.SizeOf(jobLimits))) {
+                    Console.Error.WriteLine("Error: SetInformationJobObject(Limits) failed (" + Marshal.GetLastWin32Error() + ")");
+                    return 1;
+                }
+            } finally {
+                Marshal.FreeHGlobal(lpJobLimits);
+            }
+
+            if (!networkAccess) {
+                JOBOBJECT_NET_RATE_CONTROL_INFORMATION netLimits = new JOBOBJECT_NET_RATE_CONTROL_INFORMATION();
+                netLimits.MaxBandwidth = 1;
+                netLimits.ControlFlags = 0x1 | 0x2; // ENABLE | MAX_BANDWIDTH
+                netLimits.DscpTag = 0;
+
+                IntPtr lpNetLimits = Marshal.AllocHGlobal(Marshal.SizeOf(netLimits));
+                try {
+                    Marshal.StructureToPtr(netLimits, lpNetLimits, false);
+                    if (!SetInformationJobObject(hJob, JobObjectNetRateControlInformation, lpNetLimits, (uint)Marshal.SizeOf(netLimits))) {
+                        Console.Error.WriteLine("Warning: SetInformationJobObject(NetRate) failed (" + Marshal.GetLastWin32Error() + "). Network might not be throttled.");
+                    }
+                } finally {
+                    Marshal.FreeHGlobal(lpNetLimits);
+                }
+            }
+
+            // 6. Handle Internal Commands or External Process
             if (command == "__read") {
-                string path = args[3];
+                if (argIndex + 1 >= args.Length) {
+                    Console.Error.WriteLine("Error: Missing path for __read");
+                    return 1;
+                }
+                string path = args[argIndex + 1];
+                CheckForbidden(path, forbiddenPaths);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-                        using (StreamReader sr = new StreamReader(fs, System.Text.Encoding.UTF8)) {
-                            char[] buffer = new char[4096];
-                            int bytesRead;
-                            while ((bytesRead = sr.Read(buffer, 0, buffer.Length)) > 0) {
-                                Console.Write(buffer, 0, bytesRead);
-                            }
+                        using (Stream stdout = Console.OpenStandardOutput()) {
+                            fs.CopyTo(stdout);
                         }
                         return 0;
                     } catch (Exception e) {
-                        Console.Error.WriteLine(e.Message);
+                        Console.Error.WriteLine("Error reading file: " + e.Message);
                         return 1;
                     }
                 });
             } else if (command == "__write") {
-                string path = args[3];
-                return RunInImpersonation(hRestrictedToken, () => {
-                    try {
-                        using (StreamReader reader = new StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8))
-                        using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-                        using (StreamWriter writer = new StreamWriter(fs, System.Text.Encoding.UTF8)) {
-                            char[] buffer = new char[4096];
-                            int bytesRead;
-                            while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0) {
-                                writer.Write(buffer, 0, bytesRead);
-                            }
-                        }
-                        return 0;
-                    } catch (Exception e) {
-                        Console.Error.WriteLine(e.Message);
-                        return 1;
-                    }
-                });
-            }
+                if (argIndex + 1 >= args.Length) {
+                    Console.Error.WriteLine("Error: Missing path for __write");
+                    return 1;
+                }
+                string path = args[argIndex + 1];
+                CheckForbidden(path, forbiddenPaths);
 
-            // 4. Setup Job Object for external process
-            hJob = CreateJobObject(IntPtr.Zero, null);
-            if (hJob != IntPtr.Zero) {
-                JOBOBJECT_EXTENDED_LIMIT_INFORMATION limitInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-                limitInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-                int limitSize = Marshal.SizeOf(limitInfo);
-                IntPtr pLimit = Marshal.AllocHGlobal(limitSize);
                 try {
-                    Marshal.StructureToPtr(limitInfo, pLimit, false);
-                    SetInformationJobObject(hJob, JobObjectInfoClass.ExtendedLimitInformation, pLimit, (uint)limitSize);
-                } finally {
-                    Marshal.FreeHGlobal(pLimit);
+                    using (MemoryStream ms = new MemoryStream()) {
+                        using (Stream stdin = Console.OpenStandardInput()) {
+                            stdin.CopyTo(ms);
+                        }
+
+                        return RunInImpersonation(hRestrictedToken, () => {
+                            using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None)) {
+                                ms.Position = 0;
+                                ms.CopyTo(fs);
+                            }
+                            return 0;
+                        });
+                    }
+                } catch (Exception e) {
+                    Console.Error.WriteLine("Error during __write: " + e.Message);
+                    return 1;
                 }
             }
 
-            // 5. Launch Process
+            // 7. Execute External Process
             STARTUPINFO si = new STARTUPINFO();
             si.cb = (uint)Marshal.SizeOf(si);
-            si.dwFlags = STARTF_USESTDHANDLES;
+            si.dwFlags = 0x00000100; // STARTF_USESTDHANDLES
             si.hStdInput = GetStdHandle(-10);
             si.hStdOutput = GetStdHandle(-11);
             si.hStdError = GetStdHandle(-12);
 
             string commandLine = "";
-            for (int i = 2; i < args.Length; i++) {
-                if (i > 2) commandLine += " ";
+            for (int i = argIndex; i < args.Length; i++) {
+                if (i > argIndex) commandLine += " ";
                 commandLine += QuoteArgument(args[i]);
             }
 
-            PROCESS_INFORMATION pi;
-            if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, cwd, ref si, out pi)) {
-                Console.Error.WriteLine("Failed to create process. Error: " + Marshal.GetLastWin32Error());
+            // Creation Flags: 0x01000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
+            // 0x00000004 (CREATE_SUSPENDED) to prevent the process from executing before being placed in the job
+            uint creationFlags = 0x01000000 | 0x00000004;
+            if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + err + ") Command: " + commandLine);
                 return 1;
             }
 
+            if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + err + ") Command: " + commandLine);
+                TerminateProcess(pi.hProcess, 1);
+                return 1;
+            }
+
+            ResumeThread(pi.hThread);
+
+            if (WaitForSingleObject(pi.hProcess, 0xFFFFFFFF) == 0xFFFFFFFF) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: WaitForSingleObject failed (" + err + ")");
+            }
+            
+            uint exitCode = 0;
+            if (!GetExitCodeProcess(pi.hProcess, out exitCode)) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: GetExitCodeProcess failed (" + err + ")");
+                return 1;
+            }
+
+            return (int)exitCode;
+        } finally {
+            if (hToken != IntPtr.Zero) CloseHandle(hToken);
+            if (hRestrictedToken != IntPtr.Zero) CloseHandle(hRestrictedToken);
+            if (hJob != IntPtr.Zero) CloseHandle(hJob);
+            if (pi.hProcess != IntPtr.Zero) CloseHandle(pi.hProcess);
+            if (pi.hThread != IntPtr.Zero) CloseHandle(pi.hThread);
+        }
+    }
+
+    // --- Helper Methods ---
+
+    private static void ParseManifest(string manifestPath, HashSet<string> paths) {
+        if (!File.Exists(manifestPath)) return;
+        foreach (string line in File.ReadAllLines(manifestPath, Encoding.UTF8)) {
+            if (!string.IsNullOrWhiteSpace(line)) {
+                paths.Add(GetNormalizedPath(line.Trim()));
+            }
+        }
+    }
+
+    private static void ApplyBulkAcls(HashSet<string> allowedPaths, HashSet<string> forbiddenPaths) {
+        SecurityIdentifier lowSid = new SecurityIdentifier("S-1-16-4096");
+
+        // 1. Apply Deny Rules
+        foreach (string path in forbiddenPaths) {
             try {
-                if (hJob != IntPtr.Zero) {
-                    AssignProcessToJobObject(hJob, pi.hProcess);
+                if (File.Exists(path)) {
+                    FileSecurity fs = File.GetAccessControl(path);
+                    fs.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.FullControl, AccessControlType.Deny));
+                    File.SetAccessControl(path, fs);
+                } else if (Directory.Exists(path)) {
+                    DirectorySecurity ds = Directory.GetAccessControl(path);
+                    ds.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Deny));
+                    Directory.SetAccessControl(path, ds);
+                }
+            } catch (Exception e) {
+                Console.Error.WriteLine("Warning: Failed to apply deny ACL to " + path + ": " + e.Message);
+            }
+        }
+
+        // 2. Pre-calculate Security Descriptors for Allow Rules
+        IntPtr pSdDir = IntPtr.Zero;
+        IntPtr pSdFile = IntPtr.Zero;
+        IntPtr pSaclDir = IntPtr.Zero;
+        IntPtr pSaclFile = IntPtr.Zero;
+        uint sdSize = 0;
+        bool saclPresent = false;
+        bool saclDefaulted = false;
+
+        if (ConvertStringSecurityDescriptorToSecurityDescriptor("S:(ML;OICI;NW;;;LW)", 1, out pSdDir, out sdSize)) {
+            GetSecurityDescriptorSacl(pSdDir, out saclPresent, out pSaclDir, out saclDefaulted);
+        }
+        if (ConvertStringSecurityDescriptorToSecurityDescriptor("S:(ML;;NW;;;LW)", 1, out pSdFile, out sdSize)) {
+            GetSecurityDescriptorSacl(pSdFile, out saclPresent, out pSaclFile, out saclDefaulted);
+        }
+
+        // 3. Apply Allow Rules
+        foreach (string path in allowedPaths) {
+            try {
+                bool isDir = Directory.Exists(path);
+                if (isDir) {
+                    DirectorySecurity ds = Directory.GetAccessControl(path);
+                    ds.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.Modify, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+                    Directory.SetAccessControl(path, ds);
+                } else if (File.Exists(path)) {
+                    FileSecurity fs = File.GetAccessControl(path);
+                    fs.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.Modify, AccessControlType.Allow));
+                    File.SetAccessControl(path, fs);
+                } else {
+                    continue;
                 }
 
-                ResumeThread(pi.hThread);
-                WaitForSingleObject(pi.hProcess, INFINITE);
-
-                uint exitCode = 0;
-                GetExitCodeProcess(pi.hProcess, out exitCode);
-                return (int)exitCode;
-            } finally {
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
+                // Ensure we use the 8.3 long-name equivalent for robust security checks per guidelines
+                StringBuilder sb = new StringBuilder(1024);
+                GetLongPathName(path, sb, 1024);
+                string longPath = sb.ToString();
+                
+                IntPtr pSacl = isDir ? pSaclDir : pSaclFile;
+                if (pSacl != IntPtr.Zero) {
+                    uint result = SetNamedSecurityInfo(longPath, SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, pSacl);
+                    if (result != 0) {
+                        Console.Error.WriteLine("Warning: SetNamedSecurityInfo failed for " + longPath + " with error " + result);
+                    }
+                }
+            } catch (Exception e) {
+                Console.Error.WriteLine("Warning: Failed to apply allow ACL to " + path + ": " + e.Message);
             }
-        } catch (Exception e) {
-            Console.Error.WriteLine("Unexpected error: " + e.Message);
+        }
+
+        if (pSdDir != IntPtr.Zero) LocalFree(pSdDir);
+        if (pSdFile != IntPtr.Zero) LocalFree(pSdFile);
+    }
+
+    private static int RunInImpersonation(IntPtr hToken, Func<int> action) {
+        if (!ImpersonateLoggedOnUser(hToken)) {
+            Console.Error.WriteLine("Error: ImpersonateLoggedOnUser failed (" + Marshal.GetLastWin32Error() + ")");
             return 1;
+        }
+        try {
+            return action();
         } finally {
-            if (hRestrictedToken != IntPtr.Zero) CloseHandle(hRestrictedToken);
-            if (hToken != IntPtr.Zero) CloseHandle(hToken);
-            if (hJob != IntPtr.Zero) CloseHandle(hJob);
-            if (pSidsToDisable != IntPtr.Zero) Marshal.FreeHGlobal(pSidsToDisable);
-            if (pSidsToRestrict != IntPtr.Zero) Marshal.FreeHGlobal(pSidsToRestrict);
-            if (networkSid != IntPtr.Zero) LocalFree(networkSid);
-            if (restrictedSid != IntPtr.Zero) LocalFree(restrictedSid);
-            if (lowIntegritySid != IntPtr.Zero) LocalFree(lowIntegritySid);
+            RevertToSelf();
+        }
+    }
+
+    private static string GetNormalizedPath(string path) {
+        string fullPath = Path.GetFullPath(path);
+        StringBuilder longPath = new StringBuilder(1024);
+        uint result = GetLongPathName(fullPath, longPath, (uint)longPath.Capacity);
+        if (result > 0 && result < longPath.Capacity) {
+            return longPath.ToString();
+        }
+        return fullPath;
+    }
+
+    private static void CheckForbidden(string path, HashSet<string> forbiddenPaths) {
+        string fullPath = GetNormalizedPath(path);
+        foreach (string forbidden in forbiddenPaths) {
+            if (fullPath.Equals(forbidden, StringComparison.OrdinalIgnoreCase) || fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) {
+                throw new UnauthorizedAccessException("Access to forbidden path is denied: " + path);
+            }
         }
     }
 
     private static string QuoteArgument(string arg) {
         if (string.IsNullOrEmpty(arg)) return "\"\"";
 
-        bool hasSpace = arg.IndexOfAny(new char[] { ' ', '\t' }) != -1;
-        if (!hasSpace && arg.IndexOf('\"') == -1) return arg;
+        bool needsQuotes = false;
+        foreach (char c in arg) {
+            if (char.IsWhiteSpace(c) || c == '\"') {
+                needsQuotes = true;
+                break;
+            }
+        }
 
-        // Windows command line escaping for arguments is complex.
-        // Rule: Backslashes only need escaping if they precede a double quote or the end of the string.
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        if (!needsQuotes) return arg;
+
+        StringBuilder sb = new StringBuilder();
         sb.Append('\"');
         for (int i = 0; i < arg.Length; i++) {
-            int backslashCount = 0;
-            while (i < arg.Length && arg[i] == '\\') {
-                backslashCount++;
-                i++;
-            }
+            char c = arg[i];
+            if (c == '\"') {
+                sb.Append("\\\"");
+            } else if (c == '\\') {
+                int backslashCount = 0;
+                while (i < arg.Length && arg[i] == '\\') {
+                    backslashCount++;
+                    i++;
+                }
 
-            if (i == arg.Length) {
-                // Escape backslashes before the closing double quote
-                sb.Append('\\', backslashCount * 2);
-            } else if (arg[i] == '\"') {
-                // Escape backslashes before a literal double quote
-                sb.Append('\\', backslashCount * 2 + 1);
-                sb.Append('\"');
+                if (i == arg.Length) {
+                    sb.Append('\\', backslashCount * 2);
+                } else if (arg[i] == '\"') {
+                    sb.Append('\\', backslashCount * 2 + 1);
+                    sb.Append('\"');
+                } else {
+                    sb.Append('\\', backslashCount);
+                    sb.Append(arg[i]);
+                }
             } else {
-                // Backslashes don't need escaping here
-                sb.Append('\\', backslashCount);
-                sb.Append(arg[i]);
+                sb.Append(c);
             }
         }
         sb.Append('\"');
         return sb.ToString();
-    }
-
-    private static int RunInImpersonation(IntPtr hToken, Func<int> action) {
-        using (WindowsIdentity.Impersonate(hToken)) {
-            return action();
-        }
     }
 }

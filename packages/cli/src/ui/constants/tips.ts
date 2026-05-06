@@ -111,10 +111,10 @@ export const INFORMATIVE_TIPS = [
   'Paste from your clipboard with Ctrl+V',
   'Undo text edits in the input with Alt+Z or Cmd+Z',
   'Redo undone text edits with Shift+Alt+Z or Shift+Cmd+Z',
-  'Open the current prompt in an external editor with Ctrl+X',
+  'Open the current prompt in an external editor with Ctrl+G',
   'In menus, move up/down with k/j or the arrow keys',
   'In menus, select an item by typing its number',
-  "If you're using an IDE, see the context with Ctrl+G",
+  "If you're using an IDE, see the context with F4",
   'Toggle background shells with Ctrl+B or /shells',
   'Toggle the background shell process list with Ctrl+L',
   // Keyboard shortcut tips end here

@@ -17,7 +17,9 @@ import {
   type PartListUnion,
   type GenerateContentConfig,
   type GenerateContentParameters,
+  type FunctionCall,
 } from '@google/genai';
+import { AgentChatHistory } from './agentChatHistory.js';
 import { toParts } from '../code_assist/converter.js';
 import {
   retryWithBackoff,
@@ -25,11 +27,7 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import {
-  resolveModel,
-  isGemini2Model,
-  supportsModernFeatures,
-} from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
@@ -50,7 +48,9 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { scrubHistory } from '../utils/historyHardening.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
@@ -59,6 +59,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -97,6 +98,18 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
+/**
+ * Internal interface for parts that carry the magic 'callIndex' property
+ * used during model response consolidation.
+ */
+interface IndexedPart extends Part {
+  callIndex?: number;
+}
+
+function isIndexedPart(part: Part): part is IndexedPart {
+  return 'callIndex' in part;
+}
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -252,22 +265,30 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private callCounter = 0;
+  agentHistory: AgentChatHistory;
 
   constructor(
-    private readonly context: AgentLoopContext,
+    readonly context: AgentLoopContext,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
-    private history: Content[] = [],
+    history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
-    kind: 'main' | 'subagent' = 'main',
   ) {
     validateHistory(history);
+    this.agentHistory = new AgentChatHistory(history);
     this.chatRecordingService = new ChatRecordingService(context);
-    this.chatRecordingService.initialize(resumedSessionData, kind);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.parts || []),
     );
+  }
+
+  async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind: 'main' | 'subagent' = 'main',
+  ) {
+    await this.chatRecordingService.initialize(resumedSessionData, kind);
   }
 
   setSystemInstruction(sysInstr: string) {
@@ -316,7 +337,7 @@ export class GeminiChat {
     });
     this.sendPromise = streamDonePromise;
 
-    const userContent = createUserContent(message);
+    let userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -346,7 +367,31 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
+    const binaryInjections = this.extractBinaryInjections(userContent.parts);
+    if (binaryInjections) {
+      // Turn 1: The original tool response (now cleaned)
+      this.agentHistory.push(userContent);
+
+      // Turn 2: Synthetic Model Acknowledgment
+      this.agentHistory.push({
+        role: 'model',
+        parts: [
+          {
+            text: 'Binary content received. Proceeding with analysis.',
+            thought: true,
+            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+          },
+        ],
+      });
+
+      // Turn 3: The actual binary data (becomes the current request message)
+      userContent = {
+        role: 'user',
+        parts: binaryInjections,
+      };
+    }
+
+    this.agentHistory.push(userContent);
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -419,14 +464,13 @@ export class GeminiChat {
             );
 
             const isContentError = error instanceof InvalidStreamError;
+            const isRetryableContentError =
+              isContentError && error.type !== 'NO_RESPONSE_TEXT';
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isRetryableContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
@@ -491,6 +535,32 @@ export class GeminiChat {
     return streamWithRetries.call(this);
   }
 
+  private extractBinaryInjections(
+    parts: Part[] | undefined,
+  ): Part[] | undefined {
+    if (!parts) {
+      return undefined;
+    }
+
+    const binaryInjections: Part[] = [];
+
+    for (const part of parts) {
+      const response = part.functionResponse?.response;
+
+      if (response && BINARY_INJECTION_KEY in response) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const binaryParts = response[BINARY_INJECTION_KEY] as Part[];
+        delete response[BINARY_INJECTION_KEY];
+
+        if (Array.isArray(binaryParts)) {
+          binaryInjections.push(...binaryParts);
+        }
+      }
+    }
+
+    return binaryInjections.length > 0 ? binaryInjections : undefined;
+  }
+
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
     requestContents: readonly Content[],
@@ -498,8 +568,14 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
+    // before sending to the Gemini API. This whitelists only standard Gemini fields.
+    const scrubbedContents = this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...requestContents])
+      : [...requestContents];
+
     const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
+      this.ensureActiveLoopHasThoughtSignatures(scrubbedContents);
 
     // Track final request parameters for AfterModel hooks
     const {
@@ -524,12 +600,18 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1FlashLite =
+        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
         useGemini3_1,
+        useGemini3_1FlashLite,
         false,
-        this.context.config.getHasAccessToPreviewModel?.() ?? true,
+        hasAccessToPreview,
         this.context.config,
       );
 
@@ -539,8 +621,9 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          useGemini3_1FlashLite,
           false,
-          this.context.config.getHasAccessToPreviewModel?.() ?? true,
+          hasAccessToPreview,
           this.context.config,
         );
       }
@@ -597,6 +680,21 @@ export class GeminiChat {
           );
         }
 
+        if (beforeModelResult.modifiedModel) {
+          modelToUse = resolveModel(
+            beforeModelResult.modifiedModel,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            false,
+            hasAccessToPreview,
+            this.context.config,
+          );
+          lastModelToUse = modelToUse;
+          // Re-evaluate contentsToUse based on the new model's feature support
+          contentsToUse = supportsModernFeatures(modelToUse)
+            ? [...contentsForPreviewModel]
+            : [...requestContents];
+        }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
         }
@@ -727,35 +825,41 @@ export class GeminiChat {
    */
   getHistory(curated: boolean = false): readonly Content[] {
     const history = curated
-      ? extractCuratedHistory(this.history)
-      : this.history;
-    return [...history];
+      ? extractCuratedHistory([...this.agentHistory.get()])
+      : this.agentHistory.get();
+
+    return this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...history])
+      : [...history];
   }
 
   /**
    * Clears the chat history.
    */
   clearHistory(): void {
-    this.history = [];
+    this.agentHistory.clear();
   }
 
   /**
    * Adds a new entry to the chat history.
    */
   addHistory(content: Content): void {
-    this.history.push(content);
+    this.agentHistory.push(content);
   }
 
-  setHistory(history: readonly Content[]): void {
-    this.history = [...history];
+  setHistory(
+    history: readonly Content[],
+    options: { silent?: boolean } = {},
+  ): void {
+    this.agentHistory.set(history, options);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.parts || []),
     );
     this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
-    this.history = this.history.map((content) => {
+    this.agentHistory.map((content) => {
       const newContent = { ...content };
       if (newContent.parts) {
         newContent.parts = newContent.parts.map((part) => {
@@ -865,6 +969,14 @@ export class GeminiChat {
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
+    // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
+    // We use a Map to ensure we only keep the latest version of each call (by ID)
+    const finalFunctionCallsMap = new Map<string, FunctionCall>();
+    const legacyFunctionCalls: FunctionCall[] = [];
+
+    // Map to track synthetic IDs assigned to each call index across chunks
+    const callIndexToId = new Map<number, string>();
+
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
@@ -874,6 +986,27 @@ export class GeminiChat {
         finishReason = candidateWithReason.finishReason as FinishReason;
       }
 
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        if (this.context.config.isContextManagementEnabled()) {
+          for (let i = 0; i < chunk.functionCalls.length; i++) {
+            const fnCall = chunk.functionCalls[i];
+            if (!fnCall.id) {
+              let id = callIndexToId.get(i);
+              if (!id) {
+                id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
+                callIndexToId.set(i, id);
+                debugLogger.log(
+                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${i}: ${fnCall.name}`,
+                );
+              }
+              fnCall.id = id;
+            }
+            finalFunctionCallsMap.set(fnCall.id, fnCall);
+          }
+        } else {
+          legacyFunctionCalls.push(...chunk.functionCalls);
+        }
+      }
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
@@ -887,7 +1020,19 @@ export class GeminiChat {
           }
 
           modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
+            ...content.parts
+              .filter((part) => !part.thought)
+              .map((part) => {
+                if (!this.context.config.isContextManagementEnabled()) {
+                  return part;
+                }
+                return {
+                  ...part,
+                  callIndex: chunk.functionCalls?.findIndex(
+                    (fc) => fc.name === part.functionCall?.name,
+                  ),
+                };
+              }),
           );
         }
       }
@@ -928,16 +1073,62 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
-    for (const part of modelResponseParts) {
-      const lastPart = consolidatedParts[consolidatedParts.length - 1];
-      if (
-        lastPart?.text &&
-        isValidNonThoughtTextPart(lastPart) &&
-        isValidNonThoughtTextPart(part)
-      ) {
-        lastPart.text += part.text;
-      } else {
-        consolidatedParts.push(part);
+    const finalFunctionCalls = this.context.config.isContextManagementEnabled()
+      ? Array.from(finalFunctionCallsMap.values())
+      : legacyFunctionCalls;
+
+    let currentCallSourceIndex = -1;
+    if (this.context.config.isContextManagementEnabled()) {
+      debugLogger.log(
+        `[GeminiChat] Starting consolidation for ${modelResponseParts.length} raw parts and ${finalFunctionCalls.length} assembled function calls.`,
+      );
+      for (const part of modelResponseParts) {
+        if (part.functionCall) {
+          const partIndex = isIndexedPart(part) ? part.callIndex : undefined;
+          const isNewCall =
+            partIndex !== undefined && partIndex > currentCallSourceIndex;
+
+          if (isNewCall) {
+            currentCallSourceIndex = partIndex;
+            consolidatedParts.push({ ...part }); // Push placeholder
+          }
+        } else {
+          const lastPart = consolidatedParts[consolidatedParts.length - 1];
+          if (
+            lastPart?.text &&
+            isValidNonThoughtTextPart(lastPart) &&
+            isValidNonThoughtTextPart(part)
+          ) {
+            lastPart.text += part.text;
+          } else {
+            consolidatedParts.push(part);
+          }
+        }
+      }
+
+      // Now, replace the placeholders with the perfectly assembled final arguments
+      if (finalFunctionCalls.length > 0) {
+        let callIndex = 0;
+        for (const part of consolidatedParts) {
+          if (part.functionCall && callIndex < finalFunctionCalls.length) {
+            part.functionCall = finalFunctionCalls[callIndex];
+            callIndex++;
+          }
+        }
+      }
+    } else {
+      // Fallback to legacy consolidation for non-context-manager users
+      for (const part of modelResponseParts) {
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          lastPart?.text &&
+          isValidNonThoughtTextPart(lastPart) &&
+          isValidNonThoughtTextPart(part)
+        ) {
+          lastPart.text += part.text;
+        } else {
+          consolidatedParts.push(part);
+        }
       }
     }
 
@@ -993,7 +1184,7 @@ export class GeminiChat {
       }
     }
 
-    this.history.push({ role: 'model', parts: consolidatedParts });
+    this.agentHistory.push({ role: 'model', parts: consolidatedParts });
   }
 
   getLastPromptTokenCount(): number {
@@ -1025,11 +1216,15 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
+        agentId:
+          typeof call.response?.data?.['agentId'] === 'string'
+            ? call.response.data['agentId']
+            : undefined,
         resultDisplay,
         description:
           'invocation' in call ? call.invocation?.getDescription() : undefined,

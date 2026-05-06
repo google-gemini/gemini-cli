@@ -39,7 +39,7 @@ available combinations.
 | `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
 | `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
 | `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
-| `edit.undo`            | Undo the most recent text edit.                  | `Cmd/Win+Z`<br />`Alt+Z`                                 |
+| `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z`<br />`Alt+Z`<br />`Cmd/Win+Z`                   |
 | `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
 
 #### Scrolling
@@ -86,22 +86,25 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                     | Keys                                                                                |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
-| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                              | Action                                                                    | Keys                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`                       | Submit the current prompt.                                                | `Enter`                                                                             |
+| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
+| `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`<br />`Ctrl+Shift+G`                                                        |
+| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
+| `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 
 | Command                       | Action                                                                                                                                             | Keys               |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`              |
+| `app.showErrorDetails`        | Toggle the debug console for detailed error information.                                                                                           | `F12`              |
 | `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
-| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
+| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `F4`               |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
-| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
+| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `F9`               |
+| `app.toggleMouseMode`         | Toggle mouse mode (scrolling and clicking).                                                                                                        | `Ctrl+S`           |
 | `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
 | `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
 | `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
@@ -112,6 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+| `app.voiceModePTT`            | Hold to speak in Voice Mode.                                                                                                                       | `Space`            |
 
 #### Background Shell Controls
 
@@ -125,6 +129,16 @@ available combinations.
 | `background.unfocus`        | Move focus from background shell to Gemini.                        | `Shift+Tab` |
 | `background.unfocusList`    | Move focus from background shell list to Gemini.                   | `Tab`       |
 | `background.unfocusWarning` | Show warning when trying to move focus away from background shell. | `Tab`       |
+| `app.dumpFrame`             | Dump the current frame as a snapshot.                              | `F8`        |
+| `app.startRecording`        | Start recording the session.                                       | `F6`        |
+| `app.stopRecording`         | Stop recording the session.                                        | `F7`        |
+
+#### Extension Controls
+
+| Command            | Action                                      | Keys |
+| ------------------ | ------------------------------------------- | ---- |
+| `extension.update` | Update the current extension if available.  | `I`  |
+| `extension.link`   | Link the current extension to a local path. | `L`  |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -242,16 +256,16 @@ supports NORMAL and INSERT modes.
 
 ### Mode switching
 
-| Action                                                  | Keys      |
-| ------------------------------------------------------- | --------- |
-| Enter NORMAL mode from INSERT mode                      | `Esc`     |
-| Enter INSERT mode at the cursor                         | `i`       |
-| Enter INSERT mode after the cursor                      | `a`       |
-| Enter INSERT mode at the first non-whitespace character | `I`       |
-| Enter INSERT mode at the end of the line                | `A`       |
-| Insert a new line below and switch to INSERT            | `o`       |
-| Insert a new line above and switch to INSERT            | `O`       |
-| Clear input in NORMAL mode                              | `Esc Esc` |
+| Action                                       | Keys      |
+| -------------------------------------------- | --------- |
+| Enter NORMAL mode from INSERT mode           | `Esc`     |
+| Enter INSERT mode at the cursor              | `i`       |
+| Enter INSERT mode after the cursor           | `a`       |
+| Enter INSERT mode at the start of the line   | `I`       |
+| Enter INSERT mode at the end of the line     | `A`       |
+| Insert a new line below and switch to INSERT | `o`       |
+| Insert a new line above and switch to INSERT | `O`       |
+| Clear input in NORMAL mode                   | `Esc Esc` |
 
 ### Navigation in NORMAL mode
 

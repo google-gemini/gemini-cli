@@ -21,6 +21,7 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  normalizeCommand,
   hasRedirection,
   resolveExecutable,
 } from './shell-utils.js';
@@ -114,6 +115,23 @@ const mockPowerShellResult = (
     error: undefined,
   });
 };
+
+describe('normalizeCommand', () => {
+  it('should lowercase the command', () => {
+    expect(normalizeCommand('NPM')).toBe('npm');
+  });
+
+  it('should remove .exe extension', () => {
+    expect(normalizeCommand('node.exe')).toBe('node');
+  });
+
+  it('should handle absolute paths', () => {
+    expect(normalizeCommand('/usr/bin/npm')).toBe('npm');
+    expect(normalizeCommand('C:\\Program Files\\nodejs\\node.exe')).toBe(
+      'node',
+    );
+  });
+});
 
 describe('getCommandRoots', () => {
   it('should return a single command', () => {

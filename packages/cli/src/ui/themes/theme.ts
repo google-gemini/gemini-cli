@@ -135,7 +135,7 @@ export function interpolateColor(
     const gradient = tinygradient(color1, color2);
     const color = gradient.rgbAt(factor);
     return color.toHexString();
-  } catch (_e) {
+  } catch {
     return color1;
   }
 }

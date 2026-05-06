@@ -70,9 +70,7 @@ describe('App', () => {
     cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
-    mainControlsRef: {
-      current: null,
-    } as unknown as React.MutableRefObject<DOMElement | null>,
+    mainControlsRef: vi.fn(),
     rootUiRef: {
       current: null,
     } as unknown as React.MutableRefObject<DOMElement | null>,
@@ -90,7 +88,7 @@ describe('App', () => {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },
-    backgroundShells: new Map(),
+    backgroundTasks: new Map(),
   };
 
   it('should render main content and composer when not quitting', async () => {

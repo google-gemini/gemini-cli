@@ -11,6 +11,7 @@ import {
   GeminiEventType,
   ToolConfirmationOutcome,
   ApprovalMode,
+  CoreToolCallStatus,
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
@@ -51,6 +52,7 @@ import type {
   Artifact,
 } from '@a2a-js/sdk';
 import { v4 as uuidv4 } from 'uuid';
+import { EventEmitter } from 'node:events';
 import { logger } from '../utils/logger.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -95,12 +97,11 @@ export class Task {
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
+  private pendingOutcomes: Map<string, ToolConfirmationOutcome | undefined> =
+    new Map(); // toolCallId --> outcome
   private toolsAlreadyConfirmed: Set<string> = new Set();
-  private toolCompletionPromise?: Promise<void>;
-  private toolCompletionNotifier?: {
-    resolve: () => void;
-    reject: (reason?: Error) => void;
-  };
+  private toolUpdateEmitter = new EventEmitter();
+  private cancellationError?: Error;
 
   private constructor(
     id: string,
@@ -121,7 +122,6 @@ export class Task {
     this.taskState = 'submitted';
     this.eventBus = eventBus;
     this.completedToolCalls = [];
-    this._resetToolCompletionPromise();
     this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
@@ -176,22 +176,9 @@ export class Task {
     return metadata;
   }
 
-  private _resetToolCompletionPromise(): void {
-    this.toolCompletionPromise = new Promise((resolve, reject) => {
-      this.toolCompletionNotifier = { resolve, reject };
-    });
-    // If there are no pending calls when reset, resolve immediately.
-    if (this.pendingToolCalls.size === 0 && this.toolCompletionNotifier) {
-      this.toolCompletionNotifier.resolve();
-    }
-  }
-
   private _registerToolCall(toolCallId: string, status: string): void {
-    const wasEmpty = this.pendingToolCalls.size === 0;
     this.pendingToolCalls.set(toolCallId, status);
-    if (wasEmpty) {
-      this._resetToolCompletionPromise();
-    }
+    this.toolUpdateEmitter.emit('update');
     logger.info(
       `[Task] Registered tool call: ${toolCallId}. Pending: ${this.pendingToolCalls.size}`,
     );
@@ -200,23 +187,47 @@ export class Task {
   private _resolveToolCall(toolCallId: string): void {
     if (this.pendingToolCalls.has(toolCallId)) {
       this.pendingToolCalls.delete(toolCallId);
+      this.toolUpdateEmitter.emit('update');
       logger.info(
         `[Task] Resolved tool call: ${toolCallId}. Pending: ${this.pendingToolCalls.size}`,
       );
-      if (this.pendingToolCalls.size === 0 && this.toolCompletionNotifier) {
-        this.toolCompletionNotifier.resolve();
-      }
     }
   }
 
-  async waitForPendingTools(): Promise<void> {
+  private isAwaitingApprovalOnly(): boolean {
     if (this.pendingToolCalls.size === 0) {
-      return Promise.resolve();
+      return false;
     }
-    logger.info(
-      `[Task] Waiting for ${this.pendingToolCalls.size} pending tool(s)...`,
-    );
-    await this.toolCompletionPromise;
+    for (const [callId, status] of this.pendingToolCalls.entries()) {
+      if (
+        status !== CoreToolCallStatus.AwaitingApproval ||
+        this.toolsAlreadyConfirmed.has(callId)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async waitForPendingTools(): Promise<void> {
+    while (this.pendingToolCalls.size > 0 && !this.isAwaitingApprovalOnly()) {
+      if (this.cancellationError) {
+        const error = this.cancellationError;
+        this.cancellationError = undefined;
+        throw error;
+      }
+      logger.info(
+        `[Task] Waiting for ${this.pendingToolCalls.size} pending tool(s)...`,
+      );
+      await new Promise((resolve) =>
+        this.toolUpdateEmitter.once('update', resolve),
+      );
+    }
+    if (this.cancellationError) {
+      const error = this.cancellationError;
+      this.cancellationError = undefined;
+      throw error;
+    }
   }
 
   cancelPendingTools(reason: string): void {
@@ -225,15 +236,13 @@ export class Task {
         `[Task] Cancelling all ${this.pendingToolCalls.size} pending tool calls. Reason: ${reason}`,
       );
     }
-    if (this.toolCompletionNotifier) {
-      this.toolCompletionNotifier.reject(new Error(reason));
-    }
+    this.cancellationError = new Error(reason);
     this.pendingToolCalls.clear();
     this.pendingCorrelationIds.clear();
+    this.toolsAlreadyConfirmed.clear();
 
     this.scheduler.cancelAll();
-    // Reset the promise for any future operations, ensuring it's in a clean state.
-    this._resetToolCompletionPromise();
+    this.toolUpdateEmitter.emit('update');
   }
 
   private _createTextMessage(
@@ -413,7 +422,10 @@ export class Task {
   private handleEventDrivenToolCallsUpdate(
     event: ToolCallsUpdateMessage,
   ): void {
-    if (event.type !== MessageBusType.TOOL_CALLS_UPDATE) {
+    if (
+      event.type !== MessageBusType.TOOL_CALLS_UPDATE ||
+      event.schedulerId !== this.id
+    ) {
       return;
     }
 
@@ -426,7 +438,7 @@ export class Task {
     this.checkInputRequiredState();
   }
 
-  private handleEventDrivenToolCall(tc: ToolCall): void {
+  private handleEventDrivenToolCall(tc: ToolCall): boolean {
     const callId = tc.request.callId;
 
     // Do not process events for tools that have already been finalized.
@@ -436,11 +448,16 @@ export class Task {
       this.processedToolCallIds.has(callId) ||
       this.completedToolCalls.some((c) => c.request.callId === callId)
     ) {
-      return;
+      return false;
     }
 
     const previousStatus = this.pendingToolCalls.get(callId);
-    const hasChanged = previousStatus !== tc.status;
+    const previousOutcome = this.pendingOutcomes.get(callId);
+    const hasChanged =
+      previousStatus !== tc.status || previousOutcome !== tc.outcome;
+
+    // Update outcome tracking
+    this.pendingOutcomes.set(callId, tc.outcome);
 
     // 1. Handle Output
     if (tc.status === 'executing' && tc.liveOutput) {
@@ -454,6 +471,7 @@ export class Task {
       tc.status === 'cancelled'
     ) {
       this.toolsAlreadyConfirmed.delete(callId);
+      this.pendingOutcomes.delete(callId);
       if (hasChanged) {
         logger.info(
           `[Task] Tool call ${callId} completed with status: ${tc.status}`,
@@ -496,6 +514,8 @@ export class Task {
       );
       this.eventBus?.publish(statusUpdate);
     }
+
+    return hasChanged;
   }
 
   private checkInputRequiredState(): void {
@@ -508,12 +528,14 @@ export class Task {
     let isExecuting = false;
 
     for (const [callId, status] of this.pendingToolCalls.entries()) {
-      if (status === 'executing' || status === 'scheduled') {
-        isExecuting = true;
-      } else if (
-        status === 'awaiting_approval' &&
-        !this.toolsAlreadyConfirmed.has(callId)
+      if (
+        status === CoreToolCallStatus.Executing ||
+        status === CoreToolCallStatus.Scheduled ||
+        status === CoreToolCallStatus.Validating ||
+        this.toolsAlreadyConfirmed.has(callId)
       ) {
+        isExecuting = true;
+      } else if (status === CoreToolCallStatus.AwaitingApproval) {
         isAwaitingApproval = true;
       }
     }
@@ -536,8 +558,8 @@ export class Task {
 
       // Unblock waitForPendingTools to correctly end the executor loop and release the HTTP response stream.
       // The IDE client will open a new stream with the confirmation reply.
-      if (!wasAlreadyInputRequired && this.toolCompletionNotifier) {
-        this.toolCompletionNotifier.resolve();
+      if (!wasAlreadyInputRequired) {
+        this.toolUpdateEmitter.emit('update');
       }
     }
   }
@@ -574,7 +596,13 @@ export class Task {
       'confirmationDetails',
       'liveOutput',
       'response',
+      'outcome',
     );
+
+    // Map internal 'validating' status to 'scheduled' for the client
+    if (serializableToolCall.status === CoreToolCallStatus.Validating) {
+      serializableToolCall.status = CoreToolCallStatus.Scheduled;
+    }
 
     if (tc.tool) {
       const toolFields = this._pickFields(
@@ -895,6 +923,7 @@ export class Task {
     const outcomeString = part.data['outcome'];
 
     this.toolsAlreadyConfirmed.add(callId);
+    this.toolUpdateEmitter.emit('update');
 
     let confirmationOutcome: ToolConfirmationOutcome | undefined;
 
@@ -1108,10 +1137,6 @@ export class Task {
       if (confirmationHandled) {
         anyConfirmationHandled = true;
         // If a confirmation was handled, the scheduler will now run the tool (or cancel it).
-        // We resolve the toolCompletionPromise manually in checkInputRequiredState
-        // to break the original execution loop, so we must reset it here so the
-        // new loop correctly awaits the tool's final execution.
-        this._resetToolCompletionPromise();
         // We don't send anything to the LLM for this part.
         // The subsequent tool execution will eventually lead to resolveToolCall.
         continue;

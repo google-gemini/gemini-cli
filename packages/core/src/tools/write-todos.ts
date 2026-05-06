@@ -11,6 +11,7 @@ import {
   type ToolInvocation,
   type Todo,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
@@ -53,10 +54,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     return `Set ${count} todo(s)`;
   }
 
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const todos = this.params.todos ?? [];
     const todoListString = todos
       .map(

@@ -95,7 +95,7 @@ export class XcodeMcpBridgeFixTransport
           // If successful, populate structuredContent
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           result.structuredContent = parsed;
-        } catch (_) {
+        } catch {
           // Ignored: Content is likely plain text, not JSON.
         }
       }

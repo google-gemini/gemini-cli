@@ -60,7 +60,9 @@ describe('SdkTool Execution', () => {
       mockMessageBus,
       undefined,
     );
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toBe('Success: test');
     expect(result.error).toBeUndefined();
@@ -86,7 +88,7 @@ describe('SdkTool Execution', () => {
     );
 
     await expect(
-      invocation.execute(new AbortController().signal),
+      invocation.execute({ abortSignal: new AbortController().signal }),
     ).rejects.toThrow('Standard error');
   });
 
@@ -108,7 +110,9 @@ describe('SdkTool Execution', () => {
       mockMessageBus,
       undefined,
     );
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.error).toBeDefined();
     expect(result.error?.message).toBe('Visible error');
@@ -134,7 +138,9 @@ describe('SdkTool Execution', () => {
       mockMessageBus,
       undefined,
     );
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.error).toBeDefined();
     expect(result.error?.message).toBe('Standard error');

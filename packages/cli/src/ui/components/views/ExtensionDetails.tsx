@@ -12,6 +12,7 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { theme } from '../../semantic-colors.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 export interface ExtensionDetailsProps {
   extension: RegistryExtension;
@@ -23,6 +24,8 @@ export interface ExtensionDetailsProps {
     requestConsentOverride: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
   isInstalled: boolean;
+  updateState?: ExtensionUpdateState;
+  onUpdate?: () => void | Promise<void>;
 }
 
 export function ExtensionDetails({
@@ -31,6 +34,8 @@ export function ExtensionDetails({
   onInstall,
   onLink,
   isInstalled,
+  updateState,
+  onUpdate,
 }: ExtensionDetailsProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
   const [consentRequest, setConsentRequest] = useState<{
@@ -76,7 +81,12 @@ export function ExtensionDetails({
         );
         return true;
       }
-      if (key.name === 'l' && isLinkable && !isInstalled && !isInstalling) {
+      if (
+        keyMatchers[Command.LINK_EXTENSION](key) &&
+        isLinkable &&
+        !isInstalled &&
+        !isInstalling
+      ) {
         setIsInstalling(true);
         void onLink(
           (prompt: string) =>
@@ -84,6 +94,14 @@ export function ExtensionDetails({
               setConsentRequest({ prompt, resolve });
             }),
         );
+        return true;
+      }
+      if (
+        keyMatchers[Command.UPDATE_EXTENSION](key) &&
+        updateState === ExtensionUpdateState.UPDATE_AVAILABLE &&
+        !isInstalling
+      ) {
+        void onUpdate?.();
         return true;
       }
       return false;
@@ -150,6 +168,16 @@ export function ExtensionDetails({
           <Text color={theme.text.primary} bold>
             {extension.extensionName}
           </Text>
+          {updateState === ExtensionUpdateState.UPDATE_AVAILABLE && (
+            <Box marginLeft={1}>
+              <Text color={theme.status.warning}>[I] Update</Text>
+            </Box>
+          )}
+          {updateState === ExtensionUpdateState.UPDATING && (
+            <Box marginLeft={1}>
+              <Text color={theme.text.secondary}>[Updating...]</Text>
+            </Box>
+          )}
         </Box>
         <Box flexDirection="row">
           <Text color={theme.text.secondary}>
@@ -258,7 +286,7 @@ export function ExtensionDetails({
           </Box>
         </Box>
       )}
-      {isInstalled && (
+      {isInstalled && updateState !== ExtensionUpdateState.UPDATING && (
         <Box flexDirection="row" marginTop={1} justifyContent="center">
           <Text color={theme.status.success}>Already Installed</Text>
         </Box>

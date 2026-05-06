@@ -16,10 +16,6 @@ export default defineConfig({
   },
   test: {
     testTimeout: 300000, // 5 minutes
-    // Retry in CI but not nightly to avoid blocking on API error.
-    retry: process.env['VITEST_RETRY']
-      ? parseInt(process.env['VITEST_RETRY'], 10)
-      : 3,
     reporters: ['default', 'json'],
     outputFile: {
       json: 'evals/logs/report.json',
@@ -28,7 +24,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     alias: {
-      react: path.resolve(__dirname, '../node_modules/react'),
+      '@google/gemini-cli-core': path.resolve(
+        __dirname,
+        '../packages/core/index.ts',
+      ),
     },
     setupFiles: [path.resolve(__dirname, '../packages/cli/test-setup.ts')],
     server: {

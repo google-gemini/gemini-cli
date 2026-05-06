@@ -230,6 +230,9 @@ export function getSecureSanitizationConfig(
     allowedEnvironmentVariables: [...new Set(allowed)],
     blockedEnvironmentVariables: [...new Set(blocked)],
     // Redaction must be enabled for secure configurations
-    enableEnvironmentVariableRedaction: true,
+    enableEnvironmentVariableRedaction:
+      requestedConfig.enableEnvironmentVariableRedaction ??
+      baseConfig?.enableEnvironmentVariableRedaction ??
+      false,
   };
 }

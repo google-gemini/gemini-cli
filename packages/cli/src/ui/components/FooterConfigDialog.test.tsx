@@ -116,7 +116,7 @@ describe('<FooterConfigDialog />', () => {
     expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'code-changes' (which has colored elements)
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       act(() => {
         stdin.write('\u001b[B'); // Down arrow
       });
@@ -256,7 +256,7 @@ describe('<FooterConfigDialog />', () => {
       expect(nextLine).toContain('·');
       expect(nextLine).toContain('~/project/path');
       expect(nextLine).toContain('docker');
-      expect(nextLine).toContain('97%');
+      expect(nextLine).toContain('42% used');
     });
 
     await expect(renderResult).toMatchSvgSnapshot();
