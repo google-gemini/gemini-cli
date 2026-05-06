@@ -12,6 +12,7 @@ import {
   ApprovalMode,
   Scheduler,
   type MessageBus,
+  type ToolLiveOutput,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -604,6 +605,74 @@ describe('Task Event-Driven Scheduler', () => {
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: 'corr-2',
         confirmed: false,
+      }),
+    );
+  });
+
+  it('should handle multi-turn tool resolution correctly', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig);
+
+    task['_registerToolCall']('1', 'scheduled');
+    task['_registerToolCall']('2', 'scheduled');
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+
+    // Turn 1: Resolve tool 1
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [
+        {
+          request: { callId: '1', name: 't1' },
+          status: 'success',
+          response: { responseParts: [] },
+        },
+      ],
+      schedulerId: 'task-id',
+    });
+
+    expect(task['pendingToolCalls'].size).toBe(1);
+    expect(task['pendingToolCalls'].has('2')).toBe(true);
+
+    // Turn 2: Resolve tool 2
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [
+        {
+          request: { callId: '2', name: 't2' },
+          status: 'success',
+          response: { responseParts: [] },
+        },
+      ],
+      schedulerId: 'task-id',
+    });
+
+    expect(task['pendingToolCalls'].size).toBe(0);
+  });
+
+  it('should handle subagent progress events from the scheduler', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    // Trigger _schedulerOutputUpdate with subagent progress
+    task['_schedulerOutputUpdate']('tool-1', {
+      isSubagentProgress: true,
+      agentName: 'researcher',
+      recentActivity: [],
+    } as ToolLiveOutput);
+
+    expect(mockEventBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'artifact-update',
+        artifact: expect.objectContaining({
+          parts: [
+            expect.objectContaining({
+              text: expect.stringContaining('researcher'),
+            }),
+          ],
+        }),
       }),
     );
   });

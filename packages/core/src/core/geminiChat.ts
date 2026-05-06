@@ -831,7 +831,10 @@ export class GeminiChat {
     const history = curated
       ? extractCuratedHistory([...this.agentHistory.get()])
       : this.agentHistory.get();
-    return [...history];
+
+    return this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...history])
+      : [...history];
   }
 
   /**
