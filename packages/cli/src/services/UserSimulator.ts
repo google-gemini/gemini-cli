@@ -118,34 +118,54 @@ export class UserSimulator {
     try {
       this.isProcessing = true;
 
-      // Stabilization delay: Wait for the terminal UI to finish rendering
-      // (e.g. ANSI clear/repaint sequences) before looking at the screen.
-      // Increased to 1s to handle high-latency PTYs in Docker.
-      // Force a terminal repaint by sending SIGWINCH to the current process.
-      debugLogger.log('[SIMULATOR] Sending SIGWINCH to process group to force repaint.');
-      try { process.kill(0, 'SIGWINCH'); } catch (_e) { process.kill(process.pid, 'SIGWINCH'); }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Patient refresh cycle: Attempt up to 3 SIGWINCH refreshes with increasing delays if screen is blank
+      let screen = this.getScreen();
+      let strippedScreen = '';
+      let normalizedScreen = '';
+      const refreshDelays = [1500, 3000, 5000];
 
-      const screen = this.getScreen();
+      for (let attempt = 0; attempt < refreshDelays.length; attempt++) {
+        if (!screen) break;
+
+        strippedScreen = screen
+          .replace(
+            // eslint-disable-next-line no-control-regex
+            /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+            '',
+          )
+          .replace(/\n([ \t]*\n)+/g, '\n\n');
+
+        normalizedScreen = strippedScreen
+          .replace(/[\u2800-\u28FF]/g, '') // Braille patterns
+          .replace(/[|/-\\]/g, '') // Spinners
+          .replace(/\b\d+(\.\d+)?s\b/g, '') // Timers (seconds)
+          .replace(/\b\d+m(\s+\d+s)?\b/g, '') // Timers (minutes)
+          .replace(/\b\d+%\b/g, '') // Percentages
+          .replace(/\b\d+\/\d+\b/g, '') // Progress ratios (e.g. 1/10)
+          .replace(/\(\s*\)/g, '')
+          .trim();
+
+        // If screen is not blank, or we are not blocked, proceed immediately
+        if (normalizedScreen.length > 0 || this.pendingToolCalls.length === 0) {
+          break;
+        }
+
+        // Screen is blank and we are blocked: Try a patient refresh
+        debugLogger.log(
+          `[SIMULATOR] Screen blank and BLOCKED. Attempting SIGWINCH refresh ${attempt + 1}/${refreshDelays.length} with ${refreshDelays[attempt]}ms delay.`,
+        );
+        try {
+          process.kill(0, 'SIGWINCH');
+        } catch {
+          process.kill(process.pid, 'SIGWINCH');
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, refreshDelays[attempt]),
+        );
+        screen = this.getScreen();
+      }
+
       if (!screen) return;
-
-      const strippedScreen = screen
-        .replace(
-          // eslint-disable-next-line no-control-regex
-          /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
-          '',
-        )
-        .replace(/\n([ \t]*\n)+/g, '\n\n');
-
-      const normalizedScreen = strippedScreen
-        .replace(/[\u2800-\u28FF]/g, '') // Braille patterns
-        .replace(/[|/-\\]/g, '') // Spinners
-        .replace(/\b\d+(\.\d+)?s\b/g, '') // Timers (seconds)
-        .replace(/\b\d+m(\s+\d+s)?\b/g, '') // Timers (minutes)
-        .replace(/\b\d+%\b/g, '') // Percentages
-        .replace(/\b\d+\/\d+\b/g, '') // Progress ratios (e.g. 1/10)
-        .replace(/\(\s*\)/g, '')
-        .trim();
 
       // Create a composite key representing the full state (Vision + Internal State)
       const pendingIds = this.pendingToolCalls
@@ -157,11 +177,10 @@ export class UserSimulator {
         const lastAction = this.actionHistory[this.actionHistory.length - 1];
         if (lastAction && lastAction !== '<WAIT>') {
           this.consecutiveStallCount++;
-          
+
           // Increased limit to 10 for high-load environments.
           if (this.consecutiveStallCount >= 10) {
-            const errorMsg =
-              `[SIMULATOR] CRITICAL STALL DETECTED: Terminal state has not changed after ${this.consecutiveStallCount} consecutive inputs. Terminating to prevent loop.`;
+            const errorMsg = `[SIMULATOR] CRITICAL STALL DETECTED: Terminal state has not changed after ${this.consecutiveStallCount} consecutive inputs. Terminating to prevent loop.`;
             debugLogger.error(errorMsg);
             if (this.interactionsFile) {
               fs.appendFileSync(
@@ -174,12 +193,21 @@ export class UserSimulator {
             this.stop();
             process.exit(1);
           }
-          
+
           // RECOVERY: If screen is blank and we are stalled, try a terminal refresh.
-          if (normalizedScreen.length === 0 && this.pendingToolCalls.length > 0) {
-             debugLogger.log('[SIMULATOR] Screen is blank but system is BLOCKED. Sending SIGWINCH refresh.');
-             try { process.kill(0, 'SIGWINCH'); } catch (_e) { process.kill(process.pid, 'SIGWINCH'); }
-             return;
+          if (
+            normalizedScreen.length === 0 &&
+            this.pendingToolCalls.length > 0
+          ) {
+            debugLogger.log(
+              '[SIMULATOR] Screen is blank but system is BLOCKED. Sending SIGWINCH refresh.',
+            );
+            try {
+              process.kill(0, 'SIGWINCH');
+            } catch {
+              process.kill(process.pid, 'SIGWINCH');
+            }
+            return;
           }
         } else {
           // If it was a <WAIT> action or no action yet, we still want the 10s fallback for internal state sync
@@ -319,7 +347,9 @@ ${strippedScreen}
         if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
           cleanJson = cleanJson.substring(startIdx, endIdx + 1);
         } else {
-          cleanJson = cleanJson.replace(/^\`\`\`json\s*|\s*\`\`\`$/gm, '').trim();
+          cleanJson = cleanJson
+            .replace(/^\`\`\`json\s*|\s*\`\`\`$/gm, '')
+            .trim();
         }
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         parsedJson = JSON.parse(cleanJson) as SimulatorResponse;
