@@ -10,6 +10,7 @@ import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 /**
  * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -58,6 +59,33 @@ export async function render(
     reasons: Object.fromEntries(protectionReasons),
   });
 
+  // Fire-and-forget asynchronous calibration to track estimator drift
+  const performCalibration = (finalNodes: readonly ConcreteNode[], finalContents: Content[]) => {
+    void (async () => {
+      try {
+        const exactResp = await env.llmClient.countTokens({contents: finalContents});
+        const exactTokens = typeof exactResp.totalTokens === 'number' ? exactResp.totalTokens : 0;
+        const estimatedTokens = env.tokenCalculator.calculateConcreteListTokens(finalNodes);
+        
+        const delta = Math.abs(exactTokens - estimatedTokens);
+        const tolerance = Math.max(exactTokens, estimatedTokens) * 0.20; // 20% tolerance
+
+        tracer.logEvent('Render', 'Token Calibration Measurement', {
+          exactTokens,
+          estimatedTokens,
+          delta,
+          isWithinTolerance: delta <= tolerance,
+        });
+
+        if (delta > tolerance) {
+          debugLogger.log(`[Token Calibration] Large deviation detected: exact ${exactTokens} vs estimated ${estimatedTokens} (delta: ${delta})`);
+        }
+      } catch {
+        // Ignore API failures during background calibration
+      }
+    })();
+  };
+
   if (currentTokens <= maxTokens) {
     tracer.logEvent(
       'Render',
@@ -68,6 +96,7 @@ export async function render(
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
+    performCalibration(visibleNodes, contents);
     return { history: contents, didApplyManagement: false };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -83,13 +112,15 @@ export async function render(
   // Start from newest and count backwards
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
+    const priorTokens = rollingTokens;
     const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
     rollingTokens += nodeTokens;
-    if (rollingTokens > sidecar.config.budget.retainedTokens) {
+
+    // Loose Boundary Policy: Keep the node that crosses the boundary
+    if (priorTokens > sidecar.config.budget.retainedTokens) {
       agedOutNodes.add(node.id);
     }
   }
-
   const processedNodes = await orchestrator.executeTriggerSync(
     'gc_backstop',
     nodes,
@@ -113,5 +144,6 @@ export async function render(
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
+  performCalibration(visibleNodes, contents);
   return { history: contents, didApplyManagement: true };
 }
