@@ -136,11 +136,20 @@ export class KeychainService {
         return null;
       }
 
-      if (await this.isKeychainFunctional(keychainModule)) {
+      // Cap the functional probe so a non-responsive Secret Service (common on
+      // headless Linux: WSL/SSH/Docker without gnome-keyring or D-Bus) falls back
+      // to FileKeychain instead of hanging the CLI indefinitely.
+      const functional = await Promise.race([
+        this.isKeychainFunctional(keychainModule),
+        new Promise<false>((resolve) =>
+          setTimeout(() => resolve(false), 2000).unref(),
+        ),
+      ]);
+      if (functional) {
         return keychainModule;
       }
 
-      debugLogger.debug('Keychain functional verification failed');
+      debugLogger.debug('Keychain functional verification failed or timed out');
       return null;
     } catch (error) {
       // Avoid logging full error objects to prevent PII exposure.
