@@ -459,7 +459,7 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      // Verify ackService was called with the URL, not the file hash
+      // Verify ackService was called with the raw URL to avoid breaking changes
       expect(ackService.isAcknowledged).toHaveBeenCalledWith(
         expect.anything(),
         'RemoteAgent',
@@ -467,7 +467,6 @@ describe('AgentRegistry', () => {
       );
 
       // Also verify that the agent's metadata was updated to use the URL as hash
-      // Use getDefinition because registerAgent might have been called
       expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
         'https://example.com/card',
       );

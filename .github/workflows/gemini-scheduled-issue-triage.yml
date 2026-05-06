@@ -63,15 +63,15 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           NO_AREA_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body)"
+            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body)"
 
           echo '🔍 Finding issues missing kind labels...'
           NO_KIND_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body)"
+            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body)"
 
           echo '🏷️ Finding issues missing priority labels...'
           NO_PRIORITY_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body)"
+            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body)"
 
           echo '🔄 Merging and deduplicating issues...'
           ISSUES="$(echo "${NO_AREA_ISSUES}" "${NO_KIND_ISSUES}" "${NO_PRIORITY_ISSUES}" | jq -c -s 'add | unique_by(.number)')"

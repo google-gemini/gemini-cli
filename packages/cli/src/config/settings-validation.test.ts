@@ -13,6 +13,7 @@ import {
   settingsZodSchema,
 } from './settings-validation.js';
 import { z } from 'zod';
+import { type Settings } from './settingsSchema.js';
 
 describe('settings-validation', () => {
   describe('validateSettings', () => {
@@ -324,6 +325,90 @@ describe('settings-validation', () => {
 
       const result = validateSettings(validSettings);
       expect(result.success).toBe(true);
+    });
+
+    describe('type casting', () => {
+      it('should cast "true" and "false" strings to booleans', () => {
+        const settings = {
+          ui: {
+            autoThemeSwitching: 'true',
+            hideWindowTitle: 'false',
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(true);
+        const data = result.data as Settings;
+        expect(data.ui?.autoThemeSwitching).toBe(true);
+        expect(data.ui?.hideWindowTitle).toBe(false);
+      });
+
+      it('should cast boolean strings case-insensitively', () => {
+        const settings = {
+          ui: {
+            autoThemeSwitching: 'TRUE',
+            hideWindowTitle: 'fAlSe',
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(true);
+        const data = result.data as Settings;
+        expect(data.ui?.autoThemeSwitching).toBe(true);
+        expect(data.ui?.hideWindowTitle).toBe(false);
+      });
+
+      it('should cast numeric strings to numbers', () => {
+        const settings = {
+          model: {
+            maxSessionTurns: '42',
+            compressionThreshold: '0.5',
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(true);
+        const data = result.data as Settings;
+        expect(data.model?.maxSessionTurns).toBe(42);
+        expect(data.model?.compressionThreshold).toBe(0.5);
+      });
+
+      it('should reject invalid castable strings', () => {
+        const settings = {
+          ui: {
+            autoThemeSwitching: 'not-a-boolean',
+          },
+          model: {
+            maxSessionTurns: 'not-a-number',
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(false);
+        expect(result.error?.issues).toHaveLength(2);
+        expect(result.error?.issues[0].message).toContain(
+          'Expected boolean, received string',
+        );
+        expect(result.error?.issues[1].message).toContain(
+          'Expected number, received string',
+        );
+      });
+
+      it('should cast strings to booleans/numbers in shared definitions (refs)', () => {
+        const settings = {
+          mcpServers: {
+            'test-server': {
+              command: 'node',
+              trust: 'true', // from boolean ref
+            },
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(true);
+        const data = result.data as Settings;
+        expect(data.mcpServers?.['test-server'].trust).toBe(true);
+      });
     });
   });
 

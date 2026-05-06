@@ -646,7 +646,6 @@ export class ToolRegistry {
    */
   getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
-    const plansDir = this.config.storage.getPlansDir();
 
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();
@@ -690,6 +689,7 @@ export class ToolRegistry {
         isPlanMode &&
         (toolName === WRITE_FILE_TOOL_NAME || toolName === EDIT_TOOL_NAME)
       ) {
+        const plansDir = this.config.storage.getPlansDir();
         schema = {
           ...schema,
           description: `ONLY FOR PLANS: ${schema.description}. You are currently in Plan Mode and may ONLY use this tool to write or update plans (.md files) in the plans directory: ${plansDir}/. You cannot use this tool to modify source code directly.`,

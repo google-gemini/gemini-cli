@@ -47,6 +47,7 @@ function resolveProcessorOptions<T>(
 }
 
 export interface ContextProfile {
+  name: string;
   config: ContextManagementConfig;
   buildPipelines: (
     env: ContextEnvironment,
@@ -56,6 +57,10 @@ export interface ContextProfile {
     env: ContextEnvironment,
     config?: ContextManagementConfig,
   ) => AsyncPipelineDef[];
+  sentinels?: {
+    continuation?: string;
+    lostToolResponse?: string;
+  };
 }
 
 /**
@@ -63,10 +68,17 @@ export interface ContextProfile {
  * Optimized for safety, precision, and reliable summarization.
  */
 export const generalistProfile: ContextProfile = {
+  name: 'Generalist (Default)',
+  sentinels: {
+    continuation: '[Continuing from previous AI thoughts...]',
+    lostToolResponse:
+      'The tool execution result was lost due to context management truncation.',
+  },
   config: {
     budget: {
       retainedTokens: 65000,
       maxTokens: 150000,
+      coalescingThresholdTokens: 5000,
     },
   },
 
@@ -113,7 +125,7 @@ export const generalistProfile: ContextProfile = {
             'NodeTruncation',
             env,
             resolveProcessorOptions(config, 'NodeTruncation', {
-              maxTokensPerNode: 2000,
+              maxTokensPerNode: 4000,
             }),
           ),
         ],
@@ -158,6 +170,7 @@ export const generalistProfile: ContextProfile = {
  * within a few conversational turns.
  */
 export const stressTestProfile: ContextProfile = {
+  name: 'Stress Test',
   config: {
     budget: {
       retainedTokens: 4000,
