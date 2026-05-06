@@ -304,6 +304,57 @@ describe('GitService', () => {
       );
       expect(systemConfigContent).toBe('');
     });
+
+    it('should preserve system PATH and other env vars in the Git environment', async () => {
+      const customPath = '/custom/bin';
+      vi.stubEnv('PATH', customPath);
+      vi.stubEnv('OTHER_VAR', 'other-value');
+
+      try {
+        hoistedMockCheckIsRepo.mockResolvedValue(false);
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            PATH: customPath,
+            OTHER_VAR: 'other-value',
+            GIT_CONFIG_GLOBAL: expect.any(String),
+            GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+          }),
+        );
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should override GIT_CONFIG environment variables from process.env', async () => {
+      vi.stubEnv('GIT_CONFIG_GLOBAL', '/user/global/config');
+      vi.stubEnv('GIT_CONFIG_SYSTEM', '/user/system/config');
+
+      try {
+        hoistedMockCheckIsRepo.mockResolvedValue(false);
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const expectedConfigPath = path.join(repoDir, '.gitconfig');
+        const expectedSystemPath = path.join(repoDir, '.gitconfig_system_empty');
+
+        expect(hoistedMockEnv).toHaveBeenCalledWith(
+          expect.objectContaining({
+            GIT_CONFIG_GLOBAL: expectedConfigPath,
+            GIT_CONFIG_SYSTEM: expectedSystemPath,
+          }),
+        );
+
+        // Ensure it's not using the values from stubbed process.env
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.GIT_CONFIG_GLOBAL).not.toBe('/user/global/config');
+        expect(callArgs.GIT_CONFIG_SYSTEM).not.toBe('/user/system/config');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 
   describe('createFileSnapshot', () => {
