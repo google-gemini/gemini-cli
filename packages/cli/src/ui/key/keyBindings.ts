@@ -77,6 +77,7 @@ export enum Command {
   QUEUE_MESSAGE = 'input.queueMessage',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
+  DEPRECATED_OPEN_EXTERNAL_EDITOR = 'input.deprecatedOpenExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
   // App Controls
@@ -96,6 +97,7 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
   SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+  VOICE_MODE_PTT = 'app.voiceModePTT',
 
   // Background Shell Controls
   BACKGROUND_SHELL_ESCAPE = 'background.escape',
@@ -310,15 +312,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     Command.DELETE_CHAR_RIGHT,
     [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
   ],
-  [Command.UNDO, [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]],
-  [
-    Command.REDO,
-    [
-      new KeyBinding('ctrl+shift+z'),
-      new KeyBinding('cmd+shift+z'),
-      new KeyBinding('alt+shift+z'),
-    ],
-  ],
+  [Command.UNDO, getPlatformUndoBindings(process.platform)],
+  [Command.REDO, getPlatformRedoBindings(process.platform)],
 
   // Scrolling
   [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
@@ -375,7 +370,11 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [
+    Command.OPEN_EXTERNAL_EDITOR,
+    [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
+  ],
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -388,7 +387,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // App Controls
   [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
   [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
-  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
+  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('f4')]],
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
   [Command.TOGGLE_COPY_MODE, [new KeyBinding('f9')]],
   [Command.TOGGLE_MOUSE_MODE, [new KeyBinding('ctrl+s')]],
@@ -402,9 +401,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
-  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
-  [Command.START_RECORDING, [new KeyBinding('f6')]],
-  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
+  [Command.VOICE_MODE_PTT, [new KeyBinding('space')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -419,6 +416,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Extension Controls
   [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
   [Command.LINK_EXTENSION, [new KeyBinding('l')]],
+
+  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
+  [Command.START_RECORDING, [new KeyBinding('f6')]],
+  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
 ]);
 
 interface CommandCategory {
@@ -510,6 +511,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.QUEUE_MESSAGE,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
+      Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
     ],
   },
@@ -532,6 +534,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.RESTART_APP,
       Command.SUSPEND_APP,
       Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
+      Command.VOICE_MODE_PTT,
     ],
   },
   {
@@ -626,10 +629,13 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR]:
+    'Deprecated command to open external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
-  [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
+  [Command.SHOW_ERROR_DETAILS]:
+    'Toggle the debug console for detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
@@ -649,6 +655,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from shell input.',
+  [Command.VOICE_MODE_PTT]: 'Hold to speak in Voice Mode.',
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
@@ -767,4 +774,34 @@ export async function loadCustomKeybindings(): Promise<{
   }
 
   return { config, errors };
+}
+
+export function getPlatformUndoBindings(
+  platform: string,
+): readonly KeyBinding[] {
+  if (platform === 'win32') {
+    return [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')];
+  }
+  if (platform === 'darwin') {
+    return [new KeyBinding('cmd+z'), new KeyBinding('alt+z')];
+  }
+  // Linux / WSL: Promote Alt+Z to avoid Windows interception,
+  // but keep Ctrl+Z for smart bubbling.
+  return [
+    new KeyBinding('alt+z'),
+    new KeyBinding('cmd+z'),
+    new KeyBinding('ctrl+z'),
+  ];
+}
+
+export function getPlatformRedoBindings(
+  _platform: string,
+): readonly KeyBinding[] {
+  // Use a stable order for all platforms to minimize churn.
+  // Ctrl+Shift+Z is the universal primary.
+  return [
+    new KeyBinding('ctrl+shift+z'),
+    new KeyBinding('cmd+shift+z'),
+    new KeyBinding('alt+shift+z'),
+  ];
 }

@@ -23,9 +23,11 @@ import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useQuotaState } from '../contexts/QuotaContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import {
   ALL_ITEMS,
   type FooterItemId,
@@ -173,6 +175,8 @@ interface FooterColumn {
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
+  const quotaState = useQuotaState();
+  const { copyModeEnabled } = useInputState();
   const config = useConfig();
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
@@ -201,7 +205,6 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     isTrustedFolder,
     terminalWidth,
-    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -214,8 +217,9 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
-    quotaStats: uiState.quota.stats,
   };
+
+  const quotaStats = quotaState.stats;
 
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
   const showErrorSummary =
@@ -349,13 +353,11 @@ export const Footer: React.FC = () => {
               <QuotaDisplay
                 remaining={quotaStats.remaining}
                 limit={quotaStats.limit}
-                resetTime={quotaStats.resetTime}
-                terse={true}
                 forceShow={true}
                 lowercase={true}
               />
             ),
-            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
+            9, // "100% used" is 9 chars
           );
         }
         break;
@@ -365,10 +367,7 @@ export const Footer: React.FC = () => {
           id,
           header,
           () => (
-            <MemoryUsageDisplay
-              color={itemColor}
-              isActive={!uiState.copyModeEnabled}
-            />
+            <MemoryUsageDisplay color={itemColor} isActive={!copyModeEnabled} />
           ),
           10,
         );

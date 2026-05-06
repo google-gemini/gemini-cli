@@ -348,4 +348,66 @@ describe('MessageBus', () => {
       );
     });
   });
+
+  describe('subscribe with AbortSignal', () => {
+    it('should remove listener when signal is aborted', async () => {
+      const handler = vi.fn();
+      const controller = new AbortController();
+
+      messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler, {
+        signal: controller.signal,
+      });
+
+      const message: ToolExecutionSuccess<string> = {
+        type: MessageBusType.TOOL_EXECUTION_SUCCESS as const,
+        toolCall: { name: 'test' },
+        result: 'test',
+      };
+
+      controller.abort();
+
+      await messageBus.publish(message);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should not add listener if signal is already aborted', async () => {
+      const handler = vi.fn();
+      const controller = new AbortController();
+      controller.abort();
+
+      messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler, {
+        signal: controller.signal,
+      });
+
+      const message: ToolExecutionSuccess<string> = {
+        type: MessageBusType.TOOL_EXECUTION_SUCCESS as const,
+        toolCall: { name: 'test' },
+        result: 'test',
+      };
+
+      await messageBus.publish(message);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should remove abort listener when unsubscribe is called', async () => {
+      const handler = vi.fn();
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      const removeEventListenerSpy = vi.spyOn(signal, 'removeEventListener');
+
+      messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler, {
+        signal,
+      });
+
+      messageBus.unsubscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler);
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'abort',
+        expect.any(Function),
+      );
+    });
+  });
 });

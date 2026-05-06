@@ -16,6 +16,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
@@ -104,7 +105,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(): Promise<ToolResult> {
+  async execute(_options: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(
       this.resolvedPath,
       'read',

@@ -14,7 +14,6 @@ import {
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
-  type ToolLiveOutput,
   type ToolResult,
   type ExecuteOptions,
 } from '../tools/tools.js';
@@ -27,6 +26,7 @@ interface MockToolOptions {
   description?: string;
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
+  kind?: Kind;
   shouldConfirmExecute?: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
@@ -53,11 +53,8 @@ class MockToolInvocation extends BaseToolInvocation<
     super(params, messageBus, tool.name, tool.displayName);
   }
 
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<ToolResult> {
+  execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     return this.tool.execute(
       this.params,
       signal,
@@ -101,7 +98,7 @@ export class MockTool extends BaseDeclarativeTool<
       options.name,
       options.displayName ?? options.name,
       options.description ?? options.name,
-      Kind.Other,
+      options.kind ?? Kind.Other,
       options.params,
       options.messageBus ?? createMockMessageBus(),
       options.isOutputMarkdown ?? false,
@@ -157,11 +154,10 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
     super(params, messageBus, tool.name, tool.displayName);
   }
 
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: ToolLiveOutput) => void,
-    _options?: ExecuteOptions,
-  ): Promise<ToolResult> {
+  async execute({
+    abortSignal: _signal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
     const result = this.tool.executeFn(this.params);
     return (
       result ?? {

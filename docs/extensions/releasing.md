@@ -98,7 +98,7 @@ Use these values for the placeholders:
 **Examples:**
 
 - `darwin.arm64.my-tool.tar.gz` (specific to Apple Silicon Macs)
-- `darwin.my-tool.tar.gz` (fallback for all Macs, e.g. Intel)
+- `darwin.my-tool.tar.gz` (fallback for all Macs, for example Intel)
 - `linux.x64.my-tool.tar.gz`
 - `win32.my-tool.zip`
 
@@ -155,9 +155,10 @@ jobs:
 
 ## Migrating an Extension Repository
 
-If you need to move your extension to a new repository (e.g., from a personal
-account to an organization) or rename it, you can use the `migratedTo` property
-in your `gemini-extension.json` file to seamlessly transition your users.
+If you need to move your extension to a new repository (for example, from a
+personal account to an organization) or rename it, you can use the `migratedTo`
+property in your `gemini-extension.json` file to seamlessly transition your
+users.
 
 1. **Create the new repository**: Setup your extension in its new location.
 2. **Update the old repository**: In your original repository, update the
@@ -173,7 +174,7 @@ in your `gemini-extension.json` file to seamlessly transition your users.
    ```
 3. **Release the update**: Publish this new version in your old repository.
 
-When users check for updates, the Gemini CLI will detect the `migratedTo` field,
+When users check for updates, Gemini CLI will detect the `migratedTo` field,
 verify that the new repository contains a valid extension update, and
 automatically update their local installation to track the new source and name
 moving forward. All extension settings will automatically migrate to the new

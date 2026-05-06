@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
-import { ToolCallDecision } from '@google/gemini-cli-core';
+import { ToolCallDecision, LlmRole } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -128,6 +128,66 @@ describe('<StatsDisplay />', () => {
     expect(output).toContain('Input Tokens');
     expect(output).toContain('Cache Reads');
     expect(output).toContain('Output Tokens');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('renders role breakdown correctly under models', async () => {
+    const metrics = createTestMetrics({
+      models: {
+        'gemini-2.5-flash': {
+          api: { totalRequests: 10, totalErrors: 0, totalLatencyMs: 10000 },
+          tokens: {
+            input: 1000,
+            prompt: 1200,
+            candidates: 2000,
+            total: 3200,
+            cached: 200,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [LlmRole.MAIN]: {
+              totalRequests: 7,
+              totalErrors: 0,
+              totalLatencyMs: 7000,
+              tokens: {
+                input: 800,
+                prompt: 900,
+                candidates: 1500,
+                total: 2400,
+                cached: 100,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+            [LlmRole.UTILITY_TOOL]: {
+              totalRequests: 3,
+              totalErrors: 0,
+              totalLatencyMs: 3000,
+              tokens: {
+                input: 200,
+                prompt: 300,
+                candidates: 500,
+                total: 800,
+                cached: 100,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const { lastFrame } = await renderWithMockedStats(metrics);
+    const output = lastFrame();
+
+    expect(output).toContain('gemini-2.5-flash');
+    expect(output).toContain('10'); // Total requests
+    expect(output).toContain('↳ main');
+    expect(output).toContain('7'); // main requests
+    expect(output).toContain('↳ utility_tool');
+    expect(output).toContain('3'); // tool requests
     expect(output).toMatchSnapshot();
   });
 

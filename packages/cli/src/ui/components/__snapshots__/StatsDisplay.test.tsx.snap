@@ -263,3 +263,32 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
+
+exports[`<StatsDisplay /> > renders role breakdown correctly under models 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Session Stats                                                                                   │
+│                                                                                                  │
+│  Interaction Summary                                                                             │
+│  Session ID:                 test-session-id                                                     │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
+│  Success Rate:               0.0%                                                                │
+│                                                                                                  │
+│  Performance                                                                                     │
+│  Wall Time:                  1s                                                                  │
+│  Agent Active:               10.0s                                                               │
+│    » API Time:               10.0s (100.0%)                                                      │
+│    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Use /model to view model quota information                                                      │
+│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-flash                  10         1,200           200         2,000                  │
+│    ↳ main                           7           900           100         1,500                  │
+│    ↳ utility_tool                   3           300           100           500                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

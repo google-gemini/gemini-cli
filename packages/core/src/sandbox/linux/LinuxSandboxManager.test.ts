@@ -131,6 +131,25 @@ describe('LinuxSandboxManager', () => {
       );
     });
 
+    it('allows virtual commands targeting includeDirectories', async () => {
+      const includeDir = '/opt/tools';
+      const testFile = path.join(includeDir, 'tool.sh');
+      const customManager = new LinuxSandboxManager({
+        workspace,
+        includeDirectories: [includeDir],
+      });
+
+      const result = await customManager.prepareCommand({
+        command: '__read',
+        args: [testFile],
+        cwd: workspace,
+        env: {},
+      });
+
+      expect(result.args[result.args.length - 2]).toBe('/bin/cat');
+      expect(result.args[result.args.length - 1]).toBe(testFile);
+    });
+
     it('rejects overrides in plan mode', async () => {
       const customManager = new LinuxSandboxManager({
         workspace,

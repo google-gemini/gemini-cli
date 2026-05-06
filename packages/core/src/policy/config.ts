@@ -74,7 +74,9 @@ export const ADMIN_POLICY_TIER = 5;
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
+export const CONFIRMATION_REQUIRED_PRIORITY = USER_POLICY_TIER + 0.35;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
+export const CORE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.25;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
 export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
@@ -398,9 +400,10 @@ export async function createPolicyEngineConfig(
   // TOML policy priorities (before transformation):
   //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
   //   15: Auto-edit tool override (becomes 1.015 in default tier)
+  //   30: Unknown subagents (blocked by Plan Mode's 40)
+  //   40: Plan mode catch-all DENY override (becomes 1.040 in default tier)
   //   50: Read-only tools (becomes 1.050 in default tier)
-  //   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
-  //   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
+  //   70: Mode transition overrides (becomes 1.070 in default tier)
   //   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
   // MCP servers that are explicitly excluded in settings.mcp.excluded
@@ -433,10 +436,21 @@ export async function createPolicyEngineConfig(
     }
   }
 
-  // Tools that are explicitly allowed in the settings.
-  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
-  if (settings.tools?.allowed) {
-    for (const tool of settings.tools.allowed) {
+  const nonPlanModes = [
+    ApprovalMode.DEFAULT,
+    ApprovalMode.AUTO_EDIT,
+    ApprovalMode.YOLO,
+  ];
+
+  const mapToolsToRules = (
+    tools: string[],
+    priority: number,
+    source: string,
+    modes?: ApprovalMode[],
+    addDefaultDenyForTools = false,
+  ) => {
+    const toolsWithNarrowing = new Set<string>();
+    for (const tool of tools) {
       // Check for legacy format: toolName(args)
       const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
       if (match) {
@@ -448,15 +462,17 @@ export async function createPolicyEngineConfig(
 
         // Treat args as a command prefix for shell tool
         if (toolName === SHELL_TOOL_NAME) {
+          toolsWithNarrowing.add(toolName);
           const patterns = buildArgsPatterns(undefined, args);
           for (const pattern of patterns) {
             if (pattern) {
               rules.push({
                 toolName,
                 decision: PolicyDecision.ALLOW,
-                priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+                priority,
                 argsPattern: new RegExp(pattern),
-                source: 'Settings (Tools Allowed)',
+                source,
+                modes,
               });
             }
           }
@@ -466,8 +482,9 @@ export async function createPolicyEngineConfig(
           rules.push({
             toolName,
             decision: PolicyDecision.ALLOW,
-            priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-            source: 'Settings (Tools Allowed)',
+            priority,
+            source,
+            modes,
           });
         }
       } else {
@@ -478,11 +495,70 @@ export async function createPolicyEngineConfig(
         rules.push({
           toolName,
           decision: PolicyDecision.ALLOW,
-          priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-          source: 'Settings (Tools Allowed)',
+          priority,
+          source,
+          modes,
         });
       }
     }
+
+    if (addDefaultDenyForTools) {
+      for (const toolName of toolsWithNarrowing) {
+        rules.push({
+          toolName,
+          decision: PolicyDecision.DENY,
+          priority: priority - 0.01,
+          source: `${source} (Narrowing Enforcement)`,
+          modes,
+        });
+      }
+    }
+  };
+
+  // Tools that are explicitly allowed in the settings.
+  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
+  if (settings.tools?.allowed) {
+    mapToolsToRules(
+      settings.tools.allowed,
+      ALLOWED_TOOLS_FLAG_PRIORITY,
+      'Settings (Tools Allowed)',
+      undefined,
+      true,
+    );
+  }
+
+  // Tools that explicitly require confirmation in the settings.
+  // Priority: CONFIRMATION_REQUIRED_PRIORITY (overrides allowed and core)
+  if (settings.tools?.confirmationRequired) {
+    for (const tool of settings.tools.confirmationRequired) {
+      rules.push({
+        toolName: SHELL_TOOL_NAMES.includes(tool) ? SHELL_TOOL_NAME : tool,
+        decision: PolicyDecision.ASK_USER,
+        priority: CONFIRMATION_REQUIRED_PRIORITY,
+        source: 'Settings (Confirmation Required)',
+      });
+    }
+  }
+
+  // Core tools that are restricted in the settings.
+  // Priority: CORE_TOOLS_FLAG_PRIORITY (user tier - core tool allowlist)
+  if (settings.tools?.core) {
+    mapToolsToRules(
+      settings.tools.core,
+      CORE_TOOLS_FLAG_PRIORITY,
+      'Settings (Core Tools)',
+      nonPlanModes,
+    );
+
+    // If core tools are restricted, we should add a default DENY rule for everything else
+    // at a slightly lower priority than the explicit allows.
+    rules.push({
+      toolName: '*',
+      decision: PolicyDecision.DENY,
+      priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
+      source: 'Settings (Core Tools Allowlist Enforcement)',
+      modes: nonPlanModes,
+    });
   }
 
   // MCP servers that are trusted in the settings.
@@ -500,6 +576,7 @@ export async function createPolicyEngineConfig(
           decision: PolicyDecision.ALLOW,
           priority: TRUSTED_MCP_SERVER_PRIORITY,
           source: 'Settings (MCP Trusted)',
+          modes: nonPlanModes,
         });
       }
     }
@@ -518,6 +595,7 @@ export async function createPolicyEngineConfig(
         decision: PolicyDecision.ALLOW,
         priority: ALLOWED_MCP_SERVER_PRIORITY,
         source: 'Settings (MCP Allowed)',
+        modes: nonPlanModes,
       });
     }
   }

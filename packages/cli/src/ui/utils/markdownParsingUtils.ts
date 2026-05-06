@@ -12,6 +12,7 @@ import {
 } from '../themes/color-utils.js';
 import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { convertLatexToUnicode } from './latexToUnicode.js';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -72,11 +73,49 @@ const ansiColorize = (str: string, color: string | undefined): string => {
  * Converts markdown text into a string with ANSI escape codes.
  * This mirrors the parsing logic in InlineMarkdownRenderer.tsx
  */
+// Private-Use-Area codepoint used as a placeholder sentinel when masking
+// inline code / URL spans from LaTeX conversion. Not touched by
+// stripUnsafeCharacters and not matched by the markdown tokenizer.
+const MASK_SENTINEL = '\uE000';
+const MASK_PATTERN = /\uE000(\d+)\uE000/g;
+
+/**
+ * Runs LaTeX conversion on `text` while keeping inline code spans and bare
+ * URLs verbatim. Without masking, the LaTeX pass would happily rewrite
+ * ``$\to$`` inside a backtick code span — violating the "code is verbatim"
+ * contract — and could rewrite URL query strings containing `$`.
+ */
+const convertLatexPreservingSpans = (text: string): string => {
+  const preserved: string[] = [];
+  // Match inline code spans (with matched backtick counts) and bare URLs.
+  // Order matters: code spans first so they win over a URL inside a span.
+  const masked = text.replace(/(`+)([^`\n]+?)\1|https?:\/\/\S+/g, (match) => {
+    const index = preserved.push(match) - 1;
+    return `${MASK_SENTINEL}${index}${MASK_SENTINEL}`;
+  });
+  const converted = convertLatexToUnicode(masked);
+  return converted.replace(
+    MASK_PATTERN,
+    // Fallback to the literal match if the index is somehow out of range —
+    // defensive against the unlikely case where the PUA sentinel appears in
+    // user input. Without the fallback, replace would emit "undefined".
+    (match, i: string) => preserved[Number(i)] ?? match,
+  );
+};
+
 export const parseMarkdownToANSI = (
-  text: string,
+  rawText: string,
   defaultColor?: string,
 ): string => {
   const baseColor = defaultColor ?? theme.text.primary;
+  // Convert LaTeX-style math/commands to Unicode BEFORE tokenizing markdown,
+  // so constructs like `$\{P_0, \dots, P_n\}$` are handled as a whole even
+  // when they contain underscores (which the tokenizer would otherwise treat
+  // as italic markers). Inline code and URLs are masked during the
+  // conversion so their contents are preserved verbatim. Unknown `\foo`
+  // sequences are left alone, so Windows paths and regex escapes survive.
+  // See issue #25656.
+  const text = convertLatexPreservingSpans(rawText);
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
     return ansiColorize(text, baseColor);

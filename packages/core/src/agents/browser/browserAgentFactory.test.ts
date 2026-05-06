@@ -38,6 +38,8 @@ const mockBrowserManager = {
   ]),
   callTool: vi.fn().mockResolvedValue({ content: [] }),
   close: vi.fn().mockResolvedValue(undefined),
+  acquire: vi.fn(),
+  release: vi.fn(),
 };
 
 // Mock dependencies

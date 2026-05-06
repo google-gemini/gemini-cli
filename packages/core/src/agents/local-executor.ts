@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
   type Content,
@@ -19,6 +20,7 @@ import { ResourceRegistry } from '../resources/resource-registry.js';
 import {
   type AnyDeclarativeTool,
   ToolConfirmationOutcome,
+  Kind,
 } from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
@@ -75,12 +77,15 @@ import {
 import type { InjectionSource } from '../config/injectionService.js';
 import {
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
 import {
   COMPLETE_TASK_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
 
 /** A callback function to report on agent activity. */
@@ -113,7 +118,7 @@ export function createUnauthorizedToolError(toolName: string): string {
 export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   readonly definition: LocalAgentDefinition<TOutput>;
 
-  private readonly agentId: string;
+  readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly promptRegistry: PromptRegistry;
   private readonly resourceRegistry: ResourceRegistry;
@@ -180,17 +185,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const parentToolRegistry = context.toolRegistry;
-    const allAgentNames = new Set(
-      context.config.getAgentRegistry().getAllAgentNames(),
-    );
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
-      // Check if the tool is a subagent to prevent recursion.
+      // Check if the tool is an agent tool to prevent recursion.
       // We do not allow agents to call other agents.
-      if (allAgentNames.has(tool.name)) {
-        debugLogger.warn(
-          `[LocalAgentExecutor] Skipping subagent tool '${tool.name}' for agent '${definition.name}' to prevent recursion.`,
-        );
+      if (tool.kind === Kind.Agent) {
+        return;
+      }
+
+      if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
         return;
       }
 
@@ -528,21 +531,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
-    // If the agent definition declares additional workspace directories,
-    // wrap execution in a scoped workspace context. All calls to
-    // Config.getWorkspaceContext() within this scope will see the extended
-    // directories, without mutating the shared Config.
-    const dirs = this.definition.workspaceDirectories;
-    if (dirs && dirs.length > 0) {
-      const scopedCtx = createScopedWorkspaceContext(
-        this.context.config.getWorkspaceContext(),
-        dirs,
-      );
-      return runWithScopedWorkspaceContext(scopedCtx, () =>
-        this.runInternal(inputs, signal),
-      );
+    const runWithWorkspaceScope = () => {
+      // If the agent definition declares additional workspace directories,
+      // wrap execution in a scoped workspace context. All calls to
+      // Config.getWorkspaceContext() within this scope will see the extended
+      // directories, without mutating the shared Config.
+      const dirs = this.definition.workspaceDirectories;
+      if (dirs && dirs.length > 0) {
+        const scopedCtx = createScopedWorkspaceContext(
+          this.context.config.getWorkspaceContext(),
+          dirs,
+        );
+        return runWithScopedWorkspaceContext(scopedCtx, () =>
+          this.runInternal(inputs, signal),
+        );
+      }
+      return this.runInternal(inputs, signal);
+    };
+
+    const runWithInboxScope = () =>
+      this.definition.memoryInboxAccess
+        ? runWithScopedMemoryInboxAccess(runWithWorkspaceScope)
+        : runWithWorkspaceScope();
+
+    if (this.definition.autoMemoryExtractionWriteAccess) {
+      return runWithScopedAutoMemoryExtractionWriteAccess(runWithInboxScope);
     }
-    return this.runInternal(inputs, signal);
+
+    return runWithInboxScope();
   }
 
   private async runInternal(
@@ -779,6 +795,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -786,6 +804,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        duration_ms: Date.now() - startTime,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -826,6 +846,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              duration_ms: Date.now() - startTime,
             };
           }
         }
@@ -840,6 +862,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -1026,15 +1050,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
         undefined,
         undefined,
-        'subagent',
       );
+      await chat.initialize(undefined, 'subagent');
+      return chat;
     } catch (e: unknown) {
       await reportError(
         e,
@@ -1345,6 +1370,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
+
+    const approvalMode = this.context.config.getApprovalMode();
+    if (approvalMode === ApprovalMode.PLAN) {
+      const plansDir = this.context.config.storage.getPlansDir();
+      finalPrompt += `\n\n# Execution Constraints\nYou are currently operating in Plan Mode. Your write tools are globally restricted to only modifying plan (.md) files in the plans directory: ${plansDir}/. Do not attempt to modify source code directly.`;
+    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `

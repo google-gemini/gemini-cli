@@ -11,6 +11,8 @@ describe('generalist_delegation', () => {
   // --- Positive Evals (Should Delegate) ---
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate batch error fixing to generalist agent',
     configOverrides: {
       agents: {
@@ -54,6 +56,8 @@ describe('generalist_delegation', () => {
   });
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should autonomously delegate complex batch task to generalist agent',
     configOverrides: {
       agents: {
@@ -94,6 +98,8 @@ describe('generalist_delegation', () => {
   // --- Negative Evals (Should NOT Delegate - Assertive Handling) ---
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT delegate simple read and fix to generalist agent',
     configOverrides: {
       agents: {
@@ -128,6 +134,8 @@ describe('generalist_delegation', () => {
   });
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT delegate simple direct question to generalist agent',
     configOverrides: {
       agents: {

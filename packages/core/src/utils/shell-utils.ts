@@ -240,11 +240,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +364,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -847,34 +859,40 @@ export const spawnAsync = async (
 
   const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(finalCommand, finalArgs, {
-      ...options,
-      env: finalEnv,
-    });
-    let stdout = '';
-    let stderr = '';
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(finalCommand, finalArgs, {
+        ...options,
+        env: finalEnv,
+      });
+      let stdout = '';
+      let stderr = '';
 
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
-      }
-    });
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          reject(
+            new Error(`Command failed with exit code ${code}:\n${stderr}`),
+          );
+        }
+      });
 
-    child.on('error', (err) => {
-      reject(err);
+      child.on('error', (err) => {
+        reject(err);
+      });
     });
-  });
+  } finally {
+    prepared.cleanup?.();
+  }
 };
 
 /**
@@ -902,109 +920,231 @@ export async function* execStreaming(
     env: options?.env ?? process.env,
   });
 
-  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
-
-  const child = spawn(finalCommand, finalArgs, {
-    ...options,
-    env: finalEnv,
-    // ensure we don't open a window on windows if possible/relevant
-    windowsHide: true,
-  });
-
-  const rl = readline.createInterface({
-    input: child.stdout,
-    terminal: false,
-  });
-
-  const errorChunks: Buffer[] = [];
-  let stderrTotalBytes = 0;
-  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
-
-  child.stderr.on('data', (chunk) => {
-    if (stderrTotalBytes < MAX_STDERR_BYTES) {
-      errorChunks.push(chunk);
-      stderrTotalBytes += chunk.length;
-    }
-  });
-
-  let error: Error | null = null;
-  child.on('error', (err) => {
-    error = err;
-  });
-
-  const onAbort = () => {
-    // If manually aborted by signal, we kill immediately.
-    if (!child.killed) child.kill();
-  };
-
-  if (options?.signal?.aborted) {
-    onAbort();
-  } else {
-    options?.signal?.addEventListener('abort', onAbort);
-  }
-
-  let finished = false;
   try {
-    for await (const line of rl) {
-      if (options?.signal?.aborted) break;
-      yield line;
-    }
-    finished = true;
-  } finally {
-    rl.close();
-    options?.signal?.removeEventListener('abort', onAbort);
+    const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
 
-    // Ensure process is killed when the generator is closed (consumer breaks loop)
-    let killedByGenerator = false;
-    if (!finished && child.exitCode === null && !child.killed) {
-      try {
-        child.kill();
-      } catch {
-        // ignore error if process is already dead
+    const child = spawn(finalCommand, finalArgs, {
+      ...options,
+      env: finalEnv,
+      // ensure we don't open a window on windows if possible/relevant
+      windowsHide: true,
+    });
+
+    const rl = readline.createInterface({
+      input: child.stdout,
+      terminal: false,
+    });
+
+    const errorChunks: Buffer[] = [];
+    let stderrTotalBytes = 0;
+    const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+    child.stderr.on('data', (chunk) => {
+      if (stderrTotalBytes < MAX_STDERR_BYTES) {
+        errorChunks.push(chunk);
+        stderrTotalBytes += chunk.length;
       }
-      killedByGenerator = true;
+    });
+
+    let error: Error | null = null;
+    child.on('error', (err) => {
+      error = err;
+    });
+
+    const onAbort = () => {
+      // If manually aborted by signal, we kill immediately.
+      if (!child.killed) child.kill();
+    };
+
+    if (options?.signal?.aborted) {
+      onAbort();
+    } else {
+      options?.signal?.addEventListener('abort', onAbort);
     }
 
-    // Ensure we wait for the process to exit to check codes
-    await new Promise<void>((resolve, reject) => {
-      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
-      if (error) {
-        reject(error);
-        return;
+    let finished = false;
+    try {
+      for await (const line of rl) {
+        if (options?.signal?.aborted) break;
+        yield line;
+      }
+      finished = true;
+    } finally {
+      rl.close();
+      options?.signal?.removeEventListener('abort', onAbort);
+
+      // Ensure process is killed when the generator is closed (consumer breaks loop)
+      let killedByGenerator = false;
+      if (!finished && child.exitCode === null && !child.killed) {
+        try {
+          child.kill();
+        } catch {
+          // ignore error if process is already dead
+        }
+        killedByGenerator = true;
       }
 
-      function checkExit(code: number | null) {
-        // If we aborted or killed it manually, we treat it as success (stop waiting)
-        if (options?.signal?.aborted || killedByGenerator) {
-          resolve();
+      // Ensure we wait for the process to exit to check codes
+      await new Promise<void>((resolve, reject) => {
+        // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+        if (error) {
+          reject(error);
           return;
         }
 
-        const allowed = options?.allowedExitCodes ?? [0];
-        if (code !== null && allowed.includes(code)) {
-          resolve();
-        } else {
-          // If we have an accumulated error or explicit error event
-          if (error) reject(error);
-          else {
-            const stderr = Buffer.concat(errorChunks).toString('utf8');
-            const truncatedMsg =
-              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-            reject(
-              new Error(
-                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-              ),
-            );
+        function checkExit(code: number | null) {
+          // If we aborted or killed it manually, we treat it as success (stop waiting)
+          if (options?.signal?.aborted || killedByGenerator) {
+            resolve();
+            return;
+          }
+
+          const allowed = options?.allowedExitCodes ?? [0];
+          if (code !== null && allowed.includes(code)) {
+            resolve();
+          } else {
+            // If we have an accumulated error or explicit error event
+            if (error) reject(error);
+            else {
+              const stderr = Buffer.concat(errorChunks).toString('utf8');
+              const truncatedMsg =
+                stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+              reject(
+                new Error(
+                  `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+                ),
+              );
+            }
           }
         }
-      }
 
-      if (child.exitCode !== null) {
-        checkExit(child.exitCode);
-      } else {
-        child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
-      }
-    });
+        if (child.exitCode !== null) {
+          checkExit(child.exitCode);
+        } else {
+          child.on('close', (code) => checkExit(code));
+          child.on('error', (err) => {
+            reject(err);
+          });
+        }
+      });
+    }
+  } finally {
+    prepared.cleanup?.();
   }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

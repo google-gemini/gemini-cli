@@ -59,7 +59,7 @@
     <text x="72" y="240" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs"> quota</text>
     <text x="891" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="257" fill="#afafaf" textLength="540" lengthAdjust="spacingAndGlyphs"> Remaining usage on daily limit (not shown when unavailable)</text>
+    <text x="45" y="257" fill="#afafaf" textLength="540" lengthAdjust="spacingAndGlyphs"> Percentage of daily limit used (not shown when unavailable)</text>
     <text x="891" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="45" y="274" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
@@ -133,10 +133,10 @@
     <text x="27" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <rect x="45" y="629" width="198" height="17" fill="#001a00" />
     <text x="45" y="631" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">workspace (/directory)</text>
-    <text x="324" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">branch</text>
-    <text x="459" y="631" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
-    <text x="594" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
-    <text x="801" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/stats</text>
+    <text x="315" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">branch</text>
+    <text x="450" y="631" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
+    <text x="585" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
+    <text x="783" y="631" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs">quota</text>
     <text x="864" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -144,10 +144,10 @@
     <rect x="45" y="646" width="126" height="17" fill="#001a00" />
     <text x="45" y="648" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">~/project/path</text>
     <rect x="171" y="646" width="72" height="17" fill="#001a00" />
-    <text x="324" y="648" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
-    <text x="459" y="648" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
-    <text x="594" y="648" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
-    <text x="801" y="648" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">97%</text>
+    <text x="315" y="648" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
+    <text x="450" y="648" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
+    <text x="585" y="648" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
+    <text x="783" y="648" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs">42% used</text>
     <text x="864" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="665" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

@@ -10,10 +10,13 @@ import {
   runEval,
   prepareLogDir,
   symlinkNodeModules,
+  withEvalRetries,
+  prepareWorkspace,
+  type BaseEvalCase,
+  EVAL_MODEL,
 } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
 
 /**
  * Config overrides for evals, with tool-restriction fields explicitly
@@ -29,15 +32,13 @@ interface EvalConfigOverrides {
   allowedTools?: never;
   /** Restricting tools via mainAgentTools in evals is forbidden. */
   mainAgentTools?: never;
+
   [key: string]: unknown;
 }
 
-export interface AppEvalCase {
-  name: string;
+export interface AppEvalCase extends BaseEvalCase {
   configOverrides?: EvalConfigOverrides;
   prompt: string;
-  timeout?: number;
-  files?: Record<string, string>;
   setup?: (rig: AppRig) => Promise<void>;
   assert: (rig: AppRig, output: string) => Promise<void>;
 }
@@ -48,56 +49,55 @@ export interface AppEvalCase {
  */
 export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   const fn = async () => {
-    const rig = new AppRig({
-      configOverrides: {
-        model: DEFAULT_GEMINI_MODEL,
-        ...evalCase.configOverrides,
-      },
-    });
+    await withEvalRetries(evalCase.name, async () => {
+      const rig = new AppRig({
+        configOverrides: {
+          model: EVAL_MODEL,
+          ...evalCase.configOverrides,
+        },
+      });
 
-    const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
-    const logFile = path.join(logDir, `${sanitizedName}.log`);
+      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+      const logFile = path.join(logDir, `${sanitizedName}.log`);
 
-    try {
-      await rig.initialize();
+      try {
+        await rig.initialize();
 
-      const testDir = rig.getTestDir();
-      symlinkNodeModules(testDir);
+        const testDir = rig.getTestDir();
+        symlinkNodeModules(testDir);
 
-      // Setup initial files
-      if (evalCase.files) {
-        for (const [filePath, content] of Object.entries(evalCase.files)) {
-          const fullPath = path.join(testDir, filePath);
-          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-          fs.writeFileSync(fullPath, content);
+        // Setup initial files
+        if (evalCase.files) {
+          // Note: AppRig does not use a separate homeDir, so we use testDir twice
+          await prepareWorkspace(testDir, testDir, evalCase.files);
         }
+
+        // Run custom setup if provided (e.g. for breakpoints)
+        if (evalCase.setup) {
+          await evalCase.setup(rig);
+        }
+
+        // Render the app!
+        await rig.render();
+
+        // Wait for initial ready state
+        await rig.waitForIdle();
+
+        // Send the initial prompt
+        await rig.sendMessage(evalCase.prompt);
+
+        // Run assertion. Interaction-heavy tests can do their own waiting/steering here.
+        const output = rig.getStaticOutput();
+        await evalCase.assert(rig, output);
+      } finally {
+        const output = rig.getStaticOutput();
+        if (output) {
+          await fs.promises.writeFile(logFile, output);
+        }
+        await rig.unmount();
       }
-
-      // Run custom setup if provided (e.g. for breakpoints)
-      if (evalCase.setup) {
-        await evalCase.setup(rig);
-      }
-
-      // Render the app!
-      await rig.render();
-
-      // Wait for initial ready state
-      await rig.waitForIdle();
-
-      // Send the initial prompt
-      await rig.sendMessage(evalCase.prompt);
-
-      // Run assertion. Interaction-heavy tests can do their own waiting/steering here.
-      const output = rig.getStaticOutput();
-      await evalCase.assert(rig, output);
-    } finally {
-      const output = rig.getStaticOutput();
-      if (output) {
-        await fs.promises.writeFile(logFile, output);
-      }
-      await rig.unmount();
-    }
+    });
   };
 
-  runEval(policy, evalCase.name, fn, (evalCase.timeout ?? 60000) + 10000);
+  runEval(policy, evalCase, fn, (evalCase.timeout ?? 60000) + 10000);
 }

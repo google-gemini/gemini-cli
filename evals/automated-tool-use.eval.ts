@@ -14,6 +14,8 @@ describe('Automated tool use', () => {
    * a repro by guiding the agent into using the existing deficient script.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use automated tools (eslint --fix) to fix code style issues',
     files: {
       'package.json': JSON.stringify(
@@ -102,6 +104,8 @@ describe('Automated tool use', () => {
    * instead of trying to edit the files itself.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use automated tools (prettier --write) to fix formatting issues',
     files: {
       'package.json': JSON.stringify(

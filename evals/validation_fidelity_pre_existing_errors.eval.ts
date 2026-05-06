@@ -9,6 +9,8 @@ import { evalTest } from './test-helper.js';
 
 describe('validation_fidelity_pre_existing_errors', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should handle pre-existing project errors gracefully during validation',
     files: {
       'src/math.ts': `

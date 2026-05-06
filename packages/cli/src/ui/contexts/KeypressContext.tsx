@@ -41,6 +41,7 @@ const KEY_INFO_MAP: Record<
   string,
   { name: string; shift?: boolean; ctrl?: boolean }
 > = {
+  OM: { name: 'enter' },
   '[200~': { name: 'paste-start' },
   '[201~': { name: 'paste-end' },
   '[[A': { name: 'f1' },

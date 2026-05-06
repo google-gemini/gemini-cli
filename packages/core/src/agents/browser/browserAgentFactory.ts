@@ -32,11 +32,11 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { recordBrowserAgentToolDiscovery } from '../../telemetry/metrics.js';
 import {
-  recordBrowserAgentToolDiscovery,
-  recordBrowserAgentVisionStatus,
-  recordBrowserAgentCleanup,
-} from '../../telemetry/metrics.js';
+  logBrowserAgentVisionStatus,
+  logBrowserAgentCleanup,
+} from '../../telemetry/loggers.js';
 import {
   PolicyDecision,
   PRIORITY_SUBAGENT_TOOL,
@@ -81,207 +81,218 @@ export async function createBrowserAgentDefinition(
 
   // Get or create browser manager singleton for this session mode/profile
   const browserManager = BrowserManager.getInstance(config);
-  await browserManager.ensureConnection();
+  browserManager.acquire();
 
-  debugLogger.log('Browser connected with isolated MCP client.');
+  try {
+    await browserManager.ensureConnection();
 
-  // Determine if input blocker should be active (non-headless + enabled)
-  const shouldDisableInput = config.shouldDisableBrowserUserInput();
-  // Inject automation overlay and input blocker if not in headless mode
-  const browserConfig = config.getBrowserAgentConfig();
-  if (!browserConfig?.customConfig?.headless) {
-    debugLogger.log('Injecting automation overlay...');
-    await injectAutomationOverlay(browserManager);
-    if (shouldDisableInput) {
-      debugLogger.log('Injecting input blocker...');
-      await injectInputBlocker(browserManager);
-    }
-  }
+    debugLogger.log('Browser connected with isolated MCP client.');
 
-  // Create declarative tools from dynamically discovered MCP tools
-  // These tools dispatch to browserManager's isolated client
-  const mcpTools = await createMcpDeclarativeTools(
-    browserManager,
-    messageBus,
-    shouldDisableInput,
-    browserConfig.customConfig.blockFileUploads,
-  );
-  const availableToolNames = mcpTools.map((t) => t.name);
-
-  // Register high-priority policy rules for sensitive actions which is not
-  // able to be overwrite by YOLO mode.
-  const policyEngine = config.getPolicyEngine();
-
-  if (policyEngine) {
-    const existingRules = policyEngine.getRules();
-
-    const restrictedTools = ['fill', 'fill_form'];
-
-    // ASK_USER for upload_file and evaluate_script when sensitive action
-    // need confirmation.
-    if (browserConfig.customConfig.confirmSensitiveActions) {
-      restrictedTools.push('upload_file', 'evaluate_script');
-    }
-
-    for (const toolName of restrictedTools) {
-      const rule = generateAskUserRules(toolName);
-      if (!existingRules.some((r) => isRuleEqual(r, rule))) {
-        policyEngine.addRule(rule);
+    // Determine if input blocker should be active (non-headless + enabled)
+    const shouldDisableInput = config.shouldDisableBrowserUserInput();
+    // Inject automation overlay and input blocker if not in headless mode
+    const browserConfig = config.getBrowserAgentConfig();
+    if (!browserConfig?.customConfig?.headless) {
+      debugLogger.log('Injecting automation overlay...');
+      await injectAutomationOverlay(browserManager);
+      if (shouldDisableInput) {
+        debugLogger.log('Injecting input blocker...');
+        await injectInputBlocker(browserManager);
       }
     }
 
-    // Reduce noise for read-only tools in default mode
-    const readOnlyTools = (await browserManager.getDiscoveredTools())
-      .filter((t) => !!t.annotations?.readOnlyHint)
-      .map((t) => t.name);
-    const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
+    // Create declarative tools from dynamically discovered MCP tools
+    // These tools dispatch to browserManager's isolated client
+    const mcpTools = await createMcpDeclarativeTools(
+      browserManager,
+      messageBus,
+      shouldDisableInput,
+      browserConfig.customConfig.blockFileUploads,
+    );
+    const availableToolNames = mcpTools.map((t) => t.name);
 
-    for (const toolName of [...readOnlyTools, ...allowlistedReadonlyTools]) {
-      if (availableToolNames.includes(toolName)) {
-        const rule = generateAllowRules(toolName);
+    // Register high-priority policy rules for sensitive actions which is not
+    // able to be overwrite by YOLO mode.
+    const policyEngine = config.getPolicyEngine();
+
+    if (policyEngine) {
+      const existingRules = policyEngine.getRules();
+
+      const restrictedTools = ['fill', 'fill_form'];
+
+      // ASK_USER for upload_file and evaluate_script when sensitive action
+      // need confirmation.
+      if (browserConfig.customConfig.confirmSensitiveActions) {
+        restrictedTools.push('upload_file', 'evaluate_script');
+      }
+
+      for (const toolName of restrictedTools) {
+        const rule = generateAskUserRules(toolName);
         if (!existingRules.some((r) => isRuleEqual(r, rule))) {
           policyEngine.addRule(rule);
         }
       }
-    }
-  }
 
-  function generateAskUserRules(toolName: string): PolicyRule {
-    return {
-      toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
-      decision: PolicyDecision.ASK_USER,
-      priority: 999,
-      source: 'BrowserAgent (Sensitive Actions)',
-      mcpName: BROWSER_AGENT_NAME,
+      // Reduce noise for read-only tools in default mode
+      const readOnlyTools = (await browserManager.getDiscoveredTools())
+        .filter((t) => !!t.annotations?.readOnlyHint)
+        .map((t) => t.name);
+      const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
+
+      for (const toolName of [...readOnlyTools, ...allowlistedReadonlyTools]) {
+        if (availableToolNames.includes(toolName)) {
+          const rule = generateAllowRules(toolName);
+          if (!existingRules.some((r) => isRuleEqual(r, rule))) {
+            policyEngine.addRule(rule);
+          }
+        }
+      }
+    }
+
+    function generateAskUserRules(toolName: string): PolicyRule {
+      return {
+        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+        decision: PolicyDecision.ASK_USER,
+        priority: 999,
+        source: 'BrowserAgent (Sensitive Actions)',
+        mcpName: BROWSER_AGENT_NAME,
+      };
+    }
+
+    function generateAllowRules(toolName: string): PolicyRule {
+      return {
+        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+        decision: PolicyDecision.ALLOW,
+        priority: PRIORITY_SUBAGENT_TOOL,
+        source: 'BrowserAgent (Read-Only)',
+        mcpName: BROWSER_AGENT_NAME,
+      };
+    }
+
+    // Check if policy rule the same in all the attributes that we care about
+    function isRuleEqual(rule1: PolicyRule, rule2: PolicyRule) {
+      return (
+        rule1.toolName === rule2.toolName &&
+        rule1.decision === rule2.decision &&
+        rule1.priority === rule2.priority &&
+        rule1.mcpName === rule2.mcpName
+      );
+    }
+
+    // Validate required semantic tools are available
+    const requiredSemanticTools = [
+      'click',
+      'fill',
+      'navigate_page',
+      'take_snapshot',
+    ];
+    const missingSemanticTools = requiredSemanticTools.filter(
+      (t) => !availableToolNames.includes(t),
+    );
+
+    const rawSessionMode = browserConfig?.customConfig?.sessionMode;
+    const sessionMode =
+      rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+        ? rawSessionMode
+        : 'persistent';
+
+    recordBrowserAgentToolDiscovery(
+      config,
+      mcpTools.length,
+      missingSemanticTools,
+      sessionMode,
+    );
+
+    if (missingSemanticTools.length > 0) {
+      debugLogger.warn(
+        `Semantic tools missing (${missingSemanticTools.join(', ')}). ` +
+          'Some browser interactions may not work correctly.',
+      );
+    }
+
+    // Only click_at is strictly required — text input can use press_key or fill.
+    const requiredVisualTools = ['click_at'];
+    const missingVisualTools = requiredVisualTools.filter(
+      (t) => !availableToolNames.includes(t),
+    );
+
+    // Check whether vision can be enabled; returns structured type with code and message.
+    function getVisionDisabledReason(): VisionDisabledReason {
+      const browserConfig = config.getBrowserAgentConfig();
+      if (!browserConfig.customConfig.visualModel) {
+        return {
+          code: 'no_visual_model',
+          message: 'No visualModel configured.',
+        };
+      }
+      if (missingVisualTools.length > 0) {
+        return {
+          code: 'missing_visual_tools',
+          message:
+            `Visual tools missing (${missingVisualTools.join(', ')}). ` +
+            `The installed chrome-devtools-mcp version may be too old.`,
+        };
+      }
+      const authType = config.getContentGeneratorConfig()?.authType;
+      const blockedAuthTypes = new Set([
+        AuthType.LOGIN_WITH_GOOGLE,
+        AuthType.LEGACY_CLOUD_SHELL,
+        AuthType.COMPUTE_ADC,
+      ]);
+      if (authType && blockedAuthTypes.has(authType)) {
+        return {
+          code: 'blocked_auth_type',
+          message: 'Visual agent model not available for current auth type.',
+        };
+      }
+      return undefined;
+    }
+
+    const allTools: AnyDeclarativeTool[] = [...mcpTools];
+    const visionDisabledReason = getVisionDisabledReason();
+
+    logBrowserAgentVisionStatus(config, {
+      enabled: !visionDisabledReason,
+      disabled_reason: visionDisabledReason?.code,
+    });
+
+    if (visionDisabledReason) {
+      debugLogger.log(`Vision disabled: ${visionDisabledReason.message}`);
+    } else {
+      allTools.push(
+        createAnalyzeScreenshotTool(browserManager, config, messageBus),
+      );
+    }
+
+    debugLogger.log(
+      `Created ${allTools.length} tools for browser agent: ` +
+        allTools.map((t) => t.name).join(', '),
+    );
+
+    // Create configured definition with tools
+    // BrowserAgentDefinition is a factory function - call it with config
+    const baseDefinition = BrowserAgentDefinition(
+      config,
+      !visionDisabledReason,
+    );
+    const definition: LocalAgentDefinition<typeof BrowserTaskResultSchema> = {
+      ...baseDefinition,
+      toolConfig: {
+        tools: allTools,
+      },
     };
-  }
 
-  function generateAllowRules(toolName: string): PolicyRule {
     return {
-      toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
-      decision: PolicyDecision.ALLOW,
-      priority: PRIORITY_SUBAGENT_TOOL,
-      source: 'BrowserAgent (Read-Only)',
-      mcpName: BROWSER_AGENT_NAME,
+      definition,
+      browserManager,
+      visionEnabled: !visionDisabledReason,
+      sessionMode,
     };
+  } catch (error) {
+    // Release the browser manager if setup fails, so concurrent tasks can try again.
+    browserManager.release();
+    throw error;
   }
-
-  // Check if policy rule the same in all the attributes that we care about
-  function isRuleEqual(rule1: PolicyRule, rule2: PolicyRule) {
-    return (
-      rule1.toolName === rule2.toolName &&
-      rule1.decision === rule2.decision &&
-      rule1.priority === rule2.priority &&
-      rule1.mcpName === rule2.mcpName
-    );
-  }
-
-  // Validate required semantic tools are available
-  const requiredSemanticTools = [
-    'click',
-    'fill',
-    'navigate_page',
-    'take_snapshot',
-  ];
-  const missingSemanticTools = requiredSemanticTools.filter(
-    (t) => !availableToolNames.includes(t),
-  );
-
-  const rawSessionMode = browserConfig?.customConfig?.sessionMode;
-  const sessionMode =
-    rawSessionMode === 'isolated' || rawSessionMode === 'existing'
-      ? rawSessionMode
-      : 'persistent';
-
-  recordBrowserAgentToolDiscovery(
-    config,
-    mcpTools.length,
-    missingSemanticTools,
-    sessionMode,
-  );
-
-  if (missingSemanticTools.length > 0) {
-    debugLogger.warn(
-      `Semantic tools missing (${missingSemanticTools.join(', ')}). ` +
-        'Some browser interactions may not work correctly.',
-    );
-  }
-
-  // Only click_at is strictly required — text input can use press_key or fill.
-  const requiredVisualTools = ['click_at'];
-  const missingVisualTools = requiredVisualTools.filter(
-    (t) => !availableToolNames.includes(t),
-  );
-
-  // Check whether vision can be enabled; returns structured type with code and message.
-  function getVisionDisabledReason(): VisionDisabledReason {
-    const browserConfig = config.getBrowserAgentConfig();
-    if (!browserConfig.customConfig.visualModel) {
-      return {
-        code: 'no_visual_model',
-        message: 'No visualModel configured.',
-      };
-    }
-    if (missingVisualTools.length > 0) {
-      return {
-        code: 'missing_visual_tools',
-        message:
-          `Visual tools missing (${missingVisualTools.join(', ')}). ` +
-          `The installed chrome-devtools-mcp version may be too old.`,
-      };
-    }
-    const authType = config.getContentGeneratorConfig()?.authType;
-    const blockedAuthTypes = new Set([
-      AuthType.LOGIN_WITH_GOOGLE,
-      AuthType.LEGACY_CLOUD_SHELL,
-      AuthType.COMPUTE_ADC,
-    ]);
-    if (authType && blockedAuthTypes.has(authType)) {
-      return {
-        code: 'blocked_auth_type',
-        message: 'Visual agent model not available for current auth type.',
-      };
-    }
-    return undefined;
-  }
-
-  const allTools: AnyDeclarativeTool[] = [...mcpTools];
-  const visionDisabledReason = getVisionDisabledReason();
-
-  recordBrowserAgentVisionStatus(config, {
-    enabled: !visionDisabledReason,
-    disabled_reason: visionDisabledReason?.code,
-  });
-
-  if (visionDisabledReason) {
-    debugLogger.log(`Vision disabled: ${visionDisabledReason.message}`);
-  } else {
-    allTools.push(
-      createAnalyzeScreenshotTool(browserManager, config, messageBus),
-    );
-  }
-
-  debugLogger.log(
-    `Created ${allTools.length} tools for browser agent: ` +
-      allTools.map((t) => t.name).join(', '),
-  );
-
-  // Create configured definition with tools
-  // BrowserAgentDefinition is a factory function - call it with config
-  const baseDefinition = BrowserAgentDefinition(config, !visionDisabledReason);
-  const definition: LocalAgentDefinition<typeof BrowserTaskResultSchema> = {
-    ...baseDefinition,
-    toolConfig: {
-      tools: allTools,
-    },
-  };
-
-  return {
-    definition,
-    browserManager,
-    visionEnabled: !visionDisabledReason,
-    sessionMode,
-  };
 }
 
 /**
@@ -299,13 +310,13 @@ export async function cleanupBrowserAgent(
   const startMs = Date.now();
   try {
     await browserManager.close();
-    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+    logBrowserAgentCleanup(config, Date.now() - startMs, {
       session_mode: sessionMode,
       success: true,
     });
     debugLogger.log('Browser agent cleanup complete');
   } catch (error) {
-    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+    logBrowserAgentCleanup(config, Date.now() - startMs, {
       session_mode: sessionMode,
       success: false,
     });
