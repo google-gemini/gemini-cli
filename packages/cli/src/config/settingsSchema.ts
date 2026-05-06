@@ -994,6 +994,7 @@ const SETTINGS_SCHEMA = {
       vertexAi: {
         type: 'object',
         label: 'Vertex AI',
+
         category: 'Advanced',
         requiresRestart: true,
         default: undefined as VertexAiRoutingConfig | undefined,

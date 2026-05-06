@@ -4248,4 +4248,18 @@ describe('ADKSettings', () => {
     const config = new Config(params);
     expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
   });
+  it('should initialize vertexLocation from params', () => {
+    const config = new Config({
+      ...baseParams,
+      vertexLocation: 'us-central1',
+    });
+    expect(config.getVertexLocation()).toBe('us-central1');
+  });
+
+  it('should default vertexLocation to undefined when not provided', () => {
+    const config = new Config({
+      ...baseParams,
+    });
+    expect(config.getVertexLocation()).toBeUndefined();
+  });
 });
