@@ -305,35 +305,54 @@ describe('GitService', () => {
       expect(systemConfigContent).toBe('');
     });
 
-    it('should preserve system PATH and other env vars in the Git environment', async () => {
+    describe('environment variable preservation', () => {
       const customPath = '/custom/bin';
-      vi.stubEnv('PATH', customPath);
-      vi.stubEnv('OTHER_VAR', 'other-value');
+      const otherVar = 'other-value';
 
-      try {
+      beforeEach(() => {
+        vi.stubEnv('PATH', customPath);
+        vi.stubEnv('OTHER_VAR', otherVar);
         hoistedMockCheckIsRepo.mockResolvedValue(false);
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should preserve system PATH in the Git environment', async () => {
         const service = new GitService(projectRoot, storage);
         await service.setupShadowGitRepository();
 
         expect(hoistedMockEnv).toHaveBeenCalledWith(
           expect.objectContaining({
             PATH: customPath,
-            OTHER_VAR: 'other-value',
             GIT_CONFIG_GLOBAL: expect.any(String),
             GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
           }),
         );
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      });
+
+      it('should NOT include unrelated environment variables in the Git environment', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.OTHER_VAR).toBeUndefined();
+      });
     });
 
-    it('should override GIT_CONFIG environment variables from process.env', async () => {
-      vi.stubEnv('GIT_CONFIG_GLOBAL', '/user/global/config');
-      vi.stubEnv('GIT_CONFIG_SYSTEM', '/user/system/config');
-
-      try {
+    describe('GIT_CONFIG isolation', () => {
+      beforeEach(() => {
+        vi.stubEnv('GIT_CONFIG_GLOBAL', '/user/global/config');
+        vi.stubEnv('GIT_CONFIG_SYSTEM', '/user/system/config');
         hoistedMockCheckIsRepo.mockResolvedValue(false);
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should override GIT_CONFIG environment variables from process.env', async () => {
         const service = new GitService(projectRoot, storage);
         await service.setupShadowGitRepository();
 
@@ -354,9 +373,7 @@ describe('GitService', () => {
         const callArgs = hoistedMockEnv.mock.calls[0][0];
         expect(callArgs.GIT_CONFIG_GLOBAL).not.toBe('/user/global/config');
         expect(callArgs.GIT_CONFIG_SYSTEM).not.toBe('/user/system/config');
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      });
     });
   });
 
