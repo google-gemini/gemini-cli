@@ -38,6 +38,7 @@ import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import { LlmRole } from '../telemetry/types.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -2572,6 +2573,153 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: response,
       });
+    });
+  });
+
+  describe('automated binary injection', () => {
+    it('should expand history with synthetic turns when __binary_injection__ is detected', async () => {
+      const audioParts = [
+        {
+          functionResponse: {
+            id: 'call-123',
+            name: 'read_file',
+            response: {
+              output: 'Success',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'base64' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      // Mock API to capture the history it receives
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Analysis done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        audioParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Verify history expansion
+      // Turn 1: Tool response (cleaned)
+      // Turn 2: Model Ack (synthetic)
+      // Turn 3: User Binary data (current request)
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].role).toBe('user');
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success',
+      });
+      expect(capturedContents[1].role).toBe('model');
+      expect(capturedContents[1].parts![0].text).toContain(
+        'Binary content received',
+      );
+      expect(capturedContents[1].parts![0].thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+      expect(capturedContents[2].role).toBe('user');
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+    });
+
+    it('should handle multiple parallel binary injections', async () => {
+      const parallelParts = [
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'read_file',
+            response: {
+              output: 'Success 1',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'audio1' } },
+              ],
+            },
+          },
+        },
+        {
+          functionResponse: {
+            id: 'call-2',
+            name: 'read_file',
+            response: {
+              output: 'Success 2',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'video/mp4', data: 'video2' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        parallelParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Turn 1: Cleaned tool responses (both)
+      // Turn 2: Model Ack
+      // Turn 3: Both binary parts combined
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].parts).toHaveLength(2);
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success 1',
+      });
+      expect(capturedContents[0].parts![1].functionResponse!.response).toEqual({
+        output: 'Success 2',
+      });
+      expect(capturedContents[2].parts).toHaveLength(2);
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+      expect(capturedContents[2].parts![1].inlineData!.mimeType).toBe(
+        'video/mp4',
+      );
     });
   });
 

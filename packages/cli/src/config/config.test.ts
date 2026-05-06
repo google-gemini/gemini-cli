@@ -1174,6 +1174,20 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       ['.git'], // boundaryMarkers
     );
   });
+
+  it('should NOT call loadServerHierarchicalMemory when skipMemoryLoad is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv, {
+      skipMemoryLoad: true,
+    });
+
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
+  });
 });
 
 describe('mergeMcpServers', () => {

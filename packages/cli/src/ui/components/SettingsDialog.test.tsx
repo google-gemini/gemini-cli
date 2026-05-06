@@ -326,6 +326,36 @@ describe('SettingsDialog', () => {
       });
       unmount();
     });
+
+    it('should render the bottom border correctly when height is constrained', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+      const constrainedHeight = 15;
+
+      const renderResult = await renderDialog(settings, onSelect, {
+        availableTerminalHeight: constrainedHeight,
+      });
+
+      await renderResult.waitUntilReady();
+
+      await waitFor(() => {
+        const output = renderResult.lastFrame();
+        const lines = output.trim().split('\n');
+
+        // Verify height constraint
+        expect(lines.length).toBeLessThanOrEqual(constrainedHeight);
+
+        // Verify bottom border existence in the last line of the output
+        const lastLine = lines[lines.length - 1];
+        // 'round' border characters: ─, ╰, ╯
+        expect(lastLine).toMatch(/[─╰╯]/);
+      });
+
+      // SVG snapshot ensures visual layout and border rendering are preserved
+      await expect(renderResult).toMatchSvgSnapshot();
+
+      renderResult.unmount();
+    });
   });
 
   describe('Setting Descriptions', () => {

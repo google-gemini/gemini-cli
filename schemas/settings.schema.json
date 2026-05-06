@@ -3031,6 +3031,13 @@
             "type": "string"
           }
         },
+        "ignoreLocalEnv": {
+          "title": "Ignore Local .env",
+          "description": "Whether to ignore generic .env files in the project directory.",
+          "markdownDescription": "Whether to ignore generic .env files in the project directory.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "bugCommand": {
           "title": "Bug Command",
           "description": "Configuration for the bug report command.",
@@ -3078,8 +3085,8 @@
             },
             "backend": {
               "title": "Voice Transcription Backend",
-              "description": "The backend to use for voice transcription.",
-              "markdownDescription": "The backend to use for voice transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
+              "description": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.",
+              "markdownDescription": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
               "default": "gemini-live",
               "type": "string",
               "enum": ["gemini-live", "whisper"]
@@ -3300,8 +3307,8 @@
         },
         "autoMemory": {
           "title": "Auto Memory",
-          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
-          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.",
+          "markdownDescription": "Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

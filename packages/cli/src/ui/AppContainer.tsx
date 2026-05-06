@@ -1310,6 +1310,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isMcpReady } = useMcpStatus(config);
 
+  const isCompressing = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) =>
+          item.type === MessageType.COMPRESSION && item.compression.isPending,
+      ),
+    [pendingHistoryItems],
+  );
+
   const {
     messageQueue,
     addMessage,
@@ -1321,6 +1330,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
     isMcpReady,
+    isCompressing,
   });
 
   cancelHandlerRef.current = useCallback(
@@ -1415,7 +1425,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+      if (
+        (isSlash && isConfigInitialized) ||
+        (!isCompressing && isIdle && isMcpOrConfigReady)
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1438,7 +1451,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
+        if (
+          isIdle &&
+          !isCompressing &&
+          !isMcpOrConfigReady &&
+          messageQueue.length === 0
+        ) {
           coreEvents.emitFeedback(
             'info',
             !isConfigInitialized
@@ -1458,6 +1476,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       isMcpReady,
       streamingState,
+      isCompressing,
       messageQueue.length,
       pendingHistoryItems,
       config,
