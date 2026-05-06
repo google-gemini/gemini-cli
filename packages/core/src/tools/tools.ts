@@ -325,7 +325,16 @@ export abstract class BaseToolInvocation<
         );
       };
 
+      // Safety timeout: if no listener responds within 30s, fall back to
+      // asking the user directly. This prevents indefinite hangs if the
+      // abortSignal has no timeout and the message bus listener is missing.
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        resolve('ask_user');
+      }, 30000);
+
       const cleanup = () => {
+        clearTimeout(timeoutId);
         abortSignal.removeEventListener('abort', abortHandler);
         unsubscribe();
       };
@@ -336,6 +345,7 @@ export abstract class BaseToolInvocation<
       };
 
       if (abortSignal.aborted) {
+        clearTimeout(timeoutId);
         resolve('deny');
         return;
       }

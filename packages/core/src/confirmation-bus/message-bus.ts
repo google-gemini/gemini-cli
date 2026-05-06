@@ -211,8 +211,14 @@ export class MessageBus extends EventEmitter {
   async request<TRequest extends Message, TResponse extends Message>(
     request: Omit<TRequest, 'correlationId'>,
     responseType: TResponse['type'],
-    options: { timeoutMs?: number; signal?: AbortSignal } = {},
+    optionsOrTimeoutMs:
+      | number
+      | { timeoutMs?: number; signal?: AbortSignal } = {},
   ): Promise<TResponse> {
+    const options =
+      typeof optionsOrTimeoutMs === 'number'
+        ? { timeoutMs: optionsOrTimeoutMs }
+        : optionsOrTimeoutMs;
     const { timeoutMs = 60000, signal } = options;
     const correlationId = randomUUID();
 
