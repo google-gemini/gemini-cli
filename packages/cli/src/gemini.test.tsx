@@ -829,6 +829,7 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
         resolveSession: vi
@@ -884,6 +885,7 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
         resolveSession: vi
@@ -1068,6 +1070,7 @@ describe('resolveSessionId', () => {
   });
 
   it('should import from session file when sessionFile is provided', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
         sessionExists: vi.fn().mockResolvedValue(false),
@@ -1137,6 +1140,7 @@ describe('resolveSessionId', () => {
   });
 
   it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
         sessionExists: vi.fn().mockResolvedValue(true),
@@ -1167,6 +1171,7 @@ describe('resolveSessionId', () => {
   });
 
   it('should return provided sessionId when it does not exist', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
         sessionExists: vi.fn().mockResolvedValue(false),

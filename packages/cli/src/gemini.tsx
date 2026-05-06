@@ -37,6 +37,7 @@ import {
   Storage,
   getProjectHash,
   loadConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -226,11 +227,11 @@ export async function resolveSessionId(
       // and only keep actual conversation messages (user/gemini).
       // Best effort parse: ensure message is an object and has required fields.
       sessionData.messages = (sessionData.messages || []).filter(
-        (m) =>
+        (m: MessageRecord) =>
           typeof m === 'object' &&
           m !== null &&
           (m.type === 'user' || m.type === 'gemini') &&
-          (m as any).content !== undefined,
+          (m as MessageRecord).content !== undefined,
       );
 
       // Add a single info message to the history to confirm the import
@@ -239,7 +240,7 @@ export async function resolveSessionId(
         type: 'info',
         content: `Imported session from ${sessionFileArg}`,
         timestamp: isoNow,
-      } as any);
+      } as MessageRecord);
 
       const newSessionId = createSessionId();
       sessionData.sessionId = newSessionId;

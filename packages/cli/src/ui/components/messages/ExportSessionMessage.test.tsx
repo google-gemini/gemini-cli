@@ -5,11 +5,10 @@
  */
 
 import { render } from '../../../test-utils/render.js';
-import { describe, it, expect, vi } from 'vitest';
-import { ExportSessionMessage } from './ExportSessionMessage.js';
+import { Text } from 'ink';
 
 vi.mock('../CliSpinner.js', () => ({
-  CliSpinner: () => '[spinner]',
+  CliSpinner: () => <Text>[spinner]</Text>,
 }));
 
 describe('ExportSessionMessage', () => {
