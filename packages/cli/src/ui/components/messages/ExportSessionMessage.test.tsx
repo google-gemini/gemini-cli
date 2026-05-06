@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { render } from '../../test-utils/render.js';
+import { render } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { ExportSessionMessage } from './ExportSessionMessage.js';
 
