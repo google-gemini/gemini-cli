@@ -4113,6 +4113,7 @@ describe('Plans Directory Initialization', () => {
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'warning',
       expect.stringContaining('Invalid custom plans directory'),
+      expect.any(Error),
     );
 
     // Should still add the fallback plans directory to workspace context if it exists
