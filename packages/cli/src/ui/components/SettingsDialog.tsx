@@ -125,11 +125,9 @@ export function SettingsDialog({
     editableScopeItems[0]?.value;
   const effectiveSelectedScope = writableSelectedScope ?? SettingScope.User;
 
-  useEffect(() => {
-    if (writableSelectedScope && selectedScope !== writableSelectedScope) {
-      setSelectedScope(writableSelectedScope);
-    }
-  }, [selectedScope, writableSelectedScope]);
+  if (writableSelectedScope && selectedScope !== writableSelectedScope) {
+    setSelectedScope(writableSelectedScope);
+  }
 
   // Snapshot restart-required values at mount time for diff tracking
   const [activeRestartRequiredSettings] = useState(() =>
