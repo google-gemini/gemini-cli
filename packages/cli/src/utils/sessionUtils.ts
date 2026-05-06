@@ -65,7 +65,7 @@ export class SessionError extends Error {
     const dirInfo = chatsDir ? ` in ${chatsDir}` : '';
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume {shortId}, or --resume latest.`,
     );
   }
 }
@@ -447,9 +447,14 @@ export class SessionSelector {
   }
 
   /**
-   * Finds a session by identifier (UUID or numeric index).
+   * Finds a session by identifier (UUID, 8-char shortId, or numeric index).
    *
-   * @param identifier - Can be a full UUID or an index number (1-based)
+   * The shortId form is the first 8 characters of a session UUID — the same
+   * id surfaced by `/fork` and used in session filenames. Matching is
+   * case-insensitive on the hex characters.
+   *
+   * @param identifier - Can be a full UUID, an 8-char shortId, or an index
+   *   number (1-based).
    * @returns Promise resolving to the found SessionInfo
    * @throws Error if the session is not found or identifier is invalid
    */
@@ -473,6 +478,19 @@ export class SessionSelector {
     );
     if (sessionByUuid) {
       return sessionByUuid;
+    }
+
+    // Try 8-char shortId (the first 8 chars of a UUID, as printed by /fork
+    // and used in session filenames). Checked before numeric index so an
+    // 8-digit shortId like "12345678" is not misread as an index.
+    if (/^[a-f0-9]{8}$/i.test(trimmedIdentifier)) {
+      const lowerShortId = trimmedIdentifier.toLowerCase();
+      const sessionByShortId = sortedSessions.find(
+        (session) => session.id.slice(0, 8).toLowerCase() === lowerShortId,
+      );
+      if (sessionByShortId) {
+        return sessionByShortId;
+      }
     }
 
     // Parse as index number (1-based) - only allow numeric indexes

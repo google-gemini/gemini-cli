@@ -154,6 +154,80 @@ describe('SessionSelector', () => {
     expect(result2.sessionData.messages[0].content).toBe('Test message 2');
   });
 
+  it('should resolve session by 8-char shortId', async () => {
+    const sessionId1 = randomUUID();
+    const sessionId2 = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session1 = {
+      sessionId: sessionId1,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Short id session 1',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const session2 = {
+      sessionId: sessionId2,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Short id session 2',
+          id: 'msg2',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session1, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session2, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    // Resolves by exact 8-char shortId
+    const result1 = await sessionSelector.resolveSession(
+      sessionId1.slice(0, 8),
+    );
+    expect(result1.sessionData.sessionId).toBe(sessionId1);
+    expect(result1.sessionData.messages[0].content).toBe('Short id session 1');
+
+    // Case-insensitive
+    const result2 = await sessionSelector.resolveSession(
+      sessionId2.slice(0, 8).toUpperCase(),
+    );
+    expect(result2.sessionData.sessionId).toBe(sessionId2);
+
+    // Falls through to invalid identifier when shortId doesn't match anything
+    await expect(sessionSelector.resolveSession('deadbeef')).rejects.toThrow(
+      /Invalid session identifier/,
+    );
+  });
+
   it('should resolve session by index', async () => {
     const sessionId1 = randomUUID();
     const sessionId2 = randomUUID();
