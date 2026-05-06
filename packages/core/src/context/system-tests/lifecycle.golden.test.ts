@@ -169,6 +169,9 @@ describe('System Lifecycle Golden Tests', () => {
       { role: 'model', parts: [{ text: 'Yes we can.' }] },
     ]);
 
+    // Give the background tasks a moment to inject the snapshot into the graph
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     // Get final state
     const goldenState = await harness.getGoldenState();
 
@@ -238,23 +241,34 @@ describe('System Lifecycle Golden Tests', () => {
 
     // Turn 0
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'A'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'B'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'A'.repeat(500) }] },
+      { role: 'model', parts: [{ text: 'B'.repeat(500) }] },
     ]);
 
     // Turn 1 (Should trigger StateSnapshotasync pipeline because we exceed 100 retainedTokens)
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'C'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'D'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'C'.repeat(500) }] },
+      { role: 'model', parts: [{ text: 'D'.repeat(500) }] },
+    ]);
+
+    // Extra turn to push it over the loose boundary.
+    // Turn 0 = ~330 tokens. Turn 1 = ~330 tokens. Turn 2 = ~330 tokens.
+    // Total = ~990 tokens. Backwards loop:
+    // T2 (330) -> prior 0
+    // T1 (330) -> prior 330. 330 > 100, so T1 is kept (loose boundary)
+    // T0 (330) -> prior 660. 660 > 100, so T0 is aged out!
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'G'.repeat(500) }] },
+      { role: 'model', parts: [{ text: 'H'.repeat(500) }] },
     ]);
 
     // Give the async background pipeline an extra beat to complete its async execution and emit variants
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Turn 2
+    // Turn 3
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'E'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'F'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'E'.repeat(500) }] },
+      { role: 'model', parts: [{ text: 'F'.repeat(500) }] },
     ]);
 
     const goldenState = await harness.getGoldenState();
