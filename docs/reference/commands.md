@@ -193,6 +193,13 @@ Slash commands provide meta-level control over the CLI itself.
   - **`update`**:
     - **Description:** Update extensions. Usage: update <extension-names>|--all
 
+### `/fork`
+
+- **Description:** Save a copy of the current conversation under a new ID so it
+  can be resumed independently in another terminal. See
+  [Session management](../cli/session-management.md#forking-sessions).
+- **Output:** Prints the fork's short ID and a `gemini --resume <id>` hint.
+
 ### `/help` (or `/?`)
 
 - **Description:** Display help information about Gemini CLI, including

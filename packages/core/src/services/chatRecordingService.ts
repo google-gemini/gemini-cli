@@ -674,6 +674,85 @@ export class ChatRecordingService {
   }
 
   /**
+   * Saves a copy of the current conversation under a new sessionId so it can
+   * be resumed independently in another terminal. The fork is a stand-alone
+   * session file in the same chats directory; the active session is not
+   * mutated. Subagent sessions cannot be forked.
+   *
+   * @returns the new sessionId, its 8-character shortId, and the path of the
+   *          new file.
+   * @throws if there is no active conversation, the source file is missing,
+   *         the session is a subagent, or a filesystem error occurs (ENOSPC
+   *         is rethrown with a friendlier message).
+   */
+  fork(): { sessionId: string; shortId: string; filePath: string } {
+    if (!this.conversationFile) {
+      throw new Error('No active conversation to fork.');
+    }
+    if (this.kind === 'subagent') {
+      throw new Error('Cannot fork a subagent session.');
+    }
+    if (!fs.existsSync(this.conversationFile)) {
+      throw new Error('Conversation file not found.');
+    }
+
+    const newSessionId = randomUUID();
+    const safeNewId = sanitizeFilenamePart(newSessionId);
+    if (!safeNewId) {
+      throw new Error(`Invalid sessionId after sanitization: ${newSessionId}`);
+    }
+    const shortId = safeNewId.slice(0, 8);
+
+    // Second-precision timestamp so two forks taken in the same minute
+    // produce distinct, sortable filenames.
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const filename = `${SESSION_FILE_PREFIX}${timestamp}-${shortId}.jsonl`;
+    const newPath = path.join(path.dirname(this.conversationFile), filename);
+
+    try {
+      fs.mkdirSync(path.dirname(newPath), { recursive: true });
+
+      const raw = fs.readFileSync(this.conversationFile, 'utf-8');
+      const lines = raw.split('\n');
+      const now = new Date().toISOString();
+
+      let metadataRewritten = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as unknown;
+          if (isPartialMetadataRecord(parsed)) {
+            const updated = {
+              ...parsed,
+              sessionId: newSessionId,
+              startTime: now,
+              lastUpdated: now,
+            };
+            lines[i] = JSON.stringify(updated);
+            metadataRewritten = true;
+            break;
+          }
+        } catch {
+          // Not the metadata line — keep scanning.
+        }
+      }
+      if (!metadataRewritten) {
+        throw new Error('Could not locate session metadata in source file.');
+      }
+
+      fs.writeFileSync(newPath, lines.join('\n'), 'utf-8');
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
+        throw new Error('No space left on device.');
+      }
+      throw error;
+    }
+
+    return { sessionId: newSessionId, shortId, filePath: newPath };
+  }
+
+  /**
    * Deletes a session file by sessionId, filename, or basename.
    * Derives an 8-character shortId to find and delete all associated files
    * (parent and subagents).

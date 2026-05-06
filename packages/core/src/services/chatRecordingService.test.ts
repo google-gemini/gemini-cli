@@ -1315,4 +1315,134 @@ describe('ChatRecordingService', () => {
       mkdirSyncSpy.mockRestore();
     });
   });
+
+  describe('fork', () => {
+    it('throws when there is no active conversation', () => {
+      expect(() => chatRecordingService.fork()).toThrow(
+        /No active conversation/,
+      );
+    });
+
+    it('throws when called on a subagent session', async () => {
+      await chatRecordingService.initialize(undefined, 'subagent');
+      expect(() => chatRecordingService.fork()).toThrow(/subagent/);
+    });
+
+    it('writes a new file with a new sessionId and preserves other lines', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hi',
+        model: 'm',
+      });
+
+      const sourceFile = chatRecordingService.getConversationFilePath()!;
+      const sourceBefore = fs.readFileSync(sourceFile, 'utf-8');
+
+      const cryptoModule = await import('node:crypto');
+      vi.mocked(cryptoModule.randomUUID).mockReturnValueOnce(
+        'fork0001-aaaa-bbbb-cccc-dddddddddddd' as ReturnType<
+          typeof cryptoModule.randomUUID
+        >,
+      );
+
+      const result = chatRecordingService.fork();
+
+      expect(result.sessionId).toBe('fork0001-aaaa-bbbb-cccc-dddddddddddd');
+      expect(result.shortId).toBe('fork0001');
+      expect(result.filePath).not.toBe(sourceFile);
+      expect(fs.existsSync(result.filePath)).toBe(true);
+      expect(path.basename(result.filePath)).toMatch(
+        /^session-.*-fork0001\.jsonl$/,
+      );
+
+      // Source file is unchanged
+      expect(fs.readFileSync(sourceFile, 'utf-8')).toBe(sourceBefore);
+
+      const forked = fs.readFileSync(result.filePath, 'utf-8');
+      const sourceLines = sourceBefore.split('\n');
+      const forkedLines = forked.split('\n');
+      expect(forkedLines.length).toBe(sourceLines.length);
+
+      const sourceMeta = JSON.parse(sourceLines[0]);
+      const forkedMeta = JSON.parse(forkedLines[0]);
+      expect(forkedMeta.sessionId).toBe('fork0001-aaaa-bbbb-cccc-dddddddddddd');
+      expect(forkedMeta.sessionId).not.toBe(sourceMeta.sessionId);
+      expect(forkedMeta.projectHash).toBe(sourceMeta.projectHash);
+      expect(forkedMeta.kind).toBe(sourceMeta.kind);
+
+      for (let i = 1; i < sourceLines.length; i++) {
+        expect(forkedLines[i]).toBe(sourceLines[i]);
+      }
+    });
+
+    it('preserves $rewindTo markers from the source', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'first',
+        model: 'm',
+      });
+      const firstId = chatRecordingService.getConversation()!.messages[0].id;
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'reply',
+        model: 'm',
+      });
+      chatRecordingService.rewindTo(firstId);
+
+      const result = chatRecordingService.fork();
+      const forked = fs.readFileSync(result.filePath, 'utf-8');
+      expect(forked).toContain(`"$rewindTo":"${firstId}"`);
+    });
+
+    it('produces distinct files for consecutive forks', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hi',
+        model: 'm',
+      });
+
+      const cryptoModule = await import('node:crypto');
+      vi.mocked(cryptoModule.randomUUID)
+        .mockReturnValueOnce(
+          'forkAAAA-aaaa-aaaa-aaaa-aaaaaaaaaaaa' as ReturnType<
+            typeof cryptoModule.randomUUID
+          >,
+        )
+        .mockReturnValueOnce(
+          'forkBBBB-bbbb-bbbb-bbbb-bbbbbbbbbbbb' as ReturnType<
+            typeof cryptoModule.randomUUID
+          >,
+        );
+
+      const a = chatRecordingService.fork();
+      const b = chatRecordingService.fork();
+
+      expect(a.shortId).toBe('forkAAAA');
+      expect(b.shortId).toBe('forkBBBB');
+      expect(a.filePath).not.toBe(b.filePath);
+      expect(fs.existsSync(a.filePath)).toBe(true);
+      expect(fs.existsSync(b.filePath)).toBe(true);
+    });
+
+    it('rethrows ENOSPC with a friendlier message', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hi',
+        model: 'm',
+      });
+
+      const writeSpy = vi.mocked(fs.writeFileSync);
+      writeSpy.mockImplementationOnce(() => {
+        const err = new Error('ENOSPC') as NodeJS.ErrnoException;
+        err.code = 'ENOSPC';
+        throw err;
+      });
+
+      expect(() => chatRecordingService.fork()).toThrow(/no space left/i);
+    });
+  });
 });

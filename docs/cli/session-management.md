@@ -96,6 +96,37 @@ Compatibility aliases:
 - `/chat ...` works for the same commands.
 - `/resume checkpoints ...` also remains supported during migration.
 
+## Forking sessions
+
+Use the `/fork` slash command from inside a session to save a snapshot of the
+current conversation under a new session ID. The fork is fully independent:
+writes in either session no longer flow to the other, so two terminals can
+safely explore different directions from the same starting point.
+
+This avoids the silent last-write-wins corruption that happens when two
+`gemini --resume` processes are pointed at the same session file at the same
+time.
+
+### From the interactive interface
+
+```text
+> /fork
+Fork saved (a1b2c3d4).
+Resume in another terminal: gemini --resume a1b2c3d4
+```
+
+### Resuming a fork
+
+A fork is just a regular session, so any of the standard resume mechanisms work:
+
+```bash
+gemini --resume <shortId>
+```
+
+You can also open the [Session Browser](#from-the-interactive-interface) and
+pick the fork from the list. The original session keeps its existing ID; the
+fork has a fresh one. Forking does not modify the original.
+
 ## Parallel sessions with Git worktrees
 
 When working on multiple tasks at once, you can use
