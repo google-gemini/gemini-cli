@@ -122,7 +122,7 @@ export class UserSimulator {
       let screen = this.getScreen();
       let strippedScreen = '';
       let normalizedScreen = '';
-      const refreshDelays = [1500, 3000, 5000];
+      const refreshDelays = []; // SIGWINCH DISABLED
 
       for (let attempt = 0; attempt < refreshDelays.length; attempt++) {
         if (!screen) break;
@@ -155,9 +155,9 @@ export class UserSimulator {
           `[SIMULATOR] Screen blank and BLOCKED. Attempting SIGWINCH refresh ${attempt + 1}/${refreshDelays.length} with ${refreshDelays[attempt]}ms delay.`,
         );
         try {
-          process.kill(0, 'SIGWINCH');
+          // SIGWINCH DISABLED: process.kill(0, 'SIGWINCH');
         } catch {
-          process.kill(process.pid, 'SIGWINCH');
+          // SIGWINCH DISABLED: process.kill(process.pid, 'SIGWINCH');
         }
         await new Promise((resolve) =>
           setTimeout(resolve, refreshDelays[attempt]),
@@ -203,9 +203,9 @@ export class UserSimulator {
               '[SIMULATOR] Screen is blank but system is BLOCKED. Sending SIGWINCH refresh.',
             );
             try {
-              process.kill(0, 'SIGWINCH');
+              // SIGWINCH DISABLED: process.kill(0, 'SIGWINCH');
             } catch {
-              process.kill(process.pid, 'SIGWINCH');
+              // SIGWINCH DISABLED: process.kill(process.pid, 'SIGWINCH');
             }
             return;
           }
