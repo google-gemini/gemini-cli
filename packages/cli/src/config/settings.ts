@@ -398,8 +398,7 @@ export class LoadedSettings {
 
   private computeSnapshot(): LoadedSettingsSnapshot {
     const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
-      path: file.path,
-      rawJson: file.rawJson,
+      ...file,
       settings: structuredClone(file.settings),
       originalSettings: structuredClone(file.originalSettings),
     });
