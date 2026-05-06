@@ -6,6 +6,7 @@
 
 import { render } from '../../../test-utils/render.js';
 import { Text } from 'ink';
+import { ExportSessionMessage } from './ExportSessionMessage.js';
 
 vi.mock('../CliSpinner.js', () => ({
   CliSpinner: () => <Text>[spinner]</Text>,

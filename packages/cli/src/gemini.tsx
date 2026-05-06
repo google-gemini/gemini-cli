@@ -231,7 +231,7 @@ export async function resolveSessionId(
           typeof m === 'object' &&
           m !== null &&
           (m.type === 'user' || m.type === 'gemini') &&
-          (m as MessageRecord).content !== undefined,
+          m.content !== undefined,
       );
 
       // Add a single info message to the history to confirm the import
