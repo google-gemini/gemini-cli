@@ -22,6 +22,7 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
+import { CAMPProcessorOptionsSchema } from './processors/campProcessor.js';
 
 export async function initializeContextManager(
   config: Config,
@@ -69,6 +70,10 @@ export async function initializeContextManager(
   registry.registerProcessor({
     id: 'RollingSummaryProcessor',
     schema: RollingSummaryProcessorOptionsSchema,
+  });
+  registry.registerProcessor({
+    id: 'CAMP',
+    schema: CAMPProcessorOptionsSchema,
   });
 
   const sidecarProfile = await loadContextManagementConfig(
