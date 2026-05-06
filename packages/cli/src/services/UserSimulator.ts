@@ -122,8 +122,9 @@ export class UserSimulator {
       // (e.g. ANSI clear/repaint sequences) before looking at the screen.
       // Increased to 1s to handle high-latency PTYs in Docker.
       // Force a terminal repaint by sending SIGWINCH to the current process.
-      process.kill(process.pid, "SIGWINCH");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      debugLogger.log('[SIMULATOR] Sending SIGWINCH to process group to force repaint.');
+      try { process.kill(0, 'SIGWINCH'); } catch (_e) { process.kill(process.pid, 'SIGWINCH'); }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const screen = this.getScreen();
       if (!screen) return;
@@ -176,8 +177,8 @@ export class UserSimulator {
           
           // RECOVERY: If screen is blank and we are stalled, try a terminal refresh.
           if (normalizedScreen.length === 0 && this.pendingToolCalls.length > 0) {
-             debugLogger.log('[SIMULATOR] Screen is blank but system is BLOCKED. Sending refresh carriage return.');
-             this.stdinBuffer.write('\r');
+             debugLogger.log('[SIMULATOR] Screen is blank but system is BLOCKED. Sending SIGWINCH refresh.');
+             try { process.kill(0, 'SIGWINCH'); } catch (_e) { process.kill(process.pid, 'SIGWINCH'); }
              return;
           }
         } else {
