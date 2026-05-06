@@ -1444,7 +1444,27 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
+      let plansDir: string;
+      try {
+        plansDir = this.storage.getPlansDir();
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes('outside the project root')
+        ) {
+          // Emit a user-friendly warning
+          coreEvents.emitFeedback(
+            'warning',
+            `Invalid custom plans directory: ${error.message}. Falling back to default project temp directory.`,
+          );
+          // Unset the invalid directory for this session to ensure subsequent tool calls use the fallback
+          this.storage.setCustomPlansDir(undefined);
+          plansDir = this.storage.getPlansDir();
+        } else {
+          throw error;
+        }
+      }
+
       try {
         await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
