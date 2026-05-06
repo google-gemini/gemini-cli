@@ -14,11 +14,13 @@ import {
   startCallbackServer,
   buildAuthorizationUrl,
   exchangeCodeForToken,
+  refreshAccessToken,
 } from '../../utils/oauth-flow.js';
 import { openBrowserSecurely } from '../../utils/secure-browser-launcher.js';
 import { getConsentForOauth } from '../../utils/authConsent.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { Storage } from '../../config/storage.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 const OidcDiscoverySchema = z.object({
   authorization_endpoint: z.string().url(),
@@ -115,12 +117,58 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
 
   override async headers(): Promise<HttpHeaders> {
     const storage = await this.getTokenStorage();
+
+    // 1. Valid cached token → return immediately.
     if (this.cachedToken && !storage.isTokenExpired(this.cachedToken)) {
       return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
     }
 
+    // 2. Expired but has refresh token → attempt silent refresh.
+    if (this.cachedToken?.refreshToken) {
+      try {
+        const refreshed = await refreshAccessToken(
+          {
+            clientId: this.config.client_id,
+            clientSecret: this.config.client_secret,
+            scopes: ['openid', ...(this.config.scopes || [])],
+          },
+          this.cachedToken.refreshToken,
+          this.endpoints.token_endpoint,
+        );
+
+        this.cachedToken = {
+          accessToken: refreshed.access_token,
+          tokenType: refreshed.token_type || 'Bearer',
+          refreshToken:
+            refreshed.refresh_token ?? this.cachedToken.refreshToken,
+          expiresAt: refreshed.expires_in
+            ? Date.now() + refreshed.expires_in * 1000
+            : undefined,
+        };
+        await this.persistToken();
+        return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
+      } catch (error) {
+        debugLogger.debug(
+          `[OIDC] Refresh failed, falling back to interactive flow: ${getErrorMessage(error)}`,
+        );
+        // Clear stale credentials and fall through to interactive flow.
+        await storage.deleteCredentials(this.agentName);
+      }
+    }
+
+    // 3. No valid token → interactive browser-based auth.
     this.cachedToken = await this.authenticateInteractively();
     return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
+  }
+
+  private async persistToken(): Promise<void> {
+    if (!this.cachedToken) return;
+    const storage = await this.getTokenStorage();
+    await storage.setCredentials({
+      serverName: this.agentName,
+      token: this.cachedToken,
+      updatedAt: Date.now(),
+    });
   }
 
   private async authenticateInteractively(): Promise<OAuthToken> {
@@ -128,6 +176,7 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
 
     const pkce = generatePKCEParams();
     const { port, response } = startCallbackServer(pkce.state);
+    const callbackPort = await port;
 
     const authUrl = buildAuthorizationUrl(
       {
@@ -137,7 +186,7 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
         scopes: ['openid', ...(this.config.scopes || [])],
       },
       pkce,
-      await port,
+      callbackPort,
     );
 
     await openBrowserSecurely(authUrl);
@@ -152,10 +201,13 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
       },
       code,
       pkce.codeVerifier,
-      await port,
+      callbackPort,
     );
 
-    const token: OAuthToken = {
+    // TODO: Verify ID token signature via jwks_uri and extract claims.
+    // For now, we only use the access_token as a Bearer credential.
+
+    this.cachedToken = {
       accessToken: tokenResponse.access_token,
       tokenType: tokenResponse.token_type || 'Bearer',
       refreshToken: tokenResponse.refresh_token,
@@ -164,12 +216,7 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
         : undefined,
     };
 
-    const storage = await this.getTokenStorage();
-    await storage.setCredentials({
-      serverName: this.agentName,
-      token,
-      updatedAt: Date.now(),
-    });
-    return token;
+    await this.persistToken();
+    return this.cachedToken;
   }
 }

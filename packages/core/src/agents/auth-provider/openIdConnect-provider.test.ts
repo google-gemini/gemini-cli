@@ -81,6 +81,43 @@ describe('OpenIdConnectAuthProvider', () => {
     expect(provider).toBeInstanceOf(OpenIdConnectAuthProvider);
   });
 
+  it('should initialize from cache when valid token is present', async () => {
+    const mockDiscoveryResponse: MockDiscoveryResponse = {
+      authorization_endpoint: 'https://example.com/auth/authorize',
+      token_endpoint: 'https://example.com/auth/token',
+      jwks_uri: 'https://example.com/auth/jwks',
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockDiscoveryResponse,
+    } as Response);
+
+    const validToken = {
+      accessToken: 'valid-access-token',
+      tokenType: 'Bearer',
+      expiresAt: Date.now() + 3600000,
+    };
+
+    // Mock token storage instance to return a valid token
+    const mockStorage = {
+      getCredentials: vi.fn().mockResolvedValue({ token: validToken }),
+      isTokenExpired: vi.fn().mockReturnValue(false),
+    };
+    vi.mocked(MCPOAuthTokenStorage).mockImplementation(
+      () => mockStorage as unknown as MCPOAuthTokenStorage,
+    );
+
+    const provider = await OpenIdConnectAuthProvider.create(
+      mockConfig,
+      agentName,
+    );
+
+    const headers = await provider.headers();
+    expect(headers).toEqual({ Authorization: 'Bearer valid-access-token' });
+    expect(mockStorage.getCredentials).toHaveBeenCalledWith(agentName);
+  });
+
   it('should throw if issuer_url is not HTTPS', async () => {
     const insecureConfig = { ...mockConfig, issuer_url: 'http://insecure.com' };
     await expect(

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as crypto from 'node:crypto';
 import type { AgentCard, SecurityScheme } from '@a2a-js/sdk';
 import type {
   A2AAuthConfig,
@@ -74,7 +75,7 @@ export class A2AAuthProviderFactory {
         const { OAuth2AuthProvider } = await import('./oauth2-provider.js');
         const provider = new OAuth2AuthProvider(
           authConfig,
-          options.agentName ?? 'unknown',
+          options.agentName ?? crypto.randomUUID(),
           agentCard,
           options.agentCardUrl,
         );
@@ -88,7 +89,7 @@ export class A2AAuthProviderFactory {
         );
         return OpenIdConnectAuthProvider.create(
           authConfig,
-          options.agentName ?? 'unknown',
+          options.agentName ?? crypto.randomUUID(),
         );
       }
 
