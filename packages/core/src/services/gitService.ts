@@ -64,7 +64,9 @@ export class GitService {
     return {
       ...sanitizeEnvironment(
         process.env,
-        getSecureSanitizationConfig({ enableEnvironmentVariableRedaction: true }),
+        getSecureSanitizationConfig({
+          enableEnvironmentVariableRedaction: true,
+        }),
       ),
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
