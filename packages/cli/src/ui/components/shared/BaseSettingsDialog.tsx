@@ -425,7 +425,7 @@ export function BaseSettingsDialog({
       flexDirection="row"
       padding={1}
       width="100%"
-      height="100%"
+      maxHeight={availableHeight}
     >
       <Box flexDirection="column" flexGrow={1}>
         {/* Title */}
