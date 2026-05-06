@@ -1095,9 +1095,11 @@ describe('resolveSessionId', () => {
     } as unknown as ConversationRecord);
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
-    const processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
-      throw new MockProcessExitError(code);
-    });
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
 
     try {
       const { sessionId, resumedSessionData } = await resolveSessionId(
@@ -1105,12 +1107,12 @@ describe('resolveSessionId', () => {
         undefined,
         'dummy-session.json',
       );
-      
+
       expect(sessionId).toBeDefined();
       expect(sessionId).not.toBe('old-session-id'); // A new session ID should be created
       expect(resumedSessionData).toBeDefined();
       expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
-      
+
       // Verify messages: should have 1 info (the new import confirmation) + 2 valid conversation messages
       // Invalid messages (missing content, null, unknown type) and transient messages should be filtered out.
       expect(resumedSessionData?.conversation.messages).toHaveLength(3);
@@ -1126,11 +1128,14 @@ describe('resolveSessionId', () => {
         type: 'gemini',
         content: 'Hi',
       });
-      
+
       expect(resumedSessionData?.filePath).toContain(sessionId.slice(0, 8)); // New path
     } catch (e) {
       if (e instanceof MockProcessExitError) {
-        throw new Error("process.exit called with: " + JSON.stringify(emitFeedbackSpy.mock.calls));
+        throw new Error(
+          'process.exit called with: ' +
+            JSON.stringify(emitFeedbackSpy.mock.calls),
+        );
       }
       throw e;
     } finally {

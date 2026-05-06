@@ -33,9 +33,7 @@ export function ExportSessionMessage({
         )}
       </Box>
       <Box>
-        <Text
-          color={isPending ? theme.text.accent : theme.status.success}
-        >
+        <Text color={isPending ? theme.text.accent : theme.status.success}>
           {isPending
             ? 'Exporting session...'
             : `Successfully exported session to ${targetPath}`}

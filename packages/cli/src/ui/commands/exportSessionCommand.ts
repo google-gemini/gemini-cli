@@ -29,7 +29,8 @@ export const exportSessionCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Please provide a file path to export the session to. Example: /export-session ./my-session.json',
+        content:
+          'Please provide a file path to export the session to. Example: /export-session ./my-session.json',
       };
     }
 
@@ -67,8 +68,12 @@ export const exportSessionCommand: SlashCommand = {
       const { sessionData } = await sessionSelector.resolveSession(sessionId);
 
       const targetPath = path.resolve(process.cwd(), args);
-      
-      await fs.writeFile(targetPath, JSON.stringify(sessionData, null, 2), 'utf-8');
+
+      await fs.writeFile(
+        targetPath,
+        JSON.stringify(sessionData, null, 2),
+        'utf-8',
+      );
 
       ui.addItem(
         {

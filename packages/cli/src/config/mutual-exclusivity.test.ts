@@ -21,14 +21,18 @@ describe('parseArguments mutual exclusivity', () => {
   ];
 
   combinations.forEach((args) => {
-    it(`should fail if ${args.filter(a => a.startsWith('--')).join(' and ')} are provided`, async () => {
+    it(`should fail if ${args.filter((a) => a.startsWith('--')).join(' and ')} are provided`, async () => {
       process.argv = ['node', 'script.js', ...args];
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
 
-      await expect(parseArguments(createTestMergedSettings())).rejects.toThrow('process.exit called');
+      await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+        'process.exit called',
+      );
 
       expect(mockConsoleError).toHaveBeenCalledWith(
         expect.stringContaining(

@@ -110,7 +110,7 @@ describe('exportSessionCommand', () => {
       expect.any(Number),
     );
     expect(mockContext.ui.setPendingItem).toHaveBeenLastCalledWith(null);
-    });
+  });
 
   it('should return error if resolveSession fails', async () => {
     vi.mocked(SessionSelector.prototype.resolveSession).mockRejectedValue(

@@ -16,9 +16,7 @@ vi.mock('../CliSpinner.js', () => ({
 describe('ExportSessionMessage', () => {
   it('renders pending state correctly', async () => {
     const { lastFrame } = await render(
-      <ExportSessionMessage
-        exportSession={{ isPending: true }}
-      />
+      <ExportSessionMessage exportSession={{ isPending: true }} />,
     );
     expect(lastFrame()).toContain('[spinner]');
     expect(lastFrame()).toContain('Exporting session...');
@@ -27,13 +25,15 @@ describe('ExportSessionMessage', () => {
   it('renders success state correctly', async () => {
     const { lastFrame } = await render(
       <ExportSessionMessage
-        exportSession={{ 
-          isPending: false, 
-          targetPath: '/path/to/session.json' 
+        exportSession={{
+          isPending: false,
+          targetPath: '/path/to/session.json',
         }}
-      />
+      />,
     );
     expect(lastFrame()).toContain('✓');
-    expect(lastFrame()).toContain('Successfully exported session to /path/to/session.json');
+    expect(lastFrame()).toContain(
+      'Successfully exported session to /path/to/session.json',
+    );
   });
 });
