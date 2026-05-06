@@ -296,7 +296,10 @@ class GrepToolInvocation extends BaseToolInvocation<
           name: this._toolDisplayName,
           description: this.getDescription(),
           resultSummary: result.returnDisplay.summary,
-          result: null,
+          result: {
+            type: 'text',
+            text: result.llmContent.split('\n---\n').slice(1).join('\n---\n'),
+          },
         },
       };
     } catch (error) {

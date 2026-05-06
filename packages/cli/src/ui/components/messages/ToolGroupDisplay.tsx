@@ -121,7 +121,6 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
 
   // Since ToolDisplayItem is ToolDisplay & { status, ... }, we check for identifying properties
   // of ToolDisplay. If name or description is missing and there's no result, it might be "empty".
-  // But per instructions, if display is missing (which we now interpret as the ToolDisplay part being effectively empty/null), show error.
   if (!tool.name && !tool.description && !tool.result && !tool.resultSummary) {
     return (
       <Box paddingLeft={2}>
