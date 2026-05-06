@@ -4091,7 +4091,7 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).not.toContain(plansDir);
   });
 
-  it('should gracefully fallback to default plans directory if custom directory is outside project root', async () => {
+  it('should gracefully fallback to default plans directory if retrieving custom directory throw an error', async () => {
     vi.spyOn(coreEvents, 'emitFeedback');
     vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
     const config = new Config({
@@ -4112,7 +4112,7 @@ describe('Plans Directory Initialization', () => {
     // Should emit a warning feedback
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'warning',
-      expect.stringContaining('outside the project root'),
+      expect.stringContaining('Invalid custom plans directory'),
     );
 
     // Should still add the fallback plans directory to workspace context if it exists
