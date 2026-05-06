@@ -315,6 +315,10 @@ describe('GitService', () => {
         vi.stubEnv('HOME', safeHome);
         vi.stubEnv('API_KEY', sensitiveKey);
         vi.stubEnv('UNRELATED_VAR', 'some-value');
+        // Explicitly unset strict mode triggers to ensure predictable test behavior
+        // across local and CI environments.
+        vi.stubEnv('GITHUB_SHA', '');
+        vi.stubEnv('SURFACE', '');
         hoistedMockCheckIsRepo.mockResolvedValue(false);
       });
 
@@ -354,12 +358,21 @@ describe('GitService', () => {
         expect(callArgs.API_KEY).toBeUndefined();
       });
 
-      it('should preserve unrelated environment variables (non-strict mode)', async () => {
+      it('should preserve unrelated environment variables in non-strict mode', async () => {
         const service = new GitService(projectRoot, storage);
         await service.setupShadowGitRepository();
 
         const callArgs = hoistedMockEnv.mock.calls[0][0];
         expect(callArgs.UNRELATED_VAR).toBe('some-value');
+      });
+
+      it('should explicitly unset GIT_DIR and GIT_WORK_TREE to maintain isolation', async () => {
+        const service = new GitService(projectRoot, storage);
+        await service.setupShadowGitRepository();
+
+        const callArgs = hoistedMockEnv.mock.calls[0][0];
+        expect(callArgs.GIT_DIR).toBeUndefined();
+        expect(callArgs.GIT_WORK_TREE).toBeUndefined();
       });
     });
 

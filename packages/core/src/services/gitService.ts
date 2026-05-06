@@ -69,6 +69,9 @@ export class GitService {
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
       GIT_CONFIG_SYSTEM: systemConfigPath,
+      // Ensure we don't inherit isolation-breaking variables from the user environment.
+      GIT_DIR: undefined,
+      GIT_WORK_TREE: undefined,
       // Explicitly provide identity to prevent "Author identity unknown" errors
       // inside sandboxed environments like Docker where the gitconfig might not
       // be picked up properly.
