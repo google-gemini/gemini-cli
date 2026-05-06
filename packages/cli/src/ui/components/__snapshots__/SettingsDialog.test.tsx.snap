@@ -46,6 +46,24 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`SettingsDialog > Initial Rendering > should render the bottom border correctly when height is constrained 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ ╰─Search to filter─────────────────────────────────────────────────────────────────────────────╯ │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│  ▼ Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
