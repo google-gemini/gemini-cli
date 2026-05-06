@@ -104,6 +104,7 @@ export class Task {
     resolve: () => void;
     reject: (reason?: Error) => void;
   };
+  private isCompletionPromiseResolved = true;
 
   private constructor(
     id: string,
@@ -180,8 +181,21 @@ export class Task {
   }
 
   private _resetToolCompletionPromise(): void {
+    if (!this.isCompletionPromiseResolved) {
+      return;
+    }
+    this.isCompletionPromiseResolved = false;
     this.toolCompletionPromise = new Promise((resolve, reject) => {
-      this.toolCompletionNotifier = { resolve, reject };
+      this.toolCompletionNotifier = {
+        resolve: () => {
+          this.isCompletionPromiseResolved = true;
+          resolve();
+        },
+        reject: (reason?: Error) => {
+          this.isCompletionPromiseResolved = true;
+          reject(reason);
+        },
+      };
     });
     // If there are no pending calls when reset, resolve immediately.
     if (this.pendingToolCalls.size === 0 && this.toolCompletionNotifier) {
