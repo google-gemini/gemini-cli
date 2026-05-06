@@ -253,15 +253,11 @@ const renderDialog = async (
     },
   );
 
-type MockSettingsFileWithReadOnly = MockSettingsFile & {
-  readOnly?: boolean;
-};
-
 const createSettingsFile = (
   path: string,
   settings: Record<string, unknown> = {},
   readOnly?: boolean,
-): MockSettingsFileWithReadOnly => ({
+): MockSettingsFile => ({
   settings,
   originalSettings: settings,
   path,
