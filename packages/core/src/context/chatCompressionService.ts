@@ -33,9 +33,9 @@ import {
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
-import { ContextWindow } from '../services/contextWindow.js';
-import { TFIDFEmbedder } from '../services/embeddingService.js';
-import { ClusterSummarizer } from '../services/clusterSummarizer.js';
+import { ContextWindow } from './contextWindow.js';
+import { TFIDFEmbedder } from './embeddingService.js';
+import { ClusterSummarizer } from './clusterSummarizer.js';
 import { sanitizePromptString } from '../utils/sanitizePromptInput.js';
 
 /**
