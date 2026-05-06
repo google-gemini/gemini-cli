@@ -235,6 +235,43 @@ describe('ChatRecordingService', () => {
       )) as ConversationRecord;
       expect(conversation.sessionId).toBe('old-session-id');
     });
+
+    it('should not write a session file until the first record is appended', async () => {
+      // Regression: a fresh ChatRecordingService that gets initialized and
+      // then immediately discarded (e.g. when the CLI swaps in a resumed chat
+      // right after `client.initialize()`) must not leave an orphan stub on
+      // disk. Otherwise a second file with the resumed sessionId pollutes the
+      // chats directory and triggers the cleanup's shortId-suffix dedup,
+      // wiping the original session and any forks taken from it.
+      await chatRecordingService.initialize();
+
+      const chatsDir = path.join(testTempDir, 'chats');
+      expect(fs.existsSync(chatsDir) ? fs.readdirSync(chatsDir) : []).toEqual(
+        [],
+      );
+
+      // The conversation is still tracked in memory so callers can read it.
+      const cached = chatRecordingService.getConversation();
+      expect(cached?.sessionId).toBe('test-session-id');
+      expect(cached?.messages).toEqual([]);
+
+      // First write flushes the buffered metadata header alongside the record.
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const lines = fs
+        .readFileSync(sessionFile, 'utf-8')
+        .split('\n')
+        .filter((l) => l.trim());
+      // First record: buffered metadata header + the message itself, plus
+      // the lastUpdated tick that pushMessage emits after each append.
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      expect(JSON.parse(lines[0]).sessionId).toBe('test-session-id');
+      expect(JSON.parse(lines[1]).type).toBe('user');
+    });
   });
 
   describe('recordMessage', () => {
@@ -1425,6 +1462,56 @@ describe('ChatRecordingService', () => {
       expect(a.filePath).not.toBe(b.filePath);
       expect(fs.existsSync(a.filePath)).toBe(true);
       expect(fs.existsSync(b.filePath)).toBe(true);
+    });
+
+    it('rewrites $set sessionId markers in the source so the fork loads with its own id', async () => {
+      // Regression: ChatRecordingService writes `{$set: { sessionId }}`
+      // entries when resuming an existing session, so any session that has
+      // ever been resumed will carry the source id in a later $set. fork()
+      // must rewrite those to the new id, otherwise loadConversationRecord
+      // folds the source id back into metadata and the fork shows up under
+      // the source's id in --list-sessions.
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hi',
+        model: 'm',
+      });
+
+      // Simulate a prior resume by appending a $set:sessionId marker.
+      const sourceFile = chatRecordingService.getConversationFilePath()!;
+      fs.appendFileSync(
+        sourceFile,
+        JSON.stringify({ $set: { sessionId: 'test-session-id' } }) + '\n',
+      );
+
+      const cryptoModule = await import('node:crypto');
+      vi.mocked(cryptoModule.randomUUID).mockReturnValueOnce(
+        'fork9999-aaaa-bbbb-cccc-dddddddddddd' as ReturnType<
+          typeof cryptoModule.randomUUID
+        >,
+      );
+
+      const result = chatRecordingService.fork();
+
+      const loaded = await loadConversationRecord(result.filePath);
+      expect(loaded?.sessionId).toBe('fork9999-aaaa-bbbb-cccc-dddddddddddd');
+
+      const forkLines = fs
+        .readFileSync(result.filePath, 'utf-8')
+        .split('\n')
+        .filter((l) => l.trim());
+      const setLines = forkLines
+        .map((l) => JSON.parse(l))
+        .filter((r) => r && typeof r === 'object' && '$set' in r);
+      expect(setLines.length).toBeGreaterThan(0);
+      for (const entry of setLines) {
+        if ('sessionId' in entry.$set) {
+          expect(entry.$set.sessionId).toBe(
+            'fork9999-aaaa-bbbb-cccc-dddddddddddd',
+          );
+        }
+      }
     });
 
     it('rethrows ENOSPC with a friendlier message', async () => {

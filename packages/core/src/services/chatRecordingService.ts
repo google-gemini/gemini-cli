@@ -309,6 +309,12 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private context: AgentLoopContext;
+  // Metadata header buffered for a brand-new (non-resumed) session. Written to
+  // disk on the first appendRecord so that an instance that gets discarded
+  // before any real record is appended (e.g. when the CLI immediately swaps
+  // in a resumed chat) leaves no orphan stub file behind. Stays null in the
+  // resumed path because the source file already contains its own metadata.
+  private pendingMetadata: object | null = null;
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -428,7 +434,7 @@ export class ChatRecordingService {
           directories,
         };
 
-        this.appendRecord(initialMetadata);
+        this.pendingMetadata = initialMetadata;
         this.cachedConversation = {
           ...initialMetadata,
           messages: [],
@@ -451,9 +457,14 @@ export class ChatRecordingService {
   private appendRecord(record: unknown): void {
     if (!this.conversationFile) return;
     try {
-      const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.appendFileSync(this.conversationFile, line);
+      let payload = '';
+      if (this.pendingMetadata) {
+        payload += JSON.stringify(this.pendingMetadata) + '\n';
+        this.pendingMetadata = null;
+      }
+      payload += JSON.stringify(record) + '\n';
+      fs.appendFileSync(this.conversationFile, payload);
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
@@ -722,7 +733,7 @@ export class ChatRecordingService {
         if (!line.trim()) continue;
         try {
           const parsed = JSON.parse(line) as unknown;
-          if (isPartialMetadataRecord(parsed)) {
+          if (!metadataRewritten && isPartialMetadataRecord(parsed)) {
             const updated = {
               ...parsed,
               sessionId: newSessionId,
@@ -731,10 +742,21 @@ export class ChatRecordingService {
             };
             lines[i] = JSON.stringify(updated);
             metadataRewritten = true;
-            break;
+          } else if (
+            isMetadataUpdateRecord(parsed) &&
+            hasProperty(parsed.$set, 'sessionId')
+          ) {
+            // Rewrite any later $set:sessionId markers to the fork id —
+            // loadConversationRecord folds every $set into metadata, so leaving
+            // the source's id here would cause the fork to be read with the
+            // source's id and shadow the rewritten header.
+            lines[i] = JSON.stringify({
+              ...parsed,
+              $set: { ...parsed.$set, sessionId: newSessionId },
+            });
           }
         } catch {
-          // Not the metadata line — keep scanning.
+          // Not a JSON line — keep scanning.
         }
       }
       if (!metadataRewritten) {
