@@ -199,20 +199,19 @@ describe('<HistoryItemDisplay />', () => {
   });
 
   it('renders ExportSessionMessage for "export_session" type', async () => {
+    const testPath = path.join(path.sep, 'test', 'path.json');
     const item: HistoryItem = {
       ...baseItem,
       type: 'export_session',
       exportSession: {
         isPending: false,
-        targetPath: '/test/path.json',
+        targetPath: testPath,
       },
     };
     const { lastFrame, unmount } = await renderWithProviders(
       <HistoryItemDisplay {...baseItem} item={item} />,
     );
-    expect(lastFrame()).toContain(
-      'Successfully exported session to /test/path.json',
-    );
+    expect(lastFrame()).toContain(`Successfully exported session to ${testPath}`);
     unmount();
   });
 

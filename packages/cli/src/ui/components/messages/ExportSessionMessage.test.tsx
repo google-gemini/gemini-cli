@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import { render } from '../../../test-utils/render.js';
 import { Text } from 'ink';
 import { describe, it, expect, vi } from 'vitest';
@@ -23,17 +24,18 @@ describe('ExportSessionMessage', () => {
   });
 
   it('renders success state correctly', async () => {
+    const testPath = path.join(path.sep, 'path', 'to', 'session.json');
     const { lastFrame } = await render(
       <ExportSessionMessage
         exportSession={{
           isPending: false,
-          targetPath: '/path/to/session.json',
+          targetPath: testPath,
         }}
       />,
     );
     expect(lastFrame()).toContain('✓');
     expect(lastFrame()).toContain(
-      'Successfully exported session to /path/to/session.json',
+      `Successfully exported session to ${testPath}`,
     );
   });
 });
