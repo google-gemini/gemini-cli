@@ -212,7 +212,9 @@ describe('<HistoryItemDisplay />', () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <HistoryItemDisplay {...baseItem} item={item} />,
     );
-    expect(lastFrame()).toContain(`Successfully exported session to ${testPath}`);
+    expect(lastFrame()).toContain(
+      `Successfully exported session to ${testPath}`,
+    );
     unmount();
   });
 

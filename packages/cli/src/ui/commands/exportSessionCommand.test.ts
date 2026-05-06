@@ -80,7 +80,13 @@ describe('exportSessionCommand', () => {
     };
     vi.mocked(SessionSelector.prototype.resolveSession).mockResolvedValue({
       sessionData: mockSessionData,
-      sessionPath: path.join(path.sep, 'tmp', 'mock-dir', 'chats', 'session.jsonl'),
+      sessionPath: path.join(
+        path.sep,
+        'tmp',
+        'mock-dir',
+        'chats',
+        'session.jsonl',
+      ),
       displayInfo: 'test',
     });
 
