@@ -297,8 +297,7 @@ JSON FORMAT:
 {
   "action": "<The exact raw characters to send, <WAIT>, or <DONE>>",
   "session_notes": "<Brief factual note to remember for future turns, if applicable>",
-  "used_knowledge": <true if you used the User Knowledge Base below to answer this prompt, false otherwise>,
-  "new_rule": "<If used_knowledge is false and action is not <WAIT> or <DONE>, formulate a single, clear, reusable one-line rule combining the question and your answer without using option numbers (e.g. 1, 2) that might change. For example: 'If asked to allow pip execution, always allow it.' or 'Automatically accept edits for snake game implementation.'>"
+  "used_knowledge": <true if you used the User Knowledge Base below to answer this prompt, false otherwise>
 }
 ${goalInstruction}${knowledgeInstruction}${sessionInstruction}${historyInstruction}${pendingToolInstruction}
 
@@ -437,11 +436,7 @@ ${strippedScreen}
           );
         }
 
-        if (
-          !parsedJson.used_knowledge &&
-          parsedJson.new_rule &&
-          this.editableKnowledgeFile
-        ) {
+        if (false) /* Disabled dynamic knowledge generation for evaluation stability */ {
           const newKnowledge = `- ${parsedJson.new_rule}\n`;
           this.knowledgeBase += newKnowledge;
           try {
