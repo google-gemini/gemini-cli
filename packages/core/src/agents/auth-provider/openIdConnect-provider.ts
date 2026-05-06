@@ -21,8 +21,8 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { Storage } from '../../config/storage.js';
 
 const OidcDiscoverySchema = z.object({
-  authorization_endpoint: z.string(),
-  token_endpoint: z.string(),
+  authorization_endpoint: z.string().url(),
+  token_endpoint: z.string().url(),
 });
 
 /**
@@ -32,7 +32,7 @@ const OidcDiscoverySchema = z.object({
 export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
   readonly type = 'openIdConnect' as const;
 
-  private tokenStorage: any | undefined;
+  private tokenStorage?: import('../../mcp/oauth-token-storage.js').MCPOAuthTokenStorage;
   private cachedToken: OAuthToken | null = null;
 
   /** Discovery endpoints */
@@ -44,9 +44,16 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
     private readonly agentName: string,
   ) {
     super();
+
+    // Security: Enforce HTTPS for issuer URL to prevent MITM and SSRF
+    if (!this.config.issuer_url.startsWith('https://')) {
+      throw new Error('OIDC issuer_url must use HTTPS');
+    }
   }
 
-  private async getTokenStorage(): Promise<any> {
+  private async getTokenStorage(): Promise<
+    import('../../mcp/oauth-token-storage.js').MCPOAuthTokenStorage
+  > {
     if (!this.tokenStorage) {
       const { MCPOAuthTokenStorage } = await import(
         '../../mcp/oauth-token-storage.js'
@@ -78,6 +85,15 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
 
       const data: unknown = await response.json();
       const parsed = OidcDiscoverySchema.parse(data);
+
+      // Security: Validate that discovered endpoints also use HTTPS
+      if (
+        !parsed.authorization_endpoint.startsWith('https://') ||
+        !parsed.token_endpoint.startsWith('https://')
+      ) {
+        throw new Error('OIDC discovery returned non-HTTPS endpoints');
+      }
+
       this.authorizationUrl = parsed.authorization_endpoint;
       this.tokenUrl = parsed.token_endpoint;
 
@@ -105,22 +121,6 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
 
     this.cachedToken = await this.authenticateInteractively();
     return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
-  }
-
-  private isOidcDiscoveryConfig(data: unknown): data is any {
-    if (typeof data !== 'object' || data === null) return false;
-
-    const hasAuth = 'authorization_endpoint' in data;
-    const hasToken = 'token_endpoint' in data;
-
-    if (hasAuth && hasToken) {
-      const d = data as Record<string, unknown>;
-      return (
-        typeof d['authorization_endpoint'] === 'string' &&
-        typeof d['token_endpoint'] === 'string'
-      );
-    }
-    return false;
   }
 
   private async authenticateInteractively(): Promise<OAuthToken> {
