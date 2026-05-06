@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import type { ExportSessionProps } from '../../types.js';
 import { CliSpinner } from '../CliSpinner.js';
@@ -20,7 +20,7 @@ export interface ExportSessionDisplayProps {
  */
 export function ExportSessionMessage({
   exportSession,
-}: ExportSessionDisplayProps): React.JSX.Element {
+}: ExportSessionDisplayProps): JSX.Element {
   const { isPending, targetPath } = exportSession;
 
   return (

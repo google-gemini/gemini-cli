@@ -227,7 +227,7 @@ export async function resolveSessionId(
       // and only keep actual conversation messages (user/gemini).
       // Best effort parse: ensure message is an object and has required fields.
       sessionData.messages = (sessionData.messages || []).filter(
-        (m: MessageRecord) =>
+        (m) =>
           typeof m === 'object' &&
           m !== null &&
           (m.type === 'user' || m.type === 'gemini') &&
