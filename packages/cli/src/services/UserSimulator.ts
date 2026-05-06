@@ -121,7 +121,9 @@ export class UserSimulator {
       // Stabilization delay: Wait for the terminal UI to finish rendering
       // (e.g. ANSI clear/repaint sequences) before looking at the screen.
       // Increased to 1s to handle high-latency PTYs in Docker.
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Force a terminal repaint by sending SIGWINCH to the current process.
+      process.kill(process.pid, "SIGWINCH");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const screen = this.getScreen();
       if (!screen) return;
