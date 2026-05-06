@@ -62,6 +62,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { LRUCache } from 'mnemonist';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -127,7 +128,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
-  private cachedModelToUse?: string;
+  private cache: LRUCache<string, string>;
 
   private get executionContext(): AgentLoopContext {
     return {
@@ -312,6 +313,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.cache = new LRUCache<string, string>(10);
 
     this.agentId = Math.random().toString(36).slice(2, 8);
   }
@@ -952,8 +954,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let modelToUse: string;
     if (isAutoModel(requestedModel)) {
-      if (this.cachedModelToUse) {
-        modelToUse = this.cachedModelToUse;
+      const cached = this.cache.get('modelToUse');
+      if (cached) {
+        modelToUse = cached;
       } else {
         // TODO(joshualitt): This try / catch is inconsistent with the routing
         // behavior for the main agent. Ideally, we would have a universal
@@ -970,10 +973,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           const router = this.context.config.getModelRouterService();
           const decision = await router.route(routingContext);
           modelToUse = decision.model;
-          this.cachedModelToUse = modelToUse;
+          this.cache.set('modelToUse', modelToUse);
         } catch (error) {
           debugLogger.warn(`Error during model routing: ${error}`);
           modelToUse = DEFAULT_GEMINI_MODEL;
+          this.cache.set('modelToUse', modelToUse);
         }
       }
     } else {
