@@ -86,12 +86,10 @@ export class A2AAuthProviderFactory {
         const { OpenIdConnectAuthProvider } = await import(
           './openIdConnect-provider.js'
         );
-        const provider = new OpenIdConnectAuthProvider(
+        return OpenIdConnectAuthProvider.create(
           authConfig,
           options.agentName ?? 'unknown',
         );
-        await provider.initialize();
-        return provider;
       }
 
       default: {

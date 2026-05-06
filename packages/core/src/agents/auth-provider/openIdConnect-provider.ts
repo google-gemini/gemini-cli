@@ -25,6 +25,8 @@ const OidcDiscoverySchema = z.object({
   token_endpoint: z.string().url(),
 });
 
+type OidcEndpoints = z.infer<typeof OidcDiscoverySchema>;
+
 /**
  * Authentication provider for OpenID Connect (OIDC).
  * Extends OAuth2 with dynamic discovery and identity token handling.
@@ -35,19 +37,64 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
   private tokenStorage?: import('../../mcp/oauth-token-storage.js').MCPOAuthTokenStorage;
   private cachedToken: OAuthToken | null = null;
 
-  /** Discovery endpoints */
-  private authorizationUrl?: string;
-  private tokenUrl?: string;
-
-  constructor(
+  private constructor(
     private readonly config: OpenIdConnectAuthConfig,
     private readonly agentName: string,
+    private readonly endpoints: OidcEndpoints,
   ) {
     super();
+  }
 
-    // Security: Enforce HTTPS for issuer URL to prevent MITM and SSRF
-    if (!this.config.issuer_url.startsWith('https://')) {
+  /**
+   * Factory method to discover endpoints and create a validated provider instance.
+   * This ensures all remote settings are gathered before object initialization
+   * to avoid resource leaks and unvalidated states.
+   */
+  static async create(
+    config: OpenIdConnectAuthConfig,
+    agentName: string,
+  ): Promise<OpenIdConnectAuthProvider> {
+    // Security: Enforce HTTPS for issuer URL
+    if (!config.issuer_url.startsWith('https://')) {
       throw new Error('OIDC issuer_url must use HTTPS');
+    }
+
+    const discoveryUrl = config.issuer_url.endsWith('/')
+      ? `${config.issuer_url}.well-known/openid-configuration`
+      : `${config.issuer_url}/.well-known/openid-configuration`;
+
+    debugLogger.debug(`[OIDC] Performing discovery at ${discoveryUrl}`);
+
+    const response = await fetch(discoveryUrl);
+    if (!response.ok) {
+      throw new Error(`OIDC Discovery failed: ${response.statusText}`);
+    }
+
+    const data: unknown = await response.json();
+    const endpoints = OidcDiscoverySchema.parse(data);
+
+    // Security: Validate that discovered endpoints also use HTTPS to prevent MITM
+    if (
+      !endpoints.authorization_endpoint.startsWith('https://') ||
+      !endpoints.token_endpoint.startsWith('https://')
+    ) {
+      throw new Error('OIDC discovery returned non-HTTPS endpoints');
+    }
+
+    const instance = new OpenIdConnectAuthProvider(
+      config,
+      agentName,
+      endpoints,
+    );
+    await instance.initializeFromCache();
+    return instance;
+  }
+
+  private async initializeFromCache(): Promise<void> {
+    const storage = await this.getTokenStorage();
+    const credentials = await storage.getCredentials(this.agentName);
+    if (credentials && !storage.isTokenExpired(credentials.token)) {
+      this.cachedToken = credentials.token;
     }
   }
 
@@ -66,68 +113,17 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
     return this.tokenStorage;
   }
 
-  /**
-   * Performs OIDC Discovery to find endpoints.
-   */
-  override async initialize(): Promise<void> {
-    debugLogger.debug(
-      `[OIDC] Initializing discovery for ${this.config.issuer_url}`,
-    );
-
-    try {
-      const discoveryUrl = this.config.issuer_url.endsWith('/')
-        ? `${this.config.issuer_url}.well-known/openid-configuration`
-        : `${this.config.issuer_url}/.well-known/openid-configuration`;
-
-      const response = await fetch(discoveryUrl);
-      if (!response.ok)
-        throw new Error(`Discovery failed: ${response.statusText}`);
-
-      const data: unknown = await response.json();
-      const parsed = OidcDiscoverySchema.parse(data);
-
-      // Security: Validate that discovered endpoints also use HTTPS
-      if (
-        !parsed.authorization_endpoint.startsWith('https://') ||
-        !parsed.token_endpoint.startsWith('https://')
-      ) {
-        throw new Error('OIDC discovery returned non-HTTPS endpoints');
-      }
-
-      this.authorizationUrl = parsed.authorization_endpoint;
-      this.tokenUrl = parsed.token_endpoint;
-
-      debugLogger.debug(`[OIDC] Discovered endpoints for ${this.agentName}`);
-    } catch (error) {
-      debugLogger.error(`[OIDC] Failed to discover OIDC endpoints: ${error}`);
-      throw error;
-    }
-
-    // Load existing token if available
-    const storage = await this.getTokenStorage();
-    const credentials = await storage.getCredentials(this.agentName);
-    if (credentials && !storage.isTokenExpired(credentials.token)) {
-      this.cachedToken = credentials.token;
-    }
-  }
-
   override async headers(): Promise<HttpHeaders> {
     const storage = await this.getTokenStorage();
     if (this.cachedToken && !storage.isTokenExpired(this.cachedToken)) {
       return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
     }
 
-    // TODO: Add refresh logic similar to OAuth2AuthProvider
-
     this.cachedToken = await this.authenticateInteractively();
     return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
   }
 
   private async authenticateInteractively(): Promise<OAuthToken> {
-    if (!this.authorizationUrl || !this.tokenUrl) {
-      throw new Error('OIDC provider not initialized (endpoints missing)');
-    }
-
     await getConsentForOauth(this.agentName);
 
     const pkce = generatePKCEParams();
@@ -136,8 +132,8 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
     const authUrl = buildAuthorizationUrl(
       {
         clientId: this.config.client_id,
-        authorizationUrl: this.authorizationUrl,
-        tokenUrl: this.tokenUrl,
+        authorizationUrl: this.endpoints.authorization_endpoint,
+        tokenUrl: this.endpoints.token_endpoint,
         scopes: ['openid', ...(this.config.scopes || [])],
       },
       pkce,
@@ -151,15 +147,13 @@ export class OpenIdConnectAuthProvider extends BaseA2AAuthProvider {
       {
         clientId: this.config.client_id,
         clientSecret: this.config.client_secret,
-        authorizationUrl: this.authorizationUrl,
-        tokenUrl: this.tokenUrl,
+        authorizationUrl: this.endpoints.authorization_endpoint,
+        tokenUrl: this.endpoints.token_endpoint,
       },
       code,
       pkce.codeVerifier,
       await port,
     );
-
-    // TODO: Validate id_token if needed
 
     const token: OAuthToken = {
       accessToken: tokenResponse.access_token,

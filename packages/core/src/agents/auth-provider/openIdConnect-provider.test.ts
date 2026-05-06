@@ -49,7 +49,7 @@ describe('OpenIdConnectAuthProvider', () => {
     vi.unstubAllGlobals();
   });
 
-  it('should discover endpoints during initialization', async () => {
+  it('should discover endpoints and create instance during factory creation', async () => {
     const mockDiscoveryResponse: MockDiscoveryResponse = {
       authorization_endpoint: 'https://example.com/auth/authorize',
       token_endpoint: 'https://example.com/auth/token',
@@ -61,8 +61,6 @@ describe('OpenIdConnectAuthProvider', () => {
       json: async () => mockDiscoveryResponse,
     } as Response);
 
-    const provider = new OpenIdConnectAuthProvider(mockConfig, agentName);
-
     // Mock token storage instance
     const mockStorage = {
       getCredentials: vi.fn().mockResolvedValue(null),
@@ -72,23 +70,37 @@ describe('OpenIdConnectAuthProvider', () => {
       () => mockStorage as unknown as MCPOAuthTokenStorage,
     );
 
-    await provider.initialize();
+    const provider = await OpenIdConnectAuthProvider.create(
+      mockConfig,
+      agentName,
+    );
 
     expect(fetch).toHaveBeenCalledWith(
       'https://example.com/auth/.well-known/openid-configuration',
     );
-    expect(MCPOAuthTokenStorage).toHaveBeenCalled();
+    expect(provider).toBeInstanceOf(OpenIdConnectAuthProvider);
   });
 
-  it('should throw if discovery fails', async () => {
+  it('should throw if issuer_url is not HTTPS', async () => {
+    const insecureConfig = { ...mockConfig, issuer_url: 'http://insecure.com' };
+    await expect(
+      OpenIdConnectAuthProvider.create(insecureConfig, agentName),
+    ).rejects.toThrow('OIDC issuer_url must use HTTPS');
+  });
+
+  it('should throw if discovered endpoints are not HTTPS', async () => {
+    const mockInsecureDiscovery = {
+      authorization_endpoint: 'http://example.com/auth/authorize',
+      token_endpoint: 'https://example.com/auth/token',
+    };
+
     vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      statusText: 'Not Found',
+      ok: true,
+      json: async () => mockInsecureDiscovery,
     } as Response);
 
-    const provider = new OpenIdConnectAuthProvider(mockConfig, agentName);
-    await expect(provider.initialize()).rejects.toThrow(
-      'Discovery failed: Not Found',
-    );
+    await expect(
+      OpenIdConnectAuthProvider.create(mockConfig, agentName),
+    ).rejects.toThrow('OIDC discovery returned non-HTTPS endpoints');
   });
 });
