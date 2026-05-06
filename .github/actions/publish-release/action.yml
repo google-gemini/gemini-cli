@@ -312,11 +312,13 @@ runs:
 
         # Check for and prepare macOS binaries if they exist
         if [[ -f "dist/darwin-arm64/gemini" ]]; then
+          chmod +x dist/darwin-arm64/gemini
           zip -j gemini-darwin-arm64-unsigned.zip dist/darwin-arm64/gemini
           RELEASE_ASSETS+=("gemini-darwin-arm64-unsigned.zip")
         fi
 
         if [[ -f "dist/darwin-x64/gemini" ]]; then
+          chmod +x dist/darwin-x64/gemini
           zip -j gemini-darwin-x64-unsigned.zip dist/darwin-x64/gemini
           RELEASE_ASSETS+=("gemini-darwin-x64-unsigned.zip")
         fi
