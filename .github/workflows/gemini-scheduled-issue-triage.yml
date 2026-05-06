@@ -47,8 +47,8 @@ jobs:
           ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
         run: |
           set -euo pipefail
-          ISSUE_JSON=$(echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]')
-          echo "issues_to_triage=${ISSUE_JSON}" >> "${GITHUB_OUTPUT}"
+          echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]' > issues_to_triage.json
+          echo "has_issues=true" >> "${GITHUB_OUTPUT}"
           echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
 
       - name: 'Find untriaged issues'
@@ -62,24 +62,26 @@ jobs:
           set -euo pipefail
 
           echo '🔍 Finding issues missing area labels...'
-          NO_AREA_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body)"
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body > no_area_issues.json
 
           echo '🔍 Finding issues missing kind labels...'
-          NO_KIND_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body)"
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body > no_kind_issues.json
 
           echo '🏷️ Finding issues missing priority labels...'
-          NO_PRIORITY_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body)"
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body > no_priority_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
-          ISSUES="$(echo "${NO_AREA_ISSUES}" "${NO_KIND_ISSUES}" "${NO_PRIORITY_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json > issues_to_triage.json
 
-          echo '📝 Setting output for GitHub Actions...'
-          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
-
-          ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
+          ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            echo "has_issues=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_issues=false" >> "${GITHUB_OUTPUT}"
+          fi
           echo "✅ Found ${ISSUE_COUNT} unique issues to triage! 🎯"
 
       - name: 'Get Repository Labels'
@@ -99,15 +101,14 @@ jobs:
 
       - name: 'Run Gemini Issue Analysis'
         if: |-
-          (steps.get_issue_from_event.outputs.issues_to_triage != '' && steps.get_issue_from_event.outputs.issues_to_triage != '[]') ||
-          (steps.find_issues.outputs.issues_to_triage != '' && steps.find_issues.outputs.issues_to_triage != '[]')
+          steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_issues == 'true'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -120,7 +121,8 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(echo)"
+                "run_shell_command(echo)",
+                "read_file"
               ],
               "telemetry": {
                 "enabled": true,
@@ -136,9 +138,9 @@ jobs:
 
             ## Steps
 
-            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
-            2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
-            3. Review the issue title, body and any comments provided in the environment variables.
+            1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            2. Use the read_file tool to read the file "issues_to_triage.json" which contains the JSON array of issues to triage.
+            3. Review the issue title, body and any comments provided in the JSON file.
             4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/* and priority/*.
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
