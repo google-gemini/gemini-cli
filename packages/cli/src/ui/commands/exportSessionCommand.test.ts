@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { exportSessionCommand } from './exportSessionCommand.js';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { SessionSelector } from '../../utils/sessionUtils.js';
 import type { CommandContext } from './types.js';
 import { Storage, type ConversationRecord } from '@google/gemini-cli-core';
@@ -21,7 +22,7 @@ describe('exportSessionCommand', () => {
     vi.resetAllMocks();
     vi.spyOn(Storage.prototype, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
-      '/tmp/mock-dir',
+      path.join(path.sep, 'tmp', 'mock-dir'),
     );
     mockContext = {
       services: {
@@ -34,9 +35,9 @@ describe('exportSessionCommand', () => {
         },
       },
       invocation: {
-        args: '  /path/to/export.json  ',
+        args: '  export.json  ',
         name: 'export-session',
-        raw: '/export-session /path/to/export.json',
+        raw: '/export-session export.json',
       },
       ui: {
         addItem: vi.fn(),
@@ -79,7 +80,7 @@ describe('exportSessionCommand', () => {
     };
     vi.mocked(SessionSelector.prototype.resolveSession).mockResolvedValue({
       sessionData: mockSessionData,
-      sessionPath: '/tmp/mock-dir/chats/session.jsonl',
+      sessionPath: path.join(path.sep, 'tmp', 'mock-dir', 'chats', 'session.jsonl'),
       displayInfo: 'test',
     });
 
@@ -89,7 +90,7 @@ describe('exportSessionCommand', () => {
 
     expect(result).toBeUndefined();
     expect(fs.writeFile).toHaveBeenCalledWith(
-      '/path/to/export.json',
+      path.resolve(process.cwd(), 'export.json'),
       JSON.stringify(mockSessionData, null, 2),
       'utf-8',
     );
