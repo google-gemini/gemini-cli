@@ -17,6 +17,7 @@ import {
   getGlobalMemoryFilePath,
   PROJECT_MEMORY_INDEX_FILENAME,
 } from '../tools/memoryTool.js';
+import { isSubpath } from '../utils/paths.js';
 import {
   type AppliedSkillPatchTarget,
   applyParsedPatchesWithAllowedRoots,
@@ -427,11 +428,7 @@ function getMemoryPatchRoot(
 }
 
 function isSubpathOrSame(childPath: string, parentPath: string): boolean {
-  const relativePath = path.relative(parentPath, childPath);
-  return (
-    relativePath === '' ||
-    (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
-  );
+  return isSubpath(parentPath, childPath);
 }
 
 function normalizeInboxMemoryPatchPath(
@@ -503,13 +500,24 @@ function uniqueResolvedPaths(paths: readonly string[]): string[] {
   return Array.from(new Set(paths.map((filePath) => path.resolve(filePath))));
 }
 
+function isSamePath(leftPath: string, rightPath: string): boolean {
+  return isSubpath(leftPath, rightPath) && isSubpath(rightPath, leftPath);
+}
+
+function includesSamePath(
+  paths: readonly string[],
+  targetPath: string,
+): boolean {
+  return paths.some((candidate) => isSamePath(candidate, targetPath));
+}
+
 function isAllowedPrivateMemoryDocumentPath(
   targetPath: string,
   memoryDirs: readonly string[],
 ): boolean {
   const resolvedTargetPath = path.resolve(targetPath);
   const targetDir = path.dirname(resolvedTargetPath);
-  if (!memoryDirs.includes(targetDir)) {
+  if (!includesSamePath(memoryDirs, targetDir)) {
     return false;
   }
   return isAllowedPrivateMemoryFileName(path.basename(resolvedTargetPath));
@@ -520,7 +528,7 @@ function isAllowedGlobalMemoryDocumentPath(
   globalMemoryFiles: readonly string[],
 ): boolean {
   const resolvedTargetPath = path.resolve(targetPath);
-  return globalMemoryFiles.includes(resolvedTargetPath);
+  return includesSamePath(globalMemoryFiles, resolvedTargetPath);
 }
 
 async function getMemoryPatchTargetValidationContext(

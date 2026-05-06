@@ -325,6 +325,8 @@ describe('memory commands', () => {
     let projectRoot: string;
     let globalMemoryDir: string;
     let patchConfig: Config;
+    const isCaseInsensitivePathPlatform =
+      process.platform === 'win32' || process.platform === 'darwin';
 
     function buildUpdatePatch(
       absoluteTargetPath: string,
@@ -370,6 +372,12 @@ describe('memory commands', () => {
         ...additions,
         '',
       ].join('\n');
+    }
+
+    function swapAsciiPathCase(filePath: string): string {
+      return filePath.replace(/[a-z]/gi, (char) =>
+        char === char.toLowerCase() ? char.toUpperCase() : char.toLowerCase(),
+      );
     }
 
     beforeEach(async () => {
@@ -569,6 +577,39 @@ describe('memory commands', () => {
       ).rejects.toThrow();
     });
 
+    it.runIf(isCaseInsensitivePathPlatform)(
+      'accepts private memory patch targets with different path casing',
+      async () => {
+        const target = path.join(memoryTempDir, 'MEMORY.md');
+        await fs.writeFile(target, '- old\n');
+
+        const patchDir = path.join(memoryTempDir, '.inbox', 'private');
+        await fs.mkdir(patchDir, { recursive: true });
+        await fs.writeFile(
+          path.join(patchDir, 'MEMORY.patch'),
+          buildUpdatePatch(
+            swapAsciiPathCase(target),
+            '- old\n',
+            '- accepted\n',
+          ),
+        );
+
+        const patches = await listInboxMemoryPatches(patchConfig);
+        expect(patches).toHaveLength(1);
+
+        const result = await applyInboxMemoryPatch(
+          patchConfig,
+          'private',
+          'MEMORY.patch',
+        );
+
+        expect(result.success).toBe(true);
+        await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+          '- accepted\n',
+        );
+      },
+    );
+
     it('applies a private creation patch with a paired MEMORY.md pointer', async () => {
       // The auto-memory contract: creating a sibling .md file requires a
       // hunk that adds a pointer to MEMORY.md (so the sibling becomes
@@ -762,6 +803,39 @@ describe('memory commands', () => {
         fs.access(path.join(patchDir, 'GEMINI.patch')),
       ).rejects.toThrow();
     });
+
+    it.runIf(isCaseInsensitivePathPlatform)(
+      'accepts global memory patch targets with different path casing',
+      async () => {
+        const target = path.join(globalMemoryDir, 'GEMINI.md');
+        await fs.writeFile(target, '- prefer X\n');
+
+        const patchDir = path.join(memoryTempDir, '.inbox', 'global');
+        await fs.mkdir(patchDir, { recursive: true });
+        await fs.writeFile(
+          path.join(patchDir, 'GEMINI.patch'),
+          buildUpdatePatch(
+            swapAsciiPathCase(target),
+            '- prefer X\n',
+            '- prefer Y\n',
+          ),
+        );
+
+        const patches = await listInboxMemoryPatches(patchConfig);
+        expect(patches).toHaveLength(1);
+
+        const result = await applyInboxMemoryPatch(
+          patchConfig,
+          'global',
+          'GEMINI.patch',
+        );
+
+        expect(result.success).toBe(true);
+        await expect(fs.readFile(target, 'utf-8')).resolves.toBe(
+          '- prefer Y\n',
+        );
+      },
+    );
 
     it('dismisses a single memory patch from the inbox (legacy single-file mode)', async () => {
       const patchDir = path.join(memoryTempDir, '.inbox', 'global');
