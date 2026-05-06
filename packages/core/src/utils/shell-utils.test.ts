@@ -485,19 +485,22 @@ describe('getShellConfiguration', () => {
       expect(config.shell).toBe('powershell');
     });
 
-    it('should prefer pwsh.exe over powershell.exe when pwsh is available in PATH', () => {
-      const pwshDir = path.resolve('C:\\Program Files\\PowerShell\\7');
-      const pwshPath = path.join(pwshDir, 'pwsh.exe');
-      vi.stubEnv('PATH', pwshDir);
-      mockAccessSync.mockImplementation((p: string) => {
-        if (p === pwshPath) return;
-        throw new Error('ENOENT');
-      });
-      const config = getShellConfiguration();
-      expect(config.executable).toBe(pwshPath);
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
-      expect(config.shell).toBe('powershell');
-    });
+    it.skipIf(!isWindowsRuntime)(
+      'should prefer pwsh.exe over powershell.exe when pwsh is available in PATH',
+      () => {
+        const pwshDir = path.resolve('C:\\Program Files\\PowerShell\\7');
+        const pwshPath = path.join(pwshDir, 'pwsh.exe');
+        vi.stubEnv('PATH', pwshDir);
+        mockAccessSync.mockImplementation((p: string) => {
+          if (p === pwshPath) return;
+          throw new Error('ENOENT');
+        });
+        const config = getShellConfiguration();
+        expect(config.executable).toBe(pwshPath);
+        expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+        expect(config.shell).toBe('powershell');
+      },
+    );
 
     it('should ignore ComSpec when pointing to cmd.exe', () => {
       vi.stubEnv('ComSpec', 'C:\\WINDOWS\\system32\\cmd.exe');
