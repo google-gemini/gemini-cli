@@ -82,9 +82,17 @@ export class A2AAuthProviderFactory {
         return provider;
       }
 
-      case 'openIdConnect':
-        // TODO: Implement
-        throw new Error('openIdConnect auth provider not yet implemented');
+      case 'openIdConnect': {
+        const { OpenIdConnectAuthProvider } = await import(
+          './openIdConnect-provider.js'
+        );
+        const provider = new OpenIdConnectAuthProvider(
+          authConfig,
+          options.agentName ?? 'unknown',
+        );
+        await provider.initialize();
+        return provider;
+      }
 
       default: {
         const _exhaustive: never = authConfig;
