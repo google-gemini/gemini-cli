@@ -26,4 +26,7 @@ export interface ContextEnvironment {
   readonly inbox: LiveInbox;
   readonly behaviorRegistry: NodeBehaviorRegistry;
   readonly graphMapper: ContextGraphMapper;
+  readonly renderOptions?: {
+    calibrateTokenCalculation?: boolean;
+  };
 }

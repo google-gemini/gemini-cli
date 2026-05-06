@@ -10,7 +10,7 @@ import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import { debugLogger } from '../../utils/debugLogger.js';
+import { performCalibration } from '../utils/tokenCalibration.js';
 
 /**
  * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -59,42 +59,6 @@ export async function render(
     reasons: Object.fromEntries(protectionReasons),
   });
 
-  // Fire-and-forget asynchronous calibration to track estimator drift
-  const performCalibration = (
-    finalNodes: readonly ConcreteNode[],
-    finalContents: Content[],
-  ) => {
-    void (async () => {
-      try {
-        const exactResp = await env.llmClient.countTokens({
-          contents: finalContents,
-        });
-        const exactTokens =
-          typeof exactResp.totalTokens === 'number' ? exactResp.totalTokens : 0;
-        const estimatedTokens =
-          env.tokenCalculator.calculateConcreteListTokens(finalNodes);
-
-        const delta = Math.abs(exactTokens - estimatedTokens);
-        const tolerance = Math.max(exactTokens, estimatedTokens) * 0.2; // 20% tolerance
-
-        tracer.logEvent('Render', 'Token Calibration Measurement', {
-          exactTokens,
-          estimatedTokens,
-          delta,
-          isWithinTolerance: delta <= tolerance,
-        });
-
-        if (delta > tolerance) {
-          debugLogger.error(
-            `[Token Calibration] Large deviation detected: exact ${exactTokens} vs estimated ${estimatedTokens} (delta: ${delta})`,
-          );
-        }
-      } catch {
-        // Ignore API failures during background calibration
-      }
-    })();
-  };
-
   if (currentTokens <= maxTokens) {
     tracer.logEvent(
       'Render',
@@ -105,7 +69,7 @@ export async function render(
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
-    performCalibration(visibleNodes, contents);
+    performCalibration(env, visibleNodes, contents);
     return { history: contents, didApplyManagement: false };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -130,6 +94,7 @@ export async function render(
       agedOutNodes.add(node.id);
     }
   }
+
   const processedNodes = await orchestrator.executeTriggerSync(
     'gc_backstop',
     nodes,
@@ -153,6 +118,6 @@ export async function render(
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
-  performCalibration(visibleNodes, contents);
+  performCalibration(env, visibleNodes, contents);
   return { history: contents, didApplyManagement: true };
 }

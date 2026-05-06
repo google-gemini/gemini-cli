@@ -72,7 +72,11 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
-      this.evaluateTriggers(new Set());
+      // We explicitly DO NOT call evaluateTriggers here.
+      // The Context Manager is a one-way assembly line. It only evaluates triggers
+      // when fundamentally new organic context is added via PristineHistoryUpdated.
+      // Re-evaluating after a processor finishes creates infinite feedback loops if
+      // the processor fails to reduce the token count below the threshold.
     });
 
     this.historyObserver.start();
@@ -141,6 +145,7 @@ export class ContextManager {
           }
         }
       }
+
       if (agedOutNodes.size > 0) {
         const targetDeficit =
           currentTokens - this.sidecar.config.budget.retainedTokens;
