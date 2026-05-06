@@ -105,6 +105,7 @@ import {
   type OutputConfig,
   SubagentActivityErrorType,
 } from './types.js';
+import { ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -207,18 +208,32 @@ vi.mock('../config/scoped-config.js', async (importOriginal) => {
     ...actual,
     runWithScopedWorkspaceContext: vi.fn(actual.runWithScopedWorkspaceContext),
     createScopedWorkspaceContext: vi.fn(actual.createScopedWorkspaceContext),
+    runWithScopedAutoMemoryExtractionWriteAccess: vi.fn(
+      actual.runWithScopedAutoMemoryExtractionWriteAccess,
+    ),
+    runWithScopedMemoryInboxAccess: vi.fn(
+      actual.runWithScopedMemoryInboxAccess,
+    ),
   };
 });
 
 import {
   runWithScopedWorkspaceContext,
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
 } from '../config/scoped-config.js';
 const mockedRunWithScopedWorkspaceContext = vi.mocked(
   runWithScopedWorkspaceContext,
 );
 const mockedCreateScopedWorkspaceContext = vi.mocked(
   createScopedWorkspaceContext,
+);
+const mockedRunWithScopedMemoryInboxAccess = vi.mocked(
+  runWithScopedMemoryInboxAccess,
+);
+const mockedRunWithScopedAutoMemoryExtractionWriteAccess = vi.mocked(
+  runWithScopedAutoMemoryExtractionWriteAccess,
 );
 
 const MockedGeminiChat = vi.mocked(GeminiChat);
@@ -421,6 +436,8 @@ describe('LocalAgentExecutor', () => {
     mockedLogAgentFinish.mockReset();
     mockedRunWithScopedWorkspaceContext.mockClear();
     mockedCreateScopedWorkspaceContext.mockClear();
+    mockedRunWithScopedMemoryInboxAccess.mockClear();
+    mockedRunWithScopedAutoMemoryExtractionWriteAccess.mockClear();
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
@@ -940,6 +957,52 @@ describe('LocalAgentExecutor', () => {
       expect(mockedRunWithScopedWorkspaceContext).toHaveBeenCalledOnce();
     });
 
+    it('should use runWithScopedMemoryInboxAccess when memoryInboxAccess is set', async () => {
+      const definition = createTestDefinition();
+      definition.memoryInboxAccess = true;
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockedRunWithScopedMemoryInboxAccess).toHaveBeenCalledOnce();
+    });
+
+    it('should use the extraction write scope when autoMemoryExtractionWriteAccess is set', async () => {
+      const definition = createTestDefinition();
+      definition.autoMemoryExtractionWriteAccess = true;
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(
+        mockedRunWithScopedAutoMemoryExtractionWriteAccess,
+      ).toHaveBeenCalledOnce();
+    });
+
     it('should not use runWithScopedWorkspaceContext when workspaceDirectories is not set', async () => {
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -961,6 +1024,10 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockedCreateScopedWorkspaceContext).not.toHaveBeenCalled();
       expect(mockedRunWithScopedWorkspaceContext).not.toHaveBeenCalled();
+      expect(mockedRunWithScopedMemoryInboxAccess).not.toHaveBeenCalled();
+      expect(
+        mockedRunWithScopedAutoMemoryExtractionWriteAccess,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -1274,6 +1341,42 @@ describe('LocalAgentExecutor', () => {
       expect(output.result).toBe('All work done');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(mockScheduleAgentTools).toHaveBeenCalledTimes(2);
+    });
+
+    it('should inject Plan Mode context into the system prompt when in Plan Mode', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {}, 'none');
+      vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
+        ApprovalMode.PLAN,
+      );
+      vi.spyOn(mockConfig.storage, 'getPlansDir').mockReturnValue(
+        '/mock/plans',
+      );
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls complete_task immediately
+      mockModelResponse(
+        [
+          {
+            name: COMPLETE_TASK_TOOL_NAME,
+            args: { result: 'Plan done' },
+            id: 'call1',
+          },
+        ],
+        'Task finished.',
+      );
+
+      await executor.run({ goal: 'Do plan' }, signal);
+
+      const systemInstruction = MockedGeminiChat.mock.calls[0][1];
+      expect(systemInstruction).toContain('Execution Constraints');
+      expect(systemInstruction).toContain(
+        'You are currently operating in Plan Mode. Your write tools are globally restricted to only modifying plan (.md) files in the plans directory: /mock/plans/',
+      );
     });
 
     it('should error immediately if the model stops tools without calling complete_task (Protocol Violation)', async () => {
