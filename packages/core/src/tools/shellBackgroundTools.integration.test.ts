@@ -53,7 +53,7 @@ describe('Background Tools Integration', () => {
     const scriptPath = path.join(tempRootDir, 'log.js');
     fs.writeFileSync(
       scriptPath,
-      "setInterval(() => console.log('Log line'), 100);",
+      "console.log('Log line'); setInterval(() => console.log('Log line'), 100);",
     );
 
     // Using 'node' directly avoids cross-platform shell quoting issues with absolute paths.
@@ -101,7 +101,8 @@ describe('Background Tools Integration', () => {
     );
 
     // 4. Give it time to write output to interval
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // 5 seconds is safer for slow CI environments like Windows
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // 5. Model decides to read logs
     const readInvocation = readTool.build({ pid, lines: 2 });
