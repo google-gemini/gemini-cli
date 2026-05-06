@@ -338,7 +338,10 @@ describe('GitService', () => {
         await service.setupShadowGitRepository();
 
         const expectedConfigPath = path.join(repoDir, '.gitconfig');
-        const expectedSystemPath = path.join(repoDir, '.gitconfig_system_empty');
+        const expectedSystemPath = path.join(
+          repoDir,
+          '.gitconfig_system_empty',
+        );
 
         expect(hoistedMockEnv).toHaveBeenCalledWith(
           expect.objectContaining({
