@@ -136,11 +136,6 @@ describe('System Lifecycle Golden Tests', () => {
     // Get final state
     const goldenState = await harness.getGoldenState();
 
-    console.log(
-      'SCENARIO 1 FINAL PROJECTION TURN 2:',
-      JSON.stringify(goldenState.finalProjection[2], null, 2),
-    );
-
     // In a perfectly functioning opportunistic system, the token trajectory should show
     // the massive spikes in Turn 2 and 3 being immediately resolved by the background tasks.
     // The final projection should fit neatly under the Max Tokens limit.
