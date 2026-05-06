@@ -1448,11 +1448,11 @@ export class Config implements McpContext, AgentLoopContext {
       try {
         plansDir = this.storage.getPlansDir();
       } catch (error) {
+        // Gracefully handle the case where the project root is outside of the project
         if (
           error instanceof Error &&
           error.message.includes('outside the project root')
         ) {
-          // Emit a user-friendly warning
           coreEvents.emitFeedback(
             'warning',
             `Invalid custom plans directory: ${error.message}. Falling back to default project temp directory.`,
