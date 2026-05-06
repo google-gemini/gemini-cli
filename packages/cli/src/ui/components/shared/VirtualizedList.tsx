@@ -108,24 +108,6 @@ function findLastIndex<T>(
   return -1;
 }
 
-const MemoizedStaticItem = memo(
-  ({
-    content,
-    width,
-    itemKey,
-  }: {
-    content: React.ReactElement;
-    width: number;
-    itemKey: string;
-  }) => (
-    <StaticRender width={width} key={itemKey}>
-      {() => content}
-    </StaticRender>
-  ),
-);
-
-MemoizedStaticItem.displayName = 'MemoizedStaticItem';
-
 const VirtualizedListItem = memo(
   ({
     content,
@@ -300,6 +282,22 @@ function VirtualizedList<T>(
     prevScrollTop: -1,
     prevContainerHeight: -1,
   });
+
+  const onStaticRender = useCallback(
+    (index: number, key: string, node: DOMElement) => {
+      const height = Math.round(getBoundingBox(node).height);
+      if (
+        height > 0 &&
+        (state.current.measuredHeights[index] !== height ||
+          state.current.measuredKeys[index] !== key)
+      ) {
+        state.current.measuredHeights[index] = height;
+        state.current.measuredKeys[index] = key;
+        setMeasurementVersion((v) => v + 1);
+      }
+    },
+    [],
+  );
 
   const itemsObserver = useMemo(
     () =>
@@ -775,12 +773,13 @@ function VirtualizedList<T>(
 
         if (shouldBeStatic) {
           items.push(
-            <MemoizedStaticItem
-              key={`${key}-static`}
-              itemKey={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
+            <StaticRender
+              key={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
               width={typeof width === 'number' ? width : containerWidth}
-              content={content}
-            />,
+              onRender={(node: DOMElement) => onStaticRender(i, key, node)}
+            >
+              {() => content}
+            </StaticRender>,
           );
         } else {
           items.push(
@@ -829,6 +828,7 @@ function VirtualizedList<T>(
     onSetRef,
     estimatedItemHeight,
     temporarilyInteractiveIndexes,
+    onStaticRender,
   ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
