@@ -129,7 +129,7 @@ jobs:
                 "read_file"
               ],
               "telemetry": {
-                "enabled": true,
+                "enabled": false,
                 "target": "gcp"
               }
             }
@@ -274,7 +274,7 @@ jobs:
                 // If no markdown block, try to find a raw JSON array in the output.
                 // The CLI may include debug/log lines (e.g. telemetry init, YOLO mode)
                 // before the actual JSON response.
-                const jsonArrayMatch = rawLabels.match(/(\[[\s\S]*\])/);
+                const jsonArrayMatch = rawLabels.match(/\[\s*\{\s*"issue_number"[\s\S]*\}\s*\]/);
                 if (jsonArrayMatch) {
                   try {
                     parsedLabels = JSON.parse(jsonArrayMatch[0]);
