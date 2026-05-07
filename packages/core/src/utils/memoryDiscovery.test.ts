@@ -25,7 +25,11 @@ import {
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
+import {
+  GEMINI_DIR,
+  toAbsolutePath,
+  homedir as pathsHomedir,
+} from './paths.js';
 
 function flattenResult(result: {
   memoryContent: HierarchicalMemory;
@@ -35,7 +39,7 @@ function flattenResult(result: {
   return {
     ...result,
     memoryContent: flattenMemory(result.memoryContent),
-    filePaths: result.filePaths.map((p) => normalizePath(p)),
+    filePaths: result.filePaths,
   };
 }
 import { Config, type GeminiCLIExtension } from '../config/config.js';
@@ -72,17 +76,17 @@ describe('memoryDiscovery', () => {
 
   async function createEmptyDir(fullPath: string) {
     await fsPromises.mkdir(fullPath, { recursive: true });
-    return normalizePath(fullPath);
+    return toAbsolutePath(fullPath);
   }
 
   async function createTestFile(fullPath: string, fileContents: string) {
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, fileContents);
-    return normalizePath(path.resolve(testRootDir, fullPath));
+    return toAbsolutePath(path.resolve(testRootDir, fullPath));
   }
 
   beforeEach(async () => {
-    testRootDir = normalizePath(
+    testRootDir = toAbsolutePath(
       await fsPromises.mkdtemp(
         path.join(os.tmpdir(), 'folder-structure-test-'),
       ),
@@ -99,9 +103,6 @@ describe('memoryDiscovery', () => {
     vi.mocked(os.homedir).mockReturnValue(homedir);
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
-
-  const normMarker = (p: string) =>
-    process.platform === 'win32' ? p.toLowerCase() : p;
 
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -1602,7 +1603,7 @@ included directory memory
     expect(flattenedMemory).toContain('Really cool custom context!');
     expect(config.getUserMemory()).toStrictEqual(refreshResult.memoryContent);
     expect(refreshResult.filePaths[0]).toContain(
-      normMarker(path.join(extensionPath, 'CustomContext.md')),
+      toAbsolutePath(path.join(extensionPath, 'CustomContext.md')),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({
