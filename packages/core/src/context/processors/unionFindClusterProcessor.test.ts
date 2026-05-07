@@ -177,8 +177,8 @@ describe('UnionFindClusterProcessor', () => {
       {
         mergeThreshold: 0.1,
         maxColdClusters: 5,
-        graduateAt: 2,
-        evictAt: 4,
+        graduateAt: 1,
+        evictAt: 3,
       },
     );
 
@@ -209,6 +209,15 @@ describe('UnionFindClusterProcessor', () => {
           payload: { text: 'the quick brown fox leaps over the lazy dog' },
         },
         'a-3',
+      ),
+      createDummyNode(
+        't3b',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'the quick brown fox dashes over the lazy dog' },
+        },
+        'a-4',
       ),
     ];
 
@@ -242,13 +251,28 @@ describe('UnionFindClusterProcessor', () => {
         },
         'b-3',
       ),
+      createDummyNode(
+        't7',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'quantum entanglement and decoherence' },
+        },
+        'b-4',
+      ),
     ];
 
     const resultB = await processor.process(createMockProcessArgs(targetsB));
 
+    // Both calls should produce at least one snapshot
+    const snapshotsA = resultA.filter((n) => n.type === NodeType.SNAPSHOT);
+    const snapshotsB = resultB.filter((n) => n.type === NodeType.SNAPSHOT);
+    expect(snapshotsA.length).toBeGreaterThan(0);
+    expect(snapshotsB.length).toBeGreaterThan(0);
+
     // Results should only reference their own input node IDs
-    const allIdsA = new Set(targetsA.map((t) => t.id));
-    const allIdsB = new Set(targetsB.map((t) => t.id));
+    const allIdsA = new Set(targetsA.map((n) => n.id));
+    const allIdsB = new Set(targetsB.map((n) => n.id));
 
     for (const node of resultA) {
       if (node.abstractsIds) {
