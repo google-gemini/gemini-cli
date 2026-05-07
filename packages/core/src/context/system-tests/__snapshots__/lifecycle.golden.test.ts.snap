@@ -38,7 +38,10 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
-          "text": "Please continue.",
+          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
+        },
+        {
+          "text": "<MOCKED_STATE_SNAPSHOT_SUMMARY>",
         },
       ],
       "role": "user",
@@ -61,13 +64,13 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 93,
-      "tokensBeforeBackground": 3037,
+      "tokensAfterBackground": 393,
+      "tokensBeforeBackground": 23197,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 27,
-      "tokensBeforeBackground": 27,
+      "tokensAfterBackground": 411,
+      "tokensBeforeBackground": 23215,
       "turnIndex": 4,
     },
   ],
