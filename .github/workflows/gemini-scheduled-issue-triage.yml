@@ -151,7 +151,7 @@ jobs:
                - If the issue already has a priority/ label, do not change it.
                - If the issue already has an area/ label, do not change it.
                - If the issue already has an effort/ label, do not change it.
-               - If the issue is missing an effort/ label, you must evaluate the architectural complexity to determine the effort level. Use your codebase search tools (grep, find) to search for keywords from the issue. Determine how many components/files are involved before deciding the effort.
+               - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. Use your codebase search tools (grep, find) to search for keywords from the issue. Determine how many components/files are involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. Give me a single short explanation about why you are selecting each label in the process.
