@@ -778,7 +778,7 @@ export class ShellExecutionService {
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-      child.on('exit', (code, signal) => {
+      child.on('close', (code, signal) => {
         handleExit(code, signal);
       });
 

@@ -69,16 +69,16 @@ describe('Output Redirection', () => {
     expect(writeToStderr).not.toHaveBeenCalled();
   });
 
-  it('should force stdout to stderr when config is undefined (early failure)', () => {
+  it('should NOT force stdout to stderr when config is undefined (early init/version)', () => {
     // Simulate buffered output during early init
     coreEvents.emitOutput(false, 'early init message');
 
     // Initialize with undefined config
     initializeOutputListenersAndFlush(undefined);
 
-    // Verify it was forced to stderr
-    expect(writeToStderr).toHaveBeenCalledWith('early init message', undefined);
-    expect(writeToStdout).not.toHaveBeenCalled();
+    // Verify it went to stdout (default behavior)
+    expect(writeToStdout).toHaveBeenCalledWith('early init message', undefined);
+    expect(writeToStderr).not.toHaveBeenCalled();
   });
 
   it('should attach ConsoleLog and UserFeedback listeners even if Output already has one', () => {
