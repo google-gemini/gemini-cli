@@ -252,15 +252,24 @@ export async function applyParsedSkillPatches(
   return applyParsedPatchesWithAllowedRoots(parsedPatches, allowedRoots);
 }
 
+export interface ApplyParsedPatchesWithAllowedRootsOptions {
+  /**
+   * Optional fine-grained allowlist for callers whose allowed root is broader
+   * than their actual target surface. Receives the canonical target path after
+   * root containment has already passed.
+   */
+  isResolvedTargetAllowed?: (resolvedTargetPath: string) => boolean;
+}
+
 /**
  * Applies parsed unified diff patches against any caller-supplied set of
  * allowed root directories. This is the kind-agnostic core used by both the
  * skill patch flow and the memory patch flow.
  *
  * The patch headers must reference absolute paths inside one of the allowed
- * roots (after canonical resolution). Update patches must reference an
- * existing target; creation patches (`/dev/null` source) must reference a path
- * that does not yet exist.
+ * roots (after canonical resolution) and pass any caller-supplied fine-grained
+ * target predicate. Update patches must reference an existing target; creation
+ * patches (`/dev/null` source) must reference a path that does not yet exist.
  *
  * Returns the per-target before/after content so callers can stage commits
  * and roll back on failure.
@@ -268,6 +277,7 @@ export async function applyParsedSkillPatches(
 export async function applyParsedPatchesWithAllowedRoots(
   parsedPatches: StructuredPatch[],
   allowedRoots: string[],
+  options: ApplyParsedPatchesWithAllowedRootsOptions = {},
 ): Promise<ApplyParsedSkillPatchesResult> {
   const results = new Map<string, AppliedSkillPatchTarget>();
   const patchedContentByTarget = new Map<string, string>();
@@ -285,7 +295,11 @@ export async function applyParsedPatchesWithAllowedRoots(
       targetPath,
       allowedRoots,
     );
-    if (!resolvedTargetPath) {
+    if (
+      !resolvedTargetPath ||
+      (options.isResolvedTargetAllowed &&
+        !options.isResolvedTargetAllowed(resolvedTargetPath))
+    ) {
       return {
         success: false,
         reason: 'outsideAllowedRoots',

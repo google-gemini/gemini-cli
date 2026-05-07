@@ -49,6 +49,11 @@ describe('Turn', () => {
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
     context: { config: { isContextManagementEnabled: () => boolean } };
+    loopContext?: {
+      toolRegistry: {
+        getTool: (name: string) => unknown;
+      };
+    };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -61,6 +66,11 @@ describe('Turn', () => {
       context: {
         config: {
           isContextManagementEnabled: () => false,
+        },
+      },
+      loopContext: {
+        toolRegistry: {
+          getTool: vi.fn().mockReturnValue(undefined),
         },
       },
     };

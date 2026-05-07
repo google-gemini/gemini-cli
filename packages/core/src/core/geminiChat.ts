@@ -284,6 +284,10 @@ export class GeminiChat {
     );
   }
 
+  get loopContext(): AgentLoopContext {
+    return this.context;
+  }
+
   async initialize(
     resumedSessionData?: ResumedSessionData,
     kind: 'main' | 'subagent' = 'main',

@@ -30,6 +30,9 @@ export class ContextManager {
   private readonly orchestrator: PipelineOrchestrator;
   private readonly historyObserver: HistoryObserver;
 
+  // Hysteresis tracking to prevent utility call churn
+  private lastTriggeredDeficit = 0;
+
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
@@ -69,6 +72,7 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
+      this.evaluateTriggers(new Set());
     });
 
     this.historyObserver.start();
@@ -137,11 +141,24 @@ export class ContextManager {
         const targetDeficit =
           currentTokens - this.sidecar.config.budget.retainedTokens;
 
+        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
+        // so we can track growth from this new, smaller deficit.
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
         // Respect coalescing threshold for background work
         const threshold =
           this.sidecar.config.budget.coalescingThresholdTokens || 0;
 
-        if (targetDeficit >= threshold) {
+        // Only trigger if deficit has grown significantly since last time
+        const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
+
+        if (
+          targetDeficit >= threshold &&
+          (growthSinceLast >= threshold || this.lastTriggeredDeficit === 0)
+        ) {
+          this.lastTriggeredDeficit = targetDeficit;
           this.env.tokenCalculator.garbageCollectCache(
             new Set(this.buffer.nodes.map((n) => n.id)),
           );
@@ -151,6 +168,9 @@ export class ContextManager {
             targetNodeIds: agedOutNodes,
           });
         }
+      } else {
+        // Budget is healthy, reset hysteresis
+        this.lastTriggeredDeficit = 0;
       }
     }
   }
