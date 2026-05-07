@@ -746,10 +746,12 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
+      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: contentsToUse,
+          contents: finalContents,
           config,
         },
         prompt_id,
@@ -1016,10 +1018,20 @@ export class GeminiChat {
               }
               fnCall.id = id;
             }
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
             finalFunctionCallsMap.set(fnCall.id, fnCall);
           }
           runningFunctionCallCounter += chunk.functionCalls.length;
         } else {
+          for (const fnCall of chunk.functionCalls) {
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
+          }
           legacyFunctionCalls.push(...chunk.functionCalls);
         }
       }
@@ -1287,4 +1299,36 @@ export function isSchemaDepthError(errorMessage: string): boolean {
 
 export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
+}
+
+export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
+  return contents.map((content) => ({
+    ...content,
+    parts: (content.parts || []).map((part) => {
+      const newPart = { ...part };
+      if (newPart.functionCall) {
+        const fc = newPart.functionCall;
+        const name = fc.name?.trim() || 'generic_tool';
+        if (fc.id && fc.id.startsWith(`${name}__`)) {
+          newPart.functionCall = {
+            name: fc.name,
+            args: fc.args,
+            id: fc.id.substring(name.length + 2),
+          };
+        }
+      }
+      if (newPart.functionResponse) {
+        const fr = newPart.functionResponse;
+        const name = fr.name?.trim() || 'generic_tool';
+        if (fr.id && fr.id.startsWith(`${name}__`)) {
+          newPart.functionResponse = {
+            name: fr.name,
+            response: fr.response,
+            id: fr.id.substring(name.length + 2),
+          };
+        }
+      }
+      return newPart;
+    }),
+  }));
 }
