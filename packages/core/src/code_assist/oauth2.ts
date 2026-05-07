@@ -356,8 +356,10 @@ async function initOauthClient(
 
       // Note that SIGINT might not get raised on Ctrl+C in raw mode
       // so we also need to look for Ctrl+C directly in stdin.
+      // Only match a lone 0x03 byte — some terminals (e.g. Ghostty) embed
+      // 0x03 inside multi-byte escape sequences, causing false cancellations.
       stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
+        if (data.length === 1 && data[0] === 0x03) {
           reject(
             new FatalCancellationError('Authentication cancelled by user.'),
           );

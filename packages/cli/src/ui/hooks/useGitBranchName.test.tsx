@@ -12,7 +12,10 @@ import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path'; // For mocking fs
-import { spawnAsync as mockSpawnAsync } from '@google/gemini-cli-core';
+import {
+  spawnAsync as mockSpawnAsync,
+  getAbsoluteGitDir as mockGetAbsoluteGitDir,
+} from '@google/gemini-cli-core';
 
 // Mock @google/gemini-cli-core
 vi.mock('@google/gemini-cli-core', async () => {
@@ -22,6 +25,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...original,
     spawnAsync: vi.fn(),
+    getAbsoluteGitDir: vi.fn(),
   };
 });
 
@@ -40,19 +44,21 @@ vi.mock('node:fs/promises', async () => {
 });
 
 const CWD = '/test/project';
-const GIT_LOGS_HEAD_PATH = path.join(CWD, '.git', 'logs', 'HEAD');
+const GIT_DIR = path.join(CWD, '.git');
+const GIT_HEAD_PATH = path.join(GIT_DIR, 'HEAD');
 
 describe('useGitBranchName', () => {
   let deferredSpawn: Array<{
-    resolve: (val: { stdout: string; stderr: string }) => void;
+    resolve: (val: { stdout: string; stderr: string; code: number }) => void;
     reject: (err: Error) => void;
     args: string[];
   }> = [];
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vol.reset(); // Reset in-memory filesystem
     vol.fromJSON({
-      [GIT_LOGS_HEAD_PATH]: 'ref: refs/heads/main',
+      [GIT_HEAD_PATH]: 'ref: refs/heads/main',
     });
 
     deferredSpawn = [];
@@ -62,9 +68,11 @@ describe('useGitBranchName', () => {
           deferredSpawn.push({ resolve, reject, args });
         }),
     );
+    vi.mocked(mockGetAbsoluteGitDir).mockResolvedValue(GIT_DIR);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -86,16 +94,35 @@ describe('useGitBranchName', () => {
     };
   };
 
+  /**
+   * Helper to resolve pending spawns for a hook render.
+   */
+  const resolveInitialSpawns = async (branch: string = 'main') => {
+    await act(async () => {
+      let resolvedAny = true;
+      while (resolvedAny || deferredSpawn.length > 0) {
+        resolvedAny = false;
+        while (deferredSpawn.length > 0) {
+          const spawn = deferredSpawn.shift()!;
+          if (spawn.args.includes('--abbrev-ref')) {
+            spawn.resolve({ stdout: `${branch}\n`, stderr: '', code: 0 });
+            resolvedAny = true;
+          } else if (spawn.args.includes('--short')) {
+            spawn.resolve({ stdout: `${branch}\n`, stderr: '', code: 0 });
+            resolvedAny = true;
+          }
+        }
+        await vi.advanceTimersByTimeAsync(1);
+      }
+    });
+  };
+
   it('should return branch name', async () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     expect(result.current).toBeUndefined();
 
-    await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'main\n', stderr: '' });
-    });
+    await resolveInitialSpawns('main');
 
     expect(result.current).toBe('main');
   });
@@ -104,9 +131,13 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.reject(new Error('Git error'));
+      const abbrevSpawn = deferredSpawn.find((s) =>
+        s.args.includes('--abbrev-ref'),
+      );
+      if (abbrevSpawn) {
+        abbrevSpawn.reject(new Error('Git error'));
+      }
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(result.current).toBeUndefined();
@@ -116,16 +147,22 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'HEAD\n', stderr: '' });
+      const abbrevSpawn = deferredSpawn.find((s) =>
+        s.args.includes('--abbrev-ref'),
+      )!;
+      abbrevSpawn.resolve({ stdout: 'HEAD\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     // It should now call spawnAsync again for the short hash
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--short');
-      spawn.resolve({ stdout: 'a1b2c3d\n', stderr: '' });
+      const shortSpawn = deferredSpawn.find((s) => s.args.includes('--short'));
+      if (shortSpawn) {
+        shortSpawn.resolve({ stdout: 'a1b2c3d\n', stderr: '', code: 0 });
+      } else {
+        throw new Error('Short spawn not found');
+      }
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(result.current).toBe('a1b2c3d');
@@ -135,15 +172,21 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'HEAD\n', stderr: '' });
+      const abbrevSpawn = deferredSpawn.find((s) =>
+        s.args.includes('--abbrev-ref'),
+      )!;
+      abbrevSpawn.resolve({ stdout: 'HEAD\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--short');
-      spawn.reject(new Error('Git error'));
+      const shortSpawn = deferredSpawn.find((s) => s.args.includes('--short'));
+      if (shortSpawn) {
+        shortSpawn.reject(new Error('Git error'));
+      } else {
+        throw new Error('Short spawn not found');
+      }
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(result.current).toBeUndefined();
@@ -151,64 +194,94 @@ describe('useGitBranchName', () => {
 
   it('should update branch name when .git/HEAD changes', async () => {
     vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
-    const watchSpy = vi.spyOn(fs, 'watch');
+    let watchCallback:
+      | ((eventType: string, filename: string | null) => void)
+      | undefined;
+    const watchSpy = vi.spyOn(fs, 'watch').mockImplementation(((
+      _path: string,
+      callback: (eventType: string, filename: string | null) => void,
+    ) => {
+      watchCallback = callback;
+      return { close: vi.fn() };
+    }) as unknown as typeof fs.watch);
 
     const { result } = await renderGitBranchNameHook(CWD);
 
-    await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'main\n', stderr: '' });
-    });
+    await resolveInitialSpawns('main');
 
     expect(result.current).toBe('main');
 
     // Wait for watcher to be set up
     await waitFor(() => {
-      expect(watchSpy).toHaveBeenCalled();
+      expect(watchSpy).toHaveBeenCalledWith(GIT_DIR, expect.any(Function));
     });
 
-    // Simulate file change event
+    // Simulate file change event for HEAD
     await act(async () => {
-      fs.writeFileSync(GIT_LOGS_HEAD_PATH, 'ref: refs/heads/develop'); // Trigger watcher
+      if (watchCallback) {
+        watchCallback('change', 'HEAD');
+      }
+      await vi.advanceTimersByTimeAsync(150); // triggers debounce
     });
 
     // Resolving the new branch name fetch
     await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'develop\n', stderr: '' });
+      // Find the specific abbrev-ref spawn for this update
+      const spawn = deferredSpawn.find((s) => s.args.includes('--abbrev-ref'))!;
+      // Remove it from the array so subsequent lookups don't find the same one
+      deferredSpawn.splice(deferredSpawn.indexOf(spawn), 1);
+      spawn.resolve({ stdout: 'develop\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(result.current).toBe('develop');
+
+    // Simulate file change event with null filename (platform compatibility)
+    await act(async () => {
+      if (watchCallback) {
+        watchCallback('change', null);
+      }
+      await vi.advanceTimersByTimeAsync(150);
+    });
+
+    // Resolving the new branch name fetch
+    await act(async () => {
+      const spawn = deferredSpawn.find((s) => s.args.includes('--abbrev-ref'))!;
+      deferredSpawn.splice(deferredSpawn.indexOf(spawn), 1);
+      spawn.resolve({ stdout: 'feature-x\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(result.current).toBe('feature-x');
   });
 
   it('should handle watcher setup error silently', async () => {
-    // Remove .git/logs/HEAD to cause an error in fs.watch setup
-    vol.unlinkSync(GIT_LOGS_HEAD_PATH);
+    // Cause an error in absolute git dir setup
+    vi.mocked(mockGetAbsoluteGitDir).mockRejectedValueOnce(
+      new Error('Git error'),
+    );
 
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
       const spawn = deferredSpawn.shift()!;
       expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'main\n', stderr: '' });
+      spawn.resolve({ stdout: 'main\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(result.current).toBe('main');
 
-    // This write would trigger the watcher if it was set up
-    // We need to create the file again for writeFileSync to not throw
-    vol.fromJSON({
-      [GIT_LOGS_HEAD_PATH]: 'ref: refs/heads/develop',
-    });
-
+    // Trigger a mock write that would normally be watched
     await act(async () => {
-      fs.writeFileSync(GIT_LOGS_HEAD_PATH, 'ref: refs/heads/develop');
+      fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/develop');
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     // spawnAsync should NOT have been called again for updating
-    expect(deferredSpawn.length).toBe(0);
+    expect(
+      deferredSpawn.filter((s) => s.args.includes('--abbrev-ref')).length,
+    ).toBe(0);
     expect(result.current).toBe('main');
   });
 
@@ -221,18 +294,11 @@ describe('useGitBranchName', () => {
 
     const { unmount } = await renderGitBranchNameHook(CWD);
 
-    await act(async () => {
-      const spawn = deferredSpawn.shift()!;
-      expect(spawn.args).toContain('--abbrev-ref');
-      spawn.resolve({ stdout: 'main\n', stderr: '' });
-    });
+    await resolveInitialSpawns('main');
 
     // Wait for watcher to be set up BEFORE unmounting
     await waitFor(() => {
-      expect(watchMock).toHaveBeenCalledWith(
-        GIT_LOGS_HEAD_PATH,
-        expect.any(Function),
-      );
+      expect(watchMock).toHaveBeenCalledWith(GIT_DIR, expect.any(Function));
     });
 
     unmount();

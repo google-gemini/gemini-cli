@@ -7,19 +7,20 @@
 import { describe, it, expect } from 'vitest';
 import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 import { createDummyNode } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 
 describe('ContextWorkingBufferImpl', () => {
   it('should initialize with a pristine graph correctly', () => {
     const pristine1 = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       undefined,
       'p1',
     );
     const pristine2 = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       10,
       undefined,
       'p2',
@@ -38,7 +39,7 @@ describe('ContextWorkingBufferImpl', () => {
   it('should track 1:1 replacements (e.g., masking) and append to audit log', () => {
     const pristine1 = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       undefined,
       'p1',
@@ -47,7 +48,7 @@ describe('ContextWorkingBufferImpl', () => {
 
     const maskedNode = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       5,
       undefined,
       'm1',
@@ -76,15 +77,33 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track N:1 abstractions (e.g., rolling summaries)', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
-    const p2 = createDummyNode('ep1', 'AGENT_THOUGHT', 10, undefined, 'p2');
-    const p3 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p3');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
+    const p2 = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      10,
+      undefined,
+      'p2',
+    );
+    const p3 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p3',
+    );
 
     let buffer = ContextWorkingBufferImpl.initialize([p1, p2, p3]);
 
     const summaryNode = createDummyNode(
       'ep1',
-      'ROLLING_SUMMARY',
+      NodeType.ROLLING_SUMMARY,
       15,
       undefined,
       's1',
@@ -105,11 +124,23 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track multi-generation provenance correctly', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     // Gen 1: Masked
-    const gen1 = createDummyNode('ep1', 'USER_PROMPT', 8, undefined, 'gen1');
+    const gen1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      8,
+      undefined,
+      'gen1',
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (gen1 as any).replacesId = 'p1';
     buffer = buffer.applyProcessorResult('Masking', [p1], [gen1]);
@@ -117,7 +148,7 @@ describe('ContextWorkingBufferImpl', () => {
     // Gen 2: Summarized
     const gen2 = createDummyNode(
       'ep1',
-      'ROLLING_SUMMARY',
+      NodeType.ROLLING_SUMMARY,
       5,
       undefined,
       'gen2',
@@ -140,12 +171,18 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should handle net-new injected nodes without throwing', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     const injected = createDummyNode(
       'ep1',
-      'SYSTEM_EVENT',
+      NodeType.SYSTEM_EVENT,
       5,
       undefined,
       'injected1',
@@ -158,5 +195,181 @@ describe('ContextWorkingBufferImpl', () => {
 
     // It should root to itself
     expect(buffer.getPristineNodes('injected1')).toEqual([injected]);
+  });
+
+  describe('syncPristineHistory', () => {
+    it('should append newly discovered pristine nodes to the end of the buffer', () => {
+      const p1 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p1',
+      );
+      let buffer = ContextWorkingBufferImpl.initialize([p1]);
+
+      const p2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p2',
+      );
+      const p3 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p3',
+      );
+
+      buffer = buffer.syncPristineHistory([p1, p2, p3]);
+
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p1', 'p2', 'p3']);
+      expect(buffer.getPristineNodes('p3')).toEqual([p3]);
+    });
+
+    it('should drop working nodes if their pristine root is dropped from authoritative history', () => {
+      const p1 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p1',
+      );
+      const p2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p2',
+      );
+      let buffer = ContextWorkingBufferImpl.initialize([p1, p2]);
+
+      // Mutate p2 into m2
+      const m2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        5,
+        undefined,
+        'm2',
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (m2 as any).replacesId = 'p2';
+      buffer = buffer.applyProcessorResult('Masking', [p2], [m2]);
+
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p1', 'm2']);
+
+      // Upstream graph drops p2 entirely
+      buffer = buffer.syncPristineHistory([p1]);
+
+      // m2 should be gone because its root p2 is gone
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p1']);
+    });
+
+    it('should correctly weave summarized and mutated nodes into their chronological spots when new nodes arrive', () => {
+      // Step 1: Initial state
+      const p1 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p1',
+      );
+      const p2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p2',
+      );
+      const p3 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p3',
+      );
+      let buffer = ContextWorkingBufferImpl.initialize([p1, p2, p3]);
+
+      // Step 2: Mutate p2 into m2
+      const m2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        5,
+        undefined,
+        'm2',
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (m2 as any).replacesId = 'p2';
+      buffer = buffer.applyProcessorResult('Masking', [p2], [m2]);
+
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p1', 'm2', 'p3']);
+
+      // Step 3: Upstream adds new nodes (p4, p5)
+      const p4 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p4',
+      );
+      const p5 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p5',
+      );
+
+      buffer = buffer.syncPristineHistory([p1, p2, p3, p4, p5]);
+
+      // The working buffer should re-order to match the authoritative pristine history (p1, p2, p3, p4, p5)
+      // but retain the mutated state (m2 instead of p2).
+      // So expected order: p1, m2, p3, p4, p5
+      expect(buffer.nodes.map((n) => n.id)).toEqual([
+        'p1',
+        'm2',
+        'p3',
+        'p4',
+        'p5',
+      ]);
+    });
+    it('should drop a non-pristine node if ANY of its multiple pristine roots are dropped from authoritative history', () => {
+      const p1 = createDummyNode(
+        'ep1',
+        NodeType.USER_PROMPT,
+        10,
+        undefined,
+        'p1',
+      );
+      const p2 = createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        undefined,
+        'p2',
+      );
+      let buffer = ContextWorkingBufferImpl.initialize([p1, p2]);
+
+      const s1 = createDummyNode(
+        'ep1',
+        NodeType.ROLLING_SUMMARY,
+        5,
+        undefined,
+        's1',
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s1 as any).abstractsIds = ['p1', 'p2'];
+      buffer = buffer.applyProcessorResult('Summarizer', [p1, p2], [s1]);
+
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['s1']);
+
+      // Upstream graph drops p1 but keeps p2
+      buffer = buffer.syncPristineHistory([p2]);
+
+      // s1 should be gone because one of its roots (p1) is gone
+      expect(buffer.nodes.map((n) => n.id)).toEqual(['p2']);
+    });
   });
 });
