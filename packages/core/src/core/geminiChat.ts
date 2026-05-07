@@ -914,8 +914,9 @@ export class GeminiChat {
           if (part.functionCall) {
             // @ts-expect-error We are injecting a property that the SDK doesn't officially support yet.
             if (!part.thought_signature) {
+              const { thoughtSignature: _thoughtSignature, ...rest } = part;
               newParts[j] = {
-                ...part,
+                ...rest,
                 // @ts-expect-error We are injecting a property that the SDK doesn't officially support yet.
                 thought_signature: SYNTHETIC_THOUGHT_SIGNATURE,
               };
