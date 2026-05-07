@@ -1353,15 +1353,15 @@ describe('ChatRecordingService', () => {
   });
 
   describe('fork', () => {
-    it('throws when there is no active conversation', () => {
-      expect(() => chatRecordingService.fork()).toThrow(
+    it('throws when there is no active conversation', async () => {
+      await expect(chatRecordingService.fork()).rejects.toThrow(
         /No active conversation/,
       );
     });
 
     it('throws when called on a subagent session', async () => {
       await chatRecordingService.initialize(undefined, 'subagent');
-      expect(() => chatRecordingService.fork()).toThrow(/subagent/);
+      await expect(chatRecordingService.fork()).rejects.toThrow(/subagent/);
     });
 
     it('writes a new file with a new sessionId and preserves other lines', async () => {
@@ -1382,7 +1382,7 @@ describe('ChatRecordingService', () => {
         >,
       );
 
-      const result = chatRecordingService.fork();
+      const result = await chatRecordingService.fork();
 
       expect(result.sessionId).toBe('fork0001-aaaa-bbbb-cccc-dddddddddddd');
       expect(result.shortId).toBe('fork0001');
@@ -1427,7 +1427,7 @@ describe('ChatRecordingService', () => {
       });
       chatRecordingService.rewindTo(firstId);
 
-      const result = chatRecordingService.fork();
+      const result = await chatRecordingService.fork();
       const forked = fs.readFileSync(result.filePath, 'utf-8');
       expect(forked).toContain(`"$rewindTo":"${firstId}"`);
     });
@@ -1453,8 +1453,8 @@ describe('ChatRecordingService', () => {
           >,
         );
 
-      const a = chatRecordingService.fork();
-      const b = chatRecordingService.fork();
+      const a = await chatRecordingService.fork();
+      const b = await chatRecordingService.fork();
 
       expect(a.shortId).toBe('forkAAAA');
       expect(b.shortId).toBe('forkBBBB');
@@ -1491,7 +1491,7 @@ describe('ChatRecordingService', () => {
         >,
       );
 
-      const result = chatRecordingService.fork();
+      const result = await chatRecordingService.fork();
 
       const loaded = await loadConversationRecord(result.filePath);
       expect(loaded?.sessionId).toBe('fork9999-aaaa-bbbb-cccc-dddddddddddd');
@@ -1544,7 +1544,7 @@ describe('ChatRecordingService', () => {
         >,
       );
 
-      const result = chatRecordingService.fork();
+      const result = await chatRecordingService.fork();
       const forkLoaded = await loadConversationRecord(result.filePath);
       expect(forkLoaded).not.toBeNull();
       expect(forkLoaded!.sessionId).toBe(
@@ -1562,14 +1562,16 @@ describe('ChatRecordingService', () => {
         model: 'm',
       });
 
-      const writeSpy = vi.mocked(fs.writeFileSync);
-      writeSpy.mockImplementationOnce(() => {
+      const writeSpy = vi.mocked(fs.promises.writeFile);
+      writeSpy.mockImplementationOnce(async () => {
         const err = new Error('ENOSPC') as NodeJS.ErrnoException;
         err.code = 'ENOSPC';
         throw err;
       });
 
-      expect(() => chatRecordingService.fork()).toThrow(/no space left/i);
+      await expect(chatRecordingService.fork()).rejects.toThrow(
+        /no space left/i,
+      );
     });
   });
 });

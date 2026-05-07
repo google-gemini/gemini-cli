@@ -11,7 +11,7 @@ export const forkCommand: SlashCommand = {
   description:
     'Save a copy of the current session under a new id so it can be resumed independently in another terminal.',
   kind: CommandKind.BUILT_IN,
-  action: (context) => {
+  action: async (context) => {
     const client = context.services.agentContext?.geminiClient;
     if (!client) {
       return {
@@ -39,7 +39,7 @@ export const forkCommand: SlashCommand = {
     }
 
     try {
-      const { shortId } = recording.fork();
+      const { shortId } = await recording.fork();
       return {
         type: 'message',
         messageType: 'info',

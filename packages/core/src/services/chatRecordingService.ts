@@ -696,14 +696,20 @@ export class ChatRecordingService {
    *         the session is a subagent, or a filesystem error occurs (ENOSPC
    *         is rethrown with a friendlier message).
    */
-  fork(): { sessionId: string; shortId: string; filePath: string } {
+  async fork(): Promise<{
+    sessionId: string;
+    shortId: string;
+    filePath: string;
+  }> {
     if (!this.conversationFile) {
       throw new Error('No active conversation to fork.');
     }
     if (this.kind === 'subagent') {
       throw new Error('Cannot fork a subagent session.');
     }
-    if (!fs.existsSync(this.conversationFile)) {
+    try {
+      await fs.promises.access(this.conversationFile);
+    } catch {
       throw new Error('Conversation file not found.');
     }
 
@@ -721,9 +727,9 @@ export class ChatRecordingService {
     const newPath = path.join(path.dirname(this.conversationFile), filename);
 
     try {
-      fs.mkdirSync(path.dirname(newPath), { recursive: true });
+      await fs.promises.mkdir(path.dirname(newPath), { recursive: true });
 
-      const raw = fs.readFileSync(this.conversationFile, 'utf-8');
+      const raw = await fs.promises.readFile(this.conversationFile, 'utf-8');
       const lines = raw.split('\n');
 
       let metadataRewritten = false;
@@ -760,7 +766,7 @@ export class ChatRecordingService {
         throw new Error('Could not locate session metadata in source file.');
       }
 
-      fs.writeFileSync(newPath, lines.join('\n'), 'utf-8');
+      await fs.promises.writeFile(newPath, lines.join('\n'), 'utf-8');
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         throw new Error('No space left on device.');
