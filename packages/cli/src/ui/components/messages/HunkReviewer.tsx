@@ -70,15 +70,15 @@ export const HunkReviewer: React.FC<HunkReviewerProps> = ({
         setCurrentIndex((prev) => Math.min(hunks.length - 1, prev + 1));
         return true;
       }
-      if (key.memberName === 'space' || key.memberName === ' ') {
+      if (key.name === 'space' || key.name === ' ') {
         handleToggle();
         return true;
       }
-      if (key.memberName === 'a') {
+      if (key.name === 'a') {
         handleAcceptAll();
         return true;
       }
-      if (key.memberName === 'r') {
+      if (key.name === 'r') {
         handleRejectAll();
         return true;
       }
