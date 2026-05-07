@@ -66,7 +66,7 @@ function getNumericExitCode(errorCode: string | number): number {
  * and control characters while preserving newlines and tabs to ensure 
  * readability while preventing terminal injection.
  */
-export function formatAuthError(error: unknown, authType?: string): string {
+export function formatAuthError(error: unknown, authType?: AuthType | string): string {
   let reason = 'Invalid or missing API key';
   if (error instanceof Error) {
     reason = error.message;
@@ -80,7 +80,7 @@ export function formatAuthError(error: unknown, authType?: string): string {
     char === '\n' || char === '\r' || char === '\t' ? char : ''
   );
 
-  const fix = authType === 'google-cloud' 
+  const fix = (authType === AuthType.COMPUTE_ADC || authType === AuthType.USE_VERTEX_AI)
     ? '1. Run: gcloud auth application-default login' 
     : '1. Set your API key:\n   export GEMINI_API_KEY=your_key_here\n\n2. Or login again:\n   gemini auth login';
 
@@ -117,7 +117,7 @@ export function handleError(
   );
 
   if (isAuthError) {
-    errorMessage = formatAuthError(error, config.getContentGeneratorConfig()?.authType);
+    errorMessage = formatAuthError(errorMessage, config.getContentGeneratorConfig()?.authType);
   }
 
   if (config.getOutputFormat() === OutputFormat.STREAM_JSON) {
@@ -142,8 +142,10 @@ export function handleError(
     const formatter = new JsonFormatter();
     const errorCode = customErrorCode ?? extractErrorCode(error);
 
+    const errorToFormat = error instanceof Error ? error : new Error(getErrorMessage(error));
+    errorToFormat.message = errorMessage;
     const formattedError = formatter.formatError(
-      new Error(errorMessage),
+      errorToFormat,
       errorCode,
       config.getSessionId(),
     );
