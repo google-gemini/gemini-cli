@@ -551,6 +551,62 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts![1].functionCall).toBeDefined();
       expect(modelTurn.parts![2].text).toBe('This is the second part.');
     });
+    it('repro: should not overwrite parallel tool calls when they arrive in separate streaming chunks', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      // 1. Mock the API to return parallel tool calls in separate chunks.
+      const parallelCallsStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_A' } }],
+              },
+            },
+          ],
+          functionCalls: [{ name: 'tool_A' }],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_B' } }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [{ name: 'tool_B' }],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        parallelCallsStream,
+      );
+
+      // 2. Action: Send a message and consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test parallel tools',
+        'prompt-parallel-tools',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume
+      }
+
+      // 3. Assert: Check that the final history contains both function calls.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1];
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn.parts?.length).toBe(2);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('tool_A');
+      expect(modelTurn.parts![1].functionCall?.name).toBe('tool_B');
+    });
     it('should preserve text parts that stream in the same chunk as a thought', async () => {
       // 1. Mock the API to return a single chunk containing both a thought and visible text.
       const mixedContentStream = (async function* () {
