@@ -17,6 +17,7 @@ import { McpClientManager } from './mcp-client-manager.js';
 import { McpClient, MCPDiscoveryState, MCPServerStatus } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
+import { MCPServerConfig } from '../config/config.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 
@@ -726,6 +727,40 @@ describe('McpClientManager', () => {
         extensionName: 'test-extension',
       });
     });
+
+    it('should disconnect extension-backed MCP clients when stopping extension (#24050)', async () => {
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+      const extension: GeminiCLIExtension = {
+        id: 'test-ext-id',
+        name: 'test-extension',
+        isActive: true,
+        version: '1.0.0',
+        path: '/fake/path',
+        contextFiles: [],
+        mcpServers: {
+          'test-server': new MCPServerConfig('node', ['script.js']),
+        },
+      };
+
+      await manager.startExtension(extension);
+
+      // Wait for discovery to complete
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      while ((manager as any).discoveryPromise) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (manager as any).discoveryPromise;
+      }
+
+      // Verify it was connected
+      expect(mockedMcpClient.connect).toHaveBeenCalled();
+
+      // Stop the extension
+      await manager.stopExtension(extension);
+
+      // Verify disconnect was called on the client
+      expect(mockedMcpClient.disconnect).toHaveBeenCalled();
+      expect(manager.getClient('test-server')).toBeUndefined();
+    });
   });
 
   describe('diagnostic reporting', () => {
@@ -819,6 +854,66 @@ describe('McpClientManager', () => {
       manager.setUserInteractedWithMcp();
       manager.emitDiagnostic('error', 'Same error');
       expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(2); // Now the actual error
+    });
+  });
+
+  describe('findResourceByUri', () => {
+    it('should find resource by exact URI match', () => {
+      const mockResource = { uri: 'test://resource1', name: 'Resource 1' };
+      const mockResourceRegistry = {
+        getAllResources: vi.fn().mockReturnValue([mockResource]),
+        findResourceByUri: vi.fn(),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      const result = manager.findResourceByUri('test://resource1');
+      expect(result).toBe(mockResource);
+    });
+
+    it('should try ResourceRegistry.findResourceByUri first', () => {
+      const mockResourceQualified = {
+        uri: 'test://resource1',
+        name: 'Resource 1 Qualified',
+      };
+      const mockResourceDirect = {
+        uri: 'test-server:test://resource1',
+        name: 'Resource 1 Direct',
+      };
+      const mockResourceRegistry = {
+        getAllResources: vi.fn().mockReturnValue([mockResourceDirect]),
+        findResourceByUri: vi.fn().mockReturnValue(mockResourceQualified),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      const result = manager.findResourceByUri('test-server:test://resource1');
+      expect(result).toBe(mockResourceQualified);
+      expect(mockResourceRegistry.findResourceByUri).toHaveBeenCalledWith(
+        'test-server:test://resource1',
+      );
+      expect(mockResourceRegistry.getAllResources).not.toHaveBeenCalled();
+    });
+
+    it('should return undefined if both fail', () => {
+      const mockResourceRegistry = {
+        getAllResources: vi.fn().mockReturnValue([]),
+        findResourceByUri: vi.fn().mockReturnValue(undefined),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      const result = manager.findResourceByUri('non-existent');
+      expect(result).toBeUndefined();
     });
   });
 });

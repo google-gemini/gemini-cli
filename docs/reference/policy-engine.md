@@ -1,8 +1,8 @@
 # Policy engine
 
-The Gemini CLI includes a powerful policy engine that provides fine-grained
-control over tool execution. It allows users and administrators to define rules
-that determine whether a tool call should be allowed, denied, or require user
+Gemini CLI includes a powerful policy engine that provides fine-grained control
+over tool execution. It allows users and administrators to define rules that
+determine whether a tool call should be allowed, denied, or require user
 confirmation.
 
 ## Quick start
@@ -23,9 +23,9 @@ To create your first policy:
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
     ```
 
-2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
-    can use any filename ending in `.toml`; all such files in this directory
-    will be loaded and combined:
+2.  **Create a new policy file** (for example,
+    `~/.gemini/policies/my-rules.toml`). You can use any filename ending in
+    `.toml`; all such files in this directory will be loaded and combined:
     ```toml
     [[rule]]
     toolName = "run_shell_command"
@@ -33,7 +33,7 @@ To create your first policy:
     decision = "deny"
     priority = 100
     ```
-3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
+3.  **Run a command** that triggers the policy (for example, ask Gemini CLI to
     `rm -rf /`). The tool will now be blocked automatically.
 
 ## Core concepts
@@ -71,7 +71,9 @@ primary conditions are the tool's name and its arguments.
 
 #### Tool Name
 
-The `toolName` in the rule must match the name of the tool being called.
+The `toolName` in the rule must match the name of the tool being called. For a
+complete list of built-in tool names, see the
+[Tools reference](/docs/reference/tools#available-tools).
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
@@ -87,7 +89,9 @@ The `toolName` in the rule must match the name of the tool being called.
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
-the arguments don't match the pattern, the rule does not apply.
+the arguments don't match the pattern, the rule does not apply. For a list of
+argument keys available for each tool, see the **Parameters** in the
+[Tools reference](/docs/reference/tools#available-tools).
 
 #### Execution environment
 
@@ -120,6 +124,12 @@ There are three possible decisions a rule can enforce:
 
 ### Priority system and tiers
 
+> [!WARNING] The **Workspace** tier (project-level policies) is currently
+> non-functional. Defining policies in a workspace's `.gemini/policies`
+> directory will not have any effect. See
+> [issue #18186](https://github.com/google-gemini/gemini-cli/issues/18186). Use
+> User or Admin policies instead.
+
 The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
 rule with the highest priority wins**.
@@ -127,13 +137,13 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier      | Base | Description                                                                |
-| :-------- | :--- | :------------------------------------------------------------------------- |
-| Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Extension | 2    | Policies defined in extensions.                                            |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
-| User      | 4    | Custom policies defined by the user.                                       |
-| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Tier      | Base | Description                                                                                   |
+| :-------- | :--- | :-------------------------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with Gemini CLI.                                                  |
+| Extension | 2    | Policies defined in extensions.                                                               |
+| Workspace | 3    | **(Currently disabled)** Policies defined in the current workspace's configuration directory. |
+| User      | 4    | Custom policies defined by the user.                                                          |
+| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment).             |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -159,8 +169,8 @@ For example:
 
 Approval modes allow the policy engine to apply different sets of rules based on
 the CLI's operational mode. A rule in a TOML policy file can be associated with
-one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
-active if the CLI is running in one of its specified modes. If a rule has no
+one or more modes (for example, `yolo`, `autoEdit`, `plan`). The rule will only
+be active if the CLI is running in one of its specified modes. If a rule has no
 modes specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
@@ -214,11 +224,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier          | Type   | Location                                  |
-| :------------ | :----- | :---------------------------------------- |
-| **User**      | Custom | `~/.gemini/policies/*.toml`               |
-| **Workspace** | Custom | `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
-| **Admin**     | System | _See below (OS specific)_                 |
+| Tier          | Type   | Location                                                 |
+| :------------ | :----- | :------------------------------------------------------- |
+| **User**      | Custom | `~/.gemini/policies/*.toml`                              |
+| **Workspace** | Custom | **(Disabled)** `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
+| **Admin**     | System | _See below (OS specific)_                                |
 
 #### System-wide policies (Admin)
 
@@ -257,7 +267,7 @@ To prevent privilege escalation, the CLI enforces strict security checks on the
 directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
-  or others (e.g., `chmod 755`).
+  or others (for example, `chmod 755`).
 - **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
   must NOT have `Write`, `Modify`, or `Full Control` permissions. If you see a
   security warning, use the folder properties to remove write permissions for
@@ -273,7 +283,11 @@ directory are **ignored**.
 
 ### TOML rule schema
 
-Here is a breakdown of the fields available in a TOML policy rule:
+This section describes the fields available in a TOML policy rule.
+
+For valid built-in `toolName` values and their argument structures (used by
+`argsPattern`), see the
+[Tools reference](/docs/reference/tools#available-tools).
 
 ```toml
 [[rule]]
@@ -359,6 +373,9 @@ priority = 10
 
 To simplify writing policies for `run_shell_command`, you can use
 `commandPrefix` or `commandRegex` instead of the more complex `argsPattern`.
+These are policy-rule shorthands, not arguments of the `run_shell_command` tool
+itself. For the tool's invocation arguments, see [Shell tool](/docs/tools/shell)
+and [Tools reference](/docs/reference/tools#available-tools).
 
 - `commandPrefix`: Matches if the `command` argument starts with the given
   string.
@@ -386,7 +403,7 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> Do not use underscores (`_`) in your MCP server names (e.g., use
+> Do not use underscores (`_`) in your MCP server names (for example, use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -397,7 +414,8 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 Combine `mcpName` and `toolName` to target a single operation. When using
 `mcpName`, the `toolName` field should strictly be the simple name of the tool
-(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
+(for example, `search`), **not** the Fully Qualified Name (for example,
+`mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -467,8 +485,8 @@ deny_message = "Deep codebase analysis is restricted for this session."
 
 ## Default policies
 
-The Gemini CLI ships with a set of default policies to provide a safe
-out-of-the-box experience.
+Gemini CLI ships with a set of default policies to provide a safe out-of-the-box
+experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
 - **Agent delegation** defaults to **`ask_user`** to ensure remote agents can

@@ -27,7 +27,9 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
   const config = useConfig();
-  const useBackgroundColor = config.getUseBackgroundColor();
+  const useBackgroundColorSetting = config.getUseBackgroundColor();
+  const useBackgroundColor =
+    useBackgroundColorSetting && !!theme.background.message;
 
   const textColor = isSlashCommand ? theme.text.accent : theme.text.primary;
 

@@ -18,7 +18,7 @@ import {
   type SlashCommand,
   type SlashCommandActionReturn,
 } from './types.js';
-import { SkillInboxDialog } from '../components/SkillInboxDialog.js';
+import { InboxDialog } from '../components/InboxDialog.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
@@ -145,23 +145,26 @@ export const memoryCommand: SlashCommand = {
           };
         }
 
-        if (!config.isMemoryManagerEnabled()) {
+        if (!config.isAutoMemoryEnabled()) {
           return {
             type: 'message',
             messageType: 'info',
             content:
-              'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+              'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
           };
         }
 
         return {
           type: 'custom_dialog',
-          component: React.createElement(SkillInboxDialog, {
+          component: React.createElement(InboxDialog, {
             config,
             onClose: () => context.ui.removeComponent(),
             onReloadSkills: async () => {
               await config.reloadSkills();
               context.ui.reloadCommands();
+            },
+            onReloadMemory: async () => {
+              await refreshMemory(config);
             },
           }),
         };

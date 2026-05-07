@@ -12,6 +12,7 @@ import {
   type Storage,
   type ConversationRecord,
   type MessageRecord,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -250,23 +251,27 @@ export const getAllSessionFiles = async (
   try {
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
-      .filter((f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'))
+      .filter(
+        (f) =>
+          f.startsWith(SESSION_FILE_PREFIX) &&
+          (f.endsWith('.json') || f.endsWith('.jsonl')),
+      )
       .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const content: ConversationRecord = JSON.parse(
-            await fs.readFile(filePath, 'utf8'),
-          );
+          const content = await loadConversationRecord(filePath, {
+            metadataOnly: !options.includeFullContent,
+          });
+          if (!content) {
+            return { fileName: file, sessionInfo: null };
+          }
 
           // Validate required fields
           if (
             !content.sessionId ||
-            !content.messages ||
-            !Array.isArray(content.messages) ||
             !content.startTime ||
             !content.lastUpdated
           ) {
@@ -275,7 +280,7 @@ export const getAllSessionFiles = async (
           }
 
           // Skip sessions that only contain system messages (info, error, warning)
-          if (!hasUserOrAssistantMessage(content.messages)) {
+          if (!content.hasUserOrAssistantMessage) {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -285,7 +290,9 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
-          const firstUserMessage = extractFirstUserMessage(content.messages);
+          const firstUserMessage = content.firstUserMessage
+            ? cleanMessage(content.firstUserMessage)
+            : extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
             ? file.includes(currentSessionId.slice(0, 8))
             : false;
@@ -310,11 +317,11 @@ export const getAllSessionFiles = async (
 
           const sessionInfo: SessionInfo = {
             id: content.sessionId,
-            file: file.replace('.json', ''),
+            file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
-            messageCount: content.messages.length,
+            messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
               : firstUserMessage,
@@ -400,6 +407,36 @@ export const getSessionFiles = async (
  */
 export class SessionSelector {
   constructor(private storage: Storage) {}
+
+  /**
+   * Checks if a session with the given ID already exists on disk.
+   */
+  async sessionExists(id: string): Promise<boolean> {
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+
+    // The filename format is `session-<TIMESTAMP>-<ID_SLICE(0,8)>.jsonl`
+    const shortId = id.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+    );
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (sessionData && sessionData.sessionId === id) {
+          return true;
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    return false;
+  }
 
   /**
    * Lists all available sessions for the current project.
@@ -505,10 +542,10 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const sessionData: ConversationRecord = JSON.parse(
-        await fs.readFile(sessionPath, 'utf8'),
-      );
+      const sessionData = await loadConversationRecord(sessionPath);
+      if (!sessionData) {
+        throw new Error('Failed to load session data');
+      }
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 

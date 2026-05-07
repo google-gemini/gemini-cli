@@ -98,8 +98,16 @@ export function cpSlice(str: string, start: number, end?: number): string {
 /**
  * Strip characters that can break terminal rendering.
  *
- * Uses Node.js built-in stripVTControlCharacters to handle VT sequences,
- * then filters remaining control characters that can disrupt display.
+ * This is a strict sanitization function intended for general display
+ * contexts. It strips all C1 control characters (0x80-0x9F) and VT
+ * control sequences. For list display contexts where a more lenient
+ * approach is needed (preserving C1 characters and only stripping ANSI
+ * codes and newlines/tabs), use a separate function instead.
+ *
+ * Processing order:
+ * 1. stripAnsi removes ANSI escape sequences (including 8-bit CSI 0x9B)
+ * 2. Regex strips C0, C1, BiDi, and zero-width control characters
+ * 3. stripVTControlCharacters removes any remaining VT sequences
  *
  * Characters stripped:
  * - ANSI escape sequences (via strip-ansi)
@@ -119,18 +127,20 @@ export function cpSlice(str: string, start: number, end?: number): string {
  */
 export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
-  const strippedVT = stripVTControlCharacters(strippedAnsi);
 
-  // Use a regex to strip remaining unsafe control characters
-  // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
-  // C1: 0x80-0x9F
-  // BiDi: U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069
-  // Zero-width: U+200B (ZWSP), U+FEFF (BOM)
-  return strippedVT.replace(
+  // Strip C0, C1, and other unsafe characters via regex first.
+  // This is more efficient than multiple replaces and crucially removes C1
+  // characters (e.g., 0x90 DCS) before they can be misinterpreted by
+  // stripVTControlCharacters, which could otherwise cause data loss.
+  const strippedWithRegex = strippedAnsi.replace(
     // eslint-disable-next-line no-control-regex
     /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF]/g,
     '',
   );
+
+  // Finally, use stripVTControlCharacters for any remaining VT sequences
+  // that the regex might not cover.
+  return stripVTControlCharacters(strippedWithRegex);
 }
 
 /**
