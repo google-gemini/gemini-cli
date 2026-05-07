@@ -6,7 +6,7 @@
 
 import type { Content } from '@google/genai';
 
-export type HistoryEventType = 'PUSH' | 'SYNC_FULL' | 'CLEAR';
+export type HistoryEventType = 'PUSH' | 'SYNC_FULL' | 'CLEAR' | 'SILENT_SYNC';
 
 export interface HistoryEvent {
   type: HistoryEventType;
@@ -42,9 +42,9 @@ export class AgentChatHistory {
     this.notify('PUSH', [content]);
   }
 
-  set(history: readonly Content[]) {
+  set(history: readonly Content[], options: { silent?: boolean } = {}) {
     this.history = [...history];
-    this.notify('SYNC_FULL', this.history);
+    this.notify(options.silent ? 'SILENT_SYNC' : 'SYNC_FULL', this.history);
   }
 
   clear() {

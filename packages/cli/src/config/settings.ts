@@ -348,6 +348,15 @@ export class LoadedSettings {
     return this._merged;
   }
 
+  /**
+   * Returns a merged settings object as if the folder were trusted.
+   * This is useful for commands like 'mcp list' that want to show
+   * what's configured even if it's currently disabled for security reasons.
+   */
+  getMergedSettingsAsIfTrusted(): MergedSettings {
+    return this.computeMergedSettings(true);
+  }
+
   setTrusted(isTrusted: boolean): void {
     if (this.isTrusted === isTrusted) {
       return;
@@ -368,13 +377,16 @@ export class LoadedSettings {
     };
   }
 
-  private computeMergedSettings(): MergedSettings {
+  private computeMergedSettings(forceTrusted = false): MergedSettings {
+    const isTrusted = forceTrusted || this.isTrusted;
+    const workspace = forceTrusted ? this._workspaceFile : this.workspace;
+
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
-      this.workspace.settings,
-      this.isTrusted,
+      workspace.settings,
+      isTrusted,
     );
 
     // Remote admin settings always take precedence and file-based admin settings
@@ -398,8 +410,7 @@ export class LoadedSettings {
 
   private computeSnapshot(): LoadedSettingsSnapshot {
     const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
-      path: file.path,
-      rawJson: file.rawJson,
+      ...file,
       settings: structuredClone(file.settings),
       originalSettings: structuredClone(file.originalSettings),
     });
@@ -500,7 +511,11 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string, isTrusted: boolean): string | null {
+function findEnvFile(
+  startDir: string,
+  isTrusted: boolean,
+  ignoreLocalEnv: boolean,
+): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
@@ -512,7 +527,9 @@ function findEnvFile(startDir: string, isTrusted: boolean): string | null {
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
-      return envPath;
+      if (!ignoreLocalEnv || currentDir === homedir()) {
+        return envPath;
+      }
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
@@ -595,7 +612,6 @@ export function loadEnvironment(
 ): void {
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
   const isTrusted = trustResult.isTrusted ?? false;
-  const envFilePath = findEnvFile(workspaceDir, isTrusted);
 
   // Check settings OR check process.argv directly since this might be called
   // before arguments are fully parsed. This is a best-effort sniffing approach
@@ -611,6 +627,12 @@ export function loadEnvironment(
     !!settings.tools?.sandbox ||
     relevantArgs.includes('-s') ||
     relevantArgs.includes('--sandbox');
+
+  const shouldIgnoreEnv =
+    !!settings.advanced?.ignoreLocalEnv ||
+    relevantArgs.includes('--ignore-env');
+
+  const envFilePath = findEnvFile(workspaceDir, isTrusted, shouldIgnoreEnv);
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
