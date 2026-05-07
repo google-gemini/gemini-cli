@@ -74,6 +74,7 @@ vi.mock('../agents/registry.js', () => ({
 vi.mock('../config/storage.js', () => ({
   Storage: {
     getUserSkillsDir: vi.fn().mockReturnValue('/tmp/fake-user-skills'),
+    getGlobalGeminiDir: vi.fn().mockReturnValue('/tmp/fake-global-gemini'),
   },
 }));
 
@@ -563,6 +564,109 @@ describe('memoryService', () => {
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('/memory inbox'),
+      );
+    });
+
+    it('records inbox patches as memoryCandidatesCreated without applying them', async () => {
+      const { startMemoryService, readExtractionState } = await import(
+        './memoryService.js'
+      );
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-inbox-only');
+      const skillsDir = path.join(tmpDir, 'skills-inbox-only');
+      const projectTempDir = path.join(tmpDir, 'temp-inbox-only');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const conversation = createConversation({
+        sessionId: 'inbox-only-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-inbox001.json'),
+        JSON.stringify(conversation),
+      );
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          const inboxDir = path.join(memoryDir, '.inbox');
+          await fs.mkdir(path.join(inboxDir, 'private'), { recursive: true });
+          await fs.mkdir(path.join(inboxDir, 'global'), { recursive: true });
+          await fs.writeFile(
+            path.join(inboxDir, 'private', 'MEMORY.patch'),
+            [
+              `--- /dev/null`,
+              `+++ ${path.join(memoryDir, 'MEMORY.md')}`,
+              `@@ -0,0 +1,1 @@`,
+              `+- new project fact`,
+              ``,
+            ].join('\n'),
+          );
+          await fs.writeFile(
+            path.join(inboxDir, 'global', 'reply-style.patch'),
+            [
+              `--- /dev/null`,
+              `+++ /workspace/global/GEMINI.md`,
+              `@@ -0,0 +1,1 @@`,
+              `+Prefer concise architecture summaries.`,
+              ``,
+            ].join('\n'),
+          );
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      // No patch was applied — active files do not exist.
+      await expect(
+        fs.access(path.join(memoryDir, 'MEMORY.md')),
+      ).rejects.toThrow();
+
+      // Both patches remain in inbox awaiting review.
+      for (const relativePath of [
+        path.join('.inbox', 'private', 'MEMORY.patch'),
+        path.join('.inbox', 'global', 'reply-style.patch'),
+      ]) {
+        await expect(
+          fs.access(path.join(memoryDir, relativePath)),
+        ).resolves.toBeUndefined();
+      }
+
+      const state = await readExtractionState(
+        path.join(memoryDir, '.extraction-state.json'),
+      );
+      expect(state.runs.at(-1)?.memoryFilesUpdated ?? []).toEqual([]);
+      expect(state.runs.at(-1)?.memoryCandidatesCreated ?? []).toEqual(
+        expect.arrayContaining([
+          path.join('.inbox', 'private', 'MEMORY.patch'),
+          path.join('.inbox', 'global', 'reply-style.patch'),
+        ]),
       );
     });
 

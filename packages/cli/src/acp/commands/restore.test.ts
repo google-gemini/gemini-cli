@@ -157,10 +157,15 @@ describe('RestoreCommand', () => {
 describe('ListCheckpointsCommand', () => {
   let context: CommandContext;
   let listCommand: ListCheckpointsCommand;
+  let mockReaddir: Mock<(path: string) => Promise<string[]>>;
 
   beforeEach(() => {
     vi.resetAllMocks();
     listCommand = new ListCheckpointsCommand();
+    mockReaddir = vi.mocked(fs.readdir) as unknown as Mock<
+      (path: string) => Promise<string[]>
+    >;
+
     context = {
       agentContext: {
         config: {
@@ -186,10 +191,7 @@ describe('ListCheckpointsCommand', () => {
   });
 
   it('returns "No checkpoints found." when no .json checkpoints exist', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      'not-a-checkpoint.txt',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ] as any);
+    mockReaddir.mockResolvedValue(['not-a-checkpoint.txt']);
 
     const response = await listCommand.execute(context);
 
@@ -198,7 +200,7 @@ describe('ListCheckpointsCommand', () => {
 
   it('ignores error when mkdir fails', async () => {
     vi.mocked(fs.mkdir).mockRejectedValue(new Error('mkdir fail'));
-    vi.mocked(fs.readdir).mockResolvedValue([]);
+    mockReaddir.mockResolvedValue([]);
 
     const response = await listCommand.execute(context);
 
@@ -207,11 +209,7 @@ describe('ListCheckpointsCommand', () => {
   });
 
   it('formats checkpoint summary output from checkpoint metadata', async () => {
-    vi.mocked(fs.readdir).mockResolvedValue([
-      'cp1.json',
-      'cp2.json',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ] as any);
+    mockReaddir.mockResolvedValue(['cp1.json', 'cp2.json']);
     vi.mocked(getCheckpointInfoList).mockReturnValue([
       { messageId: 'id1', checkpoint: 'cp1' },
       { messageId: 'id2', checkpoint: 'cp2' },
@@ -226,8 +224,7 @@ describe('ListCheckpointsCommand', () => {
   });
 
   it('handles empty checkpoint info list', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readdir).mockResolvedValue(['some.json'] as any);
+    mockReaddir.mockResolvedValue(['some.json']);
     vi.mocked(getCheckpointInfoList).mockReturnValue([]);
 
     const response = await listCommand.execute(context);
@@ -236,7 +233,7 @@ describe('ListCheckpointsCommand', () => {
   });
 
   it('returns generic unexpected error message on failures', async () => {
-    vi.mocked(fs.readdir).mockRejectedValue(new Error('Readdir fail'));
+    mockReaddir.mockRejectedValue(new Error('Readdir fail'));
 
     const response = await listCommand.execute(context);
 

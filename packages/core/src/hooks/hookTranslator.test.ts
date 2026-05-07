@@ -173,6 +173,215 @@ describe('HookTranslator', () => {
     });
   });
 
+  // Regression tests for https://github.com/google-gemini/gemini-cli/issues/25558
+  // BeforeModel hooks that modify text in conversations containing tool calls
+  // were destroying functionCall/functionResponse parts because
+  // fromHookLLMRequest rebuilt contents text-only. The fix merges hook text
+  // edits back into baseRequest.contents in place, preserving non-text parts.
+  describe('fromHookLLMRequest with baseRequest (non-text part preservation)', () => {
+    it('should preserve functionCall parts when merging hook text back', () => {
+      const baseRequest = {
+        model: 'gemini-2.0-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hello' }],
+          },
+          {
+            role: 'model',
+            parts: [
+              { text: 'Let me check that.' },
+              { functionCall: { name: 'search', args: { q: 'test' } } },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'search',
+                  response: { results: [] },
+                },
+              },
+            ],
+          },
+          {
+            role: 'model',
+            parts: [{ text: 'No results found.' }],
+          },
+        ],
+      } as unknown as GenerateContentParameters;
+
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [
+          { role: 'user', content: 'Hello [MODIFIED]' },
+          { role: 'model', content: 'Let me check that.' },
+          // contents[2] (functionResponse only) was skipped by toHookLLMRequest
+          { role: 'model', content: 'No results found.' },
+        ],
+      };
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+      const contents = result.contents as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
+
+      expect(contents).toHaveLength(4);
+
+      // First content: text updated
+      expect(contents[0].parts[0]['text']).toBe('Hello [MODIFIED]');
+
+      // Second content: text updated AND functionCall preserved
+      expect(contents[1].parts).toHaveLength(2);
+      expect(contents[1].parts[0]['text']).toBe('Let me check that.');
+      expect(contents[1].parts[1]['functionCall']).toBeDefined();
+
+      // Third content: functionResponse preserved as-is (was skipped)
+      expect(contents[2].parts[0]['functionResponse']).toBeDefined();
+      expect(contents[2].parts).toHaveLength(1);
+
+      // Fourth content: text updated
+      expect(contents[3].parts[0]['text']).toBe('No results found.');
+    });
+
+    it('should handle text-only entries interleaved with function-only entries', () => {
+      const baseRequest = {
+        model: 'gemini-2.0-flash',
+        contents: [
+          { role: 'user', parts: [{ text: 'Q1' }] },
+          {
+            role: 'model',
+            parts: [{ functionCall: { name: 'tool1', args: {} } }],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'tool1',
+                  response: { ok: true },
+                },
+              },
+            ],
+          },
+          { role: 'model', parts: [{ text: 'Answer' }] },
+        ],
+      } as unknown as GenerateContentParameters;
+
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [
+          { role: 'user', content: 'Q1-modified' },
+          // contents[1] and [2] skipped (no text)
+          { role: 'model', content: 'Answer-modified' },
+        ],
+      };
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+      const contents = result.contents as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
+
+      expect(contents).toHaveLength(4);
+      expect(contents[0].parts[0]['text']).toBe('Q1-modified');
+      expect(contents[1].parts[0]['functionCall']).toBeDefined();
+      expect(contents[2].parts[0]['functionResponse']).toBeDefined();
+      expect(contents[3].parts[0]['text']).toBe('Answer-modified');
+    });
+
+    it('should collapse multiple text parts and preserve non-text parts', () => {
+      const baseRequest = {
+        model: 'gemini-2.0-flash',
+        contents: [
+          {
+            role: 'model',
+            parts: [
+              { text: 'I will search' },
+              { text: ' for you.' },
+              { functionCall: { name: 'search', args: {} } },
+            ],
+          },
+        ],
+      } as unknown as GenerateContentParameters;
+
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [
+          { role: 'model', content: 'I will search for you. [BLINDED]' },
+        ],
+      };
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+      const contents = result.contents as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
+
+      expect(contents).toHaveLength(1);
+      const parts = contents[0].parts;
+      // Multiple text parts collapsed to one, non-text preserved
+      expect(parts[0]['text']).toBe('I will search for you. [BLINDED]');
+      expect(parts[1]['functionCall']).toBeDefined();
+      expect(parts).toHaveLength(2);
+    });
+
+    it('should fall back to text-only when baseRequest is undefined', () => {
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [{ role: 'user', content: 'Hello' }],
+      };
+
+      const result = translator.fromHookLLMRequest(hookRequest);
+
+      expect(result.contents).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ]);
+    });
+
+    it('should fall back to text-only when baseRequest has no contents', () => {
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [{ role: 'user', content: 'Hello' }],
+      };
+      const baseRequest = {
+        model: 'gemini-2.0-flash',
+      } as GenerateContentParameters;
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+
+      expect(result.contents).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ]);
+    });
+
+    it('should append extra hook messages beyond base contents', () => {
+      const baseRequest = {
+        model: 'gemini-2.0-flash',
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      } as unknown as GenerateContentParameters;
+
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.0-flash',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'model', content: 'Extra message added by hook' },
+        ],
+      };
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+      const contents = result.contents as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
+
+      expect(contents).toHaveLength(2);
+      expect(contents[1].parts[0]['text']).toBe('Extra message added by hook');
+    });
+  });
+
   describe('LLM Response Translation', () => {
     it('should convert SDK response to hook format', () => {
       const sdkResponse: GenerateContentResponse = {

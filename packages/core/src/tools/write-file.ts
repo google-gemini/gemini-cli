@@ -430,6 +430,19 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
       return {
         llmContent,
+        display: {
+          name: WRITE_FILE_DISPLAY_NAME,
+          description: this.getDescription(),
+          resultSummary: diffStat
+            ? `${diffStat.model_added_lines} added, ${diffStat.model_removed_lines} removed`
+            : 'Written',
+          result: {
+            type: 'diff',
+            path: this.resolvedPath,
+            beforeText: correctedContentResult.originalContent ?? '',
+            afterText: correctedContentResult.correctedContent,
+          },
+        },
         returnDisplay: displayResult,
       };
     } catch (error) {
