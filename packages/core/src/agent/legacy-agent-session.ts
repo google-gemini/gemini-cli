@@ -105,12 +105,10 @@ export class LegacyAgentProtocol implements AgentProtocol {
     };
   }
 
-  async send(payload: AgentSend): Promise<{ streamId: string }> {
+  async send(payload: AgentSend): Promise<{ streamId: string | null }> {
     const message = 'message' in payload ? payload.message : undefined;
     if (!message) {
-      throw new Error(
-        'LegacyAgentSession.send() only supports message sends for the moment.',
-      );
+      return { streamId: null };
     }
 
     if (this._activeStreamId) {
