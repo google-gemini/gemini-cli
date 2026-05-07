@@ -333,6 +333,3 @@ jobs:
                 core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
               }
             }
- core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
-              }
-            }
