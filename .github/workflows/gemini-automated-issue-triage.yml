@@ -152,7 +152,6 @@ jobs:
             ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.issue_number || inputs.issue_number) || github.event.issue.number }}
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
-          GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
