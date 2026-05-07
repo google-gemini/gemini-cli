@@ -1009,10 +1009,15 @@ export interface ToolExitPlanModeConfirmationPayload {
   feedback?: string;
 }
 
+export interface ToolReviewHunksConfirmationPayload {
+  acceptedHunkIndices: number[];
+}
+
 export type ToolConfirmationPayload =
   | ToolEditConfirmationPayload
   | ToolAskUserConfirmationPayload
-  | ToolExitPlanModeConfirmationPayload;
+  | ToolExitPlanModeConfirmationPayload
+  | ToolReviewHunksConfirmationPayload;
 
 export interface ToolSandboxExpansionConfirmationDetails {
   type: 'sandbox_expansion';
@@ -1098,6 +1103,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
+  ReviewHunks = 'review_hunks',
   Cancel = 'cancel',
 }
 

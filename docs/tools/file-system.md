@@ -119,7 +119,9 @@ around the `old_string` to ensure it modifies the correct location.
   - `new_string` (string, required): Exact literal text to replace with.
   - `allow_multiple` (boolean, optional): If `true`, replaces all occurrences.
     If `false` (default), only succeeds if exactly one occurrence is found.
-- **Confirmation:** Requires manual user approval.
+- **Confirmation:** Requires manual user approval. For complex edits involving
+  multiple changes, you can use **Hunk Review** to selectively apply or reject
+  specific blocks of code.
 
 ## Next steps
 

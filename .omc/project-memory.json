@@ -1,0 +1,259 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778123797341,
+  "projectRoot": "/Users/ranjithpuppala/Desktop/Shashu/gemini-cli-main",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=20.0.0",
+        "confidence": "high",
+        "markers": ["package.json"]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": ["tsconfig.json"]
+      },
+      {
+        "name": "C/C++",
+        "version": null,
+        "confidence": "high",
+        "markers": ["Makefile"]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "esbuild",
+        "version": "0.25.0",
+        "category": "build"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.0",
+        "category": "frontend"
+      },
+      {
+        "name": "vitest",
+        "version": "3.2.4",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 20.0.0"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run start",
+    "scripts": {
+      "start": "cross-env NODE_ENV=development node scripts/start.js",
+      "start:prod": "cross-env NODE_ENV=production node scripts/start.js",
+      "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
+      "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
+      "deflake": "node scripts/deflake.js",
+      "deflake:test:integration:sandbox:none": "npm run deflake -- --command=\"npm run test:integration:sandbox:none -- --retry=0\"",
+      "deflake:test:integration:sandbox:docker": "npm run deflake -- --command=\"npm run test:integration:sandbox:docker -- --retry=0\"",
+      "auth:npm": "npx google-artifactregistry-auth",
+      "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
+      "auth": "npm run auth:npm && npm run auth:docker",
+      "generate": "node scripts/generate-git-commit-info.js",
+      "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
+      "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
+      "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
+      "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
+      "build": "node scripts/build.js",
+      "build-and-start": "npm run build && npm run start --",
+      "build:vscode": "node scripts/build_vscode_companion.js",
+      "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
+      "build:packages": "npm run build --workspaces",
+      "build:sandbox": "node scripts/build_sandbox.js",
+      "build:binary": "node scripts/build_binary.js",
+      "bundle": "npm run generate && npm run build --workspace=@google/gemini-cli-devtools && npm run bundle:browser-mcp -w @google/gemini-cli-core && node esbuild.config.js && node scripts/copy_bundle_assets.js",
+      "test": "npm run test --workspaces --if-present && npm run test:sea-launch",
+      "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts && npm run test:sea-launch",
+      "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
+      "test:sea-launch": "vitest run sea/sea-launch.test.js",
+      "posttest": "npm run build",
+      "test:always_passing_evals": "vitest run --config evals/vitest.config.ts",
+      "test:all_evals": "cross-env RUN_EVALS=1 vitest run --config evals/vitest.config.ts",
+      "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
+      "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
+      "test:integration:flaky": "cross-env RUN_FLAKY_INTEGRATION=1 npm run test:integration:sandbox:none",
+      "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+      "test:memory": "vitest run --root ./memory-tests",
+      "test:memory:update-baselines": "cross-env UPDATE_MEMORY_BASELINES=true vitest run --root ./memory-tests",
+      "test:perf": "vitest run --root ./perf-tests",
+      "test:perf:update-baselines": "cross-env UPDATE_PERF_BASELINES=true vitest run --root ./perf-tests",
+      "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
+      "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
+      "lint": "cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" eslint . --cache --max-warnings 0",
+      "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
+      "lint:ci": "npm run lint:all",
+      "lint:all": "node scripts/lint.js",
+      "format": "prettier --experimental-cli --write .",
+      "typecheck": "npm run typecheck --workspaces --if-present && tsc -b evals/tsconfig.json integration-tests/tsconfig.json memory-tests/tsconfig.json",
+      "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
+      "prepare": "husky && npm run bundle",
+      "prepare:package": "node scripts/prepare-package.js",
+      "release:version": "node scripts/version.js",
+      "telemetry": "node scripts/telemetry.js",
+      "check:lockfile": "node scripts/check-lockfile.js",
+      "clean": "node scripts/clean.js",
+      "pre-commit": "node scripts/pre-commit.js"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": ["packages/*"],
+    "mainDirectories": ["docs", "scripts"],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 9,
+      "lastAccessed": 1778123797069,
+      "keyFiles": [
+        "index.md",
+        "integration-tests.md",
+        "issue-and-pr-automation.md",
+        "local-development.md",
+        "npm.md"
+      ]
+    },
+    "evals": {
+      "path": "evals",
+      "purpose": null,
+      "fileCount": 42,
+      "lastAccessed": 1778123797071,
+      "keyFiles": [
+        "README.md",
+        "answer-vs-act.eval.ts",
+        "app-test-helper.ts",
+        "ask_user.eval.ts",
+        "auto_memory_contract.eval.ts"
+      ]
+    },
+    "integration-tests": {
+      "path": "integration-tests",
+      "purpose": null,
+      "fileCount": 111,
+      "lastAccessed": 1778123797303,
+      "keyFiles": [
+        "acp-env-auth.test.ts",
+        "acp-telemetry.test.ts",
+        "api-resilience.responses",
+        "api-resilience.test.ts",
+        "browser-agent-localhost.dynamic.responses"
+      ]
+    },
+    "memory-tests": {
+      "path": "memory-tests",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1778123797313,
+      "keyFiles": [
+        "baselines.json",
+        "globalSetup.ts",
+        "large-chat-session.json",
+        "memory-usage.test.ts",
+        "memory.idle-startup.responses"
+      ]
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778123797316,
+      "keyFiles": []
+    },
+    "perf-tests": {
+      "path": "perf-tests",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1778123797318,
+      "keyFiles": [
+        "README.md",
+        "baselines.json",
+        "globalSetup.ts",
+        "perf-usage.test.ts",
+        "perf.asian-language.responses"
+      ]
+    },
+    "schemas": {
+      "path": "schemas",
+      "purpose": "Schema definitions",
+      "fileCount": 1,
+      "lastAccessed": 1778123797320,
+      "keyFiles": ["settings.schema.json"]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 50,
+      "lastAccessed": 1778123797326,
+      "keyFiles": [
+        "aggregate_evals.js",
+        "batch_triage.sh",
+        "build.js",
+        "build_binary.js",
+        "build_package.js"
+      ]
+    },
+    "sea": {
+      "path": "sea",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778123797326,
+      "keyFiles": ["sea-launch.cjs", "sea-launch.test.js"]
+    },
+    "third_party": {
+      "path": "third_party",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778123797327,
+      "keyFiles": []
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778123797327,
+      "keyFiles": []
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 24,
+      "lastAccessed": 1778123797328,
+      "keyFiles": [
+        "connected_devtools.png",
+        "gemini-screenshot.png",
+        "monitoring-dashboard-logs.png"
+      ]
+    },
+    "docs/examples": {
+      "path": "docs/examples",
+      "purpose": "Example code",
+      "fileCount": 1,
+      "lastAccessed": 1778123797329,
+      "keyFiles": ["proxy-script.md"]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

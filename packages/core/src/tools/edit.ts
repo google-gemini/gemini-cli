@@ -13,8 +13,8 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  ToolConfirmationOutcome,
   type ToolCallConfirmationDetails,
-  type ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
   type ToolInvocation,
   type ToolLocation,
@@ -23,6 +23,8 @@ import {
   type PolicyUpdateOptions,
   type ExecuteOptions,
   type FileDiff,
+  type ToolConfirmationPayload,
+  type ToolReviewHunksConfirmationPayload,
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -35,6 +37,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { getDiffContextSnippet } from './diff-utils.js';
+import { applySelectedHunks } from '../utils/hunk-utils.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -851,7 +854,14 @@ class EditToolInvocation
    * @param params Parameters for the edit operation
    * @returns Result of the edit operation
    */
-  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({
+    abortSignal: signal,
+    outcome,
+    payload,
+  }: ExecuteOptions & {
+    outcome?: ToolConfirmationOutcome;
+    payload?: ToolConfirmationPayload;
+  }): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {
@@ -896,6 +906,30 @@ class EditToolInvocation
     try {
       await this.ensureParentDirectoriesExistAsync(this.resolvedPath);
       let finalContent = editData.newContent;
+
+      if (
+        outcome === ToolConfirmationOutcome.ReviewHunks &&
+        payload &&
+        'acceptedHunkIndices' in payload
+      ) {
+        const fileName = path.basename(this.resolvedPath);
+        const fullDiff = Diff.createPatch(
+          fileName,
+          editData.currentContent ?? '',
+          editData.newContent,
+          'Current',
+          'Proposed',
+          DEFAULT_DIFF_OPTIONS,
+        );
+        finalContent = applySelectedHunks(
+          editData.currentContent ?? '',
+          fullDiff,
+          (payload as ToolReviewHunksConfirmationPayload).acceptedHunkIndices,
+        );
+        // Update editData.newContent so that subsequent logic (diff stats, etc)
+        // reflects the partial application.
+        editData.newContent = finalContent;
+      }
 
       // Restore original line endings if they were CRLF, or use OS default for new files
       const useCRLF =

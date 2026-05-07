@@ -51,6 +51,7 @@ export * from './core/recordingContentGenerator.js';
 
 // Export Routing
 export * from './routing/routingStrategy.js';
+export * from './utils/hunk-utils.js';
 export * from './routing/modelRouterService.js';
 
 export * from './fallback/types.js';
