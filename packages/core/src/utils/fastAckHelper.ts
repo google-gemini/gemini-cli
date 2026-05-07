@@ -64,7 +64,7 @@ const NEWLINE_RE = /\r?\n/g;
 function sanitizeForWrapper(input: string): string {
   return input
     .replace(XML_CLOSING_TAG_RE, '<\\/$1>')
-    .replace(CONTEXT_BREAKER_RE, '\\]')
+    .replace(CONTEXT_BREAKER_RE, '')
     .replace(NEWLINE_RE, ' ');
 }
 

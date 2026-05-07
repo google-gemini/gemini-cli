@@ -196,16 +196,16 @@ describe('wrapper sanitization', () => {
     expect(result).not.toMatch(/<\/user_input> <\/background_output>/);
   });
 
-  it('escapes context-breaking ] characters in steering hint input', () => {
+  it('removes context-breaking ] characters in steering hint input', () => {
     const result = buildUserSteeringHintPrompt('break] out');
-    expect(result).toContain('break\\] out');
-    expect(result).not.toMatch(/break\] out/);
+    expect(result).toContain('break out');
+    expect(result).not.toContain(']');
   });
 
-  it('escapes context-breaking ] characters in background output', () => {
+  it('removes context-breaking ] characters in background output', () => {
     const result = formatBackgroundCompletionForModel('done [step 1] [step 2]');
-    expect(result).toContain('[step 1\\]');
-    expect(result).toContain('[step 2\\]');
+    expect(result).toContain('[step 1 [step 2');
+    expect(result).not.toContain(']');
   });
 
   it('escapes closing tags with whitespace before the >', () => {
