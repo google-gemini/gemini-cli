@@ -104,6 +104,24 @@ unified diff of the proposed changes.
 Press **y** to confirm and apply the change to your local file system. If the
 diff doesn't look right, press **n** to cancel and refine your prompt.
 
+### Surgical control with Hunk Review
+
+For complex edits that span multiple parts of a file, Gemini CLI offers a
+**Review hunks** option. This lets you surgically accept or reject specific
+changes (hunks) rather than applying the entire file modification at once.
+
+When you select **Review hunks** from the confirmation menu:
+
+1.  **Navigate:** Use the **Up/Down** arrows to move between individual hunks.
+2.  **Toggle:** Press **Space** to mark a hunk as **[ACCEPTED]** or
+    **[REJECTED]**.
+3.  **Bulk actions:** Press **A** to accept all hunks or **R** to reject all.
+4.  **Confirm:** Press **Enter** to apply only the accepted changes to your
+    file.
+
+This is especially useful for large refactors where you want to keep some of the
+AI's suggestions while discarding others.
+
 ## Verify the result
 
 After the edit is complete, verify the fix. You can simply read the file again

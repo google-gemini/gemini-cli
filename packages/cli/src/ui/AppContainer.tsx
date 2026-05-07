@@ -1200,8 +1200,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ? // eslint-disable-next-line react-hooks/rules-of-hooks
       useAgentStream({
         agent: streamAgent,
+        config,
         addItem: historyManager.addItem,
         onCancelSubmit,
+        onDebugMessage: setDebugMessage,
+        setShellInputFocused: setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
         isShellFocused: embeddedShellFocused,
         logger,
       })

@@ -8,6 +8,7 @@ import type React from 'react';
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
+import { HunkReviewer } from './HunkReviewer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
   type SerializableConfirmationDetails,
@@ -18,6 +19,7 @@ import {
   ApprovalMode,
   hasRedirection,
   debugLogger,
+  parseHunks,
 } from '@google/gemini-cli-core';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
@@ -80,6 +82,7 @@ export const ToolConfirmationMessage: React.FC<
     expanded: false,
   });
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isReviewingHunks, setIsReviewingHunks] = useState(false);
   const isMcpToolDetailsExpanded =
     mcpDetailsExpansionState.callId === callId
       ? mcpDetailsExpansionState.expanded
@@ -276,7 +279,13 @@ export const ToolConfirmationMessage: React.FC<
   }, [isCancelling, handleConfirm]);
 
   const handleSelect = useCallback(
-    (item: ToolConfirmationOutcome) => handleConfirm(item),
+    (item: ToolConfirmationOutcome) => {
+      if (item === ToolConfirmationOutcome.ReviewHunks) {
+        setIsReviewingHunks(true);
+      } else {
+        handleConfirm(item);
+      }
+    },
     [handleConfirm],
   );
 
@@ -290,6 +299,14 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedOnce,
           key: 'Allow once',
         });
+        const hunks = parseHunks(confirmationDetails.fileDiff);
+        if (hunks.length > 1) {
+          options.push({
+            label: 'Review hunks',
+            value: ToolConfirmationOutcome.ReviewHunks,
+            key: 'Review hunks',
+          });
+        }
         if (isTrustedFolder) {
           options.push({
             label: 'Allow for this session',
@@ -602,6 +619,29 @@ export const ToolConfirmationMessage: React.FC<
 
       if (confirmationDetails.type === 'edit') {
         if (!confirmationDetails.isModifying) {
+          if (isReviewingHunks) {
+            const hunks = parseHunks(confirmationDetails.fileDiff);
+            return {
+              question: '',
+              bodyContent: (
+                <HunkReviewer
+                  hunks={hunks}
+                  filename={confirmationDetails.fileName}
+                  terminalWidth={terminalWidth}
+                  availableHeight={bodyHeight}
+                  onConfirm={(acceptedHunkIndices) => {
+                    handleConfirm(ToolConfirmationOutcome.ReviewHunks, {
+                      acceptedHunkIndices,
+                    });
+                  }}
+                  onCancel={() => setIsReviewingHunks(false)}
+                />
+              ),
+              options: [],
+              securityWarnings: null,
+              initialIndex: 0,
+            };
+          }
           question = `Apply this change?`;
           bodyContent = (
             <>
