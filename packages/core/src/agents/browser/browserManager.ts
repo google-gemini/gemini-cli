@@ -249,6 +249,7 @@ export class BrowserManager {
    */
   acquire(): void {
     this.inUse = true;
+    this.actionCounter = 0;
   }
 
   /**

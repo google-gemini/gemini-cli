@@ -1295,6 +1295,35 @@ describe('BrowserManager', () => {
         /maximum action limit \(1\)/,
       );
     });
+
+    it('should reset action counter on acquire() for new task invocations', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 3,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // Exhaust the action limit
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args' });
+      await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
+
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(3\)/,
+      );
+
+      // Simulate a new browser_agent invocation acquiring the manager
+      manager.release();
+      manager.acquire();
+
+      // Should succeed again with a fresh counter
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args2' });
+    });
   });
 
   describe('sandbox behavior', () => {
