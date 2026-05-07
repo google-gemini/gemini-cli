@@ -6,7 +6,12 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
-import { GEMINI_DIR, Storage, type Config, homedir } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  Storage,
+  type Config,
+  homedir,
+} from '@google/gemini-cli-core';
 import mock from 'mock-fs';
 import { FileCommandLoader } from './FileCommandLoader.js';
 import { assert, vi } from 'vitest';
@@ -21,7 +26,7 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-import type { CommandContext } from '../ui/commands/types.js';
+import { CommandKind, type CommandContext } from '../ui/commands/types.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 const mockShellProcess = vi.hoisted(() => vi.fn());
@@ -340,7 +345,7 @@ describe('FileCommandLoader', () => {
     expect(names).toContain('test');
     expect(names).toContain('another');
     // Verify they are loaded as user commands, not duplicated as workspace commands
-    expect(commands.every((c) => c.kind === 'user-file')).toBe(true);
+    expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
   });
 
   it('ignores files with TOML syntax errors', async () => {
