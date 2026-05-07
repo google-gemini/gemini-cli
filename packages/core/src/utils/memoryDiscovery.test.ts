@@ -13,6 +13,7 @@ import {
   getGlobalMemoryPaths,
   getExtensionMemoryPaths,
   getEnvironmentMemoryPaths,
+  getUserProjectMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
   readGeminiMdFiles,
@@ -20,6 +21,7 @@ import {
 import {
   setGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
+  PROJECT_MEMORY_INDEX_FILENAME,
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -789,6 +791,61 @@ included directory memory
 
     it('should return empty array if global memory file does not exist', async () => {
       const result = await getGlobalMemoryPaths();
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getUserProjectMemoryPaths', () => {
+    it('should find MEMORY.md when it exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir1'));
+      const memoryFile = await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(memoryFile);
+    });
+
+    it('should preserve the on-disk casing of the index filename', async () => {
+      // Regression: paths surfaced through /memory list and /memory show
+      // were previously lowercased on macOS/Windows because they passed
+      // through normalizePath. The MEMORY.md filename must be kept as-is
+      // for display.
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir2'));
+      await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toContain(PROJECT_MEMORY_INDEX_FILENAME);
+      expect(result[0]).not.toContain(
+        PROJECT_MEMORY_INDEX_FILENAME.toLowerCase(),
+      );
+    });
+
+    it('should fall back to legacy GEMINI.md when MEMORY.md is absent', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir3'));
+      const legacyFile = await createTestFile(
+        path.join(memoryDir, DEFAULT_CONTEXT_FILENAME),
+        'legacy memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toContain(legacyFile);
+    });
+
+    it('should return empty array when neither MEMORY.md nor GEMINI.md exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir4'));
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
 
       expect(result).toHaveLength(0);
     });
