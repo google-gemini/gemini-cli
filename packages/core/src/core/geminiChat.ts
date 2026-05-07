@@ -284,6 +284,10 @@ export class GeminiChat {
     );
   }
 
+  get loopContext(): AgentLoopContext {
+    return this.context;
+  }
+
   async initialize(
     resumedSessionData?: ResumedSessionData,
     kind: 'main' | 'subagent' = 'main',
@@ -827,7 +831,10 @@ export class GeminiChat {
     const history = curated
       ? extractCuratedHistory([...this.agentHistory.get()])
       : this.agentHistory.get();
-    return [...history];
+
+    return this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...history])
+      : [...history];
   }
 
   /**

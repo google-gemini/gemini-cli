@@ -288,12 +288,11 @@ export class PolicyEngine {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
 
-    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
-    const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
+    // Do not downgrade (do not ask user) if in AUTO_EDIT or YOLO mode.
+    // These modes trust the agent's actions (YOLO) or specific task (AUTO_EDIT).
     if (
-      sandboxEnabled &&
-      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
-        this.approvalMode === ApprovalMode.YOLO)
+      this.approvalMode === ApprovalMode.AUTO_EDIT ||
+      this.approvalMode === ApprovalMode.YOLO
     ) {
       return false;
     }
