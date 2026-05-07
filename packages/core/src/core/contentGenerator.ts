@@ -123,8 +123,13 @@ function validateBaseUrl(baseUrl: string): void {
     throw new Error(`Invalid custom base URL: ${baseUrl}`);
   }
 
-  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
-    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  // Allow both HTTP and HTTPS for custom base URLs (e.g. local/private proxies)
+  if (
+    url.protocol !== 'https:' &&
+    url.protocol !== 'http:' &&
+    !LOCAL_HOSTNAMES.includes(url.hostname)
+  ) {
+    throw new Error('Custom base URL must use HTTP or HTTPS.');
   }
 }
 
