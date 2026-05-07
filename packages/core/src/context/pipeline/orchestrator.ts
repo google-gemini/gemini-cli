@@ -23,6 +23,7 @@ export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
   private readonly pendingPipelines = new Map<string, Promise<void>>();
   private readonly pipelineMutex = new Map<string, Promise<void>>();
+  private readonly pipelineScheduled = new Set<string>();
   private nodeProvider: (() => readonly ConcreteNode[]) | undefined;
 
   constructor(
@@ -77,7 +78,7 @@ export class PipelineOrchestrator {
         nodes: readonly ConcreteNode[],
         targets: ReadonlySet<string>,
         protectedIds: ReadonlySet<string>,
-      ) => void,
+      ) => Promise<void>,
     ) => {
       for (const pipeline of pipelines) {
         for (const trigger of pipeline.triggers) {
@@ -91,30 +92,62 @@ export class PipelineOrchestrator {
             trigger === 'nodes_aged_out'
           ) {
             this.eventBus.onConsolidationNeeded((event) => {
-              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
+              void executeFn(
+                pipeline,
+                event.nodes,
+                event.targetNodeIds,
+                new Set(),
+              );
             });
           } else if (trigger === 'new_message' || trigger === 'nodes_added') {
             this.eventBus.onChunkReceived((event) => {
-              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
+              void executeFn(
+                pipeline,
+                event.nodes,
+                event.targetNodeIds,
+                new Set(),
+              );
             });
           }
         }
       }
     };
 
-    bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
-      // Fetch the tail of the current chain for this pipeline, or start a new one
+    const handleSyncExecution = async (
+      pipeline: PipelineDef,
+      nodes: readonly ConcreteNode[],
+      targets: ReadonlySet<string>,
+      protectedIds: ReadonlySet<string>,
+    ) => {
+      if (this.pipelineScheduled.has(pipeline.name)) {
+        debugLogger.log(
+          `[Orchestrator] Pipeline ${pipeline.name} already scheduled (sync), dropping.`,
+        );
+        return;
+      }
+      this.pipelineScheduled.add(pipeline.name);
+
       const existing =
         this.pipelineMutex.get(pipeline.name) || Promise.resolve();
 
       const nextPromise = (async () => {
         try {
-          // Wait for the previous run of THIS pipeline to complete
           await existing;
+          this.pipelineScheduled.delete(pipeline.name);
 
-          // We re-fetch the LATEST nodes from the environment's live buffer
-          // to ensure this sequential run isn't operating on stale data from the trigger event.
-          const latestNodes = this.nodeProvider!();
+          const latestNodes = this.nodeProvider ? this.nodeProvider() : nodes;
+          const latestTargets = latestNodes.filter((n) => targets.has(n.id));
+
+          debugLogger.log(
+            `[Orchestrator] Executing sync pipeline ${pipeline.name} with ${latestTargets.length} latest targets.`,
+          );
+
+          if (latestTargets.length === 0) {
+            debugLogger.log(
+              `[Orchestrator] No latest targets for sync pipeline ${pipeline.name}, returning.`,
+            );
+            return;
+          }
 
           await this.executePipelineAsync(
             pipeline,
@@ -123,41 +156,87 @@ export class PipelineOrchestrator {
             new Set(protectedIds),
           );
         } catch (e) {
-          debugLogger.error(`Pipeline chain ${pipeline.name} failed:`, e);
+          debugLogger.error(`Sync pipeline chain ${pipeline.name} failed:`, e);
         }
       })();
 
-      // Update the chain tail
       this.pipelineMutex.set(pipeline.name, nextPromise);
-
       const pipelineId = `${pipeline.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       this.pendingPipelines.set(pipelineId, nextPromise);
       void nextPromise.finally(() => {
         this.pendingPipelines.delete(pipelineId);
-        // Only clear the mutex if we are still the tail of the chain
         if (this.pipelineMutex.get(pipeline.name) === nextPromise) {
           this.pipelineMutex.delete(pipeline.name);
         }
       });
-    });
+    };
 
-    bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {
-      const inboxSnapshot = new InboxSnapshotImpl(
-        this.env.inbox.getMessages() || [],
-      );
-      const targets = nodes.filter((n) => targetIds.has(n.id));
-      for (const processor of pipeline.processors) {
-        processor
-          .process({
-            targets,
-            inbox: inboxSnapshot,
-            buffer: ContextWorkingBufferImpl.initialize(nodes),
-          })
-          .catch((e: unknown) =>
-            debugLogger.error(`AsyncProcessor ${processor.name} failed:`, e),
-          );
+    const handleAsyncExecution = async (
+      pipeline: AsyncPipelineDef,
+      nodes: readonly ConcreteNode[],
+      targets: ReadonlySet<string>,
+    ) => {
+      if (this.pipelineScheduled.has(pipeline.name)) {
+        debugLogger.log(
+          `[Orchestrator] Pipeline ${pipeline.name} already scheduled (async), dropping.`,
+        );
+        return;
       }
-    });
+      this.pipelineScheduled.add(pipeline.name);
+
+      const existing =
+        this.pipelineMutex.get(pipeline.name) || Promise.resolve();
+
+      const nextPromise = (async () => {
+        try {
+          await existing;
+          this.pipelineScheduled.delete(pipeline.name);
+
+          const latestNodes = this.nodeProvider ? this.nodeProvider() : nodes;
+          const latestTargets = latestNodes.filter((n) => targets.has(n.id));
+
+          debugLogger.log(
+            `[Orchestrator] Executing async pipeline ${pipeline.name} with ${latestTargets.length} latest targets.`,
+          );
+
+          const inboxSnapshot = new InboxSnapshotImpl(
+            this.env.inbox.getMessages() || [],
+          );
+
+          for (const processor of pipeline.processors) {
+            debugLogger.log(
+              `[Orchestrator] Running async processor ${processor.id}`,
+            );
+            await processor.process({
+              targets: latestTargets,
+              inbox: inboxSnapshot,
+              buffer: ContextWorkingBufferImpl.initialize(latestNodes),
+            });
+          }
+          this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
+        } catch (e) {
+          debugLogger.error(`Async pipeline chain ${pipeline.name} failed:`, e);
+        }
+      })();
+
+      this.pipelineMutex.set(pipeline.name, nextPromise);
+      const pipelineId = `${pipeline.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.pendingPipelines.set(pipelineId, nextPromise);
+      void nextPromise.finally(() => {
+        this.pendingPipelines.delete(pipelineId);
+        if (this.pipelineMutex.get(pipeline.name) === nextPromise) {
+          this.pipelineMutex.delete(pipeline.name);
+        }
+      });
+    };
+
+    bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) =>
+      handleSyncExecution(pipeline, nodes, targets, protectedIds),
+    );
+
+    bindTriggers(this.asyncPipelines, (pipeline, nodes, targets) =>
+      handleAsyncExecution(pipeline, nodes, targets),
+    );
   }
 
   shutdown() {

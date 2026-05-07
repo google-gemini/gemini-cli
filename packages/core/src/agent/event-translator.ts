@@ -236,6 +236,7 @@ export function translateEvent(
           requestId: event.value.callId,
           name: event.value.name,
           args: event.value.args,
+          display: event.value.display,
         }),
       );
       break;
@@ -243,13 +244,15 @@ export function translateEvent(
     case GeminiEventType.ToolCallResponse: {
       ensureStreamStart(state, out);
       const data = buildToolResponseData(event.value);
-      const display: ToolDisplay | undefined = event.value.resultDisplay
-        ? {
-            result: toolResultDisplayToDisplayContent(
-              event.value.resultDisplay,
-            ),
-          }
-        : undefined;
+      const display: ToolDisplay | undefined =
+        event.value.display ??
+        (event.value.resultDisplay
+          ? {
+              result: toolResultDisplayToDisplayContent(
+                event.value.resultDisplay,
+              ),
+            }
+          : undefined);
       out.push(
         makeEvent('tool_response', state, {
           requestId: event.value.callId,
@@ -279,7 +282,6 @@ export function translateEvent(
       ((x: never) => {
         throw new Error(`Unhandled event type: ${JSON.stringify(x)}`);
       })(event);
-      break;
   }
 
   return out;
