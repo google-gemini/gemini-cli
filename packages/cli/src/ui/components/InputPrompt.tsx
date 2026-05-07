@@ -91,6 +91,16 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+
+/**
+ * Detect if running inside VS Code integrated terminal.
+ * VS Code uses xterm.js which has known issues with Ink's
+ * terminalCursorPosition/cursorFocus ANSI sequences, causing
+ * the input cursor to appear at the far right of the terminal
+ * instead of the correct prompt position.
+ */
+const isVSCodeTerminal = terminalCapabilityManager.isVSCodeTerminal();
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -1398,6 +1408,49 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
 
+  // ── VSCode Terminal Cursor Workaround ──────────────────────────
+  // VS Code's xterm.js-based terminal emulator does not reliably
+  // interpret Ink's ANSI cursor-positioning sequences
+  // (\x1b[{N}G / Cursor Character Absolute). This causes the
+  // input cursor to appear at a fixed column on the far right of
+  // the terminal, making text entry unreadable.
+  //
+  // Workaround: on each cursor/text change, explicitly write the
+  // cursor-show (\x1b[?25h) and cursor-position (\x1b[{col}G)
+  // escape sequences directly to stdout, bypassing Ink's
+  // cursor management.
+  //
+  // The cursor column is calculated as:
+  //   prompt-prefix (2 chars: "> " or "! ") + cursor offset
+  // We use a generous estimate for the prefix since Ink layout
+  // may add additional padding.
+  useEffect(() => {
+    if (!isVSCodeTerminal || !focus || !showCursor) return;
+
+    // Use requestAnimationFrame-like timing to run after Ink's render cycle
+    const timer = setTimeout(() => {
+      // Prompt prefix "! " or "> " is 2 chars wide,
+      // plus 1 column for the left padding (paddingX={1})
+      const PROMPT_PREFIX_WIDTH = 3;
+      const cursorCol = PROMPT_PREFIX_WIDTH + cursorVisualColAbsolute + 1; // +1: ANSI columns are 1-indexed
+      try {
+        stdout.write(`\x1b[?25h\x1b[${cursorCol}G`);
+      } catch {
+        // Silently ignore write failures (e.g. if stdout is closed)
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    cursorVisualRowAbsolute,
+    cursorVisualColAbsolute,
+    buffer.text,
+    focus,
+    showCursor,
+    stdout,
+  ]);
+  // ── End VSCode Terminal Cursor Workaround ──────────────────────
+
   const getGhostTextLines = useCallback(() => {
     if (
       !completion.promptCompletion.text ||
@@ -1630,7 +1683,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return (
         <Box height={1}>
           <Text
-            terminalCursorFocus={showCursor && isOnCursorLine}
+            terminalCursorFocus={
+              !isVSCodeTerminal && showCursor && isOnCursorLine
+            }
             terminalCursorPosition={cpIndexToOffset(
               lineText,
               cursorVisualColAbsolute,
@@ -1831,7 +1886,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               !isVoiceModeEnabled && placeholder ? (
                 showCursor ? (
                   <Text
-                    terminalCursorFocus={showCursor}
+                    terminalCursorFocus={!isVSCodeTerminal && showCursor}
                     terminalCursorPosition={0}
                   >
                     {chalk.inverse(placeholder.slice(0, 1))}
