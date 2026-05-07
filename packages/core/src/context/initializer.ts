@@ -22,6 +22,7 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
+import { UnionFindClusterProcessorOptionsSchema } from './processors/unionFindClusterProcessor.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 
 export async function initializeContextManager(
@@ -66,6 +67,10 @@ export async function initializeContextManager(
   registry.registerProcessor({
     id: 'RollingSummaryProcessor',
     schema: RollingSummaryProcessorOptionsSchema,
+  });
+  registry.registerProcessor({
+    id: 'UnionFindClusterProcessor',
+    schema: UnionFindClusterProcessorOptionsSchema,
   });
 
   const sidecarProfile = await loadContextManagementConfig(

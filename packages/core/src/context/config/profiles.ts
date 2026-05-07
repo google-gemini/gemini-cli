@@ -18,6 +18,7 @@ import { createNodeTruncationProcessor } from '../processors/nodeTruncationProce
 import { createNodeDistillationProcessor } from '../processors/nodeDistillationProcessor.js';
 import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
 import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAsyncProcessor.js';
+import { createUnionFindClusterProcessor } from '../processors/unionFindClusterProcessor.js';
 
 /**
  * Helper to safely merge static default options with dynamically loaded
@@ -119,6 +120,14 @@ export const generalistProfile: ContextProfile = {
             env,
             resolveProcessorOptions(config, 'NodeDistillation', {
               nodeThresholdTokens: 3000,
+            }),
+          ),
+          createUnionFindClusterProcessor(
+            'UnionFindCluster',
+            env,
+            resolveProcessorOptions(config, 'UnionFindCluster', {
+              mergeThreshold: 0.15,
+              maxColdClusters: 10,
             }),
           ),
           createNodeTruncationProcessor(
