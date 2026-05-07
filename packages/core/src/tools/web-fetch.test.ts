@@ -53,6 +53,9 @@ vi.mock('../utils/fetch.js', async (importOriginal) => {
     ...actual,
     fetchWithTimeout: vi.fn(),
     isPrivateIp: vi.fn(),
+    // Default to false (public) so unit tests don't make real DNS lookups;
+    // individual tests override this when DNS-based SSRF behaviour is under test.
+    isPrivateIpAsync: vi.fn().mockResolvedValue(false),
   };
 });
 
