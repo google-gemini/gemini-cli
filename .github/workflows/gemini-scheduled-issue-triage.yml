@@ -156,14 +156,15 @@ jobs:
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. Give me a single short explanation about why you are selecting each label in the process.
             8. Output a JSON array of objects, each containing the issue number
-               and the labels to add and remove, along with an explanation. For example:
+               and the labels to add and remove, along with an explanation. If you assigned an effort/ label, you MUST also include an effort_analysis field detailing the codebase components and files involved. For example:
                ```
                [
                  {
                    "issue_number": 123,
-                   "labels_to_add": ["area/core", "kind/bug", "priority/p2"],
+                   "labels_to_add": ["area/core", "kind/bug", "priority/p2", "effort/medium"],
                    "labels_to_remove": ["status/need-triage"],
-                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority."
+                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority.",
+                   "effort_analysis": "The fix requires tracing across React state and Ink components, specifically touching packages/cli/src/gemini.tsx."
                  }
                ]
                ```
@@ -310,12 +311,21 @@ jobs:
                 core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`);
               }
 
-              if (entry.explanation) {
+              if (entry.explanation || entry.effort_analysis) {
+                let commentBody = '';
+                if (entry.explanation) {
+                  commentBody += entry.explanation;
+                }
+                if (entry.effort_analysis) {
+                  if (commentBody) commentBody += '\n\n';
+                  commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
+                }
+                
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber,
-                  body: entry.explanation,
+                  body: commentBody,
                 });
               }
 
