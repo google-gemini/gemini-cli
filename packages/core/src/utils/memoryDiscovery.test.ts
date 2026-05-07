@@ -994,8 +994,8 @@ included directory memory
         );
 
         expect(result).toEqual([
-          '/case-root/GEMINI.md',
-          '/case-root/gemini.md',
+          paths.toAbsolutePath('/case-root/GEMINI.md'),
+          paths.toAbsolutePath('/case-root/gemini.md'),
         ]);
       } finally {
         platformSpy.mockRestore();
