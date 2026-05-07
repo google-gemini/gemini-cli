@@ -73,6 +73,11 @@ export interface BaseSettingsDialogProps {
   // Scope selector
   /** Whether to show the scope selector. Default: true */
   showScopeSelector?: boolean;
+  /** Editable scope items to display. Defaults to all loadable scopes. */
+  scopeItems?: Array<{
+    label: string;
+    value: LoadableSettingScope;
+  }>;
   /** Currently selected scope */
   selectedScope: LoadableSettingScope;
   /** Callback when scope changes */
@@ -128,6 +133,7 @@ export function BaseSettingsDialog({
   searchBuffer,
   items,
   showScopeSelector = true,
+  scopeItems: providedScopeItems,
   selectedScope,
   onScopeChange,
   maxItemsToShow,
@@ -143,9 +149,19 @@ export function BaseSettingsDialog({
 }: BaseSettingsDialogProps): React.JSX.Element {
   const globalKeyMatchers = useKeyMatchers();
   const keyMatchers = customKeyMatchers ?? globalKeyMatchers;
+  const scopeItems = useMemo(
+    () =>
+      (providedScopeItems ?? getScopeItems()).map((item) => ({
+        ...item,
+        key: item.value,
+      })),
+    [providedScopeItems],
+  );
+  const showAvailableScopes = showScopeSelector && scopeItems.length > 1;
+
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
-    const initialShowScope = showScopeSelector;
+    const initialShowScope = showAvailableScopes;
     const initialMaxItems = maxItemsToShow;
 
     if (!availableHeight) {
@@ -214,7 +230,7 @@ export function BaseSettingsDialog({
     maxItemsToShow,
     items.length,
     searchEnabled,
-    showScopeSelector,
+    showAvailableScopes,
     footer,
   ]);
 
@@ -247,12 +263,6 @@ export function BaseSettingsDialog({
     !finalShowScopeSelector && focusSection === 'scope'
       ? 'settings'
       : focusSection;
-
-  // Scope selector items
-  const scopeItems = getScopeItems().map((item) => ({
-    ...item,
-    key: item.value,
-  }));
 
   // Calculate visible items based on scroll offset
   const visibleItems = items.slice(
