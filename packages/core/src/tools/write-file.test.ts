@@ -678,6 +678,16 @@ describe('WriteFileTool', () => {
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
       );
+      expect(result.display).toEqual(
+        expect.objectContaining({
+          name: 'WriteFile',
+          resultSummary: expect.stringContaining('added'),
+          result: expect.objectContaining({
+            type: 'diff',
+            afterText: content,
+          }),
+        }),
+      );
       expect(fs.existsSync(filePath)).toBe(true);
       const writtenContent = await fsService.readTextFile(filePath);
       expect(writtenContent).toBe(content);
