@@ -12,7 +12,6 @@ import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
-import { debugLogger } from '../../utils/debugLogger.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
 export interface TurnSummary {
@@ -65,7 +64,7 @@ export class SimulationHarness {
       mockTempDir,
       mockTempDir,
       this.tracer,
-      1, // 1 char per token average
+      1, // 1 char per token average for estimation (but estimator uses 0.33)
       this.eventBus,
     );
 
@@ -85,59 +84,23 @@ export class SimulationHarness {
     );
   }
 
-  /**
-   * Simulates a single "Turn" (User input + Model/Tool outputs)
-   * A turn might consist of multiple Content messages (e.g. user prompt -> model call -> user response -> model answer)
-   */
   async simulateTurn(messages: Content[]) {
     // 1. Append the new messages
     const currentHistory = this.chatHistory.get();
     this.chatHistory.set([...currentHistory, ...messages]);
 
-    // 2. Measure tokens immediately after append (Before background processing)
+    // 2. Measure tokens immediately after append
     const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
       this.contextManager.getNodes(),
     );
-    debugLogger.log(
-      `[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`,
-    );
 
-    // 3. Yield to event loop to allow internal async subscribers and orchestrator to finish
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // 3. Yield to event loop and wait for async pipelines to finish
+    await this.contextManager.waitForPipelines();
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Extra beat for event bus propagation
 
-    // 3.1 Simulate what projectCompressedHistory does with the sync handlers
-    let currentView = this.contextManager.getNodes();
-    const currentTokens =
-      this.env.tokenCalculator.calculateConcreteListTokens(currentView);
-    if (
-      this.config.config.budget &&
-      currentTokens > this.config.config.budget.maxTokens
-    ) {
-      debugLogger.log(
-        `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.config.budget.maxTokens}`,
-      );
-      const orchestrator = this.orchestrator;
-      // In the V2 simulation, we trigger the 'gc_backstop' to simulate emergency pressure.
-      // Since contextManager owns its buffer natively, the simulation now properly matches reality
-      // where the manager runs the orchestrator and keeps the resulting modified view.
-      const modifiedView = await orchestrator.executeTriggerSync(
-        'gc_backstop',
-        currentView,
-        new Set(currentView.map((e) => e.id)),
-        new Set<string>(),
-      );
-
-      // In the real system, ContextManager triggers this and retains it.
-      // We will emulate that behavior internally in the test loop for token counting.
-      currentView = modifiedView;
-    }
-
-    // 4. Measure tokens after background processors have processed inboxes
+    // 4. Measure tokens after background processors
     const tokensAfter = this.env.tokenCalculator.calculateConcreteListTokens(
       this.contextManager.getNodes(),
-    );
-    debugLogger.log(
-      `[Turn ${this.currentTurnIndex}] Tokens AFTER: ${tokensAfter}`,
     );
 
     this.tokenTrajectory.push({
