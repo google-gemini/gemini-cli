@@ -55,21 +55,12 @@ export function createUnionFindClusterProcessor(
   env: ContextEnvironment,
   options: UnionFindClusterProcessorOptions,
 ): ContextProcessor {
-  const embedder = new TFIDFEmbedder();
-  const summarizer = new ClusterSummarizer(
-    env.llmClient,
-    'gemini-3-flash-base',
-  );
-
-  const contextWindow = new ContextWindow(embedder, summarizer, {
+  const resolvedOptions = {
     mergeThreshold: options.mergeThreshold ?? 0.15,
     maxColdClusters: options.maxColdClusters ?? 10,
     graduateAt: options.graduateAt ?? 26,
     evictAt: options.evictAt ?? 30,
-  });
-
-  const appendedNodeIds: Map<number, string> = new Map();
-  let nextMsgId = 0;
+  };
 
   return {
     id,
@@ -77,77 +68,92 @@ export function createUnionFindClusterProcessor(
     process: async ({ targets }: ProcessArgs) => {
       if (targets.length < 3) return targets;
 
-      for (const node of targets) {
+      const embedder = new TFIDFEmbedder();
+      const summarizer = new ClusterSummarizer(
+        env.llmClient,
+        'gemini-3-flash-base',
+      );
+      const contextWindow = new ContextWindow(
+        embedder,
+        summarizer,
+        resolvedOptions,
+      );
+      const msgIdToNodeId = new Map<number, string>();
+      const targetIndex = new Map<string, number>();
+      let nextMsgId = 0;
+
+      for (let i = 0; i < targets.length; i++) {
+        const node = targets[i];
+        targetIndex.set(node.id, i);
         const text = extractNodeText(node);
         if (!text) continue;
 
         const msgId = nextMsgId++;
         contextWindow.append(text, new Date(node.timestamp).toISOString());
-        appendedNodeIds.set(msgId, node.id);
+        msgIdToNodeId.set(msgId, node.id);
       }
 
       if (contextWindow.coldClusterCount === 0) return targets;
 
+      try {
+        await contextWindow.resolveDirty();
+      } catch (e) {
+        debugLogger.warn('UnionFindClusterProcessor resolveDirty failed', e);
+      }
+
       const forest = contextWindow.forest;
       const coldRoots = forest.roots();
 
-      const clusteredNodeIds = new Set<string>();
-      const clusterNodes: ConcreteNode[] = [];
+      const clusterByNodeId = new Map<string, ConcreteNode>();
+      const insertedClusters = new Set<string>();
 
       for (const root of coldRoots) {
         const memberMsgIds = forest.members(root);
         const memberNodeIds = memberMsgIds
-          .map((mid) => appendedNodeIds.get(mid))
-          .filter((nid): nid is string => nid !== undefined);
+          .map((mid) => msgIdToNodeId.get(mid))
+          .filter(
+            (nid): nid is string => nid !== undefined && targetIndex.has(nid),
+          );
 
         if (memberNodeIds.length < 2) continue;
 
         const summaryText = forest.compact(root);
-        for (const nid of memberNodeIds) {
-          clusteredNodeIds.add(nid);
-        }
 
-        const earliestTarget = targets.find((t) =>
-          memberNodeIds.includes(t.id),
+        const firstIdx = Math.min(
+          ...memberNodeIds.map((nid) => targetIndex.get(nid)!),
         );
+        const firstNode = targets[firstIdx];
         const newId = randomUUID();
 
-        clusterNodes.push({
+        const snapshotNode: ConcreteNode = {
           id: newId,
           turnId: newId,
           type: NodeType.SNAPSHOT,
-          timestamp: earliestTarget?.timestamp ?? Date.now(),
+          timestamp: firstNode.timestamp,
           role: 'user',
           payload: { text: summaryText },
           abstractsIds: memberNodeIds,
-        } as ConcreteNode);
+        } as ConcreteNode;
+
+        for (const nid of memberNodeIds) {
+          clusterByNodeId.set(nid, snapshotNode);
+        }
       }
 
-      if (clusterNodes.length === 0) return targets;
-
-      void contextWindow.resolveDirty().catch((e) => {
-        debugLogger.warn('UnionFindClusterProcessor resolveDirty failed', e);
-      });
+      if (clusterByNodeId.size === 0) return targets;
 
       const returnedNodes: ConcreteNode[] = [];
-      let clusterInsertIndex = 0;
 
       for (const node of targets) {
-        if (clusteredNodeIds.has(node.id)) {
-          if (
-            clusterInsertIndex < clusterNodes.length &&
-            clusterNodes[clusterInsertIndex].abstractsIds?.includes(node.id)
-          ) {
-            returnedNodes.push(clusterNodes[clusterInsertIndex]);
-            clusterInsertIndex++;
+        if (clusterByNodeId.has(node.id)) {
+          const cluster = clusterByNodeId.get(node.id)!;
+          if (!insertedClusters.has(cluster.id)) {
+            returnedNodes.push(cluster);
+            insertedClusters.add(cluster.id);
           }
         } else {
           returnedNodes.push(node);
         }
-      }
-
-      for (let i = clusterInsertIndex; i < clusterNodes.length; i++) {
-        returnedNodes.push(clusterNodes[i]);
       }
 
       return returnedNodes;

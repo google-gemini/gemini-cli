@@ -17,7 +17,7 @@ describe('UnionFindClusterProcessor', () => {
   it('should pass through when fewer than 3 targets', async () => {
     const env = createMockEnvironment();
     const processor = createUnionFindClusterProcessor(
-      'UnionFindCluster',
+      'UnionFindClusterProcessor',
       env,
       {},
     );
@@ -39,12 +39,16 @@ describe('UnionFindClusterProcessor', () => {
 
   it('should cluster similar nodes into a Snapshot', async () => {
     const env = createMockEnvironment();
-    const processor = createUnionFindClusterProcessor('UnionFindCluster', env, {
-      mergeThreshold: 0.1,
-      maxColdClusters: 2,
-      graduateAt: 2,
-      evictAt: 4,
-    });
+    const processor = createUnionFindClusterProcessor(
+      'UnionFindClusterProcessor',
+      env,
+      {
+        mergeThreshold: 0.1,
+        maxColdClusters: 2,
+        graduateAt: 2,
+        evictAt: 4,
+      },
+    );
 
     const targets = [
       createDummyNode(
@@ -94,13 +98,9 @@ describe('UnionFindClusterProcessor', () => {
 
     const result = await processor.process(createMockProcessArgs(targets));
 
-    // Should have fewer nodes than input due to clustering
     expect(result.length).toBeLessThan(targets.length);
 
-    // Check that Snapshot nodes exist with abstractsIds
-    const snapshots = result.filter(
-      (n) => n.type === NodeType.SNAPSHOT,
-    ) as Snapshot[];
+    const snapshots = result.filter((n) => n.type === NodeType.SNAPSHOT);
     expect(snapshots.length).toBeGreaterThan(0);
 
     for (const snap of snapshots) {
@@ -111,12 +111,16 @@ describe('UnionFindClusterProcessor', () => {
 
   it('should respect maxColdClusters cap', async () => {
     const env = createMockEnvironment();
-    const processor = createUnionFindClusterProcessor('UnionFindCluster', env, {
-      mergeThreshold: 0.99,
-      maxColdClusters: 2,
-      graduateAt: 1,
-      evictAt: 3,
-    });
+    const processor = createUnionFindClusterProcessor(
+      'UnionFindClusterProcessor',
+      env,
+      {
+        mergeThreshold: 0.99,
+        maxColdClusters: 2,
+        graduateAt: 1,
+        evictAt: 3,
+      },
+    );
 
     const targets = Array.from({ length: 10 }, (_, i) =>
       createDummyNode(
@@ -133,16 +137,16 @@ describe('UnionFindClusterProcessor', () => {
     const result = await processor.process(createMockProcessArgs(targets));
 
     const snapshots = result.filter((n) => n.type === NodeType.SNAPSHOT);
-    // maxColdClusters=2 means at most 2 cluster snapshots
     expect(snapshots.length).toBeLessThanOrEqual(2);
   });
 
   it('should preserve nodes with empty text', async () => {
     const env = createMockEnvironment();
-    const processor = createUnionFindClusterProcessor('UnionFindCluster', env, {
-      graduateAt: 2,
-      evictAt: 4,
-    });
+    const processor = createUnionFindClusterProcessor(
+      'UnionFindClusterProcessor',
+      env,
+      { graduateAt: 2, evictAt: 4 },
+    );
 
     const targets = [
       createDummyNode('t1', NodeType.USER_PROMPT, 10, {
@@ -161,8 +165,105 @@ describe('UnionFindClusterProcessor', () => {
 
     const result = await processor.process(createMockProcessArgs(targets));
 
-    // The empty-text node should still be present
     const emptyNode = result.find((n) => n.payload.text === '');
     expect(emptyNode).toBeDefined();
+  });
+
+  it('should not leak state across sequential process() calls', async () => {
+    const env = createMockEnvironment();
+    const processor = createUnionFindClusterProcessor(
+      'UnionFindClusterProcessor',
+      env,
+      {
+        mergeThreshold: 0.1,
+        maxColdClusters: 5,
+        graduateAt: 2,
+        evictAt: 4,
+      },
+    );
+
+    const targetsA = [
+      createDummyNode(
+        't1',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'the quick brown fox jumps over the lazy dog' },
+        },
+        'a-1',
+      ),
+      createDummyNode(
+        't2',
+        NodeType.AGENT_THOUGHT,
+        10,
+        {
+          payload: { text: 'the quick brown fox runs over the lazy dog' },
+        },
+        'a-2',
+      ),
+      createDummyNode(
+        't3',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'the quick brown fox leaps over the lazy dog' },
+        },
+        'a-3',
+      ),
+    ];
+
+    const resultA = await processor.process(createMockProcessArgs(targetsA));
+
+    const targetsB = [
+      createDummyNode(
+        't4',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'quantum physics and entanglement theory' },
+        },
+        'b-1',
+      ),
+      createDummyNode(
+        't5',
+        NodeType.AGENT_THOUGHT,
+        10,
+        {
+          payload: { text: 'quantum mechanics and wave functions' },
+        },
+        'b-2',
+      ),
+      createDummyNode(
+        't6',
+        NodeType.USER_PROMPT,
+        10,
+        {
+          payload: { text: 'quantum computing and superposition' },
+        },
+        'b-3',
+      ),
+    ];
+
+    const resultB = await processor.process(createMockProcessArgs(targetsB));
+
+    // Results should only reference their own input node IDs
+    const allIdsA = new Set(targetsA.map((t) => t.id));
+    const allIdsB = new Set(targetsB.map((t) => t.id));
+
+    for (const node of resultA) {
+      if (node.abstractsIds) {
+        for (const aid of node.abstractsIds) {
+          expect(allIdsA.has(aid)).toBe(true);
+        }
+      }
+    }
+
+    for (const node of resultB) {
+      if (node.abstractsIds) {
+        for (const aid of node.abstractsIds) {
+          expect(allIdsB.has(aid)).toBe(true);
+        }
+      }
+    }
   });
 });
