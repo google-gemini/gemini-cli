@@ -959,6 +959,50 @@ included directory memory
       expect(result[0]).toBe(repoFile);
     });
 
+    it('should preserve case-distinct files before identity deduplication', async () => {
+      const platformSpy = vi
+        .spyOn(process, 'platform', 'get')
+        .mockReturnValue('win32');
+      vi.resetModules();
+      vi.doMock('node:fs/promises', async () => {
+        const actual =
+          await vi.importActual<typeof fsPromises>('node:fs/promises');
+        return {
+          ...actual,
+          access: vi.fn().mockResolvedValue(undefined),
+          stat: vi.fn(async (filePath) => {
+            const normalizedPath = String(filePath).replace(/\\/g, '/');
+            return {
+              dev: 1,
+              ino: normalizedPath.endsWith('/GEMINI.md') ? 101 : 202,
+            };
+          }),
+        };
+      });
+
+      try {
+        const paths = await import('./paths.js');
+        const memoryTool = await import('../tools/memoryTool.js');
+        const memoryDiscovery = await import('./memoryDiscovery.js');
+        vi.mocked(paths.homedir).mockReturnValue('/home/tester');
+        memoryTool.setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+        const result = await memoryDiscovery.getEnvironmentMemoryPaths(
+          ['/case-root'],
+          [],
+        );
+
+        expect(result).toEqual([
+          '/case-root/GEMINI.md',
+          '/case-root/gemini.md',
+        ]);
+      } finally {
+        platformSpy.mockRestore();
+        vi.doUnmock('node:fs/promises');
+        vi.resetModules();
+      }
+    });
+
     it('should recognize .git as a file (submodules/worktrees)', async () => {
       const repoDir = await createEmptyDir(
         path.join(testRootDir, 'worktree_repo'),

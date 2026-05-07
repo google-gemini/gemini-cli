@@ -285,8 +285,10 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
   for (const geminiMdFilename of geminiMdFilenames) {
     const resolvedHome = toAbsolutePath(userHomePath);
-    const globalGeminiDir = path.join(resolvedHome, GEMINI_DIR);
-    const globalMemoryPath = path.join(globalGeminiDir, geminiMdFilename);
+    const globalGeminiDir = toAbsolutePath(path.join(resolvedHome, GEMINI_DIR));
+    const globalMemoryPath = toAbsolutePath(
+      path.join(globalGeminiDir, geminiMdFilename),
+    );
     const globalMemoryKey = normalizePath(globalMemoryPath);
     const globalGeminiDirKey = normalizePath(globalGeminiDir);
 
@@ -331,7 +333,9 @@ async function getGeminiMdFilePathsInternalForEachDir(
           break;
         }
 
-        const potentialPath = path.join(currentDir, geminiMdFilename);
+        const potentialPath = toAbsolutePath(
+          path.join(currentDir, geminiMdFilename),
+        );
         try {
           await fs.access(potentialPath, fsSync.constants.R_OK);
           if (normalizePath(potentialPath) !== globalMemoryKey) {
@@ -591,15 +595,9 @@ export async function getEnvironmentMemoryPaths(
 
   const pathArrays = await Promise.all(traversalPromises);
 
-  // Dedupe case-insensitively while keeping the first-seen casing for display.
-  const seenKeys = new Set<string>();
-  const unique: string[] = [];
-  for (const p of pathArrays.flat()) {
-    const key = normalizePath(p);
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-    unique.push(p);
-  }
+  const { paths: unique } = await deduplicatePathsByFileIdentity(
+    pathArrays.flat(),
+  );
   return unique.sort();
 }
 
@@ -657,7 +655,7 @@ async function findUpwardGeminiFiles(
 
     // Parallelize checks for all filename variants in the current directory
     const accessChecks = geminiMdFilenames.map(async (filename) => {
-      const potentialPath = path.join(currentDir, filename);
+      const potentialPath = toAbsolutePath(path.join(currentDir, filename));
       try {
         await fs.access(potentialPath, fsSync.constants.R_OK);
         return potentialPath;
