@@ -249,7 +249,7 @@ const MAX_SAFE_REDIRECTS = 10;
  * @param hopsLeft Remaining redirect budget (default MAX_SAFE_REDIRECTS).
  */
 export async function fetchWithSafeRedirects(
-  isBlockedHost: (url: string) => boolean,
+  isBlockedHost: (url: string) => boolean | Promise<boolean>,
   url: string,
   timeout: number,
   options?: Omit<RequestInit, 'redirect'>,
@@ -280,7 +280,7 @@ export async function fetchWithSafeRedirects(
         'ERR_INVALID_REDIRECT',
       );
     }
-    if (isBlockedHost(redirectUrl)) {
+    if (await isBlockedHost(redirectUrl)) {
       throw new FetchError(
         `SSRF protection: redirect destination "${redirectUrl}" resolves to a blocked or private host`,
         'ERR_SSRF_REDIRECT',

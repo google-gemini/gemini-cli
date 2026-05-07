@@ -19,7 +19,11 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithSafeRedirects, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithSafeRedirects,
+  isPrivateIp,
+  isPrivateIpAsync,
+} from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -280,12 +284,28 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
   }
 
+  /**
+   * Async variant of isBlockedHost that also resolves hostnames via DNS.
+   * Prevents SSRF via domains that resolve to private/link-local addresses
+   * (e.g. 169.254.169.254.nip.io → AWS IMDS).
+   */
+  private async isBlockedHostAsync(urlStr: string): Promise<boolean> {
+    if (this.isBlockedHost(urlStr)) {
+      return true;
+    }
+    try {
+      return await isPrivateIpAsync(urlStr);
+    } catch {
+      return true; // fail closed on DNS errors
+    }
+  }
+
   private async executeFallbackForUrl(
     urlStr: string,
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHostAsync(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
@@ -295,7 +315,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const response = await retryWithBackoff(
       async () => {
         const res = await fetchWithSafeRedirects(
-          this.isBlockedHost.bind(this),
+          this.isBlockedHostAsync.bind(this),
           url,
           URL_FETCH_TIMEOUT_MS,
           {
@@ -620,7 +640,7 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHostAsync(url)) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -639,7 +659,7 @@ ${aggregatedContent}
       const response = await retryWithBackoff(
         async () => {
           const res = await fetchWithSafeRedirects(
-            this.isBlockedHost.bind(this),
+            this.isBlockedHostAsync.bind(this),
             url,
             URL_FETCH_TIMEOUT_MS,
             {
