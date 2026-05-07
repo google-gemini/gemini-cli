@@ -619,13 +619,6 @@ export class Session {
           ? invocation.getExplanation()
           : '';
 
-      if (explanation) {
-        await this.sendUpdate({
-          sessionUpdate: 'agent_thought_chunk',
-          content: { type: 'text', text: explanation },
-        });
-      }
-
       const confirmationDetails =
         await invocation.shouldConfirmExecute(abortSignal);
 
@@ -645,6 +638,13 @@ export class Session {
                   ? 'delete'
                   : 'modify',
             },
+          });
+        }
+
+        if (content.length === 0 && explanation) {
+          content.push({
+            type: 'content',
+            content: { type: 'text', text: explanation },
           });
         }
 
@@ -707,6 +707,13 @@ export class Session {
         }
       } else {
         const content: acp.ToolCallContent[] = [];
+
+        if (explanation) {
+          content.push({
+            type: 'content',
+            content: { type: 'text', text: explanation },
+          });
+        }
 
         await this.sendUpdate({
           sessionUpdate: 'tool_call',

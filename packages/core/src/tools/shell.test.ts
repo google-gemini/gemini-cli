@@ -504,6 +504,13 @@ EOF`;
       const result = await promise;
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
+      expect(result.display).toEqual(
+        expect.objectContaining({
+          name: 'Shell',
+          description: 'user-command',
+          resultSummary: 'Exit Code: 1',
+        }),
+      );
     });
 
     it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
