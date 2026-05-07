@@ -77,8 +77,7 @@ export function useVoiceMode({
     const serviceToDisconnect = transcriptionServiceRef.current;
 
     if (serviceToDisconnect) {
-      const isLive = settings.experimental.voice?.backend === 'gemini-live';
-      const gracePeriodMs = isLive ? 4000 : 3000;
+      const gracePeriodMs = settings.experimental.voice.stopGracePeriodMs;
       debugLogger.debug(
         `[Voice] Draining transcription for ${gracePeriodMs}ms`,
       );
