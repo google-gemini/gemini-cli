@@ -21,6 +21,7 @@ import {
   type AgentOverride,
   type CustomTheme,
   type SandboxConfig,
+  type VertexAiRoutingConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -990,6 +991,45 @@ const SETTINGS_SCHEMA = {
           { value: 'never', label: 'Never use credits' },
         ],
       },
+      vertexAi: {
+        type: 'object',
+        label: 'Vertex AI',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as VertexAiRoutingConfig | undefined,
+        description: 'Vertex AI request routing settings.',
+        showInDialog: false,
+        properties: {
+          requestType: {
+            type: 'enum',
+            label: 'Vertex AI Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['requestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'dedicated', label: 'Dedicated' },
+              { value: 'shared', label: 'Shared' },
+            ],
+          },
+          sharedRequestType: {
+            type: 'enum',
+            label: 'Vertex AI Shared Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['sharedRequestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'priority', label: 'Priority' },
+              { value: 'flex', label: 'Flex' },
+            ],
+          },
+        },
+      },
     },
   },
 
@@ -1431,6 +1471,17 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
+          enableFileWatcher: {
+            type: 'boolean',
+            label: 'Enable File Watcher',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description: oneLine`
+              Enable file watcher updates for @ file suggestions (experimental).
+            `,
+            showInDialog: false,
+          },
           enableRecursiveFileSearch: {
             type: 'boolean',
             label: 'Enable Recursive File Search',
@@ -1612,6 +1663,19 @@ const SETTINGS_SCHEMA = {
           Tool names that bypass the confirmation dialog.
           Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]).
           See shell tool command restrictions for matching details.
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
+      confirmationRequired: {
+        type: 'array',
+        label: 'Confirmation Required',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description: oneLine`
+          Tool names that always require user confirmation.
+          Takes precedence over allowed tools and core tool allowlists.
         `,
         showInDialog: false,
         items: { type: 'string' },
@@ -1966,6 +2030,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
@@ -1988,6 +2062,100 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      gemma: {
+        type: 'boolean',
+        label: 'Gemma Models',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable access to Gemma 4 models via Gemini API.',
+        showInDialog: true,
+      },
+      voiceMode: {
+        type: 'boolean',
+        label: 'Voice Mode',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental voice dictation and commands (/voice, /voice model).',
+        showInDialog: true,
+      },
+      voice: {
+        type: 'object',
+        label: 'Voice',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for voice mode and transcription.',
+        showInDialog: false,
+        properties: {
+          activationMode: {
+            type: 'enum',
+            label: 'Voice Activation Mode',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'push-to-talk',
+            description: 'How to trigger voice recording with the Space key.',
+            showInDialog: true,
+            options: [
+              { value: 'push-to-talk', label: 'Push-To-Talk (Hold Space)' },
+              { value: 'toggle', label: 'Toggle (Press Space to start/stop)' },
+            ],
+          },
+          backend: {
+            type: 'enum',
+            label: 'Voice Transcription Backend',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'gemini-live',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
+            showInDialog: true,
+            options: [
+              { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
+              { value: 'whisper', label: 'Whisper (Local)' },
+            ],
+          },
+          whisperModel: {
+            type: 'enum',
+            label: 'Whisper Model',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'ggml-base.en.bin',
+            description: 'The Whisper model to use for local transcription.',
+            showInDialog: true,
+            options: [
+              { value: 'ggml-tiny.en.bin', label: 'Tiny (EN) - Fast (~75MB)' },
+              {
+                value: 'ggml-base.en.bin',
+                label: 'Base (EN) - Balanced (~142MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q5_0.bin',
+                label: 'Large v3 Turbo (Q5_0) - High Accuracy (~547MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q8_0.bin',
+                label: 'Large v3 Turbo (Q8_0) - Max Accuracy (~834MB)',
+              },
+            ],
+          },
+          stopGracePeriodMs: {
+            type: 'number',
+            label: 'Voice Stop Grace Period (ms)',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 1000,
+            description:
+              'How long to wait for final transcription after stopping recording.',
+            showInDialog: true,
+          },
+        },
+      },
       adk: {
         type: 'object',
         label: 'ADK',
@@ -2089,8 +2257,9 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable Just-In-Time (JIT) context loading.',
+        default: true,
+        description:
+          'Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.',
         showInDialog: false,
       },
       useOSC52Paste: {
@@ -2169,6 +2338,26 @@ const SETTINGS_SCHEMA = {
             default: false,
             description:
               'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: true,
+          },
+          autoStartServer: {
+            type: 'boolean',
+            label: 'Auto-start LiteRT Server',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
+            showInDialog: true,
+          },
+          binaryPath: {
+            type: 'string',
+            label: 'LiteRT Binary Path',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: '',
+            description:
+              'Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).',
             showInDialog: false,
           },
           classifier: {
@@ -2203,15 +2392,26 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      memoryManager: {
+      memoryV2: {
         type: 'boolean',
-        label: 'Memory Manager Agent',
+        label: 'Memory v2',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
+        showInDialog: true,
+      },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
         description:
-          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
-        showInDialog: true,
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
       },
       autoMemory: {
         type: 'boolean',
@@ -2220,7 +2420,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
       generalistProfile: {
@@ -3000,6 +3200,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description: 'Protocol for OTLP exporters.',
         enum: ['grpc', 'http'],
       },
+      traces: {
+        type: 'boolean',
+        description:
+          'Whether detailed traces with large attributes are captured.',
+      },
       logPrompts: {
         type: 'boolean',
         description: 'Whether prompts are logged in telemetry payloads.',
@@ -3098,6 +3303,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           secondary: { type: 'string' },
           link: { type: 'string' },
           accent: { type: 'string' },
+          response: { type: 'string' },
         },
       },
       background: {

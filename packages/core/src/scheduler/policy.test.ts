@@ -239,7 +239,7 @@ describe('policy.ts', () => {
   });
 
   describe('updatePolicy', () => {
-    it('should set AUTO_EDIT mode for auto-edit transition tools', async () => {
+    it('should set AUTO_EDIT mode for auto-edit transition tools and publish policy update', async () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
@@ -266,7 +266,54 @@ describe('policy.ts', () => {
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.AUTO_EDIT,
       );
-      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'replace',
+          persist: false,
+        }),
+      );
+    });
+
+    it('should preserve the original mode set when a session allow triggers AUTO_EDIT', async () => {
+      let currentMode = ApprovalMode.DEFAULT;
+      const mockConfig = {
+        getApprovalMode: vi.fn(() => currentMode),
+        setApprovalMode: vi.fn((mode: ApprovalMode) => {
+          currentMode = mode;
+        }),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      } as unknown as Mocked<Config>;
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = { name: 'replace' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        undefined,
+        mockConfig,
+        mockMessageBus,
+      );
+
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.AUTO_EDIT,
+      );
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'replace',
+          persist: false,
+          modes: [
+            ApprovalMode.DEFAULT,
+            ApprovalMode.AUTO_EDIT,
+            ApprovalMode.YOLO,
+          ],
+        }),
+      );
     });
 
     it('should handle standard policy updates (persist=false)', async () => {
@@ -858,6 +905,7 @@ describe('Plan Mode Denial Consistency', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN), // Key: Plan Mode
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       setApprovalMode: vi.fn(),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),

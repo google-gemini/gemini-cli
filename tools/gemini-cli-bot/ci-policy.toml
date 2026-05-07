@@ -1,0 +1,16 @@
+# Custom CI Policy for Gemini CLI Bot
+# This policy guarantees permission for shell commands and file writing in the bot's CI environment.
+
+[[rule]]
+toolName = ["run_shell_command", "write_file", "replace"]
+decision = "allow"
+# Max priority to ensure it overrides all default and workspace rules.
+priority = 999
+# Explicitly target the headless environment to match the specificity of default denial rules.
+interactive = false
+
+[[rule]]
+toolName = "invoke_agent"
+decision = "deny"
+priority = 999
+interactive = false

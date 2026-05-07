@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
 import type { Config } from '../config/config.js';
+import { makeRelative } from '../utils/paths.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -58,6 +59,7 @@ describe('PromptProvider', () => {
         ).getToolRegistry?.() as unknown as ToolRegistry;
       },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getProjectRoot: vi.fn().mockReturnValue('/tmp/project-temp'),
       topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
@@ -71,7 +73,7 @@ describe('PromptProvider', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
-      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
+      isMemoryV2Enabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
@@ -236,7 +238,14 @@ describe('PromptProvider', () => {
       expect(prompt).toContain(
         '`write_file` and `replace` may ONLY be used to write .md plan files',
       );
-      expect(prompt).toContain('/tmp/project-temp/plans/');
+
+      const expectedRelativePath = makeRelative(
+        mockConfig.storage.getPlansDir(),
+        mockConfig.getProjectRoot(),
+      ).replaceAll('\\', '/');
+      expect(prompt).toContain(
+        `write .md plan files to \`${expectedRelativePath}/\``,
+      );
     });
   });
 

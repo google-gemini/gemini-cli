@@ -21,7 +21,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly graphMapper: ContextGraphMapper;
 
   constructor(
-    readonly llmClient: BaseLlmClient,
+    private readonly llmClientProvider: () => BaseLlmClient,
     readonly sessionId: string,
     readonly promptId: string,
     readonly traceDir: string,
@@ -37,6 +37,10 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
       this.behaviorRegistry,
     );
     this.inbox = new LiveInbox();
-    this.graphMapper = new ContextGraphMapper(this.behaviorRegistry);
+    this.graphMapper = new ContextGraphMapper();
+  }
+
+  get llmClient(): BaseLlmClient {
+    return this.llmClientProvider();
   }
 }

@@ -11,7 +11,7 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, Snapshot } from '../graph/types.js';
+import { type ConcreteNode, type Snapshot, NodeType } from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -61,6 +61,7 @@ export function createStateSnapshotProcessor(
         newText: string;
         consumedIds: string[];
         type: string;
+        timestamp: number;
       }>('PROPOSED_SNAPSHOT');
 
       if (proposedSnapshots.length > 0) {
@@ -75,7 +76,7 @@ export function createStateSnapshotProcessor(
         );
 
         for (const proposed of sorted) {
-          const { consumedIds, newText } = proposed.payload;
+          const { consumedIds, newText, timestamp } = proposed.payload;
 
           // Verify all consumed IDs still exist sequentially in targets
           const targetIds = new Set(targets.map((t) => t.id));
@@ -87,10 +88,11 @@ export function createStateSnapshotProcessor(
 
             const snapshotNode: Snapshot = {
               id: newId,
-              logicalParentId: newId,
-              type: 'SNAPSHOT',
-              timestamp: Date.now(),
-              text: newText,
+              turnId: newId,
+              type: NodeType.SNAPSHOT,
+              timestamp: timestamp ?? Date.now(),
+              role: 'user',
+              payload: { text: newText },
               abstractsIds: consumedIds,
             };
 
@@ -131,12 +133,6 @@ export function createStateSnapshotProcessor(
 
       // Scan oldest to newest
       for (const node of targets) {
-        if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          // In a real system, system prompt is protected, but we double check
-          continue;
-        }
-
         nodesToSummarize.push(node);
         deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
@@ -153,10 +149,11 @@ export function createStateSnapshotProcessor(
         const newId = randomUUID();
         const snapshotNode: Snapshot = {
           id: newId,
-          logicalParentId: newId,
-          type: 'SNAPSHOT',
-          timestamp: Date.now(),
-          text: snapshotText,
+          turnId: newId,
+          type: NodeType.SNAPSHOT,
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
+          role: 'user',
+          payload: { text: snapshotText },
           abstractsIds: nodesToSummarize.map((n) => n.id),
         };
 

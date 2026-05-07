@@ -29,8 +29,17 @@ export function makeFakeConfig(
     ...DEFAULT_CONFIG_PARAMETERS,
   },
 ): Config {
-  return new Config({
+  const cfg = new Config({
     ...DEFAULT_CONFIG_PARAMETERS,
     ...config,
   });
+  Object.defineProperty(cfg.storage, 'projectIdentifier', {
+    get: () => 'test-project-id',
+    configurable: true,
+  });
+  Object.defineProperty(cfg.storage, 'getPlansDir', {
+    value: () => '/mocked/plans/dir',
+    configurable: true,
+  });
+  return cfg;
 }

@@ -15,7 +15,10 @@ import {
   type LoadableSettingScope,
   type Settings,
 } from '../../config/settings.js';
-import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
+import {
+  getScopeItems,
+  getScopeMessageForSetting,
+} from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
   getDisplayValue,
@@ -105,6 +108,26 @@ export function SettingsDialog({
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
+  const editableScopeItems = useMemo(
+    () =>
+      getScopeItems().filter((item) => {
+        const settingsFile = settings.forScope(item.value);
+        return (
+          settingsFile.readOnly !== true &&
+          (item.value !== SettingScope.Workspace ||
+            settingsFile.path !== undefined)
+        );
+      }),
+    [settings],
+  );
+  const writableSelectedScope =
+    editableScopeItems.find((item) => item.value === selectedScope)?.value ??
+    editableScopeItems[0]?.value;
+  const effectiveSelectedScope = writableSelectedScope ?? SettingScope.User;
+
+  if (writableSelectedScope && selectedScope !== writableSelectedScope) {
+    setSelectedScope(writableSelectedScope);
+  }
 
   // Snapshot restart-required values at mount time for diff tracking
   const [activeRestartRequiredSettings] = useState(() =>
@@ -205,7 +228,7 @@ export function SettingsDialog({
 
       const scopeMessage = getScopeMessageForSetting(
         key,
-        selectedScope,
+        effectiveSelectedScope,
         settings,
       );
       const label = def.label || key;
@@ -218,7 +241,7 @@ export function SettingsDialog({
       max = Math.max(max, lWidth, dWidth);
     }
     return max;
-  }, [selectedScope, settings]);
+  }, [effectiveSelectedScope, settings]);
 
   // Search input buffer
   const searchBuffer = useSearchBuffer({
@@ -229,7 +252,7 @@ export function SettingsDialog({
   // Generate items for BaseSettingsDialog
   const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
   const items: SettingsDialogItem[] = useMemo(() => {
-    const scopeSettings = settings.forScope(selectedScope).settings;
+    const scopeSettings = settings.forScope(effectiveSelectedScope).settings;
     const mergedSettings = settings.merged;
 
     return settingKeys.map((key) => {
@@ -242,7 +265,7 @@ export function SettingsDialog({
       // Get the scope message (e.g., "(Modified in Workspace)")
       const scopeMessage = getScopeMessageForSetting(
         key,
-        selectedScope,
+        effectiveSelectedScope,
         settings,
       );
 
@@ -266,7 +289,7 @@ export function SettingsDialog({
         editValue,
       };
     });
-  }, [settingKeys, selectedScope, settings]);
+  }, [settingKeys, effectiveSelectedScope, settings]);
 
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
@@ -275,12 +298,16 @@ export function SettingsDialog({
   // Toggle handler for boolean/enum settings
   const handleItemToggle = useCallback(
     (key: string, _item: SettingsDialogItem) => {
+      if (!writableSelectedScope) {
+        return;
+      }
+
       const definition = getSettingDefinition(key);
       if (!TOGGLE_TYPES.has(definition?.type)) {
         return;
       }
 
-      const scopeSettings = settings.forScope(selectedScope).settings;
+      const scopeSettings = settings.forScope(writableSelectedScope).settings;
       const currentValue = getEffectiveValue(key, scopeSettings);
       let newValue: SettingsValue;
 
@@ -310,14 +337,18 @@ export function SettingsDialog({
         `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
         newValue,
       );
-      setSetting(selectedScope, key, newValue);
+      setSetting(writableSelectedScope, key, newValue);
     },
-    [settings, selectedScope, setSetting],
+    [settings, writableSelectedScope, setSetting],
   );
 
   // For inline editor
   const handleEditCommit = useCallback(
     (key: string, newValue: string, _item: SettingsDialogItem) => {
+      if (!writableSelectedScope) {
+        return;
+      }
+
       const definition = getSettingDefinition(key);
       const type: SettingsType = definition?.type ?? 'string';
       const parsed = parseEditedValue(type, newValue);
@@ -326,22 +357,26 @@ export function SettingsDialog({
         return;
       }
 
-      setSetting(selectedScope, key, parsed);
+      setSetting(writableSelectedScope, key, parsed);
     },
-    [selectedScope, setSetting],
+    [writableSelectedScope, setSetting],
   );
 
   // Clear/reset handler - removes the value from settings.json so it falls back to default
   const handleItemClear = useCallback(
     (key: string, _item: SettingsDialogItem) => {
-      setSetting(selectedScope, key, undefined);
+      if (!writableSelectedScope) {
+        return;
+      }
+
+      setSetting(writableSelectedScope, key, undefined);
     },
-    [selectedScope, setSetting],
+    [writableSelectedScope, setSetting],
   );
 
   const handleClose = useCallback(() => {
-    onSelect(undefined, selectedScope as SettingScope);
-  }, [onSelect, selectedScope]);
+    onSelect(undefined, effectiveSelectedScope as SettingScope);
+  }, [onSelect, effectiveSelectedScope]);
 
   const globalKeyMatchers = useKeyMatchers();
   const settingsKeyMatchers = useMemo(
@@ -369,7 +404,6 @@ export function SettingsDialog({
   );
 
   // Decisions on what features to enable
-  const hasWorkspace = settings.workspace.path !== undefined;
   const showSearch = !showRestartPrompt;
 
   return (
@@ -379,8 +413,9 @@ export function SettingsDialog({
       searchEnabled={showSearch}
       searchBuffer={searchBuffer}
       items={items}
-      showScopeSelector={hasWorkspace}
-      selectedScope={selectedScope}
+      showScopeSelector={editableScopeItems.length > 1}
+      scopeItems={editableScopeItems}
+      selectedScope={effectiveSelectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={MAX_ITEMS_TO_SHOW}
       availableHeight={availableTerminalHeight}

@@ -626,6 +626,29 @@
           "default": "ask",
           "type": "string",
           "enum": ["ask", "always", "never"]
+        },
+        "vertexAi": {
+          "title": "Vertex AI",
+          "description": "Vertex AI request routing settings.",
+          "markdownDescription": "Vertex AI request routing settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "object",
+          "properties": {
+            "requestType": {
+              "title": "Vertex AI Request Type",
+              "description": "Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.",
+              "markdownDescription": "Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string",
+              "enum": ["dedicated", "shared"]
+            },
+            "sharedRequestType": {
+              "title": "Vertex AI Shared Request Type",
+              "description": "Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.",
+              "markdownDescription": "Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string",
+              "enum": ["priority", "flex"]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -686,7 +709,7 @@
     "modelConfigs": {
       "title": "Model Configs",
       "description": "Model configurations.",
-      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-3-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"fast-ack-helper\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.2,\n          \"maxOutputTokens\": 120,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-3.1-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3.1-flash-lite-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"agent-history-provider-summarizer\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ],\n  \"modelDefinitions\": {\n    \"gemini-3.1-flash-lite-preview\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto\": {\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"pro\": {\n      \"tier\": \"pro\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash\": {\n      \"tier\": \"flash\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-3\": {\n      \"displayName\": \"Auto (Gemini 3)\",\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-2.5\": {\n      \"displayName\": \"Auto (Gemini 2.5)\",\n      \"tier\": \"auto\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    }\n  },\n  \"modelIdResolutions\": {\n    \"gemini-3.1-pro-preview\": {\n      \"default\": \"gemini-3.1-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        }\n      ]\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"default\": \"gemini-3.1-pro-preview-customtools\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        }\n      ]\n    },\n    \"gemini-3-flash-preview\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"gemini-3-pro-preview\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-3\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-2.5\": {\n      \"default\": \"gemini-2.5-pro\"\n    },\n    \"gemini-3.1-flash-lite-preview\": {\n      \"default\": \"gemini-3.1-flash-lite-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": false\n          },\n          \"target\": \"gemini-2.5-flash-lite\"\n        }\n      ]\n    },\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"flash-lite\": {\n      \"default\": \"gemini-2.5-flash-lite\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": true\n          },\n          \"target\": \"gemini-3.1-flash-lite-preview\"\n        }\n      ]\n    }\n  },\n  \"classifierIdResolutions\": {\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-flash\"\n        },\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-3\",\n              \"gemini-3-pro-preview\"\n            ]\n          },\n          \"target\": \"gemini-3-flash-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    }\n  },\n  \"modelChains\": {\n    \"preview\": [\n      {\n        \"model\": \"gemini-3-pro-preview\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-3-flash-preview\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"default\": [\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"lite\": [\n      {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ]\n  }\n}`",
+      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemma-4-31b-it\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemma-4-31b-it\"\n      }\n    },\n    \"gemma-4-26b-a4b-it\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemma-4-26b-a4b-it\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-3-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"fast-ack-helper\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.2,\n          \"maxOutputTokens\": 120,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-3.1-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3.1-flash-lite-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"agent-history-provider-summarizer\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ],\n  \"modelDefinitions\": {\n    \"gemini-3.1-flash-lite-preview\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemma-4-31b-it\": {\n      \"displayName\": \"gemma-4-31b-it\",\n      \"tier\": \"custom\",\n      \"family\": \"gemma-4\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemma-4-26b-a4b-it\": {\n      \"displayName\": \"gemma-4-26b-a4b-it\",\n      \"tier\": \"custom\",\n      \"family\": \"gemma-4\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto\": {\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"pro\": {\n      \"tier\": \"pro\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash\": {\n      \"tier\": \"flash\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-3\": {\n      \"displayName\": \"Auto (Gemini 3)\",\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-2.5\": {\n      \"displayName\": \"Auto (Gemini 2.5)\",\n      \"tier\": \"auto\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    }\n  },\n  \"modelIdResolutions\": {\n    \"gemma-4-31b-it\": {\n      \"default\": \"gemma-4-31b-it\"\n    },\n    \"gemma-4-26b-a4b-it\": {\n      \"default\": \"gemma-4-26b-a4b-it\"\n    },\n    \"gemini-3.1-pro-preview\": {\n      \"default\": \"gemini-3.1-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        }\n      ]\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"default\": \"gemini-3.1-pro-preview-customtools\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        }\n      ]\n    },\n    \"gemini-3-flash-preview\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"gemini-3-pro-preview\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-3\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-2.5\": {\n      \"default\": \"gemini-2.5-pro\"\n    },\n    \"gemini-3.1-flash-lite-preview\": {\n      \"default\": \"gemini-3.1-flash-lite-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": false\n          },\n          \"target\": \"gemini-2.5-flash-lite\"\n        }\n      ]\n    },\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"flash-lite\": {\n      \"default\": \"gemini-2.5-flash-lite\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": true\n          },\n          \"target\": \"gemini-3.1-flash-lite-preview\"\n        }\n      ]\n    }\n  },\n  \"classifierIdResolutions\": {\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-flash\"\n        },\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-3\",\n              \"gemini-3-pro-preview\"\n            ]\n          },\n          \"target\": \"gemini-3-flash-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    }\n  },\n  \"modelChains\": {\n    \"preview\": [\n      {\n        \"model\": \"gemini-3-pro-preview\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-3-flash-preview\",\n        \"isLastResort\": true,\n        \"maxAttempts\": 10,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"auto-preview\": [\n      {\n        \"model\": \"gemini-3-pro-preview\",\n        \"maxAttempts\": 3,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"silent\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"sticky_retry\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-3-flash-preview\",\n        \"isLastResort\": true,\n        \"maxAttempts\": 10,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"default\": [\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"sticky_retry\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"isLastResort\": true,\n        \"maxAttempts\": 10,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"auto-default\": [\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"maxAttempts\": 3,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"silent\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"sticky_retry\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"isLastResort\": true,\n        \"maxAttempts\": 10,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"lite\": [\n      {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ]\n  }\n}`",
       "default": {
         "aliases": {
           "base": {
@@ -758,6 +781,18 @@
             "extends": "chat-base-2.5",
             "modelConfig": {
               "model": "gemini-2.5-flash-lite"
+            }
+          },
+          "gemma-4-31b-it": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma-4-31b-it"
+            }
+          },
+          "gemma-4-26b-a4b-it": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma-4-26b-a4b-it"
             }
           },
           "gemini-2.5-flash-base": {
@@ -1020,6 +1055,28 @@
               "multimodalToolUse": false
             }
           },
+          "gemma-4-31b-it": {
+            "displayName": "gemma-4-31b-it",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma-4-26b-a4b-it": {
+            "displayName": "gemma-4-26b-a4b-it",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
           "auto": {
             "tier": "auto",
             "isPreview": true,
@@ -1080,6 +1137,12 @@
           }
         },
         "modelIdResolutions": {
+          "gemma-4-31b-it": {
+            "default": "gemma-4-31b-it"
+          },
+          "gemma-4-26b-a4b-it": {
+            "default": "gemma-4-26b-a4b-it"
+          },
           "gemini-3.1-pro-preview": {
             "default": "gemini-3.1-pro-preview",
             "contexts": [
@@ -1315,6 +1378,42 @@
             {
               "model": "gemini-3-flash-preview",
               "isLastResort": true,
+              "maxAttempts": 10,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            }
+          ],
+          "auto-preview": [
+            {
+              "model": "gemini-3-pro-preview",
+              "maxAttempts": 3,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "silent",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "sticky_retry",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-3-flash-preview",
+              "isLastResort": true,
+              "maxAttempts": 10,
               "actions": {
                 "terminal": "prompt",
                 "transient": "prompt",
@@ -1340,7 +1439,7 @@
               },
               "stateTransitions": {
                 "terminal": "terminal",
-                "transient": "terminal",
+                "transient": "sticky_retry",
                 "not_found": "terminal",
                 "unknown": "terminal"
               }
@@ -1348,6 +1447,42 @@
             {
               "model": "gemini-2.5-flash",
               "isLastResort": true,
+              "maxAttempts": 10,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            }
+          ],
+          "auto-default": [
+            {
+              "model": "gemini-2.5-pro",
+              "maxAttempts": 3,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "silent",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "sticky_retry",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-2.5-flash",
+              "isLastResort": true,
+              "maxAttempts": 10,
               "actions": {
                 "terminal": "prompt",
                 "transient": "prompt",
@@ -1417,7 +1552,7 @@
         "aliases": {
           "title": "Model Config Aliases",
           "description": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
-          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-3-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"fast-ack-helper\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.2,\n        \"maxOutputTokens\": 120,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-3.1-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3.1-flash-lite-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"agent-history-provider-summarizer\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  }\n}`",
+          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemma-4-31b-it\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemma-4-31b-it\"\n    }\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemma-4-26b-a4b-it\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-3-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"fast-ack-helper\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.2,\n        \"maxOutputTokens\": 120,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-3.1-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3.1-flash-lite-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"agent-history-provider-summarizer\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  }\n}`",
           "default": {
             "base": {
               "modelConfig": {
@@ -1488,6 +1623,18 @@
               "extends": "chat-base-2.5",
               "modelConfig": {
                 "model": "gemini-2.5-flash-lite"
+              }
+            },
+            "gemma-4-31b-it": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma-4-31b-it"
+              }
+            },
+            "gemma-4-26b-a4b-it": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma-4-26b-a4b-it"
               }
             },
             "gemini-2.5-flash-base": {
@@ -1686,7 +1833,7 @@
         "modelDefinitions": {
           "title": "Model Definitions",
           "description": "Registry of model metadata, including tier, family, and features.",
-          "markdownDescription": "Registry of model metadata, including tier, family, and features.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-flash-lite-preview\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto\": {\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"pro\": {\n    \"tier\": \"pro\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash\": {\n    \"tier\": \"flash\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-3\": {\n    \"displayName\": \"Auto (Gemini 3)\",\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-2.5\": {\n    \"displayName\": \"Auto (Gemini 2.5)\",\n    \"tier\": \"auto\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  }\n}`",
+          "markdownDescription": "Registry of model metadata, including tier, family, and features.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-flash-lite-preview\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-31b-it\": {\n    \"displayName\": \"gemma-4-31b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"displayName\": \"gemma-4-26b-a4b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto\": {\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"pro\": {\n    \"tier\": \"pro\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash\": {\n    \"tier\": \"flash\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-3\": {\n    \"displayName\": \"Auto (Gemini 3)\",\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-2.5\": {\n    \"displayName\": \"Auto (Gemini 2.5)\",\n    \"tier\": \"auto\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  }\n}`",
           "default": {
             "gemini-3.1-flash-lite-preview": {
               "tier": "flash-lite",
@@ -1768,6 +1915,28 @@
                 "multimodalToolUse": false
               }
             },
+            "gemma-4-31b-it": {
+              "displayName": "gemma-4-31b-it",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma-4-26b-a4b-it": {
+              "displayName": "gemma-4-26b-a4b-it",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
             "auto": {
               "tier": "auto",
               "isPreview": true,
@@ -1835,8 +2004,14 @@
         "modelIdResolutions": {
           "title": "Model ID Resolutions",
           "description": "Rules for resolving requested model names to concrete model IDs based on context.",
-          "markdownDescription": "Rules for resolving requested model names to concrete model IDs based on context.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-pro-preview\": {\n    \"default\": \"gemini-3.1-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      }\n    ]\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"default\": \"gemini-3.1-pro-preview-customtools\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      }\n    ]\n  },\n  \"gemini-3-flash-preview\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"gemini-3-pro-preview\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-3\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-2.5\": {\n    \"default\": \"gemini-2.5-pro\"\n  },\n  \"gemini-3.1-flash-lite-preview\": {\n    \"default\": \"gemini-3.1-flash-lite-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": false\n        },\n        \"target\": \"gemini-2.5-flash-lite\"\n      }\n    ]\n  },\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"flash-lite\": {\n    \"default\": \"gemini-2.5-flash-lite\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": true\n        },\n        \"target\": \"gemini-3.1-flash-lite-preview\"\n      }\n    ]\n  }\n}`",
+          "markdownDescription": "Rules for resolving requested model names to concrete model IDs based on context.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemma-4-31b-it\": {\n    \"default\": \"gemma-4-31b-it\"\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"default\": \"gemini-3.1-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      }\n    ]\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"default\": \"gemini-3.1-pro-preview-customtools\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      }\n    ]\n  },\n  \"gemini-3-flash-preview\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"gemini-3-pro-preview\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-3\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-2.5\": {\n    \"default\": \"gemini-2.5-pro\"\n  },\n  \"gemini-3.1-flash-lite-preview\": {\n    \"default\": \"gemini-3.1-flash-lite-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": false\n        },\n        \"target\": \"gemini-2.5-flash-lite\"\n      }\n    ]\n  },\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"flash-lite\": {\n    \"default\": \"gemini-2.5-flash-lite\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": true\n        },\n        \"target\": \"gemini-3.1-flash-lite-preview\"\n      }\n    ]\n  }\n}`",
           "default": {
+            "gemma-4-31b-it": {
+              "default": "gemma-4-31b-it"
+            },
+            "gemma-4-26b-a4b-it": {
+              "default": "gemma-4-26b-a4b-it"
+            },
             "gemini-3.1-pro-preview": {
               "default": "gemini-3.1-pro-preview",
               "contexts": [
@@ -2069,7 +2244,7 @@
         "modelChains": {
           "title": "Model Chains",
           "description": "Availability policy chains defining fallback behavior for models.",
-          "markdownDescription": "Availability policy chains defining fallback behavior for models.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"preview\": [\n    {\n      \"model\": \"gemini-3-pro-preview\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-3-flash-preview\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"default\": [\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"lite\": [\n    {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ]\n}`",
+          "markdownDescription": "Availability policy chains defining fallback behavior for models.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"preview\": [\n    {\n      \"model\": \"gemini-3-pro-preview\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-3-flash-preview\",\n      \"isLastResort\": true,\n      \"maxAttempts\": 10,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"auto-preview\": [\n    {\n      \"model\": \"gemini-3-pro-preview\",\n      \"maxAttempts\": 3,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"silent\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"sticky_retry\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-3-flash-preview\",\n      \"isLastResort\": true,\n      \"maxAttempts\": 10,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"default\": [\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"sticky_retry\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"isLastResort\": true,\n      \"maxAttempts\": 10,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"auto-default\": [\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"maxAttempts\": 3,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"silent\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"sticky_retry\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"isLastResort\": true,\n      \"maxAttempts\": 10,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"lite\": [\n    {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ]\n}`",
           "default": {
             "preview": [
               {
@@ -2090,6 +2265,42 @@
               {
                 "model": "gemini-3-flash-preview",
                 "isLastResort": true,
+                "maxAttempts": 10,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              }
+            ],
+            "auto-preview": [
+              {
+                "model": "gemini-3-pro-preview",
+                "maxAttempts": 3,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "silent",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "sticky_retry",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-3-flash-preview",
+                "isLastResort": true,
+                "maxAttempts": 10,
                 "actions": {
                   "terminal": "prompt",
                   "transient": "prompt",
@@ -2115,7 +2326,7 @@
                 },
                 "stateTransitions": {
                   "terminal": "terminal",
-                  "transient": "terminal",
+                  "transient": "sticky_retry",
                   "not_found": "terminal",
                   "unknown": "terminal"
                 }
@@ -2123,6 +2334,42 @@
               {
                 "model": "gemini-2.5-flash",
                 "isLastResort": true,
+                "maxAttempts": 10,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              }
+            ],
+            "auto-default": [
+              {
+                "model": "gemini-2.5-pro",
+                "maxAttempts": 3,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "silent",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "sticky_retry",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-2.5-flash",
+                "isLastResort": true,
+                "maxAttempts": 10,
                 "actions": {
                   "terminal": "prompt",
                   "transient": "prompt",
@@ -2370,6 +2617,13 @@
               "default": true,
               "type": "boolean"
             },
+            "enableFileWatcher": {
+              "title": "Enable File Watcher",
+              "description": "Enable file watcher updates for @ file suggestions (experimental).",
+              "markdownDescription": "Enable file watcher updates for @ file suggestions (experimental).\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
             "enableRecursiveFileSearch": {
               "title": "Enable Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
@@ -2496,6 +2750,15 @@
           "title": "Allowed Tools",
           "description": "Tool names that bypass the confirmation dialog. Useful for trusted commands (for example [\"run_shell_command(git)\", \"run_shell_command(npm test)\"]). See shell tool command restrictions for matching details.",
           "markdownDescription": "Tool names that bypass the confirmation dialog. Useful for trusted commands (for example [\"run_shell_command(git)\", \"run_shell_command(npm test)\"]). See shell tool command restrictions for matching details.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confirmationRequired": {
+          "title": "Confirmation Required",
+          "description": "Tool names that always require user confirmation. Takes precedence over allowed tools and core tool allowlists.",
+          "markdownDescription": "Tool names that always require user confirmation. Takes precedence over allowed tools and core tool allowlists.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
           "type": "array",
           "items": {
             "type": "string"
@@ -2768,6 +3031,13 @@
             "type": "string"
           }
         },
+        "ignoreLocalEnv": {
+          "title": "Ignore Local .env",
+          "description": "Whether to ignore generic .env files in the project directory.",
+          "markdownDescription": "Whether to ignore generic .env files in the project directory.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "bugCommand": {
           "title": "Bug Command",
           "description": "Configuration for the bug report command.",
@@ -2784,6 +3054,66 @@
       "default": {},
       "type": "object",
       "properties": {
+        "gemma": {
+          "title": "Gemma Models",
+          "description": "Enable access to Gemma 4 models via Gemini API.",
+          "markdownDescription": "Enable access to Gemma 4 models via Gemini API.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "voiceMode": {
+          "title": "Voice Mode",
+          "description": "Enable experimental voice dictation and commands (/voice, /voice model).",
+          "markdownDescription": "Enable experimental voice dictation and commands (/voice, /voice model).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "voice": {
+          "title": "Voice",
+          "description": "Settings for voice mode and transcription.",
+          "markdownDescription": "Settings for voice mode and transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "activationMode": {
+              "title": "Voice Activation Mode",
+              "description": "How to trigger voice recording with the Space key.",
+              "markdownDescription": "How to trigger voice recording with the Space key.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `push-to-talk`",
+              "default": "push-to-talk",
+              "type": "string",
+              "enum": ["push-to-talk", "toggle"]
+            },
+            "backend": {
+              "title": "Voice Transcription Backend",
+              "description": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.",
+              "markdownDescription": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
+              "default": "gemini-live",
+              "type": "string",
+              "enum": ["gemini-live", "whisper"]
+            },
+            "whisperModel": {
+              "title": "Whisper Model",
+              "description": "The Whisper model to use for local transcription.",
+              "markdownDescription": "The Whisper model to use for local transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `ggml-base.en.bin`",
+              "default": "ggml-base.en.bin",
+              "type": "string",
+              "enum": [
+                "ggml-tiny.en.bin",
+                "ggml-base.en.bin",
+                "ggml-large-v3-turbo-q5_0.bin",
+                "ggml-large-v3-turbo-q8_0.bin"
+              ]
+            },
+            "stopGracePeriodMs": {
+              "title": "Voice Stop Grace Period (ms)",
+              "description": "How long to wait for final transcription after stopping recording.",
+              "markdownDescription": "How long to wait for final transcription after stopping recording.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `1000`",
+              "default": 1000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
         "adk": {
           "title": "ADK",
           "description": "Settings for the Agent Development Kit (ADK).",
@@ -2859,9 +3189,9 @@
         },
         "jitContext": {
           "title": "JIT Context Loading",
-          "description": "Enable Just-In-Time (JIT) context loading.",
-          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "description": "Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.",
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "useOSC52Paste": {
@@ -2920,6 +3250,20 @@
               "default": false,
               "type": "boolean"
             },
+            "autoStartServer": {
+              "title": "Auto-start LiteRT Server",
+              "description": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.",
+              "markdownDescription": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "binaryPath": {
+              "title": "LiteRT Binary Path",
+              "description": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).",
+              "markdownDescription": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: ``",
+              "default": "",
+              "type": "string"
+            },
             "classifier": {
               "title": "Classifier",
               "description": "Classifier configuration.",
@@ -2947,17 +3291,24 @@
           },
           "additionalProperties": false
         },
-        "memoryManager": {
-          "title": "Memory Manager Agent",
-          "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
-          "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+        "memoryV2": {
+          "title": "Memory v2",
+          "description": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.",
+          "markdownDescription": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "stressTestProfile": {
+          "title": "Use the stress test profile to aggressively trigger context management.",
+          "description": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.",
+          "markdownDescription": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "autoMemory": {
           "title": "Auto Memory",
-          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
-          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.",
+          "markdownDescription": "Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -3583,6 +3934,10 @@
           "description": "Protocol for OTLP exporters.",
           "enum": ["grpc", "http"]
         },
+        "traces": {
+          "type": "boolean",
+          "description": "Whether detailed traces with large attributes are captured."
+        },
         "logPrompts": {
           "type": "boolean",
           "description": "Whether prompts are logged in telemetry payloads."
@@ -3682,6 +4037,9 @@
               "type": "string"
             },
             "accent": {
+              "type": "string"
+            },
+            "response": {
               "type": "string"
             }
           }

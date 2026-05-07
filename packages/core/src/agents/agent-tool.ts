@@ -194,6 +194,7 @@ class DelegateInvocation extends BaseToolInvocation<
       {
         operation: GeminiCliOperation.AgentCall,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.context.config.getTelemetryTracesEnabled(),
         sessionId: this.context.config.getSessionId(),
         attributes: {
           [GEN_AI_AGENT_NAME]: this.definition.name,
