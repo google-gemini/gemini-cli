@@ -155,10 +155,9 @@ describe('translateEvent', () => {
       expect(resp.content).toEqual([
         { type: 'text', text: 'Permission denied to write' },
       ]);
-      expect(resp.display?.result).toEqual({
-        type: 'text',
-        text: 'Permission denied',
-      });
+      expect(resp.displayContent).toEqual([
+        { type: 'text', text: 'Permission denied' },
+      ]);
       expect(resp.data).toEqual({ errorType: 'permission_denied' });
     });
 
@@ -201,12 +200,9 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const resp = result[0] as AgentEvent<'tool_response'>;
-      expect(resp.display?.result).toEqual({
-        type: 'diff',
-        path: '/tmp/test.txt',
-        beforeText: 'a',
-        afterText: 'b',
-      });
+      expect(resp.displayContent).toEqual([
+        { type: 'text', text: JSON.stringify(objectDisplay) },
+      ]);
     });
 
     it('passes through string resultDisplay as-is', () => {
@@ -224,10 +220,9 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const resp = result[0] as AgentEvent<'tool_response'>;
-      expect(resp.display?.result).toEqual({
-        type: 'text',
-        text: 'Command output text',
-      });
+      expect(resp.displayContent).toEqual([
+        { type: 'text', text: 'Command output text' },
+      ]);
     });
 
     it('preserves outputFile and contentLength in data', () => {
@@ -378,7 +373,7 @@ describe('translateEvent', () => {
       expect(err.type).toBe('error');
       expect(err.fatal).toBe(false);
       expect(err._meta?.['code']).toBe('AGENT_EXECUTION_BLOCKED');
-      expect(err.message).toBe('Policy violation');
+      expect(err.message).toBe('Agent execution blocked: Policy violation');
     });
 
     it('uses systemMessage in the final error message when available', () => {
@@ -393,7 +388,9 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const err = result[0] as AgentEvent<'error'>;
-      expect(err.message).toBe('Blocked by policy hook');
+      expect(err.message).toBe(
+        'Agent execution blocked: Blocked by policy hook',
+      );
     });
   });
 

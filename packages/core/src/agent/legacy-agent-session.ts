@@ -23,8 +23,8 @@ import {
   buildToolResponseData,
   contentPartsToGeminiParts,
   geminiPartsToContentParts,
+  toolResultDisplayToContentParts,
 } from './content-utils.js';
-import { populateToolDisplay } from './tool-display-utils.js';
 import { AgentSession } from './agent-session.js';
 import {
   createTranslationState,
@@ -166,6 +166,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
       } else {
         this._emitErrorAndAgentEnd(err);
       }
+    } finally {
       this._clearActiveStream();
     }
   }
@@ -196,6 +197,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
         this._abortController.signal,
         this._promptId,
         undefined,
+        false,
         currentDisplayContent,
       );
       currentDisplayContent = undefined;
@@ -261,13 +263,9 @@ export class LegacyAgentProtocol implements AgentProtocol {
         const content: ContentPart[] = response.error
           ? [{ type: 'text', text: response.error.message }]
           : geminiPartsToContentParts(response.responseParts);
-        const display = populateToolDisplay({
-          name: request.name,
-          invocation: 'invocation' in tc ? tc.invocation : undefined,
-          resultDisplay: response.resultDisplay,
-          displayName: 'tool' in tc ? tc.tool?.displayName : undefined,
-          display: response.display,
-        });
+        const displayContent = toolResultDisplayToContentParts(
+          response.resultDisplay,
+        );
         const data = buildToolResponseData(response);
 
         this._emit([
@@ -276,7 +274,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
             name: request.name,
             content,
             isError: response.error !== undefined,
-            ...(display ? { display } : {}),
+            ...(displayContent ? { displayContent } : {}),
             ...(data ? { data } : {}),
           }),
         ]);
@@ -390,6 +388,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
     const meta: Record<string, unknown> = {};
     if (err instanceof Error) {
       meta['errorName'] = err.constructor.name;
+      meta['stack'] = err.stack;
       if ('exitCode' in err && typeof err.exitCode === 'number') {
         meta['exitCode'] = err.exitCode;
       }
