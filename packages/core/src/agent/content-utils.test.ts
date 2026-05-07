@@ -187,22 +187,14 @@ describe('contentPartsToGeminiParts', () => {
     ]);
   });
 
-  it('serializes unknown ContentPart variants', () => {
+  it('throws on unknown ContentPart variants', () => {
     // Force an unknown variant past the type system
     const content = [
       { type: 'custom_widget', payload: 123 },
     ] as unknown as ContentPart[];
-
-    const warnSpy = vi.spyOn(debugLogger, 'warn');
-    const result = contentPartsToGeminiParts(content);
-
-    expect(warnSpy).toHaveBeenCalled();
-    expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({
-      text: JSON.stringify({ type: 'custom_widget', payload: 123 }),
-    });
-
-    warnSpy.mockRestore();
+    expect(() => contentPartsToGeminiParts(content)).toThrow(
+      'Unhandled ContentPart type: {"type":"custom_widget","payload":123}',
+    );
   });
 });
 
