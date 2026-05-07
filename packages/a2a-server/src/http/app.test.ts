@@ -263,7 +263,7 @@ describe('E2E Tests', () => {
           value: {
             callId: 'test-call-id-1',
             name: 'test-tool-1',
-            args: {},
+            args: { wait_for_previous: false },
           },
         },
         {
@@ -271,7 +271,7 @@ describe('E2E Tests', () => {
           value: {
             callId: 'test-call-id-2',
             name: 'test-tool-2',
-            args: {},
+            args: { wait_for_previous: false },
           },
         },
       ];

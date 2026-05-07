@@ -554,8 +554,8 @@ export class Scheduler {
       }
     }
 
-    // Default to parallel if the flag is omitted.
-    return true;
+    // Default to sequential if the flag is omitted (wait_for_previous = true)
+    return false;
   }
 
   private async _processValidatingCall(

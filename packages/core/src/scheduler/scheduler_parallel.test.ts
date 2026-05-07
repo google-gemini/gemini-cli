@@ -100,7 +100,7 @@ describe('Scheduler Parallel Execution', () => {
   const req1: ToolCallRequestInfo = {
     callId: 'call-1',
     name: 'read-tool-1',
-    args: { path: 'a.txt' },
+    args: { path: 'a.txt', wait_for_previous: false },
     isClientInitiated: false,
     prompt_id: 'p1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -109,7 +109,7 @@ describe('Scheduler Parallel Execution', () => {
   const req2: ToolCallRequestInfo = {
     callId: 'call-2',
     name: 'read-tool-2',
-    args: { path: 'b.txt' },
+    args: { path: 'b.txt', wait_for_previous: false },
     isClientInitiated: false,
     prompt_id: 'p1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -127,7 +127,7 @@ describe('Scheduler Parallel Execution', () => {
   const agentReq1: ToolCallRequestInfo = {
     callId: 'agent-1',
     name: 'agent-tool-1',
-    args: { query: 'do thing 1' },
+    args: { query: 'do thing 1', wait_for_previous: false },
     isClientInitiated: false,
     prompt_id: 'p1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -136,7 +136,7 @@ describe('Scheduler Parallel Execution', () => {
   const agentReq2: ToolCallRequestInfo = {
     callId: 'agent-2',
     name: 'agent-tool-2',
-    args: { query: 'do thing 2' },
+    args: { query: 'do thing 2', wait_for_previous: false },
     isClientInitiated: false,
     prompt_id: 'p1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -554,5 +554,27 @@ describe('Scheduler Parallel Execution', () => {
     expect(executionLog[1]).toBe('end-r1');
     expect(executionLog[2]).toBe('start-r2');
     expect(executionLog[3]).toBe('end-r2');
+  });
+
+  it('should default wait_for_previous to true when omitted, running tools sequentially', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    // Omit wait_for_previous completely
+    const r1 = { ...req1, callId: 'r1', args: { path: 'a.txt' } };
+    const r2 = { ...req1, callId: 'r2', args: { path: 'b.txt' } };
+
+    await scheduler.schedule([r1, r2], signal);
+
+    expect(executionLog).toEqual(['start-r1', 'end-r1', 'start-r2', 'end-r2']);
   });
 });
