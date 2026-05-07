@@ -73,8 +73,12 @@ jobs:
           gh issue list --repo "${GITHUB_REPOSITORY}" \
             --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body > no_priority_issues.json
 
+          echo '📏 Finding issues missing effort labels...'
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large' --limit 100 --json number,title,body > no_effort_issues.json
+
           echo '🔄 Merging and deduplicating issues...'
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json > issues_to_triage.json
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json > issues_to_triage.json
 
           ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
           if [ "$ISSUE_COUNT" -gt 0 ]; then
@@ -121,7 +125,7 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(echo)",
+                "run_shell_command(echo, grep, find)",
                 "read_file"
               ],
               "telemetry": {
@@ -141,11 +145,13 @@ jobs:
             1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Use the read_file tool to read the file "issues_to_triage.json" which contains the JSON array of issues to triage.
             3. Review the issue title, body and any comments provided in the JSON file.
-            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/* and priority/*.
+            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, priority/*, and effort/*.
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
                - If the issue already has a priority/ label, do not change it.
                - If the issue already has an area/ label, do not change it.
+               - If the issue already has an effort/ label, do not change it.
+               - If the issue is missing an effort/ label, you must evaluate the architectural complexity to determine the effort level. Use your codebase search tools (grep, find) to search for keywords from the issue. Determine how many components/files are involved before deciding the effort.
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. Give me a single short explanation about why you are selecting each label in the process.
@@ -180,6 +186,23 @@ jobs:
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
               - Identify only one priority/ label.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+
+            Categorization Guidelines (Effort):
+            effort/small (1 day or less):
+              - Trivial Logic & Config: Schema updates (Zod), feature flag toggles, adding missing fields to package.json or settings.json.
+              - UI/Aesthetic Adjustments: Fixing minor layout bugs in Ink components (e.g., adding flexShrink, correcting padding in a single Box), text color changes.
+              - Documentation & Strings: Typos, log message updates, CLI argument descriptions.
+              - Localized Bug Fixes: Single-file logic errors, straightforward promise rejections (e.g., wrapping a known failure in a try/catch), simple regex or string parsing fixes.
+            effort/medium (2-3 days):
+              - React/Ink State Management: Debugging useState/useEffect/useReducer bugs, component lifecycle issues (memory leaks in the UI), terminal redraw flickering, or state synchronization between the CLI's internal input buffer and the interactive React components.
+              - Asynchronous Flow & Integration: Resolving complex Promise chains, ERR_STREAM_PREMATURE_CLOSE, fixing hanging IDE companion HTTP requests, timeouts in non-interactive/ACP modes.
+              - Tooling & Output Parsers: Modifying how tools parse streaming stdout/stderr buffers, adding new built-in tools that don't require native bindings.
+              - Cross-Component Refactors: Changes that span across packages/cli and packages/core to pass new data models or telemetry state.
+            effort/large (3+ days):
+              - Platform-Specific Complexities (PTY/Signals): Any issue involving node-pty, child_process.spawn, OS-level shell behavior (Windows vs Linux vs macOS), pseudo-terminal exhaustion (ENXIO), raw mode terminal desyncs, or POSIX signal forwarding (SIGINT/SIGTERM).
+              - Core Architecture & Protocols: Refactoring the Scheduler, Agent-to-Agent (A2A) protocol implementation, low-level MCP (Model Context Protocol) transport mechanisms.
+              - Performance & Memory: Diagnosing massive disk/memory leaks, severe boot time regressions, high-throughput streaming optimizations (e.g., voice streaming pipelines).
+            Note: Any bug that is described as intermittent, flickering, difficult to reproduce, or platform-specific MUST NOT be rated as effort/small.
 
             Categorization Guidelines (Priority):
             P0 - Urgent Blocking Issues:
