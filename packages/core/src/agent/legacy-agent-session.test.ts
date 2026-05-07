@@ -102,10 +102,7 @@ function makeCompletedToolCall(
     response: {
       callId,
       responseParts: [{ text: responseText }],
-      resultDisplay: responseText,
-      display: {
-        result: { type: 'text', text: responseText },
-      },
+      resultDisplay: undefined,
       error: undefined,
       errorType: undefined,
     },
@@ -203,6 +200,7 @@ describe('LegacyAgentSession', () => {
         expect.any(AbortSignal),
         'test-prompt',
         undefined,
+        false,
         'raw input',
       );
 
@@ -429,12 +427,6 @@ describe('LegacyAgentSession', () => {
         (e): e is AgentEvent<'tool_response'> => e.type === 'tool_response',
       );
       expect(toolResp?.name).toBe('read_file');
-      expect(toolResp?.display).toEqual(
-        expect.objectContaining({
-          name: 'read_file',
-          result: { type: 'text', text: 'file contents' },
-        }),
-      );
       expect(toolResp?.content).toEqual([
         { type: 'text', text: 'file contents' },
       ]);
@@ -497,10 +489,9 @@ describe('LegacyAgentSession', () => {
       expect(toolResp?.content).toEqual([
         { type: 'text', text: 'Permission denied' },
       ]);
-      expect(toolResp?.display?.result).toEqual({
-        type: 'text',
-        text: 'Error display',
-      });
+      expect(toolResp?.displayContent).toEqual([
+        { type: 'text', text: 'Error display' },
+      ]);
     });
 
     it('stops on STOP_EXECUTION tool error', async () => {
@@ -655,7 +646,7 @@ describe('LegacyAgentSession', () => {
           e.type === 'error' && e._meta?.['code'] === 'AGENT_EXECUTION_BLOCKED',
       );
       expect(blocked?.fatal).toBe(false);
-      expect(blocked?.message).toBe('Blocked by hook');
+      expect(blocked?.message).toBe('Agent execution blocked: Blocked by hook');
 
       const messages = events.filter(
         (e): e is AgentEvent<'message'> =>
