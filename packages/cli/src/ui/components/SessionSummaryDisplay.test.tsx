@@ -181,8 +181,9 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps strings in single quotes
-      expect(output).toContain("gemini --resume '1234-abcd-5678-efgh'");
+      // PowerShell doesn't wraps UUID in single quotes because
+      // it contains no special characters.
+      expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
 

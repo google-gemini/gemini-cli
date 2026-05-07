@@ -89,7 +89,7 @@ export interface CommandContext {
      *
      * @param value The confirmation request details.
      */
-    setConfirmationRequest: (value: ConfirmationRequest) => void;
+    setConfirmationRequest: (value: ConfirmationRequest | null) => void;
     removeComponent: () => void;
     toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;

@@ -149,13 +149,13 @@ export class ContextGraphBuilder {
       const msg = history[turnIdx];
       if (!msg.parts) continue;
 
-      // Defensive: Skip legacy environment header if it's the first turn.
+      // Defensive: Skip legacy environment header regardless of where it appears.
       // We now manage this as an orthogonal late-addition header.
-      if (turnIdx === 0 && msg.role === 'user' && msg.parts.length === 1) {
+      if (msg.role === 'user' && msg.parts.length === 1) {
         const text = msg.parts[0].text;
         if (
           text?.startsWith('<session_context>') &&
-          text?.includes('This is the Gemini CLI.')
+          text?.includes('This is the Gemini CLI')
         ) {
           debugLogger.log(
             '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
