@@ -255,7 +255,6 @@ describe('ChatRecordingService', () => {
       expect(cached?.sessionId).toBe('test-session-id');
       expect(cached?.messages).toEqual([]);
 
-      // First write flushes the buffered metadata header alongside the record.
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'ping',
@@ -1512,6 +1511,47 @@ describe('ChatRecordingService', () => {
           );
         }
       }
+    });
+
+    it('inherits source startTime and lastUpdated rather than resetting them', async () => {
+      // Regression: setting startTime/lastUpdated to "now" in the fork's
+      // metadata header was shadowed by later $set:lastUpdated markers
+      // copied from the source during the fold, leaving startTime ahead
+      // of lastUpdated. Inheriting source values keeps them consistent.
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'first',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'reply',
+        model: 'm',
+      });
+
+      const sourceLoaded = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(sourceLoaded).not.toBeNull();
+      const sourceStart = sourceLoaded!.startTime;
+      const sourceLastUpdated = sourceLoaded!.lastUpdated;
+
+      const cryptoModule = await import('node:crypto');
+      vi.mocked(cryptoModule.randomUUID).mockReturnValueOnce(
+        'forkLAST-aaaa-bbbb-cccc-dddddddddddd' as ReturnType<
+          typeof cryptoModule.randomUUID
+        >,
+      );
+
+      const result = chatRecordingService.fork();
+      const forkLoaded = await loadConversationRecord(result.filePath);
+      expect(forkLoaded).not.toBeNull();
+      expect(forkLoaded!.sessionId).toBe(
+        'forkLAST-aaaa-bbbb-cccc-dddddddddddd',
+      );
+      expect(forkLoaded!.startTime).toBe(sourceStart);
+      expect(forkLoaded!.lastUpdated).toBe(sourceLastUpdated);
     });
 
     it('rethrows ENOSPC with a friendlier message', async () => {

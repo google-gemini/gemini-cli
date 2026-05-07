@@ -725,7 +725,6 @@ export class ChatRecordingService {
 
       const raw = fs.readFileSync(this.conversationFile, 'utf-8');
       const lines = raw.split('\n');
-      const now = new Date().toISOString();
 
       let metadataRewritten = false;
       for (let i = 0; i < lines.length; i++) {
@@ -734,13 +733,11 @@ export class ChatRecordingService {
         try {
           const parsed = JSON.parse(line) as unknown;
           if (!metadataRewritten && isPartialMetadataRecord(parsed)) {
-            const updated = {
-              ...parsed,
-              sessionId: newSessionId,
-              startTime: now,
-              lastUpdated: now,
-            };
-            lines[i] = JSON.stringify(updated);
+            // Only rewrite sessionId. Inheriting source startTime/lastUpdated
+            // keeps them consistent with any later $set:lastUpdated markers
+            // copied from the source, which loadConversationRecord folds
+            // back into metadata.
+            lines[i] = JSON.stringify({ ...parsed, sessionId: newSessionId });
             metadataRewritten = true;
           } else if (
             isMetadataUpdateRecord(parsed) &&
