@@ -2066,7 +2066,7 @@ describe('GeminiChat', () => {
   });
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
-    it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
+    it('should add thought_signature to the first functionCall in each model turn of the active loop', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'Old message' }] },
@@ -2093,7 +2093,8 @@ describe('GeminiChat', () => {
           parts: [
             {
               functionCall: { name: 'tool_with_sig', args: {} },
-              thoughtSignature: 'existing-sig',
+              // @ts-expect-error test injection
+              thought_signature: 'existing-sig',
             },
             { functionCall: { name: 'another_tool', args: {} } }, // This one does NOT get a signature
           ],
@@ -2103,24 +2104,36 @@ describe('GeminiChat', () => {
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
 
       // Outside active loop - unchanged
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[1]?.parts?.[0]).not.toHaveProperty(
+        'thought_signature',
+      );
 
       // Inside active loop, first model turn
       // First function call gets a signature
-      expect(newContents[3]?.parts?.[0]?.thoughtSignature).toBe(
+      // @ts-expect-error testing injection
+      expect(newContents[3]?.parts?.[0]?.thought_signature).toBe(
         SYNTHETIC_THOUGHT_SIGNATURE,
       );
       // Second function call does NOT
-      expect(newContents[3]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[3]?.parts?.[1]).not.toHaveProperty(
+        'thought_signature',
+      );
 
       // User functionResponse part - unchanged (this is not a model turn)
-      expect(newContents[4]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[4]?.parts?.[0]).not.toHaveProperty(
+        'thought_signature',
+      );
 
       // Inside active loop, second model turn
       // First function call already has a signature, so nothing changes
-      expect(newContents[5]?.parts?.[0]?.thoughtSignature).toBe('existing-sig');
+      // @ts-expect-error testing injection
+      expect(newContents[5]?.parts?.[0]?.thought_signature).toBe(
+        'existing-sig',
+      );
       // Second function call does NOT get a signature
-      expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[5]?.parts?.[1]).not.toHaveProperty(
+        'thought_signature',
+      );
     });
 
     it('should not modify contents if there is no user text message', () => {
@@ -2137,7 +2150,9 @@ describe('GeminiChat', () => {
       ];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      expect(newContents[1]?.parts?.[0]).not.toHaveProperty(
+        'thought_signature',
+      );
     });
 
     it('should handle an empty history', () => {
