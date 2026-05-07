@@ -229,6 +229,75 @@ export async function fetchWithTimeout(
   }
 }
 
+/**
+ * Maximum number of redirects followed by fetchWithSafeRedirects.
+ */
+const MAX_SAFE_REDIRECTS = 10;
+
+/**
+ * Fetches a URL while re-validating each redirect destination for SSRF risk.
+ *
+ * fetchWithTimeout follows redirects automatically (WHATWG default), which
+ * means the initial isBlockedHost check is bypassed for redirect destinations.
+ * This function opts-out of automatic redirect following and re-validates each
+ * Location header value before following it, preventing open-redirect SSRF.
+ *
+ * @param isBlockedHost Predicate returning true for URLs that must not be fetched.
+ * @param url The URL to fetch.
+ * @param timeout Per-hop timeout in milliseconds.
+ * @param options Fetch options. Must NOT include a `redirect` key.
+ * @param hopsLeft Remaining redirect budget (default MAX_SAFE_REDIRECTS).
+ */
+export async function fetchWithSafeRedirects(
+  isBlockedHost: (url: string) => boolean,
+  url: string,
+  timeout: number,
+  options?: Omit<RequestInit, 'redirect'>,
+  hopsLeft = MAX_SAFE_REDIRECTS,
+): Promise<Response> {
+  const response = await fetchWithTimeout(url, timeout, {
+    ...(options as RequestInit),
+    redirect: 'manual',
+  });
+
+  const { status } = response;
+  if (status >= 300 && status < 400) {
+    if (hopsLeft <= 0) {
+      throw new FetchError('Too many redirects', 'ERR_TOO_MANY_REDIRECTS');
+    }
+    const location = response.headers.get('location');
+    if (!location) {
+      // No Location header — return the redirect response as-is.
+      return response;
+    }
+    // Resolve relative Location values against the current URL.
+    let redirectUrl: string;
+    try {
+      redirectUrl = new URL(location, url).href;
+    } catch {
+      throw new FetchError(
+        `Invalid redirect location: ${location}`,
+        'ERR_INVALID_REDIRECT',
+      );
+    }
+    if (isBlockedHost(redirectUrl)) {
+      throw new FetchError(
+        `SSRF protection: redirect destination "${redirectUrl}" resolves to a blocked or private host`,
+        'ERR_SSRF_REDIRECT',
+      );
+    }
+    return fetchWithSafeRedirects(
+      isBlockedHost,
+      redirectUrl,
+      timeout,
+      options,
+      hopsLeft - 1,
+    );
+  }
+
+  return response;
+}
+
 export function setGlobalProxy(proxy: string) {
   const trimmedProxy = proxy.trim();
   currentProxy = trimmedProxy;

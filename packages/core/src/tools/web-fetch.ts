@@ -19,7 +19,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { fetchWithSafeRedirects, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -294,12 +294,17 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-          signal,
-          headers: {
-            'User-Agent': USER_AGENT,
+        const res = await fetchWithSafeRedirects(
+          this.isBlockedHost.bind(this),
+          url,
+          URL_FETCH_TIMEOUT_MS,
+          {
+            signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+            },
           },
-        });
+        );
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -633,14 +638,19 @@ ${aggregatedContent}
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              Accept:
-                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
-              'User-Agent': USER_AGENT,
+          const res = await fetchWithSafeRedirects(
+            this.isBlockedHost.bind(this),
+            url,
+            URL_FETCH_TIMEOUT_MS,
+            {
+              signal,
+              headers: {
+                Accept:
+                  'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+                'User-Agent': USER_AGENT,
+              },
             },
-          });
+          );
           return res;
         },
         {
