@@ -68,3 +68,7 @@ temp_agents/
 
 # conductor extension and planning directories
 conductor/
+
+# sync script artifacts
+sync-upstream.sh
+.sync-upstream.log
