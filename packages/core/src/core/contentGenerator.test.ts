@@ -851,7 +851,7 @@ describe('createContentGenerator', () => {
     ).rejects.toThrow('Invalid custom base URL: not-a-url');
   });
 
-  it('should reject non-https remote custom baseUrl values', async () => {
+  it('should allow http remote custom baseUrl values', async () => {
     await expect(
       createContentGenerator(
         {
@@ -861,7 +861,7 @@ describe('createContentGenerator', () => {
         },
         mockConfig,
       ),
-    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
+    ).resolves.toBeDefined();
   });
 });
 
