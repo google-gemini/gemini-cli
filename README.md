@@ -14,6 +14,37 @@ most direct path from your prompt to our model.
 
 Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
+---
+
+## 🔧 Fork Modifications (dreamaeiou/gemini-cli)
+
+This fork includes the following changes compared to upstream
+`google-gemini/gemini-cli`:
+
+### 🌐 Restore HTTP Base URL Support
+
+In a recent upstream version update, **HTTP protocol was disabled for custom
+base URLs** (only HTTPS was allowed). This restriction prevents users from
+connecting to private/local proxies or self-hosted API endpoints that run on
+plain HTTP.
+
+**This fork reverts that change** and restores full HTTP base URL support,
+allowing you to:
+
+- Connect to local API proxies (e.g., `http://localhost:8080/v1`)
+- Use self-hosted model servers without TLS
+- Work with internal network endpoints that don't require HTTPS
+
+### 🐛 Bug Fixes
+
+Additional fixes included in this fork:
+
+- Fixed issues related to HTTP custom base URL handling in private/local proxy
+  scenarios
+- Improved connection resilience when using non-HTTPS endpoints
+
+---
+
 ## 🚀 Why Gemini CLI?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
