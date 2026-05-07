@@ -5103,10 +5103,6 @@ describe('InputPrompt', () => {
 
       // turnComplete advances the baseline; next turn appends after it
       await act(async () => {
-        // Manually ensure mock state is synced for the baseline capture
-        mockBuffer.text = 'initial hello';
-        mockBuffer.cursor = [0, 13];
-
         (fakeTranscriptionProvider as unknown as EventEmitter).emit(
           'turnComplete',
         );

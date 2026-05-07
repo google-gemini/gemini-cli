@@ -187,7 +187,10 @@ export function useVoiceMode({
       transcriptionServiceRef.current = currentService;
 
       currentService.on('transcription', (text) => {
-        if (transcriptionServiceRef.current !== currentService) {
+        if (
+          transcriptionServiceRef.current !== currentService &&
+          stopRequestedRef.current
+        ) {
           // If this is an orphaned service that was replaced by a new session, ignore its events
           return;
         }
@@ -215,7 +218,11 @@ export function useVoiceMode({
       });
 
       currentService.on('turnComplete', () => {
-        if (transcriptionServiceRef.current !== currentService) return;
+        if (
+          transcriptionServiceRef.current !== currentService &&
+          stopRequestedRef.current
+        )
+          return;
         // Advance the baseline so subsequent turns append after this turn's text
         turnBaselineRef.current = bufferRef.current.text;
         turnBaselineCursorOffsetRef.current = bufferRef.current.getOffset();
