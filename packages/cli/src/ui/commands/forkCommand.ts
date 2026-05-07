@@ -22,11 +22,19 @@ export const forkCommand: SlashCommand = {
     }
 
     const recording = client.getChatRecordingService();
-    if (!recording || !recording.getConversation()) {
+    const conv = recording?.getConversation();
+    if (!recording || !conv) {
       return {
         type: 'message',
         messageType: 'info',
         content: 'No conversation to fork.',
+      };
+    }
+    if (conv.messages.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'No messages yet to fork. Send a message first.',
       };
     }
 

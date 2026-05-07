@@ -65,8 +65,22 @@ describe('forkCommand', () => {
     expect(mockFork).not.toHaveBeenCalled();
   });
 
+  it('returns info when the conversation has no messages yet', async () => {
+    mockGetConversation.mockReturnValue({ sessionId: 'fresh', messages: [] });
+    const result = await forkCommand.action!(mockContext, '');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'No messages yet to fork. Send a message first.',
+    });
+    expect(mockFork).not.toHaveBeenCalled();
+  });
+
   it('returns the shortId and a resume hint on success', async () => {
-    mockGetConversation.mockReturnValue({ sessionId: 'old', messages: [] });
+    mockGetConversation.mockReturnValue({
+      sessionId: 'old',
+      messages: [{ id: 'm1', type: 'user', content: 'hi' }],
+    });
     mockFork.mockReturnValue({
       sessionId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       shortId: 'a1b2c3d4',
@@ -84,7 +98,10 @@ describe('forkCommand', () => {
   });
 
   it('reports an error when fork() throws', async () => {
-    mockGetConversation.mockReturnValue({ sessionId: 'old', messages: [] });
+    mockGetConversation.mockReturnValue({
+      sessionId: 'old',
+      messages: [{ id: 'm1', type: 'user', content: 'hi' }],
+    });
     mockFork.mockImplementation(() => {
       throw new Error('No space left on device.');
     });
