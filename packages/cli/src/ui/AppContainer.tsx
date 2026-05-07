@@ -89,8 +89,9 @@ import {
   ProjectIdRequiredError,
   buildUserSteeringHintPrompt,
   logBillingEvent,
-  ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
+  ApiKeyUpdatedEvent,
+  AdkAgentProtocol,
   type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -1188,13 +1189,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
-  const streamAgent = useMemo(
-    () =>
-      config?.getAgentSessionInteractiveEnabled()
-        ? new LegacyAgentProtocol({ config, getPreferredEditor })
-        : undefined,
-    [config, getPreferredEditor],
-  );
+  const streamAgent = useMemo(() => {
+    if (config?.getAgentSessionInteractiveEnabled()) {
+      return new LegacyAgentProtocol({ config, getPreferredEditor });
+    }
+
+    if (config?.getAdkAgentSessionInteractiveEnabled()) {
+      return new AdkAgentProtocol({ config, userId: 'gemini-cli-user' });
+    }
+
+    return undefined;
+  }, [config, getPreferredEditor]);
 
   const activeStream = streamAgent
     ? // eslint-disable-next-line react-hooks/rules-of-hooks

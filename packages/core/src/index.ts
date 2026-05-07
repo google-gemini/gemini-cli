@@ -199,6 +199,7 @@ export * from './agent/legacy-agent-session.js';
 export * from './agent/event-translator.js';
 export * from './agent/content-utils.js';
 export * from './agent/tool-display-utils.js';
+export * from './agent/adk/adk-agent-session.js';
 // Agent event types — namespaced to avoid collisions with existing exports
 export type {
   AgentEvent,
