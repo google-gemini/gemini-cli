@@ -187,7 +187,7 @@ describe('contentPartsToGeminiParts', () => {
     ]);
   });
 
-  it('serializes unknown ContentPart variants', () => {
+  it('throws on unknown ContentPart variants', () => {
     // Force an unknown variant past the type system
     const content = [
       { type: 'custom_widget', payload: 123 },
