@@ -5,15 +5,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type {
- SubagentProgress ,
+import {
   AgentTerminateMode,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
+  SUBAGENT_CANCELLED_ERROR_MESSAGE,
+  type SubagentProgress,
   type LocalAgentDefinition,
   type AgentInputs,
   type SubagentActivityEvent,
-  SubagentActivityErrorType,
-  SUBAGENT_REJECTED_ERROR_PREFIX,
-  SUBAGENT_CANCELLED_ERROR_MESSAGE } from './types.js';
+} from './types.js';
 import { LocalSessionInvocation } from './local-session-invocation.js';
 import { LocalSubagentSession } from './local-subagent-protocol.js';
 import { makeFakeConfig } from '../test-utils/config.js';
