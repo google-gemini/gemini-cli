@@ -196,14 +196,14 @@ jobs:
               - Localized Bug Fixes: Single-file logic errors, straightforward promise rejections (e.g., wrapping a known failure in a try/catch), simple regex or string parsing fixes.
             effort/medium (2-3 days):
               - React/Ink State Management: Debugging useState/useEffect/useReducer bugs, component lifecycle issues (memory leaks in the UI), terminal redraw flickering, or state synchronization between the CLI's internal input buffer and the interactive React components.
-              - Asynchronous Flow & Integration: Resolving complex Promise chains, ERR_STREAM_PREMATURE_CLOSE, fixing hanging IDE companion HTTP requests, timeouts in non-interactive/ACP modes.
+              - Asynchronous Flow & Integration: Resolving complex Promise chains, ERR_STREAM_PREMATURE_CLOSE, debugging IDE companion extensions (VS Code, Android Studio) or resolving hanging HTTP requests/IPC between the CLI and external plugins, timeouts in non-interactive/ACP modes.
               - Tooling & Output Parsers: Modifying how tools parse streaming stdout/stderr buffers, adding new built-in tools that don't require native bindings.
               - Cross-Component Refactors: Changes that span across packages/cli and packages/core to pass new data models or telemetry state.
             effort/large (3+ days):
               - Platform-Specific Complexities (PTY/Signals): Any issue involving node-pty, child_process.spawn, OS-level shell behavior (Windows vs Linux vs macOS), pseudo-terminal exhaustion (ENXIO), raw mode terminal desyncs, or POSIX signal forwarding (SIGINT/SIGTERM).
               - Core Architecture & Protocols: Refactoring the Scheduler, Agent-to-Agent (A2A) protocol implementation, low-level MCP (Model Context Protocol) transport mechanisms.
               - Performance & Memory: Diagnosing massive disk/memory leaks, severe boot time regressions, high-throughput streaming optimizations (e.g., voice streaming pipelines).
-            Note: Any bug that is described as intermittent, flickering, difficult to reproduce, or platform-specific MUST NOT be rated as effort/small.
+            Note: Any bug that is described as intermittent, flickering, difficult to reproduce, platform-specific, or requiring cross-environment setups (e.g., involving the VS Code IDE companion, GCA plugin, or Android Studio) MUST NOT be rated as effort/small because of the increased overhead of testing and reproducing.
 
             Categorization Guidelines (Priority):
             P0 - Urgent Blocking Issues:
