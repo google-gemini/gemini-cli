@@ -47,6 +47,10 @@ synchronize with previous sessions:
   than closure rates).
 - **Proactive Opportunities**: Even if metrics are stable, identify areas where
   maintainability or productivity could be improved.
+- **Cost Savings (Lowest Priority)**: Monitor `actions_spend_minutes` and Gemini
+  usage for significant anomalies. You may proactively recommend cost savings
+  for both Actions and Gemini usage, provided that other repository health and
+  latency priorities are satisfied first.
 
 ### 2. Hypothesis Testing & Deep Dive
 

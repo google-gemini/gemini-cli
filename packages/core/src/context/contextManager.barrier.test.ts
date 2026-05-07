@@ -51,17 +51,18 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     const rawHistoryLength = chatHistory.get().length;
 
     // 5. Project History (Triggers Sync Barrier)
-    const projection = await contextManager.renderHistory();
+    const { history: projection } = await contextManager.renderHistory();
 
     // 6. Assertions
     // The barrier should have dropped several older episodes to get under 150k.
 
     expect(projection.length).toBeLessThan(rawHistoryLength);
 
-    // Verify Episode 0 (System) is perfectly preserved at the front
-
+    // Verify Episode 0 (System) was pruned, so we now start with a sentinel due to role alternation
     expect(projection[0].role).toBe('user');
-    expect(projection[0].parts![0].text).toBe('System prompt');
+    expect(projection[0].parts![0].text).toBe(
+      '[Continuing from previous AI thoughts...]',
+    );
 
     // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
     const contentNodes = projection.filter(
@@ -70,8 +71,14 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // Verify the latest turn is perfectly preserved at the back
-    const lastUser = contentNodes[contentNodes.length - 2];
-    const lastModel = contentNodes[contentNodes.length - 1];
+    // Note: The HistoryHardener appends a "Please continue." user turn if we end on model,
+    // so we look at the turns before the sentinel.
+    const lastSentinel = contentNodes[contentNodes.length - 1];
+    const lastModel = contentNodes[contentNodes.length - 2];
+    const lastUser = contentNodes[contentNodes.length - 3];
+
+    expect(lastSentinel.role).toBe('user');
+    expect(lastSentinel.parts![0].text).toBe('Please continue.');
 
     expect(lastUser.role).toBe('user');
     expect(lastUser.parts![0].text).toBe('Final question.');
