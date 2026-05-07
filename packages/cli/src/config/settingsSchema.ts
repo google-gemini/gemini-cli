@@ -1029,6 +1029,15 @@ const SETTINGS_SCHEMA = {
               { value: 'flex', label: 'Flex' },
             ],
           },
+          location: {
+            type: 'string',
+            label: 'Vertex AI Location',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Overrides the default Vertex AI region (e.g., us-central1 or global).',
+            showInDialog: true,
+          },
         },
       },
     },
@@ -3587,3 +3596,5 @@ type InferMergedSettings<T extends SettingsSchema> = {
 
 export type Settings = InferSettings<SettingsSchemaType>;
 export type MergedSettings = InferMergedSettings<SettingsSchemaType>;
+
+
