@@ -320,7 +320,7 @@ jobs:
                   if (commentBody) commentBody += '\n\n';
                   commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
                 }
-                
+
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
