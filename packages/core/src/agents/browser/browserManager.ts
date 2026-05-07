@@ -753,8 +753,6 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
-          // clear the action counter for each connection
-          this.actionCounter = 0;
 
           logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
             session_mode: sessionMode,

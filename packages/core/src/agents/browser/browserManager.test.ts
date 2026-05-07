@@ -1264,7 +1264,6 @@ describe('BrowserManager', () => {
       await manager.callTool('take_snapshot', {});
       await manager.callTool('take_snapshot', { some: 'args' });
       await manager.callTool('take_snapshot', { other: 'args' });
-      await manager.callTool('take_snapshot', { other: 'new args' });
 
       // 4th call should throw
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
@@ -1306,15 +1305,14 @@ describe('BrowserManager', () => {
       });
       const manager = new BrowserManager(limitedConfig);
 
-      // Exhaust the action limit
+      // Exhaust the action limit (3 calls allowed)
       await manager.callTool('take_snapshot', {});
       await manager.callTool('take_snapshot', { some: 'args' });
       await manager.callTool('take_snapshot', { other: 'args' });
-      await manager.callTool('take_snapshot', { other: 'new args' });
 
-      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
-        /maximum action limit \(3\)/,
-      );
+      await expect(
+        manager.callTool('take_snapshot', { other: 'new args' }),
+      ).rejects.toThrow(/maximum action limit \(3\)/);
 
       // Simulate a new browser_agent invocation acquiring the manager
       manager.release();
@@ -1323,6 +1321,7 @@ describe('BrowserManager', () => {
       // Should succeed again with a fresh counter
       await manager.callTool('take_snapshot', {});
       await manager.callTool('take_snapshot', { some: 'args2' });
+      await manager.callTool('take_snapshot', { other: 'args2' });
     });
   });
 
