@@ -187,14 +187,16 @@ describe('contentPartsToGeminiParts', () => {
     ]);
   });
 
-  it('throws on unknown ContentPart variants', () => {
+  it('serializes unknown ContentPart variants', () => {
     // Force an unknown variant past the type system
     const content = [
       { type: 'custom_widget', payload: 123 },
     ] as unknown as ContentPart[];
-    expect(() => contentPartsToGeminiParts(content)).toThrow(
-      'Unhandled ContentPart type: {"type":"custom_widget","payload":123}',
-    );
+    const result = contentPartsToGeminiParts(content);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      text: JSON.stringify({ type: 'custom_widget', payload: 123 }),
+    });
   });
 });
 

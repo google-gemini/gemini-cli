@@ -241,10 +241,11 @@ describe('LegacyAgentSession', () => {
       );
     });
 
-    it('returns null streamId for non-message payloads', async () => {
+    it('throws for non-message payloads', async () => {
       const session = new LegacyAgentSession(deps);
-      const result = await session.send({ update: { title: 'test' } });
-      expect(result.streamId).toBeNull();
+      await expect(session.send({ update: { title: 'test' } })).rejects.toThrow(
+        'only supports message sends',
+      );
     });
 
     it('throws if send is called while a stream is active', async () => {
