@@ -11,6 +11,10 @@ import { spawnAsync } from '../utils/shell-utils.js';
 import { simpleGit, CheckRepoActions, type SimpleGit } from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  sanitizeEnvironment,
+  getSecureSanitizationConfig,
+} from './environmentSanitization.js';
 
 export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
 export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
@@ -58,9 +62,18 @@ export class GitService {
     const gitConfigPath = path.join(repoDir, '.gitconfig');
     const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return {
+      ...sanitizeEnvironment(
+        process.env,
+        getSecureSanitizationConfig({
+          enableEnvironmentVariableRedaction: true,
+        }),
+      ),
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
       GIT_CONFIG_SYSTEM: systemConfigPath,
+      // Ensure we don't inherit isolation-breaking variables from the user environment.
+      GIT_DIR: undefined,
+      GIT_WORK_TREE: undefined,
       // Explicitly provide identity to prevent "Author identity unknown" errors
       // inside sandboxed environments like Docker where the gitconfig might not
       // be picked up properly.
@@ -126,9 +139,9 @@ export class GitService {
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
     return simpleGit(this.projectRoot).env({
+      ...this.getShadowRepoEnv(repoDir),
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
-      ...this.getShadowRepoEnv(repoDir),
     });
   }
 

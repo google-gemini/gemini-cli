@@ -97,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionFile?: string | undefined;
   sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
@@ -239,8 +240,14 @@ export async function parseArguments(
         ? query.length > 0
         : !!query;
 
-      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
-        return 'Cannot use both --resume (-r) and --session-id together';
+      const sessionFlags = [
+        argv['resume'] !== undefined,
+        argv['session-id'] !== undefined,
+        argv['session-file'] !== undefined,
+      ].filter(Boolean).length;
+
+      if (sessionFlags > 1) {
+        return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
       }
 
       if (argv['prompt'] && hasPositionalQuery) {
@@ -412,6 +419,11 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-file', {
+          type: 'string',
+          nargs: 1,
+          description: 'Load a session from a JSON file',
+        })
         .option('session-id', {
           type: 'string',
           nargs: 1,
@@ -560,6 +572,7 @@ export interface LoadCliConfigOptions {
   };
   worktreeSettings?: WorktreeSettings;
   skipExtensions?: boolean;
+  skipMemoryLoad?: boolean;
 }
 
 export async function loadCliConfig(
@@ -568,7 +581,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks, skipExtensions = false } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    skipMemoryLoad = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -681,7 +699,7 @@ export async function loadCliConfig(
   const finalExtensionLoader =
     extensionManager ?? new SimpleExtensionLoader([]);
 
-  if (!experimentalJitContext) {
+  if (!experimentalJitContext && !skipMemoryLoad) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,

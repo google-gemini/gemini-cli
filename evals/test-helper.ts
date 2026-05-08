@@ -45,7 +45,7 @@ export const EVAL_MODEL =
 //   The pass/fail trendline of this set of tests can be used as a general measure
 //   of product quality. You can run these locally with 'npm run test:all_evals'.
 //   This may take a really long time and is not recommended.
-export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
+export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES' | 'USUALLY_FAILS';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   runEval(policy, evalCase, () => internalEvalTest(evalCase));
@@ -356,12 +356,16 @@ export function runEval(
     targetSuiteName && suiteName && suiteName !== targetSuiteName;
 
   const options = { timeout: timeoutOverride ?? timeout, meta };
-  if (
-    (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) ||
-    skipBySuiteType ||
-    skipBySuiteName
+
+  if (skipBySuiteType || skipBySuiteName) {
+    it.skip(name, options, fn);
+  } else if (
+    !process.env['RUN_EVALS'] &&
+    (policy === 'USUALLY_PASSES' || policy === 'USUALLY_FAILS')
   ) {
     it.skip(name, options, fn);
+  } else if (policy === 'USUALLY_FAILS') {
+    it.fails(name, options, fn);
   } else {
     it(name, options, fn);
   }

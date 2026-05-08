@@ -48,6 +48,12 @@ describe('Turn', () => {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
+    context: { config: { isContextManagementEnabled: () => boolean } };
+    loopContext?: {
+      toolRegistry: {
+        getTool: (name: string) => unknown;
+      };
+    };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -57,6 +63,16 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
       maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
+      context: {
+        config: {
+          isContextManagementEnabled: () => false,
+        },
+      },
+      loopContext: {
+        toolRegistry: {
+          getTool: vi.fn().mockReturnValue(undefined),
+        },
+      },
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);

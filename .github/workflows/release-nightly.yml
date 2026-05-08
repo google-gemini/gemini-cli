@@ -30,8 +30,15 @@ on:
         default: 'prod'
 
 jobs:
+  build-mac:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    uses: './.github/workflows/build-unsigned-mac-binaries.yml'
+    with:
+      ref: '${{ github.event.inputs.ref }}'
+
   release:
     if: "github.repository == 'google-gemini/gemini-cli'"
+    needs: ['build-mac']
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     runs-on: 'ubuntu-latest'
     permissions:
@@ -61,6 +68,11 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
 
       - name: 'Print Inputs'
         shell: 'bash'
