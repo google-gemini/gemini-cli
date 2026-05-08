@@ -150,6 +150,8 @@ function isValidContent(content: Content): boolean {
       !part.thought &&
       !part.functionCall &&
       !part.functionResponse &&
+      !part.inlineData &&
+      !part.fileData &&
       part.text !== undefined &&
       part.text === ''
     ) {
