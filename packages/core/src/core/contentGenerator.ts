@@ -110,21 +110,15 @@ export interface VertexAiRoutingConfig {
   sharedRequestType?: VertexAiSharedRequestType;
 }
 
-const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
 const VERTEX_AI_REQUEST_TYPE_HEADER = 'X-Vertex-AI-LLM-Request-Type';
 const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
   'X-Vertex-AI-LLM-Shared-Request-Type';
 
 function validateBaseUrl(baseUrl: string): void {
-  let url: URL;
   try {
-    url = new URL(baseUrl);
+    new URL(baseUrl);
   } catch {
     throw new Error(`Invalid custom base URL: ${baseUrl}`);
-  }
-
-  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
-    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
   }
 }
 
@@ -136,6 +130,24 @@ export async function createContentGeneratorConfig(
   customHeaders?: Record<string, string>,
   vertexAiRouting?: VertexAiRoutingConfig,
 ): Promise<ContentGeneratorConfig> {
+  const contentGeneratorConfig: ContentGeneratorConfig = {
+    authType,
+    proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
+    vertexAiRouting,
+  };
+
+  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
+  // Return before touching the API-key keychain: on Linux without a Secret Service
+  // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
+  if (
+    authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.COMPUTE_ADC
+  ) {
+    return contentGeneratorConfig;
+  }
+
   const geminiApiKey =
     apiKey ||
     process.env['GEMINI_API_KEY'] ||
@@ -147,22 +159,6 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
-
-  const contentGeneratorConfig: ContentGeneratorConfig = {
-    authType,
-    proxy: config?.getProxy(),
-    baseUrl,
-    customHeaders,
-    vertexAiRouting,
-  };
-
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
-  if (
-    authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
-  ) {
-    return contentGeneratorConfig;
-  }
 
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;

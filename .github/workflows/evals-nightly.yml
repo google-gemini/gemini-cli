@@ -66,6 +66,7 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: 'true'
           EVAL_SUITE_TYPE: "${{ github.event.inputs.suite_type || 'behavioral' }}"

@@ -167,6 +167,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
           BUILD_SANDBOX_FLAGS: '--cache-from type=gha --cache-to type=gha,mode=max'
@@ -212,6 +213,7 @@ jobs:
         if: "${{runner.os != 'Windows'}}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -288,6 +290,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -334,6 +337,7 @@ jobs:
         if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: 'gemini-3-pro-preview'
           # Only run always passes behavioral tests.
           EVAL_SUITE_TYPE: 'behavioral'

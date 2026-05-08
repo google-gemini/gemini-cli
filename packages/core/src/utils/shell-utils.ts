@@ -240,11 +240,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +364,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -683,9 +695,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':

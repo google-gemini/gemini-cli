@@ -364,10 +364,11 @@ export function renderGitRepo(options?: GitRepoOptions): string {
   - "Commit the change" -> add changed files and commit.
   - "Wrap up this PR for me" -> do not commit.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
-  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add ...\` as needed.
+  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add <file>...\` for specific files as needed.
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
     - \`git diff --staged\` to review only staged changes when a partial commit makes sense or was requested by the user.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
+- Do not use \`git add .\` or \`git add -A\` unprompted as this can stage unwanted or untracked files. Instead, stage only the specific files that were changed or created as part of the task.
 - Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".${gitRepoKeepUserInformed(options.interactive)}
@@ -477,7 +478,7 @@ ${options.planModeToolsList}
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- Present the plan and request approval for the finalized plan using the built-in \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool. **CRITICAL: NEVER attempt to call this tool via \`${SHELL_TOOL_NAME}\`.**
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
@@ -510,7 +511,8 @@ You are operating with a persistent file-based task tracking system located at \
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
 7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
-8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.
+9.  **TURN EFFICIENCY**: Update the tracker immediately when a step is completed. Combine \`${TRACKER_UPDATE_TASK_TOOL_NAME}\` calls with other tool calls in the same turn to save turns.`.trim();
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---

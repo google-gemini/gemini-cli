@@ -720,6 +720,17 @@ function doIt() {
       });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.display).toEqual(
+        expect.objectContaining({
+          name: 'Edit',
+          resultSummary: expect.stringContaining('added'),
+          result: expect.objectContaining({
+            type: 'diff',
+            beforeText: initialContent,
+            afterText: newContent,
+          }),
+        }),
+      );
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
       const display = result.returnDisplay as FileDiff;
       expect(display.fileDiff).toMatch(initialContent);

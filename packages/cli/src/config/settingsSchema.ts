@@ -1667,6 +1667,19 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      confirmationRequired: {
+        type: 'array',
+        label: 'Confirmation Required',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description: oneLine`
+          Tool names that always require user confirmation.
+          Takes precedence over allowed tools and core tool allowlists.
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       exclude: {
         type: 'array',
         label: 'Exclude Tools',
@@ -2017,6 +2030,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
@@ -2039,6 +2062,100 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      gemma: {
+        type: 'boolean',
+        label: 'Gemma Models',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable access to Gemma 4 models via Gemini API.',
+        showInDialog: true,
+      },
+      voiceMode: {
+        type: 'boolean',
+        label: 'Voice Mode',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental voice dictation and commands (/voice, /voice model).',
+        showInDialog: true,
+      },
+      voice: {
+        type: 'object',
+        label: 'Voice',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for voice mode and transcription.',
+        showInDialog: false,
+        properties: {
+          activationMode: {
+            type: 'enum',
+            label: 'Voice Activation Mode',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'push-to-talk',
+            description: 'How to trigger voice recording with the Space key.',
+            showInDialog: true,
+            options: [
+              { value: 'push-to-talk', label: 'Push-To-Talk (Hold Space)' },
+              { value: 'toggle', label: 'Toggle (Press Space to start/stop)' },
+            ],
+          },
+          backend: {
+            type: 'enum',
+            label: 'Voice Transcription Backend',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'gemini-live',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
+            showInDialog: true,
+            options: [
+              { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
+              { value: 'whisper', label: 'Whisper (Local)' },
+            ],
+          },
+          whisperModel: {
+            type: 'enum',
+            label: 'Whisper Model',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'ggml-base.en.bin',
+            description: 'The Whisper model to use for local transcription.',
+            showInDialog: true,
+            options: [
+              { value: 'ggml-tiny.en.bin', label: 'Tiny (EN) - Fast (~75MB)' },
+              {
+                value: 'ggml-base.en.bin',
+                label: 'Base (EN) - Balanced (~142MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q5_0.bin',
+                label: 'Large v3 Turbo (Q5_0) - High Accuracy (~547MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q8_0.bin',
+                label: 'Large v3 Turbo (Q8_0) - Max Accuracy (~834MB)',
+              },
+            ],
+          },
+          stopGracePeriodMs: {
+            type: 'number',
+            label: 'Voice Stop Grace Period (ms)',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 4000,
+            description:
+              'How long to wait for final transcription after stopping recording.',
+            showInDialog: true,
+          },
+        },
+      },
       adk: {
         type: 'object',
         label: 'ADK',
@@ -2285,6 +2402,17 @@ const SETTINGS_SCHEMA = {
           'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
         showInDialog: true,
       },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
+      },
       autoMemory: {
         type: 'boolean',
         label: 'Auto Memory',
@@ -2292,7 +2420,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
       generalistProfile: {
@@ -3175,6 +3303,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           secondary: { type: 'string' },
           link: { type: 'string' },
           accent: { type: 'string' },
+          response: { type: 'string' },
         },
       },
       background: {
