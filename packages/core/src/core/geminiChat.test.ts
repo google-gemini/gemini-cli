@@ -2818,5 +2818,39 @@ describe('GeminiChat', () => {
       expect(curatedHistory[1].role).toBe('model');
       expect(curatedHistory[1].parts![0].functionCall).toBeDefined();
     });
+
+    it('should not drop model turns with inlineData and empty text', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        {
+          role: 'model',
+          parts: [{ inlineData: { mimeType: 'image/jpeg', data: 'base64...' }, text: '' }],
+        },
+      ];
+      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
+      
+      const curatedHistory = chatWithHistory.getHistory(true);
+      
+      expect(curatedHistory.length).toBe(2);
+      expect(curatedHistory[1].role).toBe('model');
+      expect(curatedHistory[1].parts![0].inlineData).toBeDefined();
+    });
+
+    it('should not drop model turns with fileData and empty text', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        {
+          role: 'model',
+          parts: [{ fileData: { mimeType: 'image/jpeg', fileUri: 'https://...' }, text: '' }],
+        },
+      ];
+      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
+      
+      const curatedHistory = chatWithHistory.getHistory(true);
+      
+      expect(curatedHistory.length).toBe(2);
+      expect(curatedHistory[1].role).toBe('model');
+      expect(curatedHistory[1].parts![0].fileData).toBeDefined();
+    });
   });
 });
