@@ -13,6 +13,7 @@ import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
   getShellConfiguration,
+  isWindows,
   type WorktreeSettings,
 } from '@google/gemini-cli-core';
 
@@ -22,6 +23,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     getShellConfiguration: vi.fn(),
+    isWindows: vi.fn(),
   };
 });
 
@@ -44,6 +46,7 @@ vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
 });
 
 const getShellConfigurationMock = vi.mocked(getShellConfiguration);
+const isWindowsMock = vi.mocked(isWindows);
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
 const renderWithMockedStats = async (
@@ -106,6 +109,7 @@ describe('<SessionSummaryDisplay />', () => {
       argsPrefix: ['-c'],
       shell: 'bash',
     });
+    isWindowsMock.mockReturnValue(false);
   });
 
   it('renders the summary display with a title', async () => {
@@ -149,8 +153,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // Standard UUID characters are wrapped in double quotes.
-      expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
+      // Standard UUID characters are NOT wrapped in double quotes on non-Windows.
+      expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
 
@@ -167,7 +171,8 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
-    it('renders a standard UUID-formatted session ID in the footer (powershell)', async () => {
+    it('renders a standard UUID-formatted session ID in the footer (powershell) on Windows', async () => {
+      isWindowsMock.mockReturnValue(true);
       getShellConfigurationMock.mockReturnValue({
         executable: 'powershell.exe',
         argsPrefix: ['-NoProfile', '-Command'],
@@ -181,7 +186,7 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes.
+      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes on Windows.
       expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
       unmount();
     });
@@ -224,7 +229,7 @@ describe('<SessionSummaryDisplay />', () => {
 
       expect(output).toContain('To resume work in this worktree:');
       expect(output).toContain(
-        'cd /path/to/foo-bar && gemini --resume "test-session"',
+        'cd /path/to/foo-bar && gemini --resume test-session',
       );
       expect(output).toContain(
         'To remove manually: git worktree remove /path/to/foo-bar',
