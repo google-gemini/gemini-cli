@@ -10,6 +10,7 @@ import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
+import { performCalibration } from '../utils/tokenCalibration.js';
 
 /**
  * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -68,6 +69,7 @@ export async function render(
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
+    performCalibration(env, visibleNodes, contents);
     return { history: contents, didApplyManagement: false };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -83,9 +85,12 @@ export async function render(
   // Start from newest and count backwards
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
+    const priorTokens = rollingTokens;
     const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
     rollingTokens += nodeTokens;
-    if (rollingTokens > sidecar.config.budget.retainedTokens) {
+
+    // Loose Boundary Policy: Keep the node that crosses the boundary
+    if (priorTokens > sidecar.config.budget.retainedTokens) {
       agedOutNodes.add(node.id);
     }
   }
@@ -113,5 +118,6 @@ export async function render(
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
+  performCalibration(env, visibleNodes, contents);
   return { history: contents, didApplyManagement: true };
 }
