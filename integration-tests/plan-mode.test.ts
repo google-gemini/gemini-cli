@@ -239,7 +239,7 @@ describe('Plan Mode', () => {
     await rig.setup('should-switch-to-flash', {
       settings: {
         model: {
-          name: 'auto-gemini-2.5',
+          name: 'auto-gemini-3',
         },
         experimental: { plan: true },
         tools: {
