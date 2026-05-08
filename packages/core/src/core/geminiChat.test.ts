@@ -2796,4 +2796,27 @@ describe('GeminiChat', () => {
       ]);
     });
   });
+
+  describe('getHistory with curated: true', () => {
+    it('should not drop model turns with function calls and empty text', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} }, text: '' }],
+        },
+        {
+          role: 'user',
+          parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+        },
+      ];
+      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
+      
+      const curatedHistory = chatWithHistory.getHistory(true);
+      
+      expect(curatedHistory.length).toBe(3);
+      expect(curatedHistory[1].role).toBe('model');
+      expect(curatedHistory[1].parts![0].functionCall).toBeDefined();
+    });
+  });
 });
