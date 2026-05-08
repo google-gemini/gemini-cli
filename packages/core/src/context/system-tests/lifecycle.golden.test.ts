@@ -9,11 +9,7 @@ import fs from 'node:fs';
 import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
-import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
-import { createBlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
-import { createHistoryTruncationProcessor } from '../processors/historyTruncationProcessor.js';
-import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAsyncProcessor.js';
+import { stressTestProfile } from '../config/profiles.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -52,57 +48,22 @@ describe('System Lifecycle Golden Tests', () => {
     vi.restoreAllMocks();
   });
 
-  const getAggressiveConfig = (): ContextProfile => ({
-    name: 'Aggressive Test',
-    config: {
-      budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
-    },
-    buildPipelines: (env) => [
-      {
-        name: 'Pressure Relief', // Emits from eventBus 'retained_exceeded'
-        triggers: ['retained_exceeded'],
-        processors: [
-          createBlobDegradationProcessor('BlobDegradationProcessor', env),
-          createToolMaskingProcessor('ToolMaskingProcessor', env, {
-            stringLengthThresholdTokens: 50,
-          }),
-          createStateSnapshotProcessor('StateSnapshotProcessor', env, {}),
-        ],
-      },
-      {
-        name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
-        triggers: ['retained_exceeded'],
-        processors: [
-          createHistoryTruncationProcessor(
-            'HistoryTruncationProcessor',
-            env,
-            {},
-          ),
-        ],
-      },
-    ],
-    buildAsyncPipelines: (env) => [
-      {
-        name: 'Async',
-        triggers: ['nodes_aged_out'],
-        processors: [
-          createStateSnapshotAsyncProcessor(
-            'StateSnapshotAsyncProcessor',
-            env,
-            {},
-          ),
-        ],
-      },
-    ],
-  });
-
-  const mockLlmClient = createMockLlmClient([
-    '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
-  ]);
+  // Uses dynamic role-based mocking to differentiate Snapshot vs Distillation output automatically.
+  const mockLlmClient = createMockLlmClient();
 
   it('Scenario 1: Organic Growth with Huge Tool Output & Images', async () => {
+    // Override stressTestProfile limits slightly to ensure immediate overflow
+    // without having to push 50,000 characters to cross the generalist boundaries.
+    const customProfile: ContextProfile = {
+      ...stressTestProfile,
+      config: {
+        ...stressTestProfile.config,
+        budget: { maxTokens: 1000, retainedTokens: 500 },
+      },
+    };
+
     const harness = await SimulationHarness.create(
-      getAggressiveConfig(),
+      customProfile,
       mockLlmClient,
     );
 
@@ -169,6 +130,9 @@ describe('System Lifecycle Golden Tests', () => {
       { role: 'model', parts: [{ text: 'Yes we can.' }] },
     ]);
 
+    // Give the background tasks a moment to inject the snapshot into the graph
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     // Get final state
     const goldenState = await harness.getGoldenState();
 
@@ -212,54 +176,117 @@ describe('System Lifecycle Golden Tests', () => {
     expect(goldenState).toMatchSnapshot();
   });
 
-  it('Scenario 3: Async-Driven Background GC', async () => {
-    const gcConfig: ContextProfile = {
-      name: 'GC Test Config',
+  it('Scenario 3: Node Distillation of Large Historical Messages', async () => {
+    // 1 Turn = ~2520 tokens.
+    // retainedTokens = 4000 ensures Turn 0 is kept intact until Turn 1 pushes the total to ~5040.
+    const customProfile: ContextProfile = {
+      ...stressTestProfile,
       config: {
-        budget: { maxTokens: 200, retainedTokens: 100 },
-      },
-      buildPipelines: () => [],
-      buildAsyncPipelines: (env) => [
-        {
-          name: 'Async',
-          triggers: ['nodes_aged_out'],
-          processors: [
-            createStateSnapshotAsyncProcessor(
-              'StateSnapshotAsyncProcessor',
-              env,
-              {},
-            ),
-          ],
+        ...stressTestProfile.config,
+        budget: { maxTokens: 10000, retainedTokens: 4000 },
+        processorOptions: {
+          ...stressTestProfile.config?.processorOptions,
+          NodeDistillation: {
+            type: 'NodeDistillationProcessor',
+            options: {
+              nodeThresholdTokens: 1000, // 1250 > 1000, so older messages will be distilled
+            },
+          },
         },
-      ],
+      },
+      // Disable async pipelines (StateSnapshots) so they don't compete with the Normalization pipeline
+      buildAsyncPipelines: () => [],
     };
 
-    const harness = await SimulationHarness.create(gcConfig, mockLlmClient);
+    const harness = await SimulationHarness.create(
+      customProfile,
+      mockLlmClient,
+    );
 
     // Turn 0
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'A'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'B'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'A'.repeat(5000) }] },
+      { role: 'model', parts: [{ text: 'B'.repeat(5000) }] },
     ]);
 
-    // Turn 1 (Should trigger StateSnapshotasync pipeline because we exceed 100 retainedTokens)
+    // Turn 1
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'C'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'D'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'C'.repeat(5000) }] },
+      { role: 'model', parts: [{ text: 'D'.repeat(5000) }] },
     ]);
-
-    // Give the async background pipeline an extra beat to complete its async execution and emit variants
-    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Turn 2
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'E'.repeat(50) }] },
-      { role: 'model', parts: [{ text: 'F'.repeat(50) }] },
+      { role: 'user', parts: [{ text: 'E'.repeat(5000) }] },
+      { role: 'model', parts: [{ text: 'F'.repeat(5000) }] },
     ]);
 
     const goldenState = await harness.getGoldenState();
 
-    // We should see ROLLING_SUMMARY nodes injected into the graph, proving the async pipeline ran in the background
+    // We should see MOCKED_DISTILLED_NODE replacing older bloated messages, while recent messages are untouched.
+    expect(goldenState).toMatchSnapshot();
+  });
+
+  it('Scenario 4: Async-Driven Background GC via State Snapshots', async () => {
+    // Mathematical Token Budgeting:
+    // 200 chars ≈ 50 tokens.
+    // 1 Turn (User + Model + Overhead) ≈ 50 + 50 + 20 = 120 Tokens.
+    const customProfile: ContextProfile = {
+      ...stressTestProfile,
+      config: {
+        ...stressTestProfile.config,
+        // Retain 3 Turns (~360 tokens). Max 5 Turns (~600 tokens).
+        budget: { maxTokens: 600, retainedTokens: 360 },
+      },
+    };
+
+    const harness = await SimulationHarness.create(
+      customProfile,
+      mockLlmClient,
+    );
+
+    const createMessage = (index: number) =>
+      `Msg ${index} `.repeat(25).padEnd(200, '.');
+
+    // Turn 0 (~120 tokens) Total: 120
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: createMessage(0) }] },
+      { role: 'model', parts: [{ text: createMessage(1) }] },
+    ]);
+
+    // Turn 1 (~120 tokens) Total: 240
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: createMessage(2) }] },
+      { role: 'model', parts: [{ text: createMessage(3) }] },
+    ]);
+
+    // Turn 2 (~120 tokens) Total: 360 (At retainedTokens boundary)
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: createMessage(4) }] },
+      { role: 'model', parts: [{ text: createMessage(5) }] },
+    ]);
+
+    // Turn 3 (~120 tokens) Total: 480 (Exceeds retainedTokens! Triggers GC on Turn 0 & 1)
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: createMessage(6) }] },
+      { role: 'model', parts: [{ text: createMessage(7) }] },
+    ]);
+
+    // Give the async background snapshot pipeline time to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Turn 4 (~120 tokens).
+    // If GC succeeded, Turn 0 and 1 are now a ~10 token snapshot.
+    // Total should be: 10 (Snapshot) + 120 (Turn 2) + 120 (Turn 3) + 120 (Turn 4) = ~370 tokens.
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: createMessage(8) }] },
+      { role: 'model', parts: [{ text: createMessage(9) }] },
+    ]);
+
+    const goldenState = await harness.getGoldenState();
+
+    // We should see a MOCKED_STATE_SNAPSHOT_SUMMARY rolling up Turns 0 and 1,
+    // while Turns 2, 3, and 4 remain fully intact.
     expect(goldenState).toMatchSnapshot();
   });
 });
