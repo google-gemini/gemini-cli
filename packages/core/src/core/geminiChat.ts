@@ -1027,6 +1027,7 @@ export class GeminiChat {
             hasToolCall = true;
           }
 
+          let localFunctionCallCounter = 0;
           modelResponseParts.push(
             ...content.parts
               .filter((part) => !part.thought)
@@ -1034,15 +1035,14 @@ export class GeminiChat {
                 if (!this.context.config.isContextManagementEnabled()) {
                   return part;
                 }
-                const localIndex = chunk.functionCalls?.findIndex(
-                  (fc) => fc.name === part.functionCall?.name,
-                );
+                let callIndex: number | undefined;
+                if (part.functionCall) {
+                  callIndex =
+                    currentChunkStartCounter + localFunctionCallCounter++;
+                }
                 return {
                   ...part,
-                  callIndex:
-                    localIndex !== undefined && localIndex !== -1
-                      ? currentChunkStartCounter + localIndex
-                      : undefined,
+                  callIndex,
                 };
               }),
           );
