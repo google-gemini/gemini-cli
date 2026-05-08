@@ -17,6 +17,7 @@ import {
   resolveToRealPath,
   makeRelative,
   deduplicateAbsolutePaths,
+  toAbsolutePath,
   toPathKey,
 } from './paths.js';
 
@@ -647,6 +648,40 @@ describe('makeRelative', () => {
       const root = 'C:\\Users\\test\\project\\src';
       const target = 'C:\\Users\\test\\project\\docs\\readme.md';
       expect(makeRelative(target, root)).toBe('..\\docs\\readme.md');
+    });
+  });
+});
+
+describe('toAbsolutePath', () => {
+  it('should resolve a relative path to an absolute path', () => {
+    const result = toAbsolutePath('some/relative/path');
+    expect(result).toMatch(/^\/|^[A-Za-z]:\//);
+  });
+
+  it('should convert all backslashes to forward slashes', () => {
+    const result = toAbsolutePath(path.resolve('some', 'path'));
+    expect(result).not.toContain('\\');
+  });
+
+  describe.skipIf(process.platform !== 'darwin')(
+    'on Darwin (case-preserving)',
+    () => {
+      beforeEach(() => mockPlatform('darwin'));
+      afterEach(() => vi.unstubAllGlobals());
+
+      it('should preserve the original casing of every segment', () => {
+        const result = toAbsolutePath('/Users/Sandy/Memory/MEMORY.md');
+        expect(result).toBe('/Users/Sandy/Memory/MEMORY.md');
+      });
+    },
+  );
+
+  describe.skipIf(
+    process.platform === 'win32' || process.platform === 'darwin',
+  )('on Linux', () => {
+    it('should preserve case', () => {
+      const result = toAbsolutePath('/usr/Local/Bin');
+      expect(result).toBe('/usr/Local/Bin');
     });
   });
 });
