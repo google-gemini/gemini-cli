@@ -54,6 +54,7 @@ export class GcpMetricExporter extends MetricExporter {
         // expected when the CLI shuts down quickly after a periodic export.
         const errorMessage = result.error.message || String(result.error);
         if (
+          process.env['GEMINI_CI_TELEMETRY_WORKAROUNDS'] === 'true' &&
           errorMessage.includes(
             'written more frequently than the maximum sampling period',
           )
@@ -115,20 +116,37 @@ export class GcpLogExporter implements LogRecordExporter {
           ...log.resource?.attributes,
           message: log.body,
         };
-        let safePayload = truncateLogPayload(rawPayload, 10000);
+        const isCiWorkaround =
+          process.env['GEMINI_CI_TELEMETRY_WORKAROUNDS'] === 'true';
+        const limitThreshold = isCiWorkaround ? 100000 : 240000;
+
+        let safePayload = truncateLogPayload(
+          rawPayload,
+          isCiWorkaround ? 10000 : 100000,
+        );
         let payloadString = JSON.stringify(safePayload);
 
-        if (payloadString && payloadString.length > 100000) {
+        if (payloadString && payloadString.length > limitThreshold) {
           // If still too large, apply a stricter limit
-          safePayload = truncateLogPayload(rawPayload, 2000);
+          safePayload = truncateLogPayload(
+            rawPayload,
+            isCiWorkaround ? 2000 : 30000,
+          );
           payloadString = JSON.stringify(safePayload);
 
-          if (payloadString && payloadString.length > 100000) {
-            // Fallback: strip structure and send a truncated raw string
-            safePayload = {
-              _warning: 'Payload heavily truncated due to 256KB limit',
-              data: payloadString.substring(0, 50000) + '... (truncated)',
-            };
+          if (payloadString && payloadString.length > limitThreshold) {
+            safePayload = truncateLogPayload(rawPayload, 5000);
+            payloadString = JSON.stringify(safePayload);
+
+            if (payloadString && payloadString.length > limitThreshold) {
+              // Fallback: strip structure and send a truncated raw string
+              safePayload = {
+                _warning: 'Payload heavily truncated due to GCP 256KB limit',
+                data:
+                  payloadString.substring(0, isCiWorkaround ? 50000 : 100000) +
+                  '... (truncated)',
+              };
+            }
           }
         }
 
