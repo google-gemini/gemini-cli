@@ -1,7 +1,8 @@
 # Release extensions
 
 Release Gemini CLI extensions to your users through a Git repository or GitHub
-Releases.
+Releases. This guide explains how to share your work, list it in the gallery,
+and manage updates.
 
 Git repository releases are the simplest approach and offer the most flexibility
 for managing development branches. GitHub Releases are more efficient for
@@ -153,29 +154,62 @@ jobs:
             release/win32.arm64.my-tool.zip
 ```
 
-## Migrating an Extension Repository
+## Migrate an extension repository
 
-If you need to move your extension to a new repository (for example, from a
-personal account to an organization) or rename it, you can use the `migratedTo`
-property in your `gemini-extension.json` file to seamlessly transition your
+If you move your extension to a new repository or rename it, use the
+`migratedTo` property in `gemini-extension.json` to seamlessly transition your
 users.
 
-1. **Create the new repository**: Setup your extension in its new location.
-2. **Update the old repository**: In your original repository, update the
-   `gemini-extension.json` file to include the `migratedTo` property, pointing
-   to the new repository URL, and bump the version number. You can optionally
-   change the `name` of your extension at this time in the new repository.
-   ```json
-   {
-     "name": "my-extension",
-     "version": "1.1.0",
-     "migratedTo": "https://github.com/new-owner/new-extension-repo"
-   }
-   ```
-3. **Release the update**: Publish this new version in your old repository.
+1.  **Create the new repository:** Set up your extension in its new location.
+2.  **Update the old repository:** In your original repository, update the
+    `gemini-extension.json` file to include the `migratedTo` property pointing
+    to the new repository URL, and increment the version number.
+    ```json
+    {
+      "name": "my-extension",
+      "version": "1.1.0",
+      "migratedTo": "https://github.com/new-owner/new-extension-repo"
+    }
+    ```
+3.  **Release the update:** Publish this new version in your old repository.
 
-When users check for updates, Gemini CLI will detect the `migratedTo` field,
-verify that the new repository contains a valid extension update, and
-automatically update their local installation to track the new source and name
-moving forward. All extension settings will automatically migrate to the new
-installation.
+When users check for updates, Gemini CLI detects the `migratedTo` field,
+verifies the new repository, and automatically updates their local installation
+to track the new source. All settings migrate automatically.
+
+## How updates work
+
+Gemini CLI automatically checks for extension updates based on the installation
+method. Understanding these mechanisms helps you ensure your users always have
+the latest version.
+
+### Sync manifest and tags
+
+For GitHub releases, always ensure the `version` in `gemini-extension.json`
+matches your GitHub release tag. While the CLI uses tags for update detection,
+it displays the manifest version in the UI. Keeping them in sync prevents
+confusion.
+
+### Update mechanisms
+
+<details>
+<summary>Technical update details</summary>
+
+The CLI uses different strategies depending on the installation type:
+
+- **GitHub releases:** The CLI queries the GitHub API for the latest release
+  tag. It ignores the `version` field in the manifest for detection.
+- **Git clones:** The CLI runs `git ls-remote` to compare the latest remote
+  commit hash with your local `HEAD`.
+- **Local extensions:** The CLI compares the `version` field in the source
+  directory's manifest with the installed version.
+
+To verify an extension's installation type, inspect the `type` field in the
+metadata file at `~/.gemini/extensions/<name>/.gemini-extension-install.json`.
+
+</details>
+
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> The `migratedTo` flow requires at least one release on the new repository for
+> the CLI to recognize it as a valid update source.
