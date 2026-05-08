@@ -531,12 +531,18 @@ export class ShellExecutionService {
         cwd: finalCwd,
       } = prepared;
 
+      // Bun's child_process does not properly call setsid() for detached
+      // processes, leaving children in the parent's session without a
+      // controlling terminal. They receive SIGHUP immediately. Disable
+      // detached mode in Bun; killProcessGroup already falls back to
+      // direct-pid kill when the group kill fails.
+      const isBun = 'bun' in process.versions;
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
-        detached: !isWindows,
+        detached: !isWindows && !isBun,
         env: finalEnv,
       });
 
@@ -772,7 +778,7 @@ export class ShellExecutionService {
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-      child.on('exit', (code, signal) => {
+      child.on('close', (code, signal) => {
         handleExit(code, signal);
       });
 

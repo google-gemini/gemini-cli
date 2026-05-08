@@ -55,6 +55,8 @@ export async function start_sandbox(
   });
   patcher.patch();
 
+  let stopProxy: (() => void) | undefined = undefined;
+
   try {
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
@@ -188,17 +190,18 @@ export async function start_sandbox(
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
-        const stopProxy = () => {
+        stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
-            process.kill(-proxyProcess.pid, 'SIGTERM');
+            try {
+              process.kill(-proxyProcess.pid, 'SIGTERM');
+            } catch {
+              // ignore
+            }
           }
         };
-        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -490,27 +493,18 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus random suffix to avoid conflicts
+    // Use a random suffix instead of probing existing containers so concurrent
+    // CLI starts cannot race on the same sequential name.
     const imageName = parseImageName(image);
     const isIntegrationTest =
       process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
-    let containerName;
-    if (isIntegrationTest) {
-      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
-        'hex',
-      )}`;
-      debugLogger.log(`ContainerName: ${containerName}`);
-    } else {
-      let index = 0;
-      const containerNameCheck = (
-        await execAsync(`${command} ps -a --format "{{.Names}}"`)
-      ).stdout.trim();
-      while (containerNameCheck.includes(`${imageName}-${index}`)) {
-        index++;
-      }
-      containerName = `${imageName}-${index}`;
-      debugLogger.log(`ContainerName (regular): ${containerName}`);
-    }
+    const containerNamePrefix = isIntegrationTest
+      ? 'gemini-cli-integration-test'
+      : imageName;
+    const containerName = `${containerNamePrefix}-${randomBytes(6).toString(
+      'hex',
+    )}`;
+    debugLogger.log(`ContainerName: ${containerName}`);
     args.push('--name', containerName, '--hostname', containerName);
 
     // copy GEMINI_CLI_TEST_VAR for integration tests
@@ -746,15 +740,18 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      const stopProxy = () => {
+      stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
+            stdio: 'ignore',
+          });
+        } catch {
+          // ignore
+        }
       };
-      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
@@ -806,6 +803,12 @@ export async function start_sandbox(
       });
     });
   } finally {
+    if (stopProxy) {
+      stopProxy();
+      process.off('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
+    }
     patcher.cleanup();
   }
 }

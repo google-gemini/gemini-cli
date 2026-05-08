@@ -22,6 +22,7 @@ import {
   type ToolResultDisplay,
   type PolicyUpdateOptions,
   type ExecuteOptions,
+  type FileDiff,
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -58,6 +59,7 @@ import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -430,6 +432,12 @@ export function isEditToolParams(args: unknown): args is EditToolParams {
   );
 }
 
+function fileDiffToSummary(diff: FileDiff, editData: CalculatedEdit) {
+  return diff.diffStat
+    ? `${diff.diffStat.model_added_lines} added, ${diff.diffStat.model_removed_lines} removed`
+    : `${editData.occurrences} replacements`;
+}
+
 interface CalculatedEdit {
   currentContent: string | null;
   newContent: string;
@@ -465,11 +473,21 @@ class EditToolInvocation
       () => this.config.getApprovalMode(),
     );
     if (this.config.isPlanMode()) {
-      const safeFilename = path.basename(this.params.file_path);
-      this.resolvedPath = path.join(
-        this.config.storage.getPlansDir(),
-        safeFilename,
-      );
+      try {
+        this.resolvedPath = resolveAndValidatePlanPath(
+          this.params.file_path,
+          this.config.storage.getPlansDir(),
+          this.config.getProjectRoot(),
+        );
+      } catch (e) {
+        debugLogger.error(
+          'Failed to resolve plan path during EditTool invocation setup',
+          e,
+        );
+        // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
+        // It's safer to store it so validation in execute() or getConfirmationDetails() catches it.
+        this.resolvedPath = this.params.file_path;
+      }
     } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
@@ -984,8 +1002,24 @@ ${snippet}`);
         llmContent = appendJitContext(llmContent, jitContext);
       }
 
+      const resultSummary =
+        typeof displayResult === 'string'
+          ? displayResult
+          : fileDiffToSummary(displayResult, editData);
+
       return {
         llmContent,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary,
+          result: {
+            type: 'diff',
+            path: this.resolvedPath,
+            beforeText: editData.currentContent ?? '',
+            afterText: editData.newContent,
+          },
+        },
         returnDisplay: displayResult,
       };
     } catch (error) {
@@ -1054,7 +1088,17 @@ export class EditTool
     }
 
     let resolvedPath: string;
-    if (!path.isAbsolute(params.file_path)) {
+    if (this.config.isPlanMode()) {
+      try {
+        resolvedPath = resolveAndValidatePlanPath(
+          params.file_path,
+          this.config.storage.getPlansDir(),
+          this.config.getProjectRoot(),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    } else if (!path.isAbsolute(params.file_path)) {
       const result = correctPath(params.file_path, this.config);
       if (result.success) {
         resolvedPath = result.correctedPath;

@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.40.0-nightly.20260414.g5b1f7375a",
+  "version": "0.42.0-nightly.20260428.g59b2dea0e",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -20,8 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist",
-    "vendor"
+    "dist"
   ],
   "dependencies": {
     "@a2a-js/sdk": "0.3.11",
@@ -56,6 +55,8 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
+    "chokidar": "^5.0.0",
+    "command-exists": "^1.2.9",
     "diff": "^8.0.3",
     "dotenv": "^17.2.4",
     "dotenv-expand": "^12.0.3",

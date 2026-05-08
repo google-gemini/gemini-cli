@@ -31,6 +31,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
+export const PROJECT_MEMORY_INDEX_FILENAME = 'MEMORY.md';
 
 // This variable will hold the currently configured filename for GEMINI.md context files.
 // It defaults to DEFAULT_CONTEXT_FILENAME but can be overridden by setGeminiMdFilename.
@@ -71,8 +72,11 @@ export function getGlobalMemoryFilePath(): string {
   return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
 }
 
-export function getProjectMemoryFilePath(storage: Storage): string {
-  return path.join(storage.getProjectMemoryDir(), getCurrentGeminiMdFilename());
+export function getProjectMemoryIndexFilePath(storage: Storage): string {
+  return path.join(
+    storage.getProjectMemoryDir(),
+    PROJECT_MEMORY_INDEX_FILENAME,
+  );
 }
 
 /**
@@ -101,13 +105,25 @@ async function readMemoryFileContent(filePath: string): Promise<string> {
   }
 }
 
-/**
- * Computes the new content that would result from adding a memory entry
- */
-function computeNewContent(currentContent: string, fact: string): string {
-  // Sanitize to prevent markdown injection by collapsing to a single line.
+function sanitizeFact(fact: string): string {
+  // Sanitize to prevent markdown injection by collapsing to a single line, and
+  // collapse XML angle brackets so a persisted fact cannot break out of the
+  // `<user_project_memory>` / `<global_context>` / `<project_context>` style
+  // context tags that `renderUserMemory` wraps memory content in. Without this
+  // a malicious fact like `</user_project_memory>... new instructions ...` would
+  // survive sanitization, hit disk, and inject prompt content on every future
+  // session that loads the memory file.
   let processedText = fact.replace(/[\r\n]/g, ' ').trim();
   processedText = processedText.replace(/^(-+\s*)+/, '').trim();
+  processedText = processedText.replace(/[<>]/g, ' ');
+  return processedText;
+}
+
+function computeGlobalMemoryContent(
+  currentContent: string,
+  fact: string,
+): string {
+  const processedText = sanitizeFact(fact);
   const newMemoryItem = `- ${processedText}`;
 
   const headerIndex = currentContent.indexOf(MEMORY_SECTION_HEADER);
@@ -146,6 +162,36 @@ function computeNewContent(currentContent: string, fact: string): string {
   }
 }
 
+function computeProjectMemoryContent(
+  currentContent: string,
+  fact: string,
+): string {
+  const processedText = sanitizeFact(fact);
+  const newMemoryItem = `- ${processedText}`;
+
+  if (currentContent.length === 0) {
+    return `${newMemoryItem}\n`;
+  }
+  if (currentContent.endsWith('\n') || currentContent.endsWith('\r\n')) {
+    return `${currentContent}${newMemoryItem}\n`;
+  }
+  return `${currentContent}\n${newMemoryItem}\n`;
+}
+
+/**
+ * Computes the new content that would result from adding a memory entry.
+ */
+function computeNewContent(
+  currentContent: string,
+  fact: string,
+  scope?: 'global' | 'project',
+): string {
+  if (scope === 'project') {
+    return computeProjectMemoryContent(currentContent, fact);
+  }
+  return computeGlobalMemoryContent(currentContent, fact);
+}
+
 class MemoryToolInvocation extends BaseToolInvocation<
   SaveMemoryParams,
   ToolResult
@@ -167,7 +213,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
   private getMemoryFilePath(): string {
     if (this.params.scope === 'project' && this.storage) {
-      return getProjectMemoryFilePath(this.storage);
+      return getProjectMemoryIndexFilePath(this.storage);
     }
     return getGlobalMemoryFilePath();
   }
@@ -195,7 +241,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     const contentForDiff =
       modified_by_user && modified_content !== undefined
         ? modified_content
-        : computeNewContent(currentContent, fact);
+        : computeNewContent(currentContent, fact, this.params.scope);
 
     this.proposedNewContent = contentForDiff;
 
@@ -237,7 +283,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
       // Sanitize the fact for use in the success message, matching the sanitization
       // that happened inside computeNewContent.
-      const sanitizedFact = fact.replace(/[\r\n]/g, ' ').trim();
+      const sanitizedFact = sanitizeFact(fact);
 
       if (modified_by_user && modified_content !== undefined) {
         // User modified the content, so that is the source of truth.
@@ -251,7 +297,11 @@ class MemoryToolInvocation extends BaseToolInvocation<
           // As a fallback, we recompute the content now. This is safe because
           // computeNewContent sanitizes the input.
           const currentContent = await readMemoryFileContent(memoryFilePath);
-          this.proposedNewContent = computeNewContent(currentContent, fact);
+          this.proposedNewContent = computeNewContent(
+            currentContent,
+            fact,
+            this.params.scope,
+          );
         }
         contentToWrite = this.proposedNewContent;
         successMessage = `Okay, I've remembered that: "${sanitizedFact}"`;
@@ -310,7 +360,7 @@ export class MemoryTool
 
   private resolveMemoryFilePath(params: SaveMemoryParams): string {
     if (params.scope === 'project' && this.storage) {
-      return getProjectMemoryFilePath(this.storage);
+      return getProjectMemoryIndexFilePath(this.storage);
     }
     return getGlobalMemoryFilePath();
   }
@@ -362,7 +412,7 @@ export class MemoryTool
         // that the confirmation diff would show.
         return modified_by_user && modified_content !== undefined
           ? modified_content
-          : computeNewContent(currentContent, fact);
+          : computeNewContent(currentContent, fact, params.scope);
       },
       createUpdatedParams: (
         _oldContent: string,
