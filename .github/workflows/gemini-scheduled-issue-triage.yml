@@ -306,7 +306,7 @@ jobs:
           echo '🧹 Finding issues that have both bot-triaged and need-triage labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
             --search 'is:open is:issue label:status/bot-triaged label:status/need-triage' --limit 50 --json number > issues_to_cleanup.json
-            
+
       - name: 'Clean Up Triage Labels'
         if: |-
           always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
