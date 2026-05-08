@@ -581,6 +581,33 @@ describe('handleAtCommand', () => {
       expect(result.processedQuery).toEqual([{ text: query }]);
       expect(result.shouldProceed).toBe(true);
     });
+
+    it('should emit debug messages in @path order while resolving in parallel', async () => {
+      const missingPathName = 'missing.txt';
+      const query = `@${missingPathName} @`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 301,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+      expect(mockOnDebugMessage).toHaveBeenNthCalledWith(
+        1,
+        `Glob tool not found. Path ${missingPathName} will be skipped.`,
+      );
+      expect(mockOnDebugMessage).toHaveBeenNthCalledWith(
+        2,
+        'Lone @ detected, will be treated as text in the modified query.',
+      );
+    });
   });
 
   describe('gemini-ignore filtering', () => {
