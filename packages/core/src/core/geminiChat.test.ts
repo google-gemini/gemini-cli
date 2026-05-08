@@ -551,6 +551,112 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts![1].functionCall).toBeDefined();
       expect(modelTurn.parts![2].text).toBe('This is the second part.');
     });
+    it('repro: should not overwrite parallel tool calls when they arrive in separate streaming chunks', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      // 1. Mock the API to return parallel tool calls in separate chunks.
+      const parallelCallsStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_A' } }],
+              },
+            },
+          ],
+          functionCalls: [{ name: 'tool_A' }],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_B' } }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [{ name: 'tool_B' }],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        parallelCallsStream,
+      );
+
+      // 2. Action: Send a message and consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test parallel tools',
+        'prompt-parallel-tools',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume
+      }
+
+      // 3. Assert: Check that the final history contains both function calls.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1];
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn.parts?.length).toBe(2);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('tool_A');
+      expect(modelTurn.parts![1].functionCall?.name).toBe('tool_B');
+    });
+    it('repro: should not collide when multiple tool calls with the same name arrive in the same chunk', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      const sameNameStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { functionCall: { name: 'tool_X', args: { id: 1 } } },
+                  { functionCall: { name: 'tool_X', args: { id: 2 } } },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [
+            { name: 'tool_X', args: { id: 1 } },
+            { name: 'tool_X', args: { id: 2 } },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        sameNameStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test same name tools',
+        'prompt-same-name',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording
+      }
+
+      const history = chat.getHistory();
+      const modelTurn = history[1];
+      expect(modelTurn.parts?.length).toBe(2);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('tool_X');
+      expect(modelTurn.parts![0].functionCall?.args).toEqual({ id: 1 });
+      expect(modelTurn.parts![1].functionCall?.name).toBe('tool_X');
+      expect(modelTurn.parts![1].functionCall?.args).toEqual({ id: 2 });
+
+      // If findIndex was used, both would likely point to index 0, and the second one might overwrite the first if consolidated incorrectly,
+      // or they both might end up with the same callIndex and thus the same args in final assembly.
+    });
     it('should preserve text parts that stream in the same chunk as a thought', async () => {
       // 1. Mock the API to return a single chunk containing both a thought and visible text.
       const mixedContentStream = (async function* () {
