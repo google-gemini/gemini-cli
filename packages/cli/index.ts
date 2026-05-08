@@ -81,9 +81,9 @@ async function run() {
   // Disable it automatically when running on Alpine.
   if (
     process.platform === 'linux' &&
-    (await import('node:fs')).existsSync('/etc/alpine-release') &&
     !process.env['GEMINI_CLI_NO_RELAUNCH'] &&
-    !process.env['GEMINI_CLI_FORCE_RELAUNCH']
+    !process.env['GEMINI_CLI_FORCE_RELAUNCH'] &&
+    (await import('node:fs')).existsSync('/etc/alpine-release')
   ) {
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
   }
