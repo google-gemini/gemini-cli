@@ -23,6 +23,7 @@ import {
   handleAutoUpdate,
   setUpdateHandler,
   isUpdateInProgress,
+  isAutoUpdateEnabled,
   waitForUpdateCompletion,
   _setUpdateStateForTesting,
 } from './handleAutoUpdate.js';
@@ -408,6 +409,116 @@ describe('handleAutoUpdate', () => {
       message: `${mockUpdateInfo.message}\nAutomatic update is not available in sandbox mode.`,
     });
     expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('should not update when GEMINI_CLI_ENABLE_AUTO_UPDATE=false even if setting is true', () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', 'false');
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'Please update manually.',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
+      message: 'An update is available!\nPlease update manually.',
+      isUpdating: false,
+    });
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('should update when GEMINI_CLI_ENABLE_AUTO_UPDATE=true even if setting is false', () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', 'true');
+    mockSettings.merged.general.enableAutoUpdate = false;
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'This is an additional message.',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('should fall back to setting when GEMINI_CLI_ENABLE_AUTO_UPDATE is unrecognized', () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', 'maybe');
+    mockSettings.merged.general.enableAutoUpdate = false;
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'Please update manually.',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('isAutoUpdateEnabled', () => {
+  let mockSettings: LoadedSettings;
+  let originalEnv: string | undefined;
+
+  beforeEach(() => {
+    originalEnv = process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
+    delete process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
+    mockSettings = {
+      merged: {
+        general: {
+          enableAutoUpdate: true,
+        },
+      },
+    } as LoadedSettings;
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
+    } else {
+      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = originalEnv;
+    }
+  });
+
+  it.each(['true', 'TRUE', '1', '  true  '])(
+    'returns true when env var is %s',
+    (value) => {
+      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = value;
+      mockSettings.merged.general.enableAutoUpdate = false;
+      expect(isAutoUpdateEnabled(mockSettings)).toBe(true);
+    },
+  );
+
+  it.each(['false', 'FALSE', '0'])(
+    'returns false when env var is %s',
+    (value) => {
+      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = value;
+      mockSettings.merged.general.enableAutoUpdate = true;
+      expect(isAutoUpdateEnabled(mockSettings)).toBe(false);
+    },
+  );
+
+  it('falls back to setting when env var has an unrecognized value', () => {
+    process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = 'yes';
+    mockSettings.merged.general.enableAutoUpdate = false;
+    expect(isAutoUpdateEnabled(mockSettings)).toBe(false);
+  });
+
+  it('falls back to setting when env var is unset', () => {
+    mockSettings.merged.general.enableAutoUpdate = false;
+    expect(isAutoUpdateEnabled(mockSettings)).toBe(false);
+  });
+
+  it('defaults to true when env var is unset and setting is missing', () => {
+    delete (mockSettings.merged.general as { enableAutoUpdate?: boolean })
+      .enableAutoUpdate;
+    expect(isAutoUpdateEnabled(mockSettings)).toBe(true);
   });
 });
 
