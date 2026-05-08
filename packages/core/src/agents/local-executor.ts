@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
   type Content,
@@ -61,6 +62,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { LRUCache } from 'mnemonist';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -76,12 +78,15 @@ import {
 import type { InjectionSource } from '../config/injectionService.js';
 import {
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
 import {
   COMPLETE_TASK_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
 
 /** A callback function to report on agent activity. */
@@ -123,6 +128,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+  private cache: LRUCache<string, string>;
 
   private get executionContext(): AgentLoopContext {
     return {
@@ -186,6 +192,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Check if the tool is an agent tool to prevent recursion.
       // We do not allow agents to call other agents.
       if (tool.kind === Kind.Agent) {
+        return;
+      }
+
+      if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
         return;
       }
 
@@ -303,6 +313,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.cache = new LRUCache<string, string>(10);
 
     this.agentId = Math.random().toString(36).slice(2, 8);
   }
@@ -523,21 +534,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
-    // If the agent definition declares additional workspace directories,
-    // wrap execution in a scoped workspace context. All calls to
-    // Config.getWorkspaceContext() within this scope will see the extended
-    // directories, without mutating the shared Config.
-    const dirs = this.definition.workspaceDirectories;
-    if (dirs && dirs.length > 0) {
-      const scopedCtx = createScopedWorkspaceContext(
-        this.context.config.getWorkspaceContext(),
-        dirs,
-      );
-      return runWithScopedWorkspaceContext(scopedCtx, () =>
-        this.runInternal(inputs, signal),
-      );
+    const runWithWorkspaceScope = () => {
+      // If the agent definition declares additional workspace directories,
+      // wrap execution in a scoped workspace context. All calls to
+      // Config.getWorkspaceContext() within this scope will see the extended
+      // directories, without mutating the shared Config.
+      const dirs = this.definition.workspaceDirectories;
+      if (dirs && dirs.length > 0) {
+        const scopedCtx = createScopedWorkspaceContext(
+          this.context.config.getWorkspaceContext(),
+          dirs,
+        );
+        return runWithScopedWorkspaceContext(scopedCtx, () =>
+          this.runInternal(inputs, signal),
+        );
+      }
+      return this.runInternal(inputs, signal);
+    };
+
+    const runWithInboxScope = () =>
+      this.definition.memoryInboxAccess
+        ? runWithScopedMemoryInboxAccess(runWithWorkspaceScope)
+        : runWithWorkspaceScope();
+
+    if (this.definition.autoMemoryExtractionWriteAccess) {
+      return runWithScopedAutoMemoryExtractionWriteAccess(runWithInboxScope);
     }
-    return this.runInternal(inputs, signal);
+
+    return runWithInboxScope();
   }
 
   private async runInternal(
@@ -774,6 +798,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -781,6 +807,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        duration_ms: Date.now() - startTime,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -821,6 +849,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              duration_ms: Date.now() - startTime,
             };
           }
         }
@@ -835,6 +865,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -920,26 +952,28 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       });
     const requestedModel = resolvedConfig.model;
 
-    let modelToUse: string;
+    let modelToUse: string | undefined;
     if (isAutoModel(requestedModel)) {
-      // TODO(joshualitt): This try / catch is inconsistent with the routing
-      // behavior for the main agent. Ideally, we would have a universal
-      // policy for routing failure. Given routing failure does not necessarily
-      // mean generation will fail, we may want to share this logic with
-      // other places we use model routing.
-      try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: message.parts || [],
-          signal,
-          requestedModel,
-        };
-        const router = this.context.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      } catch (error) {
-        debugLogger.warn(`Error during model routing: ${error}`);
-        modelToUse = DEFAULT_GEMINI_MODEL;
+      modelToUse = this.cache.get('modelToUse');
+
+      // If not cached, fetch from the router and cache the result.
+      if (!modelToUse) {
+        try {
+          const routingContext: RoutingContext = {
+            history: chat.getHistory(/*curated=*/ true),
+            request: message.parts || [],
+            signal,
+            requestedModel,
+          };
+          const router = this.context.config.getModelRouterService();
+          const decision = await router.route(routingContext);
+          modelToUse = decision.model;
+        } catch (error) {
+          debugLogger.warn(`Error during model routing: ${error}`);
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
+        // Cache the result regardless of whether it succeeded or fell back
+        this.cache.set('modelToUse', modelToUse);
       }
     } else {
       modelToUse = requestedModel;
@@ -1341,6 +1375,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
+
+    const approvalMode = this.context.config.getApprovalMode();
+    if (approvalMode === ApprovalMode.PLAN) {
+      const plansDir = this.context.config.storage.getPlansDir();
+      finalPrompt += `\n\n# Execution Constraints\nYou are currently operating in Plan Mode. Your write tools are globally restricted to only modifying plan (.md) files in the plans directory: ${plansDir}/. Do not attempt to modify source code directly.`;
+    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `

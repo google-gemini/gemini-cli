@@ -5,13 +5,15 @@
  */
 
 import fs from 'node:fs/promises';
+import { homedir as osHomedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import {
-  homedir,
   getCompatibilityWarnings,
   WarningPriority,
   type StartupWarning,
+  isHeadlessMode,
+  FatalUntrustedWorkspaceError,
 } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
@@ -37,10 +39,10 @@ const homeDirectoryCheck: WarningCheck = {
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
-        fs.realpath(homedir()),
+        fs.realpath(osHomedir()),
       ]);
 
-      if (workspaceRealPath === homeRealPath) {
+      if (path.resolve(workspaceRealPath) === path.resolve(homeRealPath)) {
         // If folder trust is enabled and the user trusts the home directory, don't show the warning.
         if (
           isFolderTrustEnabled(settings) &&
@@ -79,10 +81,36 @@ const rootDirectoryCheck: WarningCheck = {
   },
 };
 
+const folderTrustCheck: WarningCheck = {
+  id: 'folder-trust',
+  priority: WarningPriority.High,
+  check: async (workspaceRoot: string, settings: Settings) => {
+    if (!isFolderTrustEnabled(settings)) {
+      return null;
+    }
+
+    const { isTrusted } = isWorkspaceTrusted(settings, workspaceRoot);
+    if (isTrusted === true) {
+      return null;
+    }
+
+    if (isHeadlessMode()) {
+      throw new FatalUntrustedWorkspaceError(
+        'Gemini CLI is not running in a trusted directory. To proceed, either use `--skip-trust`, ' +
+          'set the `GEMINI_CLI_TRUST_WORKSPACE=true` environment variable, or trust this directory in interactive mode. ' +
+          'For more details, see https://geminicli.com/docs/cli/trusted-folders/#headless-and-automated-environments',
+      );
+    }
+
+    return null;
+  },
+};
+
 // All warning checks
 const WARNING_CHECKS: readonly WarningCheck[] = [
   homeDirectoryCheck,
   rootDirectoryCheck,
+  folderTrustCheck,
 ];
 
 export async function getUserStartupWarnings(

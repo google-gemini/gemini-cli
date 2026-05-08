@@ -24,7 +24,8 @@ Once Gemini CLI is installed, run Gemini CLI from your command line:
 gemini
 ```
 
-For more installation options, see [Gemini CLI Installation](./installation.md).
+For more installation options, see
+[Gemini CLI Installation](./installation.mdx).
 
 ## Authenticate
 
@@ -46,7 +47,7 @@ cases, you can log in with your existing Google account:
 
 Certain account types may require you to configure a Google Cloud project. For
 more information, including other authentication methods, see
-[Gemini CLI Authentication Setup](./authentication.md).
+[Gemini CLI Authentication Setup](./authentication.mdx).
 
 ## Configure
 

@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.39.0-nightly.20260408.e77b22e63",
+  "version": "0.42.0-nightly.20260428.g59b2dea0e",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.39.0-nightly.20260408.e77b22e63"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.42.0-nightly.20260428.g59b2dea0e"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -62,7 +62,7 @@
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -b evals/tsconfig.json integration-tests/tsconfig.json memory-tests/tsconfig.json",
     "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
@@ -81,8 +81,7 @@
     "glob": "^12.0.0",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
-    "cross-spawn": "^7.0.6",
-    "minimatch": "^10.2.2"
+    "cross-spawn": "^7.0.6"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -94,6 +93,7 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "^0.16.1",
+    "read-package-up": "^11.0.0",
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
@@ -137,6 +137,7 @@
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"

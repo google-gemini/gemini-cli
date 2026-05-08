@@ -43,6 +43,8 @@ describe('ApprovalModeStrategy', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getPlanModeRoutingEnabled: vi.fn().mockResolvedValue(true),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig?.()?.authType;

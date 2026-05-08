@@ -76,6 +76,7 @@ vi.mocked(IdeClient.getInstance).mockResolvedValue(
 const fsService = new StandardFileSystemService();
 const mockConfigInternal = {
   getTargetDir: () => rootDir,
+  getProjectRoot: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
@@ -677,6 +678,16 @@ describe('WriteFileTool', () => {
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
       );
+      expect(result.display).toEqual(
+        expect.objectContaining({
+          name: 'WriteFile',
+          resultSummary: expect.stringContaining('added'),
+          result: expect.objectContaining({
+            type: 'diff',
+            afterText: content,
+          }),
+        }),
+      );
       expect(fs.existsSync(filePath)).toBe(true);
       const writtenContent = await fsService.readTextFile(filePath);
       expect(writtenContent).toBe(content);
@@ -1111,6 +1122,28 @@ describe('WriteFileTool', () => {
       expect(result.llmContent).not.toContain(
         'Newly Discovered Project Context',
       );
+    });
+  });
+
+  describe('plan mode path handling', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should correctly resolve nested paths in plan mode', async () => {
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+      // Extend storage mock with getPlansDir
+      mockConfig.storage.getPlansDir = vi.fn().mockReturnValue(plansDir);
+
+      const nestedFilePath = 'conductor/tracks/test.md';
+      const invocation = tool.build({
+        file_path: nestedFilePath,
+        content: 'nested content',
+      });
+
+      await invocation.execute({ abortSignal });
+
+      const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
+      expect(fs.existsSync(expectedWritePath)).toBe(true);
+      expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
     });
   });
 });

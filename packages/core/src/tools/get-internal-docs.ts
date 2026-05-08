@@ -102,8 +102,12 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
       const docsRoot = await getDocsRoot();
 
       if (!this.params.path) {
-        // List all .md files recursively
-        const files = await glob('**/*.md', { cwd: docsRoot, posix: true });
+        // List all .md and .mdx files recursively
+        const files = await glob('**/*.{md,mdx}', {
+          cwd: docsRoot,
+          posix: true,
+        });
+
         files.sort();
 
         const fileList = files.map((f) => `- ${f}`).join('\n');

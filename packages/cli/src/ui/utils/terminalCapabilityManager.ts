@@ -284,30 +284,42 @@ export class TerminalCapabilityManager {
     );
   }
 
-  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
-    if (env['WT_SESSION']) {
-      return false;
-    }
+  isTmux(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['TMUX'];
+  }
 
-    return (
-      this.hasOsc9TerminalSignature(this.getTerminalName()) ||
-      this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
-      this.hasOsc9TerminalSignature(env['TERM'])
+  isScreen(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['STY'];
+  }
+
+  isITerm2(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('iterm') ||
+      env['TERM_PROGRAM']?.toLowerCase().includes('iterm')
     );
   }
 
-  private hasOsc9TerminalSignature(value: string | undefined): boolean {
-    if (!value) {
-      return false;
-    }
-
-    const normalized = value.toLowerCase();
-    return (
-      normalized.includes('wezterm') ||
-      normalized.includes('ghostty') ||
-      normalized.includes('iterm') ||
-      normalized.includes('kitty')
+  isAlacritty(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('alacritty') ||
+      env['ALACRITTY_WINDOW_ID'] ||
+      env['TERM']?.toLowerCase().includes('alacritty')
     );
+  }
+
+  isAppleTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('apple_terminal') ||
+      env['TERM_PROGRAM']?.toLowerCase().includes('apple_terminal')
+    );
+  }
+
+  isVSCodeTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['TERM_PROGRAM']?.toLowerCase().includes('vscode');
+  }
+
+  isWindowsTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['WT_SESSION'];
   }
 }
 

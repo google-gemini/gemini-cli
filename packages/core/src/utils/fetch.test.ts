@@ -209,7 +209,7 @@ describe('fetch utils', () => {
       expect(ProxyAgent).toHaveBeenCalledWith({
         uri: proxyUrl,
         headersTimeout: 45773134,
-        bodyTimeout: 45773134,
+        bodyTimeout: 300000,
       });
       expect(setGlobalDispatcher).toHaveBeenCalled();
     });
