@@ -295,3 +295,25 @@ jobs:
             const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
             await syncIssueTypes({ github, context, core });
 
+      - name: 'Find Triaged Issues to Clean Up'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+        run: |-
+          set -euo pipefail
+          echo '🧹 Finding issues that have both bot-triaged and need-triage labels...'
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue label:status/bot-triaged label:status/need-triage' --limit 100 --json number > issues_to_cleanup.json
+            
+      - name: 'Clean Up Triage Labels'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const cleanupLabels = require('./.github/scripts/cleanup-triage-labels.cjs');
+            await cleanupLabels({ github, context, core });
+
