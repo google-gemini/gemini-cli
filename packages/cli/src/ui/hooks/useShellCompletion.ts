@@ -254,33 +254,30 @@ export async function scanPathExecutables(
     dirs.map(async (dir) => {
       if (signal?.aborted) return [];
       try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
+        const dirHandle = await fs.opendir(dir);
         const validEntries: string[] = [];
 
         // Check executability in parallel (batched per directory)
-        await Promise.all(
-          entries.map(async (entry) => {
-            if (signal?.aborted) return;
-            if (!entry.isFile() && !entry.isSymbolicLink()) return;
+        for await (const entry of dirHandle) {
+          if (signal?.aborted) return;
+          if (!entry.isFile() && !entry.isSymbolicLink()) continue;
 
-            const name = entry.name;
-            if (isWindows) {
-              const ext = path.extname(name).toLowerCase();
-              if (pathExtList.length > 0 && !pathExtList.includes(ext)) return;
-            }
+          const name = entry.name;
+          if (isWindows) {
+            const ext = path.extname(name).toLowerCase();
+            if (pathExtList.length > 0 && !pathExtList.includes(ext)) continue;
+          }
 
-            try {
-              await fs.access(
-                path.join(dir, name),
-                fs.constants.R_OK | fs.constants.X_OK,
-              );
-              validEntries.push(name);
-            } catch {
-              // Not executable — skip
-            }
-          }),
-        );
-
+          try {
+            await fs.access(
+              path.join(dir, name),
+              fs.constants.R_OK | fs.constants.X_OK,
+            );
+            validEntries.push(name);
+          } catch {
+            // Not executable — skip
+          }
+        }
         return validEntries;
       } catch {
         // EACCES, ENOENT, etc. — skip this directory
@@ -349,7 +346,14 @@ export async function resolvePathCompletions(
   let entries: Array<import('node:fs').Dirent>;
   try {
     if (signal?.aborted) return [];
-    entries = await fs.readdir(dirToRead, { withFileTypes: true });
+    const dirHandle = await fs.opendir(dirToRead);
+    entries = [];
+    for await (const entry of dirHandle) {
+      if (signal?.aborted) break;
+      entries.push(entry);
+      // 100(Memory safety)
+      if (entries.length >= MAX_SHELL_SUGGESTIONS) break;
+    }
   } catch {
     // EACCES, ENOENT, etc.
     return [];
