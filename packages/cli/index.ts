@@ -17,16 +17,17 @@ import {
 
 // --- Global Entry Point ---
 
-// Suppress known race condition error in node-pty on Windows
+// Suppress known race condition error in node-pty
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
+// Alpine Linux (musl libc) also triggers this error, not only Windows.
 process.on('uncaughtException', (error) => {
   if (
-    process.platform === 'win32' &&
     error instanceof Error &&
     error.message === 'Cannot resize a pty that has already exited'
   ) {
-    // This error happens on Windows with node-pty when resizing a pty that has just exited.
+    // This error happens with node-pty when resizing a pty that has just exited.
     // It is a race condition in node-pty that we cannot prevent, so we silence it.
+    // Affects Windows and Alpine Linux (musl libc) alike.
     return;
   }
 
@@ -75,6 +76,18 @@ async function getMemoryNodeArgs(): Promise<string[]> {
 }
 
 async function run() {
+  // Alpine Linux (musl libc): the child-process relaunch mechanism fails silently
+  // due to musl's different handling of stdio inheritance and IPC channels.
+  // Disable it automatically when running on Alpine.
+  if (
+    process.platform === 'linux' &&
+    (await import('node:fs')).existsSync('/etc/alpine-release') &&
+    !process.env['GEMINI_CLI_NO_RELAUNCH'] &&
+    !process.env['GEMINI_CLI_FORCE_RELAUNCH']
+  ) {
+    process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+  }
+
   if (!process.env['GEMINI_CLI_NO_RELAUNCH'] && !process.env['SANDBOX']) {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
