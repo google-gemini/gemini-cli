@@ -2279,6 +2279,89 @@ describe('LocalAgentExecutor', () => {
       );
     });
 
+    it('should cache the routing decision across multiple turns', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'auto';
+      definition.runConfig.maxTurns = 3;
+
+      const mockRouter = {
+        route: vi.fn().mockResolvedValue({
+          model: 'routed-model',
+          metadata: { source: 'test', reasoning: 'test' },
+        }),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'auto',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: LS_TOOL_NAME,
+          args: {},
+          id: 'call1',
+        },
+      ]);
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call2',
+        },
+      ]);
+
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: {},
+            prompt_id: 'test-prompt',
+          },
+          response: {
+            resultDisplay: 'ls result',
+            responseParts: [],
+            data: {},
+          },
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
+      );
+      expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
+      );
+    });
+
     it('should NOT use model routing when the agent model is NOT "auto"', async () => {
       const definition = createTestDefinition();
       definition.modelConfig.model = 'concrete-model';
