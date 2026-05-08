@@ -37,10 +37,34 @@ module.exports = async ({ github, context, core }) => {
         try {
           parsedLabels = JSON.parse(jsonArrayMatch[0]);
         } catch (extractError) {
-          core.setFailed(
-            `Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawLabels}`,
+          // It's possible the regex matched from a `[STARTUP]` log all the way to the end
+          // of the JSON array. We need to be more aggressive and find the FIRST `[ { "issue_number"`
+          core.warning(
+            `Strict array match failed: ${extractError.message}. Attempting to clean leading noisy brackets.`,
           );
-          return;
+          const fallbackMatch = rawLabels.match(
+            /(\[\s*\{\s*"issue_number"[\s\S]*)/,
+          );
+          if (fallbackMatch) {
+            try {
+              // We might have grabbed trailing noise too, so we find the last closing bracket
+              const cleaned = fallbackMatch[0].substring(
+                0,
+                fallbackMatch[0].lastIndexOf(']') + 1,
+              );
+              parsedLabels = JSON.parse(cleaned);
+            } catch (fallbackError) {
+              core.setFailed(
+                `Found JSON-like content but failed to parse: ${fallbackError.message}\nRaw output: ${rawLabels}`,
+              );
+              return;
+            }
+          } else {
+            core.setFailed(
+              `Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawLabels}`,
+            );
+            return;
+          }
         }
       } else {
         core.setFailed(
