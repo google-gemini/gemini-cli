@@ -1130,8 +1130,11 @@ export function recordModelRoutingMetrics(
 
   if (event.reasoning) {
     // GCP metric labels have a maximum string size of 1024 characters.
+    // Apply strict truncation only in CI workflows to avoid masking data for normal users.
+    const isStrictTelemetry =
+      process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
     attributes['routing.reasoning'] =
-      event.reasoning.length > 1000
+      isStrictTelemetry && event.reasoning.length > 1000
         ? event.reasoning.substring(0, 1000) + '...'
         : event.reasoning;
   }
@@ -1146,10 +1149,14 @@ export function recordModelRoutingMetrics(
   modelRoutingLatencyHistogram.record(event.routing_latency_ms, attributes);
 
   if (event.failed) {
+    const isStrictTelemetry =
+      process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
     modelRoutingFailureCounter.add(1, {
       ...attributes,
       'routing.error_message':
-        event.error_message && event.error_message.length > 1000
+        isStrictTelemetry &&
+        event.error_message &&
+        event.error_message.length > 1000
           ? event.error_message.substring(0, 1000) + '...'
           : event.error_message,
     });
