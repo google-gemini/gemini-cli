@@ -18,11 +18,15 @@ import {
   createSingleModelChain,
   getModelPolicyChain,
   getFlashLitePolicyChain,
+  getFlash3UtilityChain,
+  getFlash25UtilityChain,
   SILENT_ACTIONS,
 } from './policyCatalog.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
@@ -32,6 +36,20 @@ import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ApprovalMode } from '../policy/types.js';
 
+export interface ResolvePolicyChainOptions {
+  wrapsAround?: boolean;
+  /**
+   * When true, builds a silent downgrade chain suitable for internal background
+   * tasks (utility models). These chains step through Flash → Flash 2.5 →
+   * Flash Lite without user prompts, since utility tasks tolerate lower-tier
+   * models and should never block the interactive UI.
+   *
+   * Derived automatically by `applyModelSelection` from `ModelConfigKey.isChatModel`.
+   * Chat callers MUST set `isChatModel: true`; omitting it is treated as utility.
+   */
+  isUtility?: boolean;
+}
+
 /**
  * Resolves the active policy chain for the given config, ensuring the
  * user-selected active model is represented.
@@ -39,7 +57,7 @@ import { ApprovalMode } from '../policy/types.js';
 export function resolvePolicyChain(
   config: Config,
   preferredModel?: string,
-  wrapsAround: boolean = false,
+  { wrapsAround = false, isUtility = false }: ResolvePolicyChainOptions = {},
 ): ModelPolicyChain {
   const modelFromConfig =
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
@@ -64,6 +82,51 @@ export function resolvePolicyChain(
     ? isAutoModel(preferredModel, config)
     : false;
   const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // Auto mode must always wrap chains so fallback candidates remain available
+  // when the router resolves to a non-primary model (e.g. Flash). Without this,
+  // applyDynamicSlicing reduces the chain to a single element and there is
+  // nowhere to fall back to when that model hits its quota.
+  const shouldWrapAround = wrapsAround || isAutoPreferred || isAutoConfigured;
+
+  // --- UTILITY PATH ---
+  // Internal background tasks (utility models) use a dedicated silent downgrade
+  // chain: Flash3 → Flash2.5 → FlashLite. This avoids blocking the interactive
+  // UI with prompts and provides two quota pool alternatives before giving up.
+  if (isUtility) {
+    if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+      const context = {
+        useGemini3_1: useGemini31,
+        useGemini3_1FlashLite: useGemini31FlashLite,
+        useCustomTools: useCustomToolModel,
+      };
+      const utilityChainKey =
+        resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL
+          ? 'lite'
+          : resolvedModel === PREVIEW_GEMINI_FLASH_MODEL
+            ? 'flash3-utility'
+            : resolvedModel === DEFAULT_GEMINI_FLASH_MODEL
+              ? 'flash25-utility'
+              : undefined;
+      if (utilityChainKey) {
+        return (
+          config.modelConfigService.resolveChain(utilityChainKey, context) ??
+          createSingleModelChain(resolvedModel)
+        );
+      }
+    } else {
+      if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+        return getFlashLitePolicyChain();
+      }
+      if (resolvedModel === PREVIEW_GEMINI_FLASH_MODEL) {
+        return getFlash3UtilityChain();
+      }
+      if (resolvedModel === DEFAULT_GEMINI_FLASH_MODEL) {
+        return getFlash25UtilityChain();
+      }
+    }
+    return createSingleModelChain(resolvedModel);
+  }
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -110,7 +173,7 @@ export function resolvePolicyChain(
       // No matching modelChains found, default to single model chain
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, shouldWrapAround);
   } else {
     // --- LEGACY PATH ---
 
@@ -150,8 +213,9 @@ export function resolvePolicyChain(
     } else {
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, shouldWrapAround);
   }
+
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
     return chain.map((policy) => ({
@@ -252,8 +316,9 @@ export function createAvailabilityContextProvider(
 export function selectModelForAvailability(
   config: Config,
   requestedModel: string,
+  isUtility: boolean = false,
 ): ModelSelectionResult {
-  const chain = resolvePolicyChain(config, requestedModel);
+  const chain = resolvePolicyChain(config, requestedModel, { isUtility });
   const selection = config
     .getModelAvailabilityService()
     .selectFirstAvailable(chain.map((p) => p.model));
@@ -269,6 +334,11 @@ export function selectModelForAvailability(
 /**
  * Applies the model availability selection logic, including side effects
  * (setting active model, consuming sticky attempts) and config updates.
+ *
+ * IMPORTANT: `modelConfigKey.isChatModel` MUST be set to `true` for
+ * interactive chat callers. Any key without `isChatModel: true` is treated
+ * as a utility model and routed through a silent downgrade chain (Flash →
+ * Flash 2.5 → Flash Lite) that never prompts the user.
  */
 export function applyModelSelection(
   config: Config,
@@ -277,7 +347,8 @@ export function applyModelSelection(
 ): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
   const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
   const model = resolved.model;
-  const selection = selectModelForAvailability(config, model);
+  const isUtility = !modelConfigKey.isChatModel;
+  const selection = selectModelForAvailability(config, model, isUtility);
 
   if (!selection) {
     return { model, config: resolved.generateContentConfig };
@@ -302,7 +373,7 @@ export function applyModelSelection(
     config.getModelAvailabilityService().consumeStickyAttempt(finalModel);
   }
 
-  const chain = resolvePolicyChain(config, finalModel);
+  const chain = resolvePolicyChain(config, finalModel, { isUtility });
   const policy = chain.find((p) => p.model === finalModel);
 
   return {

@@ -136,6 +136,69 @@ export function getFlashLitePolicyChain(): ModelPolicyChain {
   return cloneChain(FLASH_LITE_CHAIN);
 }
 
+// Transient errors (network blips) use sticky_retry so a single hiccup does
+// not permanently mark a model terminal for the entire session. maxAttempts=2
+// keeps utility retries brief before stepping to the next model in the chain.
+const UTILITY_TRANSIENT_STATE = {
+  terminal: 'terminal',
+  transient: 'sticky_retry',
+  not_found: 'terminal',
+  unknown: 'terminal',
+} as const;
+
+const FLASH3_UTILITY_CHAIN: ModelPolicyChain = [
+  definePolicy({
+    model: PREVIEW_GEMINI_FLASH_MODEL,
+    maxAttempts: 2,
+    actions: SILENT_ACTIONS,
+    stateTransitions: UTILITY_TRANSIENT_STATE,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_MODEL,
+    maxAttempts: 2,
+    actions: SILENT_ACTIONS,
+    stateTransitions: UTILITY_TRANSIENT_STATE,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    isLastResort: true,
+    actions: SILENT_ACTIONS,
+  }),
+];
+
+const FLASH25_UTILITY_CHAIN: ModelPolicyChain = [
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_MODEL,
+    maxAttempts: 2,
+    actions: SILENT_ACTIONS,
+    stateTransitions: UTILITY_TRANSIENT_STATE,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    isLastResort: true,
+    actions: SILENT_ACTIONS,
+  }),
+];
+
+/**
+ * Returns the policy chain for utility (non-interactive) models that resolve
+ * to Gemini 3 Flash. The chain silently degrades through Flash 2.5 to Flash
+ * Lite without prompting the user, since utility tasks tolerate lower-tier
+ * models better than interactive chat.
+ */
+export function getFlash3UtilityChain(): ModelPolicyChain {
+  return cloneChain(FLASH3_UTILITY_CHAIN);
+}
+
+/**
+ * Returns the policy chain for utility (non-interactive) models that resolve
+ * to Gemini 2.5 Flash (e.g., when the user lacks preview access). The chain
+ * silently degrades to Flash Lite without prompting.
+ */
+export function getFlash25UtilityChain(): ModelPolicyChain {
+  return cloneChain(FLASH25_UTILITY_CHAIN);
+}
+
 /**
  * Provides a default policy scaffold for models not present in the catalog.
  */

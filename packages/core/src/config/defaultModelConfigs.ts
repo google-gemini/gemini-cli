@@ -684,6 +684,90 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     ],
+    'flash3-utility': [
+      {
+        model: 'gemini-3-flash-preview',
+        maxAttempts: 2,
+        actions: {
+          terminal: 'silent',
+          transient: 'silent',
+          not_found: 'silent',
+          unknown: 'silent',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'sticky_retry',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash',
+        maxAttempts: 2,
+        actions: {
+          terminal: 'silent',
+          transient: 'silent',
+          not_found: 'silent',
+          unknown: 'silent',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'sticky_retry',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash-lite',
+        isLastResort: true,
+        actions: {
+          terminal: 'silent',
+          transient: 'silent',
+          not_found: 'silent',
+          unknown: 'silent',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+    ],
+    'flash25-utility': [
+      {
+        model: 'gemini-2.5-flash',
+        maxAttempts: 2,
+        actions: {
+          terminal: 'silent',
+          transient: 'silent',
+          not_found: 'silent',
+          unknown: 'silent',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'sticky_retry',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash-lite',
+        isLastResort: true,
+        actions: {
+          terminal: 'silent',
+          transient: 'silent',
+          not_found: 'silent',
+          unknown: 'silent',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+    ],
     lite: [
       {
         model: 'gemini-2.5-flash-lite',
