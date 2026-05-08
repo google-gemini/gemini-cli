@@ -65,6 +65,45 @@ module.exports = async ({ github, context, core }) => {
         issue_number: issueNumber,
         labels: labelsToAdd,
       });
+
+      try {
+        const hasBug = labelsToAdd.includes('kind/bug');
+        const hasFeature = labelsToAdd.includes('kind/feature') || labelsToAdd.includes('kind/enhancement');
+        
+        let issueTypeId = null;
+        if (hasBug) {
+          issueTypeId = 'IT_kwDOCaSVvs4BR7vP'; // Bug
+        } else if (hasFeature) {
+          issueTypeId = 'IT_kwDOCaSVvs4BR7vQ'; // Feature
+        }
+
+        if (issueTypeId) {
+          const { data: issueData } = await github.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issueNumber,
+          });
+          
+          if (issueData && issueData.node_id) {
+            await github.graphql(`
+              mutation($issueId: ID!, $issueTypeId: ID!) {
+                updateIssue(input: {id: $issueId, issueTypeId: $issueTypeId}) {
+                  issue {
+                    id
+                  }
+                }
+              }
+            `, {
+              issueId: issueData.node_id,
+              issueTypeId: issueTypeId
+            });
+            core.info(`Successfully synced Issue Type for #${issueNumber}`);
+          }
+        }
+      } catch (typeError) {
+        core.warning(`Failed to sync Issue Type for #${issueNumber}: ${typeError.message}`);
+      }
+
       const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
       core.info(
         `Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`
