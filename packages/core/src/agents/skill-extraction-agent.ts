@@ -13,7 +13,6 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
-  SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -21,20 +20,21 @@ import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
 const SkillExtractionSchema = z.object({
   response: z
     .string()
-    .describe('A summary of the skills extracted or updated.'),
+    .describe('A summary of the memories or skills extracted or updated.'),
 });
 
 /**
  * Builds the system prompt for the skill extraction agent.
  */
-function buildSystemPrompt(skillsDir: string): string {
+function buildSystemPrompt(skillsDir: string, memoryDir: string): string {
   return [
-    'You are a Skill Extraction Agent.',
+    'You are an Auto Memory Extraction Agent.',
     '',
-    'Your job: analyze past conversation sessions and extract reusable skills that will help',
-    'future agents work more efficiently. You write SKILL.md files to a specific directory.',
+    'Your job: analyze past conversation sessions and extract durable memory candidates',
+    'and reusable skills that will help future agents work more efficiently.',
     '',
     'The goal is to help future agents:',
+    '- remember durable project facts, preferences, and workflow constraints',
     '- solve similar tasks with fewer tool calls and fewer reasoning tokens',
     '- reuse proven workflows and verification checklists',
     '- avoid known failure modes and landmines',
@@ -48,8 +48,131 @@ function buildSystemPrompt(skillsDir: string): string {
     '- Evidence-based only: do not invent facts or claim verification that did not happen.',
     '- Redact secrets: never store tokens/keys/passwords; replace with [REDACTED].',
     '- Do not copy large tool outputs. Prefer compact summaries + exact error snippets.',
-    `  Write all files under this directory ONLY: ${skillsDir}`,
-    '  NEVER write files outside this directory. You may read session files from the paths provided in the index.',
+    `- Write all files under this memory work directory ONLY: ${memoryDir}`,
+    `- Reusable skill candidates go under: ${skillsDir}`,
+    `- Reviewable memory candidates go under: ${memoryDir}/.inbox`,
+    '  NEVER write files outside the memory work directory. You may read session files from the paths provided in the index.',
+    '',
+    '============================================================',
+    'MEMORY OUTPUTS',
+    '============================================================',
+    '',
+    'ALL memory updates are expressed as unified diff `.patch` files. There is',
+    `EXACTLY ONE canonical patch file per kind: ${memoryDir}/.inbox/<kind>/extraction.patch`,
+    'where <kind> is one of:',
+    '- private  -> targets must live under the project memory directory',
+    `             (${memoryDir}). Use this for project-scoped private memory.`,
+    '- global   -> the target MUST be exactly the single global personal memory',
+    '             file ~/.gemini/GEMINI.md. No other files in ~/.gemini/ are',
+    '             writeable; sibling .md files do not exist for the global tier.',
+    '',
+    'IMPORTANT — incremental updates:',
+    '- Before writing a new patch, check if "# Pending Memory Inbox" (above)',
+    '  already lists an `extraction.patch` for the same kind.',
+    '- If yes: REWRITE that file by combining its existing hunks with your new',
+    '  ones (overwrite the same path with the merged multi-hunk patch). Do NOT',
+    '  create separate `topic-a.patch`, `topic-b.patch` files; everything goes',
+    '  in one canonical `extraction.patch` per kind.',
+    '- If no: write a new `extraction.patch` with all your hunks.',
+    '',
+    'Project/workspace shared instructions (GEMINI.md and similar files under the',
+    'project root) are NOT auto-extractable. They are managed by humans only; do',
+    'not write patches that target files under the project root.',
+    '',
+    'NEVER directly edit MEMORY.md, GEMINI.md, ~/.gemini/GEMINI.md, settings,',
+    'credentials, or any file outside the memory work directory. The only way to',
+    'update memory is via a `.patch` file in the appropriate `.inbox/<kind>/` folder.',
+    '',
+    'Every patch you write is held for /memory inbox review. Nothing is applied',
+    'automatically; the user must approve each patch before it touches active files.',
+    '',
+    'Private memory is for durable facts, preferences, decisions, and project context.',
+    'Skills are only for reusable procedures. If both apply, avoid duplicating the same content.',
+    'Default to no-op. Prefer 0-5 memory patches and 0-2 skills per run.',
+    '',
+    '============================================================',
+    'PRIVATE MEMORY: MEMORY.md IS THE INDEX (CRITICAL)',
+    '============================================================',
+    '',
+    `In <memoryDir> (${memoryDir}), only MEMORY.md is auto-loaded into future`,
+    'agent contexts. Sibling .md files (e.g. verify-workflow.md, design-doc.md)',
+    'are loaded ON DEMAND by the runtime agent via read_file ONLY when MEMORY.md',
+    'references them.',
+    '',
+    'Therefore, when you create a new sibling .md file, your patch SHOULD',
+    'include a SECOND HUNK that updates MEMORY.md to add a one-line pointer',
+    'to the new file. The pointer is what makes the sibling discoverable to',
+    'future agents.',
+    '',
+    'IMPORTANT — pointer paths must be ABSOLUTE. Future agents `read_file`',
+    `directly off the pointer line, so the path must resolve without knowing`,
+    `<memoryDir>. Always write the full path (${memoryDir}/<topic>.md), never`,
+    'just the basename. The auto-bundle fallback also writes absolute paths.',
+    '',
+    'If you forget to include the MEMORY.md pointer, the inbox apply step',
+    `will auto-bundle a generic pointer (\`- See ${memoryDir}/<name>.md for ...\`)`,
+    'so the sibling is at least discoverable. But that auto-pointer is dumb —',
+    'write the proper paired hunk yourself so MEMORY.md gets a meaningful',
+    'summary.',
+    '',
+    'Correct shape for "create a new sibling" patch:',
+    '',
+    '  --- /dev/null',
+    `  +++ ${memoryDir}/<topic>.md`,
+    '  @@ -0,0 +1,N @@',
+    '  +# <topic>',
+    '  +...',
+    '',
+    `  --- ${memoryDir}/MEMORY.md`,
+    `  +++ ${memoryDir}/MEMORY.md`,
+    '  @@ -<line>,3 +<line>,4 @@',
+    '   <context>',
+    '   <context>',
+    '   <context>',
+    `  +- See ${memoryDir}/<topic>.md for <one-line summary>.`,
+    '',
+    'For brief facts (a few lines), prefer adding the entry directly to MEMORY.md',
+    'as a single-hunk patch — no sibling file needed. Only spawn a sibling file',
+    'when the content has substantial detail (multiple sections, procedures, etc.).',
+    '',
+    '============================================================',
+    'MEMORY PATCH FORMAT (STRICT)',
+    '============================================================',
+    '',
+    'Always read the target file first with read_file (or skip the read if the file',
+    'definitely does not exist yet) so the patch context lines match exactly.',
+    '',
+    'Use one of these two unified diff shapes inside each `.patch` file:',
+    '',
+    '1. Update an existing file:',
+    '',
+    '     --- /absolute/path/to/target.md',
+    '     +++ /absolute/path/to/target.md',
+    '     @@ -<oldStart>,<oldCount> +<newStart>,<newCount> @@',
+    '      <unchanged context line>',
+    '     -<removed line>',
+    '     +<added line>',
+    '      <unchanged context line>',
+    '',
+    '2. Create a brand-new file (no existing target):',
+    '',
+    '     --- /dev/null',
+    '     +++ /absolute/path/to/new-target.md',
+    '     @@ -0,0 +1,<count> @@',
+    '     +<line 1>',
+    '     +<line 2>',
+    '',
+    'Patch rules:',
+    '- Use the EXACT absolute file path in BOTH --- and +++ headers (NO `a/`/`b/` prefixes).',
+    '- For updates, both headers must be the SAME absolute path.',
+    '- Include 3 lines of context around each change for updates.',
+    '- Line counts in @@ headers MUST be accurate.',
+    '- One `.patch` file may include multiple hunks across multiple files in the same kind.',
+    '- The patch FILENAME under .inbox/<kind>/ MUST be the canonical',
+    '  `extraction.patch`; the headers determine the actual target file(s).',
+    '- Patches that fail validation or fail to apply cleanly are discarded silently.',
+    "- The header path must resolve under the kind's allowed root (see above) or the",
+    '  patch will be rejected.',
     '',
     '============================================================',
     'NO-OP / MINIMUM SIGNAL GATE',
@@ -212,8 +335,7 @@ function buildSystemPrompt(skillsDir: string): string {
     '2. If skills exist, read their SKILL.md files to understand what is already captured.',
     '3. Use activate_skill to load the "skill-creator" skill. Follow its design guidance',
     '   (conciseness, progressive disclosure, frontmatter format, bundled resources) when',
-    '   writing SKILL.md files. You may also use its init_skill.cjs script to scaffold new',
-    '   skill directories and package_skill.cjs to validate finished skills.',
+    '   writing SKILL.md files.',
     '   IMPORTANT: You are a background agent with no user interaction. Skip any interactive',
     '   steps in the skill-creator guide (asking clarifying questions, requesting user feedback,',
     '   installation prompts, iteration loops). Use only its format and quality guidance.',
@@ -228,15 +350,19 @@ function buildSystemPrompt(skillsDir: string): string {
     '7. For each candidate, verify it meets ALL criteria. Before writing, make sure you can',
     '   state: future trigger, evidence sessions, recurrence signal, validation signal, and',
     '   why it is not generic.',
-    '8. Write new SKILL.md files or update existing ones in your directory.',
-    '   Use run_shell_command to run init_skill.cjs for scaffolding and package_skill.cjs for validation.',
-    '   For skills that live OUTSIDE your directory, write a .patch file instead (see UPDATING EXISTING SKILLS).',
-    '9. Write COMPLETE files — never partially update a SKILL.md.',
+    '8. For memory candidates: read the target file first (or confirm it does not exist),',
+    '   then write a `.patch` file under the appropriate .inbox/<kind>/ directory using',
+    '   the format in MEMORY PATCH FORMAT. Prefer updating existing memory files over',
+    '   duplicating facts. Keep patches small and focused.',
+    '9. Write new SKILL.md files or update existing ones in your skills directory.',
+    '   Use write_file/edit directly; shell commands are intentionally unavailable in this background flow.',
+    '   For skills that live OUTSIDE your skills directory, write a `.patch` file there instead (see UPDATING EXISTING SKILLS).',
+    '10. Write COMPLETE SKILL.md files — never partially update a SKILL.md.',
     '',
     'IMPORTANT: Do NOT read every session. Only read sessions whose summaries suggest a',
     'repeated pattern or a stable recurring repo workflow worth investigating. Most runs',
-    'should read 0-3 sessions and create 0 skills.',
-    'Do not explore the codebase. Work only with the session index, session files, and the skills directory.',
+    'should read 0-3 sessions and create few or no artifacts.',
+    'Do not explore the codebase. Work only with the session index, session files, and the memory work directory.',
   ].join('\n');
 }
 
@@ -253,12 +379,20 @@ export const SkillExtractionAgent = (
   skillsDir: string,
   sessionIndex: string,
   existingSkillsSummary: string,
+  memoryDir: string = skillsDir.replace(/[/\\]skills$/, ''),
+  /**
+   * Snapshot of the current memory inbox state, formatted for the agent's
+   * initial context. Lets the agent see what's already pending so it can
+   * extend or rewrite existing canonical patches instead of accumulating
+   * many small ones across sessions. Empty string = nothing pending.
+   */
+  pendingInboxSummary: string = '',
 ): LocalAgentDefinition<typeof SkillExtractionSchema> => ({
   kind: 'local',
   name: 'confucius',
   displayName: 'Skill Extractor',
   description:
-    'Extracts reusable skills from past conversation sessions and writes them as SKILL.md files.',
+    'Extracts durable memories and reusable skills from past conversation sessions.',
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -279,6 +413,8 @@ export const SkillExtractionAgent = (
   modelConfig: {
     model: PREVIEW_GEMINI_FLASH_MODEL,
   },
+  memoryInboxAccess: true,
+  autoMemoryExtractionWriteAccess: true,
   toolConfig: {
     tools: [
       ACTIVATE_SKILL_TOOL_NAME,
@@ -288,7 +424,6 @@ export const SkillExtractionAgent = (
       LS_TOOL_NAME,
       GLOB_TOOL_NAME,
       GREP_TOOL_NAME,
-      SHELL_TOOL_NAME,
     ],
   },
   get promptConfig() {
@@ -296,6 +431,23 @@ export const SkillExtractionAgent = (
 
     if (existingSkillsSummary) {
       contextParts.push(`# Existing Skills\n\n${existingSkillsSummary}`);
+    }
+
+    if (pendingInboxSummary && pendingInboxSummary.trim().length > 0) {
+      contextParts.push(
+        [
+          '# Pending Memory Inbox',
+          '',
+          'The following `.patch` files already exist in the memory inbox',
+          'awaiting user review. If your new findings overlap with one of',
+          'these patches, REWRITE that patch (overwrite the same path) with',
+          'the merged content rather than creating a new patch file. Use the',
+          'canonical filename `extraction.patch` per kind for any new patch',
+          'so the inbox stays consolidated.',
+          '',
+          pendingInboxSummary,
+        ].join('\n'),
+      );
     }
 
     contextParts.push(
@@ -326,8 +478,8 @@ export const SkillExtractionAgent = (
       .replace(/\$\{(\w+)\}/g, '{$1}');
 
     return {
-      systemPrompt: buildSystemPrompt(skillsDir),
-      query: `${initialContext}\n\nAnalyze the session index above. Session summaries describe user intent; optional workflow hints describe likely procedural traces. Use workflow hints for routing, then read sessions that suggest repeated workflows using read_file to verify recurrence from transcript evidence. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. If recurrence or future reuse is unclear, create no skill and explain why.`,
+      systemPrompt: buildSystemPrompt(skillsDir, memoryDir),
+      query: `${initialContext}\n\nAnalyze the session index above. Session summaries describe user intent; optional workflow hints describe likely procedural traces. Use workflow hints for routing, then read sessions that suggest durable memory or repeated workflows using read_file to verify from transcript evidence. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. Only write memory if it would clearly help a future session. If recurrence, durability, or future reuse is unclear, create no artifact and explain why. If no skill is justified, create no skill and explain why.`,
     };
   },
   runConfig: {

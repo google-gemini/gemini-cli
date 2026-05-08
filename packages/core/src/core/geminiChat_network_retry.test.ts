@@ -587,4 +587,66 @@ describe('GeminiChat Network Retries', () => {
       }),
     );
   });
+
+  it('should retry on premature stream closure (ERR_STREAM_PREMATURE_CLOSE)', async () => {
+    mockConfig.getRetryFetchErrors = vi.fn().mockReturnValue(true);
+
+    const prematureCloseError = new Error('Premature close');
+    Object.defineProperty(prematureCloseError, 'code', {
+      value: 'ERR_STREAM_PREMATURE_CLOSE',
+    });
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'Incomplete part' }] } }],
+          } as unknown as GenerateContentResponse;
+          throw prematureCloseError;
+        })(),
+      )
+      .mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Complete response after retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-premature-close',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
+    expect(retryEvent).toBeDefined();
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Complete response after retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_STREAM_PREMATURE_CLOSE',
+      }),
+    );
+  });
 });
