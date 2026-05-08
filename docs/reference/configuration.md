@@ -126,7 +126,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.enableAutoUpdate`** (boolean):
-  - **Description:** Enable automatic updates.
+  - **Description:** Enable automatic updates. Can also be controlled via the
+    `GEMINI_CLI_ENABLE_AUTO_UPDATE` environment variable, which takes precedence
+    over this setting when set to a recognized value.
   - **Default:** `true`
 
 - **`general.enableAutoUpdateNotification`** (boolean):
@@ -2321,6 +2323,15 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
     `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_ENABLE_AUTO_UPDATE`**:
+  - Overrides the `general.enableAutoUpdate` setting from `settings.json`.
+  - Recognized values: `true` / `1` to enable, `false` / `0` to disable (case
+    insensitive). Any other value is ignored and the setting is used.
+  - Useful for disabling auto-update in environments where `settings.json` is
+    not present or cannot be modified (for example, ephemeral containers or
+    CI/CD pipelines).
+  - Example: `export GEMINI_CLI_ENABLE_AUTO_UPDATE="false"` (Windows PowerShell:
+    `$env:GEMINI_CLI_ENABLE_AUTO_UPDATE="false"`)
 - **`GEMINI_CLI_TRUST_WORKSPACE`**:
   - If set to `"true"`, trusts the current workspace for the duration of the
     session, bypassing the folder trust check.

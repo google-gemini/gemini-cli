@@ -29,6 +29,27 @@ export function isUpdateInProgress() {
 }
 
 /**
+ * Returns whether automatic updates are enabled, taking the
+ * `GEMINI_CLI_ENABLE_AUTO_UPDATE` environment variable into account. When set,
+ * the env var overrides `general.enableAutoUpdate` from settings. Recognized
+ * truthy values are `1` / `true`; falsy values are `0` / `false` (case
+ * insensitive). Any other value is ignored and the setting is used.
+ */
+export function isAutoUpdateEnabled(settings: LoadedSettings): boolean {
+  const envValue = process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
+  if (envValue !== undefined) {
+    const normalized = envValue.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') {
+      return true;
+    }
+    if (normalized === 'false' || normalized === '0') {
+      return false;
+    }
+  }
+  return settings.merged.general.enableAutoUpdate ?? true;
+}
+
+/**
  * Returns a promise that resolves when the update process completes or times out.
  */
 export async function waitForUpdateCompletion(
@@ -86,10 +107,9 @@ export function handleAutoUpdate(
     return;
   }
 
-  const installationInfo = getInstallationInfo(
-    projectRoot,
-    settings.merged.general.enableAutoUpdate,
-  );
+  const autoUpdateEnabled = isAutoUpdateEnabled(settings);
+
+  const installationInfo = getInstallationInfo(projectRoot, autoUpdateEnabled);
 
   if (
     [
@@ -107,10 +127,7 @@ export function handleAutoUpdate(
     combinedMessage += `\n${installationInfo.updateMessage}`;
   }
 
-  if (
-    !installationInfo.updateCommand ||
-    !settings.merged.general.enableAutoUpdate
-  ) {
+  if (!installationInfo.updateCommand || !autoUpdateEnabled) {
     updateEventEmitter.emit('update-received', {
       ...info,
       message: combinedMessage,
