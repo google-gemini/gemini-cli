@@ -64,6 +64,16 @@ module.exports = async ({ github, context, core }) => {
     const labelsToAdd = entry.labels_to_add || [];
     labelsToAdd.push('status/bot-triaged');
 
+    let labelsToRemove = entry.labels_to_remove || [];
+    if (
+      labelsToAdd.includes('status/bot-triaged') ||
+      labelsToAdd.includes('status/manual-triage')
+    ) {
+      labelsToRemove.push('status/need-triage');
+    }
+    // Deduplicate array
+    labelsToRemove = [...new Set(labelsToRemove)];
+
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
         owner: context.repo.owner,
@@ -75,6 +85,28 @@ module.exports = async ({ github, context, core }) => {
       const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
       core.info(
         `Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`,
+      );
+    }
+
+    if (labelsToRemove.length > 0) {
+      for (const label of labelsToRemove) {
+        try {
+          await github.rest.issues.removeLabel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issueNumber,
+            name: label,
+          });
+        } catch (e) {
+          if (e.status !== 404) {
+            core.warning(
+              `Failed to remove label ${label} from #${issueNumber}: ${e.message}`,
+            );
+          }
+        }
+      }
+      core.info(
+        `Successfully removed labels for #${issueNumber}: ${labelsToRemove.join(', ')}`,
       );
     }
 
