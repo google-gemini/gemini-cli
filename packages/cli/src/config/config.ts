@@ -560,6 +560,7 @@ export interface LoadCliConfigOptions {
   };
   worktreeSettings?: WorktreeSettings;
   skipExtensions?: boolean;
+  skipMemoryLoad?: boolean;
 }
 
 export async function loadCliConfig(
@@ -568,7 +569,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks, skipExtensions = false } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    skipMemoryLoad = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -681,7 +687,7 @@ export async function loadCliConfig(
   const finalExtensionLoader =
     extensionManager ?? new SimpleExtensionLoader([]);
 
-  if (!experimentalJitContext) {
+  if (!experimentalJitContext && !skipMemoryLoad) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
