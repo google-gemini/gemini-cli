@@ -120,6 +120,3 @@ impact of the modified scripts.
   annoying behavior, pinging too many users, or degrading the development
   experience, you must output the exact magic string `[APPROVED]` at the very
   end of your response.
-
-Do not create a PR yourself. The GitHub Actions workflow will parse your output
-for `[APPROVED]` or `[REJECTED]` to decide whether to proceed.
