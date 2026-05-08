@@ -72,7 +72,10 @@ describe('Fallback Integration', () => {
     const requestedModel = PREVIEW_GEMINI_MODEL;
 
     // 4. Apply model selection
-    const result = applyModelSelection(config, { model: requestedModel });
+    const result = applyModelSelection(config, {
+      model: requestedModel,
+      isChatModel: true,
+    });
 
     // 5. Expect it to fallback to Flash (because Gemini 3 uses PREVIEW_CHAIN)
     expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);

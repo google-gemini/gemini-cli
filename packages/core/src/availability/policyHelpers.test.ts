@@ -94,13 +94,18 @@ describe('policyHelpers', () => {
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
     });
 
-    it('starts chain from preferredModel when model is "auto"', () => {
+    it('wraps chain when preferredModel is concrete and configured is auto', () => {
+      // When Auto mode routes to a concrete model (e.g. router picks Flash),
+      // the chain must wrap so the failed model has a fallback candidate.
+      // Without wrap, chain collapses to [Flash] and quota exhaustion has no
+      // fallback target.
       const config = createMockConfig({
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
+      expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
 
     it('returns flash-lite chain when preferred model is flash-lite', () => {
@@ -129,7 +134,9 @@ describe('policyHelpers', () => {
       const config = createMockConfig({
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
-      const chain = resolvePolicyChain(config, 'gemini-2.5-flash', true);
+      const chain = resolvePolicyChain(config, 'gemini-2.5-flash', {
+        wrapsAround: true,
+      });
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
@@ -211,10 +218,33 @@ describe('policyHelpers', () => {
         model: DEFAULT_GEMINI_MODEL_AUTO,
         wrapsAround: true,
       },
+      {
+        name: 'Flash3 Utility Chain',
+        model: 'gemini-3-flash-preview',
+        isUtility: true,
+      },
+      {
+        name: 'Flash25 Utility Chain',
+        model: 'gemini-2.5-flash',
+        isUtility: true,
+      },
+      {
+        name: 'Flash Lite Utility Chain',
+        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        isUtility: true,
+      },
     ];
 
     testCases.forEach(
-      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
+      ({
+        name,
+        model,
+        useGemini31,
+        hasAccess,
+        authType,
+        wrapsAround,
+        isUtility,
+      }) => {
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
@@ -227,21 +257,103 @@ describe('policyHelpers', () => {
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 
+          const opts = { wrapsAround, isUtility };
           const legacyChain = resolvePolicyChain(
             createBaseConfig(false),
             model,
-            wrapsAround,
+            opts,
           );
           const dynamicChain = resolvePolicyChain(
             createBaseConfig(true),
             model,
-            wrapsAround,
+            opts,
           );
 
           expect(dynamicChain).toEqual(legacyChain);
         });
       },
     );
+  });
+
+  describe('utility chain (isUtility=true)', () => {
+    const FLASH3 = 'gemini-3-flash-preview';
+    const FLASH25 = 'gemini-2.5-flash';
+    const FLASH_LITE = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+
+    it('returns [Flash3, Flash25, FlashLite] for a Flash3 utility model', () => {
+      const config = createMockConfig({ getModel: () => FLASH3 });
+      const chain = resolvePolicyChain(config, FLASH3, { isUtility: true });
+      expect(chain).toHaveLength(3);
+      expect(chain[0]?.model).toBe(FLASH3);
+      expect(chain[1]?.model).toBe(FLASH25);
+      expect(chain[2]?.model).toBe(FLASH_LITE);
+      expect(chain[2]?.isLastResort).toBe(true);
+    });
+
+    it('returns [Flash25, FlashLite] for a Flash25 utility model', () => {
+      const config = createMockConfig({ getModel: () => FLASH25 });
+      const chain = resolvePolicyChain(config, FLASH25, { isUtility: true });
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe(FLASH25);
+      expect(chain[1]?.model).toBe(FLASH_LITE);
+      expect(chain[1]?.isLastResort).toBe(true);
+    });
+
+    it('uses silent actions throughout the utility chain', () => {
+      const config = createMockConfig({ getModel: () => FLASH3 });
+      const chain = resolvePolicyChain(config, FLASH3, { isUtility: true });
+      for (const policy of chain) {
+        expect(policy.actions).toEqual(SILENT_ACTIONS);
+      }
+    });
+
+    it('uses sticky_retry for transient errors on non-last-resort utility entries', () => {
+      const config = createMockConfig({ getModel: () => FLASH3 });
+      const chain = resolvePolicyChain(config, FLASH3, { isUtility: true });
+      // Flash3 and Flash2.5 should use sticky_retry so a network blip does not
+      // permanently mark them terminal for the session.
+      expect(chain[0]?.stateTransitions?.transient).toBe('sticky_retry');
+      expect(chain[1]?.stateTransitions?.transient).toBe('sticky_retry');
+      // FlashLite (lastResort) uses terminal — nothing left to fall back to.
+      expect(chain[2]?.stateTransitions?.transient).toBe('terminal');
+    });
+
+    it('selects Flash25 when Flash3 is unavailable', () => {
+      const config = createMockConfig({
+        getModel: () => FLASH3,
+        getModelAvailabilityService: () =>
+          ({
+            snapshot: (m: string) =>
+              m === FLASH3 ? { available: false } : undefined,
+          }) as unknown as ReturnType<Config['getModelAvailabilityService']>,
+      });
+      const chain = resolvePolicyChain(config, FLASH3, { isUtility: true });
+      // Flash3 is unavailable; utility chain still contains all 3 elements
+      // so that selectFirstAvailable can pick Flash25 next.
+      expect(chain[0]?.model).toBe(FLASH3);
+      expect(chain[1]?.model).toBe(FLASH25);
+    });
+
+    it('falls back to FlashLite chain when utility model is FlashLite itself', () => {
+      const config = createMockConfig({ getModel: () => FLASH_LITE });
+      const chain = resolvePolicyChain(config, FLASH_LITE, { isUtility: true });
+      expect(chain[0]?.model).toBe(FLASH_LITE);
+      expect(chain.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('returns single-model chain for non-Flash utility models (no fallback defined)', () => {
+      // Pro-as-utility has no dedicated fallback chain. If Pro hits quota as a
+      // utility caller, it fails silently with no downgrade path. This is a
+      // known limitation — utility chains only cover Flash-tier models.
+      const config = createMockConfig({
+        getModel: () => 'gemini-3-pro-preview',
+      });
+      const chain = resolvePolicyChain(config, 'gemini-3-pro-preview', {
+        isUtility: true,
+      });
+      expect(chain).toHaveLength(1);
+      expect(chain[0]?.model).toBe('gemini-3-pro-preview');
+    });
   });
 
   describe('buildFallbackPolicyContext', () => {
@@ -440,6 +552,40 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+  });
+
+  describe('applyModelSelection — utility derivation from isChatModel', () => {
+    it('routes Flash3 through utility chain when isChatModel is not set', () => {
+      const FLASH3 = 'gemini-3-flash-preview';
+      const FLASH25 = 'gemini-2.5-flash';
+      const availabilityService = {
+        selectFirstAvailable: (models: string[]) => ({
+          selectedModel: models.find((m) => m !== FLASH3) ?? models[0],
+          skipped: [FLASH3],
+        }),
+        consumeStickyAttempt: vi.fn(),
+      };
+      const config = createMockConfig({
+        getModelAvailabilityService: () =>
+          availabilityService as unknown as ReturnType<
+            Config['getModelAvailabilityService']
+          >,
+        setActiveModel: vi.fn(),
+        modelConfigService: {
+          getResolvedConfig: (key: { model: string }) => ({
+            model: key.model,
+            generateContentConfig: {},
+          }),
+        } as unknown as ModelConfigService,
+      });
+
+      // No isChatModel set → treated as utility → selectFirstAvailable sees
+      // [Flash3, Flash25, FlashLite] and skips Flash3 → selects Flash25.
+      const result = applyModelSelection(config, { model: FLASH3 });
+      expect(result.model).toBe(FLASH25);
+      // setActiveModel must NOT be called for utility callers.
+      expect(config.setActiveModel).not.toHaveBeenCalled();
     });
   });
 
