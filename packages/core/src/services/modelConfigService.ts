@@ -101,6 +101,7 @@ export interface ResolutionContext {
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
   requestedModel?: string;
+  releaseChannel?: string;
 }
 
 /** The requirements defined in the registry. */
@@ -111,6 +112,7 @@ export interface ResolutionCondition {
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
   requestedModels?: string[];
+  releaseChannel?: string;
 }
 
 export interface ModelConfigServiceConfig {
@@ -156,6 +158,7 @@ export class ModelConfigService {
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
     const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
+    const releaseChannel = context.releaseChannel ?? 'stable';
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -164,18 +167,28 @@ export class ModelConfigService {
         if (m.tier !== 'auto') return false;
         return true;
       })
-      .map(([id, m]) => ({
-        modelId: id,
-        name: m.displayName ?? getDisplayString(id),
-        description:
-          id === 'auto-gemini-3' && useGemini31
-            ? (m.dialogDescription ?? '').replace(
-                'gemini-3-pro',
-                'gemini-3.1-pro',
-              )
-            : (m.dialogDescription ?? ''),
-        tier: m.tier ?? 'auto',
-      }));
+      .map(([id, m]) => {
+        let description = m.dialogDescription ?? '';
+        if (id === 'auto') {
+          const proModel =
+            releaseChannel === 'preview'
+              ? useGemini31
+                ? 'gemini-3.1-pro'
+                : 'gemini-3-pro'
+              : 'gemini-2.5-pro';
+          const flashModel = 'gemini-3-flash';
+          description = `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
+        } else if (id === 'auto-gemini-3' && useGemini31) {
+          description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
+        }
+
+        return {
+          modelId: id,
+          name: m.displayName ?? getDisplayString(id),
+          description,
+          tier: m.tier ?? 'auto',
+        };
+      });
 
     const manualOptions = Object.entries(definitions)
       .filter(([id, m]) => {
@@ -258,6 +271,8 @@ export class ModelConfigService {
             !!context.requestedModel &&
             value.includes(context.requestedModel)
           );
+        case 'releaseChannel':
+          return value === context.releaseChannel;
         default:
           return false;
       }

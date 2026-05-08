@@ -23,6 +23,7 @@ import {
   getDisplayString,
   AuthType,
   ToolConfirmationOutcome,
+  getChannelFromVersion,
 } from '@google/gemini-cli-core';
 import type * as acp from '@agentclientprotocol/sdk';
 import { z } from 'zod';
@@ -271,6 +272,8 @@ export function buildAvailableModels(
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
+  const releaseChannel = getChannelFromVersion(config.clientVersion);
+
   // --- DYNAMIC PATH ---
   if (
     config.getExperimentalDynamicModelConfiguration?.() === true &&
@@ -281,6 +284,7 @@ export function buildAvailableModels(
       useGemini3_1FlashLite: useGemini31FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview: shouldShowPreviewModels,
+      releaseChannel,
     });
 
     return {

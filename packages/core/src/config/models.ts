@@ -10,6 +10,7 @@ export interface ModelResolutionContext {
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
+  releaseChannel?: string;
 }
 
 /**
@@ -78,7 +79,9 @@ export const VALID_GEMINI_MODELS = new Set([
   GEMMA_4_26B_A4B_IT_MODEL,
 ]);
 
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 // Model aliases for user convenience.
@@ -93,7 +96,7 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 export const DEFAULT_THINKING_MODE = 8192;
 
 /**
- * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
+ * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
  * to a concrete model name.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
@@ -202,7 +205,7 @@ export function resolveModel(
 /**
  * Resolves the appropriate model based on the classifier's decision.
  *
- * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
+ * @param requestedModel The current requested model (e.g. auto).
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview.
  * @param useCustomToolModel Whether to use the custom tool model.
@@ -240,7 +243,8 @@ export function resolveClassifierModel(
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      requestedModel === PREVIEW_GEMINI_MODEL
+      requestedModel === PREVIEW_GEMINI_MODEL ||
+      requestedModel === GEMINI_MODEL_ALIAS_AUTO
     ) {
       return PREVIEW_GEMINI_FLASH_MODEL;
     }
@@ -266,6 +270,8 @@ export function getDisplayString(
   }
 
   switch (model) {
+    case GEMINI_MODEL_ALIAS_AUTO:
+      return 'Auto';
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:

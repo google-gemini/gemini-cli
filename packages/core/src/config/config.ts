@@ -88,7 +88,6 @@ import {
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -762,7 +761,8 @@ export class Config implements McpContext, AgentLoopContext {
   private skillManager!: SkillManager;
   private _sessionId: string;
   private readonly clientName: string | undefined;
-  private clientVersion: string;
+  private _clientVersion: string;
+
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
   readonly topicState = new TopicState();
@@ -982,8 +982,9 @@ export class Config implements McpContext, AgentLoopContext {
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
-    this.clientVersion = params.clientVersion ?? 'unknown';
+    this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.sandbox = params.sandbox
@@ -2009,13 +2010,20 @@ export class Config implements McpContext, AgentLoopContext {
     resetTime?: string;
   } {
     const model = this.getModel();
-    if (!isAutoModel(model)) {
+    if (!isAutoModel(model, this)) {
       return {};
     }
 
-    const isPreview =
-      model === PREVIEW_GEMINI_MODEL_AUTO ||
-      isPreviewModel(this.getActiveModel(), this);
+    const primaryModel = resolveModel(
+      model,
+      this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
+    );
+
+    const isPreview = isPreviewModel(primaryModel, this);
     const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
@@ -3466,6 +3474,13 @@ export class Config implements McpContext, AgentLoopContext {
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
     );
+  }
+
+  /**
+   * Returns the client version.
+   */
+  get clientVersion(): string {
+    return this._clientVersion;
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
