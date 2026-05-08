@@ -13,20 +13,29 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { flattenMemory } from '../config/memory.js';
 import { loadSkillFromFile, loadSkillsFromDir } from '../skills/skillLoader.js';
-import { getGlobalMemoryFilePath } from '../tools/memoryTool.js';
 import {
   type AppliedSkillPatchTarget,
+  type InboxMemoryPatchKind,
   applyParsedPatchesWithAllowedRoots,
   applyParsedSkillPatches,
-  canonicalizeAllowedPatchRoots,
+  findDisallowedMemoryPatchTarget,
+  getInboxMemoryPatchSourcePath,
+  getMemoryPatchTargetValidationContext,
+  isResolvedMemoryPatchTargetAllowed,
   hasParsedPatchHunks,
   isProjectSkillPatchTarget,
-  resolveTargetWithinAllowedRoots,
+  listInboxPatchFiles,
+  listValidInboxPatchFiles,
+  normalizeInboxMemoryPatchPath,
+  resolveMemoryPatchTargetWithinAllowedSet,
   validateParsedSkillPatchHeaders,
 } from '../services/memoryPatchUtils.js';
 import { readExtractionState } from '../services/memoryService.js';
 import { refreshServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import type { MessageActionReturn, ToolActionReturn } from './types.js';
+
+export type { InboxMemoryPatchKind } from '../services/memoryPatchUtils.js';
+export { getAllowedMemoryPatchRoots } from '../services/memoryPatchUtils.js';
 
 export function showMemory(config: Config): MessageActionReturn {
   const memoryContent = flattenMemory(config.getUserMemory());
@@ -342,8 +351,6 @@ export interface InboxPatch {
   extractedAt?: string;
 }
 
-export type InboxMemoryPatchKind = 'private' | 'global';
-
 /**
  * One target file inside a memory patch (most patches will have a single entry).
  */
@@ -416,68 +423,6 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function getMemoryPatchRoot(
-  memoryDir: string,
-  kind: InboxMemoryPatchKind,
-): string {
-  return path.join(memoryDir, '.inbox', kind);
-}
-
-function isSubpathOrSame(childPath: string, parentPath: string): boolean {
-  const relativePath = path.relative(parentPath, childPath);
-  return (
-    relativePath === '' ||
-    (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
-  );
-}
-
-function normalizeInboxMemoryPatchPath(
-  relativePath: string,
-): string | undefined {
-  if (
-    relativePath.length === 0 ||
-    path.isAbsolute(relativePath) ||
-    relativePath.includes('\\')
-  ) {
-    return undefined;
-  }
-
-  const normalizedPath = path.posix.normalize(relativePath);
-  if (
-    normalizedPath === '.' ||
-    normalizedPath.startsWith('../') ||
-    normalizedPath === '..' ||
-    !normalizedPath.endsWith('.patch')
-  ) {
-    return undefined;
-  }
-  return normalizedPath;
-}
-
-/**
- * Returns the directory roots (or single-file allowlists) that a memory patch
- * of the given kind is allowed to modify. Memory patch headers must reference
- * paths inside / equal to one of these entries after canonical resolution.
- *
- * - `private` allows any markdown file inside the project memory directory.
- * - `global` is intentionally a single-file allowlist: the only writeable
- *   global file is the personal `~/.gemini/GEMINI.md`. Other files under
- *   `~/.gemini/` (settings, credentials, oauth, keybindings, etc.) are off-limits.
- */
-export function getAllowedMemoryPatchRoots(
-  config: Config,
-  kind: InboxMemoryPatchKind,
-): string[] {
-  switch (kind) {
-    case 'private':
-      return [path.resolve(config.storage.getProjectMemoryTempDir())];
-    case 'global':
-      return [path.resolve(getGlobalMemoryFilePath())];
-    default:
-      throw new Error(`Unknown memory patch kind: ${kind as string}`);
-  }
-}
-
 async function getFileMtimeIso(filePath: string): Promise<string | undefined> {
   try {
     const stats = await fs.stat(filePath);
@@ -485,26 +430,6 @@ async function getFileMtimeIso(filePath: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-async function getInboxMemoryPatchSourcePath(
-  config: Config,
-  kind: InboxMemoryPatchKind,
-  relativePath: string,
-): Promise<string | undefined> {
-  const normalizedPath = normalizeInboxMemoryPatchPath(relativePath);
-  if (!normalizedPath) {
-    return undefined;
-  }
-
-  const patchRoot = path.resolve(
-    getMemoryPatchRoot(config.storage.getProjectMemoryTempDir(), kind),
-  );
-  const sourcePath = path.resolve(patchRoot, ...normalizedPath.split('/'));
-  if (!isSubpathOrSame(sourcePath, patchRoot)) {
-    return undefined;
-  }
-  return sourcePath;
 }
 
 async function patchTargetsProjectSkills(
@@ -542,114 +467,11 @@ function formatMemoryKindLabel(kind: InboxMemoryPatchKind): string {
 }
 
 /**
- * Returns the absolute paths of every `.patch` file currently in the kind's
- * inbox directory (sorted by basename for stable ordering at apply time).
- *
- * NOTE: this is a raw filesystem listing — it does NOT validate patch shape
- * or that targets fall inside the kind's allowed root. Callers that need
- * "what the user actually sees in the inbox" should use `listValidInboxPatchFiles`.
- */
-async function listInboxPatchFiles(
-  config: Config,
-  kind: InboxMemoryPatchKind,
-): Promise<string[]> {
-  const patchRoot = getMemoryPatchRoot(
-    config.storage.getProjectMemoryTempDir(),
-    kind,
-  );
-  const found: string[] = [];
-
-  async function walk(currentDir: string): Promise<void> {
-    let dirEntries: Array<import('node:fs').Dirent>;
-    try {
-      dirEntries = await fs.readdir(currentDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of dirEntries) {
-      const entryPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(entryPath);
-        continue;
-      }
-      if (entry.isFile() && entry.name.endsWith('.patch')) {
-        found.push(entryPath);
-      }
-    }
-  }
-
-  await walk(patchRoot);
-  return found.sort();
-}
-
-/**
- * Returns only the inbox patch files that pass the same validation as the
- * inbox listing (parseable, has hunks, valid headers, targets in the
- * kind's allowed root). Used by aggregate apply so the user only ever sees
- * results for patches the inbox actually surfaced.
- */
-async function listValidInboxPatchFiles(
-  config: Config,
-  kind: InboxMemoryPatchKind,
-): Promise<string[]> {
-  const patchFiles = await listInboxPatchFiles(config, kind);
-  if (patchFiles.length === 0) {
-    return [];
-  }
-
-  const allowedRoots = await canonicalizeAllowedPatchRoots(
-    getAllowedMemoryPatchRoots(config, kind),
-  );
-
-  const valid: string[] = [];
-  for (const sourcePath of patchFiles) {
-    let content: string;
-    try {
-      content = await fs.readFile(sourcePath, 'utf-8');
-    } catch {
-      continue;
-    }
-
-    let parsed: Diff.StructuredPatch[];
-    try {
-      parsed = Diff.parsePatch(content);
-    } catch {
-      continue;
-    }
-    if (!hasParsedPatchHunks(parsed)) {
-      continue;
-    }
-
-    const validated = validateParsedSkillPatchHeaders(parsed);
-    if (!validated.success) {
-      continue;
-    }
-
-    const targetsAllAllowed = await Promise.all(
-      validated.patches.map(
-        async (header) =>
-          (await resolveTargetWithinAllowedRoots(
-            header.targetPath,
-            allowedRoots,
-          )) !== undefined,
-      ),
-    );
-    if (!targetsAllAllowed.every(Boolean)) {
-      continue;
-    }
-
-    valid.push(sourcePath);
-  }
-  return valid;
-}
-
-/**
  * Scans `<memoryDir>/.inbox/{private,global}/` and returns ONE consolidated
  * inbox entry per kind. Each entry aggregates all hunks from every valid
  * underlying `.patch` file. Patches that fail validation (unparseable, no
- * hunks, target outside allowed root) are silently skipped so they don't
- * pollute the inbox UI.
+ * hunks, target outside the allowed target set) are silently skipped so they
+ * don't pollute the inbox UI.
  */
 export async function listInboxMemoryPatches(
   config: Config,
@@ -658,8 +480,9 @@ export async function listInboxMemoryPatches(
   const aggregated: InboxMemoryPatch[] = [];
 
   for (const kind of kinds) {
-    const allowedRoots = await canonicalizeAllowedPatchRoots(
-      getAllowedMemoryPatchRoots(config, kind),
+    const validationContext = await getMemoryPatchTargetValidationContext(
+      config,
+      kind,
     );
     const patchFiles = await listInboxPatchFiles(config, kind);
 
@@ -691,13 +514,13 @@ export async function listInboxMemoryPatches(
       }
 
       // Skip the entire source file if ANY of its targets escapes the kind's
-      // allowed root.
+      // allowed target set.
       const targetsAllAllowed = await Promise.all(
         validated.patches.map(
           async (header) =>
-            (await resolveTargetWithinAllowedRoots(
+            (await resolveMemoryPatchTargetWithinAllowedSet(
               header.targetPath,
-              allowedRoots,
+              validationContext,
             )) !== undefined,
         ),
       );
@@ -1015,12 +838,31 @@ async function applyMemoryPatchFile(
     };
   }
 
-  const allowedRoots = await canonicalizeAllowedPatchRoots(
-    getAllowedMemoryPatchRoots(config, kind),
+  const validationContext = await getMemoryPatchTargetValidationContext(
+    config,
+    kind,
   );
+  const disallowedTargetPath = await findDisallowedMemoryPatchTarget(
+    parsed,
+    validationContext,
+  );
+  if (disallowedTargetPath) {
+    return {
+      success: false,
+      message: `Memory patch "${displayName}" targets a file outside the ${kind} memory root or target allowlist: ${disallowedTargetPath}`,
+    };
+  }
+
   const applied = await applyParsedPatchesWithAllowedRoots(
     parsed,
-    allowedRoots,
+    validationContext.allowedRoots,
+    {
+      isResolvedTargetAllowed: (resolvedTargetPath) =>
+        isResolvedMemoryPatchTargetAllowed(
+          resolvedTargetPath,
+          validationContext,
+        ),
+    },
   );
   if (!applied.success) {
     switch (applied.reason) {
@@ -1037,7 +879,7 @@ async function applyMemoryPatchFile(
       case 'outsideAllowedRoots':
         return {
           success: false,
-          message: `Memory patch "${displayName}" targets a file outside the ${kind} memory root: ${applied.targetPath}`,
+          message: `Memory patch "${displayName}" targets a file outside the ${kind} memory root or target allowlist: ${applied.targetPath}`,
         };
       case 'newFileAlreadyExists':
         return {

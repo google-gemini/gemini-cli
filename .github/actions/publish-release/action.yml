@@ -311,15 +311,15 @@ runs:
         RELEASE_ASSETS=("gemini-cli-bundle.zip")
 
         # Check for and prepare macOS binaries if they exist
-        if [[ -f "dist/darwin-arm64/gemini" ]]; then
-          zip -j gemini-darwin-arm64-unsigned.zip dist/darwin-arm64/gemini
-          RELEASE_ASSETS+=("gemini-darwin-arm64-unsigned.zip")
-        fi
-
-        if [[ -f "dist/darwin-x64/gemini" ]]; then
-          zip -j gemini-darwin-x64-unsigned.zip dist/darwin-x64/gemini
-          RELEASE_ASSETS+=("gemini-darwin-x64-unsigned.zip")
-        fi
+        for arch in arm64 x64; do
+          BINARY_PATH="dist/darwin-${arch}/gemini"
+          if [[ -f "$BINARY_PATH" ]]; then
+            chmod +x "$BINARY_PATH"
+            ZIP_NAME="gemini-darwin-${arch}-unsigned.zip"
+            zip -j "$ZIP_NAME" "$BINARY_PATH"
+            RELEASE_ASSETS+=("$ZIP_NAME")
+          fi
+        done
 
         gh release create "${INPUTS_RELEASE_TAG}" \
           "${RELEASE_ASSETS[@]}" \
