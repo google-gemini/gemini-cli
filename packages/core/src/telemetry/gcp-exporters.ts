@@ -54,7 +54,7 @@ export class GcpMetricExporter extends MetricExporter {
         // expected when the CLI shuts down quickly after a periodic export.
         const errorMessage = result.error.message || String(result.error);
         if (
-          process.env['GEMINI_CI_TELEMETRY_WORKAROUNDS'] === 'true' &&
+          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true' &&
           errorMessage.includes(
             'written more frequently than the maximum sampling period',
           )
@@ -117,7 +117,7 @@ export class GcpLogExporter implements LogRecordExporter {
           message: log.body,
         };
         const isCiWorkaround =
-          process.env['GEMINI_CI_TELEMETRY_WORKAROUNDS'] === 'true';
+          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
         const limitThreshold = isCiWorkaround ? 100000 : 240000;
 
         let safePayload = truncateLogPayload(
