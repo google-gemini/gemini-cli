@@ -290,6 +290,8 @@ export type { Content, Part, FunctionCall } from '@google/genai';
 
 // Export context types and profiles
 export * from './context/types.js';
+export { SnapshotGenerator } from './context/utils/snapshotGenerator.js';
+export * from './context/graph/types.js';
 
 export { generalistProfile as legacyGeneralistProfile } from './context/profiles.js';
 export {

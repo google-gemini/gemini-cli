@@ -3,17 +3,21 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
 import type { JSONSchemaType } from 'ajv';
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import { type ConcreteNode, NodeType } from '../graph/types.js';
-import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
+import {
+  SnapshotGenerator,
+  findLatestSnapshotBaseline,
+} from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { NodeType } from '../graph/types.js';
 
 export interface StateSnapshotAsyncProcessorOptions {
   type?: 'accumulate' | 'point-in-time';
   systemInstruction?: string;
+  maxSummaryTurns?: number;
+  maxStateTokens?: number;
 }
 
 export const StateSnapshotAsyncProcessorOptionsSchema: JSONSchemaType<StateSnapshotAsyncProcessorOptions> =
@@ -26,6 +30,8 @@ export const StateSnapshotAsyncProcessorOptionsSchema: JSONSchemaType<StateSnaps
         nullable: true,
       },
       systemInstruction: { type: 'string', nullable: true },
+      maxSummaryTurns: { type: 'number', nullable: true },
+      maxStateTokens: { type: 'number', nullable: true },
     },
     required: [],
   };
@@ -44,12 +50,13 @@ export function createStateSnapshotAsyncProcessor(
       if (targets.length === 0) return;
 
       try {
-        let nodesToSummarize = [...targets];
         let previousConsumedIds: string[] = [];
         const processorType = options.type ?? 'point-in-time';
+        const nodesToSummarize = [...targets];
+        let previousStateJson: string | undefined = undefined;
 
         if (processorType === 'accumulate') {
-          // Look for the most recent unconsumed accumulate snapshot in the inbox
+          // 1. Look for the most recent unconsumed accumulate snapshot in the inbox
           const proposedSnapshots = inbox.getMessages<{
             newText: string;
             consumedIds: string[];
@@ -72,26 +79,44 @@ export function createStateSnapshotAsyncProcessor(
             env.inbox.drainConsumed(new Set([latest.id]));
 
             previousConsumedIds = latest.payload.consumedIds;
+            previousStateJson = latest.payload.newText;
+          } else {
+            // 2. Global Lookback: No draft in inbox, scan the context graph for the last live snapshot
+            const baseline = findLatestSnapshotBaseline(targets);
 
-            const snapshotId = randomUUID();
-            const previousStateNode: ConcreteNode = {
-              id: snapshotId,
-              turnId: snapshotId,
-              type: NodeType.SNAPSHOT,
-              timestamp: latest.timestamp,
-              role: 'user',
-              payload: { text: latest.payload.newText },
-            };
-
-            nodesToSummarize = [previousStateNode, ...targets];
+            if (baseline) {
+              previousStateJson = baseline.text;
+              previousConsumedIds = [...baseline.abstractsIds];
+            } else {
+              debugLogger.log(
+                '[StateSnapshotAsyncProcessor] No previous snapshot found in Inbox or Graph. Initializing new Master State baseline in background.',
+              );
+            }
           }
         }
 
+        // If the snapshot happens to be inside our summary window, remove it so the LLM doesn't read it as raw transcript
+        if (previousStateJson) {
+          const summaryIdx = nodesToSummarize.findIndex(
+            (n) =>
+              n.type === NodeType.SNAPSHOT &&
+              n.payload.text === previousStateJson,
+          );
+          if (summaryIdx !== -1) {
+            nodesToSummarize.splice(summaryIdx, 1);
+          }
+        }
+
+        if (nodesToSummarize.length === 0) return;
+
         const snapshotText = await generator.synthesizeSnapshot(
           nodesToSummarize,
-          options.systemInstruction,
+          previousStateJson,
+          {
+            maxSummaryTurns: options.maxSummaryTurns,
+            maxStateTokens: options.maxStateTokens,
+          },
         );
-
         const newConsumedIds = [
           ...previousConsumedIds,
           ...targets.map((t) => t.id),
