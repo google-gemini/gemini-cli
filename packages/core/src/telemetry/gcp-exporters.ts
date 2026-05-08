@@ -45,6 +45,29 @@ export class GcpMetricExporter extends MetricExporter {
 }
 
 /**
+ * Deeply truncates strings in an object to prevent GCP log size limit errors.
+ */
+function truncateLogPayload(payload: unknown, limit = 200000): unknown {
+  if (typeof payload === 'string') {
+    return payload.length > limit
+      ? payload.substring(0, limit) + '... (truncated due to size)'
+      : payload;
+  }
+  if (Array.isArray(payload)) {
+    return payload.map((item) => truncateLogPayload(item, limit));
+  }
+  if (payload !== null && typeof payload === 'object') {
+    const truncatedObj: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      // Keys are also strings, but usually small. Truncate values.
+      truncatedObj[key] = truncateLogPayload(value, limit);
+    }
+    return truncatedObj;
+  }
+  return payload;
+}
+
+/**
  * Google Cloud Logging exporter that uses the Cloud Logging client
  */
 export class GcpLogExporter implements LogRecordExporter {
@@ -63,6 +86,14 @@ export class GcpLogExporter implements LogRecordExporter {
   ): void {
     try {
       const entries = logs.map((log) => {
+        // Enforce a strict cap on the entire payload to avoid 256KB limit crashes.
+        const rawPayload = {
+          ...log.attributes,
+          ...log.resource?.attributes,
+          message: log.body,
+        };
+        const safePayload = truncateLogPayload(rawPayload, 100000);
+
         const entry = this.log.entry(
           {
             severity: this.mapSeverityToCloudLogging(log.severityNumber),
@@ -74,11 +105,7 @@ export class GcpLogExporter implements LogRecordExporter {
               },
             },
           },
-          {
-            ...log.attributes,
-            ...log.resource?.attributes,
-            message: log.body,
-          },
+          safePayload,
         );
         return entry;
       });
