@@ -2227,6 +2227,69 @@ describe('LocalAgentExecutor', () => {
       // Agent should terminate with ABORTED status
       expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
     });
+
+    it('should throw a critical error when a tool response is dropped by the scheduler', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls two tools
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: 'dir1' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: 'dir2' }, id: 'call2' },
+      ]);
+
+      // Simulate scheduler returning only ONE result for TWO calls (dropped response)
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: { callId: 'call1', name: LS_TOOL_NAME },
+          response: {
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  id: 'call1',
+                  response: { ok: true },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      await expect(
+        executor.run({ goal: 'Protocol test' }, signal),
+      ).rejects.toThrow(
+        'Critical System Failure: Tool execution result was lost/dropped by the scheduler',
+      );
+    });
+
+    it('should throw a critical error when all scheduler results are missing/dropped', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls one tool
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: 'dir1' }, id: 'call1' },
+      ]);
+
+      // Simulate scheduler returning NO results (dropped response)
+      mockScheduleAgentTools.mockResolvedValueOnce([]);
+
+      await expect(
+        executor.run({ goal: 'Protocol test 2' }, signal),
+      ).rejects.toThrow(
+        'Critical System Failure: Tool execution result was lost/dropped by the scheduler',
+      );
+    });
   });
 
   describe('Model Routing', () => {
@@ -2334,7 +2397,15 @@ describe('LocalAgentExecutor', () => {
           },
           response: {
             resultDisplay: 'ls result',
-            responseParts: [],
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  id: 'call1',
+                  response: { ok: true },
+                },
+              },
+            ],
             data: {},
           },
         },
