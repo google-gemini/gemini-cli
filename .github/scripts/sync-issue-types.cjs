@@ -42,9 +42,11 @@ module.exports = async ({ github, context, core }) => {
 
     for (const issue of issues) {
       if (issue.issueType === null) {
-        const labelNames = issue.labels.nodes.map(l => l.name);
+        const labelNames = issue.labels.nodes.map((l) => l.name);
         const hasBug = labelNames.includes('kind/bug');
-        const hasFeature = labelNames.includes('kind/feature') || labelNames.includes('kind/enhancement');
+        const hasFeature =
+          labelNames.includes('kind/feature') ||
+          labelNames.includes('kind/enhancement');
 
         let issueTypeId = null;
         if (hasBug) {
@@ -54,7 +56,8 @@ module.exports = async ({ github, context, core }) => {
         }
 
         if (issueTypeId) {
-          await github.graphql(`
+          await github.graphql(
+            `
             mutation($issueId: ID!, $issueTypeId: ID!) {
               updateIssue(input: {id: $issueId, issueTypeId: $issueTypeId}) {
                 issue {
@@ -62,10 +65,12 @@ module.exports = async ({ github, context, core }) => {
                 }
               }
             }
-          `, {
-            issueId: issue.id,
-            issueTypeId: issueTypeId
-          });
+          `,
+            {
+              issueId: issue.id,
+              issueTypeId: issueTypeId,
+            },
+          );
           core.info(`Successfully synced Issue Type for #${issue.number}`);
           syncedCount++;
         } else {
@@ -73,17 +78,21 @@ module.exports = async ({ github, context, core }) => {
           issuesNeedingAnalysis.push({
             number: issue.number,
             title: issue.title,
-            body: issue.body
+            body: issue.body,
           });
         }
       }
     }
 
     // Write issues needing analysis to a file so the AI can process them
-    fs.writeFileSync('no_type_issues.json', JSON.stringify(issuesNeedingAnalysis));
+    fs.writeFileSync(
+      'no_type_issues.json',
+      JSON.stringify(issuesNeedingAnalysis),
+    );
     core.info(`Synced ${syncedCount} issues from labels.`);
-    core.info(`Found ${issuesNeedingAnalysis.length} issues missing both type and kind label to be analyzed.`);
-
+    core.info(
+      `Found ${issuesNeedingAnalysis.length} issues missing both type and kind label to be analyzed.`,
+    );
   } catch (error) {
     core.setFailed(`Failed to sync issue types: ${error.message}`);
   }

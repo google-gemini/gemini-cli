@@ -14,7 +14,7 @@ module.exports = async ({ github, context, core }) => {
   } catch (jsonError) {
     // If that fails, check for a markdown code block.
     core.warning(
-      `Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`
+      `Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`,
     );
     const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
@@ -22,7 +22,7 @@ module.exports = async ({ github, context, core }) => {
         parsedLabels = JSON.parse(jsonMatch[1].trim());
       } catch (markdownError) {
         core.setFailed(
-          `Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`
+          `Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`,
         );
         return;
       }
@@ -31,20 +31,20 @@ module.exports = async ({ github, context, core }) => {
       // The CLI may include debug/log lines (e.g. telemetry init, YOLO mode)
       // before the actual JSON response.
       const jsonArrayMatch = rawLabels.match(
-        /\[\s*\{\s*"issue_number"[\s\S]*\}\s*\]/
+        /\[\s*\{\s*"issue_number"[\s\S]*\}\s*\]/,
       );
       if (jsonArrayMatch) {
         try {
           parsedLabels = JSON.parse(jsonArrayMatch[0]);
         } catch (extractError) {
           core.setFailed(
-            `Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawLabels}`
+            `Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawLabels}`,
           );
           return;
         }
       } else {
         core.setFailed(
-          `Output is not valid JSON and does not contain extractable JSON.\nRaw output: ${rawLabels}`
+          `Output is not valid JSON and does not contain extractable JSON.\nRaw output: ${rawLabels}`,
         );
         return;
       }
@@ -56,7 +56,7 @@ module.exports = async ({ github, context, core }) => {
     const issueNumber = entry.issue_number;
     if (!issueNumber) {
       core.info(
-        `Skipping entry with no issue number: ${JSON.stringify(entry)}`
+        `Skipping entry with no issue number: ${JSON.stringify(entry)}`,
       );
       continue;
     }
@@ -74,7 +74,7 @@ module.exports = async ({ github, context, core }) => {
 
       const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
       core.info(
-        `Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`
+        `Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`,
       );
     }
 
@@ -101,7 +101,7 @@ module.exports = async ({ github, context, core }) => {
       (!entry.labels_to_remove || entry.labels_to_remove.length === 0)
     ) {
       core.info(
-        `No labels to add or remove for #${issueNumber}, leaving as is`
+        `No labels to add or remove for #${issueNumber}, leaving as is`,
       );
     }
   }
