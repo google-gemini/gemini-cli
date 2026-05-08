@@ -130,6 +130,9 @@ jobs:
                 "glob",
                 "read_file"
               ],
+              "routing": {
+                "enable_numerical_routing": false
+              },
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
