@@ -75,7 +75,7 @@ jobs:
 
           echo '📏 Finding issues missing effort labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 100 --json number,title,body > no_effort_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
           jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json > issues_to_triage.json
