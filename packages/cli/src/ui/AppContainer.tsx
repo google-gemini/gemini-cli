@@ -1400,7 +1400,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
+      const isSlash = isSlashCommand(String(submittedValue ?? '').trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||

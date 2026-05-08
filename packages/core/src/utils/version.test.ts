@@ -6,10 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getVersion, resetVersionCache } from './version.js';
-import { getPackageJson } from './package.js';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-vi.mock('./package.js', () => ({
-  getPackageJson: vi.fn(),
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(),
 }));
 
 describe('version', () => {
@@ -20,7 +21,7 @@ describe('version', () => {
     vi.clearAllMocks();
     resetVersionCache();
     process.env = { ...originalEnv };
-    vi.mocked(getPackageJson).mockResolvedValue({ version: '1.0.0' });
+    vi.mocked(readFile).mockResolvedValue('{"version":"1.0.0"}');
   });
 
   afterEach(() => {
@@ -41,24 +42,52 @@ describe('version', () => {
 
   it('should return "unknown" if package.json is not found and CLI_VERSION is not set', async () => {
     delete process.env['CLI_VERSION'];
-    vi.mocked(getPackageJson).mockResolvedValue(undefined);
+    vi.mocked(readFile).mockRejectedValue(new Error('not found'));
     const version = await getVersion();
     expect(version).toBe('unknown');
   });
 
-  it('should cache the version and only call getPackageJson once', async () => {
+  it('prefers the repository package version when running from source', async () => {
     delete process.env['CLI_VERSION'];
-    vi.mocked(getPackageJson).mockResolvedValue({ version: '1.2.3' });
+    vi.mocked(readFile).mockImplementation(async (filePath) => {
+      const normalizedPath = String(filePath).replace(/\\/g, '/');
+      if (normalizedPath.endsWith('/packages/core/package.json')) {
+        return '{"name":"@google/gemini-cli-core","version":"0.35.0"}';
+      }
+      if (
+        normalizedPath.endsWith('/gemini-cli-work/package.json') ||
+        normalizedPath.endsWith('/gemini-cli/package.json')
+      ) {
+        return '{"name":"@google/gemini-cli","version":"0.36.0"}';
+      }
+      throw new Error('not found');
+    });
+
+    const version = await getVersion();
+
+    expect(version).toBe('0.36.0');
+    expect(vi.mocked(readFile)).toHaveBeenCalledWith(
+      expect.stringContaining(
+        ['packages', 'core', 'package.json'].join(path.sep),
+      ),
+      'utf8',
+    );
+  });
+
+  it('should cache the version and only call readFile once', async () => {
+    delete process.env['CLI_VERSION'];
+    vi.mocked(readFile).mockResolvedValue('{"version":"1.2.3"}');
 
     const version1 = await getVersion();
     expect(version1).toBe('1.2.3');
-    expect(getPackageJson).toHaveBeenCalledTimes(1);
+    const callsAfterFirstLookup = vi.mocked(readFile).mock.calls.length;
+    expect(callsAfterFirstLookup).toBeGreaterThan(0);
 
     // Change the mock value to simulate an update on disk
-    vi.mocked(getPackageJson).mockResolvedValue({ version: '2.0.0' });
+    vi.mocked(readFile).mockResolvedValue('{"version":"2.0.0"}');
 
     const version2 = await getVersion();
     expect(version2).toBe('1.2.3'); // Should still be the cached version
-    expect(getPackageJson).toHaveBeenCalledTimes(1); // Should not have been called again
+    expect(readFile).toHaveBeenCalledTimes(callsAfterFirstLookup);
   });
 });
