@@ -10,7 +10,7 @@ module.exports = async ({ github, context, core }) => {
   const query = `
     query($owner: String!, $repo: String!) {
       repository(owner: $owner, name: $repo) {
-        issues(first: 100, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        issues(first: 50, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
           nodes {
             id
             number
