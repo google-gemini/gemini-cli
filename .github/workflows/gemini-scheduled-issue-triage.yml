@@ -88,6 +88,22 @@ jobs:
           fi
           echo "✅ Found ${ISSUE_COUNT} unique issues to triage! 🎯"
 
+      - name: 'Create Gemini CLI Experiments Override'
+        if: |-
+          steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_issues == 'true'
+        run: |
+          cat << 'EOF' > gemini_exp.json
+          {
+            "flags": [
+              {
+                "flagId": 45750526,
+                "boolValue": false
+              }
+            ],
+            "experimentIds": []
+          }
+          EOF
+
       - name: 'Get Repository Labels'
         id: 'get_labels'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
@@ -113,6 +129,7 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GEMINI_EXP: 'gemini_exp.json'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
