@@ -316,4 +316,3 @@ jobs:
           script: |-
             const cleanupLabels = require('./.github/scripts/cleanup-triage-labels.cjs');
             await cleanupLabels({ github, context, core });
-
