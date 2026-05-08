@@ -125,7 +125,9 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(echo, grep, find)",
+                "run_shell_command(echo)",
+                "grep_search",
+                "glob",
                 "read_file"
               ],
               "telemetry": {
@@ -151,7 +153,7 @@ jobs:
                - If the issue already has a priority/ label, do not change it.
                - If the issue already has an area/ label, do not change it.
                - If the issue already has an effort/ label, do not change it.
-               - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (run_shell_command with grep/find) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
+               - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. Give me a single short explanation about why you are selecting each label in the process.
