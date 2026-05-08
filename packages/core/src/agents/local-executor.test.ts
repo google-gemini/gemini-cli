@@ -2397,7 +2397,15 @@ describe('LocalAgentExecutor', () => {
           },
           response: {
             resultDisplay: 'ls result',
-            responseParts: [],
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  id: 'call1',
+                  response: { ok: true },
+                },
+              },
+            ],
             data: {},
           },
         },
