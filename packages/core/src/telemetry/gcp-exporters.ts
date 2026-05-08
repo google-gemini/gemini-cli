@@ -17,6 +17,7 @@ import type {
   ReadableLogRecord,
   LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
+import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
 
 /**
  * Google Cloud Trace exporter that extends the official trace exporter
@@ -40,6 +41,28 @@ export class GcpMetricExporter extends MetricExporter {
       projectId,
       credentials,
       prefix: 'custom.googleapis.com/gemini_cli',
+    });
+  }
+
+  override export(
+    metrics: ResourceMetrics,
+    resultCallback: (result: ExportResult) => void,
+  ): void {
+    super.export(metrics, (result: ExportResult) => {
+      if (result.code === ExportResultCode.FAILED && result.error) {
+        // Suppress errors related to writing too frequently, as they are
+        // expected when the CLI shuts down quickly after a periodic export.
+        const errorMessage = result.error.message || String(result.error);
+        if (
+          errorMessage.includes(
+            'written more frequently than the maximum sampling period',
+          )
+        ) {
+          resultCallback({ code: ExportResultCode.SUCCESS });
+          return;
+        }
+      }
+      resultCallback(result);
     });
   }
 }
