@@ -92,19 +92,19 @@ export class GcpLogExporter implements LogRecordExporter {
           ...log.resource?.attributes,
           message: log.body,
         };
-        let safePayload = truncateLogPayload(rawPayload, 20000);
+        let safePayload = truncateLogPayload(rawPayload, 10000);
         let payloadString = JSON.stringify(safePayload);
 
-        if (payloadString && payloadString.length > 200000) {
+        if (payloadString && payloadString.length > 100000) {
           // If still too large, apply a stricter limit
-          safePayload = truncateLogPayload(rawPayload, 5000);
+          safePayload = truncateLogPayload(rawPayload, 2000);
           payloadString = JSON.stringify(safePayload);
 
-          if (payloadString && payloadString.length > 200000) {
+          if (payloadString && payloadString.length > 100000) {
             // Fallback: strip structure and send a truncated raw string
             safePayload = {
               _warning: 'Payload heavily truncated due to 256KB limit',
-              data: payloadString.substring(0, 100000) + '... (truncated)',
+              data: payloadString.substring(0, 50000) + '... (truncated)',
             };
           }
         }
