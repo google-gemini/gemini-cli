@@ -18,7 +18,13 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from '../config/constants.js';
-import { GEMINI_DIR, homedir, normalizePath, isSubpath } from './paths.js';
+import {
+  GEMINI_DIR,
+  homedir,
+  isSubpath,
+  normalizePath,
+  toAbsolutePath,
+} from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -157,7 +163,7 @@ async function findProjectRoot(
     return null;
   }
 
-  let currentDir = normalizePath(startDir);
+  let currentDir = toAbsolutePath(startDir);
   while (true) {
     for (const marker of boundaryMarkers) {
       // Sanitize: skip markers with path traversal or absolute paths
@@ -200,7 +206,7 @@ async function findProjectRoot(
         }
       }
     }
-    const parentDir = normalizePath(path.dirname(currentDir));
+    const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
       return null;
     }
@@ -278,11 +284,13 @@ async function getGeminiMdFilePathsInternalForEachDir(
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   for (const geminiMdFilename of geminiMdFilenames) {
-    const resolvedHome = normalizePath(userHomePath);
-    const globalGeminiDir = normalizePath(path.join(resolvedHome, GEMINI_DIR));
-    const globalMemoryPath = normalizePath(
+    const resolvedHome = toAbsolutePath(userHomePath);
+    const globalGeminiDir = toAbsolutePath(path.join(resolvedHome, GEMINI_DIR));
+    const globalMemoryPath = toAbsolutePath(
       path.join(globalGeminiDir, geminiMdFilename),
     );
+    const globalMemoryKey = normalizePath(globalMemoryPath);
+    const globalGeminiDirKey = normalizePath(globalGeminiDir);
 
     // This part that finds the global file always runs.
     try {
@@ -300,7 +308,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
     // FIX: Only perform the workspace search (upward and downward scans)
     // if a valid currentWorkingDirectory is provided.
     if (dir && folderTrust) {
-      const resolvedCwd = normalizePath(dir);
+      const resolvedCwd = toAbsolutePath(dir);
       debugLogger.debug(
         '[DEBUG] [MemoryDiscovery] Searching for',
         geminiMdFilename,
@@ -316,35 +324,32 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
       const upwardPaths: string[] = [];
       let currentDir = resolvedCwd;
-      const ultimateStopDir = projectRoot
+      const ultimateStopDirKey = projectRoot
         ? normalizePath(path.dirname(projectRoot))
         : normalizePath(path.dirname(resolvedHome));
 
-      while (
-        currentDir &&
-        currentDir !== normalizePath(path.dirname(currentDir))
-      ) {
-        if (currentDir === globalGeminiDir) {
+      while (currentDir && currentDir !== path.dirname(currentDir)) {
+        if (normalizePath(currentDir) === globalGeminiDirKey) {
           break;
         }
 
-        const potentialPath = normalizePath(
+        const potentialPath = toAbsolutePath(
           path.join(currentDir, geminiMdFilename),
         );
         try {
           await fs.access(potentialPath, fsSync.constants.R_OK);
-          if (potentialPath !== globalMemoryPath) {
+          if (normalizePath(potentialPath) !== globalMemoryKey) {
             upwardPaths.unshift(potentialPath);
           }
         } catch {
           // Not found, continue.
         }
 
-        if (currentDir === ultimateStopDir) {
+        if (normalizePath(currentDir) === ultimateStopDirKey) {
           break;
         }
 
-        currentDir = normalizePath(path.dirname(currentDir));
+        currentDir = path.dirname(currentDir);
       }
       upwardPaths.forEach((p) => projectPaths.add(p));
 
@@ -361,7 +366,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
       });
       downwardPaths.sort();
       for (const dPath of downwardPaths) {
-        projectPaths.add(normalizePath(dPath));
+        projectPaths.add(toAbsolutePath(dPath));
       }
     }
   }
@@ -485,7 +490,9 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const globalPath = normalizePath(path.join(userHome, GEMINI_DIR, filename));
+    const globalPath = toAbsolutePath(
+      path.join(userHome, GEMINI_DIR, filename),
+    );
     try {
       await fs.access(globalPath, fsSync.constants.R_OK);
       debugLogger.debug(
@@ -506,7 +513,7 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
 export async function getUserProjectMemoryPaths(
   projectMemoryDir: string,
 ): Promise<string[]> {
-  const preferredMemoryPath = normalizePath(
+  const preferredMemoryPath = toAbsolutePath(
     path.join(projectMemoryDir, PROJECT_MEMORY_INDEX_FILENAME),
   );
 
@@ -524,7 +531,7 @@ export async function getUserProjectMemoryPaths(
 
   const geminiMdFilenames = getAllGeminiMdFilenames();
   const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const legacyMemoryPath = normalizePath(
+    const legacyMemoryPath = toAbsolutePath(
       path.join(projectMemoryDir, filename),
     );
     try {
@@ -551,22 +558,30 @@ export function getExtensionMemoryPaths(
     .getExtensions()
     .filter((ext) => ext.isActive)
     .flatMap((ext) => ext.contextFiles)
-    .map((p) => normalizePath(p));
+    .map((p) => toAbsolutePath(p));
 
-  return Array.from(new Set(extensionPaths)).sort();
+  // Deduplicate case-insensitively (so macOS/Windows don't keep two casings of
+  // the same file) while preserving the first encountered casing for display.
+  const seenKeys = new Set<string>();
+  const unique: string[] = [];
+  for (const p of extensionPaths) {
+    const key = normalizePath(p);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    unique.push(p);
+  }
+  return unique.sort();
 }
 
 export async function getEnvironmentMemoryPaths(
   trustedRoots: string[],
   boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<string[]> {
-  const allPaths = new Set<string>();
-
   // Trusted Roots Upward Traversal (Parallelized)
   const traversalPromises = trustedRoots.map(async (root) => {
-    const resolvedRoot = normalizePath(root);
+    const resolvedRoot = toAbsolutePath(root);
     const gitRoot = await findProjectRoot(resolvedRoot, boundaryMarkers);
-    const ceiling = gitRoot ? normalizePath(gitRoot) : resolvedRoot;
+    const ceiling = gitRoot ?? resolvedRoot;
     debugLogger.debug(
       '[DEBUG] [MemoryDiscovery] Loading environment memory for trusted root:',
       resolvedRoot,
@@ -579,9 +594,11 @@ export async function getEnvironmentMemoryPaths(
   });
 
   const pathArrays = await Promise.all(traversalPromises);
-  pathArrays.flat().forEach((p) => allPaths.add(p));
 
-  return Array.from(allPaths).sort();
+  const { paths: unique } = await deduplicatePathsByFileIdentity(
+    pathArrays.flat(),
+  );
+  return unique.sort();
 }
 
 export function categorizeAndConcatenate(
@@ -619,26 +636,26 @@ async function findUpwardGeminiFiles(
   stopDir: string,
 ): Promise<string[]> {
   const upwardPaths: string[] = [];
-  let currentDir = normalizePath(startDir);
-  const resolvedStopDir = normalizePath(stopDir);
+  let currentDir = toAbsolutePath(startDir);
+  const resolvedStopDirKey = normalizePath(stopDir);
   const geminiMdFilenames = getAllGeminiMdFilenames();
-  const globalGeminiDir = normalizePath(path.join(homedir(), GEMINI_DIR));
+  const globalGeminiDirKey = normalizePath(path.join(homedir(), GEMINI_DIR));
 
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Starting upward search from',
     currentDir,
     'stopping at',
-    resolvedStopDir,
+    stopDir,
   );
 
   while (true) {
-    if (currentDir === globalGeminiDir) {
+    if (normalizePath(currentDir) === globalGeminiDirKey) {
       break;
     }
 
     // Parallelize checks for all filename variants in the current directory
     const accessChecks = geminiMdFilenames.map(async (filename) => {
-      const potentialPath = normalizePath(path.join(currentDir, filename));
+      const potentialPath = toAbsolutePath(path.join(currentDir, filename));
       try {
         await fs.access(potentialPath, fsSync.constants.R_OK);
         return potentialPath;
@@ -653,8 +670,9 @@ async function findUpwardGeminiFiles(
 
     upwardPaths.unshift(...foundPathsInDir);
 
-    const parentDir = normalizePath(path.dirname(currentDir));
-    if (currentDir === resolvedStopDir || currentDir === parentDir) {
+    const parentDir = path.dirname(currentDir);
+    const currentKey = normalizePath(currentDir);
+    if (currentKey === resolvedStopDirKey || currentDir === parentDir) {
       break;
     }
     currentDir = parentDir;
@@ -821,15 +839,18 @@ export async function loadJitSubdirectoryMemory(
   alreadyLoadedIdentities?: Set<string>,
   boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<MemoryLoadResult> {
-  const resolvedTarget = normalizePath(targetPath);
+  const resolvedTarget = toAbsolutePath(targetPath);
   let bestRoot: string | null = null;
+  let bestRootKeyLength = -1;
 
   // Find the deepest trusted root that contains the target path
   for (const root of trustedRoots) {
     if (isSubpath(root, targetPath)) {
-      const resolvedRoot = normalizePath(root);
-      if (!bestRoot || resolvedRoot.length > bestRoot.length) {
+      const resolvedRoot = toAbsolutePath(root);
+      const rootKeyLength = normalizePath(resolvedRoot).length;
+      if (rootKeyLength > bestRootKeyLength) {
         bestRoot = resolvedRoot;
+        bestRootKeyLength = rootKeyLength;
       }
     }
   }
@@ -846,7 +867,7 @@ export async function loadJitSubdirectoryMemory(
   // Find the git root to use as the traversal ceiling.
   // If no git root exists, fall back to the trusted root as the ceiling.
   const gitRoot = await findProjectRoot(bestRoot, boundaryMarkers);
-  const resolvedCeiling = gitRoot ? normalizePath(gitRoot) : bestRoot;
+  const resolvedCeiling = gitRoot ?? bestRoot;
 
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Loading JIT memory for',
@@ -862,12 +883,12 @@ export async function loadJitSubdirectoryMemory(
   try {
     const stat = await fs.stat(resolvedTarget);
     if (stat.isFile()) {
-      startDir = normalizePath(path.dirname(resolvedTarget));
+      startDir = path.dirname(resolvedTarget);
     }
   } catch {
     // If stat fails (e.g. file doesn't exist yet for write_file),
     // assume it's a file path and use its parent directory.
-    startDir = normalizePath(path.dirname(resolvedTarget));
+    startDir = path.dirname(resolvedTarget);
   }
 
   // Traverse from the resolved directory up to the ceiling
