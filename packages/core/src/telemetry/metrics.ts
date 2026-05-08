@@ -1129,7 +1129,11 @@ export function recordModelRoutingMetrics(
   };
 
   if (event.reasoning) {
-    attributes['routing.reasoning'] = event.reasoning;
+    // GCP metric labels have a maximum string size of 1024 characters.
+    attributes['routing.reasoning'] =
+      event.reasoning.length > 1000
+        ? event.reasoning.substring(0, 1000) + '...'
+        : event.reasoning;
   }
   if (event.enable_numerical_routing !== undefined) {
     attributes['routing.enable_numerical_routing'] =
@@ -1144,7 +1148,10 @@ export function recordModelRoutingMetrics(
   if (event.failed) {
     modelRoutingFailureCounter.add(1, {
       ...attributes,
-      'routing.error_message': event.error_message,
+      'routing.error_message':
+        event.error_message && event.error_message.length > 1000
+          ? event.error_message.substring(0, 1000) + '...'
+          : event.error_message,
     });
   }
 }
