@@ -2136,6 +2136,28 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('should map legacy camelCase thoughtSignature to snake_case thought_signature', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Start' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'tool', args: {} },
+              thoughtSignature: 'legacy-sig',
+            },
+          ],
+        },
+      ];
+
+      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+
+      // @ts-expect-error testing injection
+      expect(newContents[1]?.parts?.[0]?.thought_signature).toBe('legacy-sig');
+      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+    });
+
     it('should not modify contents if there is no user text message', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
