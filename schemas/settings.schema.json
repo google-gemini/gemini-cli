@@ -3107,8 +3107,8 @@
             "stopGracePeriodMs": {
               "title": "Voice Stop Grace Period (ms)",
               "description": "How long to wait for final transcription after stopping recording.",
-              "markdownDescription": "How long to wait for final transcription after stopping recording.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `1000`",
-              "default": 1000,
+              "markdownDescription": "How long to wait for final transcription after stopping recording.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `4000`",
+              "default": 4000,
               "type": "number"
             }
           },
