@@ -219,4 +219,40 @@ describe('StateSnapshotProcessor', () => {
       }),
     );
   });
+
+  it('should garbage collect the old baseline snapshot from the live graph when creating a new sync snapshot', async () => {
+    const env = createMockEnvironment();
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      { target: 'incremental' },
+    );
+
+    const oldSnapshot = createDummyNode(
+      'ep1',
+      NodeType.SNAPSHOT,
+      10,
+      { payload: { text: '{}' } },
+      'old-snap',
+    );
+    const nodeA = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+
+    // The processor summarizes these 2 nodes
+    const result = await processor.process(
+      createMockProcessArgs([oldSnapshot, nodeA]),
+    );
+
+    // It should have replaced BOTH the old snapshot and the new node with ONE new snapshot
+    expect(result.length).toBe(1);
+    expect(result[0].type).toBe(NodeType.SNAPSHOT);
+    expect(result[0].id).not.toBe('old-snap');
+    expect(result[0].abstractsIds).toContain('old-snap');
+    expect(result[0].abstractsIds).toContain('node-A');
+  });
 });

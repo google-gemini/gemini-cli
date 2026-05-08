@@ -96,6 +96,11 @@ describe('snapshot_fidelity', () => {
       const generator = new SnapshotGenerator({
         llmClient,
         promptId: 'eval-snapshot-test',
+        tokenCalculator: {
+          estimateTokensForString(str: string): number {
+            return str.length * 4;
+          },
+        },
       } as any);
 
       // 3. Generate the snapshot using the CURRENT system prompt

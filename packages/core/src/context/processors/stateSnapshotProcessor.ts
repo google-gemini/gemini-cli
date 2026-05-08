@@ -149,6 +149,7 @@ export function createStateSnapshotProcessor(
       if (nodesToSummarize.length < 2) return targets; // Not enough context
 
       let previousStateJson: string | undefined = undefined;
+      let baselineIdToConsume: string | undefined = undefined;
 
       // Global Lookback: Find the absolute most recent snapshot anywhere in the active context
       const baseline = findLatestSnapshotBaseline(targets);
@@ -160,6 +161,7 @@ export function createStateSnapshotProcessor(
           (n) => n.id === baseline.id,
         );
         if (summaryIdx !== -1) {
+          baselineIdToConsume = baseline.id;
           nodesToSummarize.splice(summaryIdx, 1);
         }
       } else {
@@ -178,6 +180,11 @@ export function createStateSnapshotProcessor(
           },
         );
         const newId = randomUUID();
+        const consumedIds = nodesToSummarize.map((n) => n.id);
+        if (baselineIdToConsume && !consumedIds.includes(baselineIdToConsume)) {
+          consumedIds.push(baselineIdToConsume);
+        }
+
         const snapshotNode: Snapshot = {
           id: newId,
           turnId: newId,
@@ -185,10 +192,9 @@ export function createStateSnapshotProcessor(
           timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',
           payload: { text: snapshotText },
-          abstractsIds: nodesToSummarize.map((n) => n.id),
+          abstractsIds: [...consumedIds],
         };
 
-        const consumedIds = nodesToSummarize.map((n) => n.id);
         const returnedNodes = targets.filter(
           (t) => !consumedIds.includes(t.id),
         );
