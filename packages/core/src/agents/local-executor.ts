@@ -952,17 +952,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       });
     const requestedModel = resolvedConfig.model;
 
-    let modelToUse: string;
+    let modelToUse: string | undefined;
     if (isAutoModel(requestedModel)) {
-      const cached = this.cache.get('modelToUse');
-      if (cached) {
-        modelToUse = cached;
-      } else {
-        // TODO(joshualitt): This try / catch is inconsistent with the routing
-        // behavior for the main agent. Ideally, we would have a universal
-        // policy for routing failure. Given routing failure does not necessarily
-        // mean generation will fail, we may want to share this logic with
-        // other places we use model routing.
+      modelToUse = this.cache.get('modelToUse');
+
+      // If not cached, fetch from the router and cache the result.
+      if (!modelToUse) {
         try {
           const routingContext: RoutingContext = {
             history: chat.getHistory(/*curated=*/ true),
@@ -973,12 +968,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           const router = this.context.config.getModelRouterService();
           const decision = await router.route(routingContext);
           modelToUse = decision.model;
-          this.cache.set('modelToUse', modelToUse);
         } catch (error) {
           debugLogger.warn(`Error during model routing: ${error}`);
           modelToUse = DEFAULT_GEMINI_MODEL;
-          this.cache.set('modelToUse', modelToUse);
         }
+        // Cache the result regardless of whether it succeeded or fell back
+        this.cache.set('modelToUse', modelToUse);
       }
     } else {
       modelToUse = requestedModel;
