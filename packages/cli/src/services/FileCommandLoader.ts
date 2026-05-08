@@ -218,8 +218,9 @@ export class FileCommandLoader implements ICommandLoader {
       kind: CommandKind.USER_FILE,
     });
 
-    // 2. Project commands (skip if same directory as user commands, e.g. when
-    //    cwd is the user's home directory, to avoid false conflict warnings)
+    // 2. Project commands — skip if the workspace IS the home directory,
+    // because user and workspace commands would resolve to the same path
+    // and cause false conflict warnings. See: github.com/google-gemini/gemini-cli/issues/22929
     if (!storage.isWorkspaceHomeDir()) {
       dirs.push({
         path: storage.getProjectCommandsDir(),

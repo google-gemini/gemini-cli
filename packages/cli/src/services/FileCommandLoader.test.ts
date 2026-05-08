@@ -6,12 +6,7 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
-import {
-  GEMINI_DIR,
-  Storage,
-  type Config,
-  homedir,
-} from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage, type Config } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
 import { FileCommandLoader } from './FileCommandLoader.js';
 import { assert, vi } from 'vitest';
@@ -320,32 +315,36 @@ describe('FileCommandLoader', () => {
     }
   });
 
-  it('does not duplicate commands when project root is the home directory', async () => {
-    const homeDir = homedir();
+  it('skips workspace commands when project root is the home directory to avoid false conflicts', async () => {
     const userCommandsDir = Storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
-        'test.toml': 'prompt = "User prompt"',
+        'my_command.toml': 'prompt = "My command prompt"',
         'another.toml': 'prompt = "Another prompt"',
       },
     });
 
+    // Create a Storage instance with isWorkspaceHomeDir returning true
+    const storageInstance = new Storage(process.cwd());
+    vi.spyOn(storageInstance, 'isWorkspaceHomeDir').mockReturnValue(true);
+
     const mockConfig = {
-      getProjectRoot: vi.fn(() => homeDir),
+      getProjectRoot: vi.fn(() => process.cwd()),
       getExtensions: vi.fn(() => []),
       getFolderTrust: vi.fn(() => false),
       isTrustedFolder: vi.fn(() => false),
+      storage: storageInstance,
     } as unknown as Config;
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
 
-    // Should load each command only once (as user commands), not twice
+    // Should only load user commands, not duplicate workspace commands
     expect(commands).toHaveLength(2);
-    const names = commands.map((c) => c.name);
-    expect(names).toContain('test');
-    expect(names).toContain('another');
-    // Verify they are loaded as user commands, not duplicated as workspace commands
-    expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
+    expect(commands.every((cmd) => cmd.kind === CommandKind.USER_FILE)).toBe(
+      true,
+    );
+    const names = commands.map((c) => c.name).sort();
+    expect(names).toEqual(['another', 'my_command']);
   });
 
   it('ignores files with TOML syntax errors', async () => {
