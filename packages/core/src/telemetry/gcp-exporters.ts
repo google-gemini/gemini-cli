@@ -110,44 +110,41 @@ export class GcpLogExporter implements LogRecordExporter {
   ): void {
     try {
       const entries = logs.map((log) => {
-        // Enforce a strict cap on the entire payload to avoid 256KB limit crashes.
         const rawPayload = {
           ...log.attributes,
           ...log.resource?.attributes,
           message: log.body,
         };
-        const isCiWorkaround =
+
+        const isStrictTelemetry =
           process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
-        const limitThreshold = isCiWorkaround ? 100000 : 240000;
 
-        let safePayload = truncateLogPayload(
-          rawPayload,
-          isCiWorkaround ? 10000 : 100000,
-        );
-        let payloadString = JSON.stringify(safePayload);
+        let finalPayload: unknown = rawPayload;
 
-        if (payloadString && payloadString.length > limitThreshold) {
-          // If still too large, apply a stricter limit
-          safePayload = truncateLogPayload(
-            rawPayload,
-            isCiWorkaround ? 2000 : 30000,
-          );
-          payloadString = JSON.stringify(safePayload);
+        if (isStrictTelemetry) {
+          // Enforce a strict cap on the entire payload to avoid 256KB limit crashes in CI.
+          let safePayload = truncateLogPayload(rawPayload, 10000);
+          let payloadString = JSON.stringify(safePayload);
 
-          if (payloadString && payloadString.length > limitThreshold) {
-            safePayload = truncateLogPayload(rawPayload, 5000);
+          if (payloadString && payloadString.length > 100000) {
+            // If still too large, apply a stricter limit
+            safePayload = truncateLogPayload(rawPayload, 2000);
             payloadString = JSON.stringify(safePayload);
 
-            if (payloadString && payloadString.length > limitThreshold) {
-              // Fallback: strip structure and send a truncated raw string
-              safePayload = {
-                _warning: 'Payload heavily truncated due to GCP 256KB limit',
-                data:
-                  payloadString.substring(0, isCiWorkaround ? 50000 : 100000) +
-                  '... (truncated)',
-              };
+            if (payloadString && payloadString.length > 100000) {
+              safePayload = truncateLogPayload(rawPayload, 5000);
+              payloadString = JSON.stringify(safePayload);
+
+              if (payloadString && payloadString.length > 100000) {
+                // Fallback: strip structure and send a truncated raw string
+                safePayload = {
+                  _warning: 'Payload heavily truncated due to strict limits',
+                  data: payloadString.substring(0, 50000) + '... (truncated)',
+                };
+              }
             }
           }
+          finalPayload = safePayload;
         }
 
         const entry = this.log.entry(
@@ -162,7 +159,7 @@ export class GcpLogExporter implements LogRecordExporter {
             },
           },
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          safePayload as Record<string, unknown>,
+          finalPayload as Record<string, unknown>,
         );
         return entry;
       });

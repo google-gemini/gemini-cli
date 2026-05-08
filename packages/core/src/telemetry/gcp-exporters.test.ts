@@ -175,11 +175,41 @@ describe('GCP Exporters', () => {
         // Should have fallen back to structural strip due to strict limit
         expect(payload).toHaveProperty(
           '_warning',
-          'Payload heavily truncated due to GCP 256KB limit',
+          'Payload heavily truncated due to strict limits',
         );
         expect(payload.data.length).toBeLessThanOrEqual(50050); // 50000 + '... (truncated)'
 
         vi.unstubAllEnvs();
+      });
+
+      it('should completely bypass truncation if GEMINI_STRICT_TELEMETRY_LIMITS is false or unset', async () => {
+        const largeArray = Array(60).fill('a'.repeat(10000));
+
+        const mockLogRecords: ReadableLogRecord[] = [
+          {
+            hrTime: [1234567890, 123456789],
+            hrTimeObserved: [1234567890, 123456789],
+            severityNumber: 9,
+            body: 'Test',
+            attributes: {
+              huge_data: largeArray,
+            },
+          } as unknown as ReadableLogRecord,
+        ];
+
+        const callback = vi.fn();
+        exporter.export(mockLogRecords, callback);
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(mockLog.entry).toHaveBeenCalled();
+        const entryCallArgs = mockLog.entry.mock.calls[0];
+        const payload = entryCallArgs[1];
+
+        // Should NOT have fallen back to structural strip, array should be intact
+        expect(payload).not.toHaveProperty('_warning');
+        expect(payload).toHaveProperty('huge_data');
+        expect(payload.huge_data).toEqual(largeArray);
       });
 
       it('should handle export failures', async () => {
