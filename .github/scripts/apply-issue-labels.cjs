@@ -65,12 +65,7 @@ module.exports = async ({ github, context, core }) => {
     labelsToAdd.push('status/bot-triaged');
 
     let labelsToRemove = entry.labels_to_remove || [];
-    if (
-      labelsToAdd.includes('status/bot-triaged') ||
-      labelsToAdd.includes('status/manual-triage')
-    ) {
-      labelsToRemove.push('status/need-triage');
-    }
+    labelsToRemove.push('status/need-triage');
     // Deduplicate array
     labelsToRemove = [...new Set(labelsToRemove)];
 
