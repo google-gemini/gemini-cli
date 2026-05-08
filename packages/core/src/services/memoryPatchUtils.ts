@@ -10,6 +10,10 @@ import * as Diff from 'diff';
 import type { StructuredPatch } from 'diff';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
+import {
+  getGlobalMemoryFilePath,
+  PROJECT_MEMORY_INDEX_FILENAME,
+} from '../tools/memoryTool.js';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath } from '../utils/paths.js';
@@ -217,6 +221,406 @@ export function hasParsedPatchHunks(parsedPatches: StructuredPatch[]): boolean {
     parsedPatches.length > 0 &&
     parsedPatches.every((patch) => patch.hunks.length > 0)
   );
+}
+
+export type InboxMemoryPatchKind = 'private' | 'global';
+
+export function getMemoryPatchRoot(
+  memoryDir: string,
+  kind: InboxMemoryPatchKind,
+): string {
+  return path.join(memoryDir, '.inbox', kind);
+}
+
+function isSubpathOrSame(childPath: string, parentPath: string): boolean {
+  return isSubpath(parentPath, childPath);
+}
+
+export function normalizeInboxMemoryPatchPath(
+  relativePath: string,
+): string | undefined {
+  if (
+    relativePath.length === 0 ||
+    path.isAbsolute(relativePath) ||
+    relativePath.includes('\\')
+  ) {
+    return undefined;
+  }
+
+  const normalizedPath = path.posix.normalize(relativePath);
+  if (
+    normalizedPath === '.' ||
+    normalizedPath.startsWith('../') ||
+    normalizedPath === '..' ||
+    !normalizedPath.endsWith('.patch')
+  ) {
+    return undefined;
+  }
+  return normalizedPath;
+}
+
+/**
+ * Returns coarse directory roots (or single-file roots) used for canonical
+ * containment checks before the kind-specific target validator runs.
+ *
+ * - `private` is rooted at the project memory directory, then narrowed to
+ *   direct memory markdown documents by `isAllowedPrivateMemoryDocumentPath`.
+ * - `global` is intentionally a single-file allowlist: the only writeable
+ *   global file is the personal `~/.gemini/GEMINI.md`. Other files under
+ *   `~/.gemini/` (settings, credentials, oauth, keybindings, etc.) are off-limits.
+ */
+export function getAllowedMemoryPatchRoots(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+): string[] {
+  switch (kind) {
+    case 'private':
+      return [path.resolve(config.storage.getProjectMemoryTempDir())];
+    case 'global':
+      return [path.resolve(getGlobalMemoryFilePath())];
+    default:
+      throw new Error(`Unknown memory patch kind: ${kind as string}`);
+  }
+}
+
+export interface MemoryPatchTargetValidationContext {
+  kind: InboxMemoryPatchKind;
+  allowedRoots: string[];
+  privateMemoryDirs: string[];
+  globalMemoryFiles: string[];
+}
+
+function hasMarkdownExtension(fileName: string): boolean {
+  return fileName.toLowerCase().endsWith('.md');
+}
+
+function isAllowedPrivateMemoryFileName(fileName: string): boolean {
+  if (fileName === PROJECT_MEMORY_INDEX_FILENAME) {
+    return true;
+  }
+  return !fileName.startsWith('.') && hasMarkdownExtension(fileName);
+}
+
+function uniqueResolvedPaths(paths: readonly string[]): string[] {
+  return Array.from(new Set(paths.map((filePath) => path.resolve(filePath))));
+}
+
+function isSamePath(leftPath: string, rightPath: string): boolean {
+  return isSubpath(leftPath, rightPath) && isSubpath(rightPath, leftPath);
+}
+
+function includesSamePath(
+  paths: readonly string[],
+  targetPath: string,
+): boolean {
+  return paths.some((candidate) => isSamePath(candidate, targetPath));
+}
+
+function isAllowedPrivateMemoryDocumentPath(
+  targetPath: string,
+  memoryDirs: readonly string[],
+): boolean {
+  const resolvedTargetPath = path.resolve(targetPath);
+  const targetDir = path.dirname(resolvedTargetPath);
+  if (!includesSamePath(memoryDirs, targetDir)) {
+    return false;
+  }
+  return isAllowedPrivateMemoryFileName(path.basename(resolvedTargetPath));
+}
+
+function isAllowedGlobalMemoryDocumentPath(
+  targetPath: string,
+  globalMemoryFiles: readonly string[],
+): boolean {
+  const resolvedTargetPath = path.resolve(targetPath);
+  return includesSamePath(globalMemoryFiles, resolvedTargetPath);
+}
+
+export async function getMemoryPatchTargetValidationContext(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+): Promise<MemoryPatchTargetValidationContext> {
+  const allowedRoots = await canonicalizeAllowedPatchRoots(
+    getAllowedMemoryPatchRoots(config, kind),
+  );
+
+  if (kind === 'global') {
+    const rawGlobalMemoryFile = path.resolve(getGlobalMemoryFilePath());
+    const canonicalGlobalMemoryFiles = await canonicalizeAllowedPatchRoots([
+      rawGlobalMemoryFile,
+    ]);
+    return {
+      kind,
+      allowedRoots,
+      privateMemoryDirs: [],
+      globalMemoryFiles: uniqueResolvedPaths([
+        rawGlobalMemoryFile,
+        ...canonicalGlobalMemoryFiles,
+      ]),
+    };
+  }
+
+  const rawPrivateMemoryDir = path.resolve(
+    config.storage.getProjectMemoryTempDir(),
+  );
+  const canonicalPrivateMemoryDirs = await canonicalizeAllowedPatchRoots([
+    rawPrivateMemoryDir,
+  ]);
+  const privateMemoryDirs = uniqueResolvedPaths([
+    rawPrivateMemoryDir,
+    ...canonicalPrivateMemoryDirs,
+  ]);
+
+  return { kind, allowedRoots, privateMemoryDirs, globalMemoryFiles: [] };
+}
+
+export function isResolvedMemoryPatchTargetAllowed(
+  resolvedTargetPath: string,
+  context: MemoryPatchTargetValidationContext,
+): boolean {
+  if (context.kind === 'global') {
+    return isAllowedGlobalMemoryDocumentPath(
+      resolvedTargetPath,
+      context.globalMemoryFiles,
+    );
+  }
+  if (context.kind === 'private') {
+    return isAllowedPrivateMemoryDocumentPath(
+      resolvedTargetPath,
+      context.privateMemoryDirs,
+    );
+  }
+  return true;
+}
+
+export async function resolveMemoryPatchTargetWithinAllowedSet(
+  targetPath: string,
+  context: MemoryPatchTargetValidationContext,
+): Promise<string | undefined> {
+  const resolvedTargetPath = await resolveTargetWithinAllowedRoots(
+    targetPath,
+    context.allowedRoots,
+  );
+  if (!resolvedTargetPath) {
+    return undefined;
+  }
+  if (
+    context.kind === 'private' &&
+    (!isAllowedPrivateMemoryDocumentPath(
+      targetPath,
+      context.privateMemoryDirs,
+    ) ||
+      !isAllowedPrivateMemoryDocumentPath(
+        resolvedTargetPath,
+        context.privateMemoryDirs,
+      ))
+  ) {
+    return undefined;
+  }
+  if (
+    context.kind === 'global' &&
+    (!isAllowedGlobalMemoryDocumentPath(
+      targetPath,
+      context.globalMemoryFiles,
+    ) ||
+      !isAllowedGlobalMemoryDocumentPath(
+        resolvedTargetPath,
+        context.globalMemoryFiles,
+      ))
+  ) {
+    return undefined;
+  }
+  return resolvedTargetPath;
+}
+
+export async function findDisallowedMemoryPatchTarget(
+  parsedPatches: StructuredPatch[],
+  context: MemoryPatchTargetValidationContext,
+): Promise<string | undefined> {
+  const validated = validateParsedSkillPatchHeaders(parsedPatches);
+  if (!validated.success) {
+    return undefined;
+  }
+
+  for (const header of validated.patches) {
+    if (
+      !(await resolveMemoryPatchTargetWithinAllowedSet(
+        header.targetPath,
+        context,
+      ))
+    ) {
+      return header.targetPath;
+    }
+  }
+  return undefined;
+}
+
+export async function getInboxMemoryPatchSourcePath(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+  relativePath: string,
+): Promise<string | undefined> {
+  const normalizedPath = normalizeInboxMemoryPatchPath(relativePath);
+  if (!normalizedPath) {
+    return undefined;
+  }
+
+  const patchRoot = path.resolve(
+    getMemoryPatchRoot(config.storage.getProjectMemoryTempDir(), kind),
+  );
+  const sourcePath = path.resolve(patchRoot, ...normalizedPath.split('/'));
+  if (!isSubpathOrSame(sourcePath, patchRoot)) {
+    return undefined;
+  }
+  return sourcePath;
+}
+
+/**
+ * Returns the absolute paths of every `.patch` file currently in the kind's
+ * inbox directory (sorted by basename for stable ordering at apply time).
+ *
+ * NOTE: this is a raw filesystem listing — it does NOT validate patch shape
+ * or that targets fall inside the kind's allowed root. Callers that need
+ * "what the user actually sees in the inbox" should use `listValidInboxPatchFiles`.
+ */
+export async function listInboxPatchFiles(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+): Promise<string[]> {
+  const patchRoot = getMemoryPatchRoot(
+    config.storage.getProjectMemoryTempDir(),
+    kind,
+  );
+  const found: string[] = [];
+
+  async function walk(currentDir: string): Promise<void> {
+    let dirEntries: Array<import('node:fs').Dirent>;
+    try {
+      dirEntries = await fs.readdir(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of dirEntries) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith('.patch')) {
+        found.push(entryPath);
+      }
+    }
+  }
+
+  await walk(patchRoot);
+  return found.sort();
+}
+
+export type ValidateInboxMemoryPatchFileResult =
+  | { valid: true }
+  | { valid: false; reason: string };
+
+/**
+ * Checks whether a memory inbox patch passes the same validation as
+ * `/memory inbox`: parseable unified diff, at least one hunk per parsed file,
+ * valid absolute headers, and all targets inside the kind's allowed target set.
+ */
+export async function validateInboxMemoryPatchFile(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+  sourcePath: string,
+): Promise<ValidateInboxMemoryPatchFileResult> {
+  let content: string;
+  try {
+    content = await fs.readFile(sourcePath, 'utf-8');
+  } catch (error) {
+    return {
+      valid: false,
+      reason: `failed to read patch: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  let parsed: StructuredPatch[];
+  try {
+    parsed = Diff.parsePatch(content);
+  } catch (error) {
+    return {
+      valid: false,
+      reason: `failed to parse patch: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (!hasParsedPatchHunks(parsed)) {
+    return { valid: false, reason: 'no hunks found in patch' };
+  }
+
+  const validated = validateParsedSkillPatchHeaders(parsed);
+  if (!validated.success) {
+    switch (validated.reason) {
+      case 'missingTargetPath':
+        return {
+          valid: false,
+          reason: 'missing target file path in patch header',
+        };
+      case 'invalidPatchHeaders':
+        return {
+          valid: false,
+          reason: `invalid diff headers${validated.targetPath ? `: ${validated.targetPath}` : ''}`,
+        };
+      default:
+        return { valid: false, reason: 'invalid patch headers' };
+    }
+  }
+
+  const validationContext = await getMemoryPatchTargetValidationContext(
+    config,
+    kind,
+  );
+  for (const header of validated.patches) {
+    if (
+      !(await resolveMemoryPatchTargetWithinAllowedSet(
+        header.targetPath,
+        validationContext,
+      ))
+    ) {
+      return {
+        valid: false,
+        reason: `target file is outside ${kind} memory roots: ${header.targetPath}`,
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Returns only the inbox patch files that pass the same validation as the
+ * inbox listing (parseable, has hunks, valid headers, targets in the kind's
+ * allowed target set). Used by aggregate apply and memory-service notification
+ * counting so the user only ever sees results for patches the inbox actually
+ * surfaced.
+ */
+export async function listValidInboxPatchFiles(
+  config: Config,
+  kind: InboxMemoryPatchKind,
+): Promise<string[]> {
+  const patchFiles = await listInboxPatchFiles(config, kind);
+  if (patchFiles.length === 0) {
+    return [];
+  }
+
+  const valid: string[] = [];
+  for (const sourcePath of patchFiles) {
+    const validation = await validateInboxMemoryPatchFile(
+      config,
+      kind,
+      sourcePath,
+    );
+    if (validation.valid) {
+      valid.push(sourcePath);
+    }
+  }
+  return valid;
 }
 
 export interface AppliedSkillPatchTarget {

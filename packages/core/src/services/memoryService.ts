@@ -39,6 +39,9 @@ import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
+  type InboxMemoryPatchKind,
+  listInboxPatchFiles,
+  validateInboxMemoryPatchFile,
 } from './memoryPatchUtils.js';
 import { sanitizeWorkflowSummaryForScratchpad } from './sessionScratchpadUtils.js';
 
@@ -981,6 +984,39 @@ async function snapshotInboxCandidates(
   return snapshotFiles(path.join(memoryDir, '.inbox'));
 }
 
+const MEMORY_INBOX_PATCH_KINDS: readonly InboxMemoryPatchKind[] = [
+  'private',
+  'global',
+];
+
+async function validateMemoryInboxPatches(config: Config): Promise<void> {
+  for (const kind of MEMORY_INBOX_PATCH_KINDS) {
+    const patchFiles = await listInboxPatchFiles(config, kind);
+    for (const patchFile of patchFiles) {
+      const validation = await validateInboxMemoryPatchFile(
+        config,
+        kind,
+        patchFile,
+      );
+      if (validation.valid) {
+        continue;
+      }
+
+      try {
+        await fs.unlink(patchFile);
+        debugLogger.warn(
+          `[MemoryService] Dropped invalid ${kind} memory inbox patch ${patchFile}: ${validation.reason}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        debugLogger.warn(
+          `[MemoryService] Failed to drop invalid ${kind} memory inbox patch ${patchFile}: ${validation.reason}; unlink failed: ${message}`,
+        );
+      }
+    }
+  }
+}
+
 /**
  * Builds a human-readable summary of the current memory inbox state, grouped
  * by kind and showing the contents of each `.patch` file. Used as part of the
@@ -1329,6 +1365,8 @@ export async function startMemoryService(config: Config): Promise<void> {
         `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run`,
       );
     }
+
+    await validateMemoryInboxPatches(config);
 
     // Anything still in .inbox/ is reviewable; nothing is auto-applied.
     const memoryFilesUpdated: string[] = [];
