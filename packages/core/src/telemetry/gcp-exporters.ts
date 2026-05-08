@@ -92,7 +92,22 @@ export class GcpLogExporter implements LogRecordExporter {
           ...log.resource?.attributes,
           message: log.body,
         };
-        const safePayload = truncateLogPayload(rawPayload, 100000);
+        let safePayload = truncateLogPayload(rawPayload, 20000);
+        let payloadString = JSON.stringify(safePayload);
+
+        if (payloadString && payloadString.length > 200000) {
+          // If still too large, apply a stricter limit
+          safePayload = truncateLogPayload(rawPayload, 5000);
+          payloadString = JSON.stringify(safePayload);
+
+          if (payloadString && payloadString.length > 200000) {
+            // Fallback: strip structure and send a truncated raw string
+            safePayload = {
+              _warning: 'Payload heavily truncated due to 256KB limit',
+              data: payloadString.substring(0, 100000) + '... (truncated)',
+            };
+          }
+        }
 
         const entry = this.log.entry(
           {
@@ -105,7 +120,8 @@ export class GcpLogExporter implements LogRecordExporter {
               },
             },
           },
-          safePayload,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          safePayload as Record<string, unknown>,
         );
         return entry;
       });
