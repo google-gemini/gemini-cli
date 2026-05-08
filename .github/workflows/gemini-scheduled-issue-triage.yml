@@ -51,6 +51,16 @@ jobs:
           echo "has_issues=true" >> "${GITHUB_OUTPUT}"
           echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
 
+      - name: 'Sync Issue Types'
+        if: |-
+          ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
+            await syncIssueTypes({ github, context, core });
+
       - name: 'Find untriaged issues'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -63,22 +73,22 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body > no_area_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 10 --json number,title,body > no_area_issues.json
 
           echo '🔍 Finding issues missing kind labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body > no_kind_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 10 --json number,title,body > no_kind_issues.json
 
           echo '🏷️ Finding issues missing priority labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body > no_priority_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 10 --json number,title,body > no_priority_issues.json
 
           echo '📏 Finding issues missing effort labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
             --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json > issues_to_triage.json
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json no_type_issues.json > issues_to_triage.json
 
           ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
           if [ "$ISSUE_COUNT" -gt 0 ]; then
@@ -274,3 +284,13 @@ jobs:
           script: |-
             const applyLabels = require('./.github/scripts/apply-issue-labels.cjs');
             await applyLabels({ github, context, core });
+
+      - name: 'Sync Issue Types (Post-Analysis)'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
+            await syncIssueTypes({ github, context, core });
