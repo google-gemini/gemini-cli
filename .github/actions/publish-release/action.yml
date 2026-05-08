@@ -308,8 +308,21 @@ runs:
         fi
         rm -rf test-bundle
 
+        RELEASE_ASSETS=("gemini-cli-bundle.zip")
+
+        # Check for and prepare macOS binaries if they exist
+        for arch in arm64 x64; do
+          BINARY_PATH="dist/darwin-${arch}/gemini"
+          if [[ -f "$BINARY_PATH" ]]; then
+            chmod +x "$BINARY_PATH"
+            ZIP_NAME="gemini-darwin-${arch}-unsigned.zip"
+            zip -j "$ZIP_NAME" "$BINARY_PATH"
+            RELEASE_ASSETS+=("$ZIP_NAME")
+          fi
+        done
+
         gh release create "${INPUTS_RELEASE_TAG}" \
-          gemini-cli-bundle.zip \
+          "${RELEASE_ASSETS[@]}" \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \

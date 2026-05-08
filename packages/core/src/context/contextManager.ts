@@ -30,6 +30,9 @@ export class ContextManager {
   private readonly orchestrator: PipelineOrchestrator;
   private readonly historyObserver: HistoryObserver;
 
+  // Hysteresis tracking to prevent utility call churn
+  private lastTriggeredDeficit = 0;
+
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
@@ -58,15 +61,8 @@ export class ContextManager {
     );
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      const newIds = new Set(event.nodes.map((n) => n.id));
-      const addedNodes = event.nodes.filter((n) => event.newNodes.has(n.id));
-
-      // Prune any pristine nodes that were dropped from the upstream history
-      this.buffer = this.buffer.prunePristineNodes(newIds);
-
-      if (addedNodes.length > 0) {
-        this.buffer = this.buffer.appendPristineNodes(addedNodes);
-      }
+      // Sync the entire pristine history chronologically
+      this.buffer = this.buffer.syncPristineHistory(event.nodes);
 
       this.evaluateTriggers(event.newNodes);
     });
@@ -76,6 +72,7 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
+      this.evaluateTriggers(new Set());
     });
 
     this.historyObserver.start();
@@ -141,15 +138,39 @@ export class ContextManager {
       }
 
       if (agedOutNodes.size > 0) {
-        this.env.tokenCalculator.garbageCollectCache(
-          new Set(this.buffer.nodes.map((n) => n.id)),
-        );
-        this.eventBus.emitConsolidationNeeded({
-          nodes: this.buffer.nodes,
-          targetDeficit:
-            currentTokens - this.sidecar.config.budget.retainedTokens,
-          targetNodeIds: agedOutNodes,
-        });
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.retainedTokens;
+
+        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
+        // so we can track growth from this new, smaller deficit.
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
+        // Respect coalescing threshold for background work
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        // Only trigger if deficit has grown significantly since last time
+        const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
+
+        if (
+          targetDeficit >= threshold &&
+          (growthSinceLast >= threshold || this.lastTriggeredDeficit === 0)
+        ) {
+          this.lastTriggeredDeficit = targetDeficit;
+          this.env.tokenCalculator.garbageCollectCache(
+            new Set(this.buffer.nodes.map((n) => n.id)),
+          );
+          this.eventBus.emitConsolidationNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNodes,
+          });
+        }
+      } else {
+        // Budget is healthy, reset hysteresis
+        this.lastTriggeredDeficit = 0;
       }
     }
   }
@@ -246,6 +267,7 @@ export class ContextManager {
     await this.orchestrator.waitForPipelines();
 
     let nodes = this.buffer.nodes;
+    const previewNodeIds = new Set<string>();
 
     // If we have a pending request, we need to build a 'preview' graph for this render.
     if (pendingRequest) {
@@ -253,6 +275,9 @@ export class ContextManager {
         type: 'PUSH',
         payload: [pendingRequest],
       });
+      for (const n of previewNodes) {
+        previewNodeIds.add(n.id);
+      }
       nodes = [...nodes, ...previewNodes];
     }
 
@@ -288,6 +313,7 @@ export class ContextManager {
       this.env,
       protectionReasons,
       headerTokens,
+      previewNodeIds,
     );
 
     // Structural validation in debug mode
