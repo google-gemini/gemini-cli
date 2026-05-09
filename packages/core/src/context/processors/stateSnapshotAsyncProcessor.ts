@@ -52,7 +52,7 @@ export function createStateSnapshotAsyncProcessor(
       try {
         let previousConsumedIds: string[] = [];
         const processorType = options.type ?? 'point-in-time';
-        const nodesToSummarize = [...targets];
+        let nodesToSummarize = [...targets];
         let previousStateJson: string | undefined = undefined;
 
         if (processorType === 'accumulate') {
@@ -93,6 +93,16 @@ export function createStateSnapshotAsyncProcessor(
               );
             }
           }
+
+          // Filter out nodes that have already been summarized into the previous state.
+          // This prevents the background processor from repeatedly sending the entire
+          // history of aged-out nodes to the LLM on every background run.
+          if (previousConsumedIds.length > 0) {
+            const consumedSet = new Set(previousConsumedIds);
+            nodesToSummarize = nodesToSummarize.filter(
+              (n) => !consumedSet.has(n.id),
+            );
+          }
         }
 
         // If the snapshot happens to be inside our summary window, remove it so the LLM doesn't read it as raw transcript
@@ -117,10 +127,9 @@ export function createStateSnapshotAsyncProcessor(
             maxStateTokens: options.maxStateTokens,
           },
         );
-        const newConsumedIds = [
-          ...previousConsumedIds,
-          ...targets.map((t) => t.id),
-        ];
+        const newConsumedIds = Array.from(
+          new Set([...previousConsumedIds, ...targets.map((t) => t.id)]),
+        );
 
         // In V2, async pipelines communicate their work to the inbox, and the processor picks it up.
         env.inbox.publish('PROPOSED_SNAPSHOT', {

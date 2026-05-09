@@ -143,6 +143,74 @@ describe('StateSnapshotAsyncProcessor', () => {
     expect(publishSpy).not.toHaveBeenCalled();
   });
 
+  it('should filter previously consumed nodes and deduplicate consumedIds', async () => {
+    const env = createMockEnvironment();
+    const publishSpy = vi.spyOn(env.inbox, 'publish');
+    const generateJsonSpy = vi.spyOn(env.llmClient, 'generateJson');
+
+    const worker = createStateSnapshotAsyncProcessor(
+      'StateSnapshotAsyncProcessor',
+      env,
+      { type: 'accumulate' },
+    );
+
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      { payload: { text: 'TEXT_A' } },
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      20,
+      { payload: { text: 'TEXT_B' } },
+      'node-B',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      { payload: { text: 'TEXT_C' } },
+      'node-C',
+    );
+
+    // targets include nodes that have already been consumed
+    const targets = [nodeA, nodeB, nodeC];
+
+    const inboxMessages: InboxMessage[] = [
+      {
+        id: 'draft-1',
+        topic: 'PROPOSED_SNAPSHOT',
+        timestamp: Date.now() - 1000,
+        payload: {
+          consumedIds: ['node-A', 'node-B'],
+          newText: '<old snapshot>',
+          type: 'accumulate',
+        },
+      },
+    ];
+
+    const args = createMockProcessArgs(targets, targets, inboxMessages);
+
+    await worker.process(args);
+
+    // Verify it published with deduplicated IDs
+    expect(publishSpy).toHaveBeenCalledWith(
+      'PROPOSED_SNAPSHOT',
+      expect.objectContaining({
+        consumedIds: ['node-A', 'node-B', 'node-C'],
+      }),
+    );
+
+    // Verify the LLM prompt DOES NOT contain TEXT_A or TEXT_B, but DOES contain TEXT_C
+    const promptText = JSON.stringify(generateJsonSpy.mock.calls[0][0]);
+    expect(promptText).toContain('TEXT_C');
+    expect(promptText).not.toContain('TEXT_A');
+    expect(promptText).not.toContain('TEXT_B');
+  });
+
   it('should use Global Lookback to find an existing snapshot in the graph when inbox is empty', async () => {
     const env = createMockEnvironment();
 
