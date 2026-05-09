@@ -47,10 +47,12 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "parts": [
         {
           "functionCall": {
-            "args": {},
-            "id": "<UUID>",
+            "args": {
+              "cmd": "cat server.log",
+            },
             "name": "run_shell_command",
           },
+          "thoughtSignature": "skip_thought_signature_validator",
         },
       ],
       "role": "model",
@@ -59,10 +61,11 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "parts": [
         {
           "functionResponse": {
-            "id": "<UUID>",
             "name": "run_shell_command",
             "response": {
-              "output": "LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG ",
+              "output": "<tool_output_masked>
+[Tool observation string (0.02MB, 1 lines) masked to preserve context window. Full string saved to: <MOCKED_DIR>]
+</tool_output_masked>",
             },
           },
         },
@@ -83,10 +86,7 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
           "text": "Look at this architecture diagram:",
         },
         {
-          "inlineData": {
-            "data": "fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_",
-            "mimeType": "image/png",
-          },
+          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
         },
       ],
       "role": "user",
@@ -112,37 +112,42 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         {
           "text": "Yes we can.",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
     },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 34,
-      "tokensBeforeBackground": 34,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 64,
-      "tokensBeforeBackground": 64,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 25358,
-      "tokensBeforeBackground": 25358,
+      "tokensAfterBackground": 437,
+      "tokensBeforeBackground": 20172,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 28674,
-      "tokensBeforeBackground": 28674,
+      "tokensAfterBackground": 526,
+      "tokensBeforeBackground": 3462,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 28707,
-      "tokensBeforeBackground": 28707,
+      "tokensAfterBackground": 544,
+      "tokensBeforeBackground": 544,
       "turnIndex": 4,
     },
   ],
@@ -181,35 +186,40 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
         {
           "text": "Hi, how can I help?",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
     },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 34,
-      "tokensBeforeBackground": 34,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 64,
-      "tokensBeforeBackground": 64,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
   ],
 }
 `;
 
-exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 1`] = `
+exports[`System Lifecycle Golden Tests > Scenario 3: Node Distillation of Large Historical Messages 1`] = `
 {
   "finalProjection": [
     {
       "parts": [
         {
-          "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "text": "Mock response from: utility_compressor, for: {"text":"A...AAAAAAAA"}",
         },
       ],
       "role": "user",
@@ -217,7 +227,7 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+          "text": "Mock response from: utility_compressor, for: {"text":"B...BBBBBBBB"}",
         },
       ],
       "role": "model",
@@ -225,7 +235,7 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+          "text": "Mock response from: utility_compressor, for: {"text":"C...CCCCCCCC"}",
         },
       ],
       "role": "user",
@@ -233,7 +243,7 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+          "text": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
         },
       ],
       "role": "model",
@@ -241,7 +251,7 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+          "text": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
         },
       ],
       "role": "user",
@@ -249,30 +259,128 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        },
-        {
-          "text": "Yield",
+          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
         },
       ],
       "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
     },
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 130,
-      "tokensBeforeBackground": 130,
+      "tokensAfterBackground": 3308,
+      "tokensBeforeBackground": 3308,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 254,
-      "tokensBeforeBackground": 254,
+      "tokensAfterBackground": 4989,
+      "tokensBeforeBackground": 6616,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 378,
-      "tokensBeforeBackground": 378,
+      "tokensAfterBackground": 5043,
+      "tokensBeforeBackground": 8297,
       "turnIndex": 2,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC via State Snapshots 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
+        },
+        {
+          "text": "Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 ..................................................",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 Msg 5 ..................................................",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 Msg 6 ..................................................",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 ..................................................",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 ..................................................",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 140,
+      "tokensBeforeBackground": 140,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 280,
+      "tokensBeforeBackground": 280,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 420,
+      "tokensBeforeBackground": 420,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 560,
+      "tokensBeforeBackground": 560,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 700,
+      "tokensBeforeBackground": 700,
+      "turnIndex": 4,
     },
   ],
 }

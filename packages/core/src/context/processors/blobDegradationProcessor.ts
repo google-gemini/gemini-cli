@@ -8,7 +8,7 @@ import type { JSONSchemaType } from 'ajv';
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ConcreteNode, UserPrompt } from '../graph/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 
@@ -55,95 +55,50 @@ export function createBlobDegradationProcessor(
 
       // Forward scan, looking for bloated non-text parts to degrade
       for (const node of targets) {
-        switch (node.type) {
-          case 'USER_PROMPT': {
-            let modified = false;
-            const newParts = [...node.semanticParts];
+        const payload = node.payload;
+        let newText = '';
+        let tokensSaved = 0;
 
-            for (let j = 0; j < node.semanticParts.length; j++) {
-              const part = node.semanticParts[j];
-              if (part.type === 'text') continue;
+        if (payload.inlineData?.data && payload.inlineData?.mimeType) {
+          await ensureDir();
+          const ext = payload.inlineData.mimeType.split('/')[1] || 'bin';
+          const fileName = `blob_${Date.now()}_${randomUUID()}.${ext}`;
+          const filePath = path.join(blobOutputsDir, fileName);
 
-              let newText = '';
-              let tokensSaved = 0;
+          const buffer = Buffer.from(payload.inlineData.data, 'base64');
+          await fs.writeFile(filePath, buffer);
 
-              switch (part.type) {
-                case 'inline_data': {
-                  await ensureDir();
-                  const ext = part.mimeType.split('/')[1] || 'bin';
-                  const fileName = `blob_${Date.now()}_${randomUUID()}.${ext}`;
-                  const filePath = path.join(blobOutputsDir, fileName);
+          const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
+          newText = `[Multi-Modal Blob (${payload.inlineData.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
 
-                  const buffer = Buffer.from(part.data, 'base64');
-                  await fs.writeFile(filePath, buffer);
+          const oldTokens = env.tokenCalculator.estimateTokensForParts([
+            payload,
+          ]);
+          const newTokens = env.tokenCalculator.estimateTokensForParts([
+            { text: newText },
+          ]);
+          tokensSaved = oldTokens - newTokens;
+        } else if (payload.fileData?.mimeType && payload.fileData?.fileUri) {
+          newText = `[File Reference (${payload.fileData.mimeType}) degraded to text to preserve context window. Original URI: ${payload.fileData.fileUri}]`;
+          const oldTokens = env.tokenCalculator.estimateTokensForParts([
+            payload,
+          ]);
+          const newTokens = env.tokenCalculator.estimateTokensForParts([
+            { text: newText },
+          ]);
+          tokensSaved = oldTokens - newTokens;
+        }
 
-                  const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
-                  newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
-
-                  const oldTokens = env.tokenCalculator.estimateTokensForParts([
-                    {
-                      inlineData: { mimeType: part.mimeType, data: part.data },
-                    },
-                  ]);
-                  const newTokens = env.tokenCalculator.estimateTokensForParts([
-                    { text: newText },
-                  ]);
-                  tokensSaved = oldTokens - newTokens;
-                  break;
-                }
-                case 'file_data': {
-                  newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
-                  const oldTokens = env.tokenCalculator.estimateTokensForParts([
-                    {
-                      fileData: {
-                        mimeType: part.mimeType,
-                        fileUri: part.fileUri,
-                      },
-                    },
-                  ]);
-                  const newTokens = env.tokenCalculator.estimateTokensForParts([
-                    { text: newText },
-                  ]);
-                  tokensSaved = oldTokens - newTokens;
-                  break;
-                }
-                case 'raw_part': {
-                  newText = `[Unknown Part degraded to text to preserve context window.]`;
-                  const oldTokens = env.tokenCalculator.estimateTokensForParts([
-                    part.part,
-                  ]);
-                  const newTokens = env.tokenCalculator.estimateTokensForParts([
-                    { text: newText },
-                  ]);
-                  tokensSaved = oldTokens - newTokens;
-                  break;
-                }
-                default:
-                  break;
-              }
-
-              if (newText && tokensSaved > 0) {
-                newParts[j] = { type: 'text', text: newText };
-                modified = true;
-              }
-            }
-
-            if (modified) {
-              const degradedNode: UserPrompt = {
-                ...node,
-                id: randomUUID(),
-                semanticParts: newParts,
-                replacesId: node.id,
-              };
-              returnedNodes.push(degradedNode);
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-          default:
-            returnedNodes.push(node);
-            break;
+        if (newText && tokensSaved > 0) {
+          returnedNodes.push({
+            ...node,
+            id: randomUUID(),
+            payload: { text: newText },
+            replacesId: node.id,
+            turnId: node.turnId,
+          });
+        } else {
+          returnedNodes.push(node);
         }
       }
 

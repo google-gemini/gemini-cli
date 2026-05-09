@@ -2,7 +2,7 @@
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
 " > Can you edit InputPrompt.tsx for me?                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto…  │

@@ -13,6 +13,10 @@ import type { ContextGraphMapper } from '../graph/mapper.js';
 
 export type { ContextTracer, ContextEventBus };
 
+export interface RenderOptions {
+  calibrateTokenCalculation?: boolean;
+}
+
 export interface ContextEnvironment {
   readonly llmClient: BaseLlmClient;
   readonly promptId: string;
@@ -26,4 +30,5 @@ export interface ContextEnvironment {
   readonly inbox: LiveInbox;
   readonly behaviorRegistry: NodeBehaviorRegistry;
   readonly graphMapper: ContextGraphMapper;
+  readonly renderOptions?: RenderOptions;
 }

@@ -16,7 +16,7 @@ describe('ContextEnvironmentImpl', () => {
     const mockLlmClient = createMockLlmClient();
 
     const env = new ContextEnvironmentImpl(
-      mockLlmClient,
+      () => mockLlmClient,
       'mock-session',
       'mock-prompt',
       '/tmp/trace',

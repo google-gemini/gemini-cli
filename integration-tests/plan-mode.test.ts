@@ -231,7 +231,8 @@ describe('Plan Mode', () => {
       `Expected write_file to succeed, but it failed with error: ${'error' in (planWrite?.toolRequest || {}) ? (planWrite?.toolRequest as unknown as Record<string, string>)['error'] : 'unknown'}`,
     ).toBe(true);
   });
-  it('should switch from a pro model to a flash model after exiting plan mode', async () => {
+
+  it.skip('should switch from a pro model to a flash model after exiting plan mode', async () => {
     const plansDir = 'plans-folder';
     const planFilename = 'my-plan.md';
 

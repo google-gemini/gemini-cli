@@ -179,7 +179,12 @@ export async function startInteractiveUI(
 
   checkForUpdates(settings)
     .then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
+      handleAutoUpdate(
+        info,
+        settings,
+        config.getProjectRoot(),
+        config.getSandboxEnabled(),
+      );
     })
     .catch((err) => {
       // Silently ignore update check errors.

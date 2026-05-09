@@ -22,6 +22,7 @@ type HealthState =
       status: 'sticky_retry';
       reason: TurnUnavailabilityReason;
       consumed: boolean;
+      attempts: number;
     };
 
 export interface ModelAvailabilitySnapshot {
@@ -52,7 +53,7 @@ export class ModelAvailabilityService {
     this.clearState(model);
   }
 
-  markRetryOncePerTurn(model: ModelId) {
+  markRetryOncePerTurn(model: ModelId, attempts: number = 1) {
     const currentState = this.health.get(model);
     // Do not override a terminal failure with a transient one.
     if (currentState?.status === 'terminal') {
@@ -70,6 +71,7 @@ export class ModelAvailabilityService {
       status: 'sticky_retry',
       reason: 'retry_once_per_turn',
       consumed,
+      attempts,
     });
   }
 
@@ -106,7 +108,8 @@ export class ModelAvailabilityService {
       if (snapshot.available) {
         const state = this.health.get(model);
         // A sticky model is being attempted, so note that.
-        const attempts = state?.status === 'sticky_retry' ? 1 : undefined;
+        const attempts =
+          state?.status === 'sticky_retry' ? state.attempts : undefined;
         return { selectedModel: model, skipped, attempts };
       } else {
         skipped.push({ model, reason: snapshot.reason ?? 'unknown' });

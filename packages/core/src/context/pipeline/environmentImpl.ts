@@ -6,7 +6,7 @@
 
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
-import type { ContextEnvironment } from './environment.js';
+import type { ContextEnvironment, RenderOptions } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
@@ -21,7 +21,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly graphMapper: ContextGraphMapper;
 
   constructor(
-    readonly llmClient: BaseLlmClient,
+    private readonly llmClientProvider: () => BaseLlmClient,
     readonly sessionId: string,
     readonly promptId: string,
     readonly traceDir: string,
@@ -29,6 +29,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly tracer: ContextTracer,
     readonly charsPerToken: number,
     readonly eventBus: ContextEventBus,
+    readonly renderOptions?: RenderOptions,
   ) {
     this.behaviorRegistry = new NodeBehaviorRegistry();
     registerBuiltInBehaviors(this.behaviorRegistry);
@@ -37,6 +38,10 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
       this.behaviorRegistry,
     );
     this.inbox = new LiveInbox();
-    this.graphMapper = new ContextGraphMapper(this.behaviorRegistry);
+    this.graphMapper = new ContextGraphMapper();
+  }
+
+  get llmClient(): BaseLlmClient {
+    return this.llmClientProvider();
   }
 }

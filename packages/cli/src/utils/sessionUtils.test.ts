@@ -47,6 +47,47 @@ describe('SessionSelector', () => {
     }
   });
 
+  describe('sessionExists', () => {
+    it('should return true if a session file with the exact UUID exists', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `session-20240101T000000-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify({ sessionId }),
+      );
+
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(true);
+    });
+
+    it('should return false if no session file matches the UUID', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(chatsDir, `session-different-uuid-20240101.jsonl`),
+        '{}',
+      );
+
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(false);
+    });
+
+    it('should return false if the chats directory does not exist', async () => {
+      const sessionId = randomUUID();
+      // Notice we do NOT create chatsDir here.
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(false);
+    });
+  });
+
   it('should resolve session by UUID', async () => {
     const sessionId1 = randomUUID();
     const sessionId2 = randomUUID();

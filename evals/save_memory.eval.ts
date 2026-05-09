@@ -5,11 +5,77 @@
  */
 
 import { describe, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  loadConversationRecord,
+  SESSION_FILE_PREFIX,
+} from '@google/gemini-cli-core';
 import {
   evalTest,
   assertModelHasOutput,
   checkModelOutputContent,
 } from './test-helper.js';
+
+function findDir(base: string, name: string): string | null {
+  if (!fs.existsSync(base)) return null;
+  const files = fs.readdirSync(base);
+  for (const file of files) {
+    const fullPath = path.join(base, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      if (file === name) return fullPath;
+      const found = findDir(fullPath, name);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function loadLatestSessionRecord(homeDir: string, sessionId: string) {
+  const chatsDir = findDir(path.join(homeDir, '.gemini'), 'chats');
+  if (!chatsDir) {
+    throw new Error('Could not find chats directory for eval session logs');
+  }
+
+  const candidates = fs
+    .readdirSync(chatsDir)
+    .filter(
+      (file) =>
+        file.startsWith(SESSION_FILE_PREFIX) &&
+        (file.endsWith('.json') || file.endsWith('.jsonl')),
+    );
+
+  const matchingRecords = [];
+  for (const file of candidates) {
+    const filePath = path.join(chatsDir, file);
+    const record = await loadConversationRecord(filePath);
+    if (record?.sessionId === sessionId) {
+      matchingRecords.push(record);
+    }
+  }
+
+  matchingRecords.sort(
+    (a, b) => Date.parse(b.lastUpdated) - Date.parse(a.lastUpdated),
+  );
+  return matchingRecords[0] ?? null;
+}
+
+async function waitForSessionScratchpad(
+  homeDir: string,
+  sessionId: string,
+  timeoutMs = 30000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const record = await loadLatestSessionRecord(homeDir, sessionId);
+    if (record?.memoryScratchpad) {
+      return record;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  return loadLatestSessionRecord(homeDir, sessionId);
+}
 
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';
@@ -18,6 +84,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingFavoriteColor,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `remember that my favorite color is  blue.
   
@@ -40,6 +111,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCommandRestrictions,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I don't want you to ever run npm commands.`,
     assert: async (rig, result) => {
@@ -61,6 +137,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingWorkflow,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I want you to always lint after building.`,
     assert: async (rig, result) => {
@@ -83,6 +164,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: ignoringTemporaryInformation,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I'm going to get a coffee.`,
     assert: async (rig, result) => {
@@ -108,6 +194,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingPetName,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `Please remember that my dog's name is Buddy.`,
     assert: async (rig, result) => {
@@ -129,6 +220,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCommandAlias,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `When I say 'start server', you should run 'npm run dev'.`,
     assert: async (rig, result) => {
@@ -151,6 +247,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingDbSchemaLocationAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -180,6 +281,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCodingStyle,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I prefer to use tabs instead of spaces for indentation.`,
     assert: async (rig, result) => {
@@ -202,6 +308,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingBuildArtifactLocationAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -231,6 +342,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingMainEntryPointAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `The main entry point for this workspace is \`src/index.js\`.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -259,6 +375,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingBirthday,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `My birthday is on June 15th.`,
     assert: async (rig, result) => {
@@ -509,6 +630,103 @@ describe('save_memory', () => {
         leakedToGlobal,
         'Project preferences must NOT be written to the global ~/.gemini/GEMINI.md',
       ).toBe(false);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  const memoryV2SessionScratchpad =
+    'Session summary persists memory scratchpad for memory-saving sessions';
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: memoryV2SessionScratchpad,
+    sessionId: 'memory-scratchpad-eval',
+    params: {
+      settings: {
+        experimental: { memoryV2: true },
+      },
+    },
+    messages: [
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: [
+          {
+            text: 'Across all my projects, I prefer Vitest over Jest for testing.',
+          },
+        ],
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        type: 'gemini',
+        content: [{ text: 'Noted. What else should I keep in mind?' }],
+        timestamp: '2026-01-01T00:00:05Z',
+      },
+      {
+        id: 'msg-3',
+        type: 'user',
+        content: [
+          {
+            text: 'For this repo I was debugging a flaky API test earlier, but that was just transient context.',
+          },
+        ],
+        timestamp: '2026-01-01T00:01:00Z',
+      },
+      {
+        id: 'msg-4',
+        type: 'gemini',
+        content: [
+          { text: 'Understood. I will only save the durable preference.' },
+        ],
+        timestamp: '2026-01-01T00:01:05Z',
+      },
+    ],
+    prompt:
+      'Please save any persistent preferences or facts about me from our conversation to memory.',
+    assert: async (rig, result) => {
+      await rig.waitForToolCall('write_file').catch(() => {});
+      const writeCalls = rig
+        .readToolLogs()
+        .filter((log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name),
+        );
+
+      expect(
+        writeCalls.length,
+        'Expected memoryV2 save flow to edit a markdown memory file',
+      ).toBeGreaterThan(0);
+
+      await rig.run({
+        args: ['--list-sessions'],
+        approvalMode: 'yolo',
+        timeout: 120000,
+      });
+
+      const record = await waitForSessionScratchpad(
+        rig.homeDir!,
+        'memory-scratchpad-eval',
+      );
+      expect(
+        record?.memoryScratchpad,
+        'Expected the resumed session log to contain a memoryScratchpad after session summary generation',
+      ).toBeDefined();
+      expect(record?.memoryScratchpad?.version).toBe(1);
+      expect(
+        record?.memoryScratchpad?.toolSequence?.some((toolName) =>
+          ['write_file', 'replace'].includes(toolName),
+        ),
+        'Expected memoryScratchpad.toolSequence to include the markdown editing tool used for memory persistence',
+      ).toBe(true);
+      expect(
+        record?.memoryScratchpad?.touchedPaths?.length,
+        'Expected memoryScratchpad to capture at least one touched path',
+      ).toBeGreaterThan(0);
+      expect(
+        record?.memoryScratchpad?.workflowSummary,
+        'Expected memoryScratchpad.workflowSummary to be populated',
+      ).toMatch(/write_file|replace/i);
 
       assertModelHasOutput(result);
     },

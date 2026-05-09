@@ -140,7 +140,11 @@ import type { GenerateContentParameters } from '@google/genai';
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { getWorkspaceContextOverride } from './scoped-config.js';
+import {
+  getWorkspaceContextOverride,
+  hasScopedAutoMemoryExtractionWriteAccess,
+  hasScopedMemoryInboxAccess,
+} from './scoped-config.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -681,7 +685,6 @@ export interface ConfigParameters {
   gemmaModelRouter?: GemmaModelRouterSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
-  continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
@@ -691,6 +694,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   disableAlwaysAllow?: boolean;
+  voiceMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   dynamicModelConfiguration?: boolean;
@@ -711,6 +715,7 @@ export interface ConfigParameters {
   autoDistillation?: boolean;
   experimentalMemoryV2?: boolean;
   experimentalAutoMemory?: boolean;
+  experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -909,7 +914,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
 
-  private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
@@ -956,11 +960,13 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
+  private readonly experimentalGemma: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly voiceMode: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
@@ -1115,6 +1121,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
+    this.voiceMode = params.voiceMode ?? false;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
@@ -1172,8 +1179,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
-    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? false;
+    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    this.experimentalGemma = params.experimentalGemma ?? true;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1282,7 +1290,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
@@ -1437,7 +1444,24 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
+      let plansDir: string;
+      try {
+        plansDir = this.storage.getPlansDir();
+      } catch (error) {
+        // Fallback to the default plan dir if any error occurs
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        coreEvents.emitFeedback(
+          'warning',
+          'Invalid custom plans directory: ' +
+            errorMessage +
+            '. Falling back to default project temp directory.',
+          error,
+        );
+        this.storage.setCustomPlansDir(undefined);
+        plansDir = this.storage.getPlansDir();
+      }
+
       try {
         await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
@@ -1590,8 +1614,12 @@ export class Config implements McpContext, AgentLoopContext {
         return undefined;
       });
 
-    // Fetch experiments and update timeouts before continuing initialization
-    const experiments = await this.experimentsPromise;
+    const [experiments] = await Promise.all([
+      this.experimentsPromise,
+      quotaPromise.catch((e) => {
+        debugLogger.error('Failed to fetch user quota', e);
+      }),
+    ]);
 
     const requestTimeoutMs = this.getRequestTimeoutMs();
     if (requestTimeoutMs !== undefined) {
@@ -1600,8 +1628,6 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
-
-    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1623,16 +1649,21 @@ export class Config implements McpContext, AgentLoopContext {
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
-    const adminControls = await fetchAdminControls(
-      codeAssistServer,
-      this.getRemoteAdminSettings(),
-      adminControlsEnabled,
-      (newSettings: AdminControlsSettings) => {
-        this.setRemoteAdminSettings(newSettings);
-        coreEvents.emitAdminSettingsChanged();
-      },
-    );
-    this.setRemoteAdminSettings(adminControls);
+
+    try {
+      const adminControls = await fetchAdminControls(
+        codeAssistServer,
+        this.getRemoteAdminSettings(),
+        adminControlsEnabled,
+        (newSettings: AdminControlsSettings) => {
+          this.setRemoteAdminSettings(newSettings);
+          coreEvents.emitAdminSettingsChanged();
+        },
+      );
+      this.setRemoteAdminSettings(adminControls);
+    } catch (e) {
+      debugLogger.error('Failed to fetch admin controls', e);
+    }
 
     if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
@@ -1793,6 +1824,24 @@ export class Config implements McpContext, AgentLoopContext {
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
+    this.approvedPlanPath = undefined;
+    this.topicState.reset();
+    this.skillManager.reset();
+    this.latestApiRequest = undefined;
+    this.lastModeSwitchTime = performance.now();
+    this.compressionTruncationCounter = 0;
+    this.quotaErrorOccurred = false;
+    this.creditsNotificationShown = false;
+    this.modelAvailabilityService.reset();
+    this.modelQuotas.clear();
+    this.lastRetrievedQuota = undefined;
+    this.lastQuotaFetchTime = 0;
+    this.hasAccessToPreviewModel = null;
+
+    // Force an event emission to clear the UI display
+    coreEvents.emitQuotaChanged(undefined, undefined, undefined);
+    this.lastEmittedQuotaRemaining = undefined;
+    this.lastEmittedQuotaLimit = undefined;
 
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
@@ -1801,7 +1850,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
-    this.approvedPlanPath = undefined;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -2514,6 +2562,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalAutoMemory;
   }
 
+  getExperimentalGemma(): boolean {
+    return this.experimentalGemma;
+  }
+
   getExperimentalContextManagementConfig(): string | undefined {
     return this.experimentalContextManagementConfig;
   }
@@ -2666,26 +2718,28 @@ export class Config implements McpContext, AgentLoopContext {
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-    }
 
-    this.policyEngine.setApprovalMode(mode);
-    this.refreshSandboxManager();
+      this.policyEngine.setApprovalMode(mode);
+      this.refreshSandboxManager();
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: this.getSessionId(),
+        mode,
+      });
 
-    const isPlanModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    const isYoloModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+      const isPlanModeTransition =
+        currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN;
+      const isYoloModeTransition =
+        currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO;
 
-    if (isPlanModeTransition || isYoloModeTransition) {
-      if (this._geminiClient?.isInitialized()) {
-        this._geminiClient.clearCurrentSequenceModel();
-        this._geminiClient.setTools().catch((err) => {
-          debugLogger.error('Failed to update tools', err);
-        });
+      if (isPlanModeTransition || isYoloModeTransition) {
+        if (this._geminiClient?.isInitialized()) {
+          this._geminiClient.clearCurrentSequenceModel();
+          this._geminiClient.setTools().catch((err) => {
+            debugLogger.error('Failed to update tools', err);
+          });
+        }
+        this.updateSystemInstructionIfInitialized();
       }
-      this.updateSystemInstructionIfInitialized();
     }
   }
 
@@ -2955,6 +3009,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.planEnabled;
   }
 
+  isVoiceModeEnabled(): boolean {
+    return this.voiceMode;
+  }
+
   isTrackerEnabled(): boolean {
     return this.trackerEnabled;
   }
@@ -3026,6 +3084,52 @@ export class Config implements McpContext, AgentLoopContext {
     this.ideMode = value;
   }
 
+  private isScopedMemoryInboxPatchPathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+    inboxRoot: string,
+  ): boolean {
+    if (!hasScopedMemoryInboxAccess()) {
+      return false;
+    }
+
+    const normalizedPath = path.resolve(absolutePath);
+    const isCanonicalPatchPath = (['private', 'global'] as const).some(
+      (kind) =>
+        normalizedPath === path.resolve(inboxRoot, kind, 'extraction.patch'),
+    );
+    if (!isCanonicalPatchPath) {
+      return false;
+    }
+
+    const resolvedMemoryRoot = resolveToRealPath(
+      this.storage.getProjectMemoryTempDir(),
+    );
+    return isSubpath(resolvedMemoryRoot, resolvedPath);
+  }
+
+  private isScopedAutoMemoryExtractionWritePathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+  ): boolean {
+    if (!hasScopedAutoMemoryExtractionWriteAccess()) {
+      return false;
+    }
+
+    const resolvedSkillsMemoryDir = resolveToRealPath(
+      this.storage.getProjectSkillsMemoryDir(),
+    );
+    if (isSubpath(resolvedSkillsMemoryDir, resolvedPath)) {
+      return true;
+    }
+
+    return this.isScopedMemoryInboxPatchPathAllowed(
+      absolutePath,
+      resolvedPath,
+      path.join(this.storage.getProjectMemoryTempDir(), '.inbox'),
+    );
+  }
+
   /**
    * Get the current FileSystemService
    */
@@ -3040,11 +3144,47 @@ export class Config implements McpContext, AgentLoopContext {
    * file (the latter is the only file under `~/.gemini/` that is reachable —
    * settings, credentials, keybindings, etc. remain disallowed).
    *
+   * One subtree is *carved back out*: `<projectMemoryDir>/.inbox/` is owned by
+   * the auto-memory extraction agent and the `/memory inbox` review flow. The
+   * main agent is denied access to it even though it falls inside the project
+   * temp dir; the extraction agent receives a narrow execution-scoped exception
+   * for `.inbox/{private,global}/extraction.patch`.
+   *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
     const resolvedPath = resolveToRealPath(absolutePath);
+
+    // The auto-memory inbox (`<projectMemoryDir>/.inbox/`) is owned by the
+    // background extraction agent and the `/memory inbox` review flow. The
+    // main agent must NOT drop files into it directly (that would let the
+    // model bypass review). Deny first, even if the path also satisfies the
+    // workspace or project-temp allowlists below.
+    const inboxRoot = path.join(
+      this.storage.getProjectMemoryTempDir(),
+      '.inbox',
+    );
+    const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+    const normalizedPath = path.resolve(absolutePath);
+    const normalizedInboxRoot = path.resolve(inboxRoot);
+    if (
+      resolvedPath === resolvedInboxRoot ||
+      isSubpath(resolvedInboxRoot, resolvedPath) ||
+      normalizedPath === normalizedInboxRoot ||
+      isSubpath(normalizedInboxRoot, normalizedPath)
+    ) {
+      if (
+        this.isScopedMemoryInboxPatchPathAllowed(
+          absolutePath,
+          resolvedPath,
+          inboxRoot,
+        )
+      ) {
+        return true;
+      }
+      return false;
+    }
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
@@ -3085,6 +3225,19 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    if (checkType === 'write' && hasScopedAutoMemoryExtractionWriteAccess()) {
+      const resolvedPath = resolveToRealPath(absolutePath);
+      if (
+        this.isScopedAutoMemoryExtractionWritePathAllowed(
+          absolutePath,
+          resolvedPath,
+        )
+      ) {
+        return null;
+      }
+      return `Auto-memory extraction write denied: Attempted path "${absolutePath}" is outside the extraction write allowlist. Extraction may only write extracted skills under ${this.storage.getProjectSkillsMemoryDir()} and canonical inbox patches under ${path.join(this.storage.getProjectMemoryTempDir(), '.inbox', '{private,global}', 'extraction.patch')}.`;
+    }
+
     // For read operations, check read-only paths first
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
@@ -3428,10 +3581,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.skipNextSpeakerCheck;
   }
 
-  getContinueOnFailedApiCall(): boolean {
-    return this.continueOnFailedApiCall;
-  }
-
   getRetryFetchErrors(): boolean {
     return this.retryFetchErrors;
   }
@@ -3545,11 +3694,17 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {
-    return this.agentSessionNoninteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionNoninteractiveEnabled
+    );
   }
 
   getAgentSessionInteractiveEnabled(): boolean {
-    return this.agentSessionInteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionInteractiveEnabled
+    );
   }
 
   /**
