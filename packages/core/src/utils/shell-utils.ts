@@ -60,7 +60,7 @@ export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 /**
  * An identifier for the shell type.
  */
-export type ShellType = 'cmd' | 'powershell' | 'bash';
+export type ShellType = 'cmd' | 'powershell' | 'bash' | 'zsh';
 
 /**
  * Defines the configuration required to execute a command string within a specific shell.
@@ -631,7 +631,8 @@ export function parseCommandDetails(
     return result;
   }
 
-  if (configuration.shell === 'bash') {
+  if (configuration.shell === 'bash' || configuration.shell === 'zsh') {
+    // Use bash parser for both bash and zsh (syntax is similar enough)
     return parseBashCommandDetails(command);
   }
 
@@ -672,7 +673,27 @@ export function getShellConfiguration(): ShellConfiguration {
   }
 
   // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  // Detect the user's shell from the SHELL environment variable
+  const shellEnv = process.env['SHELL'];
+  const executable = shellEnv || 'bash';
+
+  // Determine shell type from the executable path
+  let shellType: ShellType = 'bash';
+  if (shellEnv) {
+    const basename = path.basename(shellEnv);
+    if (basename.includes('zsh')) {
+      shellType = 'zsh';
+    } else if (basename.includes('bash')) {
+      shellType = 'bash';
+    }
+    // Default to bash for unknown shells to maintain compatibility
+  }
+
+  return {
+    executable,
+    argsPrefix: ['-c'],
+    shell: shellType,
+  };
 }
 
 /**
@@ -745,7 +766,10 @@ export function hasRedirection(command: string): boolean {
       : fallbackCheck();
   }
 
-  if (configuration.shell === 'bash' && bashLanguage) {
+  if (
+    (configuration.shell === 'bash' || configuration.shell === 'zsh') &&
+    bashLanguage
+  ) {
     const tree = parseCommandTree(command);
     if (!tree) return fallbackCheck();
 
