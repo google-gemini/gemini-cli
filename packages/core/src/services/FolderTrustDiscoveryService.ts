@@ -163,6 +163,7 @@ export class FolderTrustDiscoveryService {
         for (const event of Object.values(hooksConfig)) {
           if (!Array.isArray(event)) continue;
           for (const hook of event) {
+            // eslint-disable-next-line no-restricted-syntax
             if (this.isRecord(hook) && typeof hook['command'] === 'string') {
               hooks.add(hook['command']);
             }

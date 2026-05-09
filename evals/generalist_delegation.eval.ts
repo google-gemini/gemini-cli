@@ -11,6 +11,8 @@ describe('generalist_delegation', () => {
   // --- Positive Evals (Should Delegate) ---
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate batch error fixing to generalist agent',
     configOverrides: {
       agents: {
@@ -21,7 +23,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'file1.ts': 'console.log("no semi")',
@@ -55,6 +56,8 @@ describe('generalist_delegation', () => {
   });
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should autonomously delegate complex batch task to generalist agent',
     configOverrides: {
       agents: {
@@ -65,7 +68,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'src/a.ts': 'export const a = 1;',
@@ -96,6 +98,8 @@ describe('generalist_delegation', () => {
   // --- Negative Evals (Should NOT Delegate - Assertive Handling) ---
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT delegate simple read and fix to generalist agent',
     configOverrides: {
       agents: {
@@ -106,7 +110,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'README.md': 'This is a proyect.',
@@ -131,6 +134,8 @@ describe('generalist_delegation', () => {
   });
 
   appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT delegate simple direct question to generalist agent',
     configOverrides: {
       agents: {
@@ -141,7 +146,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'src/VERSION': '1.2.3',

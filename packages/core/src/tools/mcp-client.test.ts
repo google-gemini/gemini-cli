@@ -20,6 +20,8 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
@@ -35,6 +37,7 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -42,6 +45,7 @@ import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
@@ -102,9 +106,11 @@ describe('mcp-client', () => {
     workspaceContext = new WorkspaceContext(testWorkspace);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
     vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
+    vi.restoreAllMocks();
   });
 
   describe('McpClient', () => {
@@ -318,6 +324,25 @@ describe('mcp-client', () => {
         expect.any(Error),
         'test-server',
       );
+    });
+
+    it('should return empty array for discoverPrompts on MethodNotFound error without diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listPrompts: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'Method not supported'),
+          ),
+      };
+      const result = await discoverPrompts(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      // MethodNotFound errors should be silently ignored regardless of message text
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
     it('should not discover tools if server does not support them', async () => {
@@ -1791,6 +1816,48 @@ describe('mcp-client', () => {
           },
         });
       });
+
+      it('wraps fetch to convert GET 404 to 405 for POST-only servers (e.g. n8n)', async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(
+            new Response(null, { status: 404, statusText: 'Not Found' }),
+          );
+        vi.stubGlobal('fetch', mockFetch);
+
+        try {
+          const transport = await createTransport(
+            'test-server',
+            { httpUrl: 'http://test-server' },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          const wrappedFetch = (
+            transport as unknown as {
+              _fetch: (
+                url: URL | string,
+                init?: RequestInit,
+              ) => Promise<Response>;
+            }
+          )._fetch;
+
+          // GET 404 → 405: server doesn't support optional SSE GET stream
+          const getRes = await wrappedFetch('http://test-server', {
+            method: 'GET',
+          });
+          expect(getRes.status).toBe(405);
+          expect(getRes.statusText).toBe('Method Not Allowed');
+
+          // POST 404 → unchanged: real "not found" errors must still propagate
+          const postRes = await wrappedFetch('http://test-server', {
+            method: 'POST',
+          });
+          expect(postRes.status).toBe(404);
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
     });
 
     describe('should connect via url', () => {
@@ -2388,7 +2455,10 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2595,7 +2665,10 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2758,7 +2831,10 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });

@@ -149,23 +149,44 @@ describe('keyMatchers', () => {
     {
       command: Command.UNDO,
       positive: [
-        createKey('z', { shift: false, cmd: true }),
-        createKey('z', { shift: false, alt: true }),
+        ...(process.platform === 'win32'
+          ? [createKey('z', { shift: false, ctrl: true })]
+          : process.platform === 'darwin'
+            ? [createKey('z', { shift: false, cmd: true })]
+            : [
+                createKey('z', { shift: false, alt: true }),
+                createKey('z', { shift: false, cmd: true }),
+                createKey('z', { shift: false, ctrl: true }),
+              ]),
+        ...(process.platform !== 'linux'
+          ? [createKey('z', { shift: false, alt: true })]
+          : []),
       ],
       negative: [
         createKey('z'),
         createKey('z', { shift: true, cmd: true }),
-        createKey('z', { shift: false, ctrl: true }),
+        ...(process.platform === 'darwin'
+          ? [createKey('z', { shift: false, ctrl: true })]
+          : []),
+        ...(process.platform === 'win32'
+          ? [createKey('z', { shift: false, cmd: true })]
+          : []),
       ],
     },
     {
       command: Command.REDO,
       positive: [
-        createKey('z', { shift: true, cmd: true }),
+        ...(process.platform === 'win32'
+          ? []
+          : [createKey('z', { shift: true, cmd: true })]),
         createKey('z', { shift: true, alt: true }),
         createKey('z', { shift: true, ctrl: true }),
       ],
-      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: false, cmd: true }),
+        createKey('y', { shift: false, ctrl: true }),
+      ],
     },
 
     // Screen control
@@ -311,6 +332,11 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
+      positive: [createKey('g', { ctrl: true })],
+      negative: [createKey('g'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       positive: [createKey('x', { ctrl: true })],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
@@ -336,8 +362,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_IDE_CONTEXT_DETAIL,
-      positive: [createKey('g', { ctrl: true })],
-      negative: [createKey('g'), createKey('t', { ctrl: true })],
+      positive: [createKey('f4')],
+      negative: [createKey('f5'), createKey('t', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_MARKDOWN,
@@ -346,6 +372,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('f9')],
+      negative: [createKey('f8'), createKey('f10')],
+    },
+    {
+      command: Command.TOGGLE_MOUSE_MODE,
       positive: [createKey('s', { ctrl: true })],
       negative: [createKey('s'), createKey('s', { alt: true })],
     },

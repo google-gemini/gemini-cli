@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { EnvHttpProxyAgent } from 'undici';
+import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
@@ -125,7 +125,7 @@ export async function getConnectionConfigFromFile(
     const portFileContents = await fs.promises.readFile(portFile, 'utf8');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(portFileContents);
-  } catch (_) {
+  } catch {
     // For newer extension versions, the file name matches the pattern
     // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
     // windows are open, multiple files matching the pattern are expected to
@@ -286,12 +286,7 @@ export async function createProxyAwareFetch(ideServerHost: string) {
   const agent = new EnvHttpProxyAgent({
     noProxy: [existingNoProxy, ideServerHost].filter(Boolean).join(','),
   });
-  const undiciPromise = import('undici');
-  // Suppress unhandled rejection if the promise is not awaited immediately.
-  // If the import fails, the error will be thrown when awaiting undiciPromise below.
-  undiciPromise.catch(() => {});
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
-    const { fetch: fetchFn } = await undiciPromise;
     const fetchOptions: RequestInit & { dispatcher?: unknown } = {
       ...init,
       dispatcher: agent,
@@ -299,7 +294,7 @@ export async function createProxyAwareFetch(ideServerHost: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const options = fetchOptions as unknown as import('undici').RequestInit;
     try {
-      const response = await fetchFn(url, options);
+      const response = await undiciFetch(url, options);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return new Response(response.body as ReadableStream<unknown> | null, {
         status: response.status,

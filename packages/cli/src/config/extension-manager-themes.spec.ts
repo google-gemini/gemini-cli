@@ -199,6 +199,7 @@ describe('ExtensionManager theme loading', () => {
         respectGeminiIgnore: true,
       }),
       getDiscoveryMaxDirs: () => 200,
+      getMemoryBoundaryMarkers: () => ['.git'],
       getMcpClientManager: () => ({
         getMcpInstructions: () => '',
         startExtension: vi.fn().mockResolvedValue(undefined),

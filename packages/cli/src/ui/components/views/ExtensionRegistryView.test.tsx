@@ -7,6 +7,7 @@
 import React from 'react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionRegistryView } from './ExtensionRegistryView.js';
 import { type ExtensionManager } from '../../../config/extension-manager.js';
@@ -20,6 +21,8 @@ import {
   type GenericListItem,
 } from '../shared/SearchableList.js';
 import { type TextBuffer } from '../shared/text-buffer.js';
+import { type UseHistoryManagerReturn } from '../../hooks/useHistoryManager.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 // Mocks
 vi.mock('../../hooks/useExtensionRegistry.js');
@@ -96,6 +99,7 @@ describe('ExtensionRegistryView', () => {
 
     vi.mocked(useExtensionUpdates).mockReturnValue({
       extensionsUpdateState: new Map(),
+      dispatchExtensionStateUpdate: vi.fn(),
     } as unknown as ReturnType<typeof useExtensionUpdates>);
 
     // Mock useRegistrySearch implementation
@@ -121,7 +125,7 @@ describe('ExtensionRegistryView', () => {
     );
   });
 
-  const renderView = () =>
+  const renderView = async () =>
     renderWithProviders(
       <ExtensionRegistryView
         extensionManager={mockExtensionManager}
@@ -129,16 +133,19 @@ describe('ExtensionRegistryView', () => {
         onClose={mockOnClose}
       />,
       {
+        config: makeFakeConfig(),
         uiState: {
           staticExtraHeight: 5,
           terminalHeight: 40,
+          historyManager: {
+            addItem: vi.fn(),
+          } as unknown as UseHistoryManagerReturn,
         } as Partial<UIState>,
       },
     );
 
   it('should render extensions', async () => {
-    const { lastFrame, waitUntilReady } = renderView();
-    await waitUntilReady();
+    const { lastFrame } = await renderView();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Test Extension 1');
@@ -146,8 +153,8 @@ describe('ExtensionRegistryView', () => {
     });
   });
 
-  it('should use useRegistrySearch hook', () => {
-    renderView();
+  it('should use useRegistrySearch hook', async () => {
+    await renderView();
     expect(useRegistrySearch).toHaveBeenCalled();
   });
 
@@ -185,7 +192,7 @@ describe('ExtensionRegistryView', () => {
       },
     );
 
-    renderView();
+    await renderView();
 
     await waitFor(() => {
       expect(useRegistrySearch).toHaveBeenCalledWith(
@@ -197,7 +204,7 @@ describe('ExtensionRegistryView', () => {
   });
 
   it('should call onSelect when extension is selected and Enter is pressed in details', async () => {
-    const { stdin, lastFrame } = renderView();
+    const { stdin, lastFrame } = await renderView();
 
     // Select the first extension in the list (Enter opens details)
     await React.act(async () => {
@@ -223,6 +230,44 @@ describe('ExtensionRegistryView', () => {
         mockExtensions[0],
         expect.any(Function),
       );
+    });
+  });
+
+  it('should show [Update available] and hide [Installed] when update is available', async () => {
+    mockExtensionManager.getExtensions = vi
+      .fn()
+      .mockReturnValue([{ name: 'Test Extension 1' }]);
+    vi.mocked(useExtensionUpdates).mockReturnValue({
+      extensionsUpdateState: new Map([
+        ['Test Extension 1', ExtensionUpdateState.UPDATE_AVAILABLE],
+      ]),
+      dispatchExtensionStateUpdate: vi.fn(),
+    } as unknown as ReturnType<typeof useExtensionUpdates>);
+
+    const { lastFrame } = await renderView();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Update available]');
+      expect(lastFrame()).not.toContain('[Installed]');
+    });
+  });
+
+  it('should show [Updating...] and hide [Installed] when update is in progress', async () => {
+    mockExtensionManager.getExtensions = vi
+      .fn()
+      .mockReturnValue([{ name: 'Test Extension 1' }]);
+    vi.mocked(useExtensionUpdates).mockReturnValue({
+      extensionsUpdateState: new Map([
+        ['Test Extension 1', ExtensionUpdateState.UPDATING],
+      ]),
+      dispatchExtensionStateUpdate: vi.fn(),
+    } as unknown as ReturnType<typeof useExtensionUpdates>);
+
+    const { lastFrame } = await renderView();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Updating...]');
+      expect(lastFrame()).not.toContain('[Installed]');
     });
   });
 });

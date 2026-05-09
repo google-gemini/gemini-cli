@@ -19,7 +19,9 @@ import {
   getShellConfiguration,
   initializeShellParsers,
   parseCommandDetails,
+  splitCommands,
   stripShellWrapper,
+  normalizeCommand,
   hasRedirection,
   resolveExecutable,
 } from './shell-utils.js';
@@ -114,13 +116,32 @@ const mockPowerShellResult = (
   });
 };
 
+describe('normalizeCommand', () => {
+  it('should lowercase the command', () => {
+    expect(normalizeCommand('NPM')).toBe('npm');
+  });
+
+  it('should remove .exe extension', () => {
+    expect(normalizeCommand('node.exe')).toBe('node');
+  });
+
+  it('should handle absolute paths', () => {
+    expect(normalizeCommand('/usr/bin/npm')).toBe('npm');
+    expect(normalizeCommand('C:\\Program Files\\nodejs\\node.exe')).toBe(
+      'node',
+    );
+  });
+});
+
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
     expect(getCommandRoots('ls -l')).toEqual(['ls']);
   });
 
-  it('should handle paths and return the binary name', () => {
-    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual(['node']);
+  it('should handle paths and return the full path', () => {
+    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual([
+      '/usr/local/bin/node',
+    ]);
   });
 
   it('should return an empty array for an empty string', () => {
@@ -302,6 +323,40 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 });
 
+describe('splitCommands', () => {
+  it('should split chained commands', () => {
+    expect(splitCommands('ls -l && git status')).toEqual([
+      'ls -l',
+      'git status',
+    ]);
+  });
+
+  it('should filter out redirection tokens but keep command parts', () => {
+    // Standard redirection
+    expect(splitCommands('echo "hello" > file.txt')).toEqual(['echo "hello"']);
+    expect(splitCommands('printf "test" >> log.txt')).toEqual([
+      'printf "test"',
+    ]);
+    expect(splitCommands('cat < input.txt')).toEqual(['cat']);
+
+    // Heredoc/Herestring
+    expect(splitCommands('cat << EOF\nhello\nEOF')).toEqual(['cat']);
+    // Note: The Tree-sitter bash parser includes the herestring in the main
+    // command node's text, unlike standard redirections which are siblings.
+    expect(splitCommands('grep "foo" <<< "foobar"')).toEqual([
+      'grep "foo" <<< "foobar"',
+    ]);
+  });
+
+  it('should extract nested commands from process substitution while filtering the redirection operator', () => {
+    // This is the key security test: we want cat to be checked, but not the > >(...) wrapper part
+    const parts = splitCommands('echo "foo" > >(cat)');
+    expect(parts).toContain('echo "foo"');
+    expect(parts).toContain('cat');
+    expect(parts.some((p) => p.includes('>'))).toBe(false);
+  });
+});
+
 describe('stripShellWrapper', () => {
   it('should strip sh -c with quotes', () => {
     expect(stripShellWrapper('sh -c "ls -l"')).toEqual('ls -l');
@@ -363,8 +418,8 @@ describe('escapeShellArg', () => {
       });
 
       it('should escape internal double quotes by doubling them', () => {
-        const result = escapeShellArg('He said "Hello"', 'cmd');
-        expect(result).toBe('"He said ""Hello"""');
+        const result = escapeShellArg('hello "world"', 'cmd');
+        expect(result).toBe('"hello ""world"""');
       });
 
       it('should handle empty strings', () => {
@@ -374,7 +429,12 @@ describe('escapeShellArg', () => {
     });
 
     describe('when shell is PowerShell', () => {
-      it('should wrap simple arguments in single quotes', () => {
+      it('should return simple alphanumeric arguments without quotes', () => {
+        const result = escapeShellArg('my-argument-123.txt', 'powershell');
+        expect(result).toBe('my-argument-123.txt');
+      });
+
+      it('should wrap arguments with spaces in single quotes', () => {
         const result = escapeShellArg('search term', 'powershell');
         expect(result).toBe("'search term'");
       });

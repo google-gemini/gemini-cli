@@ -23,7 +23,7 @@ exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
 │ ℹ  Log message                                                               │
 │ ⚠  Warning message                                                           │
 │ ✖  Error message                                                             │
-│ 🔍 Debug message                                                             │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

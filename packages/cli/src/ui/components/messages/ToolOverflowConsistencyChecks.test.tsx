@@ -41,7 +41,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       return null;
     };
 
-    const { unmount, waitUntilReady } = renderWithProviders(
+    const { unmount, waitUntilReady } = await renderWithProviders(
       <>
         <StateCapture />
         <ToolGroupMessage
@@ -95,7 +95,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       },
     ];
 
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
       <ToolGroupMessage
         item={{ id: 1, type: 'tool_group', tools: toolCalls }}
         toolCalls={toolCalls}
@@ -116,7 +116,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
     await waitUntilReady();
 
     // Verify truncation is occurring (standard mode uses MaxSizedBox)
-    await waitFor(() => expect(lastFrame()).toContain('hidden (Ctrl+O'));
+    await waitFor(() => expect(lastFrame()).not.toContain('line 1\n'));
 
     unmount();
   });

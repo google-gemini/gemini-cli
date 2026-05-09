@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   geminiPartsToContentParts,
   contentPartsToGeminiParts,
-  toolResultDisplayToContentParts,
   buildToolResponseData,
 } from './content-utils.js';
 import type { Part } from '@google/genai';
 import type { ContentPart } from './types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 describe('geminiPartsToContentParts', () => {
   it('converts text parts', () => {
@@ -192,32 +192,17 @@ describe('contentPartsToGeminiParts', () => {
     const content = [
       { type: 'custom_widget', payload: 123 },
     ] as unknown as ContentPart[];
+
+    const warnSpy = vi.spyOn(debugLogger, 'warn');
     const result = contentPartsToGeminiParts(content);
+
+    expect(warnSpy).toHaveBeenCalled();
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       text: JSON.stringify({ type: 'custom_widget', payload: 123 }),
     });
-  });
-});
 
-describe('toolResultDisplayToContentParts', () => {
-  it('returns undefined for undefined', () => {
-    expect(toolResultDisplayToContentParts(undefined)).toBeUndefined();
-  });
-
-  it('returns undefined for null', () => {
-    expect(toolResultDisplayToContentParts(null)).toBeUndefined();
-  });
-
-  it('handles string resultDisplay as-is', () => {
-    const result = toolResultDisplayToContentParts('File written');
-    expect(result).toEqual([{ type: 'text', text: 'File written' }]);
-  });
-
-  it('stringifies object resultDisplay', () => {
-    const display = { type: 'FileDiff', oldPath: 'a.ts', newPath: 'b.ts' };
-    const result = toolResultDisplayToContentParts(display);
-    expect(result).toEqual([{ type: 'text', text: JSON.stringify(display) }]);
+    warnSpy.mockRestore();
   });
 });
 

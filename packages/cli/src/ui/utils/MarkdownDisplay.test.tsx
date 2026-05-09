@@ -21,20 +21,18 @@ describe('<MarkdownDisplay />', () => {
   });
 
   it('renders nothing for empty text', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <MarkdownDisplay {...baseProps} text="" />,
     );
-    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
     unmount();
   });
 
   it('renders a simple paragraph', async () => {
     const text = 'Hello, world.';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <MarkdownDisplay {...baseProps} text={text} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -52,10 +50,9 @@ describe('<MarkdownDisplay />', () => {
 ### Header 3
 #### Header 4
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -65,30 +62,27 @@ describe('<MarkdownDisplay />', () => {
         /\n/g,
         eol,
       );
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('renders a fenced code block without a language', async () => {
       const text = '```\nplain text\n```'.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('handles unclosed (pending) code blocks', async () => {
       const text = '```typescript\nlet y = 2;'.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} isPending={true} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -99,10 +93,9 @@ describe('<MarkdownDisplay />', () => {
 * item B
 + item C
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -113,10 +106,9 @@ describe('<MarkdownDisplay />', () => {
   * Level 2
     * Level 3
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -126,10 +118,9 @@ describe('<MarkdownDisplay />', () => {
 1. First item
 2. Second item
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -142,10 +133,9 @@ World
 ***
 Test
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -157,10 +147,9 @@ Test
 | Cell 1   | Cell 2   |
 | Cell 3   | Cell 4   |
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -171,10 +160,9 @@ Some text before.
 | A | B |
 |---|
 | 1 | 2 |`.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -183,10 +171,9 @@ Some text before.
       const text = `Paragraph 1.
 
 Paragraph 2.`.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -206,10 +193,9 @@ some code
 
 Another paragraph.
 `.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -229,11 +215,10 @@ Another paragraph.
         [],
       );
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
         { settings },
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       expect(lastFrame()).not.toContain('1 const x = 1;');
       unmount();
@@ -241,10 +226,9 @@ Another paragraph.
 
     it('shows line numbers in code blocks by default', async () => {
       const text = '```javascript\nconst x = 1;\n```'.replace(/\n/g, eol);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       expect(lastFrame()).toContain('1 const x = 1;');
       unmount();

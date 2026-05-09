@@ -16,6 +16,7 @@ export interface MockSettingsFile {
   settings: any;
   originalSettings: any;
   path: string;
+  readOnly?: boolean;
 }
 
 interface CreateMockSettingsOptions {
@@ -46,7 +47,6 @@ export const createMockSettings = (
     workspace,
     isTrusted,
     errors,
-
     merged: mergedOverride,
     ...settingsOverrides
   } = overrides;
@@ -61,7 +61,6 @@ export const createMockSettings = (
       settings: settingsOverrides,
       originalSettings: settingsOverrides,
     },
-
     (workspace as any) || { path: '', settings: {}, originalSettings: {} },
     isTrusted ?? true,
     errors || [],

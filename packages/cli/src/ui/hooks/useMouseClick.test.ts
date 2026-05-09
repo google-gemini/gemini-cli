@@ -43,7 +43,7 @@ describe('useMouseClick', () => {
       height: 10,
     } as unknown as ReturnType<typeof getBoundingBox>);
 
-    const { unmount, waitUntilReady } = renderHook(() =>
+    const { unmount, waitUntilReady } = await renderHook(() =>
       useMouseClick(containerRef, handler),
     );
     await waitUntilReady();
@@ -74,7 +74,7 @@ describe('useMouseClick', () => {
       height: 10,
     } as unknown as ReturnType<typeof getBoundingBox>);
 
-    const { unmount, waitUntilReady } = renderHook(() =>
+    const { unmount, waitUntilReady } = await renderHook(() =>
       useMouseClick(containerRef, handler),
     );
     await waitUntilReady();

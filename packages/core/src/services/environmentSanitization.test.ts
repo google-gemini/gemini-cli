@@ -375,9 +375,9 @@ describe('sanitizeEnvironment', () => {
 });
 
 describe('getSecureSanitizationConfig', () => {
-  it('should enable environment variable redaction by default', () => {
+  it('should default enableEnvironmentVariableRedaction to false', () => {
     const config = getSecureSanitizationConfig();
-    expect(config.enableEnvironmentVariableRedaction).toBe(true);
+    expect(config.enableEnvironmentVariableRedaction).toBe(false);
   });
 
   it('should merge allowed and blocked variables from base and requested configs', () => {
@@ -440,13 +440,13 @@ describe('getSecureSanitizationConfig', () => {
     expect(config.blockedEnvironmentVariables).toEqual(['BLOCKED_VAR']);
   });
 
-  it('should force enableEnvironmentVariableRedaction to true even if requested false', () => {
+  it('should respect requested enableEnvironmentVariableRedaction value', () => {
     const requestedConfig = {
       enableEnvironmentVariableRedaction: false,
     };
 
     const config = getSecureSanitizationConfig(requestedConfig);
 
-    expect(config.enableEnvironmentVariableRedaction).toBe(true);
+    expect(config.enableEnvironmentVariableRedaction).toBe(false);
   });
 });

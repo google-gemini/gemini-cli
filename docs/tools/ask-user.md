@@ -15,7 +15,7 @@ confirmation.
     Each question object has the following properties:
     - `question` (string, required): The complete question text.
     - `header` (string, required): A short label (max 16 chars) displayed as a
-      chip/tag (e.g., "Auth", "Database").
+      chip/tag (for example, "Auth", "Database").
     - `type` (string, optional): The type of question. Defaults to `'choice'`.
       - `'choice'`: Multiple-choice with options (supports multi-select).
       - `'text'`: Free-form text input.
@@ -35,7 +35,7 @@ confirmation.
   - Returns the user's answers to the model.
 
 - **Output (`llmContent`):** A JSON string containing the user's answers,
-  indexed by question position (e.g.,
+  indexed by question position (for example,
   `{"answers":{"0": "Option A", "1": "Some text"}}`).
 
 - **Confirmation:** Yes. The tool inherently involves user interaction.
@@ -75,7 +75,7 @@ confirmation.
       "header": "Project Name",
       "question": "What is the name of your new project?",
       "type": "text",
-      "placeholder": "e.g., my-awesome-app"
+      "placeholder": "for example, my-awesome-app"
     }
   ]
 }

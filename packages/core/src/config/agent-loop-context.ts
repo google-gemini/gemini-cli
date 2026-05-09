@@ -23,6 +23,9 @@ export interface AgentLoopContext {
   /** The unique ID for the current user turn or agent thought loop. */
   readonly promptId: string;
 
+  /** The unique ID for the parent session if this is a subagent. */
+  readonly parentSessionId?: string;
+
   /** The registry of tools available to the agent in this context. */
   readonly toolRegistry: ToolRegistry;
 

@@ -48,6 +48,7 @@ packages/cli/src/generated/
 packages/core/src/generated/
 packages/devtools/src/_client-assets.ts
 .integration-tests/
+.perf-tests/
 packages/vscode-ide-companion/*.vsix
 packages/cli/download-ripgrep*/
 
@@ -65,5 +66,5 @@ evals/logs/
 
 temp_agents/
 
-# Local implementation plan (not for submission)
-implementation_plan.md
+# conductor extension and planning directories
+conductor/

@@ -51,7 +51,8 @@ const listPoliciesCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {
-    const { config } = context.services;
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     if (!config) {
       context.ui.addItem(
         {
@@ -99,7 +100,10 @@ const listPoliciesCommand: SlashCommand = {
       'Yolo Mode Policies (combined with normal mode policies)',
       uniqueYolo,
     );
-    content += formatSection('Plan Mode Policies', uniquePlan);
+    content += formatSection(
+      'Plan Mode Policies (combined with normal mode policies)',
+      uniquePlan,
+    );
 
     context.ui.addItem(
       {

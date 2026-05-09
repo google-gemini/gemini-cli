@@ -22,11 +22,10 @@ describe('compressCommand', () => {
     mockTryCompressChat = vi.fn();
     context = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () =>
-            ({
-              tryCompressChat: mockTryCompressChat,
-            }) as unknown as GeminiClient,
+        agentContext: {
+          geminiClient: {
+            tryCompressChat: mockTryCompressChat,
+          } as unknown as GeminiClient,
         },
       },
     });
@@ -43,6 +42,7 @@ describe('compressCommand', () => {
       },
     };
     await compressCommand.action!(context, '');
+    await new Promise((r) => setTimeout(r, 0));
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageType.ERROR,
@@ -63,6 +63,7 @@ describe('compressCommand', () => {
     mockTryCompressChat.mockResolvedValue(compressedResult);
 
     await compressCommand.action!(context, '');
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(context.ui.setPendingItem).toHaveBeenNthCalledWith(1, {
       type: MessageType.COMPRESSION,
@@ -99,6 +100,7 @@ describe('compressCommand', () => {
     mockTryCompressChat.mockResolvedValue(null);
 
     await compressCommand.action!(context, '');
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -115,6 +117,7 @@ describe('compressCommand', () => {
     mockTryCompressChat.mockRejectedValue(error);
 
     await compressCommand.action!(context, '');
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -129,6 +132,7 @@ describe('compressCommand', () => {
   it('should clear the pending item in a finally block', async () => {
     mockTryCompressChat.mockRejectedValue(new Error('some error'));
     await compressCommand.action!(context, '');
+    await new Promise((r) => setTimeout(r, 0));
     expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
   });
 

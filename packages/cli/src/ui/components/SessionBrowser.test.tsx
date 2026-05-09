@@ -86,6 +86,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       getProjectTempDir: () => '/tmp/test',
     },
     getSessionId: () => 'default-session-id',
+    getExperimentalGemma: () => false,
     ...overrides,
   }) as Config;
 
@@ -154,7 +155,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -163,7 +164,6 @@ describe('SessionBrowser component', () => {
         testSessions={[]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -192,7 +192,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -201,7 +201,6 @@ describe('SessionBrowser component', () => {
         testSessions={[session1, session2]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -245,7 +244,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -254,7 +253,6 @@ describe('SessionBrowser component', () => {
         testSessions={[searchSession, otherSession]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Chat Sessions (2 total');
 
@@ -305,7 +303,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -314,7 +312,6 @@ describe('SessionBrowser component', () => {
         testSessions={[session1, session2]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Chat Sessions (2 total');
 
@@ -354,7 +351,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { waitUntilReady } = render(
+    const { waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -363,7 +360,6 @@ describe('SessionBrowser component', () => {
         testSessions={[currentSession, otherSession]}
       />,
     );
-    await waitUntilReady();
 
     // Active selection is at 0 (current session).
     triggerKey({ name: 'enter', sequence: '\r' });
@@ -382,7 +378,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -391,7 +387,6 @@ describe('SessionBrowser component', () => {
         testError="storage failure"
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });

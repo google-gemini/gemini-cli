@@ -132,10 +132,10 @@ describe('ScrollableList Demo Behavior', () => {
     let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
     let waitUntilReady: () => Promise<void>;
 
-    let result: ReturnType<typeof renderWithProviders>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
 
     await act(async () => {
-      result = renderWithProviders(
+      result = await renderWithProviders(
         <TestComponent
           onAddItem={(add) => {
             addItem = add;
@@ -245,9 +245,9 @@ describe('ScrollableList Demo Behavior', () => {
 
     let lastFrame: () => string | undefined;
     let waitUntilReady: () => Promise<void>;
-    let result: ReturnType<typeof renderWithProviders>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = renderWithProviders(<StickyTestComponent />);
+      result = await renderWithProviders(<StickyTestComponent />);
       lastFrame = result.lastFrame;
       waitUntilReady = result.waitUntilReady;
     });
@@ -313,9 +313,9 @@ describe('ScrollableList Demo Behavior', () => {
         title: `Item ${i}`,
       }));
 
-      let result: ReturnType<typeof renderWithProviders>;
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        result = renderWithProviders(
+        result = await renderWithProviders(
           <Box flexDirection="column" width={80} height={10}>
             <ScrollableList
               ref={(ref) => {
@@ -417,9 +417,9 @@ describe('ScrollableList Demo Behavior', () => {
       let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let waitUntilReady: () => Promise<void>;
 
-      let result: ReturnType<typeof renderWithProviders>;
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        result = renderWithProviders(
+        result = await renderWithProviders(
           <Box width={100} height={20}>
             <ScrollableList
               data={items}
@@ -480,9 +480,9 @@ describe('ScrollableList Demo Behavior', () => {
       );
     };
 
-    let result: ReturnType<typeof renderWithProviders>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = renderWithProviders(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();
@@ -601,9 +601,9 @@ describe('ScrollableList Demo Behavior', () => {
       );
     };
 
-    let result: ReturnType<typeof renderWithProviders>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = renderWithProviders(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();
@@ -671,9 +671,9 @@ describe('ScrollableList Demo Behavior', () => {
       );
     };
 
-    let result: ReturnType<typeof renderWithProviders>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = renderWithProviders(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();

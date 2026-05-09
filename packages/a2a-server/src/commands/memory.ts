@@ -101,8 +101,8 @@ export class AddMemoryCommand implements Command {
     const tool = toolRegistry.getTool(result.toolName);
     if (tool) {
       const abortController = new AbortController();
-      const signal = abortController.signal;
-      await tool.buildAndExecute(result.toolArgs, signal, undefined, {
+      const abortSignal = abortController.signal;
+      await tool.buildAndExecute(result.toolArgs, abortSignal, undefined, {
         shellExecutionConfig: {
           sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
           sandboxManager: loopContext.sandboxManager,

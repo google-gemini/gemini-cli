@@ -37,6 +37,7 @@ describe('Tracker Tools Integration', () => {
       model: 'gemini-3-flash',
       debugMode: false,
     });
+    await config.initialize();
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
   });
 
@@ -120,8 +121,14 @@ describe('Tracker Tools Integration', () => {
     );
 
     const tasks = await config.getTrackerService().listTasks();
-    const parentId = tasks.find((t) => t.title === 'Parent Task')!.id;
-    const childId = tasks.find((t) => t.title === 'Child Task')!.id;
+    const parentTask = tasks.find((t) => t.title === 'Parent Task');
+    const childTask = tasks.find((t) => t.title === 'Child Task');
+
+    expect(parentTask).toBeDefined();
+    expect(childTask).toBeDefined();
+
+    const parentId = parentTask!.id;
+    const childId = childTask!.id;
 
     // Add Dependency
     const addDepTool = new TrackerAddDependencyTool(config, messageBus);

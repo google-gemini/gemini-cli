@@ -19,7 +19,6 @@ export function createMockWorkspaceContext(
 ): WorkspaceContext {
   const allDirs = [rootDir, ...additionalDirs];
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockWorkspaceContext = {
     addDirectory: vi.fn(),
     getDirectories: vi.fn().mockReturnValue(allDirs),

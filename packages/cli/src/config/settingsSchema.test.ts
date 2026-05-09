@@ -87,7 +87,7 @@ describe('SettingsSchema', () => {
       const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
       expect(definition).toBeDefined();
       expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('tips');
+      expect(definition?.default).toBe('off');
       expect(definition?.options?.map((o) => o.value)).toEqual([
         'tips',
         'witty',
@@ -137,6 +137,10 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties
           ?.enableRecursiveFileSearch,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.enableFileWatcher,
       ).toBeDefined();
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties
@@ -313,6 +317,22 @@ describe('SettingsSchema', () => {
       ).toBe(false);
     });
 
+    it('should have Vertex AI routing settings in schema', () => {
+      const vertexAi =
+        getSettingsSchema().billing.properties.vertexAi.properties;
+
+      expect(vertexAi.requestType).toBeDefined();
+      expect(vertexAi.requestType.type).toBe('enum');
+      expect(
+        vertexAi.requestType.options?.map((option) => option.value),
+      ).toEqual(['dedicated', 'shared']);
+      expect(vertexAi.sharedRequestType).toBeDefined();
+      expect(vertexAi.sharedRequestType.type).toBe('enum');
+      expect(
+        vertexAi.sharedRequestType.options?.map((option) => option.value),
+      ).toEqual(['priority', 'flex']);
+    });
+
     it('should have folderTrustFeature setting in schema', () => {
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled,
@@ -418,14 +438,17 @@ describe('SettingsSchema', () => {
     });
 
     it('should have plan setting in schema', () => {
-      const setting = getSettingsSchema().experimental.properties.plan;
+      const setting =
+        getSettingsSchema().general.properties.plan.properties.enabled;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
+      expect(setting.category).toBe('General');
       expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe('Enable Plan Mode.');
+      expect(setting.description).toBe(
+        'Enable Plan Mode for read-only safety during planning.',
+      );
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {
@@ -468,9 +491,31 @@ describe('SettingsSchema', () => {
       expect(enabled.category).toBe('Experimental');
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
-      expect(enabled.showInDialog).toBe(false);
+      expect(enabled.showInDialog).toBe(true);
       expect(enabled.description).toBe(
         'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
+
+      const autoStartServer = gemmaModelRouter.properties.autoStartServer;
+      expect(autoStartServer).toBeDefined();
+      expect(autoStartServer.type).toBe('boolean');
+      expect(autoStartServer.category).toBe('Experimental');
+      expect(autoStartServer.default).toBe(false);
+      expect(autoStartServer.requiresRestart).toBe(true);
+      expect(autoStartServer.showInDialog).toBe(true);
+      expect(autoStartServer.description).toBe(
+        'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
+      );
+
+      const binaryPath = gemmaModelRouter.properties.binaryPath;
+      expect(binaryPath).toBeDefined();
+      expect(binaryPath.type).toBe('string');
+      expect(binaryPath.category).toBe('Experimental');
+      expect(binaryPath.default).toBe('');
+      expect(binaryPath.requiresRestart).toBe(true);
+      expect(binaryPath.showInDialog).toBe(false);
+      expect(binaryPath.description).toBe(
+        'Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).',
       );
 
       const classifier = gemmaModelRouter.properties.classifier;
@@ -500,6 +545,31 @@ describe('SettingsSchema', () => {
       expect(model.showInDialog).toBe(false);
       expect(model.description).toBe(
         'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+      );
+    });
+
+    it('should have adk setting in schema', () => {
+      const adk = getSettingsSchema().experimental.properties.adk;
+      expect(adk).toBeDefined();
+      expect(adk.type).toBe('object');
+      expect(adk.category).toBe('Experimental');
+      expect(adk.default).toEqual({});
+      expect(adk.requiresRestart).toBe(true);
+      expect(adk.showInDialog).toBe(false);
+      expect(adk.description).toBe(
+        'Settings for the Agent Development Kit (ADK).',
+      );
+
+      const agentSessionNoninteractiveEnabled =
+        adk.properties.agentSessionNoninteractiveEnabled;
+      expect(agentSessionNoninteractiveEnabled).toBeDefined();
+      expect(agentSessionNoninteractiveEnabled.type).toBe('boolean');
+      expect(agentSessionNoninteractiveEnabled.category).toBe('Experimental');
+      expect(agentSessionNoninteractiveEnabled.default).toBe(false);
+      expect(agentSessionNoninteractiveEnabled.requiresRestart).toBe(true);
+      expect(agentSessionNoninteractiveEnabled.showInDialog).toBe(false);
+      expect(agentSessionNoninteractiveEnabled.description).toBe(
+        'Enable non-interactive agent sessions.',
       );
     });
   });
@@ -538,7 +608,31 @@ describe('SettingsSchema', () => {
       }
     };
 
+    const visitJsonSchema = (jsonSchema: Record<string, unknown>) => {
+      const ref = jsonSchema['ref'];
+      if (typeof ref === 'string') {
+        referenced.add(ref);
+      }
+      const properties = jsonSchema['properties'];
+      if (
+        properties &&
+        typeof properties === 'object' &&
+        !Array.isArray(properties)
+      ) {
+        Object.values(properties as Record<string, unknown>).forEach((prop) =>
+          visitJsonSchema(prop as Record<string, unknown>),
+        );
+      }
+      const items = jsonSchema['items'];
+      if (items && typeof items === 'object' && !Array.isArray(items)) {
+        visitJsonSchema(items as Record<string, unknown>);
+      }
+    };
+
     Object.values(schema).forEach(visitDefinition);
+
+    // Also visit all definitions to find nested references
+    Object.values(SETTINGS_SCHEMA_DEFINITIONS).forEach(visitJsonSchema);
 
     // Ensure definitions map doesn't accumulate stale entries.
     Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {

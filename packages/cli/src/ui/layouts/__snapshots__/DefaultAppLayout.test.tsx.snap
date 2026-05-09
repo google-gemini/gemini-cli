@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<DefaultAppLayout /> > hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation 1`] = `
+exports[`<DefaultAppLayout /> > hides BackgroundTaskDisplay when StreamingState is WaitingForConfirmation 1`] = `
 "MainContent
 Notifications
 CopyModeWarning
@@ -9,9 +9,9 @@ ExitWarning
 "
 `;
 
-exports[`<DefaultAppLayout /> > renders BackgroundShellDisplay when shells exist and active 1`] = `
+exports[`<DefaultAppLayout /> > renders BackgroundTaskDisplay when shells exist and active 1`] = `
 "MainContent
-BackgroundShellDisplay
+BackgroundTaskDisplay
 
 
 
@@ -23,9 +23,9 @@ ExitWarning
 "
 `;
 
-exports[`<DefaultAppLayout /> > shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation 1`] = `
+exports[`<DefaultAppLayout /> > shows BackgroundTaskDisplay when StreamingState is NOT WaitingForConfirmation 1`] = `
 "MainContent
-BackgroundShellDisplay
+BackgroundTaskDisplay
 
 
 

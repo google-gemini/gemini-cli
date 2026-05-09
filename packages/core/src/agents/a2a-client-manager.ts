@@ -26,6 +26,7 @@ import * as grpc from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 import { normalizeAgentCard } from './a2aUtils.js';
+import type { AgentCardLoadOptions } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { classifyAgentError } from './a2a-errors.js';
@@ -85,7 +86,7 @@ export class A2AClientManager {
    */
   async loadAgent(
     name: string,
-    agentCardUrl: string,
+    options: AgentCardLoadOptions,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
     if (this.clients.has(name) && this.agentCards.has(name)) {
@@ -119,7 +120,24 @@ export class A2AClientManager {
     };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
-    const rawCard = await resolver.resolve(agentCardUrl, '');
+
+    let rawCard: unknown;
+    let urlIdentifier = 'inline JSON';
+
+    if (options.type === 'json') {
+      try {
+        rawCard = JSON.parse(options.json);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to parse inline agent card JSON for agent '${name}': ${msg}`,
+        );
+      }
+    } else {
+      urlIdentifier = options.url;
+      rawCard = await resolver.resolve(options.url, '');
+    }
+
     // TODO: Remove normalizeAgentCard once @a2a-js/sdk handles
     // proto field name aliases (supportedInterfaces → additionalInterfaces,
     // protocolBinding → transport).
@@ -153,12 +171,12 @@ export class A2AClientManager {
       this.agentCards.set(name, agentCard);
 
       debugLogger.debug(
-        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+        `[A2AClientManager] Loaded agent '${name}' from ${urlIdentifier}`,
       );
 
       return agentCard;
     } catch (error: unknown) {
-      throw classifyAgentError(name, agentCardUrl, error);
+      throw classifyAgentError(name, urlIdentifier, error);
     }
   }
 

@@ -13,7 +13,7 @@ import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 describe('ToolResultDisplay Overflow', () => {
   it('shows the head of the content when overflowDirection is bottom (string)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -23,7 +23,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
@@ -31,7 +31,7 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).toContain('Line 1');
     expect(output).toContain('Line 2');
-    expect(output).not.toContain('Line 3'); // Line 3 is replaced by the "hidden" label
+    expect(output).not.toContain('Line 3');
     expect(output).not.toContain('Line 4');
     expect(output).not.toContain('Line 5');
     expect(output).toContain('hidden');
@@ -40,7 +40,7 @@ describe('ToolResultDisplay Overflow', () => {
 
   it('shows the tail of the content when overflowDirection is top (string default)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -50,7 +50,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
@@ -76,9 +76,10 @@ describe('ToolResultDisplay Overflow', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
@@ -88,7 +89,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();

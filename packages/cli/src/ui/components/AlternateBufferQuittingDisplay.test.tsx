@@ -108,7 +108,7 @@ describe('AlternateBufferQuittingDisplay', () => {
 
   it('renders with active and pending tool messages', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -118,14 +118,13 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
     unmount();
   });
 
   it('renders with empty history and no pending items', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -135,14 +134,13 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('empty');
     unmount();
   });
 
   it('renders with history but no pending items', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -152,14 +150,13 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
     unmount();
   });
 
   it('renders with pending items but no history', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -169,7 +166,6 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
     unmount();
   });
@@ -195,7 +191,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         ],
       },
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -205,7 +201,6 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Action Required (was prompted):');
     expect(output).toContain('confirming_tool');
@@ -220,7 +215,7 @@ describe('AlternateBufferQuittingDisplay', () => {
       { id: 1, type: 'user', text: 'Hello Gemini' },
       { id: 2, type: 'gemini', text: 'Hello User!' },
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -230,7 +225,6 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');
     unmount();
   });
