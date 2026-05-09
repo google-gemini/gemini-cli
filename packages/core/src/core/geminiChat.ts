@@ -146,7 +146,15 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
+    if (
+      !part.thought &&
+      !part.functionCall &&
+      !part.functionResponse &&
+      !part.inlineData &&
+      !part.fileData &&
+      part.text !== undefined &&
+      part.text === ''
+    ) {
       return false;
     }
   }
@@ -738,10 +746,12 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
+      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: contentsToUse,
+          contents: finalContents,
           config,
         },
         prompt_id,
@@ -980,8 +990,10 @@ export class GeminiChat {
 
     // Map to track synthetic IDs assigned to each call index across chunks
     const callIndexToId = new Map<number, string>();
+    let runningFunctionCallCounter = 0;
 
     for await (const chunk of streamResponse) {
+      const currentChunkStartCounter = runningFunctionCallCounter;
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -994,20 +1006,32 @@ export class GeminiChat {
         if (this.context.config.isContextManagementEnabled()) {
           for (let i = 0; i < chunk.functionCalls.length; i++) {
             const fnCall = chunk.functionCalls[i];
+            const globalIndex = currentChunkStartCounter + i;
             if (!fnCall.id) {
-              let id = callIndexToId.get(i);
+              let id = callIndexToId.get(globalIndex);
               if (!id) {
                 id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
-                callIndexToId.set(i, id);
+                callIndexToId.set(globalIndex, id);
                 debugLogger.log(
-                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${i}: ${fnCall.name}`,
+                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${globalIndex}: ${fnCall.name}`,
                 );
               }
               fnCall.id = id;
             }
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
             finalFunctionCallsMap.set(fnCall.id, fnCall);
           }
+          runningFunctionCallCounter += chunk.functionCalls.length;
         } else {
+          for (const fnCall of chunk.functionCalls) {
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
+          }
           legacyFunctionCalls.push(...chunk.functionCalls);
         }
       }
@@ -1023,6 +1047,7 @@ export class GeminiChat {
             hasToolCall = true;
           }
 
+          let localFunctionCallCounter = 0;
           modelResponseParts.push(
             ...content.parts
               .filter((part) => !part.thought)
@@ -1030,11 +1055,14 @@ export class GeminiChat {
                 if (!this.context.config.isContextManagementEnabled()) {
                   return part;
                 }
+                let callIndex: number | undefined;
+                if (part.functionCall) {
+                  callIndex =
+                    currentChunkStartCounter + localFunctionCallCounter++;
+                }
                 return {
                   ...part,
-                  callIndex: chunk.functionCalls?.findIndex(
-                    (fc) => fc.name === part.functionCall?.name,
-                  ),
+                  callIndex,
                 };
               }),
           );
@@ -1271,4 +1299,36 @@ export function isSchemaDepthError(errorMessage: string): boolean {
 
 export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
+}
+
+export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
+  return contents.map((content) => ({
+    ...content,
+    parts: (content.parts || []).map((part) => {
+      const newPart = { ...part };
+      if (newPart.functionCall) {
+        const fc = newPart.functionCall;
+        const name = fc.name?.trim() || 'generic_tool';
+        if (fc.id && fc.id.startsWith(`${name}__`)) {
+          newPart.functionCall = {
+            name: fc.name,
+            args: fc.args,
+            id: fc.id.substring(name.length + 2),
+          };
+        }
+      }
+      if (newPart.functionResponse) {
+        const fr = newPart.functionResponse;
+        const name = fr.name?.trim() || 'generic_tool';
+        if (fr.id && fr.id.startsWith(`${name}__`)) {
+          newPart.functionResponse = {
+            name: fr.name,
+            response: fr.response,
+            id: fr.id.substring(name.length + 2),
+          };
+        }
+      }
+      return newPart;
+    }),
+  }));
 }
