@@ -25,12 +25,22 @@ import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { fileExists } from '../utils/fileUtils.js';
+import { resolveExecutable } from '../utils/shell-utils.js';
 
 vi.mock('../utils/fileUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
   return {
     ...actual,
     fileExists: vi.fn(),
+  };
+});
+
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    resolveExecutable: vi.fn(),
   };
 });
 
@@ -105,7 +115,7 @@ function createMockSpawn(
 
     const stderr = new PassThrough();
     const mockProcess = new EventEmitter() as ChildProcess;
-    mockProcess.stdout = stdout as unknown as Readable;
+    mockProcess.stdout = stdout;
     mockProcess.stderr = stderr;
     mockProcess.kill = vi.fn();
     // @ts-expect-error - mocking private/internal property
@@ -2004,11 +2014,21 @@ describe('getRipgrepPath', () => {
       );
     });
 
-    it('should return null if binary is missing from both paths', async () => {
+    it('should return null if binary is missing from both paths and fallback fails', async () => {
       vi.mocked(fileExists).mockResolvedValue(false);
+      vi.mocked(resolveExecutable).mockResolvedValue(undefined);
 
       const resolvedPath = await getRipgrepPath();
       expect(resolvedPath).toBeNull();
+    });
+
+    it('should fall back to resolveExecutable if bundled binary is missing', async () => {
+      vi.mocked(fileExists).mockResolvedValue(false);
+      vi.mocked(resolveExecutable).mockResolvedValue('/global/path/to/rg');
+
+      const resolvedPath = await getRipgrepPath();
+      expect(resolvedPath).toBe('/global/path/to/rg');
+      expect(resolveExecutable).toHaveBeenCalledWith('rg');
     });
   });
 });
