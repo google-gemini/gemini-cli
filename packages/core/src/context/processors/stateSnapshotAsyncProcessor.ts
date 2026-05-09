@@ -127,9 +127,11 @@ export function createStateSnapshotAsyncProcessor(
             maxStateTokens: options.maxStateTokens,
           },
         );
-        const newConsumedIds = Array.from(
-          new Set([...previousConsumedIds, ...targets.map((t) => t.id)]),
-        );
+        const newConsumedIdsSet = new Set(previousConsumedIds);
+        for (const t of targets) {
+          newConsumedIdsSet.add(t.id);
+        }
+        const newConsumedIds = Array.from(newConsumedIdsSet);
 
         // In V2, async pipelines communicate their work to the inbox, and the processor picks it up.
         env.inbox.publish('PROPOSED_SNAPSHOT', {
