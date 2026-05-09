@@ -79,6 +79,10 @@ real-world usage while remaining small and maintainable.
 
 ## Creating an Evaluation
 
+> [!TIP] **New contributors**: See [CONTRIBUTING.md](./CONTRIBUTING.md) for a
+> step-by-step walkthrough of writing your first eval, including the full `rig`
+> API reference and worked examples.
+
 Evaluations are located in the `evals` directory. Each evaluation is a Vitest
 test file that uses the `evalTest` function from `evals/test-helper.ts`.
 
