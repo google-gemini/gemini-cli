@@ -50,16 +50,52 @@ describe('formatters', () => {
   });
 
   describe('formatBytes', () => {
+    it('should format bytes under 1KB as bytes', () => {
+      expect(formatBytes(999)).toBe('999 B');
+    });
+
+    it('should format zero bytes as bytes', () => {
+      expect(formatBytes(0)).toBe('0 B');
+    });
+
     it('should format bytes into KB', () => {
       expect(formatBytes(12345)).toBe('12.1 KB');
+    });
+
+    it('should format exact 1KB boundary into KB', () => {
+      expect(formatBytes(1024)).toBe('1.0 KB');
     });
 
     it('should format bytes into MB', () => {
       expect(formatBytes(12345678)).toBe('11.8 MB');
     });
 
+    it('should format exact 1MB boundary into MB', () => {
+      expect(formatBytes(1024 * 1024)).toBe('1.0 MB');
+    });
+
     it('should format bytes into GB', () => {
       expect(formatBytes(12345678901)).toBe('11.50 GB');
+    });
+
+    it('should format exact 1GB boundary into GB', () => {
+      expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
+    });
+
+    it('should preserve negative sign when formatting values', () => {
+      expect(formatBytes(-1536)).toBe('-1.5 KB');
+    });
+
+    it('should return N/A for NaN', () => {
+      expect(formatBytes(Number.NaN)).toBe('N/A');
+    });
+
+    it('should return N/A for positive infinity', () => {
+      expect(formatBytes(Number.POSITIVE_INFINITY)).toBe('N/A');
+    });
+
+    it('should return N/A for negative infinity', () => {
+      expect(formatBytes(Number.NEGATIVE_INFINITY)).toBe('N/A');
     });
   });
 

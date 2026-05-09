@@ -10,14 +10,28 @@ import {
 } from '@google/gemini-cli-core';
 
 export const formatBytes = (bytes: number): string => {
-  const gb = bytes / (1024 * 1024 * 1024);
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
+  if (!Number.isFinite(bytes)) {
+    return 'N/A';
   }
-  if (bytes < 1024 * 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  const sign = bytes < 0 ? '-' : '';
+  const absBytes = Math.abs(bytes);
+
+  if (absBytes < 1024) {
+    const byteValue = Number.isInteger(absBytes)
+      ? absBytes.toString()
+      : absBytes.toFixed(1);
+    return `${sign}${byteValue} B`;
   }
-  return `${gb.toFixed(2)} GB`;
+
+  if (absBytes < 1024 * 1024) {
+    return `${sign}${(absBytes / 1024).toFixed(1)} KB`;
+  }
+  if (absBytes < 1024 * 1024 * 1024) {
+    return `${sign}${(absBytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${sign}${(absBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 };
 
 /**
