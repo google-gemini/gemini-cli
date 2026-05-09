@@ -186,6 +186,8 @@ export async function fetchWithTimeout(
       // cancellation (e.g. Ctrl+C), not an internal timeout. Re-throw as a plain
       // AbortError so the retry layer does NOT treat it as a retryable ETIMEDOUT.
       if (options?.signal?.aborted) {
+        // Rethrow the original abort reason or the caught error to preserve
+        // the stack trace and any custom abort reason (e.g. from Ctrl+C).
         throw options.signal.reason ?? error;
       }
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');

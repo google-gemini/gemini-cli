@@ -64,3 +64,6 @@ gemini-debug.log
 evals/logs/
 
 temp_agents/
+
+# Local implementation plan (not for submission)
+implementation_plan.md

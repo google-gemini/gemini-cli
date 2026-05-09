@@ -187,13 +187,24 @@ describe('fetch utils', () => {
       vi.mocked(global.fetch).mockImplementation(
         (_input, init) =>
           new Promise((_resolve, reject) => {
+            const rejectWithAbortError = () => {
+              const error = new Error('The operation was aborted');
+              error.name = 'AbortError';
+              // @ts-expect-error - for mocking purposes
+              error.code = 'ABORT_ERR';
+              reject(error);
+            };
+
+            // Handle the case where the signal is already aborted before
+            // fetch is called (e.g. controller.abort() called synchronously).
+            if (init?.signal?.aborted) {
+              rejectWithAbortError();
+              return;
+            }
+
             if (init?.signal) {
-              init.signal.addEventListener('abort', () => {
-                const error = new Error('The operation was aborted');
-                error.name = 'AbortError';
-                // @ts-expect-error - for mocking purposes
-                error.code = 'ABORT_ERR';
-                reject(error);
+              init.signal.addEventListener('abort', rejectWithAbortError, {
+                once: true,
               });
             }
           }),
