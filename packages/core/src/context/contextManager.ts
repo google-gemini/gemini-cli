@@ -30,6 +30,9 @@ export class ContextManager {
   private readonly orchestrator: PipelineOrchestrator;
   private readonly historyObserver: HistoryObserver;
 
+  // Hysteresis tracking to prevent utility call churn
+  private lastTriggeredDeficit = 0;
+
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
@@ -58,15 +61,8 @@ export class ContextManager {
     );
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      const newIds = new Set(event.nodes.map((n) => n.id));
-      const addedNodes = event.nodes.filter((n) => event.newNodes.has(n.id));
-
-      // Prune any pristine nodes that were dropped from the upstream history
-      this.buffer = this.buffer.prunePristineNodes(newIds);
-
-      if (addedNodes.length > 0) {
-        this.buffer = this.buffer.appendPristineNodes(addedNodes);
-      }
+      // Sync the entire pristine history chronologically
+      this.buffer = this.buffer.syncPristineHistory(event.nodes);
 
       this.evaluateTriggers(event.newNodes);
     });
@@ -76,6 +72,11 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
+      // We explicitly DO NOT call evaluateTriggers here.
+      // The Context Manager is a one-way assembly line. It only evaluates triggers
+      // when fundamentally new organic context is added via PristineHistoryUpdated.
+      // Re-evaluating after a processor finishes creates infinite feedback loops if
+      // the processor fails to reduce the token count below the threshold.
     });
 
     this.historyObserver.start();
@@ -129,10 +130,15 @@ export class ContextManager {
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
         const node = this.buffer.nodes[i];
+        const priorTokens = rollingTokens;
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
         ]);
-        if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
+
+        // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
+        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
+        // strictly *older* than the boundary node.
+        if (priorTokens > this.sidecar.config.budget.retainedTokens) {
           // Only age out if not protected
           if (!protectedIds.has(node.id)) {
             agedOutNodes.add(node.id);
@@ -141,15 +147,39 @@ export class ContextManager {
       }
 
       if (agedOutNodes.size > 0) {
-        this.env.tokenCalculator.garbageCollectCache(
-          new Set(this.buffer.nodes.map((n) => n.id)),
-        );
-        this.eventBus.emitConsolidationNeeded({
-          nodes: this.buffer.nodes,
-          targetDeficit:
-            currentTokens - this.sidecar.config.budget.retainedTokens,
-          targetNodeIds: agedOutNodes,
-        });
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.retainedTokens;
+
+        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
+        // so we can track growth from this new, smaller deficit.
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
+        // Respect coalescing threshold for background work
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        // Only trigger if deficit has grown significantly since last time
+        const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
+
+        if (
+          targetDeficit >= threshold &&
+          (growthSinceLast >= threshold || this.lastTriggeredDeficit === 0)
+        ) {
+          this.lastTriggeredDeficit = targetDeficit;
+          this.env.tokenCalculator.garbageCollectCache(
+            new Set(this.buffer.nodes.map((n) => n.id)),
+          );
+          this.eventBus.emitConsolidationNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNodes,
+          });
+        }
+      } else {
+        // Budget is healthy, reset hysteresis
+        this.lastTriggeredDeficit = 0;
       }
     }
   }
@@ -246,6 +276,7 @@ export class ContextManager {
     await this.orchestrator.waitForPipelines();
 
     let nodes = this.buffer.nodes;
+    const previewNodeIds = new Set<string>();
 
     // If we have a pending request, we need to build a 'preview' graph for this render.
     if (pendingRequest) {
@@ -253,6 +284,9 @@ export class ContextManager {
         type: 'PUSH',
         payload: [pendingRequest],
       });
+      for (const n of previewNodes) {
+        previewNodeIds.add(n.id);
+      }
       nodes = [...nodes, ...previewNodes];
     }
 
@@ -288,6 +322,7 @@ export class ContextManager {
       this.env,
       protectionReasons,
       headerTokens,
+      previewNodeIds,
     );
 
     // Structural validation in debug mode

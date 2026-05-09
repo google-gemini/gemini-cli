@@ -62,6 +62,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { LRUCache } from 'mnemonist';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -77,6 +78,8 @@ import {
 import type { InjectionSource } from '../config/injectionService.js';
 import {
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
@@ -125,6 +128,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+  private cache: LRUCache<string, string>;
 
   private get executionContext(): AgentLoopContext {
     return {
@@ -309,6 +313,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.cache = new LRUCache<string, string>(10);
 
     this.agentId = Math.random().toString(36).slice(2, 8);
   }
@@ -529,21 +534,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
-    // If the agent definition declares additional workspace directories,
-    // wrap execution in a scoped workspace context. All calls to
-    // Config.getWorkspaceContext() within this scope will see the extended
-    // directories, without mutating the shared Config.
-    const dirs = this.definition.workspaceDirectories;
-    if (dirs && dirs.length > 0) {
-      const scopedCtx = createScopedWorkspaceContext(
-        this.context.config.getWorkspaceContext(),
-        dirs,
-      );
-      return runWithScopedWorkspaceContext(scopedCtx, () =>
-        this.runInternal(inputs, signal),
-      );
+    const runWithWorkspaceScope = () => {
+      // If the agent definition declares additional workspace directories,
+      // wrap execution in a scoped workspace context. All calls to
+      // Config.getWorkspaceContext() within this scope will see the extended
+      // directories, without mutating the shared Config.
+      const dirs = this.definition.workspaceDirectories;
+      if (dirs && dirs.length > 0) {
+        const scopedCtx = createScopedWorkspaceContext(
+          this.context.config.getWorkspaceContext(),
+          dirs,
+        );
+        return runWithScopedWorkspaceContext(scopedCtx, () =>
+          this.runInternal(inputs, signal),
+        );
+      }
+      return this.runInternal(inputs, signal);
+    };
+
+    const runWithInboxScope = () =>
+      this.definition.memoryInboxAccess
+        ? runWithScopedMemoryInboxAccess(runWithWorkspaceScope)
+        : runWithWorkspaceScope();
+
+    if (this.definition.autoMemoryExtractionWriteAccess) {
+      return runWithScopedAutoMemoryExtractionWriteAccess(runWithInboxScope);
     }
-    return this.runInternal(inputs, signal);
+
+    return runWithInboxScope();
   }
 
   private async runInternal(
@@ -934,26 +952,28 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       });
     const requestedModel = resolvedConfig.model;
 
-    let modelToUse: string;
+    let modelToUse: string | undefined;
     if (isAutoModel(requestedModel)) {
-      // TODO(joshualitt): This try / catch is inconsistent with the routing
-      // behavior for the main agent. Ideally, we would have a universal
-      // policy for routing failure. Given routing failure does not necessarily
-      // mean generation will fail, we may want to share this logic with
-      // other places we use model routing.
-      try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: message.parts || [],
-          signal,
-          requestedModel,
-        };
-        const router = this.context.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      } catch (error) {
-        debugLogger.warn(`Error during model routing: ${error}`);
-        modelToUse = DEFAULT_GEMINI_MODEL;
+      modelToUse = this.cache.get('modelToUse');
+
+      // If not cached, fetch from the router and cache the result.
+      if (!modelToUse) {
+        try {
+          const routingContext: RoutingContext = {
+            history: chat.getHistory(/*curated=*/ true),
+            request: message.parts || [],
+            signal,
+            requestedModel,
+          };
+          const router = this.context.config.getModelRouterService();
+          const decision = await router.route(routingContext);
+          modelToUse = decision.model;
+        } catch (error) {
+          debugLogger.warn(`Error during model routing: ${error}`);
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
+        // Cache the result regardless of whether it succeeded or fell back
+        this.cache.set('modelToUse', modelToUse);
       }
     } else {
       modelToUse = requestedModel;
@@ -1267,25 +1287,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Reconstruct toolResponseParts in the original order
+    // Ensure exactly one response per function call to satisfy the Gemini API protocol.
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const part = syncResults.get(callId);
+
       if (part) {
         toolResponseParts.push(part);
+        continue;
       }
-    }
 
-    // If all authorized tool calls failed (and task isn't complete), provide a generic error.
-    if (
-      functionCalls.length > 0 &&
-      toolResponseParts.length === 0 &&
-      !taskCompleted
-    ) {
-      toolResponseParts.push({
-        text: 'All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach.',
-      });
+      const isAborted = signal.aborted;
+      const isTaskComplete =
+        functionCall.name === COMPLETE_TASK_TOOL_NAME && taskCompleted;
+
+      // Safely skip missing responses if the run was interrupted or the turn won't be sent back.
+      if (isAborted || isTaskComplete) {
+        continue;
+      }
+
+      throw new Error(
+        `[LocalAgentExecutor] Critical System Failure: Tool execution result was lost/dropped by the scheduler for callId ${callId} (${functionCall.name}). This indicates an internal race condition or scheduler bug.`,
+      );
     }
 
     return {

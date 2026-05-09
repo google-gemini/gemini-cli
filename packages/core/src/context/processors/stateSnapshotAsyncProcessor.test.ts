@@ -44,14 +44,15 @@ describe('StateSnapshotAsyncProcessor', () => {
     const targets = [nodeA, nodeB];
     await worker.process(createMockProcessArgs(targets, targets, []));
 
-    // Ensure generateContent was called
-    expect(env.llmClient.generateContent).toHaveBeenCalled();
+    // Ensure generateJson was called
+    expect(env.llmClient.generateJson).toHaveBeenCalled();
 
     // Verify it published to the inbox
     expect(publishSpy).toHaveBeenCalledWith(
       'PROPOSED_SNAPSHOT',
       expect.objectContaining({
-        newText: 'Mock LLM summary response',
+        newText:
+          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}',
         consumedIds: ['node-A', 'node-B'],
         type: 'point-in-time',
       }),
@@ -105,20 +106,20 @@ describe('StateSnapshotAsyncProcessor', () => {
     expect(publishSpy).toHaveBeenCalledWith(
       'PROPOSED_SNAPSHOT',
       expect.objectContaining({
-        newText: 'Mock LLM summary response',
+        newText:
+          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}',
         consumedIds: ['node-A', 'node-B', 'node-C'], // Aggregated!
         type: 'accumulate',
       }),
     );
-
-    // Verify the LLM was called with the old snapshot prepended
-    expect(env.llmClient.generateContent).toHaveBeenCalledWith(
+    // Verify the LLM was called with the old snapshot provided in the prompt
+    expect(env.llmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
         contents: expect.arrayContaining([
           expect.objectContaining({
             parts: expect.arrayContaining([
               expect.objectContaining({
-                text: expect.stringContaining('<old snapshot>'),
+                text: expect.stringContaining('CURRENT MASTER STATE'),
               }),
             ]),
           }),
@@ -140,5 +141,53 @@ describe('StateSnapshotAsyncProcessor', () => {
 
     expect(env.llmClient.generateContent).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();
+  });
+
+  it('should use Global Lookback to find an existing snapshot in the graph when inbox is empty', async () => {
+    const env = createMockEnvironment();
+
+    const worker = createStateSnapshotAsyncProcessor(
+      'StateSnapshotAsyncProcessor',
+      env,
+      { type: 'accumulate' },
+    );
+
+    // Create an old snapshot with existing JSON state
+    const oldStateJson = JSON.stringify({
+      discovered_facts: ['Global Lookback Async Works!'],
+    });
+    const oldSnapshot = createDummyNode(
+      'ep1',
+      NodeType.SNAPSHOT,
+      10,
+      { payload: { text: oldStateJson } },
+      'old-snap',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
+
+    const targets = [oldSnapshot, nodeC];
+    const args = createMockProcessArgs(targets, targets, []); // Empty inbox!
+
+    await worker.process(args);
+
+    expect(env.llmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.arrayContaining([
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('Global Lookback Async Works!'),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    );
   });
 });
