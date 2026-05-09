@@ -180,6 +180,71 @@ standard for your commit messages.
 In the PR description, explain the "why" behind your changes and link to the
 relevant issue (e.g., `Fixes #123`).
 
+### Practical contributor checklist
+
+To maximize acceptance and review speed, use this quick checklist before opening
+your PR:
+
+- Link the PR to an existing approved issue.
+- Keep scope focused to one bug/feature.
+- Add tests for happy-path plus at least one edge case.
+- Avoid unrelated refactors or formatting-only churn.
+- Run validation locally before requesting review.
+
+#### Suggested issue filters
+
+- [help wanted](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+- [help wanted + bug](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22+label%3Abug)
+- [area/ux](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3Aarea%2Fux)
+- [area/core](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3Aarea%2Fcore)
+- [area/tooling](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3Aarea%2Ftooling)
+
+#### PR size guidance
+
+- **Small (ideal):** 50-200 changed lines.
+- **Medium (acceptable):** 200-400 changed lines.
+- **Large (slow review):** >400 changed lines, split into multiple PRs.
+
+#### Validation commands
+
+Run these from repository root before opening your PR:
+
+```bash
+npm run preflight
+```
+
+For targeted debugging in one package:
+
+```bash
+npm run test --workspace @google/gemini-cli
+npm run test --workspace @google/gemini-cli-core
+```
+
+#### PR description template
+
+```md
+## Summary
+
+Closes #<issue_number>
+
+## What Changed
+
+- <change 1>
+- <change 2>
+
+## Why
+
+- <reason>
+
+## Tests
+
+- [x] <tests run>
+
+## Out of Scope
+
+- <non-goals>
+```
+
 ### Forking
 
 If you are forking the repository you will be able to run the Build, Test and
