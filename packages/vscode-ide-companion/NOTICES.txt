@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@1.26.0
+@modelcontextprotocol/sdk@1.29.0
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -28,7 +28,7 @@ SOFTWARE.
 
 
 ============================================================
-@hono/node-server@1.19.13
+@hono/node-server@1.19.14
 (https://github.com/honojs/node-server.git)
 
 MIT License
@@ -55,12 +55,12 @@ SOFTWARE.
 
 
 ============================================================
-ajv@6.14.0
-(https://github.com/ajv-validator/ajv.git)
+ajv@8.20.0
+(No repository found)
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2017 Evgeny Poberezkin
+Copyright (c) 2015-2021 Evgeny Poberezkin
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -110,34 +110,42 @@ SOFTWARE.
 
 
 ============================================================
-fast-json-stable-stringify@2.1.0
-(git://github.com/epoberezkin/fast-json-stable-stringify.git)
+fast-uri@3.1.2
+(git+https://github.com/fastify/fast-uri.git)
 
-This software is released under the MIT license:
+Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
+Copyright (c) 2021-present The Fastify team <https://github.com/fastify/fastify#team>
+All rights reserved.
 
-Copyright (c) 2017 Evgeny Poberezkin
-Copyright (c) 2013 James Halliday
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * The names of any contributors may not be used to endorse or promote
+      products derived from this software without specific prior written
+      permission.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS AND CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+                                  *   *   *
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+The complete list of contributors can be found at:
+- https://github.com/garycourt/uri-js/graphs/contributors
 
 ============================================================
-json-schema-traverse@0.4.1
+json-schema-traverse@1.0.0
 (git+https://github.com/epoberezkin/json-schema-traverse.git)
 
 MIT License
@@ -164,46 +172,30 @@ SOFTWARE.
 
 
 ============================================================
-uri-js@4.4.1
-(http://github.com/garycourt/uri-js)
+require-from-string@2.0.2
+(No repository found)
 
-Copyright 2011 Gary Court. All rights reserved.
+The MIT License (MIT)
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+Copyright (c) Vsevolod Strukchinsky <floatdrop@gmail.com> (github.com/floatdrop)
 
-1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-THIS SOFTWARE IS PROVIDED BY GARY COURT "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL GARY COURT OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-The views and conclusions contained in the software and documentation are those of the authors and should not be interpreted as representing official policies, either expressed or implied, of Gary Court.
-
-
-============================================================
-punycode@2.3.1
-(https://github.com/mathiasbynens/punycode.js.git)
-
-Copyright Mathias Bynens <https://mathiasbynens.be/>
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 
 ============================================================
@@ -262,7 +254,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-cors@2.8.5
+cors@2.8.6
 (No repository found)
 
 (The MIT License)
@@ -487,12 +479,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-eventsource-parser@3.0.3
+eventsource-parser@3.0.8
 (git+ssh://git@github.com/rexxars/eventsource-parser.git)
 
 MIT License
 
-Copyright (c) 2025 Espen Hovlandsdal <espen@hovlandsdal.com>
+Copyright (c) 2026 Espen Hovlandsdal <espen@hovlandsdal.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1037,7 +1029,7 @@ THE SOFTWARE.
 
 
 ============================================================
-qs@6.14.2
+qs@6.15.1
 (https://github.com/ljharb/qs.git)
 
 BSD 3-Clause License
@@ -1153,7 +1145,7 @@ SOFTWARE.
 
 
 ============================================================
-side-channel-list@1.0.0
+side-channel-list@1.0.1
 (git+https://github.com/ljharb/side-channel-list.git)
 
 MIT License
@@ -1476,7 +1468,7 @@ SOFTWARE.
 
 
 ============================================================
-hasown@2.0.2
+hasown@2.0.3
 (git+https://github.com/inspect-js/hasOwn.git)
 
 MIT License
@@ -1670,7 +1662,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-content-disposition@1.0.1
+content-disposition@1.1.0
 (No repository found)
 
 (The MIT License)
@@ -2151,7 +2143,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ============================================================
-path-to-regexp@8.4.2
+path-to-regexp@6.3.0
 (https://github.com/pillarjs/path-to-regexp.git)
 
 The MIT License (MIT)
@@ -2238,7 +2230,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-express-rate-limit@8.3.1
+express-rate-limit@8.5.1
 (git+https://github.com/express-rate-limit/express-rate-limit.git)
 
 ﻿# MIT License
@@ -2264,7 +2256,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-ip-address@10.1.0
+ip-address@10.2.0
 (git://github.com/beaugunderson/ip-address.git)
 
 Copyright (C) 2011 by Beau Gunderson
@@ -2289,7 +2281,7 @@ THE SOFTWARE.
 
 
 ============================================================
-hono@4.12.12
+hono@4.12.18
 (git+https://github.com/honojs/hono.git)
 
 MIT License
@@ -2316,7 +2308,7 @@ SOFTWARE.
 
 
 ============================================================
-jose@6.1.3
+jose@6.2.3
 (No repository found)
 
 The MIT License (MIT)
@@ -2406,7 +2398,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ============================================================
-pkce-challenge@5.0.0
+pkce-challenge@5.0.1
 (git+https://github.com/crouchcd/pkce-challenge.git)
 
 MIT License
@@ -2433,7 +2425,7 @@ SOFTWARE.
 
 
 ============================================================
-zod@3.25.76
+zod@4.4.3
 (git+https://github.com/colinhacks/zod.git)
 
 MIT License
@@ -2460,7 +2452,7 @@ SOFTWARE.
 
 
 ============================================================
-zod-to-json-schema@3.25.1
+zod-to-json-schema@3.25.2
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License

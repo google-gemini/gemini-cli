@@ -30,7 +30,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -59,6 +59,12 @@ export async function getRipgrepPath(): Promise<string | null> {
     if (await fileExists(candidate)) {
       return candidate;
     }
+  }
+
+  // Fallback to globally installed ripgrep
+  const globalPath = await resolveExecutable('rg');
+  if (globalPath) {
+    return globalPath;
   }
 
   return null;
