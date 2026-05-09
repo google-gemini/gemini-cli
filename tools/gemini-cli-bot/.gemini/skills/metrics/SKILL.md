@@ -15,8 +15,11 @@ maintainability.
 - Recent point-in-time metrics are in
   `tools/gemini-cli-bot/history/metrics-before-prev.csv` and the current run's
   metrics.
-- **Preservation Status**: Check the `ENABLE_PRS` environment variable. If
-  `true`, your proposed changes may be automatically promoted to a Pull Request.
+- **Preservation Status**: Check the `ENABLE_PRS` environment variable. If `ENABLE_PRS`
+  is `true`, your proposed changes may be automatically promoted to a Pull Request.
+  In this case, you MUST write an exhaustive PR description to `pr-description.md`
+  and stage your file changes (`git add`). If `ENABLE_PRS` is not `true`, you MUST NOT
+  stage file changes or attempt to create a patch. Instead, simply report your findings.
 
 ## Repo Policy Priorities
 
