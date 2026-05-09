@@ -91,16 +91,25 @@ export function convertToFunctionResponse(
     // Ignore other part types
   }
 
+  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
+    model,
+    config,
+  );
+
+  // Gemini 3 (and later) supports audio/video in tool responses.
+  // Earlier models (1.5) only support images and documents.
+  const isAudioVideoSupported = model.startsWith('gemini-3-');
+
   // build a list of unsupported MIME types for function responses
   const filteredInlineDataParts: Part[] = [];
   const unsupportedInlineDataParts: Part[] = [];
 
   for (const part of inlineDataParts) {
     const mimeType = part.inlineData?.mimeType;
-    if (
-      mimeType &&
-      (mimeType.startsWith('audio/') || mimeType.startsWith('video/'))
-    ) {
+    const isAudioVideo =
+      mimeType?.startsWith('audio/') || mimeType?.startsWith('video/');
+
+    if (isAudioVideo && !isAudioVideoSupported) {
       unsupportedInlineDataParts.push(part);
     } else {
       filteredInlineDataParts.push(part);
@@ -148,16 +157,30 @@ export function convertToFunctionResponse(
     }
   }
 
-  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
-    model,
-    config,
-  );
   const siblingParts: Part[] = [...fileDataParts];
 
   if (filteredInlineDataParts.length > 0) {
     if (isMultimodalFRSupported) {
-      // Nest inlineData if supported by the model
-      Object.assign(part.functionResponse!, { parts: filteredInlineDataParts });
+      // Nest inlineData if supported by the model.
+      // NOTE: Even if multimodal FR is supported, audio/video are often better
+      // handled as siblings to avoid specific API nesting restrictions on some endpoints.
+      const nestableParts = filteredInlineDataParts.filter((p) => {
+        const mimeType = p.inlineData?.mimeType;
+        return (
+          !mimeType?.startsWith('audio/') && !mimeType?.startsWith('video/')
+        );
+      });
+      const nonNestableParts = filteredInlineDataParts.filter((p) => {
+        const mimeType = p.inlineData?.mimeType;
+        return mimeType?.startsWith('audio/') || mimeType?.startsWith('video/');
+      });
+
+      if (nestableParts.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (part.functionResponse as unknown as { parts: Part[] }).parts =
+          nestableParts;
+      }
+      siblingParts.push(...nonNestableParts);
     } else {
       // Otherwise treat as siblings
       siblingParts.push(...filteredInlineDataParts);

@@ -1342,11 +1342,11 @@ describe('fileUtils', () => {
       // maxChars=4000 -> head=800 (20%), tail=3200 (80%)
       const formatted = formatTruncatedToolOutput(content, outputFile, 4000);
 
-      expect(formatted).toContain(
-        'Showing first 800 and last 3,200 characters',
+      expect(formatted).toMatch(
+        /Showing first 800 and last 3[.,]200 characters/,
       );
       expect(formatted).toContain('For full output see: /tmp/out.txt');
-      expect(formatted).toContain('[46,000 characters omitted]'); // 50000 - 800 - 3200
+      expect(formatted).toMatch(/\[46[.,]000 characters omitted\]/); // 50000 - 800 - 3200
     });
   });
 });

@@ -19,6 +19,8 @@ export const NON_ASCII_TOKENS_PER_CHAR = 1.5;
 export const MSG_OVERHEAD_TOKENS = 5;
 // Fixed token estimate for images
 const IMAGE_TOKEN_ESTIMATE = 3000;
+// Fixed token estimate for audio (heuristic, approx 2 mins at 25 tokens/sec)
+const AUDIO_TOKEN_ESTIMATE = 3000;
 // Fixed token estimate for PDFs (~100 pages at 258 tokens/page)
 // See: https://ai.google.dev/gemini-api/docs/document-processing
 const PDF_TOKEN_ESTIMATE = 25800;
@@ -66,6 +68,10 @@ function estimateMediaTokens(part: Part): number | undefined {
     // Images: 3,000 tokens (covers up to 4K resolution on Gemini 3)
     // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
     return IMAGE_TOKEN_ESTIMATE;
+  } else if (mimeType?.startsWith('audio/')) {
+    // Audio: heuristic 3,000 tokens.
+    // Gemini 3 uses ~25 tokens per second. 3,000 tokens is ~2 minutes.
+    return AUDIO_TOKEN_ESTIMATE;
   } else if (mimeType?.startsWith('application/pdf')) {
     // PDFs: 25,800 tokens (~100 pages at 258 tokens/page)
     // See: https://ai.google.dev/gemini-api/docs/document-processing

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part, FunctionResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
@@ -33,6 +33,39 @@ import {
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
+import { isRecord } from '../utils/markdownUtils.js';
+
+/**
+ * Extension of the FunctionResponse type to support multimodal parts.
+ * This is used for Gemini 3 support where tool responses can contain binary data.
+ */
+interface ExtendedFunctionResponse extends FunctionResponse {
+  parts?: Part[];
+}
+
+interface ResponseWithOutput {
+  output: string;
+}
+
+interface ResponseWithContent {
+  content: string;
+}
+
+function hasOutput(obj: unknown): obj is ResponseWithOutput {
+  if (!isRecord(obj)) {
+    return false;
+  }
+  const candidate = obj as { output?: unknown };
+  return typeof candidate.output === 'string';
+}
+
+function hasContent(obj: unknown): obj is ResponseWithContent {
+  if (!isRecord(obj)) {
+    return false;
+  }
+  const candidate = obj as { content?: unknown };
+  return typeof candidate.content === 'string';
+}
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -63,6 +96,10 @@ export function findCompressSplitPoint(
 ): number {
   if (fraction <= 0 || fraction >= 1) {
     throw new Error('Fraction must be between 0 and 1');
+  }
+
+  if (contents.length === 0) {
+    return 0;
   }
 
   const charCounts = contents.map((content) => JSON.stringify(content).length);
@@ -150,25 +187,22 @@ async function truncateHistoryToBudget(
         const part = content.parts[j];
 
         if (part.functionResponse) {
-          const responseObj = part.functionResponse.response;
+          const fr = part.functionResponse as ExtendedFunctionResponse;
+          const responseObj = fr.response;
           // Ensure we have a string representation to truncate.
           // If the response is an object, we try to extract a primary string field (output or content).
           let contentStr: string;
           if (typeof responseObj === 'string') {
             contentStr = responseObj;
-          } else if (responseObj && typeof responseObj === 'object') {
-            if (
-              'output' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
-              typeof responseObj['output'] === 'string'
-            ) {
-              contentStr = responseObj['output'];
-            } else if (
-              'content' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
-              typeof responseObj['content'] === 'string'
-            ) {
-              contentStr = responseObj['content'];
+          } else if (isRecord(responseObj)) {
+            // Specialized handling for Gemini 3 multimodal parts nested in tools
+            const nestedParts = fr.parts;
+            if (Array.isArray(nestedParts)) {
+              contentStr = JSON.stringify(nestedParts);
+            } else if (hasOutput(responseObj)) {
+              contentStr = responseObj.output;
+            } else if (hasContent(responseObj)) {
+              contentStr = responseObj.content;
             } else {
               contentStr = JSON.stringify(responseObj, null, 2);
             }
@@ -186,7 +220,7 @@ async function truncateHistoryToBudget(
               // Budget exceeded: Truncate this response.
               const { outputFile } = await saveTruncatedToolOutput(
                 contentStr,
-                part.functionResponse.name ?? 'unknown_tool',
+                fr.name ?? 'unknown_tool',
                 config.getNextCompressionTruncationId(),
                 config.storage.getProjectTempDir(),
               );
@@ -199,8 +233,7 @@ async function truncateHistoryToBudget(
 
               newParts.unshift({
                 functionResponse: {
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread
-                  ...part.functionResponse,
+                  ...fr,
                   response: { output: truncatedMessage },
                 },
               });
@@ -232,6 +265,32 @@ async function truncateHistoryToBudget(
   }
 
   return truncatedHistory;
+}
+
+/**
+ * Strips binary data and nested tool parts from history to ensure
+ * compatibility with summarizer models, especially on endpoints like Vertex AI.
+ */
+function stripBinaryDataForSummary(history: Content[]): Content[] {
+  return history.map((content) => ({
+    ...content,
+    parts: content.parts?.map((part) => {
+      if (part.inlineData || part.fileData) {
+        const mimeType = part.inlineData?.mimeType || part.fileData?.mimeType;
+        return { text: `[Binary content (${mimeType}) - removed for summary]` };
+      }
+      if (part.functionResponse) {
+        const fr = part.functionResponse as ExtendedFunctionResponse;
+        if (fr.parts) {
+          // Deep clone to avoid modifying original
+          const newFR: ExtendedFunctionResponse = { ...fr };
+          delete newFR.parts;
+          return { functionResponse: newFR };
+        }
+      }
+      return part;
+    }),
+  }));
 }
 
 export class ChatCompressionService {
@@ -285,7 +344,7 @@ export class ChatCompressionService {
     // Apply token-based truncation to the entire history before splitting.
     // This ensures that even the "to compress" portion is within safe limits for the summarization model.
     const truncatedHistory = await truncateHistoryToBudget(
-      curatedHistory,
+      [...curatedHistory],
       config,
     );
 
@@ -320,7 +379,7 @@ export class ChatCompressionService {
 
     const splitPoint = findCompressSplitPoint(
       truncatedHistory,
-      1 - COMPRESSION_PRESERVE_THRESHOLD,
+      COMPRESSION_PRESERVE_THRESHOLD,
     );
 
     const historyToCompressTruncated = truncatedHistory.slice(0, splitPoint);
@@ -356,10 +415,16 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
+    // Strip binary data (audio/images) from the history before sending to the summarizer.
+    // Summarizers don't need raw bytes and they cause API errors on some endpoints (e.g. Vertex).
+    const historyForSummarizerCleaned = stripBinaryDataForSummary([
+      ...historyForSummarizer,
+    ]);
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
-        ...historyForSummarizer,
+        ...historyForSummarizerCleaned,
         {
           role: 'user',
           parts: [
@@ -384,7 +449,7 @@ export class ChatCompressionService {
       .generateContent({
         modelConfigKey: { model: modelStringToModelConfigAlias(model) },
         contents: [
-          ...historyForSummarizer,
+          ...historyForSummarizerCleaned, // Use cleaned history here too
           {
             role: 'model',
             parts: [{ text: summary }],
@@ -467,7 +532,7 @@ export class ChatCompressionService {
       };
     } else {
       return {
-        newHistory: extraHistory,
+        newHistory: fullNewHistory,
         info: {
           originalTokenCount,
           newTokenCount,

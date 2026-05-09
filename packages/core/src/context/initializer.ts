@@ -13,7 +13,7 @@ import { ContextEventBus } from './eventBus.js';
 import { ContextEnvironmentImpl } from './pipeline/environmentImpl.js';
 import { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { ContextManager } from './contextManager.js';
-// import { debugLogger } from '../utils/debugLogger.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 import { NodeTruncationProcessorOptionsSchema } from './processors/nodeTruncationProcessor.js';
 import { ToolMaskingProcessorOptionsSchema } from './processors/toolMaskingProcessor.js';
 import { HistoryTruncationProcessorOptionsSchema } from './processors/historyTruncationProcessor.js';
@@ -72,6 +72,17 @@ export async function initializeContextManager(
     config.getExperimentalContextManagementConfig(),
     registry,
   );
+
+  // Override budget if compression threshold is provided in config
+  const compressionThreshold = await config.getCompressionThreshold();
+  if (compressionThreshold !== undefined) {
+    const model = config.getModel();
+    const limit = tokenLimit(model);
+    sidecarProfile.config.budget = {
+      retainedTokens: Math.floor(limit * compressionThreshold),
+      maxTokens: Math.floor(limit * Math.min(1.0, compressionThreshold + 0.1)),
+    };
+  }
 
   const storage = config.storage;
   const logDir = storage.getProjectTempLogsDir();

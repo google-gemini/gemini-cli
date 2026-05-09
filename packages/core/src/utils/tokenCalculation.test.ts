@@ -107,6 +107,21 @@ describe('tokenCalculation', () => {
       expect(count).toBe(0);
     });
 
+    it('should estimate audio tokens with a fixed value instead of string length (FIXED)', async () => {
+      const audioData = 'a'.repeat(1000000); // 1MB
+      const audioPart = {
+        inlineData: {
+          mimeType: 'audio/wav',
+          data: audioData,
+        },
+      };
+
+      const tokens = estimateTokenCountSync([audioPart]);
+
+      // Fixed estimate is 3000
+      expect(tokens).toBe(3000);
+    });
+
     it('should fallback to local estimation when countTokens API fails', async () => {
       vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
         new Error('API error'),

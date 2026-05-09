@@ -101,7 +101,30 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
-    it('should handle llmContent as a single Part with text', () => {
+    it('should NOT nest audio/wav in functionResponse.parts (FIXED)', () => {
+      const audioPart = {
+        inlineData: {
+          mimeType: 'audio/wav',
+          data: 'base64data',
+        },
+      };
+
+      const result = convertToFunctionResponse(
+        'read_file',
+        'call_123',
+        [audioPart],
+        'gemini-3-pro-preview',
+      );
+
+      // It should return the main functionResponse part and the audio as a sibling
+      expect(result).toHaveLength(2);
+      expect(result[0].functionResponse).toBeDefined();
+      const fr = result[0].functionResponse as { parts?: unknown[] };
+      expect(fr.parts).toBeUndefined();
+      expect(result[1].inlineData).toBeDefined();
+      expect(result[1].inlineData?.mimeType).toBe('audio/wav');
+    });
+    it('should handle llmContent with multiple text parts', () => {
       const llmContent: Part = { text: 'Text from Part object' };
       const result = convertToFunctionResponse(
         toolName,
@@ -168,7 +191,7 @@ describe('generateContentResponseUtilities', () => {
         'other_tool',
         callId,
         llmContent,
-        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL, // Use a model that doesn't support multimodal FR to trigger stripping
       );
 
       const frPart = result.find((p) => p.functionResponse);
@@ -194,7 +217,7 @@ describe('generateContentResponseUtilities', () => {
           tool,
           callId,
           llmContent,
-          PREVIEW_GEMINI_MODEL,
+          DEFAULT_GEMINI_MODEL, // Use a model that doesn't support multimodal FR to trigger stripping
         );
 
         const frPart = result.find((p) => p.functionResponse);

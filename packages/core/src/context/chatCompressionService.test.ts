@@ -648,8 +648,8 @@ describe('ChatCompressionService', () => {
       const content = truncatedPart?.response?.['output'] as string;
 
       // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
-      expect(content).toContain(
-        'Showing first 8,000 and last 32,000 characters',
+      expect(content).toMatch(
+        /Showing first 8[.,]000 and last 32[.,]000 characters/,
       );
     });
 
@@ -712,8 +712,8 @@ describe('ChatCompressionService', () => {
       const content = truncatedPart?.response?.['output'] as string;
 
       // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
-      expect(content).toContain(
-        'Showing first 8,000 and last 32,000 characters',
+      expect(content).toMatch(
+        /Showing first 8[.,]000 and last 32[.,]000 characters/,
       );
     });
 
@@ -895,6 +895,114 @@ describe('ChatCompressionService', () => {
       expect(summarizerGrepResponse?.response?.['output']).toContain(
         'Output too large.',
       );
+    });
+
+    it('should strip binary data before sending to summarizer (FIXED)', async () => {
+      const mockLlmClient = {
+        generateContent: vi.fn().mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '<state_snapshot>summary</state_snapshot>' }],
+              },
+            },
+          ],
+        }),
+      };
+
+      const myMockConfig = {
+        get config() {
+          return this;
+        },
+        getBaseLlmClient: () => mockLlmClient,
+        getContentGenerator: () => ({
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
+        }),
+        getModel: () => 'gemini-1.5-pro',
+        getActiveModel: () => 'gemini-1.5-pro',
+        storage: {
+          getProjectTempDir: () => '/tmp',
+        },
+        getTruncateToolOutputThreshold: () => 1000,
+        getNextCompressionTruncationId: () => 1,
+        getCompressionThreshold: async () => 0.5,
+        getHookSystem: () => ({
+          firePreCompressEvent: vi.fn().mockResolvedValue(undefined),
+        }),
+        getApprovedPlanPath: () => undefined,
+      } as unknown as Config;
+
+      const myService = new ChatCompressionService();
+      const historyWithAudio = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call_1',
+                name: 'read_file',
+                response: { output: 'Success' },
+              },
+            },
+            {
+              inlineData: { mimeType: 'audio/wav', data: 'huge_binary_data' },
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Reading audio' }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'Message to keep' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Response to keep' }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'Another message to keep' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Another response to keep' }],
+        },
+      ];
+
+      const myMockChat = {
+        getHistory: (_curated?: boolean) => historyWithAudio as Content[],
+        getLastPromptTokenCount: () => 600000,
+      } as unknown as GeminiChat;
+
+      vi.mocked(tokenLimit).mockReturnValue(1000000);
+
+      await myService.compress(
+        myMockChat,
+        'test-prompt',
+        true, // force
+        'gemini-1.5-pro',
+        myMockConfig,
+        false, // hasFailed
+      );
+
+      // Verify that the LLM call DOES NOT contain the raw binary data
+      expect(mockLlmClient.generateContent).toHaveBeenCalled();
+      const lastCall = mockLlmClient.generateContent.mock.calls[0][0];
+      const historySentToLlm = lastCall.contents as Content[];
+
+      const audioPart = historySentToLlm.find((c) =>
+        c.parts?.some((p) => p.inlineData?.mimeType === 'audio/wav'),
+      );
+
+      expect(audioPart).toBeUndefined();
+
+      // Check for placeholder
+      const placeholderPart = historySentToLlm.find((c) =>
+        c.parts?.some((p) => p.text?.includes('removed for summary')),
+      );
+      expect(placeholderPart).toBeDefined();
     });
   });
 });
