@@ -350,19 +350,29 @@ componentEvalTest('USUALLY_PASSES', {
 ### `LLMJudge` — semantic assertion via a model
 
 When you cannot write a deterministic assertion on output prose, use
-`LLMJudge` (in `evals/llm-judge.ts`) to ask a model a Yes/No question:
+`LLMJudge` (in `evals/llm-judge.ts`) to ask a model a Yes/No question.
+`LLMJudge` requires a `BaseLlmClient`, which is available on the `Config`
+object provided by `componentEvalTest`:
 
 ```typescript
+import { componentEvalTest } from './component-test-helper.js';
 import { LLMJudge } from './llm-judge.js';
 
-assert: async (rig, result) => {
-  const judge = new LLMJudge(llmClient);
-  const verdict = await judge.judgeYesNo(
-    `The following agent response correctly explains recursion. Answer YES or NO.\n\n${result}`,
-    { selfConsistencyRuns: 3 },
-  );
-  expect(verdict.verdict).toBe(true);
-},
+componentEvalTest('USUALLY_PASSES', {
+  suiteName: 'default',
+  suiteType: 'component-level',
+  name: 'agent response correctly explains recursion',
+  assert: async (config) => {
+    const llmClient = config.getLlmClient();
+    const judge = new LLMJudge(llmClient);
+    const agentOutput = '...'; // result from your component under test
+    const verdict = await judge.judgeYesNo(
+      `The following agent response correctly explains recursion. Answer YES or NO.\n\n${agentOutput}`,
+      { selfConsistencyRuns: 3 },
+    );
+    expect(verdict.verdict).toBe(true);
+  },
+});
 ```
 
 Use `LLMJudge` sparingly — it adds latency and cost. Prefer file content or
@@ -408,10 +418,16 @@ describe('file_tool_preference', () => {
       // Hard assertion: shell echo/redirection must not have been used
       const shellCalls = logs.filter((l) => l.toolRequest.name === 'run_shell_command');
       const echoRedirectCalls = shellCalls.filter((l) => {
-        const cmd: string =
-          typeof l.toolRequest.args === 'string'
-            ? (JSON.parse(l.toolRequest.args).command ?? l.toolRequest.args)
-            : (l.toolRequest.args as any).command ?? '';
+        let cmd = '';
+        if (typeof l.toolRequest.args === 'string') {
+          try {
+            cmd = JSON.parse(l.toolRequest.args).command ?? l.toolRequest.args;
+          } catch {
+            cmd = l.toolRequest.args;
+          }
+        } else {
+          cmd = (l.toolRequest.args as any).command ?? '';
+        }
         return cmd.includes('echo') || cmd.includes('>');
       });
       expect(
