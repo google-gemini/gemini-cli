@@ -414,8 +414,34 @@ export class ShellExecutionService {
       executable = 'cmd.exe';
     }
 
-    const resolvedExecutable =
-      (await resolveExecutable(executable)) ?? executable;
+    let resolvedExecutable = await resolveExecutable(executable);
+
+    if (!resolvedExecutable && isWindows) {
+      const fallbacks: Array<{
+        exe: string | undefined;
+        shellType: ShellType;
+        prefix: string[];
+      }> = [
+        { exe: 'bash', shellType: 'bash', prefix: ['-lc'] },
+        { exe: 'sh', shellType: 'bash', prefix: ['-lc'] },
+        { exe: process.env['ComSpec'], shellType: 'cmd', prefix: ['/c'] },
+        { exe: 'cmd.exe', shellType: 'cmd', prefix: ['/c'] },
+      ];
+
+      for (const fallback of fallbacks) {
+        if (!fallback.exe) continue;
+        const fallbackResolved = await resolveExecutable(fallback.exe);
+        if (fallbackResolved) {
+          resolvedExecutable = fallbackResolved;
+          executable = fallback.exe;
+          shell = fallback.shellType;
+          argsPrefix = fallback.prefix;
+          break;
+        }
+      }
+    }
+
+    resolvedExecutable = resolvedExecutable ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
     const spawnArgs = [...argsPrefix, guardedCommand];
