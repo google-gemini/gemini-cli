@@ -12,12 +12,17 @@ import type {
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { type ConcreteNode, type Snapshot, NodeType } from '../graph/types.js';
-import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
+import {
+  SnapshotGenerator,
+  findLatestSnapshotBaseline,
+} from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   model?: string;
   systemInstruction?: string;
+  maxSummaryTurns?: number;
+  maxStateTokens?: number;
 }
 
 export const StateSnapshotProcessorOptionsSchema: JSONSchemaType<StateSnapshotProcessorOptions> =
@@ -32,6 +37,8 @@ export const StateSnapshotProcessorOptionsSchema: JSONSchemaType<StateSnapshotPr
       freeTokensTarget: { type: 'number', nullable: true },
       model: { type: 'string', nullable: true },
       systemInstruction: { type: 'string', nullable: true },
+      maxSummaryTurns: { type: 'number', nullable: true },
+      maxStateTokens: { type: 'number', nullable: true },
     },
     required: [],
   };
@@ -141,12 +148,43 @@ export function createStateSnapshotProcessor(
 
       if (nodesToSummarize.length < 2) return targets; // Not enough context
 
+      let previousStateJson: string | undefined = undefined;
+      let baselineIdToConsume: string | undefined = undefined;
+
+      // Global Lookback: Find the absolute most recent snapshot anywhere in the active context
+      const baseline = findLatestSnapshotBaseline(targets);
+
+      if (baseline) {
+        previousStateJson = baseline.text;
+        // If the snapshot happens to be inside our summary window, remove it so the LLM doesn't read it as raw transcript
+        const summaryIdx = nodesToSummarize.findIndex(
+          (n) => n.id === baseline.id,
+        );
+        if (summaryIdx !== -1) {
+          baselineIdToConsume = baseline.id;
+          nodesToSummarize.splice(summaryIdx, 1);
+        }
+      } else {
+        debugLogger.log(
+          '[StateSnapshotProcessor] No previous snapshot found in context graph. Initializing new Master State baseline.',
+        );
+      }
+
       try {
         const snapshotText = await generator.synthesizeSnapshot(
           nodesToSummarize,
-          options.systemInstruction,
+          previousStateJson,
+          {
+            maxSummaryTurns: options.maxSummaryTurns,
+            maxStateTokens: options.maxStateTokens,
+          },
         );
         const newId = randomUUID();
+        const consumedIds = nodesToSummarize.map((n) => n.id);
+        if (baselineIdToConsume && !consumedIds.includes(baselineIdToConsume)) {
+          consumedIds.push(baselineIdToConsume);
+        }
+
         const snapshotNode: Snapshot = {
           id: newId,
           turnId: newId,
@@ -154,10 +192,9 @@ export function createStateSnapshotProcessor(
           timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',
           payload: { text: snapshotText },
-          abstractsIds: nodesToSummarize.map((n) => n.id),
+          abstractsIds: [...consumedIds],
         };
 
-        const consumedIds = nodesToSummarize.map((n) => n.id);
         const returnedNodes = targets.filter(
           (t) => !consumedIds.includes(t.id),
         );
