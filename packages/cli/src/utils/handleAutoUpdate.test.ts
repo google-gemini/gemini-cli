@@ -464,11 +464,8 @@ describe('handleAutoUpdate', () => {
 
 describe('isAutoUpdateEnabled', () => {
   let mockSettings: LoadedSettings;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
-    originalEnv = process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
-    delete process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
     mockSettings = {
       merged: {
         general: {
@@ -479,17 +476,13 @@ describe('isAutoUpdateEnabled', () => {
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'];
-    } else {
-      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = originalEnv;
-    }
+    vi.unstubAllEnvs();
   });
 
   it.each(['true', 'TRUE', '1', '  true  '])(
     'returns true when env var is %s',
     (value) => {
-      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = value;
+      vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', value);
       mockSettings.merged.general.enableAutoUpdate = false;
       expect(isAutoUpdateEnabled(mockSettings)).toBe(true);
     },
@@ -498,14 +491,14 @@ describe('isAutoUpdateEnabled', () => {
   it.each(['false', 'FALSE', '0'])(
     'returns false when env var is %s',
     (value) => {
-      process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = value;
+      vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', value);
       mockSettings.merged.general.enableAutoUpdate = true;
       expect(isAutoUpdateEnabled(mockSettings)).toBe(false);
     },
   );
 
   it('falls back to setting when env var has an unrecognized value', () => {
-    process.env['GEMINI_CLI_ENABLE_AUTO_UPDATE'] = 'yes';
+    vi.stubEnv('GEMINI_CLI_ENABLE_AUTO_UPDATE', 'yes');
     mockSettings.merged.general.enableAutoUpdate = false;
     expect(isAutoUpdateEnabled(mockSettings)).toBe(false);
   });
