@@ -15,10 +15,7 @@ import type {
 import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
-import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../../utils/messageInspectors.js';
+import { getCleanHistorySlice } from './strategyUtils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
@@ -146,16 +143,10 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const promptId = getPromptIdWithFallback('classifier-router');
 
-      const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
-
-      // Filter out tool-related turns.
-      // TODO - Consider using function req/res if they help accuracy.
-      const cleanHistory = historySlice.filter(
-        (content) => !isFunctionCall(content) && !isFunctionResponse(content),
+      const finalHistory = getCleanHistorySlice(
+        context.history,
+        HISTORY_TURNS_FOR_CONTEXT,
       );
-
-      // Take the last N turns from the *cleaned* history.
-      const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       const jsonResponse = await baseLlmClient.generateJson({
         modelConfigKey: { model: 'classifier' },

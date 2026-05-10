@@ -505,7 +505,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toHaveLength(9);
   });
 
-  it('should adjust slice boundary to avoid severing a functionResponse from its preceding functionCall', async () => {
+  it('should completely filter out tool-related turns from history before slicing', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'initial request' }] },
       { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
@@ -543,9 +543,10 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Expect it to start at index 1 (functionCall) rather than index 2 (functionResponse)
+    // Expect tool turns (index 1 and 2) to be fully filtered out
     const expectedContents = [
-      ...history.slice(1),
+      history[0],
+      ...history.slice(3),
       {
         role: 'user',
         parts: [{ text: 'simple task' }],
@@ -555,7 +556,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should adjust slice boundary correctly even when the preceding functionCall turn contains mixed parts (text + functionCall)', async () => {
+  it('should completely filter out tool-related turns correctly even when mixed parts are present', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'initial request' }] },
       {
@@ -599,9 +600,10 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Expect it to start at index 1 (mixed functionCall turn) rather than index 2 (functionResponse)
+    // Expect tool turns (index 1 and 2) to be fully filtered out
     const expectedContents = [
-      ...history.slice(1),
+      history[0],
+      ...history.slice(3),
       {
         role: 'user',
         parts: [{ text: 'simple task' }],
