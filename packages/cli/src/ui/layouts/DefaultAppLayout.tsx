@@ -18,11 +18,14 @@ import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
 import { useInputState } from '../contexts/InputContext.js';
+import { useCockpitVisible } from '../cockpit/CockpitState.js';
+import { StaticCockpitPanel } from '../cockpit/components/StaticCockpitPanel.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
   const { copyModeEnabled } = useInputState();
   const isAlternateBuffer = useAlternateBuffer();
+  const isCockpitVisible = useCockpitVisible();
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -38,6 +41,8 @@ export const DefaultAppLayout: React.FC = () => {
       flexGrow={0}
       ref={uiState.rootUiRef}
     >
+      {isCockpitVisible && <StaticCockpitPanel />}
+
       <MainContent />
 
       {uiState.isBackgroundTaskVisible &&

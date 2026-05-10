@@ -26,6 +26,7 @@ import { bugMemoryCommand } from '../ui/commands/bugMemoryCommand.js';
 import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { commandsCommand } from '../ui/commands/commandsCommand.js';
+import { cockpitCommand } from '../ui/commands/cockpitCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
@@ -133,6 +134,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       },
       clearCommand,
       commandsCommand,
+      cockpitCommand,
       compressCommand,
       copyCommand,
       corgiCommand,
