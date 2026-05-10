@@ -119,6 +119,9 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const promptId = getPromptIdWithFallback('classifier-router');
 
       const candidateSlice = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
+      // Find the first non-tool turn. The server cannot always handle tool-related
+      // turns in the first slots of the contents array, so we strip them if they appear at the start.
       let firstTextIndex = -1;
       for (let i = 0; i < candidateSlice.length; i++) {
         if (

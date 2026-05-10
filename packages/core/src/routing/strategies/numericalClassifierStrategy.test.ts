@@ -424,6 +424,50 @@ describe('NumericalClassifierStrategy', () => {
   });
 
 
+  it('should strip leading tool turns when history starts with tool calls', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'leading_tool' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'leading_tool', response: { ok: true } } },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'text response 1' }] },
+      { role: 'user', parts: [{ text: 'text request 2' }] },
+    ];
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect leading tool turns (index 0 and 1) to be stripped, keeping only text turns (index 2 and 3)
+    const expectedContents = [
+      ...history.slice(2),
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+
+    expect(contents).toEqual(expectedContents);
+  });
+
   it('should preserve tool turns when they appear after a non-tool turn in the middle of history', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'turn 0 (before)' }] },
@@ -572,19 +616,12 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should respect HISTORY_TURNS_FOR_CONTEXT correctly on long history arrays', async () => {
-    const longHistory: Content[] = [];
-    for (let i = 0; i < 40; i++) {
-      longHistory.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
-      // Add noise that should be filtered
-      if (i % 2 === 0) {
-        longHistory.push({
-          role: 'model',
-          parts: [{ functionCall: { name: 'noise', args: {} } }],
-        });
-      }
+  it('should respect HISTORY_TURNS_FOR_CONTEXT correctly when history has only text turns', async () => {
+    const history: Content[] = [];
+    for (let i = 0; i < HISTORY_TURNS_FOR_CONTEXT + 2; i++) {
+      history.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
     }
-    mockContext.history = longHistory;
+    mockContext.history = history;
     const mockApiResponse = {
       complexity_reasoning: 'Simple.',
       complexity_score: 10,
@@ -604,27 +641,51 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Manually calculate what the history should be
-    const candidateSlice = longHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
-    let firstTextIndex = -1;
-    for (let i = 0; i < candidateSlice.length; i++) {
-      if (
-        !candidateSlice[i].parts?.every((p) => !!p.functionCall) &&
-        !candidateSlice[i].parts?.every((p) => !!p.functionResponse)
-      ) {
-        firstTextIndex = i;
-        break;
-      }
-    }
-    const finalHistory =
-      firstTextIndex === -1 ? [] : candidateSlice.slice(firstTextIndex);
-
+    // Expect exactly the last 8 turns (history.slice(2))
     expect(contents).toEqual([
-      ...finalHistory,
+      ...history.slice(2),
       { role: 'user', parts: [{ text: 'simple task' }] },
     ]);
-    // Expect finalHistory length plus the current request turn
-    expect(contents).toHaveLength(finalHistory.length + 1);
+    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
+  });
+
+  it('should respect HISTORY_TURNS_FOR_CONTEXT correctly when history starts with tool calls', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool_0' } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'tool_0', response: { ok: true } } }],
+      },
+    ];
+    for (let i = 0; i < HISTORY_TURNS_FOR_CONTEXT; i++) {
+      history.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
+    }
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect exactly the last 8 text turns (history.slice(2))
+    expect(contents).toEqual([
+      ...history.slice(2),
+      { role: 'user', parts: [{ text: 'simple task' }] },
+    ]);
+    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
   });
 
   it('should use a fallback promptId if not found in context', async () => {
