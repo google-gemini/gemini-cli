@@ -6,7 +6,7 @@
 
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
-import type { ContextEnvironment } from './environment.js';
+import type { ContextEnvironment, RenderOptions } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
@@ -29,6 +29,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly tracer: ContextTracer,
     readonly charsPerToken: number,
     readonly eventBus: ContextEventBus,
+    readonly renderOptions?: RenderOptions,
   ) {
     this.behaviorRegistry = new NodeBehaviorRegistry();
     registerBuiltInBehaviors(this.behaviorRegistry);

@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   triage-issues:
-    timeout-minutes: 10
+    timeout-minutes: 60
     if: |-
       ${{ github.repository == 'google-gemini/gemini-cli' }}
     runs-on: 'ubuntu-latest'
@@ -51,6 +51,16 @@ jobs:
           echo "has_issues=true" >> "${GITHUB_OUTPUT}"
           echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
 
+      - name: 'Sync Issue Types'
+        if: |-
+          ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
+            await syncIssueTypes({ github, context, core });
+
       - name: 'Find untriaged issues'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -63,18 +73,22 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body > no_area_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 50 --json number,title,body > no_area_issues.json
 
           echo '🔍 Finding issues missing kind labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body > no_kind_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 50 --json number,title,body > no_kind_issues.json
 
           echo '🏷️ Finding issues missing priority labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body > no_priority_issues.json
+            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body > no_priority_issues.json
+
+          echo '📏 Finding issues missing effort labels...'
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json > issues_to_triage.json
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json no_type_issues.json > issues_to_triage.json
 
           ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
           if [ "$ISSUE_COUNT" -gt 0 ]; then
@@ -83,6 +97,22 @@ jobs:
             echo "has_issues=false" >> "${GITHUB_OUTPUT}"
           fi
           echo "✅ Found ${ISSUE_COUNT} unique issues to triage! 🎯"
+
+      - name: 'Create Gemini CLI Experiments Override'
+        if: |-
+          steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_issues == 'true'
+        run: |
+          cat << 'EOF' > gemini_exp.json
+          {
+            "flags": [
+              {
+                "flagId": 45750526,
+                "boolValue": false
+              }
+            ],
+            "experimentIds": []
+          }
+          EOF
 
       - name: 'Get Repository Labels'
         id: 'get_labels'
@@ -109,6 +139,8 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GEMINI_EXP: 'gemini_exp.json'
+          GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -122,6 +154,8 @@ jobs:
               "maxSessionTurns": 25,
               "coreTools": [
                 "run_shell_command(echo)",
+                "grep_search",
+                "glob",
                 "read_file"
               ],
               "telemetry": {
@@ -141,23 +175,26 @@ jobs:
             1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Use the read_file tool to read the file "issues_to_triage.json" which contains the JSON array of issues to triage.
             3. Review the issue title, body and any comments provided in the JSON file.
-            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/* and priority/*.
+            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, priority/*, and effort/*.
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
                - If the issue already has a priority/ label, do not change it.
                - If the issue already has an area/ label, do not change it.
+               - If the issue already has an effort/ label, do not change it.
+               - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. Give me a single short explanation about why you are selecting each label in the process.
             8. Output a JSON array of objects, each containing the issue number
-               and the labels to add and remove, along with an explanation. For example:
+               and the labels to add and remove, along with an explanation. If you assigned an effort/ label, you MUST also include an effort_analysis field. This effort_analysis must be highly detailed, technical, and empirical. It MUST NOT contain vague guesses (e.g., avoid words like "likely points to" or "possibly"). You must explicitly cite the specific file paths and architectural mechanisms you discovered using your search tools, explain the root cause, and then explicitly state how that complexity maps to the chosen effort level guidelines. For example:
                ```
                [
                  {
                    "issue_number": 123,
-                   "labels_to_add": ["area/core", "kind/bug", "priority/p2"],
+                   "labels_to_add": ["area/core", "kind/bug", "priority/p2", "effort/small"],
                    "labels_to_remove": ["status/need-triage"],
-                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority."
+                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority.",
+                   "effort_analysis": "The `vscode-ide-companion` extension indiscriminately tracks active text editors via `vscode.window.onDidChangeActiveTextEditor` in `open-files-manager.ts`. When a user opens `.vscode/settings.json`, its content is sent to the CLI's context. The fix is highly localized to the VS Code companion extension's event listener. It involves adding a simple conditional check to exclude specific configuration files from the active editor tracking logic, which is a trivial logic adjustment with a clear root cause."
                  }
                ]
                ```
@@ -180,6 +217,23 @@ jobs:
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
               - Identify only one priority/ label.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+
+            Categorization Guidelines (Effort):
+            effort/small (1 day or less):
+              - Trivial Logic & Config: Schema updates (Zod), feature flag toggles, adding missing fields to package.json or settings.json.
+              - UI/Aesthetic Adjustments: Fixing minor layout bugs in Ink components (e.g., adding flexShrink, correcting padding in a single Box), text color changes.
+              - Documentation & Strings: Typos, log message updates, CLI argument descriptions.
+              - Localized Bug Fixes: Single-file logic errors, straightforward promise rejections (e.g., wrapping a known failure in a try/catch), simple regex or string parsing fixes.
+            effort/medium (2-3 days):
+              - React/Ink State Management: Debugging useState/useEffect/useReducer bugs, component lifecycle issues (memory leaks in the UI), terminal redraw flickering, or state synchronization between the CLI's internal input buffer and the interactive React components.
+              - Asynchronous Flow & Integration: Resolving complex Promise chains, ERR_STREAM_PREMATURE_CLOSE, debugging IDE companion extensions (VS Code, Android Studio) or resolving hanging HTTP requests/IPC between the CLI and external plugins, timeouts in non-interactive/ACP modes.
+              - Tooling & Output Parsers: Modifying how tools parse streaming stdout/stderr buffers, adding new built-in tools that don't require native bindings.
+              - Cross-Component Refactors: Changes that span across packages/cli and packages/core to pass new data models or telemetry state.
+            effort/large (3+ days):
+              - Platform-Specific Complexities (PTY/Signals): Any issue involving node-pty, child_process.spawn, OS-level shell behavior (Windows vs Linux vs macOS), pseudo-terminal exhaustion (ENXIO), raw mode terminal desyncs, or POSIX signal forwarding (SIGINT/SIGTERM).
+              - Core Architecture & Protocols: Refactoring the Scheduler, Agent-to-Agent (A2A) protocol implementation, low-level MCP (Model Context Protocol) transport mechanisms.
+              - Performance & Memory: Diagnosing massive disk/memory leaks, severe boot time regressions, high-throughput streaming optimizations (e.g., voice streaming pipelines).
+            Note: Any bug that is described as intermittent, flickering, difficult to reproduce, platform-specific, or requiring cross-environment setups (e.g., involving the VS Code IDE companion, GCA plugin, or Android Studio) MUST NOT be rated as effort/small because of the increased overhead of testing and reproducing.
 
             Categorization Guidelines (Priority):
             P0 - Urgent Blocking Issues:
@@ -229,53 +283,37 @@ jobs:
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
-            const rawLabels = process.env.LABELS_OUTPUT;
-            core.info(`Raw labels JSON: ${rawLabels}`);
-            let parsedLabels;
-            try {
-              const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-              if (!jsonMatch || !jsonMatch[1]) {
-                throw new Error("Could not find a ```json ... ``` block in the output.");
-              }
-              const jsonString = jsonMatch[1].trim();
-              parsedLabels = JSON.parse(jsonString);
-              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
-            } catch (err) {
-              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
-              return;
-            }
+            const applyLabels = require('./.github/scripts/apply-issue-labels.cjs');
+            await applyLabels({ github, context, core });
 
-            for (const entry of parsedLabels) {
-              const issueNumber = entry.issue_number;
-              if (!issueNumber) {
-                core.info(`Skipping entry with no issue number: ${JSON.stringify(entry)}`);
-                continue;
-              }
+      - name: 'Sync Issue Types (Post-Analysis)'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
+            await syncIssueTypes({ github, context, core });
 
-              const labelsToAdd = entry.labels_to_add || [];
-              labelsToAdd.push('status/bot-triaged');
+      - name: 'Find Triaged Issues to Clean Up'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+        run: |-
+          set -euo pipefail
+          echo '🧹 Finding issues that have both bot-triaged and need-triage labels...'
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue label:status/bot-triaged label:status/need-triage' --limit 50 --json number > issues_to_cleanup.json
 
-              if (labelsToAdd.length > 0) {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  labels: labelsToAdd
-                });
-                const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-                core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`);
-              }
-
-              if (entry.explanation) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body: entry.explanation,
-                });
-              }
-
-              if ((!entry.labels_to_add || entry.labels_to_add.length === 0) && (!entry.labels_to_remove || entry.labels_to_remove.length === 0)) {
-                core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
-              }
-            }
+      - name: 'Clean Up Triage Labels'
+        if: |-
+          always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const cleanupLabels = require('./.github/scripts/cleanup-triage-labels.cjs');
+            await cleanupLabels({ github, context, core });

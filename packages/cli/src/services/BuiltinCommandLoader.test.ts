@@ -100,7 +100,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/shortcutsCommand.js', () => ({
   shortcutsCommand: {},
 }));
-vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
+vi.mock('../ui/commands/memoryCommand.js', () => ({
+  memoryCommand: () => ({}),
+}));
 vi.mock('../ui/commands/modelCommand.js', () => ({
   modelCommand: { name: 'model' },
 }));

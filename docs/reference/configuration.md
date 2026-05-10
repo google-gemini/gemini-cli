@@ -1795,7 +1795,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.voice.stopGracePeriodMs`** (number):
   - **Description:** How long to wait for final transcription after stopping
     recording.
-  - **Default:** `1000`
+  - **Default:** `4000`
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
