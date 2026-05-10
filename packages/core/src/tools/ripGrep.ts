@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import commandExists from 'command-exists';
 import { fileURLToPath } from 'node:url';
 import {
   BaseDeclarativeTool,
@@ -59,6 +60,15 @@ export async function getRipgrepPath(): Promise<string | null> {
     if (await fileExists(candidate)) {
       return candidate;
     }
+  }
+
+  // 3. System PATH fallback for non-SEA distributions (e.g. npm install -g)
+  try {
+    if (await commandExists('rg')) {
+      return 'rg';
+    }
+  } catch {
+    // Command does not exist or error checking
   }
 
   return null;

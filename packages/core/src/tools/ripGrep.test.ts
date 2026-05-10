@@ -25,6 +25,7 @@ import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { fileExists } from '../utils/fileUtils.js';
+import commandExists from 'command-exists';
 
 vi.mock('../utils/fileUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
@@ -33,6 +34,8 @@ vi.mock('../utils/fileUtils.js', async (importOriginal) => {
     fileExists: vi.fn(),
   };
 });
+
+vi.mock('command-exists');
 
 // Mock child_process for ripgrep calls
 vi.mock('child_process', () => ({
@@ -54,6 +57,7 @@ describe('canUseRipgrep', () => {
 
   it('should return false if file does not exist', async () => {
     vi.mocked(fileExists).mockResolvedValue(false);
+    vi.mocked(commandExists).mockRejectedValue(new Error('not found'));
     const result = await canUseRipgrep();
     expect(result).toBe(false);
   });
@@ -72,6 +76,7 @@ describe('ensureRgPath', () => {
 
   it('should throw an error if ripgrep cannot be used', async () => {
     vi.mocked(fileExists).mockResolvedValue(false);
+    vi.mocked(commandExists).mockRejectedValue(new Error('not found'));
     await expect(ensureRgPath()).rejects.toThrow(
       /Cannot find bundled ripgrep binary/,
     );
@@ -700,6 +705,7 @@ describe('RipGrepTool', () => {
 
     it('should throw an error if ripgrep is not available', async () => {
       vi.mocked(fileExists).mockResolvedValue(false);
+      vi.mocked(commandExists).mockRejectedValue(new Error('not found'));
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
@@ -709,6 +715,7 @@ describe('RipGrepTool', () => {
 
       // restore the mock for subsequent tests
       vi.mocked(fileExists).mockResolvedValue(true);
+      vi.mocked(commandExists).mockReset();
     });
   });
 
@@ -2006,6 +2013,7 @@ describe('getRipgrepPath', () => {
 
     it('should return null if binary is missing from both paths', async () => {
       vi.mocked(fileExists).mockResolvedValue(false);
+      vi.mocked(commandExists).mockRejectedValue(new Error('not found'));
 
       const resolvedPath = await getRipgrepPath();
       expect(resolvedPath).toBeNull();
