@@ -53,9 +53,25 @@ jobs:
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="${{ github.ref }}"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -86,8 +102,15 @@ jobs:
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
 
-            # Download brain memory (all state in one artifact)
-            gh run download "$LAST_RUN_ID" -n brain-data -D . || echo "brain-data not found"
+            # Download brain memory to a temp dir so we can selectively restore only persistent state
+            mkdir -p .temp_brain_data
+            gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
+
+            # Restore only persistent memory files
+            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
+            mkdir -p tools/gemini-cli-bot/history/
+            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv tools/gemini-cli-bot/history/ 2>/dev/null || true
+            rm -rf .temp_brain_data
           else
             echo "No previous successful run found."
           fi
@@ -132,6 +155,13 @@ jobs:
           cat trigger_context.md "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md > combined_prompt.md
 
           node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
+
+          if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+            echo "Agent failed to respond. Generating fallback error message."
+            echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
+            echo "" >> "issue-comment.md"
+            echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
+          fi
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
@@ -204,10 +234,25 @@ jobs:
           permission-pull-requests: 'write'
           permission-issues: 'write'
 
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="main"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: 'main'
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -238,7 +283,7 @@ jobs:
               exit 1
             fi
 
-            git checkout -b "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME"
             git apply "${{ runner.temp }}/brain-data/bot-changes.patch"
             git add .
 
