@@ -613,6 +613,107 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
+  it('should preserve text turns both before and after tool-related turns when tools are in the middle', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'turn 0 (before)' }] },
+      { role: 'model', parts: [{ text: 'turn 1 (before)' }] },
+      { role: 'user', parts: [{ text: 'turn 2 (before)' }] },
+      { role: 'model', parts: [{ text: 'turn 3 (before)' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'middle_tool' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'middle_tool', response: { ok: true } } },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'turn 6 (after)' }] },
+      { role: 'user', parts: [{ text: 'turn 7 (after)' }] },
+      { role: 'model', parts: [{ text: 'turn 8 (after)' }] },
+      { role: 'user', parts: [{ text: 'turn 9 (after)' }] },
+    ];
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect exactly the 4 turns before and 4 turns after to be preserved
+    const expectedContents = [
+      ...history.slice(0, 4),
+      ...history.slice(6),
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+
+    expect(contents).toEqual(expectedContents);
+  });
+
+  it('should preserve preceding text turns when tool-related turns are at the very end of history', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'turn 0' }] },
+      { role: 'model', parts: [{ text: 'turn 1' }] },
+      { role: 'user', parts: [{ text: 'turn 2' }] },
+      { role: 'model', parts: [{ text: 'turn 3' }] },
+      { role: 'user', parts: [{ text: 'turn 4' }] },
+      { role: 'model', parts: [{ text: 'turn 5' }] },
+      { role: 'user', parts: [{ text: 'turn 6' }] },
+      { role: 'model', parts: [{ text: 'turn 7' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'end_tool' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'end_tool', response: { ok: true } } },
+        ],
+      },
+    ];
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect exactly the 8 text turns before the tools to be preserved
+    const expectedContents = [
+      ...history.slice(0, 8),
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+
+    expect(contents).toEqual(expectedContents);
+  });
+
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
       .spyOn(debugLogger, 'warn')
