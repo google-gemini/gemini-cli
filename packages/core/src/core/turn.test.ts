@@ -172,7 +172,7 @@ describe('Turn', () => {
       expect(event1.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event1.value).toEqual(
         expect.objectContaining({
-          callId: 'fc1',
+          callId: 'tool1__fc1',
           name: 'tool1',
           args: { arg1: 'val1' },
           isClientInitiated: false,
@@ -190,7 +190,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^tool2_\d{13}_\d+$/),
+        expect.stringMatching(/^tool2__tool2_\d{13}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);
@@ -326,22 +326,22 @@ describe('Turn', () => {
       // Assertions for each specific tool call event
       const event1 = events[0] as ServerGeminiToolCallRequestEvent;
       expect(event1.value).toMatchObject({
-        callId: 'fc1',
-        name: 'undefined_tool_name',
+        callId: 'generic_tool__fc1',
+        name: 'generic_tool',
         args: { arg1: 'val1' },
       });
 
       const event2 = events[1] as ServerGeminiToolCallRequestEvent;
       expect(event2.value).toMatchObject({
-        callId: 'fc2',
+        callId: 'tool2__fc2',
         name: 'tool2',
         args: {},
       });
 
       const event3 = events[2] as ServerGeminiToolCallRequestEvent;
       expect(event3.value).toMatchObject({
-        callId: 'fc3',
-        name: 'undefined_tool_name',
+        callId: 'generic_tool__fc3',
+        name: 'generic_tool',
         args: {},
       });
     });
@@ -858,7 +858,7 @@ describe('Turn', () => {
       expect(toolCallEvent).toMatchObject({
         type: GeminiEventType.ToolCallRequest,
         value: expect.objectContaining({
-          callId: 'fc1',
+          callId: 'ReadFile__fc1',
           name: 'ReadFile',
           args: { path: 'file.txt' },
         }),
