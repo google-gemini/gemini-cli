@@ -750,9 +750,27 @@ export function resetOauthClientForTesting() {
 
 async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
+
+  // Try to load existing credentials to preserve the refresh token
+  let existing: Credentials | null = null;
+  try {
+    const data = await fs.readFile(filePath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    existing = JSON.parse(data);
+  } catch {
+    // Ignore errors reading existing file
+  }
+
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  const mergedCredentials = {
+    ...existing,
+    ...credentials,
+    refresh_token:
+      credentials.refresh_token || existing?.refresh_token || undefined,
+  };
+
+  const credString = JSON.stringify(mergedCredentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);

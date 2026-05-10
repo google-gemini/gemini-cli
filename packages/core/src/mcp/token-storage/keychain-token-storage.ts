@@ -64,11 +64,7 @@ export class KeychainTokenStorage
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
-    const deleted = await this.keychainService.deletePassword(sanitizedName);
-
-    if (!deleted) {
-      throw new Error(`No credentials found for ${serverName}`);
-    }
+    await this.keychainService.deletePassword(sanitizedName);
   }
 
   async listServers(): Promise<string[]> {
@@ -172,12 +168,7 @@ export class KeychainTokenStorage
   }
 
   async deleteSecret(key: string): Promise<void> {
-    const deleted = await this.keychainService.deletePassword(
-      `${SECRET_PREFIX}${key}`,
-    );
-    if (!deleted) {
-      throw new Error(`No secret found for key: ${key}`);
-    }
+    await this.keychainService.deletePassword(`${SECRET_PREFIX}${key}`);
   }
 
   async listSecrets(): Promise<string[]> {

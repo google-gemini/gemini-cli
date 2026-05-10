@@ -275,6 +275,32 @@ describe('OAuthCredentialStorage', () => {
         updatedAt: expect.any(Number),
       });
     });
+
+    it('should preserve refresh token if new credentials do not contain one', async () => {
+      const existingMcpCredentials = { ...mockMcpCredentials };
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        existingMcpCredentials,
+      );
+
+      const refreshedCredentials: Credentials = {
+        access_token: 'new_access_token',
+        expiry_date: Date.now() + 3600 * 1000,
+        token_type: 'Bearer',
+      };
+
+      await OAuthCredentialStorage.saveCredentials(refreshedCredentials);
+
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith({
+        ...mockMcpCredentials,
+        token: {
+          ...mockMcpCredentials.token,
+          accessToken: 'new_access_token',
+          refreshToken: 'mock_refresh_token', // Preserved
+          expiresAt: refreshedCredentials.expiry_date,
+        },
+        updatedAt: expect.any(Number),
+      });
+    });
   });
 
   describe('clearCredentials', () => {

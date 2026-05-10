@@ -126,14 +126,12 @@ describe('KeychainTokenStorage', () => {
         /Failed to clear some credentials: system fail/,
       );
 
-      // Aggregating a 'not found' error (returns false)
+      // Deleting a non-existent credential should now be a no-op and not throw
       vi.spyOn(KeychainService.prototype, 'deletePassword')
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false);
 
-      await expect(storage.clearAll()).rejects.toThrow(
-        /Failed to clear some credentials: No credentials found/,
-      );
+      await expect(storage.clearAll()).resolves.toBeUndefined();
     });
 
     it('should manage secrets with prefix independently', async () => {
