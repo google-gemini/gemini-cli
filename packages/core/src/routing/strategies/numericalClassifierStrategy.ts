@@ -5,6 +5,10 @@
  */
 
 import { z } from 'zod';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../../utils/messageInspectors.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
@@ -115,7 +119,20 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
 
       const promptId = getPromptIdWithFallback('classifier-router');
 
-      const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+      let startIndex = Math.max(
+        0,
+        context.history.length - HISTORY_TURNS_FOR_CONTEXT,
+      );
+      // Ensure we don't sever a functionResponse from its preceding functionCall
+      while (
+        startIndex > 0 &&
+        startIndex < context.history.length &&
+        isFunctionResponse(context.history[startIndex]) &&
+        isFunctionCall(context.history[startIndex - 1])
+      ) {
+        startIndex--;
+      }
+      const finalHistory = context.history.slice(startIndex);
 
       // Wrap the user's request in tags to prevent prompt injection
       const requestParts = Array.isArray(context.request)
