@@ -28,7 +28,7 @@ describe('StaticCockpitPanel', () => {
     unmount();
   });
 
-  it('should render active mission brief and updated phase', async () => {
+  it('should render active mission brief, council result, and updated phase', async () => {
     const mission = 'fix search without touching auth';
     const { lastFrame, unmount, waitUntilReady } = await render(
       <StaticCockpitPanel />,
@@ -43,6 +43,8 @@ describe('StaticCockpitPanel', () => {
     const frame = lastFrame();
     expect(frame).toContain('Goal:');
     expect(frame).toContain(mission);
+    expect(frame).toContain('MISSION COUNCIL v1');
+    expect(frame).toContain('[Medium]');
     expect(frame).toContain('✔ Mission');
     expect(frame).toContain('● Edit');
     unmount();

@@ -6,6 +6,10 @@
 
 import { useEffect, useState } from 'react';
 import {
+  createMissionCouncilResult,
+  type MissionCouncilResult,
+} from './services/MissionCouncil.js';
+import {
   createMissionBrief,
   type MissionBrief,
 } from './services/MissionParser.js';
@@ -26,6 +30,7 @@ export type Phase = (typeof PHASES)[number];
 let cockpitVisible = false;
 let currentMission: string | null = null;
 let currentMissionBrief: MissionBrief | null = null;
+let currentMissionCouncil: MissionCouncilResult | null = null;
 let currentPhase: Phase = 'Mission';
 const listeners = new Set<() => void>();
 
@@ -45,6 +50,10 @@ export function getCurrentMission(): string | null {
 
 export function getCurrentMissionBrief(): MissionBrief | null {
   return currentMissionBrief;
+}
+
+export function getCurrentMissionCouncil(): MissionCouncilResult | null {
+  return currentMissionCouncil;
 }
 
 export function getCurrentPhase(): string {
@@ -72,6 +81,7 @@ export function setCockpitVisible(visible: boolean): void {
 export function activateCockpitMission(request: string): void {
   currentMission = request;
   currentMissionBrief = createMissionBrief(request);
+  currentMissionCouncil = createMissionCouncilResult(request);
   currentPhase = 'Mission';
   cockpitVisible = true;
   notifyCockpitListeners();
@@ -86,6 +96,7 @@ export interface CockpitState {
   visible: boolean;
   mission: string | null;
   missionBrief: MissionBrief | null;
+  missionCouncil: MissionCouncilResult | null;
   phase: Phase;
 }
 
@@ -108,6 +119,7 @@ export function useCockpitState(): CockpitState {
     visible: cockpitVisible,
     mission: currentMission,
     missionBrief: currentMissionBrief,
+    missionCouncil: currentMissionCouncil,
     phase: currentPhase,
   };
 }

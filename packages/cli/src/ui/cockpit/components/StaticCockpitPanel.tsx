@@ -9,9 +9,14 @@ import { Box, Text } from 'ink';
 import { useCockpitState } from '../CockpitState.js';
 import { PhaseStatusPanel } from './PhaseStatusPanel.js';
 import { MissionPanel } from './MissionPanel.js';
+import { CouncilPanel } from './CouncilPanel.js';
 
 export const StaticCockpitPanel: React.FC = () => {
-  const { missionBrief, phase: activePhase } = useCockpitState();
+  const {
+    missionBrief,
+    missionCouncil,
+    phase: activePhase,
+  } = useCockpitState();
 
   return (
     <Box
@@ -29,6 +34,7 @@ export const StaticCockpitPanel: React.FC = () => {
       <PhaseStatusPanel activePhase={activePhase} />
 
       {missionBrief && <MissionPanel brief={missionBrief} />}
+      {missionCouncil && <CouncilPanel result={missionCouncil} />}
     </Box>
   );
 };
