@@ -505,6 +505,56 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toHaveLength(9);
   });
 
+  it('should adjust slice boundary to avoid severing a functionResponse from its preceding functionCall', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'initial request' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'test_tool', response: { ok: true } } },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'tool output analyzed' }] },
+      { role: 'user', parts: [{ text: 'next step' }] },
+      { role: 'model', parts: [{ text: 'working on it' }] },
+      { role: 'user', parts: [{ text: 'almost done?' }] },
+      { role: 'model', parts: [{ text: 'yes' }] },
+      { role: 'user', parts: [{ text: 'final check' }] },
+      { role: 'model', parts: [{ text: 'all good' }] },
+    ];
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect it to start at index 1 (functionCall) rather than index 2 (functionResponse)
+    const expectedContents = [
+      ...history.slice(1),
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+
+    expect(contents).toEqual(expectedContents);
+  });
+
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
       .spyOn(debugLogger, 'warn')
