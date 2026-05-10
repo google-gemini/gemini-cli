@@ -5,6 +5,7 @@
  */
 
 import { performMission } from '@google/gemini-cli-core';
+import { activateCockpitMission } from '../cockpit/CockpitState.js';
 import {
   CommandKind,
   type SlashCommand,
@@ -21,5 +22,8 @@ export const missionCommand: SlashCommand = {
   action: async (
     _context,
     userRequest: string,
-  ): Promise<SlashCommandActionReturn> => performMission(userRequest),
+  ): Promise<SlashCommandActionReturn> => {
+    activateCockpitMission(userRequest);
+    return performMission(userRequest);
+  },
 };

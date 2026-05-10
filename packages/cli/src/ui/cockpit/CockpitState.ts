@@ -5,8 +5,28 @@
  */
 
 import { useEffect, useState } from 'react';
+import {
+  createMissionBrief,
+  type MissionBrief,
+} from './services/MissionParser.js';
+
+export const PHASES = [
+  'Mission',
+  'Risk Scan',
+  'Inspect',
+  'Plan',
+  'Edit',
+  'Test',
+  'Review',
+  'Next Action',
+] as const;
+
+export type Phase = (typeof PHASES)[number];
 
 let cockpitVisible = false;
+let currentMission: string | null = null;
+let currentMissionBrief: MissionBrief | null = null;
+let currentPhase: Phase = 'Mission';
 const listeners = new Set<() => void>();
 
 function notifyCockpitListeners(): void {
@@ -19,6 +39,27 @@ export function getCockpitVisible(): boolean {
   return cockpitVisible;
 }
 
+export function getCurrentMission(): string | null {
+  return currentMission;
+}
+
+export function getCurrentMissionBrief(): MissionBrief | null {
+  return currentMissionBrief;
+}
+
+export function getCurrentPhase(): string {
+  return currentPhase;
+}
+
+export function setCurrentPhase(phase: Phase): void {
+  if (currentPhase === phase) {
+    return;
+  }
+
+  currentPhase = phase;
+  notifyCockpitListeners();
+}
+
 export function setCockpitVisible(visible: boolean): void {
   if (cockpitVisible === visible) {
     return;
@@ -28,12 +69,27 @@ export function setCockpitVisible(visible: boolean): void {
   notifyCockpitListeners();
 }
 
+export function activateCockpitMission(request: string): void {
+  currentMission = request;
+  currentMissionBrief = createMissionBrief(request);
+  currentPhase = 'Mission';
+  cockpitVisible = true;
+  notifyCockpitListeners();
+}
+
 export function toggleCockpit(): boolean {
   setCockpitVisible(!cockpitVisible);
   return cockpitVisible;
 }
 
-export function useCockpitVisible(): boolean {
+export interface CockpitState {
+  visible: boolean;
+  mission: string | null;
+  missionBrief: MissionBrief | null;
+  phase: Phase;
+}
+
+export function useCockpitState(): CockpitState {
   const [, setVersion] = useState(0);
 
   useEffect(() => {
@@ -48,5 +104,14 @@ export function useCockpitVisible(): boolean {
     };
   }, []);
 
-  return cockpitVisible;
+  return {
+    visible: cockpitVisible,
+    mission: currentMission,
+    missionBrief: currentMissionBrief,
+    phase: currentPhase,
+  };
+}
+
+export function useCockpitVisible(): boolean {
+  return useCockpitState().visible;
 }

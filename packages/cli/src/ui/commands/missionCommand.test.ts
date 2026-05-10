@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { missionCommand } from './missionCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext, SlashCommandActionReturn } from './types.js';
+import { getCurrentMission } from '../cockpit/CockpitState.js';
 
 describe('missionCommand', () => {
   let mockContext: CommandContext;
@@ -27,7 +28,7 @@ describe('missionCommand', () => {
     }
   });
 
-  it('should return submit_prompt if request is provided', async () => {
+  it('should return submit_prompt and activate cockpit mission if request is provided', async () => {
     const request = 'Refactor the tokenizer';
     const result = (await missionCommand.action!(
       mockContext,
@@ -37,5 +38,6 @@ describe('missionCommand', () => {
     if (result.type === 'submit_prompt') {
       expect(result.content).toContain(request);
     }
+    expect(getCurrentMission()).toBe(request);
   });
 });
