@@ -89,7 +89,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   /**
-   * Wraps a command in a subshell `()` to capture background process IDs (PIDs) using pgrep.
+   * Wraps a command in a command group `{}` to capture background process IDs (PIDs) using pgrep.
    * Uses newlines to prevent breaking heredocs or trailing comments.
    *
    * @param command The raw command string to execute.
@@ -112,8 +112,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (trimmed.endsWith('\\')) {
       trimmed += ' ';
     }
+    // `pgrep -P $$` works on BusyBox and GNU pgrep, unlike `pgrep -g 0`.
     const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
-    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
+    return `{\n${trimmed}\n}\n__code=$?; pgrep -P $$ >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -569,7 +570,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          this.context.config.isInteractiveShellEnabled(),
           {
             ...shellExecutionConfig,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
@@ -1000,7 +1001,7 @@ export class ShellTool extends BaseDeclarativeTool<
       // Errors are surfaced when parsing commands.
     });
     const definition = getShellDefinition(
-      context.config.getEnableInteractiveShell(),
+      context.config.isInteractiveShellEnabled(),
       context.config.getEnableShellOutputEfficiency(),
       context.config.getSandboxEnabled(),
     );
@@ -1050,7 +1051,7 @@ export class ShellTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const definition = getShellDefinition(
-      this.context.config.getEnableInteractiveShell(),
+      this.context.config.isInteractiveShellEnabled(),
       this.context.config.getEnableShellOutputEfficiency(),
       this.context.config.getSandboxEnabled(),
     );
