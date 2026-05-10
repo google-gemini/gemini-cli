@@ -714,6 +714,54 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
+  it('should send only the new request prompt if the entire history consists of tool-related turns', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool_A' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'tool_A', response: { ok: true } } },
+        ],
+      },
+      { role: 'model', parts: [{ functionCall: { name: 'tool_B' } }] },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'tool_B', response: { ok: true } } },
+        ],
+      },
+    ];
+    mockContext.history = history;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple standalone task.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Expect all history turns to be filtered out, leaving exactly just the new request
+    const expectedContents = [
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+
+    expect(contents).toEqual(expectedContents);
+  });
+
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
       .spyOn(debugLogger, 'warn')
