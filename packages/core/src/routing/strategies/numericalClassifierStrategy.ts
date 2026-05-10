@@ -5,10 +5,6 @@
  */
 
 import { z } from 'zod';
-import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../../utils/messageInspectors.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
@@ -127,8 +123,10 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       while (
         startIndex > 0 &&
         startIndex < context.history.length &&
-        isFunctionResponse(context.history[startIndex]) &&
-        isFunctionCall(context.history[startIndex - 1])
+        context.history[startIndex].role === 'user' &&
+        context.history[startIndex].parts?.some((p) => !!p.functionResponse) &&
+        context.history[startIndex - 1].role === 'model' &&
+        context.history[startIndex - 1].parts?.some((p) => !!p.functionCall)
       ) {
         startIndex--;
       }
