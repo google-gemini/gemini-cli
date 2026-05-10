@@ -72,23 +72,26 @@ if (isInDebugMode) {
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
 
-// Strip CI-related env vars before spawning the dev child. `is-in-ci`
-// (loaded transitively by `ink`) treats `CI`, `CONTINUOUS_INTEGRATION`,
-// and any `CI_*`-prefixed env var as a signal to disable interactive
-// rendering, which makes `npm run start` hang silently after the banner
-// whenever a developer has e.g. `CI_TOKEN` set in their shell. The bundled
-// path closes this via an esbuild alias on `is-in-ci` (#4822); we do the
-// dev-mode equivalent here so the unbundled `npm run start` flow doesn't
-// diverge. See issue #22452.
-const ciVarNames = Object.keys(env).filter(
-  (k) => k === 'CI' || k === 'CONTINUOUS_INTEGRATION' || k.startsWith('CI_'),
+// Strip CI-detection env vars before spawning the dev child. `is-in-ci`
+// (loaded transitively by `ink`, v2.0.0 in this repo) returns true when
+// either `CI` or `CONTINUOUS_INTEGRATION` is set to a non-falsy value,
+// and `ink` then disables interactive rendering — leaving `npm run start`
+// hanging silently after the banner. The bundled path closes this via an
+// esbuild alias on `is-in-ci` (#4822); we do the dev-mode equivalent here
+// so the unbundled flow doesn't diverge. The filter is intentionally
+// narrow: `is-in-ci` does not look at any `CI_*`-prefixed variables, so
+// developer-set tokens like `CI_TOKEN` / `CI_BUILD_ID` are preserved.
+// See issue #22452.
+const isFalsy = (v) => v === undefined || v === '0' || v === 'false';
+const ciVarNames = ['CI', 'CONTINUOUS_INTEGRATION'].filter(
+  (k) => !isFalsy(env[k]),
 );
 if (ciVarNames.length > 0) {
   for (const name of ciVarNames) {
     delete env[name];
   }
   process.stderr.write(
-    '[gemini-cli/dev] Cleared CI-related env vars to keep `ink` interactive: ' +
+    '[gemini-cli/dev] Cleared CI-detection env vars to keep `ink` interactive: ' +
       ciVarNames.join(', ') +
       '\n[gemini-cli/dev] These vars are unset in the CLI process and its shell-tool subprocesses. Use the bundled build (`npm run bundle && node bundle/gemini.js`) to preserve them.\n',
   );
