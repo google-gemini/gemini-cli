@@ -33,7 +33,12 @@ export const StaticCockpitPanel: React.FC = () => {
 
       <PhaseStatusPanel activePhase={activePhase} />
 
-      {missionBrief && <MissionPanel brief={missionBrief} />}
+      {missionBrief && (
+        <MissionPanel
+          brief={missionBrief}
+          council={missionCouncil ?? undefined}
+        />
+      )}
       {missionCouncil && <CouncilPanel result={missionCouncil} />}
     </Box>
   );
