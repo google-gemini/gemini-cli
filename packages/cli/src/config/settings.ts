@@ -348,6 +348,15 @@ export class LoadedSettings {
     return this._merged;
   }
 
+  /**
+   * Returns a merged settings object as if the folder were trusted.
+   * This is useful for commands like 'mcp list' that want to show
+   * what's configured even if it's currently disabled for security reasons.
+   */
+  getMergedSettingsAsIfTrusted(): MergedSettings {
+    return this.computeMergedSettings(true);
+  }
+
   setTrusted(isTrusted: boolean): void {
     if (this.isTrusted === isTrusted) {
       return;
@@ -368,13 +377,16 @@ export class LoadedSettings {
     };
   }
 
-  private computeMergedSettings(): MergedSettings {
+  private computeMergedSettings(forceTrusted = false): MergedSettings {
+    const isTrusted = forceTrusted || this.isTrusted;
+    const workspace = forceTrusted ? this._workspaceFile : this.workspace;
+
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
-      this.workspace.settings,
-      this.isTrusted,
+      workspace.settings,
+      isTrusted,
     );
 
     // Remote admin settings always take precedence and file-based admin settings
@@ -398,8 +410,7 @@ export class LoadedSettings {
 
   private computeSnapshot(): LoadedSettingsSnapshot {
     const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
-      path: file.path,
-      rawJson: file.rawJson,
+      ...file,
       settings: structuredClone(file.settings),
       originalSettings: structuredClone(file.originalSettings),
     });

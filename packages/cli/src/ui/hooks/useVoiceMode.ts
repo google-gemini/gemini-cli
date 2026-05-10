@@ -75,13 +75,9 @@ export function useVoiceMode({
     }
 
     const serviceToDisconnect = transcriptionServiceRef.current;
-    transcriptionServiceRef.current = null;
 
     if (serviceToDisconnect) {
-      const isLive = settings.experimental.voice?.backend === 'gemini-live';
-      const gracePeriodMs =
-        settings.experimental.voice?.stopGracePeriodMs ??
-        (isLive ? 2000 : 1000);
+      const gracePeriodMs = settings.experimental.voice.stopGracePeriodMs;
       debugLogger.debug(
         `[Voice] Draining transcription for ${gracePeriodMs}ms`,
       );
@@ -90,11 +86,16 @@ export function useVoiceMode({
       disconnectTimerRef.current = setTimeout(() => {
         debugLogger.debug('[Voice] Grace period ended, disconnecting service');
         serviceToDisconnect.disconnect();
+        if (transcriptionServiceRef.current === serviceToDisconnect) {
+          transcriptionServiceRef.current = null;
+        }
         disconnectTimerRef.current = null;
+        liveTranscriptionRef.current = '';
       }, gracePeriodMs);
+    } else {
+      liveTranscriptionRef.current = '';
     }
 
-    liveTranscriptionRef.current = '';
     pttStateRef.current = 'idle';
   }, [settings.experimental.voice]);
 

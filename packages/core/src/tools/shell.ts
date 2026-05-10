@@ -942,8 +942,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
 
+      const displayResultSummary = result.backgrounded
+        ? `PID: ${result.pid}`
+        : result.exitCode !== null && result.exitCode !== 0
+          ? `Exit Code: ${result.exitCode}`
+          : undefined;
+
       return {
         llmContent,
+        display: {
+          name: 'Shell',
+          description: this.getDescription(),
+          resultSummary: displayResultSummary,
+          result:
+            typeof returnDisplay === 'string'
+              ? { type: 'text', text: returnDisplay }
+              : // TODO: Add support for terminal display type (AnsiOutput)
+                undefined,
+        },
         returnDisplay,
         data,
         ...executionError,
