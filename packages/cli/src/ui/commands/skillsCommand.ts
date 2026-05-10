@@ -118,6 +118,7 @@ async function linkAction(
         return requestConsentInteractive(
           consentString,
           context.ui.setConfirmationRequest.bind(context.ui),
+          () => context.ui.setConfirmationRequest(null),
         );
       },
     );

@@ -1,11 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
   addMemory,
+  listInboxMemoryPatches,
   listInboxSkills,
   listInboxPatches,
   listMemoryFiles,
@@ -129,7 +130,7 @@ export class AddMemoryCommand implements Command {
 export class InboxMemoryCommand implements Command {
   readonly name = 'memory inbox';
   readonly description =
-    'Lists skills extracted from past sessions that are pending review.';
+    'Lists memory items extracted from past sessions that are pending review.';
 
   async execute(
     context: CommandContext,
@@ -142,12 +143,17 @@ export class InboxMemoryCommand implements Command {
       };
     }
 
-    const [skills, patches] = await Promise.all([
+    const [skills, patches, memoryPatches] = await Promise.all([
       listInboxSkills(context.agentContext.config),
       listInboxPatches(context.agentContext.config),
+      listInboxMemoryPatches(context.agentContext.config),
     ]);
 
-    if (skills.length === 0 && patches.length === 0) {
+    if (
+      skills.length === 0 &&
+      patches.length === 0 &&
+      memoryPatches.length === 0
+    ) {
       return { name: this.name, data: 'No items in inbox.' };
     }
 
@@ -165,8 +171,19 @@ export class InboxMemoryCommand implements Command {
         : '';
       lines.push(`- **${p.name}** (update): patches ${targets}${date}`);
     }
+    for (const memoryPatch of memoryPatches) {
+      const targets = memoryPatch.entries.map((e) => e.targetPath).join(', ');
+      const date = memoryPatch.extractedAt
+        ? ` (latest extract: ${new Date(memoryPatch.extractedAt).toLocaleDateString()})`
+        : '';
+      const sourceCount = memoryPatch.sourceFiles.length;
+      const sourceLabel = sourceCount === 1 ? 'patch' : 'patches';
+      lines.push(
+        `- **${memoryPatch.name}** (${sourceCount} source ${sourceLabel}, ${memoryPatch.entries.length} hunks): targets ${targets}${date}`,
+      );
+    }
 
-    const total = skills.length + patches.length;
+    const total = skills.length + patches.length + memoryPatches.length;
     return {
       name: this.name,
       data: `Memory inbox (${total}):\n${lines.join('\n')}`,

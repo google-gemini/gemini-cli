@@ -243,6 +243,32 @@ describe('AuthDialog', () => {
       unmount();
     });
 
+    it('sets auth context with requiresRestart: true for USE_VERTEX_AI in Cloud Shell', async () => {
+      vi.stubEnv('CLOUD_SHELL', 'true');
+      mockedValidateAuthMethod.mockReturnValue(null);
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_VERTEX_AI);
+
+      expect(props.setAuthContext).toHaveBeenCalledWith({
+        requiresRestart: true,
+      });
+      unmount();
+    });
+
+    it('sets auth context with empty object for USE_VERTEX_AI outside Cloud Shell', async () => {
+      vi.stubEnv('CLOUD_SHELL', '');
+      mockedValidateAuthMethod.mockReturnValue(null);
+      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_VERTEX_AI);
+
+      expect(props.setAuthContext).toHaveBeenCalledWith({});
+      unmount();
+    });
+
     it('sets auth context with empty object for other auth types', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       const { unmount } = await renderWithProviders(<AuthDialog {...props} />);

@@ -89,7 +89,7 @@ export interface CommandContext {
      *
      * @param value The confirmation request details.
      */
-    setConfirmationRequest: (value: ConfirmationRequest) => void;
+    setConfirmationRequest: (value: ConfirmationRequest | null) => void;
     removeComponent: () => void;
     toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
@@ -108,6 +108,8 @@ export interface CommandContext {
 export interface QuitActionReturn {
   type: 'quit';
   messages: HistoryItem[];
+  /** When true, the current session's history and temporary files will be deleted on exit. */
+  deleteSession?: boolean;
 }
 
 /**
