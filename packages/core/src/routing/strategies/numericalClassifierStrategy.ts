@@ -20,7 +20,7 @@ import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 
 // The number of recent history turns to provide to the router for context.
-const HISTORY_TURNS_FOR_CONTEXT = 8;
+export const HISTORY_TURNS_FOR_CONTEXT = 8;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';

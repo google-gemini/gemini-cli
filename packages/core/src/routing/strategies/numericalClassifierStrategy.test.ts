@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NumericalClassifierStrategy } from './numericalClassifierStrategy.js';
+import { NumericalClassifierStrategy, HISTORY_TURNS_FOR_CONTEXT } from './numericalClassifierStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -18,6 +18,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
+import { HISTORY_SEARCH_WINDOW } from './strategyUtils.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
@@ -491,8 +492,6 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Manually calculate what the history should be
-    const HISTORY_TURNS_FOR_CONTEXT = 8;
     const finalHistory = longHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
     // Last part is the request
@@ -502,7 +501,7 @@ describe('NumericalClassifierStrategy', () => {
     };
 
     expect(contents).toEqual([...finalHistory, requestPart]);
-    expect(contents).toHaveLength(9);
+    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
   });
 
   it('should completely filter out tool-related turns from history before slicing', async () => {
@@ -760,6 +759,53 @@ describe('NumericalClassifierStrategy', () => {
     ];
 
     expect(contents).toEqual(expectedContents);
+  });
+
+  it('should respect HISTORY_SEARCH_WINDOW and HISTORY_TURNS_FOR_CONTEXT correctly', async () => {
+    const longHistory: Content[] = [];
+    for (let i = 0; i < 40; i++) {
+      longHistory.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
+      // Add noise that should be filtered
+      if (i % 2 === 0) {
+        longHistory.push({
+          role: 'model',
+          parts: [{ functionCall: { name: 'noise', args: {} } }],
+        });
+      }
+    }
+    mockContext.history = longHistory;
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // Manually calculate what the history should be
+    const historySlice = longHistory.slice(-HISTORY_SEARCH_WINDOW);
+    const cleanHistory = historySlice.filter(
+      (content) => !content.parts?.some((p) => !!p.functionCall || !!p.functionResponse),
+    );
+    const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
+    expect(contents).toEqual([
+      ...finalHistory,
+      { role: 'user', parts: [{ text: 'simple task' }] },
+    ]);
+    // Exactly HISTORY_TURNS_FOR_CONTEXT history turns plus the current request turn
+    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
   });
 
   it('should use a fallback promptId if not found in context', async () => {

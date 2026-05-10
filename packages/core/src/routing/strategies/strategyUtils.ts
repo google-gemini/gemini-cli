@@ -10,6 +10,9 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 
+// The maximum number of recent history turns to scan before filtering.
+export const HISTORY_SEARCH_WINDOW = 20;
+
 /**
  * Returns a cleaned slice of conversation history for routing classifiers.
  * It strips out all tool-related turns to guarantee the context is text-only,
@@ -25,7 +28,8 @@ export function getCleanHistorySlice(
   history: readonly Content[],
   maxTurns: number,
 ): Content[] {
-  const cleanHistory = history.filter(
+  const historySlice = history.slice(-HISTORY_SEARCH_WINDOW);
+  const cleanHistory = historySlice.filter(
     (content) => !isFunctionCall(content) && !isFunctionResponse(content),
   );
   return cleanHistory.slice(-maxTurns);
