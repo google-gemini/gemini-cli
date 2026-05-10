@@ -18,12 +18,13 @@ describe('performInit', () => {
     }
   });
 
-  it('returns submit_prompt if GEMINI.md does not exist', () => {
+  it('returns success message if GEMINI.md does not exist', () => {
     const result = performInit(false);
-    expect(result.type).toBe('submit_prompt');
+    expect(result.type).toBe('message');
 
-    if (result.type === 'submit_prompt') {
-      expect(result.content).toContain('You are an AI agent');
+    if (result.type === 'message') {
+      expect(result.messageType).toBe('info');
+      expect(result.content).toContain('initialized with default rules');
     }
   });
 });

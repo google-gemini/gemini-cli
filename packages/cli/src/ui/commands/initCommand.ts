@@ -33,22 +33,35 @@ export const initCommand: SlashCommand = {
     const targetDir = context.services.agentContext.config.getTargetDir();
     const geminiMdPath = path.join(targetDir, 'GEMINI.md');
 
-    const result = performInit(fs.existsSync(geminiMdPath));
-
-    if (result.type === 'submit_prompt') {
-      // Create an empty GEMINI.md file
-      fs.writeFileSync(geminiMdPath, '', 'utf8');
-
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
-        },
-        Date.now(),
-      );
+    if (fs.existsSync(geminiMdPath)) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content:
+          'A GEMINI.md file already exists in this directory. No changes were made.',
+      };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return result as SlashCommandActionReturn;
+    const template = `# GEMINI.md
+
+## Project Identity
+This is the active workspace for this codebase.
+
+## Rules
+- Prefer small, reviewable diffs.
+- Never rewrite large files unless asked.
+- Run tests after edits when possible.
+- Explain what changed and why.
+- Preserve existing architecture unless the user requests a refactor.
+
+## User Preferences
+- Fast, practical fixes.
+- No fake placeholder features.
+- Keep output direct and patch-oriented.
+`;
+
+    fs.writeFileSync(geminiMdPath, template, 'utf8');
+
+    return performInit(false);
   },
 };

@@ -10,7 +10,6 @@ import * as path from 'node:path';
 import { initCommand } from './initCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
-import type { SubmitPromptActionReturn } from '@google/gemini-cli-core';
 
 // Mock the 'fs' module
 vi.mock('fs', async (importOriginal) => {
@@ -63,33 +62,27 @@ describe('initCommand', () => {
     expect(fs.writeFileSync).not.toHaveBeenCalled();
   });
 
-  it('should create GEMINI.md and submit a prompt if it does not exist', async () => {
+  it('should create GEMINI.md with template if it does not exist', async () => {
     // Arrange: Simulate that the file does not exist
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
     // Act: Run the command's action
-    const result = (await initCommand.action!(
-      mockContext,
-      '',
-    )) as SubmitPromptActionReturn;
+    const result = await initCommand.action!(mockContext, '');
 
-    // Assert: Check that writeFileSync was called correctly
-    expect(fs.writeFileSync).toHaveBeenCalledWith(geminiMdPath, '', 'utf8');
-
-    // Assert: Check that an informational message was added to the UI
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: 'info',
-        text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
-      },
-      expect.any(Number),
+    // Assert: Check that writeFileSync was called with the template
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      geminiMdPath,
+      expect.stringContaining('# GEMINI.md'),
+      'utf8',
     );
 
-    // Assert: Check that the correct prompt is submitted
-    expect(result.type).toBe('submit_prompt');
-    expect(result.content).toContain(
-      'You are an AI agent that brings the power of Gemini',
-    );
+    // Assert: Check for the correct informational message
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content:
+        'GEMINI.md has been initialized with default rules and project identity.',
+    });
   });
 
   it('should return an error if config is not available', async () => {

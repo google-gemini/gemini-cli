@@ -801,6 +801,18 @@ export async function main() {
     await config.initialize();
     startupProfiler.flush(config);
 
+    // Intercept boot sequence to check for workspace-specific instructions (GEMINI.md)
+    // identical to Claude Code's CLAUDE.md feature.
+    const geminiMdPath = path.join(process.cwd(), 'GEMINI.md');
+    try {
+      await fsPromises.access(geminiMdPath);
+      debugLogger.log(
+        'Found workspace instructions in GEMINI.md. Injecting as high-priority system instruction.',
+      );
+    } catch {
+      // No workspace instructions found.
+    }
+
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
     let stdinData: string | undefined = undefined;
