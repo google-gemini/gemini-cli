@@ -408,14 +408,21 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const name = fnCall.name || 'undefined_tool_name';
+    const name = fnCall.name?.trim() || 'generic_tool';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const args = (fnCall.args as Record<string, unknown>) || {};
-    const callId =
+    const rawCallId =
       fnCall.id ??
       (this.chat.context.config.isContextManagementEnabled()
         ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
         : `${name}_${Date.now()}_${this.callCounter++}`);
+
+    const callId = rawCallId.startsWith(`${name}__`)
+      ? rawCallId
+      : `${name}__${rawCallId}`;
+
+    // Mutate the function call object ID so that history consolidation inherits it
+    fnCall.id = callId;
 
     const tool = this.chat.loopContext.toolRegistry.getTool(name);
     let display;

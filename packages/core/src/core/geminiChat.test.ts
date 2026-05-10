@@ -18,6 +18,7 @@ import {
   StreamEventType,
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
+  stripToolCallIdPrefixes,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -2967,6 +2968,129 @@ describe('GeminiChat', () => {
       expect(curatedHistory.length).toBe(2);
       expect(curatedHistory[1].role).toBe('model');
       expect(curatedHistory[1].parts![0].fileData).toBeDefined();
+    });
+  });
+
+  describe('stripToolCallIdPrefixes', () => {
+    it('should strip tool name prefix matching the tool name', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'my_tool__call_123',
+                name: 'my_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'my_tool__call_123',
+                name: 'my_tool',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+    });
+
+    it('should correctly handle tool names that contain double underscores', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'my__custom__tool__call_abc',
+                name: 'my__custom__tool',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'my__custom__tool__call_abc',
+                name: 'my__custom__tool',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_abc');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_abc');
+    });
+
+    it('should not strip if prefix does not match the tool name', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'other_tool__call_123',
+                name: 'my_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe(
+        'other_tool__call_123',
+      );
+    });
+
+    it('should correctly handle fallback to generic_tool when name is missing or has whitespace', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'generic_tool__call_123',
+                name: '  ',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'generic_tool__call_123',
+                name: undefined as unknown as string,
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
     });
   });
 });

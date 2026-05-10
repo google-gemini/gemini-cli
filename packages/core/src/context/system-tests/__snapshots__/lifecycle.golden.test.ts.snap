@@ -299,7 +299,7 @@ exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC 
     {
       "parts": [
         {
-          "text": "Mock response from: utility_state_snapshot_processor, for: {"text":"T.........\\n"}",
+          "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
         },
         {
           "text": "Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 Msg 4 ..................................................",
