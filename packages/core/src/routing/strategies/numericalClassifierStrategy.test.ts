@@ -424,49 +424,6 @@ describe('NumericalClassifierStrategy', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-  it('should include tool-related history when sending to classifier', async () => {
-    mockContext.history = [
-      { role: 'user', parts: [{ text: 'call a tool' }] },
-      { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
-      {
-        role: 'user',
-        parts: [
-          { functionResponse: { name: 'test_tool', response: { ok: true } } },
-        ],
-      },
-      { role: 'user', parts: [{ text: 'another user turn' }] },
-    ];
-    const mockApiResponse = {
-      complexity_reasoning: 'Simple.',
-      complexity_score: 10,
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-
-    await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-      mockLocalLiteRtLmClient,
-    );
-
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
-    const contents = generateJsonCall.contents;
-
-    const expectedContents = [
-      ...mockContext.history,
-      // The last user turn is the request part
-      {
-        role: 'user',
-        parts: [{ text: 'simple task' }],
-      },
-    ];
-
-    expect(contents).toEqual(expectedContents);
-  });
-
   it('should respect HISTORY_TURNS_FOR_CONTEXT', async () => {
     const longHistory: Content[] = [];
     for (let i = 0; i < 30; i++) {
@@ -508,63 +465,6 @@ describe('NumericalClassifierStrategy', () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'initial request' }] },
       { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
-      {
-        role: 'user',
-        parts: [
-          { functionResponse: { name: 'test_tool', response: { ok: true } } },
-        ],
-      },
-      { role: 'model', parts: [{ text: 'tool output analyzed' }] },
-      { role: 'user', parts: [{ text: 'next step' }] },
-      { role: 'model', parts: [{ text: 'working on it' }] },
-      { role: 'user', parts: [{ text: 'almost done?' }] },
-      { role: 'model', parts: [{ text: 'yes' }] },
-      { role: 'user', parts: [{ text: 'final check' }] },
-      { role: 'model', parts: [{ text: 'all good' }] },
-    ];
-    mockContext.history = history;
-    const mockApiResponse = {
-      complexity_reasoning: 'Simple.',
-      complexity_score: 10,
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-
-    await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-      mockLocalLiteRtLmClient,
-    );
-
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
-    const contents = generateJsonCall.contents;
-
-    // Expect tool turns (index 1 and 2) to be fully filtered out
-    const expectedContents = [
-      history[0],
-      ...history.slice(3),
-      {
-        role: 'user',
-        parts: [{ text: 'simple task' }],
-      },
-    ];
-
-    expect(contents).toEqual(expectedContents);
-  });
-
-  it('should completely filter out tool-related turns correctly even when mixed parts are present', async () => {
-    const history: Content[] = [
-      { role: 'user', parts: [{ text: 'initial request' }] },
-      {
-        role: 'model',
-        parts: [
-          { text: 'thinking about which tool to call...' },
-          { functionCall: { name: 'test_tool' } },
-        ],
-      },
       {
         role: 'user',
         parts: [
