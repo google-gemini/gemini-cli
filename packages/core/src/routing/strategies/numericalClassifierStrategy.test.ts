@@ -18,7 +18,6 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
-import { HISTORY_SEARCH_WINDOW } from './strategyUtils.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
@@ -424,44 +423,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-  it('should respect HISTORY_TURNS_FOR_CONTEXT', async () => {
-    const longHistory: Content[] = [];
-    for (let i = 0; i < 30; i++) {
-      longHistory.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
-    }
-    mockContext.history = longHistory;
-    const mockApiResponse = {
-      complexity_reasoning: 'Simple.',
-      complexity_score: 10,
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-
-    await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-      mockLocalLiteRtLmClient,
-    );
-
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
-    const contents = generateJsonCall.contents;
-
-    const finalHistory = longHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
-
-    // Last part is the request
-    const requestPart = {
-      role: 'user',
-      parts: [{ text: 'simple task' }],
-    };
-
-    expect(contents).toEqual([...finalHistory, requestPart]);
-    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
-  });
-
-  it('should completely filter out tool-related turns from history before slicing', async () => {
+  it('should strip leading tool turns when the candidate slice starts with tool-related turns', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'initial request' }] },
       { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
@@ -499,9 +461,8 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Expect tool turns (index 1 and 2) to be fully filtered out
+    // Expect leading tool turns (index 1 and 2) to be stripped because index 0 was sliced off
     const expectedContents = [
-      history[0],
       ...history.slice(3),
       {
         role: 'user',
@@ -512,7 +473,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should preserve text turns both before and after tool-related turns when tools are in the middle', async () => {
+  it('should preserve tool turns when they appear after a non-tool turn in the middle of history', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'turn 0 (before)' }] },
       { role: 'model', parts: [{ text: 'turn 1 (before)' }] },
@@ -550,10 +511,9 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Expect exactly the 4 turns before and 4 turns after to be preserved
+    // Expect all 8 sliced turns (starting from non-tool turn 2) to be preserved
     const expectedContents = [
-      ...history.slice(0, 4),
-      ...history.slice(6),
+      ...history.slice(2),
       {
         role: 'user',
         parts: [{ text: 'simple task' }],
@@ -563,7 +523,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should preserve preceding text turns when tool-related turns are at the very end of history', async () => {
+  it('should preserve tool turns when they appear at the very end of history following a non-tool turn', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'turn 0' }] },
       { role: 'model', parts: [{ text: 'turn 1' }] },
@@ -601,9 +561,9 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
     const contents = generateJsonCall.contents;
 
-    // Expect exactly the 8 text turns before the tools to be preserved
+    // Expect all 8 sliced turns to be preserved because index 2 is a non-tool turn
     const expectedContents = [
-      ...history.slice(0, 8),
+      ...history.slice(2),
       {
         role: 'user',
         parts: [{ text: 'simple task' }],
@@ -661,7 +621,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should respect HISTORY_SEARCH_WINDOW and HISTORY_TURNS_FOR_CONTEXT correctly', async () => {
+  it('should respect HISTORY_TURNS_FOR_CONTEXT correctly on long history arrays', async () => {
     const longHistory: Content[] = [];
     for (let i = 0; i < 40; i++) {
       longHistory.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
@@ -694,11 +654,19 @@ describe('NumericalClassifierStrategy', () => {
     const contents = generateJsonCall.contents;
 
     // Manually calculate what the history should be
-    const historySlice = longHistory.slice(-HISTORY_SEARCH_WINDOW);
-    const cleanHistory = historySlice.filter(
-      (content) => !content.parts?.some((p) => !!p.functionCall || !!p.functionResponse),
-    );
-    const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+    const candidateSlice = longHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+    let firstTextIndex = -1;
+    for (let i = 0; i < candidateSlice.length; i++) {
+      if (
+        !candidateSlice[i].parts?.every((p) => !!p.functionCall) &&
+        !candidateSlice[i].parts?.every((p) => !!p.functionResponse)
+      ) {
+        firstTextIndex = i;
+        break;
+      }
+    }
+    const finalHistory =
+      firstTextIndex === -1 ? [] : candidateSlice.slice(firstTextIndex);
 
     expect(contents).toEqual([
       ...finalHistory,
