@@ -483,6 +483,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+#### `localModel`
+
+Settings for **local OpenAI-compatible backends** and **Gemma 4** aliases
+(`gemma4`, `gemma4-26b`, …). Full reference (every nested key, env precedence,
+and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
+
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):

@@ -1622,6 +1622,22 @@ export class Config implements McpContext, AgentLoopContext {
         this.localModel?.modelMapping,
       );
       this.setModel(resolvedModel, true);
+
+      const localModel = this.getModel();
+      const compressionAliases = [
+        'chat-compression-default',
+        'chat-compression-2.5-flash-lite',
+        'chat-compression-2.5-flash',
+        'chat-compression-2.5-pro',
+        'chat-compression-3-flash',
+        'chat-compression-3.1-flash-lite',
+        'chat-compression-3-pro',
+      ];
+      for (const alias of compressionAliases) {
+        this.modelConfigService.registerRuntimeModelConfig(alias, {
+          modelConfig: { model: localModel },
+        });
+      }
     }
 
     const newContentGeneratorConfig = await createContentGeneratorConfig(

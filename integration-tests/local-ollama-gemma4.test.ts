@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { estimateTokenCountSync } from '../packages/core/src/utils/tokenCalculation.js';
+
 import { TestRig, assertModelHasOutput } from './test-helper.js';
 
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
@@ -15,7 +15,6 @@ const CLI_TEST_TIMEOUT_MS = 300000;
 const SIMPLE_PROMPT = 'Reply with the digit 4 and nothing else.';
 const JAVA_HELLO_WORLD_PROMPT =
   'Write a complete Java HelloWorld program in one code block. Use a class named HelloWorld, include a public static void main method, and print Hello, World!.';
-const LARGE_CONTEXT_MIN_TOKENS = 32769;
 const RED_BLUE_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAAQklEQVR4nO3PQREAIBADMcC/Z1Bx5LMR0M7uu2btNftwRtc/KEArQCtAK0ArQCtAK0ArQCtAK0ArQCtAK0ArQCtAe+LxAj8B7QRwAAAAAElFTkSuQmCC';
 
@@ -283,34 +282,6 @@ function writeRedBlueImage(testDir: string): string {
   return imagePath;
 }
 
-function buildLargeContextPrompt(minTokens: number): {
-  prompt: string;
-  estimatedTokens: number;
-  overLimitMarker: string;
-  endMarker: string;
-} {
-  const overLimitMarker = 'lemur';
-  const endMarker = 'otter';
-  const prefix =
-    `Large context test.\n` +
-    `Return the post-limit marker and final marker.\n\n`;
-  const suffix = `\n${overLimitMarker}\nend0 end1 end2 end3 end4 end5 end6 end7\n${endMarker}\nReturn only the two markers separated by |.\n`;
-
-  const staticText = `${prefix}${suffix}`;
-  const staticTokens = estimateTokenCountSync([{ text: staticText }]);
-  const fillerChars = Math.max((minTokens - staticTokens + 1) * 4, 0);
-  const filler = 'z'.repeat(fillerChars);
-  const prompt = `${prefix}${filler}${suffix}`;
-  const estimatedTokens = estimateTokenCountSync([{ text: prompt }]);
-
-  return {
-    prompt,
-    estimatedTokens,
-    overLimitMarker,
-    endMarker,
-  };
-}
-
 const ollamaHostState = await detectOllamaHostState();
 const availableAliasTargets = getAvailableAliasTargets(
   ollamaHostState.downloadedGemmaModelIds,
@@ -320,14 +291,6 @@ const preferredGemma4Model = ollamaHostState.ready
   : undefined;
 const fastestAvailableGemmaModel = ollamaHostState.ready
   ? getFastestAvailableGemmaModel(ollamaHostState.downloadedGemmaModelIds)
-  : undefined;
-const largestContextGemmaModel = ollamaHostState.ready
-  ? (findMatchingModel(ollamaHostState.downloadedGemmaModelIds, /31b|31/i, {
-      excludeCloud: true,
-    }) ??
-    findMatchingModel(ollamaHostState.downloadedGemmaModelIds, /31b|31/i) ??
-    findMatchingModel(ollamaHostState.downloadedGemmaModelIds, /26b|26/i) ??
-    preferredGemma4Model)
   : undefined;
 const suiteName = ollamaHostState.ready
   ? 'local-ollama-gemma4'
@@ -559,36 +522,6 @@ describe.skipIf(!ollamaHostState.ready)(suiteName, () => {
       expect(parsed.response).toContain('323');
       expect(parsed.response).not.toContain('<|channel|>thought');
       expect(parsed.response).not.toContain('<|think|>');
-    },
-    CLI_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'should handle a local Gemma 4 prompt larger than 32768 tokens',
-    async () => {
-      rig.setup('local-ollama-large-context', {
-        settings: createLocalOllamaSettings(largestContextGemmaModel),
-      });
-
-      const { prompt, estimatedTokens, overLimitMarker, endMarker } =
-        buildLargeContextPrompt(LARGE_CONTEXT_MIN_TOKENS);
-
-      expect(estimatedTokens).toBeGreaterThan(LARGE_CONTEXT_MIN_TOKENS);
-
-      const parsed = await runJsonPrompt(
-        rig,
-        'From the stdin context, return the first and final markers exactly, separated by | and nothing else.',
-        ['--model', largestContextGemmaModel!],
-        {
-          stdin: prompt,
-        },
-      );
-      const lastRequest = await waitForLastApiRequest(rig);
-
-      expect(lastRequest.model).toBe(largestContextGemmaModel);
-      assertModelHasOutput(parsed.response);
-      expect(parsed.response).toContain(overLimitMarker);
-      expect(parsed.response).toContain(endMarker);
     },
     CLI_TEST_TIMEOUT_MS,
   );

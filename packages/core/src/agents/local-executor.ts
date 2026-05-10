@@ -66,6 +66,7 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
+import { isLocalBackendAuthType } from '../core/contentGenerator.js';
 import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
@@ -336,11 +337,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // (e.g., superseding stale tool outputs to reclaim context tokens).
     await this.definition.onBeforeTurn?.(chat, combinedSignal);
 
-    const { functionCalls, modelToUse } = await promptIdContext.run(
-      promptId,
-      async () =>
+    const { functionCalls, modelToUse, textResponse } =
+      await promptIdContext.run(promptId, async () =>
         this.callModel(chat, currentMessage, combinedSignal, promptId),
-    );
+      );
 
     if (combinedSignal.aborted) {
       const terminateReason = timeoutSignal.aborted
@@ -353,8 +353,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
     }
 
-    // If the model stops calling tools without calling complete_task, it's an error.
+    // If the model stops calling tools without calling complete_task,
+    // auto-complete with any text output the model produced.
+    // Local models often stop prematurely; treat any final output as a valid completion
+    // to avoid triplicating the subagent investigation via ERROR_NO_COMPLETE_TASK_CALL recovery.
     if (functionCalls.length === 0) {
+      const authType =
+        this.context.config.getContentGeneratorConfig()?.authType;
+      const isLocal = authType && isLocalBackendAuthType(authType);
+      if (isLocal) {
+        return {
+          status: 'stop',
+          terminateReason: AgentTerminateMode.GOAL,
+          finalResult: textResponse || 'Agent completed analysis.',
+        };
+      }
       this.emitActivity('ERROR', {
         error: `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}' to finalize the session.`,
         context: 'protocol_violation',
@@ -957,6 +970,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     } else {
       modelToUse = requestedModel;
+    }
+
+    const authType = this.context.config.getContentGeneratorConfig()?.authType;
+    if (authType && isLocalBackendAuthType(authType)) {
+      const localModel = this.context.config.getModel();
+      modelToUse = localModel;
+      this.context.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: this.definition.name,
+        },
+        modelConfig: {
+          model: localModel,
+          generateContentConfig: {},
+        },
+      });
     }
 
     const role = LlmRole.SUBAGENT;

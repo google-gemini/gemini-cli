@@ -62,6 +62,8 @@ Technical documentation for each capability of Gemini CLI.
 - **[MCP servers](./tools/mcp-server.md):** Connect to and use remote agents.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
 - **[Model selection](./cli/model.md):** Choose the best model for your needs.
+- **[Local Gemma 4](./cli/local-gemma-4.md):** Run Gemma 4 locally (Ollama, LM
+  Studio, vLLM, and more) with full settings reference.
 - **[Plan mode 🔬](./cli/plan-mode.md):** Use a safe, read-only mode for
   planning complex changes.
 - **[Subagents 🔬](./core/subagents.md):** Using specialized agents for specific

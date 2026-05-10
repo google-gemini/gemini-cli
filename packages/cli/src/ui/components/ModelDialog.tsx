@@ -48,6 +48,14 @@ interface ModelDialogProps {
   onClose: () => void;
 }
 
+const LOCAL_SEPARATOR = {
+  value: '' as const,
+  title: '── Local Models ──',
+  key: '---local-separator---',
+  disabled: true as const,
+  hideNumber: true as const,
+};
+
 const LOCAL_MODEL_CHOICE_PREFIX = 'local-choice::';
 
 function encodeLocalModelChoice(authType: AuthType, modelId: string): string {
@@ -171,7 +179,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [config]);
 
   useEffect(() => {
-    if (!isLocalModelMode || discoveryReady) return;
+    if (discoveryReady) return;
     setDiscoveryReady(true);
     const service = new LocalModelDiscoveryService();
     void service
@@ -182,7 +190,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       .then((result) => {
         setDiscoveredBackends(result.backends);
       });
-  }, [isLocalModelMode, discoveryReady, settings]);
+  }, [discoveryReady, settings]);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -344,6 +352,44 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     isLocalModelMode,
   ]);
 
+  const buildLocalModelOptions = useCallback(() => {
+    if (discoveredBackends.length === 0) return [];
+    const BACKEND_DISPLAY: Record<string, string> = {
+      ollama: 'Ollama',
+      'lm-studio': 'LM Studio',
+      'llama-cpp': 'Llama.cpp',
+      vllm: 'vLLM',
+      sglang: 'SGLang',
+    };
+    const result: Array<{
+      value: string;
+      title: string;
+      key: string;
+      description?: string;
+    }> = [];
+    for (const backend of discoveredBackends) {
+      const label = BACKEND_DISPLAY[backend.backend] || backend.backend;
+      for (const model of backend.gemma4Models) {
+        const displayName = getDisplayString(model.id, config ?? undefined);
+        const metadata = backend.gemma4Metadata.find(
+          (meta) => meta.id === model.id,
+        );
+        const details = metadata
+          ? `${metadata.quantization}, ${Math.round(
+              metadata.contextLength / 1024,
+            )}K ctx`
+          : 'running';
+        result.push({
+          value: encodeLocalModelChoice(backend.authType, model.id),
+          title: `${displayName} [Local]`,
+          description: `Provider: ${label} ● ${details}`,
+          key: `local:${backend.backend}:${model.id}`,
+        });
+      }
+    }
+    return result;
+  }, [discoveredBackends, config]);
+
   const manualOptions = useMemo(() => {
     // --- DYNAMIC PATH ---
     if (
@@ -360,13 +406,16 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           hasAccessToProModel,
         });
 
-      return allOptions
+      const cloudOptions = allOptions
         .filter((o) => o.tier !== 'auto')
         .map((o) => ({
           value: o.modelId,
           title: o.name,
           key: o.modelId,
         }));
+      const localOptions = buildLocalModelOptions();
+      if (localOptions.length === 0) return cloudOptions;
+      return [...cloudOptions, LOCAL_SEPARATOR, ...localOptions];
     }
 
     if (isLocalModelMode) {
@@ -457,7 +506,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             : 'running';
           options.push({
             value: encodeLocalModelChoice(backend.authType, model.id),
-            title: displayName,
+            title: `${displayName} [Local]`,
             description: `Provider: ${label} ● ${details}`,
             key: `${backend.backend}:${model.id}`,
           });
@@ -469,7 +518,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     // --- LEGACY PATH ---
     const showGemmaModels = config?.getExperimentalGemma() ?? false;
 
-    const options = [
+    let options: Array<{
+      value: string;
+      title: string;
+      key: string;
+      description?: string;
+      disabled?: boolean;
+      hideNumber?: boolean;
+    }> = [
       {
         value: DEFAULT_GEMINI_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_MODEL),
@@ -537,7 +593,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
     if (!hasAccessToProModel) {
       // Filter out all Pro models for free tier
-      return options.filter((option) => !isProModel(option.value));
+      options = options.filter((option) => !isProModel(option.value));
+    }
+
+    const localOptions = buildLocalModelOptions();
+    if (localOptions.length > 0) {
+      options.push(LOCAL_SEPARATOR, ...localOptions);
     }
 
     return options;
@@ -551,6 +612,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     isLocalModelMode,
     discoveredBackends,
     discoveryReady,
+    buildLocalModelOptions,
   ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;

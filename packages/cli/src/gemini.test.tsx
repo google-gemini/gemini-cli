@@ -466,6 +466,7 @@ describe('autoSelectDiscoveredLocalBackend', () => {
         vllm: undefined,
         sglang: undefined,
       },
+      timeoutMs: 1500,
     });
   });
 });
