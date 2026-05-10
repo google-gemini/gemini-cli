@@ -320,20 +320,35 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Resolves a path to an absolute path with forward slashes, preserving the
+ * original case of every segment.
+ *
+ * Use this for paths that will be surfaced to the user (e.g. `/memory list`,
+ * `--- Context from: ... ---` headers) or used as the storage form passed
+ * through to file I/O. For comparison/dedup keys on case-insensitive
+ * filesystems use `normalizePath` instead.
+ */
+export function toAbsolutePath(p: string): string {
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+  return pathModule.resolve(p).replace(/\\/g, '/');
+}
+
+/**
  * Normalizes a path for reliable comparison across platforms.
  * - Resolves to an absolute path.
  * - Converts all path separators to forward slashes.
- * - On Windows, converts to lowercase for case-insensitivity.
+ * - On case-insensitive platforms (Windows, macOS), converts to lowercase.
+ *
+ * Use this for comparison keys (Set/Map lookups, equality checks). For paths
+ * that will be displayed to the user or persisted as identifiers, use
+ * `toAbsolutePath` instead so the original casing is preserved.
  */
 export function normalizePath(p: string): string {
+  const absolute = toAbsolutePath(p);
   const platform = process.platform;
-  const isWindows = platform === 'win32';
-  const pathModule = isWindows ? path.win32 : path;
-
-  const resolved = pathModule.resolve(p);
-  const normalized = resolved.replace(/\\/g, '/');
-  const isCaseInsensitive = isWindows || platform === 'darwin';
-  return isCaseInsensitive ? normalized.toLowerCase() : normalized;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? absolute.toLowerCase() : absolute;
 }
 
 /**

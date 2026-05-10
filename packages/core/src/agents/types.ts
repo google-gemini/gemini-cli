@@ -230,6 +230,21 @@ export interface LocalAgentDefinition<
   workspaceDirectories?: string[];
 
   /**
+   * Allows this agent to access the canonical auto-memory inbox patch files
+   * under `<projectMemoryDir>/.inbox/{private,global}/extraction.patch`.
+   * This is intentionally narrow so the main session cannot bypass review by
+   * writing arbitrary inbox patches.
+   */
+  memoryInboxAccess?: boolean;
+
+  /**
+   * Restricts write validation for this agent to extracted skill artifacts and
+   * canonical auto-memory inbox patch files. Used by the background
+   * auto-memory extractor so active memory files cannot be edited directly.
+   */
+  autoMemoryExtractionWriteAccess?: boolean;
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
@@ -353,4 +368,17 @@ export interface RunConfig {
    * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
+}
+
+/**
+ * Summary of an agent reload operation.
+ */
+export interface AgentReloadSummary {
+  totalLoaded: number;
+  localCount: number;
+  remoteCount: number;
+  newAgents: string[];
+  updatedAgents: string[];
+  deletedAgents: string[];
+  errors: string[];
 }

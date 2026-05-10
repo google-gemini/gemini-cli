@@ -3005,6 +3005,44 @@ describe('Settings Loading and Merging', () => {
       expect(snap1).toBe(snap2);
     });
 
+    it('getSnapshot() should preserve readOnly metadata for each scope', () => {
+      const readonlySettings = new LoadedSettings(
+        {
+          path: getSystemSettingsPath(),
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        {
+          path: getSystemDefaultsPath(),
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        {
+          path: USER_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+          readOnly: false,
+        },
+        {
+          path: MOCK_WORKSPACE_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        true,
+        [],
+      );
+
+      const snapshot = readonlySettings.getSnapshot();
+
+      expect(snapshot.system.readOnly).toBe(true);
+      expect(snapshot.systemDefaults.readOnly).toBe(true);
+      expect(snapshot.user.readOnly).toBe(false);
+      expect(snapshot.workspace.readOnly).toBe(true);
+    });
+
     it('setValue() should create a new snapshot reference and emit event', () => {
       const oldSnapshot = loadedSettings.getSnapshot();
       const oldUserRef = oldSnapshot.user.settings;
