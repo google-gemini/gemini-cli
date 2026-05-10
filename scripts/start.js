@@ -71,6 +71,29 @@ if (isInDebugMode) {
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
+
+// Strip CI-related env vars before spawning the dev child. `is-in-ci`
+// (loaded transitively by `ink`) treats `CI`, `CONTINUOUS_INTEGRATION`,
+// and any `CI_*`-prefixed env var as a signal to disable interactive
+// rendering, which makes `npm run start` hang silently after the banner
+// whenever a developer has e.g. `CI_TOKEN` set in their shell. The bundled
+// path closes this via an esbuild alias on `is-in-ci` (#4822); we do the
+// dev-mode equivalent here so the unbundled `npm run start` flow doesn't
+// diverge. See issue #22452.
+const ciVarNames = Object.keys(env).filter(
+  (k) => k === 'CI' || k === 'CONTINUOUS_INTEGRATION' || k.startsWith('CI_'),
+);
+if (ciVarNames.length > 0) {
+  for (const name of ciVarNames) {
+    delete env[name];
+  }
+  process.stderr.write(
+    '[gemini-cli/dev] Cleared CI-related env vars to keep `ink` interactive: ' +
+      ciVarNames.join(', ') +
+      '\n[gemini-cli/dev] These vars are unset in the CLI process and its shell-tool subprocesses. Use the bundled build (`npm run bundle && node bundle/gemini.js`) to preserve them.\n',
+  );
+}
+
 const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
 
 child.on('close', (code) => {
