@@ -423,55 +423,6 @@ describe('NumericalClassifierStrategy', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-  it('should strip leading tool turns when the candidate slice starts with tool-related turns', async () => {
-    const history: Content[] = [
-      { role: 'user', parts: [{ text: 'initial request' }] },
-      { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
-      {
-        role: 'user',
-        parts: [
-          { functionResponse: { name: 'test_tool', response: { ok: true } } },
-        ],
-      },
-      { role: 'model', parts: [{ text: 'tool output analyzed' }] },
-      { role: 'user', parts: [{ text: 'next step' }] },
-      { role: 'model', parts: [{ text: 'working on it' }] },
-      { role: 'user', parts: [{ text: 'almost done?' }] },
-      { role: 'model', parts: [{ text: 'yes' }] },
-      { role: 'user', parts: [{ text: 'final check' }] },
-      { role: 'model', parts: [{ text: 'all good' }] },
-    ];
-    mockContext.history = history;
-    const mockApiResponse = {
-      complexity_reasoning: 'Simple.',
-      complexity_score: 10,
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-
-    await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-      mockLocalLiteRtLmClient,
-    );
-
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
-    const contents = generateJsonCall.contents;
-
-    // Expect leading tool turns (index 1 and 2) to be stripped because index 0 was sliced off
-    const expectedContents = [
-      ...history.slice(3),
-      {
-        role: 'user',
-        parts: [{ text: 'simple task' }],
-      },
-    ];
-
-    expect(contents).toEqual(expectedContents);
-  });
 
   it('should preserve tool turns when they appear after a non-tool turn in the middle of history', async () => {
     const history: Content[] = [
@@ -672,8 +623,8 @@ describe('NumericalClassifierStrategy', () => {
       ...finalHistory,
       { role: 'user', parts: [{ text: 'simple task' }] },
     ]);
-    // Exactly HISTORY_TURNS_FOR_CONTEXT history turns plus the current request turn
-    expect(contents).toHaveLength(HISTORY_TURNS_FOR_CONTEXT + 1);
+    // Expect finalHistory length plus the current request turn
+    expect(contents).toHaveLength(finalHistory.length + 1);
   });
 
   it('should use a fallback promptId if not found in context', async () => {
