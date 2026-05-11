@@ -9,7 +9,11 @@ import open from 'open';
 import path from 'node:path';
 import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { getVersion, type Config } from '@google/gemini-cli-core';
+import {
+  getVersion,
+  type Config,
+  type ConversationRecord,
+} from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
 import { MessageType } from '../types.js';
@@ -204,6 +208,57 @@ describe('bugCommand', () => {
     const reminder =
       '\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.';
     expect(messageText).toContain(encodeURIComponent(reminder));
+  });
+
+  it('should include subagent trajectories in history export if available', async () => {
+    const history = [
+      { role: 'user', parts: [{ text: 'hello' }] },
+      { role: 'model', parts: [{ text: 'hi' }] },
+    ];
+    const trajectories = {
+      'subagent-1': {
+        sessionId: 'subagent-1',
+        messages: [],
+      } as unknown as ConversationRecord,
+    };
+    const mockGetSubagentTrajectories = vi.fn().mockResolvedValue(trajectories);
+
+    const mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+            storage: {
+              getProjectTempDir: () => '/tmp/gemini',
+            },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
+            getChat: () => ({
+              getHistory: () => history,
+              getSubagentTrajectories: mockGetSubagentTrajectories,
+            }),
+          },
+        },
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, 'Bug with trajectories');
+
+    const expectedPath = path.join(
+      '/tmp/gemini',
+      'bug-report-history-1704067200000.json',
+    );
+    expect(mockGetSubagentTrajectories).toHaveBeenCalled();
+    expect(exportHistoryToFile).toHaveBeenCalledWith({
+      history,
+      filePath: expectedPath,
+      trajectories,
+    });
   });
 
   it('should use a custom URL template from config if provided', async () => {
