@@ -157,6 +157,7 @@ export function createMockLlmClient(
   return {
     generateContent: generateContentMock,
     generateJson: generateJsonMock,
+    countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
   } as unknown as MockLlmClient;
 }
 

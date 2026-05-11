@@ -44,7 +44,7 @@ function estimateTextTokens(text: string, charsPerToken: number): number {
 
   let tokens = 0;
   const asciiTokensPerChar = 1 / charsPerToken;
-  
+
   // Optimized loop: charCodeAt is faster than for...of on large strings
   for (let i = 0; i < text.length; i++) {
     if (text.charCodeAt(i) <= 127) {

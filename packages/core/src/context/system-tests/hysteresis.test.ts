@@ -9,6 +9,7 @@ import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
 import { generalistProfile } from '../config/profiles.js';
+import type { Content } from '@google/genai';
 
 describe('Context Manager Hysteresis Tests', () => {
   const mockLlmClient = createMockLlmClient(['<SNAPSHOT>']);

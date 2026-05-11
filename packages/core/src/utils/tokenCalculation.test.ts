@@ -283,13 +283,13 @@ describe('tokenCalculation', () => {
     it('should respect the user supplied charsPerToken argument', () => {
       const text = 'abcdefghijkl'; // 12 chars
       const parts: Part[] = [{ text }];
-      
+
       // Default (4 chars/token) -> 12 / 4 = 3 tokens
       expect(estimateTokenCountSync(parts)).toBe(3);
-      
+
       // Override to 3 chars/token -> 12 / 3 = 4 tokens
       expect(estimateTokenCountSync(parts, 0, 3)).toBe(4);
-      
+
       // Override to 2 chars/token -> 12 / 2 = 6 tokens
       expect(estimateTokenCountSync(parts, 0, 2)).toBe(6);
 
