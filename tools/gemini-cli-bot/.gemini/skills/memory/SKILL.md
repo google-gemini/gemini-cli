@@ -63,7 +63,7 @@ Once your investigation and implementation are complete:
 
 1.  **Record Findings**: You MUST update `tools/gemini-cli-bot/lessons-learned.md`
     using the format defined above.
-2.  **Generate PR Description**: If `ENABLE_PRS` is `true` and changes are
+2.  **Generate PR Description**: If PR creation is enabled (per the System Directive) and changes are
     staged, use `write_file` to create `pr-description.md`. Include:
     - What the change is.
     - Why it is recommended.

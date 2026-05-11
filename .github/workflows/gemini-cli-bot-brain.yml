@@ -151,6 +151,13 @@ jobs:
             echo "</untrusted_context>" >> trigger_context.md
           fi
 
+          if [ "$ENABLE_PRS" = "true" ]; then
+            echo "**System Directive**: PR creation is ENABLED for this run. You MUST stage your changes and generate a \`pr-description.md\` file if you are proposing fixes." >> trigger_context.md
+          else
+            echo "**System Directive**: PR creation is DISABLED for this run. You MUST NOT stage files or attempt to create a PR description." >> trigger_context.md
+          fi
+          echo "" >> trigger_context.md
+
           cat trigger_context.md "$PROMPT_PATH" > combined_prompt.md
           node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
 
