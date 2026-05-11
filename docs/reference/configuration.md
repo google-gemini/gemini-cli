@@ -884,7 +884,7 @@ their corresponding top-level category object in your `settings.json` file.
       "auto": {
         "displayName": "Auto",
         "tier": "auto",
-        "isPreview": false,
+        "isPreview": true,
         "isVisible": true,
         "dialogDescription": "Let Gemini CLI decide the best model for the task.",
         "features": {
@@ -918,6 +918,18 @@ their corresponding top-level category object in your `settings.json` file.
           "thinking": false,
           "multimodalToolUse": false
         }
+      },
+      "auto-gemini-3": {
+        "tier": "auto",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": false
+      },
+      "auto-gemini-2.5": {
+        "tier": "auto",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "isVisible": false
       }
     }
     ```
@@ -1086,6 +1098,33 @@ their corresponding top-level category object in your `settings.json` file.
             "target": "gemini-3.1-flash-lite-preview"
           }
         ]
+      },
+      "auto-gemini-3": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "auto-gemini-2.5": {
+        "default": "gemini-2.5-pro"
       }
     }
     ```
@@ -1104,7 +1143,13 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["gemini-2.5-pro"]
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-flash"
+          },
+          {
+            "condition": {
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
             "target": "gemini-2.5-flash"
           }
@@ -1115,6 +1160,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
               "releaseChannel": "stable",
               "requestedModels": ["auto"]
             },
@@ -1122,7 +1173,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           {
             "condition": {
-              "requestedModels": ["gemini-2.5-pro"]
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
             "target": "gemini-2.5-pro"
           },
