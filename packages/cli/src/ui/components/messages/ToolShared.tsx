@@ -32,10 +32,12 @@ export const STATUS_INDICATOR_WIDTH = 3;
  * Returns true if the tool name corresponds to a shell tool.
  */
 export function isShellTool(name: string): boolean {
+  const normalized = name.toLowerCase();
   return (
     name === SHELL_COMMAND_NAME ||
     name === SHELL_NAME ||
-    name === SHELL_TOOL_NAME
+    name === SHELL_TOOL_NAME ||
+    normalized === 'shell'
   );
 }
 

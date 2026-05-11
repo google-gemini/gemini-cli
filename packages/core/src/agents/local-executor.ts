@@ -1287,25 +1287,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Reconstruct toolResponseParts in the original order
+    // Ensure exactly one response per function call to satisfy the Gemini API protocol.
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const part = syncResults.get(callId);
+
       if (part) {
         toolResponseParts.push(part);
+        continue;
       }
-    }
 
-    // If all authorized tool calls failed (and task isn't complete), provide a generic error.
-    if (
-      functionCalls.length > 0 &&
-      toolResponseParts.length === 0 &&
-      !taskCompleted
-    ) {
-      toolResponseParts.push({
-        text: 'All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach.',
-      });
+      const isAborted = signal.aborted;
+      const isTaskComplete =
+        functionCall.name === COMPLETE_TASK_TOOL_NAME && taskCompleted;
+
+      // Safely skip missing responses if the run was interrupted or the turn won't be sent back.
+      if (isAborted || isTaskComplete) {
+        continue;
+      }
+
+      throw new Error(
+        `[LocalAgentExecutor] Critical System Failure: Tool execution result was lost/dropped by the scheduler for callId ${callId} (${functionCall.name}). This indicates an internal race condition or scheduler bug.`,
+      );
     }
 
     return {

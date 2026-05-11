@@ -1267,6 +1267,42 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('SessionStart Hook Rendering', () => {
+    it('does not render systemMessage directly (avoids duplicate with HookSystemMessage event)', async () => {
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const fireSessionStartEvent = vi.fn().mockResolvedValue({
+        systemMessage: 'Hello from SessionStart hook',
+        getAdditionalContext: vi.fn(() => undefined),
+      });
+      vi.spyOn(mockConfig, 'getHookSystem').mockReturnValue({
+        fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+        fireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(fireSessionStartEvent).toHaveBeenCalled());
+
+      // The direct-render path (the bug) would call addItem with the
+      // systemMessage text and no `source` field. The HookSystemMessage
+      // event-listener path (the correct one) always sets `source`.
+      const directRenderCall = mockAddItem.mock.calls.find(
+        ([item]) =>
+          item?.text === 'Hello from SessionStart hook' && !item?.source,
+      );
+      expect(directRenderCall).toBeUndefined();
+
+      unmount();
+    });
+  });
+
   describe('Token Counting from Session Stats', () => {
     it('tracks token counts from session messages', async () => {
       // Session stats are provided through the SessionStatsProvider context
