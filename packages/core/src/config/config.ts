@@ -2516,7 +2516,7 @@ export class Config implements McpContext, AgentLoopContext {
       return '';
     }
     const sections: string[] = [];
-    const includeExtensionContext = options?.includeExtensionContext !== false;
+    const includeExtensionContext = options?.includeExtensionContext ?? true;
     const extension = includeExtensionContext
       ? this.memoryContextManager.getExtensionMemory()
       : '';
