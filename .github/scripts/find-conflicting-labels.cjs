@@ -46,8 +46,8 @@ module.exports = async ({ github, context, core }) => {
     }
   }
 
-  // Limit to 20 to avoid overwhelming the AI in a single run
-  const issuesToProcess = conflictingLabelIssues.slice(0, 20);
+  // Limit to 1 to avoid overwhelming the AI in a single run
+  const issuesToProcess = conflictingLabelIssues.slice(0, 1);
 
   fs.writeFileSync(
     'conflicting_labels_issues.json',
