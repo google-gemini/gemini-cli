@@ -30,6 +30,9 @@ export class ContextManager {
   private readonly orchestrator: PipelineOrchestrator;
   private readonly historyObserver: HistoryObserver;
 
+  // Hysteresis tracking to prevent utility call churn
+  private lastTriggeredDeficit = 0;
+
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
@@ -69,6 +72,11 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
+      // We explicitly DO NOT call evaluateTriggers here.
+      // The Context Manager is a one-way assembly line. It only evaluates triggers
+      // when fundamentally new organic context is added via PristineHistoryUpdated.
+      // Re-evaluating after a processor finishes creates infinite feedback loops if
+      // the processor fails to reduce the token count below the threshold.
     });
 
     this.historyObserver.start();
@@ -122,10 +130,15 @@ export class ContextManager {
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
         const node = this.buffer.nodes[i];
+        const priorTokens = rollingTokens;
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
         ]);
-        if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
+
+        // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
+        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
+        // strictly *older* than the boundary node.
+        if (priorTokens > this.sidecar.config.budget.retainedTokens) {
           // Only age out if not protected
           if (!protectedIds.has(node.id)) {
             agedOutNodes.add(node.id);
@@ -137,11 +150,24 @@ export class ContextManager {
         const targetDeficit =
           currentTokens - this.sidecar.config.budget.retainedTokens;
 
+        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
+        // so we can track growth from this new, smaller deficit.
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
         // Respect coalescing threshold for background work
         const threshold =
           this.sidecar.config.budget.coalescingThresholdTokens || 0;
 
-        if (targetDeficit >= threshold) {
+        // Only trigger if deficit has grown significantly since last time
+        const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
+
+        if (
+          targetDeficit >= threshold &&
+          (growthSinceLast >= threshold || this.lastTriggeredDeficit === 0)
+        ) {
+          this.lastTriggeredDeficit = targetDeficit;
           this.env.tokenCalculator.garbageCollectCache(
             new Set(this.buffer.nodes.map((n) => n.id)),
           );
@@ -151,6 +177,9 @@ export class ContextManager {
             targetNodeIds: agedOutNodes,
           });
         }
+      } else {
+        // Budget is healthy, reset hysteresis
+        this.lastTriggeredDeficit = 0;
       }
     }
   }

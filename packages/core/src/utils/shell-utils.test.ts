@@ -418,8 +418,8 @@ describe('escapeShellArg', () => {
       });
 
       it('should escape internal double quotes by doubling them', () => {
-        const result = escapeShellArg('He said "Hello"', 'cmd');
-        expect(result).toBe('"He said ""Hello"""');
+        const result = escapeShellArg('hello "world"', 'cmd');
+        expect(result).toBe('"hello ""world"""');
       });
 
       it('should handle empty strings', () => {
@@ -429,7 +429,12 @@ describe('escapeShellArg', () => {
     });
 
     describe('when shell is PowerShell', () => {
-      it('should wrap simple arguments in single quotes', () => {
+      it('should return simple alphanumeric arguments without quotes', () => {
+        const result = escapeShellArg('my-argument-123.txt', 'powershell');
+        expect(result).toBe('my-argument-123.txt');
+      });
+
+      it('should wrap arguments with spaces in single quotes', () => {
         const result = escapeShellArg('search term', 'powershell');
         expect(result).toBe("'search term'");
       });

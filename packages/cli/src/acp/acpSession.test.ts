@@ -586,4 +586,125 @@ describe('Session', () => {
       },
     });
   });
+
+  it('should add explanation to tool call content instead of thought chunk', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      getExplanation: () => 'Test Explanation',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi
+        .fn()
+        .mockResolvedValue({ type: 'info', onConfirm: vi.fn() }),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.sessionUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'Test Explanation' },
+        }),
+      }),
+    );
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          content: expect.arrayContaining([
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Test Explanation' },
+            },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('should add explanation to tool_call update content instead of thought chunk when no permission required', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      getExplanation: () => 'Test Explanation',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          content: expect.arrayContaining([
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Test Explanation' },
+            },
+          ]),
+        }),
+      }),
+    );
+  });
 });

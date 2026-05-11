@@ -13,6 +13,7 @@ import {
   getGlobalMemoryPaths,
   getExtensionMemoryPaths,
   getEnvironmentMemoryPaths,
+  getUserProjectMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
   readGeminiMdFiles,
@@ -20,10 +21,15 @@ import {
 import {
   setGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
+  PROJECT_MEMORY_INDEX_FILENAME,
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
+import {
+  GEMINI_DIR,
+  toAbsolutePath,
+  homedir as pathsHomedir,
+} from './paths.js';
 
 function flattenResult(result: {
   memoryContent: HierarchicalMemory;
@@ -33,7 +39,7 @@ function flattenResult(result: {
   return {
     ...result,
     memoryContent: flattenMemory(result.memoryContent),
-    filePaths: result.filePaths.map((p) => normalizePath(p)),
+    filePaths: result.filePaths,
   };
 }
 import { Config, type GeminiCLIExtension } from '../config/config.js';
@@ -70,17 +76,17 @@ describe('memoryDiscovery', () => {
 
   async function createEmptyDir(fullPath: string) {
     await fsPromises.mkdir(fullPath, { recursive: true });
-    return normalizePath(fullPath);
+    return toAbsolutePath(fullPath);
   }
 
   async function createTestFile(fullPath: string, fileContents: string) {
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, fileContents);
-    return normalizePath(path.resolve(testRootDir, fullPath));
+    return toAbsolutePath(path.resolve(testRootDir, fullPath));
   }
 
   beforeEach(async () => {
-    testRootDir = normalizePath(
+    testRootDir = toAbsolutePath(
       await fsPromises.mkdtemp(
         path.join(os.tmpdir(), 'folder-structure-test-'),
       ),
@@ -97,9 +103,6 @@ describe('memoryDiscovery', () => {
     vi.mocked(os.homedir).mockReturnValue(homedir);
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
-
-  const normMarker = (p: string) =>
-    process.platform === 'win32' ? p.toLowerCase() : p;
 
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -794,6 +797,61 @@ included directory memory
     });
   });
 
+  describe('getUserProjectMemoryPaths', () => {
+    it('should find MEMORY.md when it exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir1'));
+      const memoryFile = await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(memoryFile);
+    });
+
+    it('should preserve the on-disk casing of the index filename', async () => {
+      // Regression: paths surfaced through /memory list and /memory show
+      // were previously lowercased on macOS/Windows because they passed
+      // through normalizePath. The MEMORY.md filename must be kept as-is
+      // for display.
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir2'));
+      await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toContain(PROJECT_MEMORY_INDEX_FILENAME);
+      expect(result[0]).not.toContain(
+        PROJECT_MEMORY_INDEX_FILENAME.toLowerCase(),
+      );
+    });
+
+    it('should fall back to legacy GEMINI.md when MEMORY.md is absent', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir3'));
+      const legacyFile = await createTestFile(
+        path.join(memoryDir, DEFAULT_CONTEXT_FILENAME),
+        'legacy memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toContain(legacyFile);
+    });
+
+    it('should return empty array when neither MEMORY.md nor GEMINI.md exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir4'));
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
   describe('getExtensionMemoryPaths', () => {
     it('should return active extension context files', async () => {
       const extFile = await createTestFile(
@@ -900,6 +958,50 @@ included directory memory
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(repoFile);
+    });
+
+    it('should preserve case-distinct files before identity deduplication', async () => {
+      const platformSpy = vi
+        .spyOn(process, 'platform', 'get')
+        .mockReturnValue('win32');
+      vi.resetModules();
+      vi.doMock('node:fs/promises', async () => {
+        const actual =
+          await vi.importActual<typeof fsPromises>('node:fs/promises');
+        return {
+          ...actual,
+          access: vi.fn().mockResolvedValue(undefined),
+          stat: vi.fn(async (filePath) => {
+            const normalizedPath = String(filePath).replace(/\\/g, '/');
+            return {
+              dev: 1,
+              ino: normalizedPath.endsWith('/GEMINI.md') ? 101 : 202,
+            };
+          }),
+        };
+      });
+
+      try {
+        const paths = await import('./paths.js');
+        const memoryTool = await import('../tools/memoryTool.js');
+        const memoryDiscovery = await import('./memoryDiscovery.js');
+        vi.mocked(paths.homedir).mockReturnValue('/home/tester');
+        memoryTool.setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+        const result = await memoryDiscovery.getEnvironmentMemoryPaths(
+          ['/case-root'],
+          [],
+        );
+
+        expect(result).toEqual([
+          paths.toAbsolutePath('/case-root/GEMINI.md'),
+          paths.toAbsolutePath('/case-root/gemini.md'),
+        ]);
+      } finally {
+        platformSpy.mockRestore();
+        vi.doUnmock('node:fs/promises');
+        vi.resetModules();
+      }
     });
 
     it('should recognize .git as a file (submodules/worktrees)', async () => {
@@ -1501,7 +1603,7 @@ included directory memory
     expect(flattenedMemory).toContain('Really cool custom context!');
     expect(config.getUserMemory()).toStrictEqual(refreshResult.memoryContent);
     expect(refreshResult.filePaths[0]).toContain(
-      normMarker(path.join(extensionPath, 'CustomContext.md')),
+      toAbsolutePath(path.join(extensionPath, 'CustomContext.md')),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({
