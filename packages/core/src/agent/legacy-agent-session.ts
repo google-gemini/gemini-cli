@@ -166,6 +166,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
       } else {
         this._emitErrorAndAgentEnd(err);
       }
+    } finally {
       this._clearActiveStream();
     }
   }
@@ -196,7 +197,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
         this._abortController.signal,
         this._promptId,
         undefined,
-        false,
         currentDisplayContent,
       );
       currentDisplayContent = undefined;
@@ -267,6 +267,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           invocation: 'invocation' in tc ? tc.invocation : undefined,
           resultDisplay: response.resultDisplay,
           displayName: 'tool' in tc ? tc.tool?.displayName : undefined,
+          display: response.display,
         });
         const data = buildToolResponseData(response);
 
@@ -390,6 +391,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
     const meta: Record<string, unknown> = {};
     if (err instanceof Error) {
       meta['errorName'] = err.constructor.name;
+      meta['stack'] = err.stack;
       if ('exitCode' in err && typeof err.exitCode === 'number') {
         meta['exitCode'] = err.exitCode;
       }

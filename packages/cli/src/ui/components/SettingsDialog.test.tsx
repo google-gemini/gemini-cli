@@ -25,7 +25,10 @@ import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { SettingScope } from '../../config/settings.js';
-import { createMockSettings } from '../../test-utils/settings.js';
+import {
+  createMockSettings,
+  type MockSettingsFile,
+} from '../../test-utils/settings.js';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { TEST_ONLY } from '../../utils/settingsUtils.js';
@@ -44,7 +47,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
-  BACKSPACE = '\x7f',
+  BACKSPACE = '\u0008',
   CTRL_P = '\u0010',
   CTRL_N = '\u000E',
 }
@@ -250,6 +253,17 @@ const renderDialog = async (
     },
   );
 
+const createSettingsFile = (
+  path: string,
+  settings: Record<string, unknown> = {},
+  readOnly?: boolean,
+): MockSettingsFile => ({
+  settings,
+  originalSettings: settings,
+  path,
+  readOnly,
+});
+
 describe('SettingsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -325,6 +339,36 @@ describe('SettingsDialog', () => {
         expect(lines.length).toBeLessThanOrEqual(25);
       });
       unmount();
+    });
+
+    it('should render the bottom border correctly when height is constrained', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+      const constrainedHeight = 15;
+
+      const renderResult = await renderDialog(settings, onSelect, {
+        availableTerminalHeight: constrainedHeight,
+      });
+
+      await renderResult.waitUntilReady();
+
+      await waitFor(() => {
+        const output = renderResult.lastFrame();
+        const lines = output.trim().split('\n');
+
+        // Verify height constraint
+        expect(lines.length).toBeLessThanOrEqual(constrainedHeight);
+
+        // Verify bottom border existence in the last line of the output
+        const lastLine = lines[lines.length - 1];
+        // 'round' border characters: ─, ╰, ╯
+        expect(lastLine).toMatch(/[─╰╯]/);
+      });
+
+      // SVG snapshot ensures visual layout and border rendering are preserved
+      await expect(renderResult).toMatchSvgSnapshot();
+
+      renderResult.unmount();
     });
   });
 
@@ -585,6 +629,131 @@ describe('SettingsDialog', () => {
 
       // This test validates the initial state - scope selection behavior
       // is complex due to keypress handling, so we focus on state validation
+
+      unmount();
+    });
+
+    it('should not offer read-only system settings as an editable target', async () => {
+      const settings = createMockSettings({
+        system: createSettingsFile('', {}, true),
+      });
+      const onSelect = vi.fn();
+
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Apply To');
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('User Settings');
+      expect(output).toContain('Workspace Settings');
+      expect(output).not.toContain('System Settings');
+
+      unmount();
+    });
+
+    it('should not offer a read-only home-directory workspace as an editable target', async () => {
+      const settings = createMockSettings({
+        user: createSettingsFile('/mock/home/.gemini/settings.json'),
+        system: createSettingsFile('/mock/system/settings.json', {}, true),
+        systemDefaults: createSettingsFile(
+          '/mock/system-defaults/settings.json',
+          {},
+          true,
+        ),
+        workspace: createSettingsFile('', {}, true),
+      });
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
+        settings,
+        onSelect,
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Vim Mode');
+      });
+
+      const output = lastFrame();
+      expect(output).not.toContain('Workspace Settings');
+      expect(output).not.toContain('System Settings');
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string);
+      });
+      await waitUntilReady();
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general.vimMode',
+        true,
+      );
+
+      unmount();
+    });
+
+    it('should fall back to the first writable scope when the selected scope is read-only', async () => {
+      const settings = createMockSettings({
+        user: createSettingsFile('', {}, true),
+        system: createSettingsFile('', {}, true),
+        workspace: createSettingsFile('/mock/workspace/.gemini/settings.json'),
+      });
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
+        settings,
+        onSelect,
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Vim Mode');
+      });
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string);
+      });
+      await waitUntilReady();
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'general.vimMode',
+        true,
+      );
+
+      unmount();
+    });
+
+    it('should not save when all editable scopes are read-only', async () => {
+      const settings = createMockSettings({
+        user: createSettingsFile('', {}, true),
+        system: createSettingsFile('', {}, true),
+        workspace: createSettingsFile(
+          '/mock/workspace/.gemini/settings.json',
+          {},
+          true,
+        ),
+      });
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
+        settings,
+        onSelect,
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Vim Mode');
+      });
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string);
+      });
+      await waitUntilReady();
+
+      expect(setValueSpy).not.toHaveBeenCalled();
 
       unmount();
     });

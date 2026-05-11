@@ -318,6 +318,20 @@ description: project-desc
     expect(service.isAdminEnabled()).toBe(false);
   });
 
+  it('should reset active skill names', () => {
+    const service = new SkillManager();
+    service.activateSkill('skill-1');
+    service.activateSkill('skill-2');
+
+    expect(service.isSkillActive('skill-1')).toBe(true);
+    expect(service.isSkillActive('skill-2')).toBe(true);
+
+    service.reset();
+
+    expect(service.isSkillActive('skill-1')).toBe(false);
+    expect(service.isSkillActive('skill-2')).toBe(false);
+  });
+
   describe('Conflict Detection', () => {
     it('should emit UI warning when a non-built-in skill is overridden', async () => {
       const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');

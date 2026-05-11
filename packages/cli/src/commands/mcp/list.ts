@@ -67,6 +67,8 @@ export async function getMcpServersFromConfig(
   return filteredResult;
 }
 
+const MCP_LIST_DEFAULT_TIMEOUT_MSEC = 5000;
+
 async function testMCPConnection(
   serverName: string,
   config: MCPServerConfig,
@@ -127,11 +129,22 @@ async function testMCPConnection(
   }
 
   try {
-    // Attempt actual MCP connection with short timeout
-    await client.connect(transport, { timeout: 5000 }); // 5s timeout
+    // Attempt actual MCP connection with timeout from config or default to 5s.
+    // We use a short default for the list command to keep it responsive.
+    const timeout = config.timeout ?? MCP_LIST_DEFAULT_TIMEOUT_MSEC;
+    await client.connect(transport, { timeout });
 
-    // Test basic MCP protocol by pinging the server
-    await client.ping();
+    // Test basic MCP protocol by pinging the server.
+    // Ping is optional per MCP spec - some servers (e.g. Google first-party)
+    // don't implement it. A successful connect() is sufficient proof of connectivity.
+    try {
+      await client.ping({ timeout });
+    } catch (e) {
+      debugLogger.debug(
+        `MCP ping failed for ${serverName}, but connect succeeded:`,
+        e,
+      );
+    }
 
     await client.close();
     return MCPServerStatus.CONNECTED;
@@ -166,6 +179,10 @@ async function getServerStatus(
     return MCPServerStatus.DISABLED;
   }
 
+  if (!isTrusted) {
+    return MCPServerStatus.DISABLED;
+  }
+
   // Test all server types by attempting actual connection
   return testMCPConnection(serverName, server, isTrusted, activeSettings);
 }
@@ -176,8 +193,14 @@ export async function listMcpServers(
   const loadedSettings = loadedSettingsArg ?? loadSettings();
   const activeSettings = loadedSettings.merged;
 
+  // If the folder is untrusted, we want to show all configured servers (including
+  // project-scoped ones) as disabled.
+  const allSettings = !loadedSettings.isTrusted
+    ? loadedSettings.getMergedSettingsAsIfTrusted()
+    : activeSettings;
+
   const { mcpServers, blockedServerNames } =
-    await getMcpServersFromConfig(activeSettings);
+    await getMcpServersFromConfig(allSettings);
   const serverNames = Object.keys(mcpServers);
 
   if (blockedServerNames.length > 0) {
@@ -193,6 +216,15 @@ export async function listMcpServers(
       debugLogger.log('No MCP servers configured.');
     }
     return;
+  }
+
+  if (!loadedSettings.isTrusted) {
+    debugLogger.log(
+      chalk.yellow(
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.\n' +
+          'User-level servers are also suppressed in untrusted folders to prevent accidental side-effects.\n',
+      ),
+    );
   }
 
   debugLogger.log('Configured MCP servers:\n');
