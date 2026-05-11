@@ -290,7 +290,7 @@ jobs:
                 "read_file"
               ],
               "telemetry": {
-                "enabled": true,
+                "enabled": false,
                 "target": "gcp"
               }
             }
