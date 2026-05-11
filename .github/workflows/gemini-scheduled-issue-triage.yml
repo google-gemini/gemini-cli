@@ -181,6 +181,7 @@ jobs:
                - If the issue already has a priority/ label, do not change it.
                - If the issue is missing a priority/ label, you must evaluate the issue's impact to determine the priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based on the categorization guidelines.
                - If the issue already has an area/ label, do not change it.
+               - If the issue is missing an area/ label, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels.
                - If the issue already has an effort/ label, do not change it.
                - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
@@ -214,7 +215,7 @@ jobs:
               - Do not add comments or modify the issue content.
               - Do not remove the following labels maintainer, help wanted or good first issue.
               - Triage only the current issue.
-              - Identify only one area/ label.
+              - Identify exactly ONE area/ label. Do NOT assign multiple area/ labels to a single issue.
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
               - Identify only one priority/ label.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.

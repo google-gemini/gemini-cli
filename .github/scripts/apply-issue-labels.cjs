@@ -104,6 +104,18 @@ module.exports = async ({ github, context, core }) => {
     labelsToAdd = [...new Set(labelsToAdd)];
     labelsToRemove = [...new Set(labelsToRemove)];
 
+    // Enforce mutually exclusive area labels
+    const areaLabelsToAdd = labelsToAdd.filter((l) => l.startsWith('area/'));
+    if (areaLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple area labels to add: ${areaLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstArea = areaLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('area/') || l === firstArea,
+      );
+    }
+
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
         owner: context.repo.owner,
