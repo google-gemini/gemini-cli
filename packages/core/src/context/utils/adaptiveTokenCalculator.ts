@@ -12,6 +12,7 @@ import {
 } from './contextTokenCalculator.js';
 import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import type { ContextEventBus, TokenGroundTruthEvent } from '../eventBus.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 /**
  * An Adaptive Token Calculator that dynamically learns the true token cost of the user's
@@ -42,14 +43,20 @@ export class AdaptiveTokenCalculator implements ContextTokenCalculator {
 
     // Determine what ratio we should have used
     const targetWeight = actualTokens / promptBaseUnits;
+    const oldWeight = this.learnedWeight;
 
     // Apply Momentum (Learning Rate)
     const learningRate = 0.2;
     const newWeight =
-      this.learnedWeight * (1 - learningRate) + targetWeight * learningRate;
+      oldWeight * (1 - learningRate) + targetWeight * learningRate;
 
     // Clamp to reasonable safety bounds to prevent rogue metadata poisoning the system
     this.learnedWeight = Math.max(0.5, Math.min(newWeight, 2.0));
+
+    debugLogger.log(
+      `[AdaptiveTokenCalculator] Learned weight updated to ${this.learnedWeight.toFixed(3)} ` +
+        `(API Tokens: ${actualTokens}, Base Units: ${promptBaseUnits}, Target Ratio: ${targetWeight.toFixed(3)})`,
+    );
   }
 
   /**
