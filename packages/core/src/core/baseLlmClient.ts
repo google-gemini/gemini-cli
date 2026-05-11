@@ -241,7 +241,6 @@ export class BaseLlmClient {
     const result = await this.contentGenerator.countTokens({
       model,
       contents: options.contents,
-      // @ts-expect-error: CountTokensParameters type in SDK might not explicitly document config yet, but it supports abortSignal.
       config: options.abortSignal
         ? { abortSignal: options.abortSignal }
         : undefined,

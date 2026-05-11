@@ -37,9 +37,20 @@ describe('render', () => {
 
     const orchestrator = {} as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn().mockReturnValue({
+        tokens: 100,
+        baseUnits: 100,
+      }),
+      getRawBaseUnits: vi.fn().mockReturnValue(100),
+      getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
+    };
+
     const env = {
+      advancedTokenCalculator: mockAdvancedTokenCalculator,
       tokenCalculator: {
-        getRawBaseUnits: vi.fn().mockReturnValue(100),
+        calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+        calculateTokenBreakdown: vi.fn().mockReturnValue({}),
       },
       graphMapper: {
         fromGraph: vi.fn((nodes: readonly ConcreteNode[]) =>
@@ -115,12 +126,18 @@ describe('render', () => {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
-      tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+      advancedTokenCalculator: {
+        calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+          const tokens = nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+          return { tokens, baseUnits: tokens };
+        }),
+        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
-        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+      },
+      tokenCalculator: {
+        calculateConcreteListTokens: vi.fn((nodes) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -199,12 +216,18 @@ describe('render', () => {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
-      tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+      advancedTokenCalculator: {
+        calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+          const tokens = nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+          return { tokens, baseUnits: tokens };
+        }),
+        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
-        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+      },
+      tokenCalculator: {
+        calculateConcreteListTokens: vi.fn((nodes) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),

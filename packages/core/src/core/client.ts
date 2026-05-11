@@ -646,7 +646,11 @@ export class GeminiClient {
           history: newHistory,
           didApplyManagement,
           baseUnits,
-        } = await this.contextManager.renderHistory(pendingRequest);
+        } = await this.contextManager.renderHistory(
+          pendingRequest,
+          undefined,
+          signal,
+        );
 
         currentBaseUnits = baseUnits;
 

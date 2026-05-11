@@ -99,7 +99,7 @@ describe('AdaptiveTokenCalculator', () => {
     const node1 = createDummyNode(turn1Id, NodeType.USER_PROMPT);
 
     // Get raw base units directly
-    const rawTokens = calculator.getRawBaseUnits([node1]);
+    const rawTokens = calculator.calculateTokensAndBaseUnits([node1]).baseUnits;
 
     // Get adjusted tokens
     const adjustedTokens = calculator.calculateConcreteListTokens([node1]);

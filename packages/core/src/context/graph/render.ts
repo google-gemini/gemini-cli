@@ -23,13 +23,22 @@ export async function render(
   tracer: ContextTracer,
   env: ContextEnvironment,
   protectionReasons: Map<string, string> = new Map(),
-  headerTokens: number = 0,
+  header?: Content,
   previewNodeIds: ReadonlySet<string> = new Set(),
 ): Promise<{
   history: Content[];
   didApplyManagement: boolean;
   baseUnits: number;
 }> {
+  let headerTokens = 0;
+  let headerBaseUnits = 0;
+  if (header) {
+    const costs =
+      env.advancedTokenCalculator.calculateContentTokensAndBaseUnits(header);
+    headerTokens = costs.tokens;
+    headerBaseUnits = costs.baseUnits;
+  }
+
   if (!sidecar.config.budget) {
     const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
     const contents = env.graphMapper.fromGraph(visibleNodes);
@@ -39,14 +48,15 @@ export async function render(
 
     // In all cases, retrieve raw base units from the token calculator interface
     const baseUnits =
-      env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerTokens;
+      env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
 
     return { history: contents, didApplyManagement: false, baseUnits };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
 
-  const graphTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
+  const { tokens: graphTokens, baseUnits: graphBaseUnits } =
+    env.advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
 
   const currentTokens = graphTokens + headerTokens;
 
@@ -84,8 +94,7 @@ export async function render(
     return {
       history: contents,
       didApplyManagement: false,
-      baseUnits:
-        env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerTokens,
+      baseUnits: graphBaseUnits + headerBaseUnits,
     };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -139,6 +148,7 @@ export async function render(
     history: contents,
     didApplyManagement: true,
     baseUnits:
-      env.advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerTokens,
+      env.advancedTokenCalculator.getRawBaseUnits(visibleNodes) +
+      headerBaseUnits,
   };
 }

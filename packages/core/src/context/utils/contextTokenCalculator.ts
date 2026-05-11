@@ -38,6 +38,14 @@ export interface ContextTokenCalculator {
 export interface AdvancedTokenCalculator extends ContextTokenCalculator {
   getRawBaseUnits(nodes: readonly ConcreteNode[]): number;
   getRawBaseUnitsForContent(content: Content): number;
+  calculateTokensAndBaseUnits(nodes: readonly ConcreteNode[]): {
+    tokens: number;
+    baseUnits: number;
+  };
+  calculateContentTokensAndBaseUnits(content: Content): {
+    tokens: number;
+    baseUnits: number;
+  };
 }
 
 /**
@@ -179,6 +187,22 @@ export class StaticTokenCalculator implements AdvancedTokenCalculator {
 
   getRawBaseUnitsForContent(content: Content): number {
     return this.calculateContentTokens(content);
+  }
+
+  calculateTokensAndBaseUnits(nodes: readonly ConcreteNode[]): {
+    tokens: number;
+    baseUnits: number;
+  } {
+    const baseUnits = this.calculateConcreteListTokens(nodes);
+    return { tokens: baseUnits, baseUnits };
+  }
+
+  calculateContentTokensAndBaseUnits(content: Content): {
+    tokens: number;
+    baseUnits: number;
+  } {
+    const baseUnits = this.calculateContentTokens(content);
+    return { tokens: baseUnits, baseUnits };
   }
 
   /**

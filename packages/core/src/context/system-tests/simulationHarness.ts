@@ -112,6 +112,7 @@ export class SimulationHarness {
 
   async getGoldenState() {
     const { history: finalProjection, baseUnits } =
+    console.error(`[TEST] simulateTurn tokensBefore=${tokensBefore}`);
       await this.contextManager.renderHistory();
     return {
       tokenTrajectory: this.tokenTrajectory,

@@ -81,6 +81,28 @@ export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
     return this.baseCalculator.calculateContentTokens(content);
   }
 
+  calculateTokensAndBaseUnits(nodes: readonly ConcreteNode[]): {
+    tokens: number;
+    baseUnits: number;
+  } {
+    const baseUnits = this.baseCalculator.calculateConcreteListTokens(nodes);
+    return {
+      tokens: Math.round(baseUnits * this.learnedWeight),
+      baseUnits,
+    };
+  }
+
+  calculateContentTokensAndBaseUnits(content: Content): {
+    tokens: number;
+    baseUnits: number;
+  } {
+    const baseUnits = this.baseCalculator.calculateContentTokens(content);
+    return {
+      tokens: Math.round(baseUnits * this.learnedWeight),
+      baseUnits,
+    };
+  }
+
   // --- Delegation and Weighting ---
 
   garbageCollectCache(liveNodeIds: ReadonlySet<string>): void {

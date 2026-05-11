@@ -326,9 +326,6 @@ export class ContextManager {
     const header = this.headerProvider
       ? await this.headerProvider()
       : undefined;
-    const headerTokens = header
-      ? this.env.tokenCalculator.calculateContentTokens(header)
-      : 0;
 
     // 3. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
     // We combine the graph hash with a hash of the header to ensure total freshness.
@@ -357,7 +354,7 @@ export class ContextManager {
       this.tracer,
       this.env,
       protectionReasons,
-      headerTokens,
+      header,
       previewNodeIds,
     );
 

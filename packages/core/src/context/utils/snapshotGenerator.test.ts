@@ -21,9 +21,11 @@ describe('SnapshotGenerator', () => {
       llmClient: {
         generateJson: mockGenerateJson,
       },
+      advancedTokenCalculator: {
+        getRawBaseUnits: vi.fn().mockReturnValue(100),
+      },
       tokenCalculator: {
         estimateTokensForString: vi.fn().mockReturnValue(100),
-        getRawBaseUnits: vi.fn().mockReturnValue(100),
       },
       promptId: 'test-prompt',
     } as unknown as ContextEnvironment;
