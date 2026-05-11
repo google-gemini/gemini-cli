@@ -26,6 +26,7 @@ import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
   getRealPath,
+  normalizePath,
 } from '@google/gemini-cli-core';
 import {
   loadSettings,
@@ -1420,6 +1421,7 @@ name = "yolo-checker"
         '.gemini',
         'trustedFolders.json',
       );
+      vi.stubEnv('GEMINI_CLI_TRUSTED_FOLDERS_PATH', trustedFoldersPath);
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: false,
         source: undefined,
@@ -1438,7 +1440,9 @@ name = "yolo-checker"
       const trustedFolders = JSON.parse(
         fs.readFileSync(trustedFoldersPath, 'utf-8'),
       );
-      expect(trustedFolders[tempWorkspaceDir]).toBe('TRUST_FOLDER');
+      expect(trustedFolders[normalizePath(tempWorkspaceDir)]).toBe(
+        'TRUST_FOLDER',
+      );
     });
 
     describe.each([true, false])(

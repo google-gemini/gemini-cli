@@ -9,9 +9,45 @@ import path from 'node:path';
 
 import { describe, expect } from 'vitest';
 
-import { evalTest, TEST_AGENTS } from './test-helper.js';
+import { AGENT_TOOL_NAME } from '@google/gemini-cli-core';
+import { evalTest, TEST_AGENTS, TestRig } from './test-helper.js';
 
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
+
+/**
+ * Helper to verify that a specific subagent was successfully invoked via the unified tool.
+ */
+async function expectSubagentCall(rig: TestRig, agentName: string) {
+  await rig.expectToolCallSuccess(
+    [AGENT_TOOL_NAME],
+    undefined,
+    (args: string) => {
+      try {
+        const parsed = JSON.parse(args);
+        return parsed.agent_name === agentName;
+      } catch {
+        return false;
+      }
+    },
+  );
+}
+
+/**
+ * Helper to check if a subagent (either via unified tool or direct name) was called.
+ */
+function isSubagentCalled(toolLogs: any[], agentName: string): boolean {
+  return toolLogs.some((l) => {
+    if (l.toolRequest.name === AGENT_TOOL_NAME) {
+      try {
+        const args = JSON.parse(l.toolRequest.args);
+        return args.agent_name === agentName;
+      } catch {
+        return false;
+      }
+    }
+    return l.toolRequest.name === agentName;
+  });
+}
 
 // A minimal package.json is used to provide a realistic workspace anchor.
 // This prevents the agent from making incorrect assumptions about the environment
@@ -45,6 +81,8 @@ describe('subagent eval test cases', () => {
    * This tests the system prompt's subagent specific clauses.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate to user provided agent with relevant expertise',
     params: {
       settings: {
@@ -60,7 +98,7 @@ describe('subagent eval test cases', () => {
       'README.md': 'TODO: update the README.\n',
     },
     assert: async (rig, _result) => {
-      await rig.expectToolCallSuccess([TEST_AGENTS.DOCS_AGENT.name]);
+      await expectSubagentCall(rig, TEST_AGENTS.DOCS_AGENT.name);
     },
   });
 
@@ -69,6 +107,8 @@ describe('subagent eval test cases', () => {
    * subagents are available. This helps catch orchestration overuse.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should avoid delegating trivial direct edit work',
     params: {
       settings: {
@@ -95,14 +135,10 @@ describe('subagent eval test cases', () => {
       }>;
 
       expect(updatedIndex).toContain('export const sum =');
-      expect(
-        toolLogs.some(
-          (l) => l.toolRequest.name === TEST_AGENTS.DOCS_AGENT.name,
-        ),
-      ).toBe(false);
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+      expect(isSubagentCalled(toolLogs, TEST_AGENTS.DOCS_AGENT.name)).toBe(
         false,
       );
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -113,6 +149,8 @@ describe('subagent eval test cases', () => {
    * This is meant to codify the "overusing Generalist" failure mode.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should prefer relevant specialist over generalist',
     params: {
       settings: {
@@ -134,13 +172,11 @@ describe('subagent eval test cases', () => {
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
+        toolRequest: { name: string; args: string };
       }>;
 
-      await rig.expectToolCallSuccess([TEST_AGENTS.TESTING_AGENT.name]);
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
-        false,
-      );
+      await expectSubagentCall(rig, TEST_AGENTS.TESTING_AGENT.name);
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -149,6 +185,8 @@ describe('subagent eval test cases', () => {
    * naturally spans docs and tests, so multiple specialists should be used.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use multiple relevant specialists for multi-surface task',
     params: {
       settings: {
@@ -173,18 +211,15 @@ describe('subagent eval test cases', () => {
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
+        toolRequest: { name: string; args: string };
       }>;
       const readme = readProjectFile(rig, 'README.md');
 
-      await rig.expectToolCallSuccess([
-        TEST_AGENTS.DOCS_AGENT.name,
-        TEST_AGENTS.TESTING_AGENT.name,
-      ]);
+      await expectSubagentCall(rig, TEST_AGENTS.DOCS_AGENT.name);
+      await expectSubagentCall(rig, TEST_AGENTS.TESTING_AGENT.name);
+
       expect(readme).not.toContain('TODO: update the README.');
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
-        false,
-      );
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -193,6 +228,8 @@ describe('subagent eval test cases', () => {
    * from a large pool of available subagents (10 total).
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should select the correct subagent from a pool of 10 different agents',
     prompt: 'Please add a new SQL table migration for a user profile.',
     files: {
@@ -209,14 +246,11 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
-      const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
-      }>;
-      await rig.expectToolCallSuccess(['database-agent']);
+      const toolLogs = rig.readToolLogs();
+      await expectSubagentCall(rig, TEST_AGENTS.DATABASE_AGENT.name);
 
       // Ensure the generalist and other irrelevant specialists were not invoked
       const uncalledAgents = [
-        'generalist',
         TEST_AGENTS.DOCS_AGENT.name,
         TEST_AGENTS.TESTING_AGENT.name,
         TEST_AGENTS.CSS_AGENT.name,
@@ -229,10 +263,9 @@ describe('subagent eval test cases', () => {
       ];
 
       for (const agentName of uncalledAgents) {
-        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
-          false,
-        );
+        expect(isSubagentCalled(toolLogs, agentName)).toBe(false);
       }
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -243,6 +276,8 @@ describe('subagent eval test cases', () => {
    * This test includes stress tests the subagent delegation with ~80 tools.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should select the correct subagent from a pool of 10 different agents with MCP tools present',
     prompt: 'Please add a new SQL table migration for a user profile.',
     setup: async (rig) => {
@@ -262,14 +297,11 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
-      const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
-      }>;
-      await rig.expectToolCallSuccess(['database-agent']);
+      const toolLogs = rig.readToolLogs();
+      await expectSubagentCall(rig, TEST_AGENTS.DATABASE_AGENT.name);
 
       // Ensure the generalist and other irrelevant specialists were not invoked
       const uncalledAgents = [
-        'generalist',
         TEST_AGENTS.DOCS_AGENT.name,
         TEST_AGENTS.TESTING_AGENT.name,
         TEST_AGENTS.CSS_AGENT.name,
@@ -282,10 +314,9 @@ describe('subagent eval test cases', () => {
       ];
 
       for (const agentName of uncalledAgents) {
-        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
-          false,
-        );
+        expect(isSubagentCalled(toolLogs, agentName)).toBe(false);
       }
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 });

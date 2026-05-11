@@ -125,7 +125,7 @@ export async function getConnectionConfigFromFile(
     const portFileContents = await fs.promises.readFile(portFile, 'utf8');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(portFileContents);
-  } catch (_) {
+  } catch {
     // For newer extension versions, the file name matches the pattern
     // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
     // windows are open, multiple files matching the pattern are expected to

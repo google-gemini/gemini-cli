@@ -2,7 +2,6 @@
 
 exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line between a compact tool and a standard tool 1`] = `
 "  ✓  ReadFolder  Listing files → file1.txt
-
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  non-compact-tool Doing something                                      │
 │                                                                          │
@@ -17,7 +16,6 @@ exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line b
 │                                                                          │
 │ some large output                                                        │
 ╰──────────────────────────────────────────────────────────────────────────╯
-
   ✓  ReadFolder  Listing files → file1.txt
 "
 `;

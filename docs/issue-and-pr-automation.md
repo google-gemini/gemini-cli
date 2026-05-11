@@ -37,8 +37,8 @@ is to perform an initial analysis and apply the correct labels.
   - It uses a Gemini model to analyze the issue's title and body against a
     detailed set of guidelines.
   - **Applies one `area/*` label**: Categorizes the issue into a functional area
-    of the project (e.g., `area/ux`, `area/models`, `area/platform`).
-  - **Applies one `kind/*` label**: Identifies the type of issue (e.g.,
+    of the project (for example, `area/ux`, `area/models`, `area/platform`).
+  - **Applies one `kind/*` label**: Identifies the type of issue (for example,
     `kind/bug`, `kind/enhancement`, `kind/question`).
   - **Applies one `priority/*` label**: Assigns a priority from P0 (critical) to
     P3 (low) based on the described impact.
@@ -50,8 +50,8 @@ is to perform an initial analysis and apply the correct labels.
 - **What you should do**:
   - Fill out the issue template as completely as possible. The more detail you
     provide, the more accurate the triage will be.
-  - If the `status/need-information` label is added, please provide the
-    requested details in a comment.
+  - If the `status/need-information` label is added, provide the requested
+    details in a comment.
 
 ### 2. When you open a pull request: `Continuous Integration (CI)`
 
@@ -84,7 +84,8 @@ issues and have consistent labels.
 - **When it runs**: Every 15 minutes on all open pull requests.
 - **What it does**:
   - **Checks for a linked issue**: The bot scans your PR description for a
-    keyword that links it to an issue (e.g., `Fixes #123`, `Closes #456`).
+    keyword that links it to an issue (for example, `Fixes #123`,
+    `Closes #456`).
   - **Adds `status/need-issue`**: If no linked issue is found, the bot will add
     the `status/need-issue` label to your PR. This is a clear signal that an
     issue needs to be created and linked.
@@ -156,7 +157,7 @@ and will never be auto-unassigned.
 ### 6. Release automation
 
 This workflow handles the process of packaging and publishing new versions of
-the Gemini CLI.
+Gemini CLI.
 
 - **Workflow File**: `.github/workflows/release-manual.yml`
 - **When it runs**: On a daily schedule for "nightly" releases, and manually for
@@ -171,4 +172,4 @@ the Gemini CLI.
     will be included in the very next nightly release.
 
 We hope this detailed overview is helpful. If you have any questions about our
-automation or processes, please don't hesitate to ask!
+automation or processes, don't hesitate to ask!

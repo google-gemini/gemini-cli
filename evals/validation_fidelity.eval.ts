@@ -9,6 +9,8 @@ import { evalTest } from './test-helper.js';
 
 describe('validation_fidelity', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should perform exhaustive validation autonomously when guided by system instructions',
     files: {
       'src/types.ts': `

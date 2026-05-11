@@ -51,10 +51,6 @@ exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
 
 exports[`DenseToolMessage > renders correctly for ReadManyFiles results 1`] = `
 "  ✓  test-tool  Attempting to read files from **/*.ts → Read 3 file(s) (1 ignored)
-
-        file1.ts
-        file2.ts
-        file3.ts
 "
 `;
 
@@ -110,9 +106,6 @@ exports[`DenseToolMessage > renders correctly for file diff results with stats 1
 
 exports[`DenseToolMessage > renders correctly for grep results 1`] = `
 "  ✓  test-tool  Test description → Found 2 matches
-
-        file1.ts:10: match 1
-        file2.ts:20: match 2
 "
 `;
 
@@ -133,6 +126,12 @@ exports[`DenseToolMessage > renders generic failure message for error status wit
 
 exports[`DenseToolMessage > renders generic output message for unknown object results 1`] = `
 "  ✓  test-tool  Test description → Returned (possible empty result)
+"
+`;
+
+exports[`DenseToolMessage > truncates long description but preserves tool name (< 25 chars) 1`] = `
+"  ✓  tool-name-is-24-chars-!!  This is a very long description that should definitely be truncated …
+   → Success result
 "
 `;
 

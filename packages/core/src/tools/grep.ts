@@ -23,6 +23,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -138,7 +139,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     return null;
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
       const pathParam = this.params.dir_path;
@@ -283,12 +284,24 @@ class GrepToolInvocation extends BaseToolInvocation<
         searchLocationDescription = `in path "${searchDirDisplay}"`;
       }
 
-      return await formatGrepResults(
+      const result = await formatGrepResults(
         allMatches,
         this.params,
         searchLocationDescription,
         totalMaxMatches,
       );
+      return {
+        ...result,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary: result.returnDisplay.summary,
+          result: {
+            type: 'text',
+            text: result.llmContent.split('\n---\n').slice(1).join('\n---\n'),
+          },
+        },
+      };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
@@ -326,6 +339,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       let finalCommand = checkCommand;
       let finalArgs = checkArgs;
       let finalEnv = process.env;
+      let cleanup: (() => void) | undefined;
 
       if (sandboxManager) {
         try {
@@ -338,6 +352,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           finalCommand = prepared.program;
           finalArgs = prepared.args;
           finalEnv = prepared.env;
+          cleanup = prepared.cleanup;
         } catch (err) {
           debugLogger.debug(
             `[GrepTool] Sandbox preparation failed for '${command}':`,
@@ -346,21 +361,27 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
-      return await new Promise((resolve) => {
-        const child = spawn(finalCommand, finalArgs, {
-          stdio: 'ignore',
-          shell: true,
-          env: finalEnv,
+      try {
+        return await new Promise((resolve) => {
+          const child = spawn(finalCommand, finalArgs, {
+            stdio: 'ignore',
+            shell: true,
+            env: finalEnv,
+          });
+          child.on('close', (code) => {
+            resolve(code === 0);
+          });
+          child.on('error', (err) => {
+            debugLogger.debug(
+              `[GrepTool] Failed to start process for '${command}':`,
+              err.message,
+            );
+            resolve(false);
+          });
         });
-        child.on('close', (code) => resolve(code === 0));
-        child.on('error', (err) => {
-          debugLogger.debug(
-            `[GrepTool] Failed to start process for '${command}':`,
-            err.message,
-          );
-          resolve(false);
-        });
-      });
+      } finally {
+        cleanup?.();
+      }
     } catch {
       return false;
     }
@@ -456,7 +477,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E', '-I'];
+        const grepArgs = ['-r', '-n', '-H', '-E', '-I', '-i'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes

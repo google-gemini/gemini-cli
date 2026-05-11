@@ -11,10 +11,15 @@ import { act } from 'react';
 import { TextInput } from './TextInput.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { useTextBuffer, type TextBuffer } from './text-buffer.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 // Mocks
 vi.mock('../../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
+}));
+
+vi.mock('../../hooks/useMouseClick.js', () => ({
+  useMouseClick: vi.fn(),
 }));
 
 vi.mock('./text-buffer.js', async (importOriginal) => {
@@ -69,6 +74,7 @@ vi.mock('./text-buffer.js', async (importOriginal) => {
 
 const mockedUseKeypress = useKeypress as Mock;
 const mockedUseTextBuffer = useTextBuffer as Mock;
+const mockedUseMouseClick = useMouseClick as Mock;
 
 describe('TextInput', () => {
   const onCancel = vi.fn();
@@ -84,6 +90,7 @@ describe('TextInput', () => {
       cursor: [0, 0],
       visualCursor: [0, 0],
       viewportVisualLines: [''],
+      visualScrollRow: 0,
       pastedContent: {} as Record<string, string>,
       handleInput: vi.fn((key) => {
         if (key.sequence) {
@@ -406,6 +413,38 @@ describe('TextInput', () => {
 
     expect(lastFrame()).toContain('line1');
     expect(lastFrame()).toContain('line2');
+    unmount();
+  });
+
+  it('registers mouse click handler for free-form text input', async () => {
+    const { unmount } = await render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+
+    expect(mockedUseMouseClick).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Function),
+      expect.objectContaining({ isActive: true, name: 'left-press' }),
+    );
+    unmount();
+  });
+
+  it('registers mouse click handler for placeholder view', async () => {
+    mockBuffer.text = '';
+    const { unmount } = await render(
+      <TextInput
+        buffer={mockBuffer}
+        placeholder="test"
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />,
+    );
+
+    expect(mockedUseMouseClick).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Function),
+      expect.objectContaining({ isActive: true, name: 'left-press' }),
+    );
     unmount();
   });
 });

@@ -11,6 +11,10 @@ import {
   type ShellState,
   type ShellAction,
 } from './shellReducer.js';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 describe('shellReducer', () => {
   it('should return the initial state', () => {
@@ -188,6 +192,196 @@ describe('shellReducer', () => {
     const action: ShellAction = { type: 'DISMISS_TASK', pid: 1001 };
     const state = shellReducer(registeredState, action);
     expect(state.backgroundTasks.has(1001)).toBe(false);
-    expect(state.isBackgroundTaskVisible).toBe(false); // Auto-hide if last shell
+    expect(state.isBackgroundTaskVisible).toBe(false); // Auto-hide if last task
+  });
+
+  it('should NOT truncate output when below the size threshold', () => {
+    const existingOutput = 'x'.repeat(MAX_SHELL_OUTPUT_SIZE - 1);
+    const chunk = 'y';
+    // combined length = MAX_SHELL_OUTPUT_SIZE, well below MAX + BUFFER
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output;
+    expect(typeof output).toBe('string');
+    expect((output as string).length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    expect((output as string).endsWith(chunk)).toBe(true);
+  });
+
+  it('should truncate output to MAX_SHELL_OUTPUT_SIZE when threshold is exceeded', () => {
+    // existing output is already at MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+    const existingOutput = 'a'.repeat(
+      MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER,
+    );
+    const chunk = 'b'.repeat(100);
+    // combined length = MAX + BUFFER + 100, which exceeds the threshold
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output;
+    expect(typeof output).toBe('string');
+    // After truncation the result should be exactly MAX_SHELL_OUTPUT_SIZE chars
+    expect((output as string).length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    // The newest chunk should be preserved at the end
+    expect((output as string).endsWith(chunk)).toBe(true);
+  });
+
+  it('should preserve output when appending empty string', () => {
+    const originalOutput = 'important data' + 'x'.repeat(5000);
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: originalOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk: '', // Empty string should not modify output
+    };
+
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output;
+
+    // Empty string should leave output unchanged
+    expect(output).toBe(originalOutput);
+    expect(output).not.toBe('');
+  });
+
+  it('should handle chunks larger than MAX_SHELL_OUTPUT_SIZE', () => {
+    // Setup: existing output that when combined with large chunk exceeds threshold
+    const existingOutput = 'a'.repeat(1_500_000); // 1.5 MB
+    const largeChunk = 'b'.repeat(MAX_SHELL_OUTPUT_SIZE + 10_000); // 10.01 MB
+    // Combined exceeds MAX (10MB) + BUFFER (1MB) = 11MB threshold
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'test',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk: largeChunk,
+    };
+
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output as string;
+
+    expect(typeof output).toBe('string');
+    // After truncation, output should be exactly MAX_SHELL_OUTPUT_SIZE
+    expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    // Because largeChunk > MAX_SHELL_OUTPUT_SIZE, we only preserve its tail
+    expect(output).toBe('b'.repeat(MAX_SHELL_OUTPUT_SIZE));
+  });
+
+  it('should not produce a broken surrogate pair at the truncation boundary', () => {
+    // '😀' is U+1F600, encoded as the surrogate pair \uD83D\uDE00 (2 code units).
+    // If a slice cuts between the high and low surrogate, the result starts with
+    // a stray low surrogate (\uDE00). The reducer must detect and strip it.
+    const emoji = '\uD83D\uDE00'; // 😀 — 2 UTF-16 code units
+    // Fill up to just below the trigger threshold with 'a', then append an emoji
+    // whose low surrogate lands exactly on the boundary so the slice splits it.
+    const baseLength =
+      MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER - 1;
+    const existingOutput = 'a'.repeat(baseLength);
+    // chunk = emoji + padding so combinedLength exceeds the threshold
+    const chunk = emoji + 'z';
+
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'test',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output as string;
+
+    expect(typeof output).toBe('string');
+    // The output must not begin with a lone low surrogate (U+DC00–U+DFFF).
+    const firstCharCode = output.charCodeAt(0);
+    const isLowSurrogate = firstCharCode >= 0xdc00 && firstCharCode <= 0xdfff;
+    expect(isLowSurrogate).toBe(false);
+    // The final 'z' from the chunk must always be preserved.
+    expect(output.endsWith('z')).toBe(true);
   });
 });

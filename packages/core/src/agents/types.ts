@@ -16,6 +16,7 @@ import type { AnySchema } from 'ajv';
 import type { AgentCard } from '@a2a-js/sdk';
 import type { A2AAuthConfig } from './auth-provider/types.js';
 import type { MCPServerConfig } from '../config/config.js';
+import type { GeminiChat } from '../core/geminiChat.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -35,6 +36,8 @@ export enum AgentTerminateMode {
 export interface OutputObject {
   result: string;
   terminate_reason: AgentTerminateMode;
+  turn_count?: number;
+  duration_ms?: number;
 }
 
 /**
@@ -215,6 +218,33 @@ export interface LocalAgentDefinition<
   toolConfig?: ToolConfig;
 
   /**
+   * Optional additional workspace directories scoped to this agent.
+   * When provided, the agent receives a workspace context that extends
+   * the parent's with these directories. Other agents and the main
+   * session are unaffected. If omitted, the parent workspace context
+   * is inherited unchanged.
+   *
+   * Note: Filesystem root paths (e.g. `/` or `C:\`) are rejected at
+   * runtime to prevent accidentally granting access to the entire filesystem.
+   */
+  workspaceDirectories?: string[];
+
+  /**
+   * Allows this agent to access the canonical auto-memory inbox patch files
+   * under `<projectMemoryDir>/.inbox/{private,global}/extraction.patch`.
+   * This is intentionally narrow so the main session cannot bypass review by
+   * writing arbitrary inbox patches.
+   */
+  memoryInboxAccess?: boolean;
+
+  /**
+   * Restricts write validation for this agent to extracted skill artifacts and
+   * canonical auto-memory inbox patch files. Used by the background
+   * auto-memory extractor so active memory files cannot be edited directly.
+   */
+  autoMemoryExtractionWriteAccess?: boolean;
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
@@ -227,6 +257,18 @@ export interface LocalAgentDefinition<
    * @returns A string representation of the final output.
    */
   processOutput?: (output: z.infer<TOutput>) => string;
+
+  /**
+   * Optional hook invoked before each model call. Receives the active
+   * {@link GeminiChat} instance and may modify chat history (e.g., to
+   * supersede stale tool outputs and reclaim context-window tokens).
+   *
+   * Runs immediately after chat compression in the agent loop.
+   */
+  onBeforeTurn?: (
+    chat: GeminiChat,
+    signal?: AbortSignal,
+  ) => Promise<void> | void;
 }
 
 export interface BaseRemoteAgentDefinition<
@@ -326,4 +368,17 @@ export interface RunConfig {
    * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
+}
+
+/**
+ * Summary of an agent reload operation.
+ */
+export interface AgentReloadSummary {
+  totalLoaded: number;
+  localCount: number;
+  remoteCount: number;
+  newAgents: string[];
+  updatedAgents: string[];
+  deletedAgents: string[];
+  errors: string[];
 }

@@ -1,15 +1,13 @@
 {
   "experimental": {
-    "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
+    "autoMemory": true,
     "memoryManager": true,
-    "topicUpdateNarration": true
+    "topicUpdateNarration": true,
+    "voiceMode": true
   },
   "general": {
     "devtools": true
-  },
-  "security": {
-    "toolSandboxing": true
   }
 }

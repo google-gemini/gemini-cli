@@ -52,6 +52,7 @@ import {
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -200,21 +201,45 @@ vi.mock('../utils/markdownUtilities.js', () => ({
   findLastSafeSplitPoint: vi.fn((s: string) => s.length),
 }));
 
-vi.mock('./useStateAndRef.js', () => ({
-  useStateAndRef: vi.fn((initial) => {
-    let val = initial;
-    const ref = { current: val };
-    const setVal = vi.fn((updater) => {
-      if (typeof updater === 'function') {
-        val = updater(val);
-      } else {
-        val = updater;
+vi.mock('./useStateAndRef.js', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useStateAndRef: vi.fn((initial) => {
+      // Keep the heavyweight test file lightweight, but still let
+      // `isResponding` participate in real rerenders.
+      if (initial === false) {
+        const [state, setState] = React.useState(initial);
+        const ref = React.useRef(initial);
+        const setStateInternal = (
+          updater: typeof initial | ((prev: typeof initial) => typeof initial),
+        ) => {
+          const nextValue =
+            typeof updater === 'function'
+              ? (updater as (prev: typeof initial) => typeof initial)(
+                  ref.current,
+                )
+              : updater;
+          ref.current = nextValue;
+          setState(nextValue);
+        };
+        return [state, ref, setStateInternal];
       }
-      ref.current = val;
-    });
-    return [val, ref, setVal];
-  }),
-}));
+
+      let val = initial;
+      const ref = { current: val };
+      const setVal = vi.fn((updater) => {
+        if (typeof updater === 'function') {
+          val = updater(val);
+        } else {
+          val = updater;
+        }
+        ref.current = val;
+      });
+      return [val, ref, setVal];
+    }),
+  };
+});
 
 vi.mock('./useLogger.js', () => ({
   useLogger: vi.fn().mockReturnValue({
@@ -780,7 +805,6 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal),
       'prompt-id-2',
       undefined,
-      false,
       expectedMergedResponse,
     );
   });
@@ -906,6 +930,30 @@ describe('useGeminiStream', () => {
     const cancelledToolCalls: TrackedToolCall[] = [
       {
         request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
+      {
+        request: {
           callId: '1',
           name: 'testTool',
           args: {},
@@ -924,8 +972,8 @@ describe('useGeminiStream', () => {
         },
         invocation: {
           getDescription: () => `Mock description`,
-        } as unknown as AnyToolInvocation,
-      } as TrackedCancelledToolCall,
+        },
+      } as any,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
@@ -978,13 +1026,106 @@ describe('useGeminiStream', () => {
     });
 
     await waitFor(() => {
-      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1', '1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
-        parts: [{ text: CoreToolCallStatus.Cancelled }],
+        parts: [
+          {
+            functionResponse: {
+              name: UPDATE_TOPIC_TOOL_NAME,
+              id: 'topic1',
+              response: {},
+            },
+          },
+          { text: CoreToolCallStatus.Cancelled },
+        ],
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should NOT stop responding when only update_topic is called', async () => {
+    const topicToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        topicToolCalls,
+        vi.fn(),
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        vi.fn(),
+        0,
+      ];
+    });
+
+    await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with the topic tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(topicToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      // The streaming state should still be Responding because we didn't cancel anything important
+      // and we expect a continuation.
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1']);
+      // Should HAVE called back to the API for continuation
+      expect(mockSendMessageStream).toHaveBeenCalled();
     });
   });
 
@@ -1390,7 +1531,6 @@ describe('useGeminiStream', () => {
         expect.any(AbortSignal),
         'prompt-id-4',
         undefined,
-        false,
         toolCallResponseParts,
       );
     });
@@ -1495,7 +1635,7 @@ describe('useGeminiStream', () => {
 
       simulateEscapeKeyPress();
 
-      expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
+      expect(cancelSubmitSpy).toHaveBeenCalledWith(false, false);
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
@@ -1696,7 +1836,7 @@ describe('useGeminiStream', () => {
   });
 
   describe('Retry Handling', () => {
-    it('should update retryStatus when CoreEvent.RetryAttempt is emitted', async () => {
+    it('should ignore retryStatus updates when not responding', async () => {
       const { result } = await renderHookWithDefaults();
 
       const retryPayload = {
@@ -1710,7 +1850,7 @@ describe('useGeminiStream', () => {
         coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
       });
 
-      expect(result.current.retryStatus).toEqual(retryPayload);
+      expect(result.current.retryStatus).toBeNull();
     });
 
     it('should reset retryStatus when isResponding becomes false', async () => {
@@ -1749,6 +1889,57 @@ describe('useGeminiStream', () => {
       // Cancel to make isResponding false
       await act(async () => {
         result.current.cancelOngoingRequest();
+      });
+
+      expect(result.current.retryStatus).toBeNull();
+    });
+
+    it('should ignore late retry events after cancellation', async () => {
+      const { result } = await renderTestHook();
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 1000,
+      };
+      const lateRetryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 3,
+        maxAttempts: 3,
+        delayMs: 2000,
+      };
+
+      const mockStream = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+
+      await act(async () => {
+        result.current.cancelOngoingRequest();
+      });
+
+      await waitFor(() => {
+        expect(result.current.retryStatus).toBeNull();
+      });
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, lateRetryPayload);
       });
 
       expect(result.current.retryStatus).toBeNull();
@@ -1834,7 +2025,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/my-custom-command',
         );
 
@@ -1863,7 +2053,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/emptycmd',
         );
       });
@@ -1884,7 +2073,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '// This is a line comment',
         );
       });
@@ -1905,7 +2093,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/* This is a block comment */',
         );
       });
@@ -2865,7 +3052,6 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
       undefined,
-      false,
       rawQuery,
     );
   });
@@ -3516,7 +3702,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           'test query',
         );
       });
@@ -3666,7 +3851,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           'second query',
         );
       });
@@ -3811,7 +3995,6 @@ describe('useGeminiStream', () => {
             expect.any(AbortSignal),
             expect.any(String),
             undefined,
-            false,
             'test query',
           );
         });

@@ -321,7 +321,7 @@ async function exploreAction(
     });
     try {
       await open(extensionsUrl);
-    } catch (_error) {
+    } catch {
       context.ui.addItem({
         type: MessageType.ERROR,
         text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
@@ -838,6 +838,7 @@ const linkCommand: SlashCommand = {
 
 const uninstallCommand: SlashCommand = {
   name: 'uninstall',
+  altNames: ['delete'],
   description: 'Uninstall an extension',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,

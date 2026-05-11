@@ -272,30 +272,54 @@ export class TerminalCapabilityManager {
     return this.kittyEnabled;
   }
 
-  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
-    if (env['WT_SESSION']) {
-      return false;
-    }
+  isGhosttyTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    const termProgram = env['TERM_PROGRAM']?.toLowerCase();
+    const term = env['TERM']?.toLowerCase();
+    const name = this.getTerminalName()?.toLowerCase();
 
-    return (
-      this.hasOsc9TerminalSignature(this.getTerminalName()) ||
-      this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
-      this.hasOsc9TerminalSignature(env['TERM'])
+    return !!(
+      name?.includes('ghostty') ||
+      termProgram?.includes('ghostty') ||
+      term?.includes('ghostty')
     );
   }
 
-  private hasOsc9TerminalSignature(value: string | undefined): boolean {
-    if (!value) {
-      return false;
-    }
+  isTmux(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['TMUX'];
+  }
 
-    const normalized = value.toLowerCase();
-    return (
-      normalized.includes('wezterm') ||
-      normalized.includes('ghostty') ||
-      normalized.includes('iterm') ||
-      normalized.includes('kitty')
+  isScreen(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['STY'];
+  }
+
+  isITerm2(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('iterm') ||
+      env['TERM_PROGRAM']?.toLowerCase().includes('iterm')
     );
+  }
+
+  isAlacritty(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('alacritty') ||
+      env['ALACRITTY_WINDOW_ID'] ||
+      env['TERM']?.toLowerCase().includes('alacritty')
+    );
+  }
+
+  isAppleTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!(
+      this.getTerminalName()?.toLowerCase().includes('apple_terminal') ||
+      env['TERM_PROGRAM']?.toLowerCase().includes('apple_terminal')
+    );
+  }
+
+  isVSCodeTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['TERM_PROGRAM']?.toLowerCase().includes('vscode');
+  }
+
+  isWindowsTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['WT_SESSION'];
   }
 }
 

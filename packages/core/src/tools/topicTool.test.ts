@@ -82,7 +82,9 @@ describe('UpdateTopicTool', () => {
       [TOPIC_PARAM_SUMMARY]: 'The goal is to implement X. Previously we did Y.',
       [TOPIC_PARAM_STRATEGIC_INTENT]: 'Initial Move',
     });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Current topic: "New Chapter"');
     expect(result.llmContent).toContain(
@@ -105,7 +107,9 @@ describe('UpdateTopicTool', () => {
       [TOPIC_PARAM_TITLE]: 'New Chapter',
       [TOPIC_PARAM_STRATEGIC_INTENT]: 'Subsequent Move',
     });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.returnDisplay).not.toContain('## 📂 Topic:');
     expect(result.returnDisplay).toBe(

@@ -19,6 +19,7 @@ export type ExecutionMethod =
 export interface ExecutionResult {
   rawOutput?: Buffer;
   output: string;
+  ansiOutput?: AnsiOutput;
   exitCode: number | null;
   signal: number | null;
   error: Error | null;
@@ -452,10 +453,13 @@ export class ExecutionLifecycleService {
     } = options ?? {};
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
+    const snapshot = execution.getSubscriptionSnapshot?.();
+    const ansiOutput = Array.isArray(snapshot) ? snapshot : undefined;
 
     this.settleExecution(executionId, {
       rawOutput: Buffer.from(output, 'utf8'),
       output,
+      ansiOutput,
       exitCode,
       signal,
       error,

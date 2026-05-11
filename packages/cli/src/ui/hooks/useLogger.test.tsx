@@ -8,14 +8,7 @@ import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useLogger } from './useLogger.js';
-import {
-  sessionId as globalSessionId,
-  Logger,
-  type Storage,
-  type Config,
-} from '@google/gemini-cli-core';
-import { ConfigContext } from '../contexts/ConfigContext.js';
-import type React from 'react';
+import { Logger, type Storage, type Config } from '@google/gemini-cli-core';
 
 let deferredInit: { resolve: (val?: unknown) => void };
 
@@ -41,35 +34,15 @@ describe('useLogger', () => {
   const mockStorage = {} as Storage;
   const mockConfig = {
     getSessionId: vi.fn().mockReturnValue('active-session-id'),
+    storage: mockStorage,
   } as unknown as Config;
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with the global sessionId by default', async () => {
-    const { result } = await renderHook(() => useLogger(mockStorage));
-
-    expect(result.current).toBeNull();
-
-    await act(async () => {
-      deferredInit.resolve();
-    });
-
-    expect(result.current).not.toBeNull();
-    expect(Logger).toHaveBeenCalledWith(globalSessionId, mockStorage);
-  });
-
-  it('should initialize with the active sessionId from ConfigContext when available', async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <ConfigContext.Provider value={mockConfig}>
-        {children}
-      </ConfigContext.Provider>
-    );
-
-    const { result } = await renderHook(() => useLogger(mockStorage), {
-      wrapper,
-    });
+  it('should initialize with the sessionId from config', async () => {
+    const { result } = await renderHook(() => useLogger(mockConfig));
 
     expect(result.current).toBeNull();
 

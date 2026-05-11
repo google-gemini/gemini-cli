@@ -1,0 +1,45 @@
+name: '🔄 Gemini Scheduled Lifecycle Manager'
+
+on:
+  schedule:
+    - cron: '30 1 * * *' # Once a day
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no changes applied)'
+        required: false
+        default: false
+        type: 'boolean'
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+permissions:
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  manage-lifecycle:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+
+      - name: 'Lifecycle Management'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          DRY_RUN: '${{ inputs.dry_run }}'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const script = require('./.github/scripts/gemini-lifecycle-manager.cjs');
+            await script({github, context, core});

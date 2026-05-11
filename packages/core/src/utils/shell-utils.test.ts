@@ -21,6 +21,7 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  normalizeCommand,
   hasRedirection,
   resolveExecutable,
 } from './shell-utils.js';
@@ -114,6 +115,23 @@ const mockPowerShellResult = (
     error: undefined,
   });
 };
+
+describe('normalizeCommand', () => {
+  it('should lowercase the command', () => {
+    expect(normalizeCommand('NPM')).toBe('npm');
+  });
+
+  it('should remove .exe extension', () => {
+    expect(normalizeCommand('node.exe')).toBe('node');
+  });
+
+  it('should handle absolute paths', () => {
+    expect(normalizeCommand('/usr/bin/npm')).toBe('npm');
+    expect(normalizeCommand('C:\\Program Files\\nodejs\\node.exe')).toBe(
+      'node',
+    );
+  });
+});
 
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
@@ -400,8 +418,8 @@ describe('escapeShellArg', () => {
       });
 
       it('should escape internal double quotes by doubling them', () => {
-        const result = escapeShellArg('He said "Hello"', 'cmd');
-        expect(result).toBe('"He said ""Hello"""');
+        const result = escapeShellArg('hello "world"', 'cmd');
+        expect(result).toBe('"hello ""world"""');
       });
 
       it('should handle empty strings', () => {
@@ -411,7 +429,12 @@ describe('escapeShellArg', () => {
     });
 
     describe('when shell is PowerShell', () => {
-      it('should wrap simple arguments in single quotes', () => {
+      it('should return simple alphanumeric arguments without quotes', () => {
+        const result = escapeShellArg('my-argument-123.txt', 'powershell');
+        expect(result).toBe('my-argument-123.txt');
+      });
+
+      it('should wrap arguments with spaces in single quotes', () => {
         const result = escapeShellArg('search term', 'powershell');
         expect(result).toBe("'search term'");
       });

@@ -118,6 +118,7 @@ async function linkAction(
         return requestConsentInteractive(
           consentString,
           context.ui.setConfirmationRequest.bind(context.ui),
+          () => context.ui.setConfirmationRequest(null),
         );
       },
     );
@@ -284,6 +285,8 @@ async function reloadAction(
       }
       context.ui.setPendingItem(null);
     }
+
+    context.ui.reloadCommands();
 
     const afterSkills = skillManager.getSkills();
     const afterNames = new Set(afterSkills.map((s) => s.name));

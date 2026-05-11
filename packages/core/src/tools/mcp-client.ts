@@ -27,6 +27,8 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
   type GetPromptResult,
@@ -812,7 +814,7 @@ type StatusChangeListener = (
   serverName: string,
   status: MCPServerStatus,
 ) => void;
-const statusChangeListeners: StatusChangeListener[] = [];
+const statusChangeListeners: Set<StatusChangeListener> = new Set();
 
 /**
  * Add a listener for MCP server status changes
@@ -820,7 +822,7 @@ const statusChangeListeners: StatusChangeListener[] = [];
 export function addMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  statusChangeListeners.push(listener);
+  statusChangeListeners.add(listener);
 }
 
 /**
@@ -829,10 +831,7 @@ export function addMCPStatusChangeListener(
 export function removeMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  const index = statusChangeListeners.indexOf(listener);
-  if (index !== -1) {
-    statusChangeListeners.splice(index, 1);
-  }
+  statusChangeListeners.delete(listener);
 }
 
 /**
@@ -1253,6 +1252,10 @@ export async function connectAndDiscover(
   }
 }
 
+function isMcpMethodNotFoundError(error: unknown): boolean {
+  return error instanceof McpError && error.code === ErrorCode.MethodNotFound;
+}
+
 /**
  * Discovers and sanitizes tools from a connected MCP client.
  * It retrieves function declarations from the client, filters out disabled tools,
@@ -1332,10 +1335,7 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
-    ) {
+    if (!isMcpMethodNotFoundError(error)) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
@@ -1459,8 +1459,7 @@ export async function discoverPrompts(
         ),
     }));
   } catch (error) {
-    // It's okay if the method is not found, which is a common case.
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1508,7 +1507,7 @@ async function listResources(
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1817,7 +1816,7 @@ export async function connectToMcpServer(
         await mcpClient.notification({
           method: 'notifications/roots/list_changed',
         });
-      } catch (_) {
+      } catch {
         // If this fails, its almost certainly because the connection was closed
         // and we should just stop listening for future directory changes.
         unlistenDirectories?.();
@@ -2124,6 +2123,22 @@ function createUrlTransport(
     | StreamableHTTPClientTransportOptions
     | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
+  // Wrap fetch to treat GET 404 as 405 so servers that do not support the
+  // optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
+  // The SDK already silently ignores 405; 404 is semantically equivalent here.
+  const baseFetch =
+    (transportOptions as StreamableHTTPClientTransportOptions).fetch ??
+    globalThis.fetch;
+  const httpOptions: StreamableHTTPClientTransportOptions = {
+    ...transportOptions,
+    fetch: async (url, init) => {
+      const res = await baseFetch(url, init);
+      return init?.method === 'GET' && res.status === 404
+        ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
+        : res;
+    },
+  };
+
   // Priority 1: httpUrl (deprecated)
   if (mcpServerConfig.httpUrl) {
     if (mcpServerConfig.url) {
@@ -2134,7 +2149,7 @@ function createUrlTransport(
     }
     return new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.httpUrl),
-      transportOptions,
+      httpOptions,
     );
   }
 
@@ -2143,7 +2158,7 @@ function createUrlTransport(
     if (mcpServerConfig.type === 'http') {
       return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.url),
-        transportOptions,
+        httpOptions,
       );
     } else if (mcpServerConfig.type === 'sse') {
       return new SSEClientTransport(
@@ -2157,7 +2172,7 @@ function createUrlTransport(
   if (mcpServerConfig.url) {
     return new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.url),
-      transportOptions,
+      httpOptions,
     );
   }
 

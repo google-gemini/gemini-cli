@@ -16,23 +16,33 @@ export interface ApiError {
 }
 
 export function isApiError(error: unknown): error is ApiError {
+  if (typeof error !== 'object' || error === null || !('error' in error)) {
+    return false;
+  }
+  const errorProp = (error as { error: unknown }).error;
+  if (typeof errorProp !== 'object' || errorProp === null) {
+    return false;
+  }
+
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'error' in error &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    typeof (error as ApiError).error === 'object' &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    'message' in (error as ApiError).error
+    'code' in errorProp &&
+    typeof errorProp.code === 'number' &&
+    'message' in errorProp &&
+    typeof errorProp.message === 'string' &&
+    'status' in errorProp &&
+    typeof errorProp.status === 'string'
   );
 }
 
 export function isStructuredError(error: unknown): error is StructuredError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'message' in error &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    typeof (error as StructuredError).message === 'string'
-  );
+  if (typeof error !== 'object' || error === null || !('message' in error)) {
+    return false;
+  }
+  if (typeof error.message !== 'string') {
+    return false;
+  }
+  if ('status' in error && typeof error.status !== 'number') {
+    return false;
+  }
+  return true;
 }

@@ -62,6 +62,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -88,6 +89,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -111,6 +113,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -140,6 +143,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -169,6 +173,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -197,6 +202,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -225,6 +231,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -253,6 +260,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
     await result.waitUntilReady();
@@ -265,6 +273,108 @@ describe('ToolConfirmationMessage', () => {
 
     await expect(result).toMatchSvgSnapshot();
     result.unmount();
+  });
+
+  it('should use the tool name for display in the confirmation question', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: '# This is a comment\necho "hello"',
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+        toolName="shell"
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Allow execution of [Shell]?');
+    unmount();
+  });
+
+  describe('tool name humanization', () => {
+    const cases = [
+      {
+        toolName: 'run_shell_command',
+        expected: 'Allow execution of [Shell]?',
+        desc: 'humanize run_shell_command to Shell',
+      },
+      {
+        toolName: 'shell',
+        expected: 'Allow execution of [Shell]?',
+        desc: 'humanize shell to Shell',
+      },
+      {
+        toolName: 'grep_search',
+        expected: 'Allow execution of [grep_search]?',
+        desc: 'keep raw name for non-shell tools',
+      },
+    ];
+
+    for (const { toolName, expected, desc } of cases) {
+      it(`should ${desc}`, async () => {
+        const confirmationDetails: SerializableConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm',
+          command: 'ls',
+          rootCommand: 'ls',
+          rootCommands: ['ls'],
+        };
+
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-call-id"
+            confirmationDetails={confirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={30}
+            terminalWidth={80}
+            toolName={toolName}
+          />,
+        );
+
+        expect(lastFrame()).toContain(expected);
+        unmount();
+      });
+    }
+
+    it('should humanize shell tool in sandbox expansion prompt', async () => {
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'sandbox_expansion',
+        title: 'Confirm',
+        command: 'ls',
+        rootCommand: 'ls',
+        additionalPermissions: {
+          network: true,
+        },
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+          toolName="run_shell_command"
+        />,
+      );
+
+      expect(lastFrame()).toContain(
+        'To run [Shell], allow access to the following?',
+      );
+      unmount();
+    });
   });
 
   describe('with folder trust', () => {
@@ -338,6 +448,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -361,6 +472,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -396,6 +508,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -423,6 +536,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -474,6 +588,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -505,6 +620,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -536,6 +652,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -562,6 +679,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -607,6 +725,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -638,6 +757,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -672,13 +792,14 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
@@ -712,13 +833,14 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
@@ -761,6 +883,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 

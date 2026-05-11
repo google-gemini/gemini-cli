@@ -59,7 +59,7 @@ export function sanitizeAdminSettings(
           }
         }
       }
-    } catch (_e) {
+    } catch {
       // Ignore parsing errors
     }
   }

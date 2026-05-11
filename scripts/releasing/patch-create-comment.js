@@ -374,7 +374,7 @@ No output was generated during patch creation.
       // Clean up temp file
       try {
         unlinkSync(tmpFile);
-      } catch (_e) {
+      } catch {
         // Ignore cleanup errors
       }
     }

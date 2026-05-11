@@ -48,15 +48,18 @@ index 0000000..e69de29
           },
         );
         await waitFor(() =>
-          expect(mockColorizeCode).toHaveBeenCalledWith({
-            code: 'print("hello world")',
-            language: 'python',
-            availableHeight: undefined,
-            maxWidth: 80,
-            theme: undefined,
-            settings: expect.anything(),
-            disableColor: false,
-          }),
+          expect(mockColorizeCode).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: 'print("hello world")',
+              language: 'python',
+              availableHeight: undefined,
+              maxWidth: 80,
+              theme: undefined,
+              settings: expect.anything(),
+              disableColor: false,
+              paddingX: 0,
+            }),
+          ),
         );
       });
 
@@ -83,15 +86,18 @@ index 0000000..e69de29
           },
         );
         await waitFor(() =>
-          expect(mockColorizeCode).toHaveBeenCalledWith({
-            code: 'some content',
-            language: null,
-            availableHeight: undefined,
-            maxWidth: 80,
-            theme: undefined,
-            settings: expect.anything(),
-            disableColor: false,
-          }),
+          expect(mockColorizeCode).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: 'some content',
+              language: null,
+              availableHeight: undefined,
+              maxWidth: 80,
+              theme: undefined,
+              settings: expect.anything(),
+              disableColor: false,
+              paddingX: 0,
+            }),
+          ),
         );
       });
 
@@ -114,15 +120,18 @@ index 0000000..e69de29
           },
         );
         await waitFor(() =>
-          expect(mockColorizeCode).toHaveBeenCalledWith({
-            code: 'some text content',
-            language: null,
-            availableHeight: undefined,
-            maxWidth: 80,
-            theme: undefined,
-            settings: expect.anything(),
-            disableColor: false,
-          }),
+          expect(mockColorizeCode).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: 'some text content',
+              language: null,
+              availableHeight: undefined,
+              maxWidth: 80,
+              theme: undefined,
+              settings: expect.anything(),
+              disableColor: false,
+              paddingX: 0,
+            }),
+          ),
         );
       });
 

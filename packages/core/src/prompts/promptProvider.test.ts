@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
 import type { Config } from '../config/config.js';
+import { makeRelative } from '../utils/paths.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -58,23 +59,28 @@ describe('PromptProvider', () => {
         ).getToolRegistry?.() as unknown as ToolRegistry;
       },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getProjectRoot: vi.fn().mockReturnValue('/tmp/project-temp'),
       topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectTempTrackerDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/tracker'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
-      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
+      isMemoryV2Enabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
@@ -101,6 +107,36 @@ describe('PromptProvider', () => {
     // Verify renderCoreMandates usage
     expect(prompt).toContain(
       `Instructions found in \`${DEFAULT_CONTEXT_FILENAME}\`, \`CUSTOM.md\` or \`ANOTHER.md\` files are foundational mandates.`,
+    );
+  });
+
+  it('should include the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(`located at \`${mockTrackerDir}\``);
+  });
+
+  it('should sanitize the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path\nwith-newline]and-bracket';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(
+      'located at `/mock/tracker/path with-newlineand-bracket`',
     );
   });
 
@@ -202,7 +238,14 @@ describe('PromptProvider', () => {
       expect(prompt).toContain(
         '`write_file` and `replace` may ONLY be used to write .md plan files',
       );
-      expect(prompt).toContain('/tmp/project-temp/plans/');
+
+      const expectedRelativePath = makeRelative(
+        mockConfig.storage.getPlansDir(),
+        mockConfig.getProjectRoot(),
+      ).replaceAll('\\', '/');
+      expect(prompt).toContain(
+        `write .md plan files to \`${expectedRelativePath}/\``,
+      );
     });
   });
 
@@ -240,6 +283,56 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+  });
+
+  describe('topicUpdateNarrationOverride', () => {
+    let provider: PromptProvider;
+
+    beforeEach(() => {
+      provider = new PromptProvider();
+      mockConfig.topicState.reset();
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([UPDATE_TOPIC_TOOL_NAME]),
+      });
+      (mockConfig.getAgentRegistry as ReturnType<typeof vi.fn>).mockReturnValue(
+        {
+          getAllDefinitions: vi.fn().mockReturnValue([]),
+          getDefinition: vi.fn().mockReturnValue(undefined),
+        },
+      );
+    });
+
+    it('should disable topic update narration when override is false, even if config is true', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig as unknown as Config,
+        /*userMemory=*/ undefined,
+        /*interactiveOverride=*/ undefined,
+        /*topicUpdateNarrationOverride=*/ false,
+      );
+
+      expect(prompt).not.toContain(
+        `As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}.`,
+      );
+    });
+
+    it('should enable topic update narration when override is true, even if config is false', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig as unknown as Config,
+        /*userMemory=*/ undefined,
+        /*interactiveOverride=*/ undefined,
+        /*topicUpdateNarrationOverride=*/ true,
+      );
+
+      expect(prompt).toContain(
+        `As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}.`,
+      );
     });
   });
 

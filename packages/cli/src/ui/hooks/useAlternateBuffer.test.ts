@@ -28,6 +28,7 @@ describe('useAlternateBuffer', () => {
   it('should return false when config.getUseAlternateBuffer returns false', async () => {
     mockUseConfig.mockReturnValue({
       getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>);
 
     const { result } = await renderHook(() => useAlternateBuffer());
@@ -37,6 +38,7 @@ describe('useAlternateBuffer', () => {
   it('should return true when config.getUseAlternateBuffer returns true', async () => {
     mockUseConfig.mockReturnValue({
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>);
 
     const { result } = await renderHook(() => useAlternateBuffer());
@@ -46,6 +48,7 @@ describe('useAlternateBuffer', () => {
   it('should return the immutable config value, not react to settings changes', async () => {
     const mockConfig = {
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>;
 
     mockUseConfig.mockReturnValue(mockConfig);
@@ -65,6 +68,7 @@ describe('isAlternateBufferEnabled', () => {
   it('should return true when config.getUseAlternateBuffer returns true', () => {
     const config = {
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as Config;
 
     expect(isAlternateBufferEnabled(config)).toBe(true);
@@ -73,6 +77,7 @@ describe('isAlternateBufferEnabled', () => {
   it('should return false when config.getUseAlternateBuffer returns false', () => {
     const config = {
       getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => false,
     } as unknown as Config;
 
     expect(isAlternateBufferEnabled(config)).toBe(false);

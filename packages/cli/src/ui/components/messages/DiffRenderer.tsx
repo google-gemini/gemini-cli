@@ -33,6 +33,7 @@ export function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
     const hunkMatch = line.match(hunkHeaderRegex);
     if (hunkMatch) {
       currentOldLine = parseInt(hunkMatch[1], 10);
+      currentOldLine = parseInt(hunkMatch[1], 10);
       currentNewLine = parseInt(hunkMatch[2], 10);
       inHunk = true;
       result.push({ type: 'hunk', content: line });
@@ -89,6 +90,7 @@ interface DiffRendererProps {
   terminalWidth: number;
   theme?: Theme;
   disableColor?: boolean;
+  paddingX?: number;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -101,6 +103,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   terminalWidth,
   theme,
   disableColor = false,
+  paddingX = 0,
 }) => {
   const settings = useSettings();
 
@@ -122,11 +125,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
     if (parsedLines.length === 0) {
       return (
-        <Box
-          borderStyle="round"
-          borderColor={semanticTheme.border.default}
-          padding={1}
-        >
+        <Box padding={1}>
           <Text dimColor>No changes detected.</Text>
         </Box>
       );
@@ -162,12 +161,14 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         theme,
         settings,
         disableColor,
+        paddingX,
       });
     } else {
       const key = filename ? `diff-box-${filename}` : undefined;
 
       return (
         <MaxSizedBox
+          paddingX={paddingX}
           maxHeight={availableTerminalHeight}
           maxWidth={terminalWidth}
           key={key}
@@ -194,6 +195,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     settings,
     tabWidth,
     disableColor,
+    paddingX,
   ]);
 
   return renderedOutput;
@@ -239,12 +241,7 @@ export const renderDiffLines = ({
 
   if (displayableLines.length === 0) {
     return [
-      <Box
-        key="no-changes"
-        borderStyle="round"
-        borderColor={semanticTheme.border.default}
-        padding={1}
-      >
+      <Box key="no-changes" padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>,
     ];

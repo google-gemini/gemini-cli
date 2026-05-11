@@ -89,6 +89,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'gemma-4-31b-it': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma-4-31b-it',
+      },
+    },
+    'gemma-4-26b-a4b-it': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma-4-26b-a4b-it',
+      },
+    },
+
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -208,6 +221,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
+    'context-snapshotter': {
+      extends: 'gemini-3-flash-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
     'chat-compression-3-pro': {
       modelConfig: {
         model: 'gemini-3-pro-preview',
@@ -317,6 +343,23 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemma-4-31b-it': {
+      displayName: 'gemma-4-31b-it',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma-4-26b-a4b-it': {
+      displayName: 'gemma-4-26b-a4b-it',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+
     // Aliases
     auto: {
       tier: 'auto',
@@ -362,6 +405,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
   },
   modelIdResolutions: {
+    'gemma-4-31b-it': {
+      default: 'gemma-4-31b-it',
+    },
+    'gemma-4-26b-a4b-it': {
+      default: 'gemma-4-26b-a4b-it',
+    },
+
     'gemini-3.1-pro-preview': {
       default: 'gemini-3.1-pro-preview',
       contexts: [
@@ -528,6 +578,42 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-3-flash-preview',
         isLastResort: true,
+        maxAttempts: 10,
+        actions: {
+          terminal: 'prompt',
+          transient: 'prompt',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+    ],
+    'auto-preview': [
+      {
+        model: 'gemini-3-pro-preview',
+        maxAttempts: 3,
+        actions: {
+          terminal: 'prompt',
+          transient: 'silent',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'sticky_retry',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-3-flash-preview',
+        isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -553,7 +639,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'terminal',
+          transient: 'sticky_retry',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -561,6 +647,42 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-2.5-flash',
         isLastResort: true,
+        maxAttempts: 10,
+        actions: {
+          terminal: 'prompt',
+          transient: 'prompt',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+    ],
+    'auto-default': [
+      {
+        model: 'gemini-2.5-pro',
+        maxAttempts: 3,
+        actions: {
+          terminal: 'prompt',
+          transient: 'silent',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'sticky_retry',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash',
+        isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',

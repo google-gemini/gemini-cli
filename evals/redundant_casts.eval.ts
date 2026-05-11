@@ -11,6 +11,8 @@ import fs from 'node:fs/promises';
 
 describe('redundant_casts', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not add redundant or unsafe casts when modifying typescript code',
     files: {
       'src/cast_example.ts': `
