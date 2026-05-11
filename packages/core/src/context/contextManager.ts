@@ -278,6 +278,7 @@ export class ContextManager {
   async renderHistory(
     pendingRequest?: Content,
     activeTaskIds: Set<string> = new Set(),
+    abortSignal?: AbortSignal,
   ): Promise<{
     history: Content[];
     didApplyManagement: boolean;
@@ -285,29 +286,36 @@ export class ContextManager {
   }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
+    let previewNodes: ConcreteNode[] = [];
+    if (pendingRequest) {
+      previewNodes = this.env.graphMapper.applyEvent({
+        type: 'PUSH',
+        payload: [pendingRequest],
+      });
+    }
+
     // --- Hot Start Calibration ---
     // If we are resuming a session with history, we don't want the adaptive token calculator
     // to fly blind on its first GC pass. We do a one-time API calibration.
-    if (!this.hasPerformedHotStart) {
-      this.hasPerformedHotStart = true;
-      if (this.buffer.nodes.length > 0) {
-        await this.performHotStartCalibration(pendingRequest);
+    const hotStartPromise = (async () => {
+      if (!this.hasPerformedHotStart) {
+        this.hasPerformedHotStart = true;
+        if (this.buffer.nodes.length > 0) {
+          const nodesForHotStart = [...this.buffer.nodes, ...previewNodes];
+          await this.performHotStartCalibration(nodesForHotStart, abortSignal);
+        }
       }
-    }
+    })();
 
     // 1. Synchronous Pressure Barrier: Wait for background management pipelines to finish.
-    // This ensures that the render sees the results of recent pushes (Anomaly 2).
-    await this.orchestrator.waitForPipelines();
+    // We run hot start calibration in parallel to hide the network latency.
+    await Promise.all([this.orchestrator.waitForPipelines(), hotStartPromise]);
 
     let nodes = this.buffer.nodes;
     const previewNodeIds = new Set<string>();
 
-    // If we have a pending request, we need to build a 'preview' graph for this render.
-    if (pendingRequest) {
-      const previewNodes = this.env.graphMapper.applyEvent({
-        type: 'PUSH',
-        payload: [pendingRequest],
-      });
+    // Apply the preview nodes to the final graph
+    if (previewNodes.length > 0) {
       for (const n of previewNodes) {
         previewNodeIds.add(n.id);
       }
@@ -375,21 +383,15 @@ export class ContextManager {
     return result;
   }
 
-  private async performHotStartCalibration(pendingRequest?: Content) {
+  private async performHotStartCalibration(
+    nodes: readonly ConcreteNode[],
+    abortSignal?: AbortSignal,
+  ) {
     try {
       this.tracer.logEvent(
         'ContextManager',
         'Performing Hot Start Token Calibration',
       );
-
-      let nodes = this.buffer.nodes;
-      if (pendingRequest) {
-        const previewNodes = this.env.graphMapper.applyEvent({
-          type: 'PUSH',
-          payload: [pendingRequest],
-        });
-        nodes = [...nodes, ...previewNodes];
-      }
 
       const contents = this.env.graphMapper.fromGraph(nodes);
       const header = this.headerProvider
@@ -398,14 +400,15 @@ export class ContextManager {
       const combinedHistory = header ? [header, ...contents] : contents;
 
       const baseUnits =
-        this.env.tokenCalculator.getRawBaseUnits(nodes) +
+        this.env.advancedTokenCalculator.getRawBaseUnits(nodes) +
         (header
-          ? this.env.tokenCalculator.getRawBaseUnitsForContent(header)
+          ? this.env.advancedTokenCalculator.getRawBaseUnitsForContent(header)
           : 0);
 
       if (baseUnits > 0) {
         const result = await this.env.llmClient.countTokens({
           contents: combinedHistory,
+          abortSignal,
         });
         if (result.totalTokens > 0) {
           this.env.eventBus.emitTokenGroundTruth({

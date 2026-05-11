@@ -8,7 +8,7 @@ import type { Content, Part } from '@google/genai';
 import type { ConcreteNode } from '../graph/types.js';
 import {
   StaticTokenCalculator,
-  type ContextTokenCalculator,
+  type AdvancedTokenCalculator,
 } from './contextTokenCalculator.js';
 import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import type { ContextEventBus, TokenGroundTruthEvent } from '../eventBus.js';
@@ -23,7 +23,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
  * immutable node cost caching while still surfacing a self-corrected estimate
  * to the pipeline processors.
  */
-export class AdaptiveTokenCalculator implements ContextTokenCalculator {
+export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
   private learnedWeight = 1.0;
   private readonly baseCalculator: StaticTokenCalculator;
 

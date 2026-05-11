@@ -38,14 +38,15 @@ export async function render(
     });
 
     // In all cases, retrieve raw base units from the token calculator interface
-    const baseUnits = env.tokenCalculator.getRawBaseUnits(nodes) + headerTokens;
+    const baseUnits =
+      env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerTokens;
 
     return { history: contents, didApplyManagement: false, baseUnits };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
 
-  const graphTokens = env.tokenCalculator.getRawBaseUnits(nodes);
+  const graphTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
   const currentTokens = graphTokens + headerTokens;
 
@@ -83,7 +84,8 @@ export async function render(
     return {
       history: contents,
       didApplyManagement: false,
-      baseUnits: currentTokens,
+      baseUnits:
+        env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerTokens,
     };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -136,6 +138,7 @@ export async function render(
   return {
     history: contents,
     didApplyManagement: true,
-    baseUnits: currentTokens,
+    baseUnits:
+      env.advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerTokens,
   };
 }

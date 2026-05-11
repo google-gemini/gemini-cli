@@ -33,6 +33,9 @@ export interface ContextTokenCalculator {
   calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number;
   calculateContentTokens(content: Content): number;
   estimateTokensForParts(parts: Part[]): number;
+}
+
+export interface AdvancedTokenCalculator extends ContextTokenCalculator {
   getRawBaseUnits(nodes: readonly ConcreteNode[]): number;
   getRawBaseUnitsForContent(content: Content): number;
 }
@@ -40,7 +43,7 @@ export interface ContextTokenCalculator {
 /**
  * A fast, deterministic token heuristic calculator.
  */
-export class StaticTokenCalculator implements ContextTokenCalculator {
+export class StaticTokenCalculator implements AdvancedTokenCalculator {
   private readonly tokenCache = new Map<string, number>();
 
   constructor(
