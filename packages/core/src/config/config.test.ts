@@ -3756,6 +3756,8 @@ describe('Config JIT Initialization', () => {
         expect(config.isPathAllowed(privateExtractionPatch)).toBe(true);
         expect(config.validatePathAccess(privateExtractionPatch)).toBeNull();
         expect(config.isPathAllowed(globalExtractionPatch)).toBe(true);
+        // Writes (the default checkType for isPathAllowed) remain restricted
+        // to the canonical extraction.patch filenames.
         expect(
           config.isPathAllowed(path.join(inboxRoot, 'private', 'other.patch')),
         ).toBe(false);
@@ -3764,9 +3766,49 @@ describe('Config JIT Initialization', () => {
             path.join(inboxRoot, 'private', 'nested', 'extraction.patch'),
           ),
         ).toBe(false);
+
+        // Reads are broadened to the .inbox/{private,global}/ subtree so the
+        // extractor can list and inspect prior patches before consolidating.
+        const privateOtherPatch = path.join(
+          inboxRoot,
+          'private',
+          'other.patch',
+        );
+        const globalLeftover = path.join(inboxRoot, 'global', 'topic-a.patch');
+        const nestedReadPath = path.join(
+          inboxRoot,
+          'private',
+          'nested',
+          'extraction.patch',
+        );
+        expect(config.validatePathAccess(privateOtherPatch, 'read')).toBeNull();
+        expect(config.validatePathAccess(globalLeftover, 'read')).toBeNull();
+        expect(config.validatePathAccess(nestedReadPath, 'read')).toBeNull();
+        expect(config.validatePathAccess(inboxRoot, 'read')).toBeNull();
+        expect(
+          config.validatePathAccess(path.join(inboxRoot, 'private'), 'read'),
+        ).toBeNull();
+        expect(
+          config.validatePathAccess(path.join(inboxRoot, 'global'), 'read'),
+        ).toBeNull();
+
+        // Writes to the same broadened paths are still rejected.
+        expect(config.validatePathAccess(privateOtherPatch)).toContain(
+          'Path not in workspace',
+        );
+        expect(config.validatePathAccess(nestedReadPath)).toContain(
+          'Path not in workspace',
+        );
       });
 
       expect(config.isPathAllowed(privateExtractionPatch)).toBe(false);
+      // Outside the scope, reads of inbox files are denied again.
+      expect(
+        config.validatePathAccess(
+          path.join(inboxRoot, 'private', 'other.patch'),
+          'read',
+        ),
+      ).toContain('Path not in workspace');
     });
 
     it('should restrict scoped auto-memory extraction writes to generated artifacts', () => {
