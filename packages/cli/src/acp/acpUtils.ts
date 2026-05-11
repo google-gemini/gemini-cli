@@ -10,8 +10,7 @@ import {
   type ToolCallConfirmationDetails,
   Kind,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  PREVIEW_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -263,7 +262,7 @@ export function buildAvailableModels(
   }>;
   currentModelId: string;
 } {
-  const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const preferredModel = config.getModel() || GEMINI_MODEL_ALIAS_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
   const useGemini31FlashLite =
@@ -294,24 +293,21 @@ export function buildAvailableModels(
   }
 
   // --- LEGACY PATH ---
+  const proModel =
+    releaseChannel === 'preview'
+      ? useGemini31
+        ? 'gemini-3.1-pro'
+        : 'gemini-3-pro'
+      : 'gemini-2.5-pro';
+  const flashModel = 'gemini-3-flash';
+
   const mainOptions = [
     {
-      value: DEFAULT_GEMINI_MODEL_AUTO,
-      title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
-      description:
-        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+      value: GEMINI_MODEL_ALIAS_AUTO,
+      title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
+      description: `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`,
     },
   ];
-
-  if (shouldShowPreviewModels) {
-    mainOptions.unshift({
-      value: PREVIEW_GEMINI_MODEL_AUTO,
-      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-      description: useGemini31
-        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
-        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-    });
-  }
 
   const manualOptions = [
     {
