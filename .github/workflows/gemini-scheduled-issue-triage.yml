@@ -61,6 +61,16 @@ jobs:
             const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
             await syncIssueTypes({ github, context, core });
 
+      - name: 'Find Issues with Multiple Area Labels'
+        if: |-
+          ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const findMultipleAreas = require('./.github/scripts/find-multiple-areas.cjs');
+            await findMultipleAreas({ github, context, core });
+
       - name: 'Find untriaged issues'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -88,7 +98,8 @@ jobs:
             --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json no_type_issues.json > issues_to_triage.json
+          if [ ! -f multiple_area_issues.json ]; then echo "[]" > multiple_area_issues.json; fi
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json multiple_area_issues.json > issues_to_triage.json
 
           ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
           if [ "$ISSUE_COUNT" -gt 0 ]; then
@@ -180,8 +191,8 @@ jobs:
                - If the issue already has a kind/ label, do not change it.
                - If the issue already has a priority/ label, do not change it.
                - If the issue is missing a priority/ label, you must evaluate the issue's impact to determine the priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based on the categorization guidelines.
-               - If the issue already has an area/ label, do not change it.
-               - If the issue is missing an area/ label, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels.
+               - If the issue has exactly ONE area/ label, do not change it.
+               - If the issue is missing an area/ label, OR if the issue currently has MULTIPLE area/ labels, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels. If you are fixing an issue with multiple area/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
                - If the issue already has an effort/ label, do not change it.
                - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
                - If any of these are missing, select exactly ONE appropriate label for the missing category.
