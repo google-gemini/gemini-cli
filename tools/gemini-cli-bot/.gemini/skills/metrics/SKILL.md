@@ -49,6 +49,9 @@ advanced triage, or semantic labeling).
   the LLM only when heuristic or semantic understanding is required.
 - **Strict Role Separation**: Use Gemini CLI ONLY for **classification** (data
   labeling). Do not use it for execution or decision-making.
+- **Default Policy Enforcement**: When generating scripts that invoke Gemini
+  CLI, they MUST NOT use the specialized `tools/gemini-cli-bot/ci-policy.toml`.
+  They should rely on the default repository policies.
 
 ## Instructions
 
