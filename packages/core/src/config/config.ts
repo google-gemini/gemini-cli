@@ -182,7 +182,11 @@ import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
-import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
+import {
+  createPlanModePlansDirectoryRules,
+  PLAN_MODE_PLANS_DIR_RULE_SOURCE,
+  WORKSPACE_POLICY_TIER,
+} from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
 import { CheckerRunner } from '../safety/checker-runner.js';
@@ -1471,6 +1475,8 @@ export class Config implements McpContext, AgentLoopContext {
         // directories must be within the project root, they are automatically
         // covered by the project-wide file discovery once created.
       }
+
+      this.refreshPlanModePlansDirectoryPolicy(plansDir);
     }
 
     // Initialize centralized FileDiscoveryService
@@ -2166,6 +2172,15 @@ export class Config implements McpContext, AgentLoopContext {
       // Ignore invalid or unreadable plans directories here. This mirrors
       // initialization behavior, which only adds the plans directory when it
       // already exists and is readable.
+    }
+
+    this.refreshPlanModePlansDirectoryPolicy(nextPlansDir);
+  }
+
+  private refreshPlanModePlansDirectoryPolicy(plansDir: string): void {
+    this.policyEngine.removeRulesBySource(PLAN_MODE_PLANS_DIR_RULE_SOURCE);
+    for (const rule of createPlanModePlansDirectoryRules(plansDir)) {
+      this.policyEngine.addRule(rule);
     }
   }
 

@@ -24,7 +24,7 @@ import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { ApprovalMode } from '../policy/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import {
   HookType,
   HookEventName,
@@ -4119,6 +4119,126 @@ describe('Plans Directory Initialization', () => {
     // Should still add the fallback plans directory to workspace context if it exists
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should allow Plan Mode writes only to direct Markdown files in the active plans directory', async () => {
+    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.PLAN,
+      plan: true,
+      planSettings: {
+        directory: 'custom-plans',
+      },
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    const engine = config.getPolicyEngine();
+
+    await expect(
+      engine.check(
+        {
+          name: 'write_file',
+          args: {
+            file_path: path.join(plansDir, 'foo.md'),
+            content: 'plan',
+          },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ALLOW });
+
+    await expect(
+      engine.check(
+        {
+          name: 'replace',
+          args: {
+            file_path: path.join(plansDir, 'foo.md'),
+            old_string: 'old',
+            new_string: 'new',
+          },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ALLOW });
+
+    await expect(
+      engine.check(
+        {
+          name: 'write_file',
+          args: {
+            file_path: path.join(plansDir, 'nested', 'foo.md'),
+            content: 'plan',
+          },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      engine.check(
+        {
+          name: 'write_file',
+          args: {
+            file_path: path.join(plansDir, 'foo.txt'),
+            content: 'plan',
+          },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      engine.check(
+        {
+          name: 'write_file',
+          args: {
+            file_path: path.join(config.getProjectRoot(), 'src', 'foo.md'),
+            content: 'plan',
+          },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+  });
+
+  it('should let higher-priority policy denies override active plans directory writes', async () => {
+    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.PLAN,
+      plan: true,
+      planSettings: {
+        directory: 'custom-plans',
+      },
+      policyEngineConfig: {
+        rules: [
+          {
+            toolName: 'write_file',
+            decision: PolicyDecision.DENY,
+            priority: 3,
+            modes: [ApprovalMode.PLAN],
+          },
+        ],
+      },
+    });
+
+    await config.initialize();
+
+    const result = await config.getPolicyEngine().check(
+      {
+        name: 'write_file',
+        args: {
+          file_path: path.join(config.storage.getPlansDir(), 'foo.md'),
+          content: 'plan',
+        },
+      },
+      undefined,
+    );
+
+    expect(result.decision).toBe(PolicyDecision.DENY);
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {

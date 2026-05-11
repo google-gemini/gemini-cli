@@ -20,7 +20,7 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import { buildArgsPatterns, escapeRegex, isSafeRegExp } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -31,8 +31,10 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import {
+  EDIT_TOOL_NAME,
   SHELL_TOOL_NAME,
   TOOLS_REQUIRING_NARROWING,
+  WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
@@ -84,6 +86,39 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 // Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
 export const ALWAYS_ALLOW_PRIORITY =
   WORKSPACE_POLICY_TIER + ALWAYS_ALLOW_PRIORITY_OFFSET;
+
+export const PLAN_MODE_PLANS_DIR_RULE_SOURCE =
+  'PlanModePlansDirectory (Dynamic)';
+export const PLAN_MODE_PLANS_DIR_ALLOW_PRIORITY =
+  DEFAULT_POLICY_TIER + 0.066;
+
+function buildDirectMarkdownInDirectoryArgsPattern(dir: string): RegExp {
+  const resolvedDir = path.resolve(dir);
+  const hasRootPrefix =
+    resolvedDir.startsWith(path.sep) || /^[\\/]/.test(resolvedDir);
+  const segments = resolvedDir.split(/[\\/]+/).filter(Boolean);
+  const dirPattern =
+    (hasRootPrefix ? '[\\\\/]+' : '') +
+    segments.map((segment) => escapeRegex(segment)).join('[\\\\/]+');
+
+  return new RegExp(
+    `\\x00${escapeRegex('"file_path":"')}${dirPattern}[\\\\/]+[^"\\\\/]+\\.md${escapeRegex('"')}\\x00`,
+  );
+}
+
+export function createPlanModePlansDirectoryRules(
+  plansDir: string,
+): PolicyRule[] {
+  const argsPattern = buildDirectMarkdownInDirectoryArgsPattern(plansDir);
+  return [WRITE_FILE_TOOL_NAME, EDIT_TOOL_NAME].map((toolName) => ({
+    toolName,
+    argsPattern,
+    decision: PolicyDecision.ALLOW,
+    priority: PLAN_MODE_PLANS_DIR_ALLOW_PRIORITY,
+    modes: [ApprovalMode.PLAN],
+    source: PLAN_MODE_PLANS_DIR_RULE_SOURCE,
+  }));
+}
 
 /**
  * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.

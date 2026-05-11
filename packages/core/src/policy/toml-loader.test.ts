@@ -859,6 +859,53 @@ priority = 100
   });
 
   describe('Built-in Plan Mode Policy', () => {
+    it('should deny custom plans directory writes with static Plan Mode policy alone', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-custom-dir-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const result = await loadPoliciesFromToml([tempPolicyDir], () => 1);
+        expect(result.errors).toHaveLength(0);
+
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        const defaultPlansPath = path.resolve(
+          '/project/.gemini/tmp/session/plans/foo.md',
+        );
+        const defaultResult = await engine.check(
+          {
+            name: 'write_file',
+            args: { file_path: defaultPlansPath, content: 'plan' },
+          },
+          undefined,
+        );
+        expect(defaultResult.decision).toBe(PolicyDecision.ALLOW);
+
+        const customPlansPath = path.resolve(
+          '/project/custom-plans/foo.md',
+        );
+        const customResult = await engine.check(
+          {
+            name: 'write_file',
+            args: { file_path: customPlansPath, content: 'plan' },
+          },
+          undefined,
+        );
+        expect(customResult.decision).toBe(PolicyDecision.DENY);
+        expect(customResult.rule?.denyMessage).toContain(
+          'You are in Plan Mode and cannot modify source code',
+        );
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
+    });
+
     it('should allow MCP tools with readOnlyHint annotation in Plan Mode (ASK_USER, not DENY)', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
