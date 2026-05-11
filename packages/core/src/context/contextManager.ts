@@ -72,7 +72,11 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
-      this.evaluateTriggers(new Set());
+      // We explicitly DO NOT call evaluateTriggers here.
+      // The Context Manager is a one-way assembly line. It only evaluates triggers
+      // when fundamentally new organic context is added via PristineHistoryUpdated.
+      // Re-evaluating after a processor finishes creates infinite feedback loops if
+      // the processor fails to reduce the token count below the threshold.
     });
 
     this.historyObserver.start();
@@ -126,10 +130,15 @@ export class ContextManager {
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
         const node = this.buffer.nodes[i];
+        const priorTokens = rollingTokens;
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
         ]);
-        if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
+
+        // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
+        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
+        // strictly *older* than the boundary node.
+        if (priorTokens > this.sidecar.config.budget.retainedTokens) {
           // Only age out if not protected
           if (!protectedIds.has(node.id)) {
             agedOutNodes.add(node.id);

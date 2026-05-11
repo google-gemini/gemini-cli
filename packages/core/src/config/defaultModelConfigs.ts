@@ -221,6 +221,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
+    'context-snapshotter': {
+      extends: 'gemini-3-flash-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
     'chat-compression-3-pro': {
       modelConfig: {
         model: 'gemini-3-pro-preview',
