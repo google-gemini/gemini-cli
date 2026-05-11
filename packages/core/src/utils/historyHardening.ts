@@ -102,11 +102,22 @@ function pairToolsAndEnforceSignatures(
       for (let j = 0; j < parts.length; j++) {
         const p = parts[j];
         if (p.functionCall) {
-          if (!foundCall && !p.thoughtSignature) {
+          const partWithSig = p as ThoughtPart;
+          if (
+            !foundCall &&
+            !partWithSig.thought_signature &&
+            !partWithSig.thoughtSignature
+          ) {
             debugLogger.warn(
               `[HistoryHardener] Missing thought signature on first function call in model turn. Injecting synthetic signature.`,
             );
-            parts[j] = { ...p, thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE };
+            const { thoughtSignature: _, ...rest } = partWithSig;
+            const updatedPart: Part = {
+              ...rest,
+              // @ts-expect-error We use snake_case for Vertex AI compatibility
+              thought_signature: SYNTHETIC_THOUGHT_SIGNATURE,
+            };
+            parts[j] = updatedPart;
           }
           foundCall = true;
         }
@@ -302,10 +313,11 @@ export function scrubHistory(history: Content[]): Content[] {
 
 interface ThoughtPart extends Part {
   thoughtSignature?: string;
+  thought_signature?: string;
 }
 
 function isThoughtPart(part: Part): part is ThoughtPart {
-  return 'thoughtSignature' in part;
+  return 'thoughtSignature' in part || 'thought_signature' in part;
 }
 
 function scrubPart(part: Part): Part {
@@ -328,7 +340,11 @@ function scrubPart(part: Part): Part {
     scrubbed['functionCall'] = scrubbedCall;
   }
   if (isThoughtPart(part)) {
-    scrubbed['thoughtSignature'] = part.thoughtSignature;
+    if (part.thoughtSignature) {
+      scrubbed['thought_signature'] = part.thoughtSignature;
+    } else if (part.thought_signature) {
+      scrubbed['thought_signature'] = part.thought_signature;
+    }
   }
   if ('functionResponse' in part && part.functionResponse) {
     const scrubbedResp: Record<string, unknown> = {
