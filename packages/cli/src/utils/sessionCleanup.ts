@@ -325,7 +325,9 @@ export async function identifySessionsToDelete(
     try {
       const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
       // Skip age-based cleanup if maxAge is "forever" (-1)
-      if (maxAgeMs > 0) {
+      const isForever = maxAgeMs === -1;
+
+      if (!isForever) {
         cutoffDate = new Date(now.getTime() - maxAgeMs);
       }
     } catch {
@@ -453,7 +455,9 @@ function validateRetentionConfig(
     }
 
     // Skip validation for "forever" (-1)
-    if (maxAgeMs > 0 && maxAgeMs < minRetentionMs) {
+    const isForever = maxAgeMs === -1;
+
+    if (!isForever && maxAgeMs < minRetentionMs) {
       return `maxAge cannot be less than minRetention (${minRetention})`;
     }
   }
@@ -562,7 +566,9 @@ export async function cleanupToolOutputFiles(
     if (retentionConfig.maxAge) {
       try {
         const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
-        if (maxAgeMs > 0) {
+        const isForever = maxAgeMs === -1;
+
+        if (!isForever) {
           const cutoffDate = new Date(now.getTime() - maxAgeMs);
 
           for (const file of fileStats) {
@@ -619,7 +625,9 @@ export async function cleanupToolOutputFiles(
         if (retentionConfig.maxAge) {
           const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
           // Skip if maxAge is "forever" (-1)
-          if (maxAgeMs > 0) {
+          const isForever = maxAgeMs === -1;
+
+          if (!isForever) {
             const cutoffDate = new Date(now.getTime() - maxAgeMs);
             if (stat.mtime < cutoffDate) {
               shouldDelete = true;
