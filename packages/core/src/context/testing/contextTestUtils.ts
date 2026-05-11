@@ -134,9 +134,17 @@ export function createMockLlmClient(
       );
     });
 
+  const generateJsonMock = vi.fn().mockImplementation(async () => ({
+    active_tasks: [],
+    discovered_facts: [],
+    constraints_and_preferences: [],
+    recent_arc: [],
+  }));
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     generateContent: generateContentMock,
+    generateJson: generateJsonMock,
   } as unknown as MockLlmClient;
 }
 
