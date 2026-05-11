@@ -700,6 +700,19 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
+      "context-snapshotter": {
+        "extends": "gemini-3-flash-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            },
+            "temperature": 1,
+            "topP": 0.95,
+            "topK": 64
+          }
+        }
+      },
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
@@ -1752,6 +1765,12 @@ their corresponding top-level category object in your `settings.json` file.
     ["DEBUG", "DEBUG_MODE"]
     ```
 
+- **`advanced.ignoreLocalEnv`** (boolean):
+  - **Description:** Whether to ignore generic .env files in the project
+    directory.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
@@ -1774,7 +1793,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Values:** `"push-to-talk"`, `"toggle"`
 
 - **`experimental.voice.backend`** (enum):
-  - **Description:** The backend to use for voice transcription.
+  - **Description:** The backend to use for voice transcription. Note: When
+    using the Gemini Live backend, voice recordings are sent to Google Cloud for
+    transcription.
   - **Default:** `"gemini-live"`
   - **Values:** `"gemini-live"`, `"whisper"`
 
@@ -1787,7 +1808,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.voice.stopGracePeriodMs`** (number):
   - **Description:** How long to wait for final transcription after stopping
     recording.
-  - **Default:** `1000`
+  - **Default:** `4000`
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
@@ -1925,8 +1946,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.autoMemory`** (boolean):
-  - **Description:** Automatically extract reusable skills from past sessions in
-    the background. Review results with /memory inbox.
+  - **Description:** Automatically extract memory patches and skills from past
+    sessions in the background. Every change is written as a unified diff
+    `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review
+    in /memory inbox; nothing is applied until you approve it.
   - **Default:** `false`
   - **Requires restart:** Yes
 

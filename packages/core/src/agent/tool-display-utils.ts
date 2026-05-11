@@ -21,18 +21,21 @@ export function populateToolDisplay({
   invocation,
   resultDisplay,
   displayName,
+  display: prevDisplay,
 }: {
   name: string;
   invocation?: ToolInvocation<object, ToolResult>;
   resultDisplay?: ToolResultDisplay;
   displayName?: string;
+  display?: ToolDisplay;
 }): ToolDisplay {
   const display: ToolDisplay = {
     name: displayName || name,
     description: invocation?.getDescription?.(),
+    ...prevDisplay,
   };
 
-  if (resultDisplay) {
+  if (resultDisplay !== undefined && display.result === undefined) {
     display.result = toolResultDisplayToDisplayContent(resultDisplay);
   }
 
@@ -91,7 +94,7 @@ export function renderDisplayDiff(diff: DisplayDiff): string {
  * Useful for fallback displays or non-interactive environments.
  */
 export function displayContentToString(
-  display: DisplayContent | undefined,
+  display: DisplayContent | undefined | null,
 ): string | undefined {
   if (!display) {
     return undefined;

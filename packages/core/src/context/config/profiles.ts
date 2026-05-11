@@ -78,6 +78,7 @@ export const generalistProfile: ContextProfile = {
     budget: {
       retainedTokens: 65000,
       maxTokens: 150000,
+      coalescingThresholdTokens: 5000,
     },
   },
 
@@ -117,14 +118,14 @@ export const generalistProfile: ContextProfile = {
             'NodeDistillation',
             env,
             resolveProcessorOptions(config, 'NodeDistillation', {
-              nodeThresholdTokens: 1000,
+              nodeThresholdTokens: 3000,
             }),
           ),
           createNodeTruncationProcessor(
             'NodeTruncation',
             env,
             resolveProcessorOptions(config, 'NodeTruncation', {
-              maxTokensPerNode: 1200,
+              maxTokensPerNode: 4000,
             }),
           ),
         ],
@@ -138,6 +139,8 @@ export const generalistProfile: ContextProfile = {
             env,
             resolveProcessorOptions(config, 'StateSnapshotSync', {
               target: 'max',
+              maxStateTokens: 4000,
+              maxSummaryTurns: 5,
             }),
           ),
         ],
@@ -156,6 +159,8 @@ export const generalistProfile: ContextProfile = {
           env,
           resolveProcessorOptions(config, 'StateSnapshotAsync', {
             type: 'accumulate',
+            maxStateTokens: 4000,
+            maxSummaryTurns: 5,
           }),
         ),
       ],
