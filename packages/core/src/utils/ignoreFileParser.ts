@@ -105,13 +105,10 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       .slice()
       .reverse()
       .map((fileName) => path.join(this.projectRoot, fileName))
-      .filter((filePath) => {
-        try {
-          return fs.statSync(filePath).isFile();
-        } catch {
-          return false;
-        }
-      });
+      .filter(
+        (filePath) =>
+          fs.statSync(filePath, { throwIfNoEntry: false })?.isFile() ?? false,
+      );
   }
 
   /**
