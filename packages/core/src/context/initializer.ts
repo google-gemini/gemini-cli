@@ -92,7 +92,7 @@ export async function initializeContextManager(
     logDir,
     projectTempDir,
     tracer,
-    4,
+    3,
     eventBus,
     {
       calibrateTokenCalculation:
