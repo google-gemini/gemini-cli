@@ -81,7 +81,7 @@ jobs:
 
           echo '🏷️ Finding issues missing priority labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body > no_priority_issues.json
+            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 20 --json number,title,body > no_priority_issues.json
 
           echo '📏 Finding issues missing effort labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
@@ -179,6 +179,7 @@ jobs:
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
                - If the issue already has a priority/ label, do not change it.
+               - If the issue is missing a priority/ label, you must evaluate the issue's impact to determine the priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based on the categorization guidelines.
                - If the issue already has an area/ label, do not change it.
                - If the issue already has an effort/ label, do not change it.
                - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
