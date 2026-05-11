@@ -248,15 +248,24 @@ export function resolveClassifierModel(
       requestedModel === PREVIEW_GEMINI_MODEL ||
       requestedModel === GEMINI_MODEL_ALIAS_AUTO
     ) {
-      return PREVIEW_GEMINI_FLASH_MODEL;
+      return hasAccessToPreview
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     }
-    return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
+    return resolveModel(
+      GEMINI_MODEL_ALIAS_FLASH,
+      false,
+      false,
+      false,
+      hasAccessToPreview,
+    );
   }
   return resolveModel(
     requestedModel,
     useGemini3_1,
     useGemini3_1FlashLite,
     useCustomToolModel,
+    hasAccessToPreview,
   );
 }
 

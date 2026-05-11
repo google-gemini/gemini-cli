@@ -364,7 +364,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       displayName: 'Auto',
       tier: 'auto',
-      isPreview: false,
+      isPreview: true,
       isVisible: true,
       dialogDescription: 'Let Gemini CLI decide the best model for the task.',
       features: { thinking: true, multimodalToolUse: false },
@@ -526,7 +526,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-flash-preview',
       contexts: [
         {
-          condition: { requestedModels: ['gemini-2.5-pro'] },
+          condition: { hasAccessToPreview: false },
+          target: 'gemini-2.5-flash',
+        },
+        {
+          condition: { requestedModels: ['gemini-2.5-pro', 'auto-gemini-2.5'] },
           target: 'gemini-2.5-flash',
         },
       ],
@@ -535,11 +539,15 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-pro-preview',
       contexts: [
         {
+          condition: { hasAccessToPreview: false },
+          target: 'gemini-2.5-pro',
+        },
+        {
           condition: { releaseChannel: 'stable', requestedModels: ['auto'] },
           target: 'gemini-2.5-pro',
         },
         {
-          condition: { requestedModels: ['gemini-2.5-pro'] },
+          condition: { requestedModels: ['gemini-2.5-pro', 'auto-gemini-2.5'] },
           target: 'gemini-2.5-pro',
         },
         {
