@@ -3005,6 +3005,44 @@ describe('Settings Loading and Merging', () => {
       expect(snap1).toBe(snap2);
     });
 
+    it('getSnapshot() should preserve readOnly metadata for each scope', () => {
+      const readonlySettings = new LoadedSettings(
+        {
+          path: getSystemSettingsPath(),
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        {
+          path: getSystemDefaultsPath(),
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        {
+          path: USER_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+          readOnly: false,
+        },
+        {
+          path: MOCK_WORKSPACE_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+          readOnly: true,
+        },
+        true,
+        [],
+      );
+
+      const snapshot = readonlySettings.getSnapshot();
+
+      expect(snapshot.system.readOnly).toBe(true);
+      expect(snapshot.systemDefaults.readOnly).toBe(true);
+      expect(snapshot.user.readOnly).toBe(false);
+      expect(snapshot.workspace.readOnly).toBe(true);
+    });
+
     it('setValue() should create a new snapshot reference and emit event', () => {
       const oldSnapshot = loadedSettings.getSnapshot();
       const oldUserRef = oldSnapshot.user.settings;
@@ -3292,6 +3330,32 @@ MALICIOUS_VAR=allowed-because-trusted
         );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
+      });
+
+      it('should respect .env override for GOOGLE_CLOUD_PROJECT in Cloud Shell when auth type is vertex-ai', () => {
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-vertex-project');
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+
+        // Mock .env file to override the shell project
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.readFileSync).mockReturnValue(
+          'GOOGLE_CLOUD_PROJECT=env-vertex-project',
+        );
+
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('env-vertex-project');
       });
 
       it('should clear cloudshell-gca when switching to Vertex AI without an original project', () => {
