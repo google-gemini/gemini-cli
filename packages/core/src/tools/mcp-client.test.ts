@@ -1784,7 +1784,14 @@ describe('mcp-client', () => {
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
-          getCredentials: vi.fn().mockResolvedValue({ clientId: 'cid' }),
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            token: {
+              accessToken: 'fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
         } as unknown as MCPOAuthTokenStorage);
 
         const transport = await createTransport(
@@ -1808,7 +1815,56 @@ describe('mcp-client', () => {
         const tokens = await testableTransport._authProvider!.tokens();
         expect(tokens?.access_token).toBe('fresh-token');
       });
+      it('uses storage-backed expiry instead of long fallback cache for dynamic authProvider', async () => {
+        const now = Date.now();
+        const soonExpiry = now + 10 * 60 * 1000; // 10 minutes
 
+        const mockGetValidToken = vi.fn().mockResolvedValue('fresh-token');
+        const mockGetCredentials = vi.fn().mockImplementation(async () => ({
+          clientId: 'cid',
+          token: {
+            accessToken: 'fresh-token',
+            tokenType: 'Bearer',
+            expiresAt: soonExpiry,
+          },
+        }));
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidToken: mockGetValidToken,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = transport as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<
+              { access_token: string; expires_in?: number } | undefined
+            >;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('fresh-token');
+        expect(tokens?.expires_in).toBeDefined();
+        expect((tokens?.expires_in ?? 0) <= 10 * 60).toBe(true);
+
+        expect(mockGetValidToken).toHaveBeenCalledTimes(1);
+        expect(mockGetCredentials).toHaveBeenCalledTimes(3);
+      });
       it('uses dynamic authProvider when stored OAuth token exists', async () => {
         const mockGetValidToken = vi
           .fn()
@@ -1818,7 +1874,14 @@ describe('mcp-client', () => {
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
-          getCredentials: vi.fn().mockResolvedValue({ clientId: 'cid' }),
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            token: {
+              accessToken: 'stored-fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
         } as unknown as MCPOAuthTokenStorage);
 
         const transport = await createTransport(
@@ -1843,9 +1906,14 @@ describe('mcp-client', () => {
       });
       it('caches OAuth tokens in dynamic authProvider and avoids repeated lookups', async () => {
         const mockGetValidToken = vi.fn().mockResolvedValue('cached-token');
-        const mockGetCredentials = vi
-          .fn()
-          .mockResolvedValue({ clientId: 'cid' });
+        const mockGetCredentials = vi.fn().mockResolvedValue({
+          clientId: 'cid',
+          token: {
+            accessToken: 'cached-token',
+            tokenType: 'Bearer',
+            expiresAt: Date.now() + 10 * 60 * 1000,
+          },
+        });
 
         vi.mocked(MCPOAuthProvider).mockReturnValue({
           getValidToken: mockGetValidToken,
@@ -1881,7 +1949,7 @@ describe('mcp-client', () => {
 
         // one call from createTransport fallback detection + one call in first tokens();
         // second tokens() should come from in-memory cache
-        expect(mockGetCredentials).toHaveBeenCalledTimes(2);
+        expect(mockGetCredentials).toHaveBeenCalledTimes(3);
         expect(mockGetValidToken).toHaveBeenCalledTimes(1);
       });
     });

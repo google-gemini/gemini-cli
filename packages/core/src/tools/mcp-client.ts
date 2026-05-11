@@ -1070,46 +1070,73 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
     );
   }
 
+  private async fetchTokenFromStorageBackedProvider(): Promise<
+    OAuthTokens | undefined
+  > {
+    const credentials = await this.tokenStorage.getCredentials(this.serverName);
+    if (!credentials) {
+      return undefined;
+    }
+
+    const oauthConfig =
+      this.serverConfig.oauth?.enabled && this.serverConfig.oauth
+        ? this.serverConfig.oauth
+        : { clientId: credentials.clientId };
+
+    const accessToken = await this.oauthProvider.getValidToken(
+      this.serverName,
+      oauthConfig,
+    );
+
+    if (!accessToken) {
+      return undefined;
+    }
+
+    // Re-read credentials once after getValidToken() so we use authoritative expiresAt
+    // written by storage (including refreshed tokens), not a guessed fallback.
+    const latestCredentials = await this.tokenStorage.getCredentials(
+      this.serverName,
+    );
+    if (!latestCredentials?.token?.accessToken) {
+      return undefined;
+    }
+
+    const latest = latestCredentials.token;
+    return {
+      access_token: latest.accessToken,
+      token_type: latest.tokenType || 'Bearer',
+      expires_in: latest.expiresAt
+        ? Math.max(0, Math.floor((latest.expiresAt - Date.now()) / 1000))
+        : undefined,
+      scope: latest.scope,
+      refresh_token: latest.refreshToken,
+    };
+  }
+
   async tokens(): Promise<OAuthTokens | undefined> {
     if (this.isCachedTokenValid()) {
       return this.cachedToken;
     }
 
-    let token: string | null;
+    const freshTokens = await this.fetchTokenFromStorageBackedProvider();
 
-    if (this.serverConfig.oauth?.enabled && this.serverConfig.oauth) {
-      token = await this.oauthProvider.getValidToken(
-        this.serverName,
-        this.serverConfig.oauth,
-      );
-    } else {
-      // Avoid redundant storage reads in fallback path by reading credentials once
-      // and reusing that clientId with getValidToken.
-      const credentials = await this.tokenStorage.getCredentials(
-        this.serverName,
-      );
-      if (!credentials) {
-        this.cachedToken = undefined;
-        this.tokenExpiryTime = undefined;
-        return undefined;
-      }
-
-      token = await this.oauthProvider.getValidToken(this.serverName, {
-        clientId: credentials.clientId,
-      });
-    }
-
-    if (!token) {
+    if (!freshTokens?.access_token) {
       this.cachedToken = undefined;
       this.tokenExpiryTime = undefined;
       return undefined;
     }
 
-    this.cachedToken = { access_token: token, token_type: 'Bearer' };
-    this.tokenExpiryTime =
-      OAuthUtils.parseTokenExpiry(token) ?? Date.now() + 60 * 60 * 1000;
+    this.cachedToken = freshTokens;
 
-    return this.cachedToken;
+    if (freshTokens.expires_in !== undefined) {
+      this.tokenExpiryTime = Date.now() + freshTokens.expires_in * 1000;
+      return this.cachedToken;
+    }
+
+    //  return fresh token
+    this.cachedToken = undefined;
+    this.tokenExpiryTime = undefined;
+    return freshTokens;
   }
 
   saveTokens(_tokens: OAuthTokens): void {}
