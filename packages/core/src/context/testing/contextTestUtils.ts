@@ -19,7 +19,10 @@ import {
 } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type {
+  BaseLlmClient,
+  GenerateContentOptions,
+} from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../pipeline/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
@@ -98,42 +101,50 @@ export function createDummyToolNode(
 
 export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;
+  countTokens: Mock;
 }
 
 export function createMockLlmClient(
   responses?: Array<string | GenerateContentResponse>,
 ): MockLlmClient {
-  const generateContentMock = vi.fn();
-
-  if (responses && responses.length > 0) {
-    for (const response of responses) {
-      if (typeof response === 'string') {
-        generateContentMock.mockResolvedValueOnce(
-          createMockGenerateContentResponse(response),
+  const generateContentMock = vi
+    .fn()
+    .mockImplementation((options: GenerateContentOptions) => {
+      // Array-based logic for backwards compatibility, if provided
+      if (responses && responses.length > 0) {
+        const callCount = generateContentMock.mock.calls.length - 1;
+        const idx =
+          callCount < responses.length ? callCount : responses.length - 1;
+        const res = responses[idx];
+        return Promise.resolve(
+          typeof res === 'string'
+            ? createMockGenerateContentResponse(res)
+            : res,
         );
-      } else {
-        generateContentMock.mockResolvedValueOnce(response);
       }
-    }
-    // Fallback to the last response for any subsequent calls
-    const lastResponse = responses[responses.length - 1];
-    if (typeof lastResponse === 'string') {
-      generateContentMock.mockResolvedValue(
-        createMockGenerateContentResponse(lastResponse),
+
+      const lastContent = options.contents[options.contents.length - 1];
+      const lastPart = lastContent?.parts?.[lastContent.parts.length - 1];
+      const lastPartString = JSON.stringify(lastPart ?? {});
+      const contentSample = `${lastPartString.slice(0, 10)}...${lastPartString.slice(-10)}`;
+      return Promise.resolve(
+        createMockGenerateContentResponse(
+          `Mock response from: ${options.role}, for: ${contentSample}`,
+        ),
       );
-    } else {
-      generateContentMock.mockResolvedValue(lastResponse);
-    }
-  } else {
-    // Default fallback
-    generateContentMock.mockResolvedValue(
-      createMockGenerateContentResponse('Mock LLM response'),
-    );
-  }
+    });
+
+  const generateJsonMock = vi.fn().mockImplementation(async () => ({
+    active_tasks: [],
+    discovered_facts: [],
+    constraints_and_preferences: [],
+    recent_arc: [],
+  }));
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     generateContent: generateContentMock,
+    generateJson: generateJsonMock,
   } as unknown as MockLlmClient;
 }
 

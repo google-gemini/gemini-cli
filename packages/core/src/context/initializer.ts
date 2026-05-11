@@ -94,6 +94,10 @@ export async function initializeContextManager(
     tracer,
     4,
     eventBus,
+    {
+      calibrateTokenCalculation:
+        !!process.env['GEMINI_CONTEXT_CALIBRATE_TOKEN_CALCULATIONS'],
+    },
   );
 
   const orchestrator = new PipelineOrchestrator(

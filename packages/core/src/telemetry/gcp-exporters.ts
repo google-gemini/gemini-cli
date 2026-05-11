@@ -17,6 +17,7 @@ import type {
   ReadableLogRecord,
   LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
+import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
 
 /**
  * Google Cloud Trace exporter that extends the official trace exporter
@@ -42,6 +43,52 @@ export class GcpMetricExporter extends MetricExporter {
       prefix: 'custom.googleapis.com/gemini_cli',
     });
   }
+
+  override export(
+    metrics: ResourceMetrics,
+    resultCallback: (result: ExportResult) => void,
+  ): void {
+    super.export(metrics, (result: ExportResult) => {
+      if (result.code === ExportResultCode.FAILED && result.error) {
+        // Suppress errors related to writing too frequently, as they are
+        // expected when the CLI shuts down quickly after a periodic export.
+        const errorMessage = result.error.message || String(result.error);
+        if (
+          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true' &&
+          errorMessage.includes(
+            'written more frequently than the maximum sampling period',
+          )
+        ) {
+          resultCallback({ code: ExportResultCode.SUCCESS });
+          return;
+        }
+      }
+      resultCallback(result);
+    });
+  }
+}
+
+/**
+ * Deeply truncates strings in an object to prevent GCP log size limit errors.
+ */
+function truncateLogPayload(payload: unknown, limit = 200000): unknown {
+  if (typeof payload === 'string') {
+    return payload.length > limit
+      ? payload.substring(0, limit) + '... (truncated due to size)'
+      : payload;
+  }
+  if (Array.isArray(payload)) {
+    return payload.map((item) => truncateLogPayload(item, limit));
+  }
+  if (payload !== null && typeof payload === 'object') {
+    const truncatedObj: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      // Keys are also strings, but usually small. Truncate values.
+      truncatedObj[key] = truncateLogPayload(value, limit);
+    }
+    return truncatedObj;
+  }
+  return payload;
 }
 
 /**
@@ -63,6 +110,43 @@ export class GcpLogExporter implements LogRecordExporter {
   ): void {
     try {
       const entries = logs.map((log) => {
+        const rawPayload = {
+          ...log.attributes,
+          ...log.resource?.attributes,
+          message: log.body,
+        };
+
+        const isStrictTelemetry =
+          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
+
+        let finalPayload: unknown = rawPayload;
+
+        if (isStrictTelemetry) {
+          // Enforce a strict cap on the entire payload to avoid 256KB limit crashes in CI.
+          let safePayload = truncateLogPayload(rawPayload, 10000);
+          let payloadString = JSON.stringify(safePayload);
+
+          if (payloadString && payloadString.length > 100000) {
+            // If still too large, apply a stricter limit
+            safePayload = truncateLogPayload(rawPayload, 2000);
+            payloadString = JSON.stringify(safePayload);
+
+            if (payloadString && payloadString.length > 100000) {
+              safePayload = truncateLogPayload(rawPayload, 5000);
+              payloadString = JSON.stringify(safePayload);
+
+              if (payloadString && payloadString.length > 100000) {
+                // Fallback: strip structure and send a truncated raw string
+                safePayload = {
+                  _warning: 'Payload heavily truncated due to strict limits',
+                  data: payloadString.substring(0, 50000) + '... (truncated)',
+                };
+              }
+            }
+          }
+          finalPayload = safePayload;
+        }
+
         const entry = this.log.entry(
           {
             severity: this.mapSeverityToCloudLogging(log.severityNumber),
@@ -74,11 +158,8 @@ export class GcpLogExporter implements LogRecordExporter {
               },
             },
           },
-          {
-            ...log.attributes,
-            ...log.resource?.attributes,
-            message: log.body,
-          },
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          finalPayload as Record<string, unknown>,
         );
         return entry;
       });
