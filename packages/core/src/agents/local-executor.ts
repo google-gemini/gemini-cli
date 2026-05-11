@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -310,10 +311,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    const sanitizedParentId = parentCallId?.replace(/[^a-zA-Z0-9_-]/g, '_');
-    this.agentId = sanitizedParentId
-      ? `${sanitizedParentId}-${Math.random().toString(36).slice(2, 8)}`
-      : Math.random().toString(36).slice(2, 8);
+    this.agentId = randomUUID();
   }
 
   /**

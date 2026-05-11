@@ -693,7 +693,7 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
     });
 
-    it('should include parentCallId in agentId when available', async () => {
+    it('should not include parentCallId in agentId even when available', async () => {
       const definition = createTestDefinition();
       const parentCallId = 'parent-call-123';
 
@@ -702,7 +702,10 @@ describe('LocalAgentExecutor', () => {
         () => LocalAgentExecutor.create(definition, mockConfig, onActivity),
       );
 
-      expect(executor['agentId']).toContain(parentCallId);
+      expect(executor['agentId']).not.toContain(parentCallId);
+      expect(executor['agentId']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should correctly apply templates to initialMessages', async () => {
