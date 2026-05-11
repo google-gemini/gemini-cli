@@ -882,9 +882,11 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "auto": {
+        "displayName": "Auto",
         "tier": "auto",
-        "isPreview": true,
-        "isVisible": false,
+        "isPreview": false,
+        "isVisible": true,
+        "dialogDescription": "Let Gemini CLI decide the best model for the task.",
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -912,28 +914,6 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "flash-lite",
         "isPreview": false,
         "isVisible": false,
-        "features": {
-          "thinking": false,
-          "multimodalToolUse": false
-        }
-      },
-      "auto-gemini-3": {
-        "displayName": "Auto (Gemini 3)",
-        "tier": "auto",
-        "isPreview": true,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
-        "features": {
-          "thinking": true,
-          "multimodalToolUse": false
-        }
-      },
-      "auto-gemini-2.5": {
-        "displayName": "Auto (Gemini 2.5)",
-        "tier": "auto",
-        "isPreview": false,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -1020,33 +1000,15 @@ their corresponding top-level category object in your `settings.json` file.
           }
         ]
       },
-      "auto-gemini-3": {
-        "default": "gemini-3-pro-preview",
-        "contexts": [
-          {
-            "condition": {
-              "hasAccessToPreview": false
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
-              "useGemini3_1": true,
-              "useCustomTools": true
-            },
-            "target": "gemini-3.1-pro-preview-customtools"
-          },
-          {
-            "condition": {
-              "useGemini3_1": true
-            },
-            "target": "gemini-3.1-pro-preview"
-          }
-        ]
-      },
       "auto": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "releaseChannel": "stable"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1091,9 +1053,6 @@ their corresponding top-level category object in your `settings.json` file.
             "target": "gemini-3.1-pro-preview"
           }
         ]
-      },
-      "auto-gemini-2.5": {
-        "default": "gemini-2.5-pro"
       },
       "gemini-3.1-flash-lite-preview": {
         "default": "gemini-3.1-flash-lite-preview",
@@ -1145,15 +1104,9 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "requestedModels": ["gemini-2.5-pro"]
             },
             "target": "gemini-2.5-flash"
-          },
-          {
-            "condition": {
-              "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
-            },
-            "target": "gemini-3-flash-preview"
           }
         ]
       },
@@ -1162,7 +1115,14 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "releaseChannel": "stable",
+              "requestedModels": ["auto"]
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "requestedModels": ["gemini-2.5-pro"]
             },
             "target": "gemini-2.5-pro"
           },
