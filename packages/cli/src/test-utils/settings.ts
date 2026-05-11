@@ -16,6 +16,7 @@ export interface MockSettingsFile {
   settings: any;
   originalSettings: any;
   path: string;
+  readOnly?: boolean;
 }
 
 interface CreateMockSettingsOptions {

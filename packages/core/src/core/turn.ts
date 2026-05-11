@@ -29,6 +29,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';
+import { populateToolDisplay } from '../agent/tool-display-utils.js';
 
 import {
   type ToolCallRequestInfo,
@@ -407,14 +408,48 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const name = fnCall.name || 'undefined_tool_name';
-    const args = fnCall.args || {};
-    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
+    const name = fnCall.name?.trim() || 'generic_tool';
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const args = (fnCall.args as Record<string, unknown>) || {};
+    const rawCallId =
+      fnCall.id ??
+      (this.chat.context.config.isContextManagementEnabled()
+        ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
+        : `${name}_${Date.now()}_${this.callCounter++}`);
+
+    const callId = rawCallId.startsWith(`${name}__`)
+      ? rawCallId
+      : `${name}__${rawCallId}`;
+
+    // Mutate the function call object ID so that history consolidation inherits it
+    fnCall.id = callId;
+
+    const tool = this.chat.loopContext.toolRegistry.getTool(name);
+    let display;
+    if (tool) {
+      let invocation;
+      try {
+        invocation = tool.build(args);
+      } catch {
+        // Ignore build errors for request display purposes
+      }
+      display = populateToolDisplay({
+        name,
+        invocation,
+        displayName: tool.displayName,
+      });
+
+      // Fallback to static description if invocation failed or didn't provide one
+      if (!display.description) {
+        display.description = tool.description;
+      }
+    }
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
       name,
       args,
+      display,
       isClientInitiated: false,
       prompt_id: this.prompt_id,
       traceId,
