@@ -85,12 +85,23 @@ module.exports = async ({ github, context, core }) => {
       continue;
     }
 
-    const labelsToAdd = entry.labels_to_add || [];
-    labelsToAdd.push('status/bot-triaged');
-
+    let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
+
     labelsToRemove.push('status/need-triage');
-    // Deduplicate array
+
+    if (labelsToAdd.includes('status/manual-triage')) {
+      // If the AI flagged it for manual triage, remove bot-triaged if it exists
+      labelsToRemove.push('status/bot-triaged');
+      // Ensure we don't accidentally try to add bot-triaged if the AI returned it
+      labelsToAdd = labelsToAdd.filter((l) => l !== 'status/bot-triaged');
+    } else {
+      // Standard successful bot triage
+      labelsToAdd.push('status/bot-triaged');
+    }
+
+    // Deduplicate arrays
+    labelsToAdd = [...new Set(labelsToAdd)];
     labelsToRemove = [...new Set(labelsToRemove)];
 
     if (labelsToAdd.length > 0) {
