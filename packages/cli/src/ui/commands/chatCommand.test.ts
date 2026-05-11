@@ -63,6 +63,7 @@ describe('chatCommand', () => {
     mockGetHistory = vi.fn().mockReturnValue([]);
     mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
+      getSubagentTrajectories: vi.fn().mockResolvedValue({}),
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
     mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
@@ -230,7 +231,7 @@ describe('chatCommand', () => {
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
-        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        { history, authType: AuthType.LOGIN_WITH_GOOGLE, trajectories: {} },
         tag,
       );
       expect(result).toEqual({
@@ -465,6 +466,7 @@ describe('chatCommand', () => {
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
         filePath: expectedPath,
+        trajectories: {},
       });
       expect(result).toEqual({
         type: 'message',
@@ -480,6 +482,7 @@ describe('chatCommand', () => {
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
         filePath: expectedPath,
+        trajectories: {},
       });
       expect(result).toEqual({
         type: 'message',
@@ -495,6 +498,7 @@ describe('chatCommand', () => {
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
         filePath: expectedPath,
+        trajectories: {},
       });
       expect(result).toEqual({
         type: 'message',
@@ -545,6 +549,7 @@ describe('chatCommand', () => {
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
         filePath: expectedPath,
+        trajectories: {},
       });
     });
 
@@ -555,6 +560,7 @@ describe('chatCommand', () => {
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
         filePath: expectedPath,
+        trajectories: {},
       });
     });
   });

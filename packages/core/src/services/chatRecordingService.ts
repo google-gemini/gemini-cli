@@ -976,6 +976,74 @@ export class ChatRecordingService {
       throw error;
     }
   }
+
+  /**
+   * Recursively collects all subagent trajectories associated with this session.
+   */
+  async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
+    const allTrajectories: Record<string, ConversationRecord> = {};
+    await this.collectSubagentTrajectories(
+      this.sessionId,
+      this.getConversation(),
+      allTrajectories,
+    );
+    return allTrajectories;
+  }
+
+  private async collectSubagentTrajectories(
+    sessionId: string,
+    conversation: ConversationRecord | null,
+    allTrajectories: Record<string, ConversationRecord>,
+  ) {
+    if (!conversation) return;
+
+    const agentIds = new Set<string>();
+    for (const message of conversation.messages) {
+      if (message.type === 'gemini' && message.toolCalls) {
+        for (const toolCall of message.toolCalls) {
+          if (toolCall.agentId && !allTrajectories[toolCall.agentId]) {
+            agentIds.add(toolCall.agentId);
+          }
+        }
+      }
+    }
+
+    if (agentIds.size === 0) return;
+
+    const tempDir = this.context.config.storage.getProjectTempDir();
+    const chatsDir = path.join(tempDir, 'chats');
+    const safeParentId = sanitizeFilenamePart(sessionId);
+
+    if (!safeParentId) return;
+
+    const loadPromises = Array.from(agentIds).map(async (agentId) => {
+      const subagentFilePath = path.join(
+        chatsDir,
+        safeParentId,
+        `${agentId}.jsonl`,
+      );
+      try {
+        const subagentConversation =
+          await loadConversationRecord(subagentFilePath);
+        if (subagentConversation) {
+          allTrajectories[agentId] = subagentConversation;
+          // Recursively collect for this subagent
+          await this.collectSubagentTrajectories(
+            agentId,
+            subagentConversation,
+            allTrajectories,
+          );
+        }
+      } catch (err) {
+        debugLogger.warn(
+          `Failed to load subagent trajectory for ${agentId}:`,
+          err,
+        );
+      }
+    });
+
+    await Promise.all(loadPromises);
+  }
 }
 
 async function parseLegacyRecordFallback(

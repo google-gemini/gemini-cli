@@ -157,6 +157,7 @@ describe('bugCommand', () => {
       { role: 'user', parts: [{ text: 'hello' }] },
       { role: 'model', parts: [{ text: 'hi' }] },
     ];
+    const mockGetSubagentTrajectories = vi.fn().mockResolvedValue({});
     const mockContext = createMockCommandContext({
       services: {
         agentContext: {
@@ -173,6 +174,7 @@ describe('bugCommand', () => {
           geminiClient: {
             getChat: () => ({
               getHistory: () => history,
+              getSubagentTrajectories: mockGetSubagentTrajectories,
             }),
           },
         },
@@ -189,6 +191,7 @@ describe('bugCommand', () => {
     expect(exportHistoryToFile).toHaveBeenCalledWith({
       history,
       filePath: expectedPath,
+      trajectories: {},
     });
 
     const addItemCall = vi.mocked(mockContext.ui.addItem).mock.calls[0];

@@ -1407,4 +1407,112 @@ describe('ChatRecordingService', () => {
       expect(record2!.messages[1].id).toBe('h2');
     });
   });
+
+  describe('getSubagentTrajectories', () => {
+    it('should recursively collect subagent trajectories', async () => {
+      await chatRecordingService.initialize();
+
+      // Setup a main conversation with a subagent call
+      const subagentId = 'sub-1';
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: 'call-1',
+          name: 'invoke_agent',
+          args: { agent_name: 'test-agent', prompt: 'test' },
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+          agentId: subagentId,
+        },
+      ]);
+
+      // Mock the subagent session file
+      const tempDir = mockConfig.storage.getProjectTempDir();
+      const chatsDir = path.join(tempDir, 'chats');
+      const subagentDir = path.join(chatsDir, 'test-session-id');
+      const subagentFile = path.join(subagentDir, `${subagentId}.jsonl`);
+
+      await fs.promises.mkdir(subagentDir, { recursive: true });
+
+      // Subagent conversation has another subagent call
+      const subSubagentId = 'sub-2';
+      const subagentConversation: ConversationRecord = {
+        sessionId: subagentId,
+        projectHash: 'mocked-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        kind: 'subagent',
+        messages: [
+          {
+            id: 'msg-1',
+            type: 'gemini',
+            timestamp: new Date().toISOString(),
+            content: [],
+            toolCalls: [
+              {
+                id: 'call-2',
+                name: 'invoke_agent',
+                args: { agent_name: 'inner-agent', prompt: 'inner' },
+                status: CoreToolCallStatus.Success,
+                timestamp: new Date().toISOString(),
+                agentId: subSubagentId,
+              },
+            ],
+          },
+        ],
+      };
+
+      await fs.promises.writeFile(
+        subagentFile,
+        JSON.stringify(subagentConversation) + '\n',
+      );
+
+      // Mock the sub-subagent session file
+      const subSubagentDir = path.join(chatsDir, subagentId);
+      const subSubagentFile = path.join(
+        subSubagentDir,
+        `${subSubagentId}.jsonl`,
+      );
+      await fs.promises.mkdir(subSubagentDir, { recursive: true });
+
+      const subSubagentConversation: ConversationRecord = {
+        sessionId: subSubagentId,
+        projectHash: 'mocked-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        kind: 'subagent',
+        messages: [
+          {
+            id: 'msg-2',
+            type: 'gemini',
+            timestamp: new Date().toISOString(),
+            content: [{ text: 'done' }],
+          },
+        ],
+      };
+
+      await fs.promises.writeFile(
+        subSubagentFile,
+        JSON.stringify(subSubagentConversation) + '\n',
+      );
+
+      const trajectories = await chatRecordingService.getSubagentTrajectories();
+
+      expect(trajectories).toHaveProperty(subagentId);
+      expect(trajectories).toHaveProperty(subSubagentId);
+      expect(trajectories[subagentId].sessionId).toBe(subagentId);
+      expect(trajectories[subSubagentId].sessionId).toBe(subSubagentId);
+    });
+
+    it('should return empty object if no subagents are called', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hello',
+        model: 'gemini-pro',
+      });
+
+      const trajectories = await chatRecordingService.getSubagentTrajectories();
+      expect(trajectories).toEqual({});
+    });
+  });
 });

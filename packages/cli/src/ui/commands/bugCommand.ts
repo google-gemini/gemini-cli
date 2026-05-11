@@ -88,7 +88,12 @@ export const bugCommand: SlashCommand = {
         const historyFileName = `bug-report-history-${Date.now()}.json`;
         const historyFilePath = path.join(tempDir, historyFileName);
         try {
-          await exportHistoryToFile({ history, filePath: historyFilePath });
+          const trajectories = await chat?.getSubagentTrajectories();
+          await exportHistoryToFile({
+            history,
+            filePath: historyFilePath,
+            trajectories,
+          });
           historyFileMessage = `\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n${historyFilePath}\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.`;
           problemValue += `\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.`;
         } catch (err) {

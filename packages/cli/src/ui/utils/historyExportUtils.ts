@@ -7,6 +7,7 @@
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { Content } from '@google/genai';
+import type { ConversationRecord } from '@google/gemini-cli-core';
 
 /**
  * Serializes chat history to a Markdown string.
@@ -53,6 +54,7 @@ export function serializeHistoryToMarkdown(
 export interface ExportHistoryOptions {
   history: readonly Content[];
   filePath: string;
+  trajectories?: Record<string, ConversationRecord>;
 }
 
 /**
@@ -61,12 +63,16 @@ export interface ExportHistoryOptions {
 export async function exportHistoryToFile(
   options: ExportHistoryOptions,
 ): Promise<void> {
-  const { history, filePath } = options;
+  const { history, filePath, trajectories } = options;
   const extension = path.extname(filePath).toLowerCase();
 
   let content: string;
   if (extension === '.json') {
-    content = JSON.stringify(history, null, 2);
+    if (trajectories && Object.keys(trajectories).length > 0) {
+      content = JSON.stringify({ history, trajectories }, null, 2);
+    } else {
+      content = JSON.stringify(history, null, 2);
+    }
   } else if (extension === '.md') {
     content = serializeHistoryToMarkdown(history);
   } else {
