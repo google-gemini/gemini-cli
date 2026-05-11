@@ -20,8 +20,11 @@ import {
   getScopedEnvContents,
   type ExtensionSetting,
 } from '../../config/extensions/extensionSettings.js';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import prompts from 'prompts';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 const { mockExtensionManager, mockGetExtensionManager, mockLoadSettings } =
   vi.hoisted(() => {
@@ -84,7 +87,9 @@ describe('extensions configure command', () => {
     vi.spyOn(debugLogger, 'error');
     vi.clearAllMocks();
 
-    tempWorkspaceDir = fs.mkdtempSync('gemini-cli-test-workspace');
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     // Default behaviors
     mockLoadSettings.mockReturnValue({ merged: {} });
@@ -94,7 +99,8 @@ describe('extensions configure command', () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await cleanupTmpDir(tempWorkspaceDir);
     vi.restoreAllMocks();
   });
 

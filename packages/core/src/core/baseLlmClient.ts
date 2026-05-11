@@ -111,6 +111,11 @@ interface _CommonGenerateOptions {
   };
 }
 
+export interface CountTokenOptions {
+  modelConfigKey?: ModelConfigKey;
+  contents: Content[];
+}
+
 /**
  * A client dedicated to stateless, utility-focused LLM calls.
  */
@@ -223,6 +228,20 @@ export class BaseLlmClient {
       return text.substring(prefix.length, text.length - suffix.length).trim();
     }
     return text;
+  }
+
+  async countTokens(
+    options: CountTokenOptions,
+  ): Promise<{ totalTokens: number }> {
+    const model = options.modelConfigKey
+      ? this.config.modelConfigService.getResolvedConfig(options.modelConfigKey)
+          .model
+      : this.config.getActiveModel();
+    const result = await this.contentGenerator.countTokens({
+      model,
+      contents: options.contents,
+    });
+    return { totalTokens: result.totalTokens || 0 };
   }
 
   async generateContent(
@@ -339,7 +358,9 @@ export class BaseLlmClient {
         retryFetchErrors: this.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
-            availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+            getAvailabilityContext()?.policy.maxAttempts ??
+            maxAttempts ??
+            DEFAULT_MAX_ATTEMPTS;
           const modelName = getDisplayString(currentModel);
           const errorType = getRetryErrorType(error);
 

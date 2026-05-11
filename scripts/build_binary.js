@@ -13,6 +13,7 @@ import {
   copyFileSync,
   writeFileSync,
   readFileSync,
+  chmodSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,6 +99,11 @@ function removeSignature(filePath) {
  * @param {string} filePath
  */
 function signFile(filePath) {
+  if (process.env.SKIP_SIGNING === 'true') {
+    console.log(`Skipping signing for ${filePath} (SKIP_SIGNING=true)`);
+    return;
+  }
+
   const platform = process.platform;
 
   if (platform === 'darwin') {
@@ -224,6 +230,19 @@ if (includeNativeModules) {
     );
   }
 
+  // Copy @github/keytar to staging
+  const githubSrc = join(root, 'node_modules/@github');
+  const githubStaging = join(stagingDir, 'node_modules/@github');
+
+  if (existsSync(githubSrc)) {
+    mkdirSync(dirname(githubStaging), { recursive: true });
+    cpSync(githubSrc, githubStaging, { recursive: true });
+  } else {
+    console.warn(
+      'Warning: @github/keytar not found in node_modules. Secure keychain features will use file fallback.',
+    );
+  }
+
   // Sign Staged .node files
   try {
     const nodeFiles = globSync('**/*.node', {
@@ -345,6 +364,7 @@ if (existsSync(ripgrepVendorDest)) {
 // Add assets from Staging
 if (includeNativeModules) {
   addAssetsFromDir('node_modules/@lydell', 'node_modules/@lydell');
+  addAssetsFromDir('node_modules/@github', 'node_modules/@github');
 }
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
@@ -454,6 +474,7 @@ console.log('Injecting SEA blob...');
 const sentinelFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
 try {
+  chmodSync(targetBinaryPath, 0o755);
   const args = [
     'postject',
     targetBinaryPath,
@@ -467,7 +488,7 @@ try {
     args.push('--macho-segment-name', 'NODE_SEA');
   }
 
-  runCommand('npx', args);
+  runCommand('npx', ['--yes', ...args]);
   console.log('Injection successful.');
 } catch (e) {
   console.error('Postject failed:', e.message);
