@@ -11,18 +11,27 @@ import {
   type ThoughtSummary,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
+  type ToolDisplay,
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type AnsiOutput,
   CoreToolCallStatus,
   checkExhaustive,
+  type SubagentActivityItem,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export { CoreToolCallStatus };
+export type {
+  ThoughtSummary,
+  SkillDefinition,
+  SerializableConfirmationDetails,
+  ToolResultDisplay,
+};
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -33,8 +42,8 @@ export enum AuthState {
   AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
-  // Waiting for the user to restart after a Google login
-  AwaitingGoogleLoginRestart = 'awaiting_google_login_restart',
+  // Waiting for the user to restart after a login
+  AwaitingLoginRestart = 'awaiting_login_restart',
 }
 
 // Only defining the state enum needed by the UI
@@ -86,6 +95,16 @@ export function mapCoreStatusToDisplayStatus(
   }
 }
 
+/**
+ * --- TYPE GUARDS ---
+ */
+
+export const isTodoList = (res: unknown): res is { todos: unknown[] } =>
+  typeof res === 'object' && res !== null && 'todos' in res;
+
+export const isAnsiOutput = (res: unknown): res is AnsiOutput =>
+  Array.isArray(res) && (res.length === 0 || Array.isArray(res[0]));
+
 export interface ToolCallEvent {
   type: 'tool_call';
   status: CoreToolCallStatus;
@@ -101,7 +120,9 @@ export interface IndividualToolCallDisplay {
   callId: string;
   parentCallId?: string;
   name: string;
+  args?: Record<string, unknown>;
   description: string;
+  display?: ToolDisplay;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
   // True when the tool was initiated directly by the user (slash/@/shell flows).
@@ -117,6 +138,7 @@ export interface IndividualToolCallDisplay {
   originalRequestName?: string;
   progress?: number;
   progressTotal?: number;
+  subagentHistory?: SubagentActivityItem[];
 }
 
 export interface CompressionProps {
@@ -124,6 +146,11 @@ export interface CompressionProps {
   originalTokenCount: number | null;
   newTokenCount: number | null;
   compressionStatus: CompressionStatus | null;
+}
+
+export interface ExportSessionProps {
+  isPending: boolean;
+  targetPath?: string;
 }
 
 /**
@@ -154,6 +181,7 @@ export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
   secondaryText?: string;
+  source?: string;
   icon?: string;
   color?: string;
   marginBottom?: number;
@@ -237,6 +265,20 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   borderDimColor?: boolean;
 };
 
+export type ToolDisplayItem = ToolDisplay & {
+  status: CoreToolCallStatus;
+  originalRequestName?: string;
+};
+
+export type HistoryItemToolDisplayGroup = HistoryItemBase & {
+  type: 'tool_display_group';
+  tools: ToolDisplayItem[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
+};
+
 export type HistoryItemUserShell = HistoryItemBase & {
   type: 'user_shell';
   text: string;
@@ -245,6 +287,11 @@ export type HistoryItemUserShell = HistoryItemBase & {
 export type HistoryItemCompression = HistoryItemBase & {
   type: 'compression';
   compression: CompressionProps;
+};
+
+export type HistoryItemExportSession = HistoryItemBase & {
+  type: 'export_session';
+  exportSession: ExportSessionProps;
 };
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
@@ -270,6 +317,12 @@ export type HistoryItemHint = HistoryItemBase & {
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
   chats: ChatDetail[];
+};
+
+export type HistoryItemSubagent = HistoryItemBase & {
+  type: 'subagent';
+  agentName: string;
+  history: SubagentActivityItem[];
 };
 
 export interface ToolDefinition {
@@ -326,6 +379,19 @@ export interface JsonMcpResource {
   description?: string;
 }
 
+export type HistoryItemGemmaStatus = HistoryItemBase & {
+  type: 'gemma_status';
+  binaryInstalled: boolean;
+  binaryPath: string | null;
+  modelName: string;
+  modelDownloaded: boolean;
+  serverRunning: boolean;
+  serverPid: number | null;
+  serverPort: number;
+  settingsEnabled: boolean;
+  allPassing: boolean;
+};
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
@@ -352,9 +418,6 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
-// Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
-// type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
-// 'tools' in historyItem.
 // Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
@@ -367,20 +430,24 @@ export type HistoryItemWithoutId =
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
+  | HistoryItemToolDisplayGroup
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
+  | HistoryItemExportSession
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
+  | HistoryItemGemmaStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemSubagent;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -398,11 +465,13 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXPORT_SESSION = 'export_session',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
+  GEMMA_STATUS = 'gemma_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',
 }
@@ -483,6 +552,7 @@ export type SlashCommandProcessorResult =
       type: 'schedule_tool';
       toolName: string;
       toolArgs: Record<string, unknown>;
+      postSubmitPrompt?: PartListUnion;
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
@@ -506,6 +576,7 @@ export interface PermissionConfirmationRequest {
 export interface ActiveHook {
   name: string;
   eventName: string;
+  source?: string;
   index?: number;
   total?: number;
 }

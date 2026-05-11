@@ -121,6 +121,7 @@ describe('file-system', () => {
 
     const result = await rig.run({
       args: `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+      timeout: 600000, // 10 min — real LLM can be slow in Docker sandbox
     });
 
     const foundToolCall = await rig.waitForToolCall('write_file');
@@ -133,7 +134,9 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('hello');
+    // Trim to tolerate models that idiomatically append a trailing newline.
+    // This test is about path-with-spaces handling, not whitespace fidelity.
+    expect(newFileContent.trim()).toBe('hello');
   });
 
   it('should perform a read-then-write sequence', async () => {

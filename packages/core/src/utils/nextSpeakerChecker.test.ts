@@ -71,6 +71,10 @@ describe('checkNextSpeaker', () => {
       generateContentConfig: {},
     };
     mockConfig = {
+      get config() {
+        return this;
+      },
+      promptId: 'test-session-id',
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getModel: () => 'test-model',

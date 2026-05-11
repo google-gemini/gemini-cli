@@ -116,8 +116,8 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
             <Text color={theme.text.primary}>
               {selectedAuthType.startsWith('oauth')
                 ? userEmail
-                  ? `Logged in with Google (${userEmail})`
-                  : 'Logged in with Google'
+                  ? `Signed in with Google (${userEmail})`
+                  : 'Signed in with Google'
                 : selectedAuthType}
             </Text>
           </Box>

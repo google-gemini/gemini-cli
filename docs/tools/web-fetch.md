@@ -17,6 +17,9 @@ specific operations like summarization or extraction.
 ## Technical behavior
 
 - **Confirmation:** Triggers a confirmation dialog showing the converted URLs.
+- **Plan Mode:** In [Plan Mode](../cli/plan-mode.md), `web_fetch` is available
+  but always requires explicit user confirmation (`ask_user`) due to security
+  implications of accessing external or private network addresses.
 - **Processing:** Uses the Gemini API's `urlContext` for retrieval.
 - **Fallback:** If API access fails, the tool attempts to fetch raw content
   directly from your local machine.

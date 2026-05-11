@@ -13,6 +13,11 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export class MessageBus extends EventEmitter {
+  private listenerToAbortCleanup = new WeakMap<
+    object,
+    Map<string, () => void>
+  >();
+
   constructor(
     private readonly policyEngine: PolicyEngine,
     private readonly debug = false,
@@ -40,6 +45,37 @@ export class MessageBus extends EventEmitter {
     this.emit(message.type, message);
   }
 
+  /**
+   * Derives a child message bus scoped to a specific subagent.
+   */
+  derive(subagentName: string): MessageBus {
+    const bus = new MessageBus(this.policyEngine, this.debug);
+
+    bus.publish = async (message: Message) => {
+      if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+        return this.publish({
+          ...message,
+          subagent: message.subagent
+            ? `${subagentName}/${message.subagent}`
+            : subagentName,
+        });
+      }
+      return this.publish(message);
+    };
+
+    // Delegate subscription methods to the parent bus
+    bus.subscribe = this.subscribe.bind(this);
+    bus.unsubscribe = this.unsubscribe.bind(this);
+    bus.on = this.on.bind(this);
+    bus.off = this.off.bind(this);
+    bus.emit = this.emit.bind(this);
+    bus.once = this.once.bind(this);
+    bus.removeListener = this.removeListener.bind(this);
+    bus.listenerCount = this.listenerCount.bind(this);
+
+    return bus;
+  }
+
   async publish(message: Message): Promise<void> {
     if (this.debug) {
       debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
@@ -52,12 +88,14 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const { decision } = await this.policyEngine.check(
+        const { decision: policyDecision } = await this.policyEngine.check(
           message.toolCall,
           message.serverName,
           message.toolAnnotations,
           message.subagent,
         );
+
+        const decision = message.forcedDecision ?? policyDecision;
 
         switch (decision) {
           case PolicyDecision.ALLOW:
@@ -112,7 +150,36 @@ export class MessageBus extends EventEmitter {
   subscribe<T extends Message>(
     type: T['type'],
     listener: (message: T) => void,
+    options?: { signal?: AbortSignal },
   ): void {
+    if (options?.signal) {
+      const signal = options.signal;
+      if (signal.aborted) return;
+
+      if (this.listenerToAbortCleanup.get(listener)?.has(type)) return;
+
+      const abortHandler = () => {
+        this.off(type, listener);
+        const typeToCleanup = this.listenerToAbortCleanup.get(listener);
+        if (typeToCleanup) {
+          typeToCleanup.delete(type);
+          if (typeToCleanup.size === 0) {
+            this.listenerToAbortCleanup.delete(listener);
+          }
+        }
+      };
+      signal.addEventListener('abort', abortHandler, { once: true });
+
+      let typeToCleanup = this.listenerToAbortCleanup.get(listener);
+      if (!typeToCleanup) {
+        typeToCleanup = new Map<string, () => void>();
+        this.listenerToAbortCleanup.set(listener, typeToCleanup);
+      }
+      typeToCleanup.set(type, () => {
+        signal.removeEventListener('abort', abortHandler);
+      });
+    }
+
     this.on(type, listener);
   }
 
@@ -121,6 +188,17 @@ export class MessageBus extends EventEmitter {
     listener: (message: T) => void,
   ): void {
     this.off(type, listener);
+    const typeToCleanup = this.listenerToAbortCleanup.get(listener);
+    if (typeToCleanup) {
+      const cleanup = typeToCleanup.get(type);
+      if (cleanup) {
+        cleanup();
+        typeToCleanup.delete(type);
+      }
+      if (typeToCleanup.size === 0) {
+        this.listenerToAbortCleanup.delete(listener);
+      }
+    }
   }
 
   /**

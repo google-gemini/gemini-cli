@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -19,6 +20,8 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
@@ -34,6 +37,7 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -41,6 +45,7 @@ import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
@@ -101,9 +106,11 @@ describe('mcp-client', () => {
     workspaceContext = new WorkspaceContext(testWorkspace);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
     vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
+    vi.restoreAllMocks();
   });
 
   describe('McpClient', () => {
@@ -160,16 +167,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
       expect(mockedClient.listTools).toHaveBeenCalledWith(
         {},
         expect.objectContaining({ timeout: 600000, progressReporter: client }),
@@ -244,16 +252,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(2);
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       consoleWarnSpy.mockRestore();
@@ -296,22 +305,44 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await expect(client.discover(MOCK_CONTEXT)).rejects.toThrow('Test error');
+      await expect(
+        client.discoverInto(MOCK_CONTEXT, {
+          toolRegistry: mockedToolRegistry,
+          promptRegistry,
+          resourceRegistry,
+        }),
+      ).rejects.toThrow('Test error');
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,
         expect.any(Error),
         'test-server',
       );
+    });
+
+    it('should return empty array for discoverPrompts on MethodNotFound error without diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listPrompts: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'Method not supported'),
+          ),
+      };
+      const result = await discoverPrompts(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      // MethodNotFound errors should be silently ignored regardless of message text
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
     it('should not discover tools if server does not support them', async () => {
@@ -354,18 +385,19 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await expect(client.discover(MOCK_CONTEXT)).rejects.toThrow(
-        'No prompts, tools, or resources found on the server.',
-      );
+      await expect(
+        client.discoverInto(MOCK_CONTEXT, {
+          toolRegistry: mockedToolRegistry,
+          promptRegistry,
+          resourceRegistry,
+        }),
+      ).rejects.toThrow('No prompts, tools, or resources found on the server.');
     });
 
     it('should discover tools if server supports them', async () => {
@@ -417,16 +449,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
     });
 
@@ -485,9 +518,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -495,7 +525,11 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
-      await client.discover(mockConfig);
+      await client.discoverInto(mockConfig, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
 
       // Verify tool registration
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
@@ -566,9 +600,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -576,7 +607,11 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
-      await client.discover(mockConfig);
+      await client.discoverInto(mockConfig, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
 
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(mockPolicyEngine.addRule).not.toHaveBeenCalled();
@@ -644,9 +679,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -654,7 +686,11 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
-      await client.discover(mockConfig);
+      await client.discoverInto(mockConfig, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
 
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
 
@@ -733,16 +769,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       const registeredTool = vi.mocked(mockedToolRegistry.registerTool).mock
         .calls[0][0];
@@ -751,6 +788,11 @@ describe('mcp-client', () => {
         properties: {
           param1: {
             $ref: '#/$defs/MyType',
+          },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
           },
         },
         $defs: {
@@ -813,16 +855,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
       expect(resourceRegistry.setResourcesForServer).toHaveBeenCalledWith(
         'test-server',
         [
@@ -902,16 +945,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledTimes(2);
       expect(resourceListHandler).toBeDefined();
@@ -991,16 +1035,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledTimes(2);
       expect(promptListHandler).toBeDefined();
@@ -1075,16 +1120,17 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
         },
-        mockedToolRegistry,
-        mockedPromptRegistry,
-        resourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
         '0.0.1',
       );
       await client.connect();
-      await client.discover(MOCK_CONTEXT);
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: mockedPromptRegistry,
+        resourceRegistry,
+      });
 
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledOnce();
@@ -1133,17 +1179,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        {
-          getPromptsByServer: vi.fn().mockReturnValue([]),
-          registerPrompt: vi.fn(),
-        } as unknown as PromptRegistry,
-        {
-          getResourcesByServer: vi.fn().mockReturnValue([]),
-          registerResource: vi.fn(),
-          removeResourcesByServer: vi.fn(),
-          setResourcesForServer: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1151,6 +1186,20 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+          registerPrompt: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          getResourcesByServer: vi.fn().mockReturnValue([]),
+          registerResource: vi.fn(),
+          removeResourcesByServer: vi.fn(),
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledWith(
         ToolListChangedNotificationSchema,
@@ -1178,21 +1227,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        {
-          getToolsByServer: vi.fn().mockReturnValue([]),
-          registerTool: vi.fn(),
-          sortTools: vi.fn(),
-        } as unknown as ToolRegistry,
-        {
-          getPromptsByServer: vi.fn().mockReturnValue([]),
-          registerPrompt: vi.fn(),
-        } as unknown as PromptRegistry,
-        {
-          getResourcesByServer: vi.fn().mockReturnValue([]),
-          registerResource: vi.fn(),
-          removeResourcesByServer: vi.fn(),
-          setResourcesForServer: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1200,6 +1234,24 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: {
+          getToolsByServer: vi.fn().mockReturnValue([]),
+          registerTool: vi.fn(),
+          sortTools: vi.fn(),
+        } as unknown as ToolRegistry,
+        promptRegistry: {
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+          registerPrompt: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          getResourcesByServer: vi.fn().mockReturnValue([]),
+          registerResource: vi.fn(),
+          removeResourcesByServer: vi.fn(),
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       // Should be called for ProgressNotificationSchema, even if no other capabilities
       expect(mockedClient.setNotificationHandler).toHaveBeenCalled();
@@ -1229,21 +1281,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        {
-          getToolsByServer: vi.fn().mockReturnValue([]),
-          registerTool: vi.fn(),
-          sortTools: vi.fn(),
-        } as unknown as ToolRegistry,
-        {
-          getPromptsByServer: vi.fn().mockReturnValue([]),
-          registerPrompt: vi.fn(),
-        } as unknown as PromptRegistry,
-        {
-          getResourcesByServer: vi.fn().mockReturnValue([]),
-          registerResource: vi.fn(),
-          removeResourcesByServer: vi.fn(),
-          setResourcesForServer: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1251,6 +1288,24 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: {
+          getToolsByServer: vi.fn().mockReturnValue([]),
+          registerTool: vi.fn(),
+          sortTools: vi.fn(),
+        } as unknown as ToolRegistry,
+        promptRegistry: {
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+          registerPrompt: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          getResourcesByServer: vi.fn().mockReturnValue([]),
+          registerResource: vi.fn(),
+          removeResourcesByServer: vi.fn(),
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       const toolUpdateCall =
         mockedClient.setNotificationHandler.mock.calls.find(
@@ -1303,12 +1358,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        {} as PromptRegistry,
-        {
-          removeMcpResourcesByServer: vi.fn(),
-          registerResource: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1318,6 +1367,15 @@ describe('mcp-client', () => {
 
       // 1. Connect (sets up listener)
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {} as PromptRegistry,
+        resourceRegistry: {
+          removeMcpResourcesByServer: vi.fn(),
+          registerResource: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       // 2. Extract the callback passed to setNotificationHandler for tools
       const toolUpdateCall =
@@ -1383,9 +1441,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        {} as PromptRegistry,
-        {} as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1393,6 +1448,12 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {} as PromptRegistry,
+        resourceRegistry: {} as ResourceRegistry,
+      });
 
       const toolUpdateCall =
         mockedClient.setNotificationHandler.mock.calls.find(
@@ -1458,9 +1519,6 @@ describe('mcp-client', () => {
       const clientA = new McpClient(
         'server-A',
         { command: 'cmd-a' },
-        mockedToolRegistry,
-        {} as PromptRegistry,
-        {} as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1471,9 +1529,6 @@ describe('mcp-client', () => {
       const clientB = new McpClient(
         'server-B',
         { command: 'cmd-b' },
-        mockedToolRegistry,
-        {} as PromptRegistry,
-        {} as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1482,7 +1537,19 @@ describe('mcp-client', () => {
       );
 
       await clientA.connect();
+      // INJECTED REGISTRIES
+      (clientA as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {} as PromptRegistry,
+        resourceRegistry: {} as ResourceRegistry,
+      });
       await clientB.connect();
+      // INJECTED REGISTRIES
+      (clientB as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {} as PromptRegistry,
+        resourceRegistry: {} as ResourceRegistry,
+      });
 
       const toolUpdateCallA =
         mockClientA.setNotificationHandler.mock.calls.find(
@@ -1567,18 +1634,6 @@ describe('mcp-client', () => {
         'test-server',
         // Set a very short timeout
         { command: 'test-command', timeout: 50 },
-        mockedToolRegistry,
-        {
-          getPromptsByServer: vi.fn().mockReturnValue([]),
-          registerPrompt: vi.fn(),
-          removePromptsByServer: vi.fn(),
-        } as unknown as PromptRegistry,
-        {
-          getResourcesByServer: vi.fn().mockReturnValue([]),
-          registerResource: vi.fn(),
-          removeResourcesByServer: vi.fn(),
-          setResourcesForServer: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1586,6 +1641,21 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+          registerPrompt: vi.fn(),
+          removePromptsByServer: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          getResourcesByServer: vi.fn().mockReturnValue([]),
+          registerResource: vi.fn(),
+          removeResourcesByServer: vi.fn(),
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       const toolUpdateCall =
         mockedClient.setNotificationHandler.mock.calls.find(
@@ -1643,18 +1713,6 @@ describe('mcp-client', () => {
       const client = new McpClient(
         'test-server',
         { command: 'test-command' },
-        mockedToolRegistry,
-        {
-          getPromptsByServer: vi.fn().mockReturnValue([]),
-          registerPrompt: vi.fn(),
-          removePromptsByServer: vi.fn(),
-        } as unknown as PromptRegistry,
-        {
-          getResourcesByServer: vi.fn().mockReturnValue([]),
-          registerResource: vi.fn(),
-          removeResourcesByServer: vi.fn(),
-          setResourcesForServer: vi.fn(),
-        } as unknown as ResourceRegistry,
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1663,6 +1721,21 @@ describe('mcp-client', () => {
       );
 
       await client.connect();
+      // INJECTED REGISTRIES
+      (client as any).registeredRegistries?.add({
+        toolRegistry: mockedToolRegistry,
+        promptRegistry: {
+          getPromptsByServer: vi.fn().mockReturnValue([]),
+          registerPrompt: vi.fn(),
+          removePromptsByServer: vi.fn(),
+        } as unknown as PromptRegistry,
+        resourceRegistry: {
+          getResourcesByServer: vi.fn().mockReturnValue([]),
+          registerResource: vi.fn(),
+          removeResourcesByServer: vi.fn(),
+          setResourcesForServer: vi.fn(),
+        } as unknown as ResourceRegistry,
+      });
 
       const toolUpdateCall =
         mockedClient.setNotificationHandler.mock.calls.find(
@@ -1742,6 +1815,48 @@ describe('mcp-client', () => {
             headers: { Authorization: 'derp' },
           },
         });
+      });
+
+      it('wraps fetch to convert GET 404 to 405 for POST-only servers (e.g. n8n)', async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(
+            new Response(null, { status: 404, statusText: 'Not Found' }),
+          );
+        vi.stubGlobal('fetch', mockFetch);
+
+        try {
+          const transport = await createTransport(
+            'test-server',
+            { httpUrl: 'http://test-server' },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          const wrappedFetch = (
+            transport as unknown as {
+              _fetch: (
+                url: URL | string,
+                init?: RequestInit,
+              ) => Promise<Response>;
+            }
+          )._fetch;
+
+          // GET 404 → 405: server doesn't support optional SSE GET stream
+          const getRes = await wrappedFetch('http://test-server', {
+            method: 'GET',
+          });
+          expect(getRes.status).toBe(405);
+          expect(getRes.statusText).toBe('Method Not Allowed');
+
+          // POST 404 → unchanged: real "not found" errors must still propagate
+          const postRes = await wrappedFetch('http://test-server', {
+            method: 'POST',
+          });
+          expect(postRes.status).toBe(404);
+        } finally {
+          vi.unstubAllGlobals();
+        }
       });
     });
 
@@ -2340,7 +2455,10 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2547,7 +2665,10 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2710,7 +2831,10 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });

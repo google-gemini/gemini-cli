@@ -10,6 +10,7 @@ import { OAuth2Client } from 'google-auth-library';
 import {
   UserTierId,
   ActionStatus,
+  InitiationMethod,
   type LoadCodeAssistResponse,
   type GeminiUserTier,
   type SetCodeAssistGlobalUserSettingRequest,
@@ -206,6 +207,8 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'test-trace-id',
               status: ActionStatus.ACTION_STATUS_NO_ERROR,
+              initiationMethod: InitiationMethod.COMMAND,
+              trajectoryId: 'test-session',
               streamingLatency: expect.objectContaining({
                 totalLatency: expect.stringMatching(/\d+s/),
                 firstMessageLatency: expect.stringMatching(/\d+s/),
@@ -274,6 +277,8 @@ describe('CodeAssistServer', () => {
           expect.objectContaining({
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
+              initiationMethod: InitiationMethod.COMMAND,
+              trajectoryId: 'test-session',
             }),
             timestamp: expect.stringMatching(
               /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
@@ -637,6 +642,28 @@ describe('CodeAssistServer', () => {
       'loadCodeAssist',
       expect.any(Object),
     );
+  });
+
+  it('should throw friendly error for 403 on cloudshell-gca project', async () => {
+    const { server } = createTestServer();
+    const mock403Error = {
+      response: {
+        status: 403,
+        data: {
+          error: {
+            message: 'Permission denied',
+          },
+        },
+      },
+    };
+    vi.spyOn(server, 'requestPost').mockRejectedValue(mock403Error);
+
+    await expect(
+      server.loadCodeAssist({
+        cloudaicompanionProject: 'cloudshell-gca',
+        metadata: {},
+      }),
+    ).rejects.toThrow(/Access to the default Cloud Shell Gemini project/);
   });
 
   it('should call the listExperiments endpoint with metadata', async () => {

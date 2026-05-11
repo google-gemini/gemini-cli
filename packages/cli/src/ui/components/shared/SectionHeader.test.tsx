@@ -37,11 +37,10 @@ describe('<SectionHeader />', () => {
       width: 40,
     },
   ])('$description', async ({ title, subtitle, width }) => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <SectionHeader title={title} subtitle={subtitle} />,
       { width },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();

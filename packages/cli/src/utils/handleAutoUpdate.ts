@@ -8,11 +8,14 @@ import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import type { HistoryItem } from '../ui/types.js';
-import { MessageType } from '../ui/types.js';
+import { MessageType, type HistoryItem } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getChannelFromVersion,
+  RELEASE_CHANNEL_STABILITY,
+} from '@google/gemini-cli-core';
 
 let _updateInProgress = false;
 
@@ -65,13 +68,14 @@ export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
   projectRoot: string,
+  isSandboxEnabled: boolean,
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
     return;
   }
 
-  if (settings.merged.tools.sandbox || process.env['GEMINI_SANDBOX']) {
+  if (isSandboxEnabled) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
     });
@@ -88,9 +92,12 @@ export function handleAutoUpdate(
   );
 
   if (
-    [PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX].includes(
-      installationInfo.packageManager,
-    )
+    [
+      PackageManager.NPX,
+      PackageManager.PNPX,
+      PackageManager.BUNX,
+      PackageManager.BINARY,
+    ].includes(installationInfo.packageManager)
   ) {
     return;
   }
@@ -100,18 +107,42 @@ export function handleAutoUpdate(
     combinedMessage += `\n${installationInfo.updateMessage}`;
   }
 
-  updateEventEmitter.emit('update-received', {
-    message: combinedMessage,
-  });
-
   if (
     !installationInfo.updateCommand ||
     !settings.merged.general.enableAutoUpdate
   ) {
+    updateEventEmitter.emit('update-received', {
+      ...info,
+      message: combinedMessage,
+      isUpdating: false,
+    });
+    return;
+  }
+  updateEventEmitter.emit('update-received', {
+    ...info,
+    message: combinedMessage,
+    isUpdating: true,
+  });
+  if (_updateInProgress) {
     return;
   }
 
-  if (_updateInProgress) {
+  const currentVersion = info.update.current;
+  if (!currentVersion) {
+    debugLogger.warn(
+      'Update check: current version is missing. Skipping automatic update for safety.',
+    );
+    return;
+  }
+
+  const currentChannel = getChannelFromVersion(currentVersion);
+  const targetChannel = getChannelFromVersion(info.update.latest);
+
+  // Defense-in-depth: prevent updates to a less stable channel
+  if (
+    RELEASE_CHANNEL_STABILITY[targetChannel] <
+    RELEASE_CHANNEL_STABILITY[currentChannel]
+  ) {
     return;
   }
 
@@ -141,7 +172,7 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        message: `Automatic update failed. Please try updating manually:\n\n${updateCommand}`,
       });
     }
   });
@@ -149,7 +180,7 @@ export function handleAutoUpdate(
   updateProcess.on('error', (err) => {
     _updateInProgress = false;
     updateEventEmitter.emit('update-failed', {
-      message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
+      message: `Automatic update failed. Please try updating manually. (error: ${err.message})\n\n${updateCommand}`,
     });
   });
   return updateProcess;
@@ -177,12 +208,14 @@ export function setUpdateHandler(
     }, 60000);
   };
 
-  const handleUpdateFailed = () => {
+  const handleUpdateFailed = (data?: { message: string }) => {
     setUpdateInfo(null);
     addItem(
       {
         type: MessageType.ERROR,
-        text: `Automatic update failed. Please try updating manually`,
+        text:
+          data?.message ||
+          `Automatic update failed. Please try updating manually`,
       },
       Date.now(),
     );

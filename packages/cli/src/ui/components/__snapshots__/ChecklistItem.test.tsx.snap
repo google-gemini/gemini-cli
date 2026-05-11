@@ -1,5 +1,10 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<ChecklistItem /> > renders { status: 'blocked', label: 'Blocked this' } item correctly 1`] = `
+"⛔ Blocked this
+"
+`;
+
 exports[`<ChecklistItem /> > renders { status: 'cancelled', label: 'Skipped this' } item correctly 1`] = `
 "✗ Skipped this
 "

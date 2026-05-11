@@ -21,7 +21,7 @@ const agentsListCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {
-    const { config } = context.services;
+    const config = context.services.agentContext?.config;
     if (!config) {
       return {
         type: 'message',
@@ -61,7 +61,8 @@ async function enableAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const { config, settings } = context.services;
+  const config = context.services.agentContext?.config;
+  const { settings } = context.services;
   if (!config) {
     return {
       type: 'message',
@@ -137,7 +138,8 @@ async function disableAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const { config, settings } = context.services;
+  const config = context.services.agentContext?.config;
+  const { settings } = context.services;
   if (!config) {
     return {
       type: 'message',
@@ -216,7 +218,7 @@ async function configAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -266,7 +268,8 @@ async function configAction(
 }
 
 function completeAgentsToEnable(context: CommandContext, partialArg: string) {
-  const { config, settings } = context.services;
+  const config = context.services.agentContext?.config;
+  const { settings } = context.services;
   if (!config) return [];
 
   const overrides = settings.merged.agents.overrides;
@@ -278,7 +281,7 @@ function completeAgentsToEnable(context: CommandContext, partialArg: string) {
 }
 
 function completeAgentsToDisable(context: CommandContext, partialArg: string) {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
@@ -287,7 +290,7 @@ function completeAgentsToDisable(context: CommandContext, partialArg: string) {
 }
 
 function completeAllAgents(context: CommandContext, partialArg: string) {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
@@ -328,7 +331,7 @@ const agentsReloadCommand: SlashCommand = {
   description: 'Reload the agent registry',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
-    const { config } = context.services;
+    const config = context.services.agentContext?.config;
     const agentRegistry = config?.getAgentRegistry();
     if (!agentRegistry) {
       return {
@@ -343,12 +346,33 @@ const agentsReloadCommand: SlashCommand = {
       text: 'Reloading agent registry...',
     });
 
-    await agentRegistry.reload();
+    const summary = await agentRegistry.reload();
+
+    let content =
+      summary.errors.length > 0
+        ? 'Agents reloaded with errors:'
+        : 'Agents reloaded successfully:';
+    content += `\n- Total: ${summary.totalLoaded} (${summary.localCount} local, ${summary.remoteCount} remote)`;
+
+    if (summary.newAgents.length > 0) {
+      content += `\n- New: ${summary.newAgents.join(', ')}`;
+    }
+    if (summary.updatedAgents.length > 0) {
+      content += `\n- Updated: ${summary.updatedAgents.join(', ')}`;
+    }
+    if (summary.deletedAgents.length > 0) {
+      content += `\n- Deleted: ${summary.deletedAgents.join(', ')}`;
+    }
+    if (summary.errors.length > 0) {
+      content += `\n- Errors: ${summary.errors.length} encountered during reload`;
+    }
+
+    content += '\n\nRun /agents list to see all available agents.';
 
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents reloaded successfully',
+      content,
     };
   },
 };

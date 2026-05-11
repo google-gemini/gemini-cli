@@ -10,6 +10,16 @@ import {
   needsResolution,
   maskSensitiveValue,
 } from './value-resolver.js';
+import * as shellUtils from '../../utils/shell-utils.js';
+
+vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    spawnAsync: vi.fn(),
+  };
+});
 
 describe('value-resolver', () => {
   describe('resolveAuthValue', () => {
@@ -39,12 +49,24 @@ describe('value-resolver', () => {
     });
 
     describe('shell commands', () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
       it('should execute shell command with ! prefix', async () => {
+        vi.mocked(shellUtils.spawnAsync).mockResolvedValue({
+          stdout: 'hello\n',
+          stderr: '',
+        });
         const result = await resolveAuthValue('!echo hello');
         expect(result).toBe('hello');
       });
 
       it('should trim whitespace from command output', async () => {
+        vi.mocked(shellUtils.spawnAsync).mockResolvedValue({
+          stdout: '  hello  \n',
+          stderr: '',
+        });
         const result = await resolveAuthValue('!echo "  hello  "');
         expect(result).toBe('hello');
       });
@@ -56,15 +78,31 @@ describe('value-resolver', () => {
       });
 
       it('should throw error for command that returns empty output', async () => {
+        vi.mocked(shellUtils.spawnAsync).mockResolvedValue({
+          stdout: '',
+          stderr: '',
+        });
         await expect(resolveAuthValue('!echo -n ""')).rejects.toThrow(
           'returned empty output',
         );
       });
 
       it('should throw error for failed command', async () => {
+        vi.mocked(shellUtils.spawnAsync).mockRejectedValue(
+          new Error('Command failed'),
+        );
         await expect(
           resolveAuthValue('!nonexistent-command-12345'),
         ).rejects.toThrow(/Command.*failed/);
+      });
+
+      it('should throw error for timeout', async () => {
+        const timeoutError = new Error('AbortError');
+        timeoutError.name = 'AbortError';
+        vi.mocked(shellUtils.spawnAsync).mockRejectedValue(timeoutError);
+        await expect(resolveAuthValue('!sleep 100')).rejects.toThrow(
+          /timed out after/,
+        );
       });
     });
 

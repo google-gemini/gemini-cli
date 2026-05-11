@@ -23,6 +23,7 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   AnyToolInvocation,
+  ToolDisplay,
   ToolCallConfirmationDetails,
   AnyDeclarativeTool,
 } from '../tools/tools.js';
@@ -32,6 +33,7 @@ import {
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
 import { isToolCallResponseInfo } from '../utils/tool-utils.js';
+import { getDiffStatFromPatch } from '../tools/diffOptions.js';
 
 /**
  * Handler for terminal tool calls.
@@ -171,10 +173,15 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call || call.status === CoreToolCallStatus.Error) return;
 
+    const display: ToolDisplay = call.request.display
+      ? { ...call.request.display }
+      : { name: call.request.name };
+    display.description = newInvocation.getDescription();
+
     this.activeCalls.set(
       callId,
       this.patchCall(call, {
-        request: { ...call.request, args: newArgs },
+        request: { ...call.request, args: newArgs, display },
         invocation: newInvocation,
       }),
     );
@@ -473,6 +480,8 @@ export class SchedulerStateManager {
           filePath: details.filePath,
           originalContent: details.originalContent,
           newContent: details.newContent,
+          // Derive stats from the patch if they aren't already present
+          diffStat: details.diffStat ?? getDiffStatFromPatch(details.fileDiff),
         };
       }
     }
@@ -514,7 +523,7 @@ export class SchedulerStateManager {
           {
             functionResponse: {
               id: call.request.callId,
-              name: call.request.name,
+              name: call.request.originalRequestName ?? call.request.name,
               response: { error: errorMessage },
             },
           },

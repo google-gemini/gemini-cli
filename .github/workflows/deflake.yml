@@ -62,6 +62,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
@@ -77,7 +78,7 @@ jobs:
 
   deflake_e2e_mac:
     name: 'E2E Test (macOS)'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
@@ -105,6 +106,7 @@ jobs:
         if: "runner.os != 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           SANDBOX: 'sandbox:none'
@@ -159,6 +161,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'

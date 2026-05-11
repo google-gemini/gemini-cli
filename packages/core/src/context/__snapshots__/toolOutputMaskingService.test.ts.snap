@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolOutputMaskingService > should match the expected snapshot for a masked tool output 1`] = `
+"<tool_output_masked>
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+
+... [6 lines omitted] ...
+
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+
+
+Output too large. Full output available at: /mock/temp/tool-outputs/session-mock-session/run_shell_command_deterministic.txt
+</tool_output_masked>"
+`;

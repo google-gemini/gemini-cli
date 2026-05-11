@@ -48,7 +48,7 @@ describe('Scheduler waiting callback', () => {
   it('should trigger onWaitingForConfirmation callback', async () => {
     const onWaitingForConfirmation = vi.fn();
     const scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus,
       getPreferredEditor: () => undefined,
       schedulerId: 'test-scheduler',

@@ -48,14 +48,14 @@ describe('auth', () => {
   });
 
   it('should return error message on failed auth', async () => {
-    const error = new Error('Auth failed');
+    const error = new Error('Authentication failed');
     vi.mocked(mockConfig.refreshAuth).mockRejectedValue(error);
     const result = await performInitialAuth(
       mockConfig,
       AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toEqual({
-      authError: 'Failed to login. Message: Auth failed',
+      authError: 'Failed to sign in. Message: Authentication failed',
       accountSuspensionInfo: null,
     });
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(

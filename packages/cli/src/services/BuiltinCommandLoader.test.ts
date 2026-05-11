@@ -52,8 +52,7 @@ vi.mock('../ui/commands/permissionsCommand.js', async () => {
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import type { Config } from '@google/gemini-cli-core';
-import { isNightly } from '@google/gemini-cli-core';
+import { isNightly, type Config } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
@@ -72,6 +71,9 @@ vi.mock('../ui/commands/agentsCommand.js', () => ({
   agentsCommand: { name: 'agents' },
 }));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
+vi.mock('../ui/commands/bugMemoryCommand.js', () => ({
+  bugMemoryCommand: { name: 'bug-memory' },
+}));
 vi.mock('../ui/commands/chatCommand.js', () => ({
   chatCommand: {
     name: 'chat',
@@ -98,7 +100,9 @@ vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/shortcutsCommand.js', () => ({
   shortcutsCommand: {},
 }));
-vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
+vi.mock('../ui/commands/memoryCommand.js', () => ({
+  memoryCommand: () => ({}),
+}));
 vi.mock('../ui/commands/modelCommand.js', () => ({
   modelCommand: { name: 'model' },
 }));
@@ -171,6 +175,7 @@ describe('BuiltinCommandLoader', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      isVoiceModeEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),
@@ -267,6 +272,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
       getEnableHooks: () => false,
       getMcpEnabled: () => true,
@@ -396,6 +402,7 @@ describe('BuiltinCommandLoader profile', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      isVoiceModeEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),

@@ -98,7 +98,7 @@ export class RestoreCommand implements Command {
         name: this.name,
         data: restoreResult,
       };
-    } catch (_error) {
+    } catch {
       return {
         name: this.name,
         data: {
@@ -142,7 +142,7 @@ export class ListCheckpointsCommand implements Command {
           content: JSON.stringify(checkpointInfoList),
         },
       };
-    } catch (_error) {
+    } catch {
       return {
         name: this.name,
         data: {

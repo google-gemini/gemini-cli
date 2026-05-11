@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LoadableSettingScope, Settings } from '../config/settings.js';
-import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
+import {
+  isLoadableSettingScope,
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
+} from '../config/settings.js';
 import { isInSettingsScope } from './settingsUtils.js';
 
 /**

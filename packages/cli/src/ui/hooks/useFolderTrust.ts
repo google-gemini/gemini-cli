@@ -102,7 +102,7 @@ export const useFolderTrust = (
 
       try {
         await trustedFolders.setValue(cwd, trustLevel);
-      } catch (_e) {
+      } catch {
         coreEvents.emitFeedback(
           'error',
           'Failed to save trust settings. Exiting Gemini CLI.',

@@ -388,5 +388,32 @@ describe('StartupProfiler', () => {
         }),
       );
     });
+
+    it('should log startup stats timestamps as rounded integers', () => {
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      const statsEvent = logStartupStats.mock.calls[0][1];
+      const phase = statsEvent.phases[0];
+
+      // Verify they are integers
+      expect(Number.isInteger(phase.start_time_usec)).toBe(true);
+      expect(Number.isInteger(phase.end_time_usec)).toBe(true);
+    });
+
+    it('should log startup stats duration as rounded integers', () => {
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      const statsEvent = logStartupStats.mock.calls[0][1];
+      const phase = statsEvent.phases[0];
+
+      // Verify they are integers
+      expect(Number.isInteger(phase.duration_ms)).toBe(true);
+    });
   });
 });

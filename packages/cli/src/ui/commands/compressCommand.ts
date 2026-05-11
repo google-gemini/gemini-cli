@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HistoryItemCompression } from '../types.js';
-import { MessageType } from '../types.js';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { MessageType, type HistoryItemCompression } from '../types.js';
+import { CommandKind, type SlashCommand } from './types.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
@@ -38,46 +36,51 @@ export const compressCommand: SlashCommand = {
       },
     };
 
-    try {
-      ui.setPendingItem(pendingMessage);
-      const promptId = `compress-${Date.now()}`;
-      const compressed = await context.services.config
-        ?.getGeminiClient()
-        ?.tryCompressChat(promptId, true);
-      if (compressed) {
-        ui.addItem(
-          {
-            type: MessageType.COMPRESSION,
-            compression: {
-              isPending: false,
-              originalTokenCount: compressed.originalTokenCount,
-              newTokenCount: compressed.newTokenCount,
-              compressionStatus: compressed.compressionStatus,
+    ui.setPendingItem(pendingMessage);
+
+    void (async () => {
+      try {
+        const promptId = `compress-${Date.now()}`;
+        const compressed =
+          await context.services.agentContext?.geminiClient?.tryCompressChat(
+            promptId,
+            true,
+          );
+        if (compressed) {
+          ui.addItem(
+            {
+              type: MessageType.COMPRESSION,
+              compression: {
+                isPending: false,
+                originalTokenCount: compressed.originalTokenCount,
+                newTokenCount: compressed.newTokenCount,
+                compressionStatus: compressed.compressionStatus,
+              },
+            } as HistoryItemCompression,
+            Date.now(),
+          );
+        } else {
+          ui.addItem(
+            {
+              type: MessageType.ERROR,
+              text: 'Failed to compress chat history.',
             },
-          } as HistoryItemCompression,
-          Date.now(),
-        );
-      } else {
+            Date.now(),
+          );
+        }
+      } catch (e) {
         ui.addItem(
           {
             type: MessageType.ERROR,
-            text: 'Failed to compress chat history.',
+            text: `Failed to compress chat history: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
           },
           Date.now(),
         );
+      } finally {
+        ui.setPendingItem(null);
       }
-    } catch (e) {
-      ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: `Failed to compress chat history: ${
-            e instanceof Error ? e.message : String(e)
-          }`,
-        },
-        Date.now(),
-      );
-    } finally {
-      ui.setPendingItem(null);
-    }
+    })();
   },
 };
