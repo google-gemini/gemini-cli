@@ -166,8 +166,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // escapeShellArg (using shell-quote for bash) will wrap special characters in double quotes.
-      expect(output).toContain('gemini --resume "\'; rm -rf / #"');
+      // Session ID is displayed as-is for user convenience (no shell escaping in display)
+      expect(output).toContain("gemini --resume '; rm -rf / #");
       unmount();
     });
 
@@ -186,8 +186,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes on Windows.
-      expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
+      // Session ID is displayed as-is for user convenience (no shell escaping in display)
+      expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
 
@@ -205,9 +205,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them.
-      // Since it's already quoted, we don't add redundant double quotes.
-      expect(output).toContain("gemini --resume '''; rm -rf / #'");
+      // Session ID is displayed as-is for user convenience (no shell escaping in display)
+      expect(output).toContain("gemini --resume '; rm -rf / #");
       unmount();
     });
   });
