@@ -2511,12 +2511,15 @@ export class Config implements McpContext, AgentLoopContext {
    * user message when JIT is enabled. Returns empty string when JIT is
    * disabled (Tier 2 memory is already in the system instruction).
    */
-  getSessionMemory(): string {
+  getSessionMemory(options?: { includeExtensionContext?: boolean }): string {
     if (!this.experimentalJitContext || !this.memoryContextManager) {
       return '';
     }
     const sections: string[] = [];
-    const extension = this.memoryContextManager.getExtensionMemory();
+    const includeExtensionContext = options?.includeExtensionContext !== false;
+    const extension = includeExtensionContext
+      ? this.memoryContextManager.getExtensionMemory()
+      : '';
     const project = this.memoryContextManager.getEnvironmentMemory();
     if (extension?.trim()) {
       sections.push(

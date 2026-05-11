@@ -3525,6 +3525,16 @@ describe('Config JIT Initialization', () => {
     expect(sessionMemory).toContain('</project_context>');
     expect(sessionMemory).toContain('</loaded_context>');
 
+    const sessionMemoryWithoutExtension = config.getSessionMemory({
+      includeExtensionContext: false,
+    });
+    expect(sessionMemoryWithoutExtension).toContain('<loaded_context>');
+    expect(sessionMemoryWithoutExtension).not.toContain('<extension_context>');
+    expect(sessionMemoryWithoutExtension).not.toContain('Extension Memory');
+    expect(sessionMemoryWithoutExtension).toContain('<project_context>');
+    expect(sessionMemoryWithoutExtension).toContain('Environment Memory');
+    expect(sessionMemoryWithoutExtension).toContain('</loaded_context>');
+
     // Verify state update (delegated to MemoryContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
