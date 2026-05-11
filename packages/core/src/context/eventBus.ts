@@ -7,6 +7,12 @@
 import { EventEmitter } from 'node:events';
 import type { ConcreteNode } from './graph/types.js';
 
+export interface ProcessorResultEvent {
+  processorId: string;
+  targets: readonly ConcreteNode[];
+  returnedNodes: readonly ConcreteNode[];
+}
+
 export interface PristineHistoryUpdatedEvent {
   nodes: readonly ConcreteNode[];
   newNodes: Set<string>;
@@ -48,5 +54,13 @@ export class ContextEventBus extends EventEmitter {
 
   onConsolidationNeeded(listener: (event: ContextConsolidationEvent) => void) {
     this.on('BUDGET_RETAINED_CROSSED', listener);
+  }
+
+  emitProcessorResult(event: ProcessorResultEvent) {
+    this.emit('PROCESSOR_RESULT', event);
+  }
+
+  onProcessorResult(listener: (event: ProcessorResultEvent) => void) {
+    this.on('PROCESSOR_RESULT', listener);
   }
 }

@@ -277,9 +277,6 @@ export * from './hooks/index.js';
 // Export hook types
 export * from './hooks/types.js';
 
-// Export agent types
-export * from './agents/types.js';
-
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
@@ -293,4 +290,23 @@ export type { Content, Part, FunctionCall } from '@google/genai';
 
 // Export context types and profiles
 export * from './context/types.js';
-export * from './context/profiles.js';
+export { SnapshotGenerator } from './context/utils/snapshotGenerator.js';
+export * from './context/graph/types.js';
+
+export { generalistProfile as legacyGeneralistProfile } from './context/profiles.js';
+export {
+  generalistProfile,
+  stressTestProfile,
+} from './context/config/profiles.js';
+
+// Export trust utility
+export * from './utils/trust.js';
+
+// Export voice utilities
+export * from './voice/audioRecorder.js';
+export * from './voice/transcriptionProvider.js';
+export * from './voice/geminiLiveTranscriptionProvider.js';
+export * from './voice/whisperTranscriptionProvider.js';
+export * from './voice/transcriptionFactory.js';
+export * from './voice/whisperModelManager.js';
+export { isBinaryAvailable } from './utils/binaryCheck.js';

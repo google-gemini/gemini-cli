@@ -38,6 +38,10 @@ describe('GemmaClassifierStrategy', () => {
       }),
       getModel: () => DEFAULT_GEMINI_MODEL,
       getPreviewFeatures: () => false,
+      getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
+      getUseCustomToolModel: vi.fn().mockResolvedValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     strategy = new GemmaClassifierStrategy();

@@ -215,6 +215,7 @@ export class McpClientManager {
       Object.keys(extension.mcpServers ?? {}).map((name) => {
         const config = this.allServerConfigs.get(name);
         if (config?.extension?.id === extension.id) {
+          const clientKey = this.getClientKey(name, config);
           this.allServerConfigs.delete(name);
           // Also remove from blocked servers if present
           const index = this.blockedMcpServers.findIndex(
@@ -223,7 +224,7 @@ export class McpClientManager {
           if (index !== -1) {
             this.blockedMcpServers.splice(index, 1);
           }
-          return this.disconnectClient(name, true);
+          return this.disconnectClient(clientKey, true);
         }
         return Promise.resolve();
       }),

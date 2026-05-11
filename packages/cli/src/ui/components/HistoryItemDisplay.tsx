@@ -14,8 +14,10 @@ import { GeminiMessage } from './messages/GeminiMessage.js';
 import { InfoMessage } from './messages/InfoMessage.js';
 import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
+import { ToolGroupDisplay } from './messages/ToolGroupDisplay.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
+import { ExportSessionMessage } from './messages/ExportSessionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
@@ -32,6 +34,7 @@ import { ToolsList } from './views/ToolsList.js';
 import { SkillsList } from './views/SkillsList.js';
 import { AgentsStatus } from './views/AgentsStatus.js';
 import { McpStatus } from './views/McpStatus.js';
+import { GemmaStatus } from './views/GemmaStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
@@ -194,6 +197,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           isExpandable={isExpandable}
         />
       )}
+      {itemForDisplay.type === 'tool_display_group' && (
+        <ToolGroupDisplay
+          item={itemForDisplay}
+          isToolGroupBoundary={isToolGroupBoundary}
+        />
+      )}
       {itemForDisplay.type === 'subagent' && (
         <SubagentHistoryMessage
           item={itemForDisplay}
@@ -202,6 +211,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'compression' && (
         <CompressionMessage compression={itemForDisplay.compression} />
+      )}
+      {itemForDisplay.type === 'export_session' && (
+        <ExportSessionMessage exportSession={itemForDisplay.exportSession} />
       )}
       {itemForDisplay.type === 'extensions_list' && (
         <ExtensionsList extensions={itemForDisplay.extensions} />
@@ -227,6 +239,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'mcp_status' && (
         <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+      )}
+      {itemForDisplay.type === 'gemma_status' && (
+        <GemmaStatus {...itemForDisplay} />
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
