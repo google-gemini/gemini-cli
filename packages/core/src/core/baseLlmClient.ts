@@ -349,10 +349,8 @@ export class BaseLlmClient {
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
-        onPersistent429: this.config.isInteractive()
-          ? (authType, error) =>
-              handleFallback(this.config, currentModel, authType, error)
-          : undefined,
+        onPersistent429: (authType, error) =>
+          handleFallback(this.config, currentModel, authType, error),
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),

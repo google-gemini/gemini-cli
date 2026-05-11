@@ -69,7 +69,7 @@ export async function handleFallback(
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
 
-    if (action === 'silent') {
+    if (action === 'silent' || !config.isInteractive()) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
       return processIntent(config, 'retry_always', fallbackModel);
     }

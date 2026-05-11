@@ -76,7 +76,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getActiveModel: vi.fn(() => MOCK_PRO_MODEL),
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getUserTier: vi.fn(() => undefined),
-    isInteractive: vi.fn(() => false),
+    isInteractive: vi.fn(() => true),
     ...overrides,
   }) as unknown as Config;
 
@@ -156,6 +156,26 @@ describe('handleFallback', () => {
         MOCK_PRO_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         undefined,
+      );
+    });
+
+    it('silently falls back without calling handler in non-interactive (headless) mode', async () => {
+      vi.mocked(policyConfig.isInteractive).mockReturnValue(false);
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      // Verify it fell back silently
+      expect(result).toBe(true);
+      expect(policyHandler).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
     });
 
