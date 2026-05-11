@@ -387,6 +387,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: false,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'auto-gemini-3': {
+      tier: 'auto',
+      family: 'gemini-3',
+      isPreview: true,
+      isVisible: false,
+    },
+    'auto-gemini-2.5': {
+      tier: 'auto',
+      family: 'gemini-2.5',
+      isPreview: false,
+      isVisible: false,
+    },
   },
   modelIdResolutions: {
     'gemma-4-31b-it': {
@@ -490,6 +502,23 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
           target: 'gemini-3.1-flash-lite-preview',
         },
       ],
+    },
+    'auto-gemini-3': {
+      default: 'gemini-3-pro-preview',
+      contexts: [
+        { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
+        {
+          condition: { useGemini3_1: true, useCustomTools: true },
+          target: 'gemini-3.1-pro-preview-customtools',
+        },
+        {
+          condition: { useGemini3_1: true },
+          target: 'gemini-3.1-pro-preview',
+        },
+      ],
+    },
+    'auto-gemini-2.5': {
+      default: 'gemini-2.5-pro',
     },
   },
   classifierIdResolutions: {

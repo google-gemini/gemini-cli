@@ -49,6 +49,7 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
+  getReleaseChannel?(): string;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -125,6 +126,7 @@ export function resolveModel(
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
+      releaseChannel: config.getReleaseChannel?.(),
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {

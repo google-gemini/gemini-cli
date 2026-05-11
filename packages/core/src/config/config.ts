@@ -442,6 +442,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { getChannelFromVersion } from '../utils/channel.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -2782,6 +2783,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getExperimentalDynamicModelConfiguration(): boolean {
     return this.dynamicModelConfiguration;
+  }
+
+  getReleaseChannel(): string {
+    return getChannelFromVersion(this._clientVersion);
   }
 
   getPendingIncludeDirectories(): string[] {
