@@ -93,6 +93,8 @@ import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
+const SCROLLBAR_GUTTER_WIDTH = 1;
+
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
  * rather than potentially sending multiple paste events separated by line
@@ -1868,7 +1870,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         ? `line-${item.absoluteVisualIdx}`
                         : `ghost-${item.index}`
                     }
-                    width={inputWidth}
+                    width={inputWidth + SCROLLBAR_GUTTER_WIDTH}
                     backgroundColor={listBackgroundColor}
                     containerHeight={Math.min(
                       buffer.viewportHeight,
