@@ -35,6 +35,9 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  getProjectHash,
+  loadConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -44,6 +47,8 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
+import * as path from 'node:path';
+import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   loadSettings,
@@ -194,11 +199,12 @@ ${reason.stack}`
 export async function resolveSessionId(
   resumeArg: string | undefined,
   sessionIdArg?: string | undefined,
+  sessionFileArg?: string | undefined,
 ): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg && !sessionIdArg) {
+  if (!resumeArg && !sessionIdArg && !sessionFileArg) {
     return { sessionId: createSessionId() };
   }
 
@@ -206,6 +212,80 @@ export async function resolveSessionId(
   await storage.initialize();
 
   const sessionSelector = new SessionSelector(storage);
+
+  if (sessionFileArg) {
+    try {
+      const sessionData = await loadConversationRecord(sessionFileArg);
+      if (!sessionData) {
+        throw new Error(`File not found or invalid format: ${sessionFileArg}`);
+      }
+
+      const now = Date.now();
+      const isoNow = new Date(now).toISOString();
+
+      // Filter out old system/info messages that are specific to the previous run
+      // and only keep actual conversation messages (user/gemini).
+      // Best effort parse: ensure message is an object and has required fields.
+      sessionData.messages = (sessionData.messages || []).filter(
+        (m) =>
+          typeof m === 'object' &&
+          m !== null &&
+          (m.type === 'user' || m.type === 'gemini') &&
+          m.content !== undefined,
+      );
+
+      // Add a single info message to the history to confirm the import
+      sessionData.messages.unshift({
+        id: `import-${now}`,
+        type: 'info',
+        content: `Imported session from ${sessionFileArg}`,
+        timestamp: isoNow,
+      } as MessageRecord);
+
+      const newSessionId = createSessionId();
+      sessionData.sessionId = newSessionId;
+      sessionData.projectHash = getProjectHash(storage.getProjectRoot());
+      sessionData.startTime = isoNow;
+      sessionData.lastUpdated = isoNow;
+
+      const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+      const newSessionPath = path.join(
+        chatsDir,
+        `session-${now}-${newSessionId.slice(0, 8)}.jsonl`,
+      );
+
+      const { messages: _messages, ...initialMetadata } = sessionData;
+
+      const lines = [JSON.stringify(initialMetadata)];
+      if (sessionData.messages) {
+        for (const msg of sessionData.messages) {
+          lines.push(JSON.stringify(msg));
+        }
+      }
+
+      await fsPromises.mkdir(chatsDir, { recursive: true });
+      await fsPromises.writeFile(
+        newSessionPath,
+        lines.join('\n') + '\n',
+        'utf-8',
+      );
+
+      return {
+        sessionId: newSessionId,
+        resumedSessionData: {
+          conversation: sessionData,
+          filePath: newSessionPath,
+        },
+      };
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error importing session from file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
 
   if (sessionIdArg) {
     if (await sessionSelector.sessionExists(sessionIdArg)) {
@@ -340,6 +420,7 @@ export async function main() {
   const { sessionId, resumedSessionData } = await resolveSessionId(
     argv.resume,
     argv.sessionId,
+    argv.sessionFile,
   );
 
   if (
