@@ -269,7 +269,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-1',
       undefined,
-      false,
       'Test input',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
@@ -436,7 +435,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-2',
       undefined,
-      false,
       undefined,
     );
     expect(getWrittenOutput()).toBe('Final answer\n');
@@ -596,7 +594,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-3',
       undefined,
-      false,
       undefined,
     );
     expect(getWrittenOutput()).toBe('Sorry, let me try again.\n');
@@ -738,7 +735,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-7',
       undefined,
-      false,
       rawInput,
     );
 
@@ -774,7 +770,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-1',
       undefined,
-      false,
       'Test input',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
@@ -980,7 +975,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-empty',
       undefined,
-      false,
       'Empty response test',
     );
 
@@ -1117,7 +1111,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-slash',
       undefined,
-      false,
       '/testcommand',
     );
 
@@ -1163,7 +1156,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-slash',
       undefined,
-      false,
       '/help',
     );
     expect(getWrittenOutput()).toBe('Response to slash command\n');
@@ -1383,7 +1375,6 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
       'prompt-id-unknown',
       undefined,
-      false,
       '/unknowncommand',
     );
 
@@ -2215,6 +2206,76 @@ describe('runNonInteractive', () => {
         'Agent execution stopped: Stopped by hook\n',
       );
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should write JSON output when AgentExecutionStopped event occurs', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Partial content' },
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop',
+        prompt_id: 'prompt-id-stop-json',
+      });
+
+      expect(processStdoutSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            session_id: 'test-session-id',
+            response: 'Partial content',
+            stats: MOCK_SESSION_METRICS,
+          },
+          null,
+          2,
+        ),
+      );
+    });
+
+    it('should emit result event when AgentExecutionStopped event occurs in streaming JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Partial content' },
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop',
+        prompt_id: 'prompt-id-stop-stream',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"result"');
+      expect(output).toContain('"status":"success"');
     });
 
     it('should handle AgentExecutionBlocked event', async () => {

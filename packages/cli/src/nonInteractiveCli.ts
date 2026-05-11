@@ -319,7 +319,6 @@ export async function runNonInteractive(
           abortController.signal,
           prompt_id,
           undefined,
-          false,
           turnCount === 1 ? input : undefined,
         );
 
@@ -401,6 +400,20 @@ export async function runNonInteractive(
                   durationMs,
                 ),
               });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  [...warnings, stopMessage],
+                ),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {

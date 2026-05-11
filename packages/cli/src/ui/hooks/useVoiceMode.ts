@@ -51,6 +51,7 @@ export function useVoiceMode({
   const recorderRef = useRef<AudioRecorder | null>(null);
   const transcriptionServiceRef = useRef<TranscriptionProvider | null>(null);
   const turnBaselineRef = useRef<string | null>(null);
+  const turnBaselineCursorOffsetRef = useRef<number>(0);
 
   const pttStateRef = useRef<'idle' | 'possible-hold' | 'recording'>('idle');
   const pttTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -74,13 +75,9 @@ export function useVoiceMode({
     }
 
     const serviceToDisconnect = transcriptionServiceRef.current;
-    transcriptionServiceRef.current = null;
 
     if (serviceToDisconnect) {
-      const isLive = settings.experimental.voice?.backend === 'gemini-live';
-      const gracePeriodMs =
-        settings.experimental.voice?.stopGracePeriodMs ??
-        (isLive ? 2000 : 1000);
+      const gracePeriodMs = settings.experimental.voice.stopGracePeriodMs;
       debugLogger.debug(
         `[Voice] Draining transcription for ${gracePeriodMs}ms`,
       );
@@ -89,11 +86,16 @@ export function useVoiceMode({
       disconnectTimerRef.current = setTimeout(() => {
         debugLogger.debug('[Voice] Grace period ended, disconnecting service');
         serviceToDisconnect.disconnect();
+        if (transcriptionServiceRef.current === serviceToDisconnect) {
+          transcriptionServiceRef.current = null;
+        }
         disconnectTimerRef.current = null;
+        liveTranscriptionRef.current = '';
       }, gracePeriodMs);
+    } else {
+      liveTranscriptionRef.current = '';
     }
 
-    liveTranscriptionRef.current = '';
     pttStateRef.current = 'idle';
   }, [settings.experimental.voice]);
 
@@ -112,6 +114,7 @@ export function useVoiceMode({
 
     recordingInProgressRef.current = true;
     turnBaselineRef.current = bufferRef.current.text;
+    turnBaselineCursorOffsetRef.current = bufferRef.current.getOffset();
 
     setIsConnecting(true);
     setIsRecording(true);
@@ -193,29 +196,23 @@ export function useVoiceMode({
         }
 
         if (text) {
-          const currentBufferText = bufferRef.current.text;
-          const previousTranscription = liveTranscriptionRef.current;
+          const baseline = turnBaselineRef.current ?? '';
+          const insertOffset = turnBaselineCursorOffsetRef.current;
+          const textBefore = baseline.slice(0, insertOffset);
+          const textAfter = baseline.slice(insertOffset);
 
-          let newTotalText = currentBufferText;
+          const prefix =
+            textBefore.length > 0 && !/\s$/.test(textBefore)
+              ? textBefore + ' '
+              : textBefore;
 
-          if (
-            previousTranscription &&
-            currentBufferText.endsWith(previousTranscription)
-          ) {
-            newTotalText = currentBufferText.slice(
-              0,
-              -previousTranscription.length,
-            );
-          } else if (
-            currentBufferText &&
-            !currentBufferText.endsWith(' ') &&
-            !currentBufferText.endsWith('\n')
-          ) {
-            newTotalText += ' ';
-          }
+          const suffix =
+            text.length > 0 && textAfter.length > 0 && !/^\s/.test(textAfter)
+              ? ' '
+              : '';
 
-          newTotalText += text;
-          bufferRef.current.setText(newTotalText, 'end');
+          const newTotalText = prefix + text + suffix + textAfter;
+          bufferRef.current.setText(newTotalText, prefix.length + text.length);
         }
         liveTranscriptionRef.current = text;
       });
@@ -226,6 +223,9 @@ export function useVoiceMode({
           stopRequestedRef.current
         )
           return;
+        // Advance the baseline so subsequent turns append after this turn's text
+        turnBaselineRef.current = bufferRef.current.text;
+        turnBaselineCursorOffsetRef.current = bufferRef.current.getOffset();
         liveTranscriptionRef.current = '';
       });
 
