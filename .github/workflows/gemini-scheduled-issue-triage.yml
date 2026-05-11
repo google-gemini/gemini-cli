@@ -61,15 +61,15 @@ jobs:
             const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
             await syncIssueTypes({ github, context, core });
 
-      - name: 'Find Issues with Multiple Area Labels'
+      - name: 'Find Issues with Conflicting Labels'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
-            const findMultipleAreas = require('./.github/scripts/find-multiple-areas.cjs');
-            await findMultipleAreas({ github, context, core });
+            const findConflictingLabels = require('./.github/scripts/find-conflicting-labels.cjs');
+            await findConflictingLabels({ github, context, core });
 
       - name: 'Find untriaged issues'
         if: |-
@@ -98,8 +98,8 @@ jobs:
             --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating issues...'
-          if [ ! -f multiple_area_issues.json ]; then echo "[]" > multiple_area_issues.json; fi
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json multiple_area_issues.json > issues_to_triage.json
+          if [ ! -f conflicting_labels_issues.json ]; then echo "[]" > conflicting_labels_issues.json; fi
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json conflicting_labels_issues.json > issues_to_triage.json
 
           ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
           if [ "$ISSUE_COUNT" -gt 0 ]; then
@@ -189,8 +189,8 @@ jobs:
             4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, priority/*, and effort/*.
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
-               - If the issue already has a priority/ label, do not change it.
-               - If the issue is missing a priority/ label, you must evaluate the issue's impact to determine the priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based on the categorization guidelines.
+               - If the issue has exactly ONE priority/ label, do not change it.
+               - If the issue is missing a priority/ label, OR if the issue currently has MULTIPLE priority/ labels, you must evaluate the issue's impact to determine exactly ONE priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based on the categorization guidelines. If you are fixing an issue with multiple priority/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
                - If the issue has exactly ONE area/ label, do not change it.
                - If the issue is missing an area/ label, OR if the issue currently has MULTIPLE area/ labels, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels. If you are fixing an issue with multiple area/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
                - If the issue already has an effort/ label, do not change it.
@@ -228,7 +228,7 @@ jobs:
               - Triage only the current issue.
               - Identify exactly ONE area/ label. Do NOT assign multiple area/ labels to a single issue.
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
-              - Identify only one priority/ label.
+              - Identify exactly ONE priority/ label. Do NOT assign multiple priority/ labels to a single issue.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
 
             Categorization Guidelines (Effort):

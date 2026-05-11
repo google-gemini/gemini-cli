@@ -116,6 +116,20 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
+    // Enforce mutually exclusive priority labels
+    const priorityLabelsToAdd = labelsToAdd.filter((l) =>
+      l.startsWith('priority/'),
+    );
+    if (priorityLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple priority labels to add: ${priorityLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstPriority = priorityLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('priority/') || l === firstPriority,
+      );
+    }
+
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
         owner: context.repo.owner,
