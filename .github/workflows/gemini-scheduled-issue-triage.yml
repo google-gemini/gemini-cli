@@ -263,7 +263,7 @@ jobs:
       - name: 'Stop Telemetry Collector'
         if: |-
           steps.find_issues.outputs.has_effort_issues == 'true'
-        run: docker rm -f gemini-telemetry-collector || true
+        run: 'docker rm -f gemini-telemetry-collector || true'
 
       - name: 'Run Effort Triage Analysis'
         if: |-
