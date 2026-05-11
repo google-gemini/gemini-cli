@@ -37,6 +37,7 @@ import {
   type Resource,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod/v4';
 import { parse } from 'shell-quote';
 import {
   AuthProviderType,
@@ -88,6 +89,18 @@ import {
 } from '../services/shellExecutionService.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+
+const LenientListResourcesResultSchema = z.preprocess((result) => {
+  if (
+    result !== null &&
+    typeof result === 'object' &&
+    'resources' in result &&
+    (result as { resources?: unknown }).resources === null
+  ) {
+    return { ...result, resources: [] };
+  }
+  return result;
+}, ListResourcesResultSchema);
 
 export type DiscoveredMCPPrompt = Prompt & {
   serverName: string;
@@ -1501,7 +1514,7 @@ async function listResources(
           method: 'resources/list',
           params: cursor ? { cursor } : {},
         },
-        ListResourcesResultSchema,
+        LenientListResourcesResultSchema,
       );
       resources.push(...(response.resources ?? []));
       cursor = response.nextCursor ?? undefined;

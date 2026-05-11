@@ -37,6 +37,7 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  discoverResources,
   discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
@@ -875,6 +876,20 @@ describe('mcp-client', () => {
           }),
         ],
       );
+    });
+
+    it('treats null resources from resources/list as empty', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        request: vi.fn().mockResolvedValue({
+          resources: null,
+        }),
+      } as unknown as ClientLib.Client;
+
+      await expect(
+        discoverResources('test-server', mockedClient, MOCK_CONTEXT),
+      ).resolves.toEqual([]);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
     it('refreshes registry when resource list change notification is received', async () => {
