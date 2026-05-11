@@ -81,13 +81,11 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_MODEL,
   resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -2024,7 +2022,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
-    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const proModel = primaryModel;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
       : DEFAULT_GEMINI_FLASH_MODEL;
