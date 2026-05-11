@@ -180,7 +180,7 @@ export class ClassifierStrategy implements RoutingStrategy {
         ]);
       const selectedModel = normalizeModelId(
         resolveClassifierModel(
-          model,
+          normalizeModelId(model),
           routerResponse.model_choice,
           useGemini3_1,
           useGemini3_1FlashLite,
