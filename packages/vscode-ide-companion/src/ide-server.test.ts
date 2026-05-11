@@ -535,4 +535,21 @@ describe('IDEServer HTTP endpoints', () => {
     // but it's not a host error, which is what we are testing.
     expect(response.statusCode).toBe(400);
   });
+
+  it('should allow requests with an IPv6 loopback host header', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `[::1]:${port}`,
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(400);
+  });
 });
