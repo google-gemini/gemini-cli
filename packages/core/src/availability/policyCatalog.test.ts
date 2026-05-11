@@ -11,6 +11,8 @@ import {
   validateModelPolicyChain,
 } from './policyCatalog.js';
 import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
@@ -50,7 +52,10 @@ describe('policyCatalog', () => {
   it('returns default chain when preview disabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: false });
     expect(chain[0]?.model).toBe(DEFAULT_GEMINI_MODEL);
-    expect(chain).toHaveLength(2);
+    expect(chain[1]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(chain[2]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(chain[2]?.isLastResort).toBe(true);
+    expect(chain).toHaveLength(3);
   });
 
   it('marks preview transients as sticky retries when auto-selected', () => {
