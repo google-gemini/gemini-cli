@@ -34,7 +34,6 @@ export class AdaptiveTokenCalculator implements ContextTokenCalculator {
   ) {
     this.baseCalculator = new StaticTokenCalculator(charsPerToken, registry);
     eventBus.onTokenGroundTruth((event: TokenGroundTruthEvent) => {
-      debugLogger.log(`!!! IN HERE: ${JSON.stringify(event, null, 2)}`);
       this.handleGroundTruth(event.actualTokens, event.promptBaseUnits);
     });
   }

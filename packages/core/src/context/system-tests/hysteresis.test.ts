@@ -37,7 +37,6 @@ describe('Context Manager Hysteresis Tests', () => {
     const harness = await SimulationHarness.create(
       getHysteresisConfig(threshold),
       mockLlmClient,
-      '/usr/local/google/home/joshualitt/a/gemini/test-traces',
     );
 
     // Turn 0: INIT
@@ -90,7 +89,6 @@ describe('Context Manager Hysteresis Tests', () => {
     const harness = await SimulationHarness.create(
       getHysteresisConfig(threshold),
       mockLlmClient,
-      '/usr/local/google/home/joshualitt/a/gemini/test-traces',
     );
 
     // 1. Trigger first consolidation
