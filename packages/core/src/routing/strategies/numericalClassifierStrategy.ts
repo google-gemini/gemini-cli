@@ -14,6 +14,7 @@ import type {
 } from '../routingStrategy.js';
 import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
+import type { Config } from '../../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,

@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NumericalClassifierStrategy, HISTORY_TURNS_FOR_CONTEXT } from './numericalClassifierStrategy.js';
+import {
+  NumericalClassifierStrategy,
+  HISTORY_TURNS_FOR_CONTEXT,
+} from './numericalClassifierStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -423,14 +426,15 @@ describe('NumericalClassifierStrategy', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-
   it('should strip leading tool turns when history starts with tool calls', async () => {
     const history: Content[] = [
       { role: 'model', parts: [{ functionCall: { name: 'leading_tool' } }] },
       {
         role: 'user',
         parts: [
-          { functionResponse: { name: 'leading_tool', response: { ok: true } } },
+          {
+            functionResponse: { name: 'leading_tool', response: { ok: true } },
+          },
         ],
       },
       { role: 'model', parts: [{ text: 'text response 1' }] },
@@ -654,7 +658,9 @@ describe('NumericalClassifierStrategy', () => {
       { role: 'model', parts: [{ functionCall: { name: 'tool_0' } }] },
       {
         role: 'user',
-        parts: [{ functionResponse: { name: 'tool_0', response: { ok: true } } }],
+        parts: [
+          { functionResponse: { name: 'tool_0', response: { ok: true } } },
+        ],
       },
     ];
     for (let i = 0; i < HISTORY_TURNS_FOR_CONTEXT; i++) {
