@@ -61,7 +61,7 @@ describe('Fallback Integration', () => {
     );
   });
 
-  it('should fallback for Gemini 3 models even if config is NOT in AUTO mode', () => {
+  it('should not fallback for Gemini 3 models if config is NOT in AUTO mode', () => {
     // 1. Config is explicitly set to Pro, not Auto
     vi.spyOn(config, 'getModel').mockReturnValue(PREVIEW_GEMINI_MODEL);
 
@@ -74,8 +74,8 @@ describe('Fallback Integration', () => {
     // 4. Apply model selection
     const result = applyModelSelection(config, { model: requestedModel });
 
-    // 5. Expect it to fallback to Flash (because Gemini 3 uses PREVIEW_CHAIN)
-    expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    // 5. Expect it to stay pinned to Pro.
+    expect(result.model).toBe(PREVIEW_GEMINI_MODEL);
   });
 
   it('should fallback to Flash after failures and restore Pro on next turn', () => {

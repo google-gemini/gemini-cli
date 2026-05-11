@@ -146,7 +146,7 @@ describe('Auto Routing Fallback Integration', () => {
     expect(attemptsFlash).toBe(10);
   });
 
-  it('should try 10 times and prompt user in non-auto mode', async () => {
+  it('should try 10 times without switching models in non-auto mode', async () => {
     // Instantiate real Config in non-auto mode
     const configNonAuto = new Config({
       sessionId: 'test-session',
@@ -212,11 +212,11 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify attempts (should default to 10)
     expect(attemptsPro).toBe(10);
 
-    // Verify handler was called once after 10 attempts to prompt user
+    // Verify handler was called once after 10 attempts, without a fallback model.
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
       PREVIEW_GEMINI_MODEL,
-      PREVIEW_GEMINI_FLASH_MODEL,
+      PREVIEW_GEMINI_MODEL,
       expect.any(RetryableQuotaError),
     );
   });

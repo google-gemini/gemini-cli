@@ -23,6 +23,7 @@ import {
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
@@ -76,9 +77,11 @@ export function resolvePolicyChain(
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = config.modelConfigService.resolveChain('lite', context);
     } else if (
-      isGemini3Model(resolvedModel, config) ||
+      // Auto selections use Pro/Flash chains. Explicit Flash also uses the
+      // chain so auto fallback to Flash keeps the Flash retry policy.
       isAutoPreferred ||
-      isAutoConfigured
+      isAutoConfigured ||
+      resolvedModel === PREVIEW_GEMINI_FLASH_MODEL
     ) {
       // 1. Try to find a chain specifically for the current configured alias
       if (
@@ -117,9 +120,11 @@ export function resolvePolicyChain(
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = getFlashLitePolicyChain();
     } else if (
-      isGemini3Model(resolvedModel, config) ||
+      // Auto selections use Pro/Flash chains. Explicit Flash also uses the
+      // chain so auto fallback to Flash keeps the Flash retry policy.
       isAutoPreferred ||
-      isAutoConfigured
+      isAutoConfigured ||
+      resolvedModel === PREVIEW_GEMINI_FLASH_MODEL
     ) {
       const isAutoSelection = isAutoPreferred || isAutoConfigured;
       if (hasAccessToPreview) {

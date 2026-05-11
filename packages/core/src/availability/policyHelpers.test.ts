@@ -158,6 +158,16 @@ describe('policyHelpers', () => {
       expect(chain[1]?.model).toBe('gemini-3-flash-preview');
     });
 
+    it('returns a single-model chain when Gemini 3.1 Pro is explicitly requested', () => {
+      const config = createMockConfig({
+        getModel: () => PREVIEW_GEMINI_3_1_MODEL,
+        getGemini31LaunchedSync: () => true,
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain).toHaveLength(1);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    });
+
     it('returns Gemini 3.1 Pro Custom Tools chain when launched, auth is Gemini, and auto-gemini-3 requested', () => {
       const config = createMockConfig({
         getModel: () => 'auto-gemini-3',
