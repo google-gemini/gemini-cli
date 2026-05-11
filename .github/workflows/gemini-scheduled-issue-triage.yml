@@ -260,6 +260,11 @@ jobs:
             area/platform: Platform specific behavior
             area/security: Authentication, authorization, privacy, data leaks, credential storage.
 
+      - name: 'Stop Telemetry Collector'
+        if: |-
+          steps.find_issues.outputs.has_effort_issues == 'true'
+        run: docker stop gemini-telemetry-collector || true
+
       - name: 'Run Effort Triage Analysis'
         if: |-
           steps.find_issues.outputs.has_effort_issues == 'true'
@@ -290,7 +295,7 @@ jobs:
                 "read_file"
               ],
               "telemetry": {
-                "enabled": false,
+                "enabled": true,
                 "target": "gcp"
               }
             }
