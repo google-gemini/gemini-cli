@@ -8,7 +8,8 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextEnvironment, RenderOptions } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { AdaptiveTokenCalculator } from '../utils/adaptiveTokenCalculator.js';
+import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
 import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
@@ -33,9 +34,10 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
   ) {
     this.behaviorRegistry = new NodeBehaviorRegistry();
     registerBuiltInBehaviors(this.behaviorRegistry);
-    this.tokenCalculator = new ContextTokenCalculator(
+    this.tokenCalculator = new AdaptiveTokenCalculator(
       this.charsPerToken,
       this.behaviorRegistry,
+      this.eventBus,
     );
     this.inbox = new LiveInbox();
     this.graphMapper = new ContextGraphMapper();

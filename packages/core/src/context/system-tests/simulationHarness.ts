@@ -111,11 +111,12 @@ export class SimulationHarness {
   }
 
   async getGoldenState() {
-    const { history: finalProjection } =
+    const { history: finalProjection, baseUnits } =
       await this.contextManager.renderHistory();
     return {
       tokenTrajectory: this.tokenTrajectory,
       finalProjection,
+      baseUnits,
     };
   }
 }

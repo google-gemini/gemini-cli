@@ -637,11 +637,18 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    let currentBaseUnits = 0;
+
     if (this.config.getContextManagementConfig().enabled) {
       if (this.contextManager) {
         const pendingRequest = createUserContent(request);
-        const { history: newHistory, didApplyManagement } =
-          await this.contextManager.renderHistory(pendingRequest);
+        const {
+          history: newHistory,
+          didApplyManagement,
+          baseUnits,
+        } = await this.contextManager.renderHistory(pendingRequest);
+
+        currentBaseUnits = baseUnits;
 
         if (didApplyManagement) {
           // If the manager pruned history, we update the chat before continuing.
@@ -800,8 +807,21 @@ export class GeminiClient {
       }
       yield event;
 
-      this.updateTelemetryTokenCount();
+      if (event.type === GeminiEventType.Finished && this.contextManager) {
+        const usageMetadata = event.value.usageMetadata;
+        if (
+          usageMetadata &&
+          usageMetadata.promptTokenCount !== undefined &&
+          currentBaseUnits > 0
+        ) {
+          this.contextManager.getEnvironment().eventBus.emitTokenGroundTruth({
+            actualTokens: usageMetadata.promptTokenCount,
+            promptBaseUnits: currentBaseUnits,
+          });
+        }
+      }
 
+      this.updateTelemetryTokenCount();
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }

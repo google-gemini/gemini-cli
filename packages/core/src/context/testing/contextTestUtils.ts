@@ -134,12 +134,24 @@ export function createMockLlmClient(
       );
     });
 
-  const generateJsonMock = vi.fn().mockImplementation(async () => ({
-    active_tasks: [],
-    discovered_facts: [],
-    constraints_and_preferences: [],
-    recent_arc: [],
-  }));
+  const generateJsonMock = vi.fn().mockImplementation(async () => {
+    let mockStr = '';
+    if (responses && responses.length > 0) {
+      const callCount = generateJsonMock.mock.calls.length - 1;
+      const idx =
+        callCount < responses.length ? callCount : responses.length - 1;
+      const res = responses[idx];
+      if (typeof res === 'string') {
+        mockStr = res;
+      }
+    }
+    return {
+      active_tasks: [],
+      discovered_facts: [],
+      constraints_and_preferences: [],
+      chronological_summary: mockStr,
+    };
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {

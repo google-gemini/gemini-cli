@@ -17,7 +17,30 @@ import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
  * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
  */
 
-export class ContextTokenCalculator {
+export interface ContextTokenCalculator {
+  estimateTokensForString(text: string): number;
+  tokensToChars(tokens: number): number;
+  garbageCollectCache(liveNodeIds: ReadonlySet<string>): void;
+  cacheNodeTokens(node: ConcreteNode): number;
+  getTokenCost(node: ConcreteNode): number;
+  calculateTokenBreakdown(nodes: readonly ConcreteNode[]): {
+    text: number;
+    media: number;
+    tool: number;
+    overhead: number;
+    total: number;
+  };
+  calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number;
+  calculateContentTokens(content: Content): number;
+  estimateTokensForParts(parts: Part[]): number;
+  getRawBaseUnits(nodes: readonly ConcreteNode[]): number;
+  getRawBaseUnitsForContent(content: Content): number;
+}
+
+/**
+ * A fast, deterministic token heuristic calculator.
+ */
+export class StaticTokenCalculator implements ContextTokenCalculator {
   private readonly tokenCache = new Map<string, number>();
 
   constructor(
@@ -141,6 +164,18 @@ export class ContextTokenCalculator {
       }
     }
     return breakdown;
+  }
+
+  /**
+   * For the static calculator, Raw Base Units are exactly the same as the final tokens,
+   * because there is no dynamic learned weight (the multiplier is effectively 1.0).
+   */
+  getRawBaseUnits(nodes: readonly ConcreteNode[]): number {
+    return this.calculateConcreteListTokens(nodes);
+  }
+
+  getRawBaseUnitsForContent(content: Content): number {
+    return this.calculateContentTokens(content);
   }
 
   /**

@@ -38,6 +38,9 @@ describe('render', () => {
     const orchestrator = {} as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
     const env = {
+      tokenCalculator: {
+        getRawBaseUnits: vi.fn().mockReturnValue(100),
+      },
       graphMapper: {
         fromGraph: vi.fn((nodes: readonly ConcreteNode[]) =>
           nodes.map((n) => ({ text: n.id })),
@@ -114,6 +117,10 @@ describe('render', () => {
       },
       tokenCalculator: {
         calculateConcreteListTokens: vi.fn((nodes) => {
+          if (nodes.length === 1) return tokenMap[nodes[0].id];
+          return currentTokens;
+        }),
+        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -194,6 +201,10 @@ describe('render', () => {
       },
       tokenCalculator: {
         calculateConcreteListTokens: vi.fn((nodes) => {
+          if (nodes.length === 1) return tokenMap[nodes[0].id];
+          return currentTokens;
+        }),
+        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),

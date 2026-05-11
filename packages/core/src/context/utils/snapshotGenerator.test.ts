@@ -23,6 +23,7 @@ describe('SnapshotGenerator', () => {
       },
       tokenCalculator: {
         estimateTokensForString: vi.fn().mockReturnValue(100),
+        getRawBaseUnits: vi.fn().mockReturnValue(100),
       },
       promptId: 'test-prompt',
     } as unknown as ContextEnvironment;

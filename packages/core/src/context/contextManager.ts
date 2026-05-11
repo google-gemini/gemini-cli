@@ -36,8 +36,14 @@ export class ContextManager {
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
-    result: { history: Content[]; didApplyManagement: boolean };
+    result: {
+      history: Content[];
+      didApplyManagement: boolean;
+      baseUnits: number;
+    };
   };
+
+  private hasPerformedHotStart = false;
 
   constructor(
     private readonly sidecar: ContextProfile,
@@ -260,6 +266,10 @@ export class ContextManager {
     return [...this.buffer.nodes];
   }
 
+  getEnvironment(): ContextEnvironment {
+    return this.env;
+  }
+
   /**
    * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
    * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -268,8 +278,22 @@ export class ContextManager {
   async renderHistory(
     pendingRequest?: Content,
     activeTaskIds: Set<string> = new Set(),
-  ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
+  ): Promise<{
+    history: Content[];
+    didApplyManagement: boolean;
+    baseUnits: number;
+  }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
+
+    // --- Hot Start Calibration ---
+    // If we are resuming a session with history, we don't want the adaptive token calculator
+    // to fly blind on its first GC pass. We do a one-time API calibration.
+    if (!this.hasPerformedHotStart) {
+      this.hasPerformedHotStart = true;
+      if (this.buffer.nodes.length > 0) {
+        await this.performHotStartCalibration(pendingRequest);
+      }
+    }
 
     // 1. Synchronous Pressure Barrier: Wait for background management pipelines to finish.
     // This ensures that the render sees the results of recent pushes (Anomaly 2).
@@ -314,7 +338,11 @@ export class ContextManager {
     const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
-    const { history: renderedHistory, didApplyManagement } = await render(
+    const {
+      history: renderedHistory,
+      didApplyManagement,
+      baseUnits,
+    } = await render(
       nodes,
       this.orchestrator,
       this.sidecar,
@@ -339,10 +367,61 @@ export class ContextManager {
         sentinels: this.sidecar.sentinels,
       }),
       didApplyManagement,
+      baseUnits,
     };
 
     // Update cache
     this.lastRenderCache = { nodesHash: totalHash, result };
     return result;
+  }
+
+  private async performHotStartCalibration(pendingRequest?: Content) {
+    try {
+      this.tracer.logEvent(
+        'ContextManager',
+        'Performing Hot Start Token Calibration',
+      );
+
+      let nodes = this.buffer.nodes;
+      if (pendingRequest) {
+        const previewNodes = this.env.graphMapper.applyEvent({
+          type: 'PUSH',
+          payload: [pendingRequest],
+        });
+        nodes = [...nodes, ...previewNodes];
+      }
+
+      const contents = this.env.graphMapper.fromGraph(nodes);
+      const header = this.headerProvider
+        ? await this.headerProvider()
+        : undefined;
+      const combinedHistory = header ? [header, ...contents] : contents;
+
+      const baseUnits =
+        this.env.tokenCalculator.getRawBaseUnits(nodes) +
+        (header
+          ? this.env.tokenCalculator.getRawBaseUnitsForContent(header)
+          : 0);
+
+      if (baseUnits > 0) {
+        const result = await this.env.llmClient.countTokens({
+          contents: combinedHistory,
+        });
+        if (result.totalTokens > 0) {
+          this.env.eventBus.emitTokenGroundTruth({
+            actualTokens: result.totalTokens,
+            promptBaseUnits: baseUnits,
+          });
+        }
+      }
+    } catch (error) {
+      // Hot start calibration is purely an optimization. If the network fails or auth is weird,
+      // we silently swallow and fallback to the un-calibrated 1.0 ratio heuristic.
+      this.tracer.logEvent(
+        'ContextManager',
+        'Hot Start Token Calibration Failed (Ignored)',
+        { error },
+      );
+    }
   }
 }
