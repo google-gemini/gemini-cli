@@ -89,8 +89,10 @@ export const bugCommand: SlashCommand = {
         const historyFilePath = path.join(tempDir, historyFileName);
         try {
           const trajectories = await chat?.getSubagentTrajectories();
+          const messages = chat?.getConversation()?.messages;
           await exportHistoryToFile({
             history,
+            messages,
             filePath: historyFilePath,
             trajectories,
           });

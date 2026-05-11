@@ -64,6 +64,7 @@ describe('chatCommand', () => {
     mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
       getSubagentTrajectories: vi.fn().mockResolvedValue({}),
+      getConversation: vi.fn().mockReturnValue({ messages: [] }),
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
     mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
@@ -231,7 +232,12 @@ describe('chatCommand', () => {
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
-        { history, authType: AuthType.LOGIN_WITH_GOOGLE, trajectories: {} },
+        {
+          history,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          trajectories: {},
+          messages: [],
+        },
         tag,
       );
       expect(result).toEqual({
@@ -465,6 +471,7 @@ describe('chatCommand', () => {
       );
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
+        messages: [],
         filePath: expectedPath,
         trajectories: {},
       });
@@ -481,6 +488,7 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
+        messages: [],
         filePath: expectedPath,
         trajectories: {},
       });
@@ -497,6 +505,7 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
+        messages: [],
         filePath: expectedPath,
         trajectories: {},
       });
@@ -548,6 +557,7 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
+        messages: [],
         filePath: expectedPath,
         trajectories: {},
       });
@@ -559,6 +569,7 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
+        messages: [],
         filePath: expectedPath,
         trajectories: {},
       });

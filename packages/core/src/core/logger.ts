@@ -11,7 +11,10 @@ import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import type { ConversationRecord } from '../services/chatRecordingService.js';
+import {
+  type ConversationRecord,
+  type MessageRecord,
+} from '../services/chatRecordingService.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -31,6 +34,7 @@ export interface Checkpoint {
   history: readonly Content[];
   authType?: AuthType;
   trajectories?: Record<string, ConversationRecord>;
+  messages?: MessageRecord[];
 }
 
 // This regex matches any character that is NOT a letter (a-z, A-Z),

@@ -1341,7 +1341,15 @@ export class GeminiChat {
   }
 
   /**
+   * Gets the current conversation record.
+   */
+  getConversation(): ConversationRecord | null {
+    return this.chatRecordingService.getConversation();
+  }
+
+  /**
    * Records completed tool calls with full metadata.
+
    * This is called by external components when tool calls complete, before sending responses to Gemini.
    */
   recordCompletedToolCalls(

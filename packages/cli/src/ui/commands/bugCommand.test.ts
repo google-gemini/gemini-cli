@@ -162,6 +162,7 @@ describe('bugCommand', () => {
       { role: 'model', parts: [{ text: 'hi' }] },
     ];
     const mockGetSubagentTrajectories = vi.fn().mockResolvedValue({});
+    const mockGetConversation = vi.fn().mockReturnValue({ messages: [] });
     const mockContext = createMockCommandContext({
       services: {
         agentContext: {
@@ -179,6 +180,7 @@ describe('bugCommand', () => {
             getChat: () => ({
               getHistory: () => history,
               getSubagentTrajectories: mockGetSubagentTrajectories,
+              getConversation: mockGetConversation,
             }),
           },
         },
@@ -194,6 +196,7 @@ describe('bugCommand', () => {
     );
     expect(exportHistoryToFile).toHaveBeenCalledWith({
       history,
+      messages: [],
       filePath: expectedPath,
       trajectories: {},
     });
@@ -222,6 +225,7 @@ describe('bugCommand', () => {
       } as unknown as ConversationRecord,
     };
     const mockGetSubagentTrajectories = vi.fn().mockResolvedValue(trajectories);
+    const mockGetConversation = vi.fn().mockReturnValue({ messages: [] });
 
     const mockContext = createMockCommandContext({
       services: {
@@ -240,6 +244,7 @@ describe('bugCommand', () => {
             getChat: () => ({
               getHistory: () => history,
               getSubagentTrajectories: mockGetSubagentTrajectories,
+              getConversation: mockGetConversation,
             }),
           },
         },
@@ -256,6 +261,7 @@ describe('bugCommand', () => {
     expect(mockGetSubagentTrajectories).toHaveBeenCalled();
     expect(exportHistoryToFile).toHaveBeenCalledWith({
       history,
+      messages: [],
       filePath: expectedPath,
       trajectories,
     });

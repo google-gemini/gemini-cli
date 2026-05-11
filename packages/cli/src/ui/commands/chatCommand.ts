@@ -140,7 +140,11 @@ const saveCommand: SlashCommand = {
     if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       const trajectories = await chat.getSubagentTrajectories();
-      await logger.saveCheckpoint({ history, authType, trajectories }, tag);
+      const messages = chat.getConversation()?.messages;
+      await logger.saveCheckpoint(
+        { history, authType, trajectories, messages },
+        tag,
+      );
       return {
         type: 'message',
         messageType: 'info',
@@ -326,7 +330,8 @@ const shareCommand: SlashCommand = {
 
     try {
       const trajectories = await chat.getSubagentTrajectories();
-      await exportHistoryToFile({ history, filePath, trajectories });
+      const messages = chat.getConversation()?.messages;
+      await exportHistoryToFile({ history, filePath, trajectories, messages });
       return {
         type: 'message',
         messageType: 'info',
