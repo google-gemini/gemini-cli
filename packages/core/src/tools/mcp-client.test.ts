@@ -881,15 +881,37 @@ describe('mcp-client', () => {
     it('treats null resources from resources/list as empty', async () => {
       const mockedClient = {
         getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
-        request: vi.fn().mockResolvedValue({
-          resources: null,
-        }),
+        request: vi.fn().mockImplementation((_request, resultSchema) =>
+          Promise.resolve(
+            (resultSchema as { parse: (result: unknown) => unknown }).parse({
+              resources: null,
+            }),
+          ),
+        ),
       } as unknown as ClientLib.Client;
 
       await expect(
         discoverResources('test-server', mockedClient, MOCK_CONTEXT),
       ).resolves.toEqual([]);
       expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
+    });
+
+    it('still rejects invalid resource list shapes', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        request: vi.fn().mockImplementation((_request, resultSchema) =>
+          Promise.resolve(
+            (resultSchema as { parse: (result: unknown) => unknown }).parse({
+              resources: 123,
+            }),
+          ),
+        ),
+      } as unknown as ClientLib.Client;
+
+      await expect(
+        discoverResources('test-server', mockedClient, MOCK_CONTEXT),
+      ).rejects.toThrow();
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledOnce();
     });
 
     it('refreshes registry when resource list change notification is received', async () => {
