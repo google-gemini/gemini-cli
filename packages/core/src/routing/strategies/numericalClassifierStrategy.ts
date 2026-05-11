@@ -16,6 +16,7 @@ import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { normalizeModelId } from '../../utils/modelUtils.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 
@@ -153,15 +154,27 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getGemini31FlashLiteLaunched(),
           config.getUseCustomToolModel(),
         ]);
-      const selectedModel = resolveClassifierModel(
-        model,
-        modelAlias,
-        useGemini3_1,
-        useGemini3_1FlashLite,
-        useCustomToolModel,
-        config.getHasAccessToPreviewModel?.() ?? true,
-        config,
+      const selectedModel = normalizeModelId(
+        resolveClassifierModel(
+          model,
+          modelAlias,
+          useGemini3_1,
+          useGemini3_1FlashLite,
+          useCustomToolModel,
+          config.getHasAccessToPreviewModel?.() ?? true,
+          config,
+        ),
       );
+
+      const service = config.getModelAvailabilityService();
+      const snapshot = service.snapshot(selectedModel);
+
+      if (!snapshot.available) {
+        debugLogger.warn(
+          `[Routing] Numerical classifier selected unavailable model ${selectedModel} (${snapshot.reason}). Bypassing.`,
+        );
+        return null;
+      }
 
       const latencyMs = Date.now() - startTime;
 
