@@ -40,6 +40,7 @@ import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
 import { isDirectorySecure } from '../utils/security.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,14 +93,77 @@ export const PLAN_MODE_PLANS_DIR_RULE_SOURCE =
 export const PLAN_MODE_PLANS_DIR_ALLOW_PRIORITY =
   DEFAULT_POLICY_TIER + 0.066;
 
+function resolveToRealPathForPattern(
+  dir: string,
+  fallbackNormalize: (path: string) => string,
+): string {
+  try {
+    return resolveToRealPath(dir);
+  } catch {
+    return fallbackNormalize(dir);
+  }
+}
+
+function resolvePlansDirForPolicyPattern(dir: string): string {
+  if (/^[\\/]{2}[^\\/]+[\\/]+[^\\/]+/.test(dir)) {
+    return process.platform === 'win32'
+      ? resolveToRealPathForPattern(dir, path.win32.normalize)
+      : path.win32.normalize(dir);
+  }
+
+  if (/^[a-zA-Z]:[\\/]/.test(dir)) {
+    return process.platform === 'win32'
+      ? resolveToRealPathForPattern(dir, path.win32.normalize)
+      : path.win32.normalize(dir);
+  }
+
+  if (dir.startsWith('/')) {
+    return process.platform === 'win32'
+      ? path.posix.normalize(dir)
+      : resolveToRealPathForPattern(dir, path.posix.normalize);
+  }
+
+  return resolveToRealPathForPattern(dir, path.normalize);
+}
+
+function joinEscapedPathSegments(segments: string[]): string {
+  return segments.map((segment) => escapeRegex(segment)).join('[\\\\/]+');
+}
+
 function buildDirectMarkdownInDirectoryArgsPattern(dir: string): RegExp {
-  const resolvedDir = path.resolve(dir);
-  const hasRootPrefix =
-    resolvedDir.startsWith(path.sep) || /^[\\/]/.test(resolvedDir);
-  const segments = resolvedDir.split(/[\\/]+/).filter(Boolean);
-  const dirPattern =
-    (hasRootPrefix ? '[\\\\/]+' : '') +
-    segments.map((segment) => escapeRegex(segment)).join('[\\\\/]+');
+  const resolvedDir = resolvePlansDirForPolicyPattern(dir);
+  const uncMatch = resolvedDir.match(
+    /^[\\/]{2}([^\\/]+)[\\/]+([^\\/]+)(?:[\\/]+(.*))?$/,
+  );
+  const driveMatch = resolvedDir.match(/^([a-zA-Z]:)[\\/]*(.*)$/);
+
+  let dirPattern: string;
+  if (uncMatch) {
+    const [, server, share, rest = ''] = uncMatch;
+    dirPattern = [
+      '(?:/{2,}|\\\\{4,})',
+      escapeRegex(server),
+      '[\\\\/]+',
+      escapeRegex(share),
+      ...rest
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .flatMap((segment) => ['[\\\\/]+', escapeRegex(segment)]),
+    ].join('');
+  } else if (driveMatch) {
+    const [, drive, rest] = driveMatch;
+    const segments = rest.split(/[\\/]+/).filter(Boolean);
+    dirPattern =
+      escapeRegex(drive) +
+      (segments.length > 0
+        ? `[\\\\/]+${joinEscapedPathSegments(segments)}`
+        : '');
+  } else {
+    const hasRootPrefix = /^[\\/]/.test(resolvedDir);
+    const segments = resolvedDir.split(/[\\/]+/).filter(Boolean);
+    dirPattern =
+      (hasRootPrefix ? '[\\\\/]+' : '') + joinEscapedPathSegments(segments);
+  }
 
   return new RegExp(
     `\\x00${escapeRegex('"file_path":"')}${dirPattern}[\\\\/]+[^"\\\\/]+\\.md${escapeRegex('"')}\\x00`,

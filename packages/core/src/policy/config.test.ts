@@ -18,9 +18,11 @@ import {
 import { isDirectorySecure } from '../utils/security.js';
 import {
   createPolicyEngineConfig,
+  createPlanModePlansDirectoryRules,
   clearEmittedPolicyWarnings,
   getPolicyDirectories,
 } from './config.js';
+import { PolicyEngine } from './policy-engine.js';
 import { Storage } from '../config/storage.js';
 import * as tomlLoader from './toml-loader.js';
 import { coreEvents } from '../utils/events.js';
@@ -50,6 +52,98 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 afterEach(() => {
   vi.resetAllMocks();
+});
+
+describe('createPlanModePlansDirectoryRules', () => {
+  async function checkWriteFileDecision(plansDir: string, filePath: string) {
+    const engine = new PolicyEngine({
+      approvalMode: ApprovalMode.PLAN,
+      rules: [
+        ...createPlanModePlansDirectoryRules(plansDir),
+        {
+          toolName: 'write_file',
+          decision: PolicyDecision.DENY,
+          priority: 1.065,
+          modes: [ApprovalMode.PLAN],
+        },
+      ],
+    });
+
+    return engine.check(
+      {
+        name: 'write_file',
+        args: { file_path: filePath, content: 'plan' },
+      },
+      undefined,
+    );
+  }
+
+  async function expectOnlyDirectMarkdownFilesAllowed(
+    plansDir: string,
+    directMarkdownPath: string,
+    nestedMarkdownPath: string,
+    nonMarkdownPath: string,
+    traversalPath: string,
+  ) {
+    await expect(
+      checkWriteFileDecision(plansDir, directMarkdownPath),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ALLOW });
+
+    await expect(
+      checkWriteFileDecision(plansDir, nestedMarkdownPath),
+    ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+
+    await expect(
+      checkWriteFileDecision(plansDir, nonMarkdownPath),
+    ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+
+    await expect(
+      checkWriteFileDecision(plansDir, traversalPath),
+    ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+  }
+
+  it('should match only direct Markdown files in a POSIX custom plans directory', async () => {
+    const plansDir = '/project/custom-plans';
+
+    await expectOnlyDirectMarkdownFilesAllowed(
+      plansDir,
+      '/project/custom-plans/foo.md',
+      '/project/custom-plans/nested/foo.md',
+      '/project/custom-plans/foo.txt',
+      '/project/custom-plans/../foo.md',
+    );
+  });
+
+  it('should match only direct Markdown files in a Windows drive custom plans directory', async () => {
+    const plansDir = String.raw`C:\project\custom-plans`;
+
+    await expectOnlyDirectMarkdownFilesAllowed(
+      plansDir,
+      String.raw`C:\project\custom-plans\foo.md`,
+      String.raw`C:\project\custom-plans\nested\foo.md`,
+      String.raw`C:\project\custom-plans\foo.txt`,
+      String.raw`C:\project\custom-plans\..\foo.md`,
+    );
+  });
+
+  it('should match only direct Markdown files in a Windows UNC custom plans directory', async () => {
+    const plansDir = String.raw`\\server\share\project\custom-plans`;
+
+    await expectOnlyDirectMarkdownFilesAllowed(
+      plansDir,
+      String.raw`\\server\share\project\custom-plans\foo.md`,
+      String.raw`\\server\share\project\custom-plans\nested\foo.md`,
+      String.raw`\\server\share\project\custom-plans\foo.txt`,
+      String.raw`\\server\share\project\custom-plans\..\foo.md`,
+    );
+
+    await expect(
+      checkWriteFileDecision(
+        plansDir,
+        String.raw`\server\share\project\custom-plans\foo.md`,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+  });
 });
 
 describe('createPolicyEngineConfig', () => {
