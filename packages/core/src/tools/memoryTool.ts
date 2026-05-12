@@ -74,7 +74,7 @@ export function resetGeminiMdFilename(
   filename: string | string[] = DEFAULT_CONTEXT_FILENAME,
 ): void {
   const filenames = Array.isArray(filename) ? filename : [filename];
-  const cleaned = filenames.map((f) => f.trim()).filter((f) => f !== '');
+  const cleaned = filenames.map((f) => path.basename(f.trim())).filter((f) => f !== '');
 
   if (cleaned.length === 0) {
     currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;
