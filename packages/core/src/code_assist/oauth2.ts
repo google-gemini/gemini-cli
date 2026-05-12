@@ -61,7 +61,10 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     type: 'authorized_user',
     client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
     // Fix: Inject quota_project_id to prevent trace export fallback to default oauth client
-    quota_project_id: process.env['GOOGLE_CLOUD_QUOTA_PROJECT'] || process.env['GOOGLE_CLOUD_PROJECT'] || process.env['GOOGLE_CLOUD_PROJECT_ID'],
+    quota_project_id:
+      process.env['GOOGLE_CLOUD_QUOTA_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'],
   };
 
   // Execute all registered post-authentication callbacks.
