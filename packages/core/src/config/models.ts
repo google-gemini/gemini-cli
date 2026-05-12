@@ -100,13 +100,13 @@ export function getAutoModelDescription(
   releaseChannel: string = 'stable',
   useGemini3_1: boolean = false,
 ) {
-  const proModel =
-    releaseChannel === 'preview'
-      ? useGemini3_1
-        ? 'gemini-3.1-pro'
-        : 'gemini-3-pro'
-      : 'gemini-2.5-pro';
-  const flashModel = 'gemini-3-flash';
+  const isPreview = releaseChannel === 'preview';
+  const proModel = isPreview
+    ? useGemini3_1
+      ? 'gemini-3.1-pro'
+      : 'gemini-3-pro'
+    : 'gemini-2.5-pro';
+  const flashModel = isPreview ? 'gemini-3-flash' : 'gemini-2.5-flash';
   return `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
 }
 
