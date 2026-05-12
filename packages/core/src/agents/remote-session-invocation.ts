@@ -17,6 +17,7 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  SubagentState,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -139,13 +140,13 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
         updateOutput({
           isSubagentProgress: true,
           agentName,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: [
             {
               id: 'pending',
               type: 'thought',
               content: 'Working...',
-              status: 'running',
+              status: SubagentState.RUNNING,
             },
           ],
         });
@@ -164,7 +165,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
         const errorProgress: SubagentProgress = {
           isSubagentProgress: true,
           agentName,
-          state: 'error',
+          state: SubagentState.ERROR,
           result:
             typeof partialProgress?.result === 'string'
               ? partialProgress.result
@@ -199,7 +200,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
       const errorProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: 'error',
+        state: SubagentState.ERROR,
         result: fullDisplay,
         recentActivity: partialProgress?.recentActivity ?? [],
       };
