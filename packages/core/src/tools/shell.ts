@@ -471,6 +471,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
     let timeoutTimer: NodeJS.Timeout | undefined;
+    let trailingFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Handle signal combination manually to avoid TS issues or runtime missing features
     const combinedController = new AbortController();
@@ -523,7 +524,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
             : nextOutput;
       };
 
+      const cancelTrailingFlush = () => {
+        if (trailingFlushTimer !== null) {
+          clearTimeout(trailingFlushTimer);
+          trailingFlushTimer = null;
+        }
+      };
+
       const flushOutput = () => {
+        cancelTrailingFlush();
         if (!hasPendingOutput || !updateOutput || this.params.is_background) {
           return;
         }
@@ -532,6 +541,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
         hasPendingOutput = false;
         hasFlushedOutput = true;
         lastUpdateTime = Date.now();
+      };
+
+      const scheduleTrailingFlush = () => {
+        if (
+          trailingFlushTimer !== null ||
+          !updateOutput ||
+          this.params.is_background
+        ) {
+          return;
+        }
+        trailingFlushTimer = setTimeout(() => {
+          trailingFlushTimer = null;
+          flushOutput();
+        }, OUTPUT_UPDATE_INTERVAL_MS);
       };
 
       const resetTimeout = () => {
@@ -569,6 +592,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   shouldUpdate =
                     !hasFlushedOutput ||
                     Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS;
+                  if (!shouldUpdate) {
+                    scheduleTrailingFlush();
+                  }
                 } else {
                   cumulativeOutput = event.chunk;
                   shouldUpdate = true;
@@ -1005,6 +1031,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (trailingFlushTimer) {
+        clearTimeout(trailingFlushTimer);
+        trailingFlushTimer = null;
+      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       if (tempFilePath) {

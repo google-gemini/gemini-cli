@@ -705,14 +705,14 @@ EOF`;
         mockShellOutputCallback({ type: 'data', chunk: 'second' });
         expect(updateOutputMock).toHaveBeenCalledOnce();
 
-        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
         mockShellOutputCallback({ type: 'data', chunk: 'third' });
-
-        expect(updateOutputMock).toHaveBeenCalledTimes(2);
-        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecondthird');
+        expect(updateOutputMock).toHaveBeenCalledOnce();
 
         resolveShellExecution({ output: 'firstsecondthird' });
         await promise;
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecondthird');
       });
 
       it('should flush trailing throttled text output when the command completes', async () => {
@@ -774,6 +774,52 @@ EOF`;
 
         resolveShellExecution({ ansiOutput: secondAnsiOutput });
         await promise;
+      });
+
+      it('should trailing-flush throttled text output when the command goes silent', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'first' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+        expect(updateOutputMock).toHaveBeenLastCalledWith('first');
+
+        mockShellOutputCallback({ type: 'data', chunk: 'second' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecond');
+
+        resolveShellExecution({ output: 'firstsecond' });
+        await promise;
+      });
+
+      it('should cancel the scheduled trailing flush when the command exits', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'first' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        mockShellOutputCallback({ type: 'data', chunk: 'second' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        resolveShellExecution({ output: 'firstsecond' });
+        await promise;
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecond');
+
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS * 5);
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
       });
 
       it('should NOT call updateOutput if the command is backgrounded', async () => {
