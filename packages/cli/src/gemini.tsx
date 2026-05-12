@@ -85,7 +85,11 @@ import { validateAuthMethod } from './config/auth.js';
 import { runAcpClient } from './acp/acpStdioTransport.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionError, SessionSelector } from './utils/sessionUtils.js';
+import {
+  RESUME_LATEST,
+  SessionError,
+  SessionSelector,
+} from './utils/sessionUtils.js';
 
 import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
@@ -309,8 +313,10 @@ export async function resolveSessionId(
     };
   } catch (error) {
     if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
-      coreEvents.emitFeedback('warning', error.message);
-      return { sessionId: createSessionId() };
+      if (resumeArg === RESUME_LATEST) {
+        coreEvents.emitFeedback('warning', error.message);
+        return { sessionId: createSessionId() };
+      }
     }
     coreEvents.emitFeedback(
       'error',

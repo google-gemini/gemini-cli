@@ -11,6 +11,7 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { performCalibration } from '../utils/tokenCalibration.js';
+import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 /**
  * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -22,21 +23,43 @@ export async function render(
   sidecar: ContextProfile,
   tracer: ContextTracer,
   env: ContextEnvironment,
+  advancedTokenCalculator: AdvancedTokenCalculator,
   protectionReasons: Map<string, string> = new Map(),
-  headerTokens: number = 0,
+  header?: Content,
   previewNodeIds: ReadonlySet<string> = new Set(),
-): Promise<{ history: Content[]; didApplyManagement: boolean }> {
+): Promise<{
+  history: Content[];
+  didApplyManagement: boolean;
+  baseUnits: number;
+}> {
+  let headerTokens = 0;
+  let headerBaseUnits = 0;
+  if (header) {
+    const costs =
+      advancedTokenCalculator.calculateContentTokensAndBaseUnits(header);
+    headerTokens = costs.tokens;
+    headerBaseUnits = costs.baseUnits;
+  }
+
   if (!sidecar.config.budget) {
     const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
     const contents = env.graphMapper.fromGraph(visibleNodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
-    return { history: contents, didApplyManagement: false };
+
+    // In all cases, retrieve raw base units from the token calculator interface
+    const baseUnits =
+      advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
+
+    return { history: contents, didApplyManagement: false, baseUnits };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
-  const graphTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
+
+  const { tokens: graphTokens, baseUnits: graphBaseUnits } =
+    advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
+
   const currentTokens = graphTokens + headerTokens;
 
   const protectedIds = new Set(protectionReasons.keys());
@@ -70,7 +93,11 @@ export async function render(
       renderedContext: contents,
     });
     performCalibration(env, visibleNodes, contents);
-    return { history: contents, didApplyManagement: false };
+    return {
+      history: contents,
+      didApplyManagement: false,
+      baseUnits: graphBaseUnits + headerBaseUnits,
+    };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
   tracer.logEvent(
@@ -119,5 +146,10 @@ export async function render(
     renderedContextSanitized: contents,
   });
   performCalibration(env, visibleNodes, contents);
-  return { history: contents, didApplyManagement: true };
+  return {
+    history: contents,
+    didApplyManagement: true,
+    baseUnits:
+      advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerBaseUnits,
+  };
 }
