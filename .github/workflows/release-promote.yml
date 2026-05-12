@@ -55,6 +55,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
 
@@ -171,11 +172,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ matrix.sha }}'
           path: 'release'
           fetch-depth: 0
@@ -216,11 +219,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -288,11 +293,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -360,6 +367,7 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Setup Node.js'
