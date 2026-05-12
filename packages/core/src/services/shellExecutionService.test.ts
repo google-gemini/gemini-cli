@@ -768,6 +768,44 @@ describe('ShellExecutionService', () => {
       (ShellExecutionService as any).backgroundLogStreams.clear();
     });
 
+    it('should create background log file with restrictive permissions (0o600)', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'permission-test',
+        '/',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Use the registered onData listener to produce some output
+      const onDataListener = mockPtyProcess.onData.mock.calls[0][0];
+      onDataListener('sensitive output');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      mockSerializeTerminalToObject.mockReturnValue([
+        [{ text: 'sensitive output', fg: '', bg: '' }],
+      ]);
+
+      // Background the process — this triggers createWriteStream
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'permission-test',
+      );
+
+      // Verify that createWriteStream was called with mode: 0o600
+      expect(mockCreateWriteStream).toHaveBeenCalledWith(
+        expect.stringContaining('background-'),
+        expect.objectContaining({
+          flags: 'wx',
+          mode: 0o600,
+        }),
+      );
+
+      await ShellExecutionService.kill(handle.pid!);
+    });
+
     it('should move a running pty process to the background and start logging', async () => {
       const abortController = new AbortController();
       const handle = await ShellExecutionService.execute(
