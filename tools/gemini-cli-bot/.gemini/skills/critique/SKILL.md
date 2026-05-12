@@ -65,10 +65,18 @@ changes. You MUST use `git add` to stage these files.**
     `pr-description.md`, `lessons-learned.md`, or metrics CSVs are NOT staged.
     If they are staged, you MUST unstage them using `git reset <file>`.
 12. **One Thing at a Time**: Does the PR address ONLY a single improvement or
-    fix? If you detect multiple unrelated changes bundled together (e.g., fixing
-    a bug in one file and updating documentation in another, or performing
-    unrelated refactors alongside a fix), you MUST REJECT the changes by
-    outputting `[REJECTED]`. A PR must have a single, cohesive purpose.
+    fix? If you detect multiple unrelated changes bundled together, you MUST
+    REJECT the changes by outputting `[REJECTED]`.
+    - **Test for Relatedness**: Changes are UNRELATED if they address different
+      root causes or if one could be committed without the other while still
+      providing value.
+    - **Examples of BUNDLING (Reject)**: Fixing a bug in one file and updating
+      documentation in another; performing unrelated refactors alongside a fix;
+      updating two different automation scripts.
+    - **Examples of SINGLE CHANGE (Approve)**: Updating a script and its
+      corresponding documentation; fixing a bug and adding a test for that bug;
+      refactoring a specific function to support a fix for that function.
+    - **Goal**: A PR must have a single, cohesive purpose.
 
 ### Security & Payload Awareness
 

@@ -15,7 +15,10 @@ descriptions, and manages the lifecycle of both new and existing PRs.
 If you are proposing fixes and PR creation is enabled (per the System Directive):
 
 1.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
-    Prioritize highest impact, lowest risk.
+    - **No Bundling**: You are STRICTLY FORBIDDEN from bundling unrelated
+      changes. Changes are unrelated if they address different root causes.
+    - **Examples**: Do not combine a script fix with a documentation update or
+      unrelated refactor.
 2.  **Generate PR Description**: Use the `write_file` tool to create
     `pr-description.md`.
     - **Title**: The very first line MUST be a concise, conventional title.
