@@ -85,13 +85,50 @@ module.exports = async ({ github, context, core }) => {
       continue;
     }
 
-    const labelsToAdd = entry.labels_to_add || [];
-    labelsToAdd.push('status/bot-triaged');
-
+    let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
+
     labelsToRemove.push('status/need-triage');
-    // Deduplicate array
+
+    if (labelsToAdd.includes('status/manual-triage')) {
+      // If the AI flagged it for manual triage, remove bot-triaged if it exists
+      labelsToRemove.push('status/bot-triaged');
+      // Ensure we don't accidentally try to add bot-triaged if the AI returned it
+      labelsToAdd = labelsToAdd.filter((l) => l !== 'status/bot-triaged');
+    } else {
+      // Standard successful bot triage
+      labelsToAdd.push('status/bot-triaged');
+    }
+
+    // Deduplicate arrays
+    labelsToAdd = [...new Set(labelsToAdd)];
     labelsToRemove = [...new Set(labelsToRemove)];
+
+    // Enforce mutually exclusive area labels
+    const areaLabelsToAdd = labelsToAdd.filter((l) => l.startsWith('area/'));
+    if (areaLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple area labels to add: ${areaLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstArea = areaLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('area/') || l === firstArea,
+      );
+    }
+
+    // Enforce mutually exclusive priority labels
+    const priorityLabelsToAdd = labelsToAdd.filter((l) =>
+      l.startsWith('priority/'),
+    );
+    if (priorityLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple priority labels to add: ${priorityLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstPriority = priorityLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('priority/') || l === firstPriority,
+      );
+    }
 
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
