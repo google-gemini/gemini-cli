@@ -44,13 +44,18 @@ let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 export function setGeminiMdFilename(newFilename: string | string[]): void {
   const filenames = Array.isArray(newFilename) ? newFilename : [newFilename];
   const current = getAllGeminiMdFilenames();
-  const next = new Set(current);
+  const next = new Set<string>();
 
   for (const filename of filenames) {
     const trimmed = filename.trim();
     if (trimmed !== '') {
-      next.add(trimmed);
+      const safeFilename = path.basename(trimmed);
+      next.add(safeFilename);
     }
+  }
+
+  for (const filename of current) {
+    next.add(filename);
   }
 
   const result = Array.from(next);
