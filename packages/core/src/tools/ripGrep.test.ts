@@ -47,6 +47,9 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   return {
     ...actual,
     resolveToRealPath: vi.fn((p) => p),
+    normalizePath: vi.fn((p) =>
+      typeof p === 'string' ? p.replace(/\\/g, '/') : p,
+    ),
   };
 });
 
