@@ -23,7 +23,7 @@ import {
   resolveToRealPath,
   shortenPath,
   makeRelative,
-  normalizePath,
+  isTrustedSystemPath,
 } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -87,46 +87,6 @@ export async function resolveRipgrepPath(): Promise<string | null> {
   } catch (error: unknown) {
     debugLogger.error('Error resolving ripgrep path:', error);
     return null;
-  }
-}
-
-/**
- * Verifies if a path is a trusted system directory.
- */
-function isTrustedSystemPath(filePath: string): boolean {
-  const normPath = normalizePath(filePath);
-
-  // 1. Explicitly reject paths in current working directory to prevent RCE
-  const normCwd = normalizePath(process.cwd());
-  if (normPath === normCwd || normPath.startsWith(normCwd + '/')) {
-    return false;
-  }
-
-  // 2. Allow standard system directories
-  const platform = os.platform();
-  if (platform === 'win32') {
-    const trustedPrefixes = [
-      process.env['SystemRoot'] || 'C:\\Windows',
-      process.env['ProgramFiles'] || 'C:\\Program Files',
-      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
-    ].map((p) => normalizePath(p));
-
-    return trustedPrefixes.some(
-      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
-    );
-  } else {
-    const trustedPrefixes = [
-      '/usr/bin',
-      '/bin',
-      '/usr/local/bin',
-      '/opt/homebrew/bin',
-      '/usr/sbin',
-      '/sbin',
-    ];
-
-    return trustedPrefixes.some(
-      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
-    );
   }
 }
 

@@ -1829,16 +1829,16 @@ describe('resolveRipgrepPath', () => {
       expect(resolvedPath).toBeNull();
     });
 
-    it('should allow system PATH if the real path is untrusted but the link is in a trusted directory (e.g. Homebrew)', async () => {
+    it('should allow system PATH if the real path is in a trusted directory (e.g. Homebrew Cellar)', async () => {
       vi.mocked(fileExists).mockResolvedValue(false);
       const trustedLink = '/usr/local/bin/rg';
-      const untrustedRealPath = '/Users/user/Library/Caches/homebrew/rg';
+      const trustedRealPath = '/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg';
 
       vi.mocked(resolveExecutable).mockResolvedValue(trustedLink);
-      vi.mocked(resolveToRealPath).mockReturnValue(untrustedRealPath);
+      vi.mocked(resolveToRealPath).mockReturnValue(trustedRealPath);
 
       const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).toBe(untrustedRealPath);
+      expect(resolvedPath).toBe(trustedRealPath);
     });
 
     it('should return null if binary is missing from both bundled paths and system PATH', async () => {

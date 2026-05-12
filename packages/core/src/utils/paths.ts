@@ -512,3 +512,45 @@ export function toPathKey(p: string): string {
   const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
   return isCaseInsensitive ? norm.toLowerCase() : norm;
 }
+
+/**
+ * Verifies if a path is a trusted system directory.
+ */
+export function isTrustedSystemPath(filePath: string): boolean {
+  const normPath = normalizePath(filePath);
+
+  // 1. Explicitly reject paths in current working directory to prevent RCE
+  const normCwd = normalizePath(process.cwd());
+  if (normPath === normCwd || normPath.startsWith(normCwd + '/')) {
+    return false;
+  }
+
+  // 2. Allow standard system directories
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const trustedPrefixes = [
+      process.env['SystemRoot'] || 'C:\\Windows',
+      process.env['ProgramFiles'] || 'C:\\Program Files',
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  } else {
+    const trustedPrefixes = [
+      '/usr/bin',
+      '/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/Cellar',
+      '/usr/local/Cellar',
+      '/usr/sbin',
+      '/sbin',
+    ];
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  }
+}

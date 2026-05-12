@@ -11,6 +11,7 @@ import {
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
+import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Determines if a command is strictly approved for execution on macOS.
@@ -192,8 +193,24 @@ function isSafeToCallWithExec(args: string[]): boolean {
     return !args.some((arg) => unsafeOptions.has(arg));
   }
 
-  const cmdBasename = path.basename(cmd);
-  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
+  let isRg = false;
+  if (cmd === 'rg' || cmd === 'rg.exe') {
+    isRg = true;
+  } else {
+    const cmdBasename = path.basename(cmd);
+    if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
+      try {
+        const realPath = resolveToRealPath(cmd);
+        if (isTrustedSystemPath(realPath)) {
+          isRg = true;
+        }
+      } catch {
+        // Fall back to false if path resolution fails
+      }
+    }
+  }
+
+  if (isRg) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
@@ -455,8 +472,24 @@ export function isDangerousCommand(args: string[]): boolean {
     return args.some((arg) => unsafeOptions.has(arg));
   }
 
-  const cmdBasename = path.basename(cmd);
-  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
+  let isRg = false;
+  if (cmd === 'rg' || cmd === 'rg.exe') {
+    isRg = true;
+  } else {
+    const cmdBasename = path.basename(cmd);
+    if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
+      try {
+        const realPath = resolveToRealPath(cmd);
+        if (isTrustedSystemPath(realPath)) {
+          isRg = true;
+        }
+      } catch {
+        // Fall back to false if path resolution fails
+      }
+    }
+  }
+
+  if (isRg) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
