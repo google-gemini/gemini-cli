@@ -37,8 +37,8 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     ]);
 
     // 3. Add massive history that blows past the 150k maxTokens limit
-    // 20 turns * 10,000 tokens/turn = ~200,000 tokens
-    const massiveHistory = createSyntheticHistory(20, 35000);
+    // 20 turns * ~20,000 tokens/turn (10k user + 10k model) = ~400,000 tokens
+    const massiveHistory = createSyntheticHistory(20, 10000);
     chatHistory.set([...chatHistory.get(), ...massiveHistory]);
 
     // 4. Add the Latest Turn (Protected)
@@ -51,18 +51,17 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     const rawHistoryLength = chatHistory.get().length;
 
     // 5. Project History (Triggers Sync Barrier)
-    const projection = await contextManager.renderHistory();
+    const { history: projection } = await contextManager.renderHistory();
 
     // 6. Assertions
     // The barrier should have dropped several older episodes to get under 150k.
 
     expect(projection.length).toBeLessThan(rawHistoryLength);
 
-    // Verify Episode 0 (System) is perfectly preserved at the front
-
+    // Verify Episode 0 (System) was pruned, so we now start with a sentinel due to role alternation
     expect(projection[0].role).toBe('user');
-    expect(projection[0].parts![0].text).toBe('System prompt');
-
+    const projectionString = JSON.stringify(projection);
+    expect(projectionString).toContain('User turn 17');
     // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
     const contentNodes = projection.filter(
       (p) =>
@@ -70,8 +69,14 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // Verify the latest turn is perfectly preserved at the back
-    const lastUser = contentNodes[contentNodes.length - 2];
-    const lastModel = contentNodes[contentNodes.length - 1];
+    // Note: The HistoryHardener appends a "Please continue." user turn if we end on model,
+    // so we look at the turns before the sentinel.
+    const lastSentinel = contentNodes[contentNodes.length - 1];
+    const lastModel = contentNodes[contentNodes.length - 2];
+    const lastUser = contentNodes[contentNodes.length - 3];
+
+    expect(lastSentinel.role).toBe('user');
+    expect(lastSentinel.parts![0].text).toBe('Please continue.');
 
     expect(lastUser.role).toBe('user');
     expect(lastUser.parts![0].text).toBe('Final question.');

@@ -234,7 +234,7 @@ describe('parseArguments', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it('should fail if both --resume and --session-id are provided', async () => {
+  it('should fail if multiple session flags are provided', async () => {
     process.argv = [
       'node',
       'script.js',
@@ -255,7 +255,7 @@ describe('parseArguments', () => {
 
     expect(mockConsoleError).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Cannot use both --resume (-r) and --session-id together',
+        'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.',
       ),
     );
   });
@@ -1043,6 +1043,28 @@ describe('loadCliConfig', () => {
 
     expect(config.isInteractive()).toBe(false);
   });
+
+  describe('isAcpMode', () => {
+    it('should force skipNextSpeakerCheck to true when in ACP mode', async () => {
+      process.argv = ['node', 'script.js', '--acp'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(true);
+    });
+
+    it('should respect settings.model.skipNextSpeakerCheck when not in ACP mode', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(false);
+    });
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
@@ -1173,6 +1195,20 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       200,
       ['.git'], // boundaryMarkers
     );
+  });
+
+  it('should NOT call loadServerHierarchicalMemory when skipMemoryLoad is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv, {
+      skipMemoryLoad: true,
+    });
+
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
   });
 });
 

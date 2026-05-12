@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AskUserTool, isCompletedAskUserTool } from './ask-user.js';
+import {
+  AskUserTool,
+  isCompletedAskUserTool,
+  type AskUserParams,
+  type AskUserInvocation,
+} from './ask-user.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -61,6 +66,80 @@ describe('AskUserTool', () => {
   it('should have correct metadata', () => {
     expect(tool.name).toBe('ask_user');
     expect(tool.displayName).toBe('Ask User');
+  });
+
+  describe('createInvocation and normalization', () => {
+    it('should unescape double-escaped newlines in question parameters', async () => {
+      const params: AskUserParams = {
+        questions: [
+          {
+            question: 'Line 1\\nLine 2',
+            header: 'Header\\nTest',
+            placeholder: 'Placeholder\\nTest',
+            type: QuestionType.CHOICE,
+            options: [
+              { label: 'Option\\n1', description: 'Desc\\n1' },
+              { label: 'Option\\n2', description: 'Desc\\n2' },
+            ],
+          },
+        ],
+      };
+
+      const invocation = (
+        tool as unknown as {
+          createInvocation: (
+            params: AskUserParams,
+            messageBus: MessageBus,
+            toolName: string,
+            toolDisplayName: string,
+          ) => AskUserInvocation;
+        }
+      ).createInvocation(params, mockMessageBus, 'ask_user', 'Ask User');
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (!details || details.type !== 'ask_user') {
+        throw new Error('Expected ask_user details');
+      }
+
+      expect(details.questions[0].question).toBe('Line 1\nLine 2');
+      expect(details.questions[0].header).toBe('Header\nTest');
+      expect(details.questions[0].placeholder).toBe('Placeholder\nTest');
+      expect(details.questions[0].options?.[0].label).toBe('Option\n1');
+      expect(details.questions[0].options?.[0].description).toBe('Desc\n1');
+    });
+
+    it('should handle carriage returns and literal newlines', async () => {
+      const params: AskUserParams = {
+        questions: [
+          {
+            question: 'Line 1\\r\\nLine 2\nLine 3',
+            header: 'Header',
+            type: QuestionType.TEXT,
+          },
+        ],
+      };
+      const invocation = (
+        tool as unknown as {
+          createInvocation: (
+            params: AskUserParams,
+            messageBus: MessageBus,
+            toolName: string,
+            toolDisplayName: string,
+          ) => AskUserInvocation;
+        }
+      ).createInvocation(params, mockMessageBus, 'ask_user', 'Ask User');
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (!details || details.type !== 'ask_user') {
+        throw new Error('Expected ask_user details');
+      }
+
+      expect(details.questions[0].question).toBe('Line 1\nLine 2\nLine 3');
+    });
   });
 
   describe('validateToolParams', () => {

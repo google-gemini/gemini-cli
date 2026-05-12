@@ -133,7 +133,9 @@
     <text x="63" y="546" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 50&quot;</text>
     <text x="711" y="546" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="563" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
-    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Allow execution of [echo]?                                                                          </text>
+    <text x="0" y="580" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs">Allow execution of </text>
+    <text x="171" y="580" fill="#ffffaf" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">[Shell]</text>
+    <text x="234" y="580" fill="#ffffff" textLength="666" lengthAdjust="spacingAndGlyphs">?                                                                         </text>
     <rect x="0" y="612" width="9" height="17" fill="#001a00" />
     <text x="0" y="614" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
     <rect x="9" y="612" width="9" height="17" fill="#001a00" />

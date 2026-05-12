@@ -493,27 +493,18 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus random suffix to avoid conflicts
+    // Use a random suffix instead of probing existing containers so concurrent
+    // CLI starts cannot race on the same sequential name.
     const imageName = parseImageName(image);
     const isIntegrationTest =
       process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
-    let containerName;
-    if (isIntegrationTest) {
-      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
-        'hex',
-      )}`;
-      debugLogger.log(`ContainerName: ${containerName}`);
-    } else {
-      let index = 0;
-      const containerNameCheck = (
-        await execAsync(`${command} ps -a --format "{{.Names}}"`)
-      ).stdout.trim();
-      while (containerNameCheck.includes(`${imageName}-${index}`)) {
-        index++;
-      }
-      containerName = `${imageName}-${index}`;
-      debugLogger.log(`ContainerName (regular): ${containerName}`);
-    }
+    const containerNamePrefix = isIntegrationTest
+      ? 'gemini-cli-integration-test'
+      : imageName;
+    const containerName = `${containerNamePrefix}-${randomBytes(6).toString(
+      'hex',
+    )}`;
+    debugLogger.log(`ContainerName: ${containerName}`);
     args.push('--name', containerName, '--hostname', containerName);
 
     // copy GEMINI_CLI_TEST_VAR for integration tests

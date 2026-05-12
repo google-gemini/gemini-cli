@@ -111,6 +111,12 @@ interface _CommonGenerateOptions {
   };
 }
 
+export interface CountTokenOptions {
+  modelConfigKey?: ModelConfigKey;
+  contents: Content[];
+  abortSignal?: AbortSignal;
+}
+
 /**
  * A client dedicated to stateless, utility-focused LLM calls.
  */
@@ -223,6 +229,23 @@ export class BaseLlmClient {
       return text.substring(prefix.length, text.length - suffix.length).trim();
     }
     return text;
+  }
+
+  async countTokens(
+    options: CountTokenOptions,
+  ): Promise<{ totalTokens: number }> {
+    const model = options.modelConfigKey
+      ? this.config.modelConfigService.getResolvedConfig(options.modelConfigKey)
+          .model
+      : this.config.getActiveModel();
+    const result = await this.contentGenerator.countTokens({
+      model,
+      contents: options.contents,
+      config: options.abortSignal
+        ? { abortSignal: options.abortSignal }
+        : undefined,
+    });
+    return { totalTokens: result.totalTokens || 0 };
   }
 
   async generateContent(

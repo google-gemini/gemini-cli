@@ -6,18 +6,15 @@
 
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
-import type { ContextEnvironment } from './environment.js';
+import type { ContextEnvironment, RenderOptions } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
-import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
-import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
+import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import { ContextGraphMapper } from '../graph/mapper.js';
 
 export class ContextEnvironmentImpl implements ContextEnvironment {
-  readonly tokenCalculator: ContextTokenCalculator;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: NodeBehaviorRegistry;
   readonly graphMapper: ContextGraphMapper;
 
   constructor(
@@ -29,15 +26,12 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly tracer: ContextTracer,
     readonly charsPerToken: number,
     readonly eventBus: ContextEventBus,
+    readonly tokenCalculator: ContextTokenCalculator,
+    readonly behaviorRegistry: NodeBehaviorRegistry,
+    readonly renderOptions?: RenderOptions,
   ) {
-    this.behaviorRegistry = new NodeBehaviorRegistry();
-    registerBuiltInBehaviors(this.behaviorRegistry);
-    this.tokenCalculator = new ContextTokenCalculator(
-      this.charsPerToken,
-      this.behaviorRegistry,
-    );
     this.inbox = new LiveInbox();
-    this.graphMapper = new ContextGraphMapper(this.behaviorRegistry);
+    this.graphMapper = new ContextGraphMapper();
   }
 
   get llmClient(): BaseLlmClient {

@@ -93,6 +93,11 @@ class UpdateTopicInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
+      display: {
+        format: 'notice',
+        name: title || UPDATE_TOPIC_DISPLAY_NAME,
+        description: this.getDescription(),
+      },
       returnDisplay,
     };
   }
