@@ -29,6 +29,34 @@ export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
 
+const BRACKETED_PASTE_START = '\x1b[200~';
+const BRACKETED_PASTE_END = '\x1b[201~';
+
+/**
+ * Heuristic for stdin chunks that look like pastes from terminals that
+ * didn't honor bracketed-paste mode (commonly Windows Terminal/PowerShell
+ * and WSL2 via ConPTY). Wrapping such chunks in the bracketed-paste
+ * sequences lets the existing paste-buffering logic treat their contents
+ * as a single paste event with embedded newlines instead of a string of
+ * keypresses that can submit prematurely on the first '\r'.
+ *
+ * - '\r\n' is a smoking gun: never produced by a single keystroke in raw
+ *   mode (Enter is bare '\r'), so any chunk containing it is paste content.
+ * - A bare '\n' in a chunk of length >= 4 is also treated as paste content.
+ *   This length threshold avoids false positives on single-keystroke events
+ *   that legitimately produce '\n' (Ctrl+J as bare '\n', Alt+Enter as
+ *   '\x1b\n').
+ */
+export function looksLikeUnbracketedPaste(data: string): boolean {
+  if (data.includes(BRACKETED_PASTE_START)) {
+    return false;
+  }
+  if (data.includes('\r\n')) {
+    return true;
+  }
+  return data.length >= 4 && data.includes('\n');
+}
+
 export enum KeypressPriority {
   Low = -100,
   Normal = 0,
@@ -361,8 +389,24 @@ function createDataListener(keypressHandler: KeypressHandler) {
   parser.next(); // prime the generator so it starts listening.
 
   let timeoutId: NodeJS.Timeout;
+  // Track unmatched bracketed-paste-start across stdin chunks so we don't
+  // re-wrap content that's the middle of a legitimate bracketed paste.
+  let insideBracketedPaste = false;
+
   return (data: string) => {
     clearTimeout(timeoutId);
+
+    const startIdx = data.lastIndexOf(BRACKETED_PASTE_START);
+    const endIdx = data.lastIndexOf(BRACKETED_PASTE_END);
+    if (startIdx !== -1 && (endIdx === -1 || endIdx < startIdx)) {
+      insideBracketedPaste = true;
+    } else if (endIdx !== -1 && (startIdx === -1 || startIdx < endIdx)) {
+      insideBracketedPaste = false;
+    }
+
+    if (!insideBracketedPaste && looksLikeUnbracketedPaste(data)) {
+      data = BRACKETED_PASTE_START + data + BRACKETED_PASTE_END;
+    }
     for (const char of data) {
       parser.next(char);
     }

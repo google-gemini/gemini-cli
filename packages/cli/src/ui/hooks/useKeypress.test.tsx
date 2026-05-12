@@ -260,4 +260,71 @@ describe(`useKeypress`, () => {
       expect(onKeypress).toHaveBeenCalledTimes(3);
     });
   });
+
+  describe('unbracketed paste from terminals not honoring bracketed-paste mode', () => {
+    it('should treat a chunk containing CRLF as a paste (Windows-style line ending)', async () => {
+      await renderKeypressHook(true);
+      const pasteText = 'first line\r\nsecond line';
+      act(() => stdin.write(pasteText));
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'paste', sequence: pasteText }),
+      );
+    });
+
+    it('should treat a chunk containing bare LF as a paste (Unix-style line ending)', async () => {
+      await renderKeypressHook(true);
+      const pasteText = 'first line\nsecond line';
+      act(() => stdin.write(pasteText));
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'paste', sequence: pasteText }),
+      );
+    });
+
+    it('should NOT wrap a single CR keystroke (real Enter)', async () => {
+      await renderKeypressHook(true);
+      act(() => stdin.write('\r'));
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'enter' }),
+      );
+    });
+
+    it('should NOT wrap Alt+Enter (ESC + LF)', async () => {
+      await renderKeypressHook(true);
+      act(() => stdin.write('\x1b\n'));
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'enter', alt: true }),
+      );
+    });
+
+    it('should NOT wrap a bare LF keystroke (Ctrl+J)', async () => {
+      await renderKeypressHook(true);
+      act(() => stdin.write('\n'));
+
+      // Ctrl+J in raw mode arrives as bare '\n'. We don't care what name it
+      // gets — only that it is NOT delivered as a paste event.
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'paste' }),
+      );
+    });
+
+    it('should NOT double-wrap an already-bracketed paste', async () => {
+      await renderKeypressHook(true);
+      const pasteText = 'line a\r\nline b';
+      act(() => stdin.write(PASTE_START + pasteText + PASTE_END));
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'paste', sequence: pasteText }),
+      );
+    });
+  });
 });
