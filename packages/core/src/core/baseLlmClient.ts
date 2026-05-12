@@ -114,6 +114,7 @@ interface _CommonGenerateOptions {
 export interface CountTokenOptions {
   modelConfigKey?: ModelConfigKey;
   contents: Content[];
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -240,6 +241,9 @@ export class BaseLlmClient {
     const result = await this.contentGenerator.countTokens({
       model,
       contents: options.contents,
+      config: options.abortSignal
+        ? { abortSignal: options.abortSignal }
+        : undefined,
     });
     return { totalTokens: result.totalTokens || 0 };
   }
