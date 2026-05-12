@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import path from 'node:path';
 import { parse as shellParse } from 'shell-quote';
 import {
   extractStringFromParseEntry,
@@ -191,7 +192,8 @@ function isSafeToCallWithExec(args: string[]): boolean {
     return !args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (cmd === 'rg') {
+  const cmdBasename = path.basename(cmd);
+  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
@@ -453,7 +455,8 @@ export function isDangerousCommand(args: string[]): boolean {
     return args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (cmd === 'rg') {
+  const cmdBasename = path.basename(cmd);
+  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
