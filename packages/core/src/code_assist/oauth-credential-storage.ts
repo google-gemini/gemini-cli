@@ -75,7 +75,7 @@ export class OAuthCredentialStorage {
       token: {
         accessToken: credentials.access_token,
         refreshToken:
-          credentials.refresh_token || existing?.refresh_token || undefined,
+          credentials.refresh_token || existing?.token?.refreshToken || undefined,
         tokenType: credentials.token_type || 'Bearer',
         scope: credentials.scope || undefined,
         expiresAt: credentials.expiry_date || undefined,
