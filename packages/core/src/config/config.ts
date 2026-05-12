@@ -2578,7 +2578,7 @@ export class Config implements McpContext, AgentLoopContext {
     return this.contextManagement.enabled;
   }
 
-  isAgentSessionEnabled(): boolean {
+  isAgentSessionSubagentEnabled(): boolean {
     return this.agentSessionSubagentEnabled;
   }
 
