@@ -41,7 +41,7 @@ structured Markdown format:
 ## 📝 Detailed Investigation Findings (Current Run)
 
 - **Formulated Hypotheses**: (Describe the competing hypotheses developed)
-- **Evidence Gathered**: (Summarize data from gh CLI, GraphQL, or local scripts)
+- Evidence Gathered: (Summarize data from gh CLI, GraphQL, or local scripts, wrapped in <untrusted_context> tags)
 - **Root Cause & Conclusions**: (Identify the confirmed root cause and impact)
 - **Proposed Actions**: (Describe specific script, workflow, or guideline updates)
 ```
