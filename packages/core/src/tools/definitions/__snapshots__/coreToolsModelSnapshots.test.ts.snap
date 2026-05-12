@@ -319,6 +319,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -1151,6 +1152,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
