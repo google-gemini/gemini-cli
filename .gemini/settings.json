@@ -5,7 +5,10 @@
     "autoMemory": true,
     "memoryManager": true,
     "topicUpdateNarration": true,
-    "voiceMode": true
+    "voiceMode": true,
+    "adk": {
+      "agentSessionNoninteractiveEnabled": true
+    }
   },
   "general": {
     "devtools": true
