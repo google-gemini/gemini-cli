@@ -159,7 +159,7 @@ jobs:
           echo "" >> trigger_context.md
 
           cat trigger_context.md "$PROMPT_PATH" > combined_prompt.md
-          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
+          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
 
           if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
             echo "Agent failed to respond. Generating fallback error message."
@@ -180,7 +180,7 @@ jobs:
              echo "No changes staged. Skipping critique."
              echo "[APPROVED]" > critique_result.txt
           else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
+             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
 
              if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
                echo "[APPROVED]" > critique_result.txt
