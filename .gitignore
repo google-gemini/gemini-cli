@@ -14,12 +14,6 @@
 !.gemini/skills/
 !.gemini/settings.json
 
-# Allow gemini-cli-bot skills and agents
-!/tools/gemini-cli-bot/.gemini/
-/tools/gemini-cli-bot/.gemini/*
-!/tools/gemini-cli-bot/.gemini/skills/
-!/tools/gemini-cli-bot/.gemini/agents/
-
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
 # Dependency directory
