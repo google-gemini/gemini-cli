@@ -13,6 +13,22 @@ import {
 } from '../../utils/shell-utils.js';
 import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
 
+function isRipgrep(cmd: string): boolean {
+  if (cmd === 'rg' || cmd === 'rg.exe') {
+    return true;
+  }
+  const cmdBasename = path.basename(cmd);
+  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
+    try {
+      const realPath = resolveToRealPath(cmd);
+      return isTrustedSystemPath(realPath);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 /**
  * Determines if a command is strictly approved for execution on macOS.
  * A command is approved if it's composed entirely of tools explicitly listed in `approvedTools`
@@ -193,24 +209,7 @@ function isSafeToCallWithExec(args: string[]): boolean {
     return !args.some((arg) => unsafeOptions.has(arg));
   }
 
-  let isRg = false;
-  if (cmd === 'rg' || cmd === 'rg.exe') {
-    isRg = true;
-  } else {
-    const cmdBasename = path.basename(cmd);
-    if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
-      try {
-        const realPath = resolveToRealPath(cmd);
-        if (isTrustedSystemPath(realPath)) {
-          isRg = true;
-        }
-      } catch {
-        // Fall back to false if path resolution fails
-      }
-    }
-  }
-
-  if (isRg) {
+  if (isRipgrep(cmd)) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
@@ -472,24 +471,7 @@ export function isDangerousCommand(args: string[]): boolean {
     return args.some((arg) => unsafeOptions.has(arg));
   }
 
-  let isRg = false;
-  if (cmd === 'rg' || cmd === 'rg.exe') {
-    isRg = true;
-  } else {
-    const cmdBasename = path.basename(cmd);
-    if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
-      try {
-        const realPath = resolveToRealPath(cmd);
-        if (isTrustedSystemPath(realPath)) {
-          isRg = true;
-        }
-      } catch {
-        // Fall back to false if path resolution fails
-      }
-    }
-  }
-
-  if (isRg) {
+  if (isRipgrep(cmd)) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
