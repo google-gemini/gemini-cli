@@ -1797,6 +1797,18 @@ describe('resolveRipgrepPath', () => {
     beforeEach(() => {
       vi.spyOn(os, 'platform').mockReturnValue('linux');
       vi.spyOn(os, 'arch').mockReturnValue('x64');
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          platform: {
+            get: () => 'linux',
+          },
+        }),
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
 
     it('should resolve the SEA (flattened) path first', async () => {
