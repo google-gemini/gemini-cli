@@ -151,11 +151,15 @@ function deepMergeSettings(target: Settings, source: Settings): Settings {
       continue;
     }
     const targetValue = result[key];
-    if (isPlainObject(targetValue) && isPlainObject(srcValue)) {
-      result[key] = deepMergeSettings(
-        targetValue as Settings,
-        srcValue as Settings,
-      );
+    // Always recurse when the source value is a plain object so that the
+    // pollution-key filter and recursive merge apply at every nested level,
+    // even when the workspace introduces a key that did not exist in the
+    // user settings.
+    if (isPlainObject(srcValue)) {
+      const nestedTarget: Settings = isPlainObject(targetValue)
+        ? (targetValue as Settings)
+        : ({} as Settings);
+      result[key] = deepMergeSettings(nestedTarget, srcValue as Settings);
     } else {
       result[key] = srcValue;
     }

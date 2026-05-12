@@ -198,4 +198,35 @@ describe('loadSettings', () => {
       (Object.prototype as unknown as Record<string, unknown>)['polluted'],
     ).toBeUndefined();
   });
+
+  it('should strip prototype-polluting keys from nested objects introduced solely by workspace', () => {
+    // User settings do not have a `general` key at all, so the merge would
+    // previously assign the raw workspace object verbatim without recursing
+    // through the pollution filter at the nested level.
+    const userSettings = {
+      fileFiltering: { respectGitIgnore: true },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    // `general` is brand-new in workspace and carries an own __proto__ from JSON.
+    fs.writeFileSync(
+      workspaceSettingsPath,
+      '{"general":{"__proto__":{"nestedPolluted":true},"previewFeatures":true}}',
+    );
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.general?.previewFeatures).toBe(true);
+    expect(
+      (result.general as unknown as Record<string, unknown>)['__proto__'],
+    ).toBe(Object.prototype);
+    expect(
+      (Object.prototype as unknown as Record<string, unknown>)[
+        'nestedPolluted'
+      ],
+    ).toBeUndefined();
+  });
 });
