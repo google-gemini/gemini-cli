@@ -27,7 +27,7 @@ export interface ConfigLogger {
 
 export type RequestSettingCallback = (
   setting: ExtensionSetting,
-) => Promise<string>;
+) => Promise<string | undefined>;
 export type RequestConfirmationCallback = (message: string) => Promise<boolean>;
 
 const defaultLogger: ConfigLogger = {
