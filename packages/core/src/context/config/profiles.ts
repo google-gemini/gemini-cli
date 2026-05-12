@@ -126,6 +126,7 @@ export const generalistProfile: ContextProfile = {
             'UnionFindCluster',
             env,
             resolveProcessorOptions(config, 'UnionFindCluster', {
+              enabled: false,
               mergeThreshold: 0.15,
               maxColdClusters: 10,
             }),

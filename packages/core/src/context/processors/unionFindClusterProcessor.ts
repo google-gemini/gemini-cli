@@ -14,6 +14,7 @@ import { ClusterSummarizer } from '../clusterSummarizer.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 export interface UnionFindClusterProcessorOptions {
+  enabled?: boolean;
   mergeThreshold?: number;
   maxColdClusters?: number;
   graduateAt?: number;
@@ -24,6 +25,7 @@ export const UnionFindClusterProcessorOptionsSchema: JSONSchemaType<UnionFindClu
   {
     type: 'object',
     properties: {
+      enabled: { type: 'boolean', nullable: true },
       mergeThreshold: { type: 'number', nullable: true },
       maxColdClusters: { type: 'number', nullable: true },
       graduateAt: { type: 'number', nullable: true },
@@ -56,6 +58,7 @@ export function createUnionFindClusterProcessor(
   options: UnionFindClusterProcessorOptions,
 ): ContextProcessor {
   const resolvedOptions = {
+    enabled: options.enabled ?? false,
     mergeThreshold: options.mergeThreshold ?? 0.15,
     maxColdClusters: options.maxColdClusters ?? 10,
     graduateAt: options.graduateAt ?? 26,
@@ -66,6 +69,7 @@ export function createUnionFindClusterProcessor(
     id,
     name: 'UnionFindClusterProcessor',
     process: async ({ targets }: ProcessArgs) => {
+      if (!resolvedOptions.enabled) return targets;
       if (targets.length < 3) return targets;
 
       const embedder = new TFIDFEmbedder();

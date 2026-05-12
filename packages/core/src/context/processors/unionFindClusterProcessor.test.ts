@@ -14,12 +14,37 @@ import {
 import { NodeType } from '../graph/types.js';
 
 describe('UnionFindClusterProcessor', () => {
-  it('should pass through when fewer than 3 targets', async () => {
+  it('should pass through when disabled (default)', async () => {
     const env = createMockEnvironment();
     const processor = createUnionFindClusterProcessor(
       'UnionFindClusterProcessor',
       env,
       {},
+    );
+
+    const targets = [
+      createDummyNode('t1', NodeType.USER_PROMPT, 10, {
+        payload: { text: 'hello' },
+      }),
+      createDummyNode('t2', NodeType.AGENT_THOUGHT, 10, {
+        payload: { text: 'world' },
+      }),
+      createDummyNode('t3', NodeType.AGENT_THOUGHT, 10, {
+        payload: { text: 'foo' },
+      }),
+    ];
+
+    const result = await processor.process(createMockProcessArgs(targets));
+    expect(result.length).toBe(3);
+    expect(result).toEqual(targets);
+  });
+
+  it('should pass through when fewer than 3 targets', async () => {
+    const env = createMockEnvironment();
+    const processor = createUnionFindClusterProcessor(
+      'UnionFindClusterProcessor',
+      env,
+      { enabled: true },
     );
 
     const targets = [
@@ -43,6 +68,7 @@ describe('UnionFindClusterProcessor', () => {
       'UnionFindClusterProcessor',
       env,
       {
+        enabled: true,
         mergeThreshold: 0.1,
         maxColdClusters: 2,
         graduateAt: 2,
@@ -115,6 +141,7 @@ describe('UnionFindClusterProcessor', () => {
       'UnionFindClusterProcessor',
       env,
       {
+        enabled: true,
         mergeThreshold: 0.99,
         maxColdClusters: 2,
         graduateAt: 1,
@@ -145,7 +172,7 @@ describe('UnionFindClusterProcessor', () => {
     const processor = createUnionFindClusterProcessor(
       'UnionFindClusterProcessor',
       env,
-      { graduateAt: 2, evictAt: 4 },
+      { enabled: true, graduateAt: 2, evictAt: 4 },
     );
 
     const targets = [
@@ -175,6 +202,7 @@ describe('UnionFindClusterProcessor', () => {
       'UnionFindClusterProcessor',
       env,
       {
+        enabled: true,
         mergeThreshold: 0.1,
         maxColdClusters: 5,
         graduateAt: 1,
