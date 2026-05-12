@@ -466,14 +466,34 @@ describe('getShellConfiguration', () => {
 
   it('should return bash configuration on Linux', () => {
     mockPlatform.mockReturnValue('linux');
+    process.env['SHELL'] = '/bin/bash';
     const config = getShellConfiguration();
-    expect(config.executable).toBe('bash');
+    expect(config.executable).toBe('/bin/bash');
     expect(config.argsPrefix).toEqual(['-c']);
     expect(config.shell).toBe('bash');
   });
 
   it('should return bash configuration on macOS (darwin)', () => {
     mockPlatform.mockReturnValue('darwin');
+    process.env['SHELL'] = '/bin/bash';
+    const config = getShellConfiguration();
+    expect(config.executable).toBe('/bin/bash');
+    expect(config.argsPrefix).toEqual(['-c']);
+    expect(config.shell).toBe('bash');
+  });
+
+  it('should return zsh configuration when SHELL is zsh', () => {
+    mockPlatform.mockReturnValue('darwin');
+    process.env['SHELL'] = '/bin/zsh';
+    const config = getShellConfiguration();
+    expect(config.executable).toBe('/bin/zsh');
+    expect(config.argsPrefix).toEqual(['-c']);
+    expect(config.shell).toBe('zsh');
+  });
+
+  it('should fall back to bash when SHELL is not set', () => {
+    mockPlatform.mockReturnValue('linux');
+    delete process.env['SHELL'];
     const config = getShellConfiguration();
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
