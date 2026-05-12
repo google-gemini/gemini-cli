@@ -55,9 +55,11 @@ import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
-import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { OAuthUtils, FIVE_MIN_BUFFER_MS } from '../mcp/oauth-utils.js';
+import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
+import { OAuthUtils } from '../mcp/oauth-utils.js';
+
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   getErrorMessage,
@@ -83,11 +85,6 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
-import type {
-  OAuthClientInformation,
-  OAuthClientMetadata,
-  OAuthTokens,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
 
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
@@ -1032,121 +1029,6 @@ function createAuthProvider(
   }
   return undefined;
 }
-
-class DynamicStoredOAuthProvider implements McpAuthProvider {
-  readonly redirectUrl = '';
-  readonly clientMetadata: OAuthClientMetadata = {
-    client_name: 'Gemini CLI (Stored OAuth)',
-    redirect_uris: [],
-    grant_types: [],
-    response_types: [],
-    token_endpoint_auth_method: 'none',
-  };
-
-  private clientInfo?: OAuthClientInformation;
-  private readonly tokenStorage = new MCPOAuthTokenStorage();
-  private readonly oauthProvider = new MCPOAuthProvider(this.tokenStorage);
-  private cachedToken?: OAuthTokens;
-  private tokenExpiryTime?: number;
-
-  constructor(
-    private readonly serverName: string,
-    private readonly serverConfig: MCPServerConfig,
-  ) {}
-
-  clientInformation(): OAuthClientInformation | undefined {
-    return this.clientInfo;
-  }
-
-  saveClientInformation(clientInformation: OAuthClientInformation): void {
-    this.clientInfo = clientInformation;
-  }
-
-  private isCachedTokenValid(): boolean {
-    return !!(
-      this.cachedToken?.access_token &&
-      this.tokenExpiryTime &&
-      Date.now() < this.tokenExpiryTime - FIVE_MIN_BUFFER_MS
-    );
-  }
-
-  private async fetchTokenFromStorageBackedProvider(): Promise<
-    OAuthTokens | undefined
-  > {
-    const credentials = await this.tokenStorage.getCredentials(this.serverName);
-    if (!credentials) {
-      return undefined;
-    }
-
-    const oauthConfig =
-      this.serverConfig.oauth?.enabled && this.serverConfig.oauth
-        ? this.serverConfig.oauth
-        : { clientId: credentials.clientId };
-
-    const accessToken = await this.oauthProvider.getValidToken(
-      this.serverName,
-      oauthConfig,
-    );
-
-    if (!accessToken) {
-      return undefined;
-    }
-
-    // Re-read credentials once after getValidToken() so we use authoritative expiresAt
-    // written by storage (including refreshed tokens), not a guessed fallback.
-    const latestCredentials = await this.tokenStorage.getCredentials(
-      this.serverName,
-    );
-    if (!latestCredentials?.token?.accessToken) {
-      return undefined;
-    }
-
-    const latest = latestCredentials.token;
-    return {
-      access_token: latest.accessToken,
-      token_type: latest.tokenType || 'Bearer',
-      expires_in: latest.expiresAt
-        ? Math.max(0, Math.floor((latest.expiresAt - Date.now()) / 1000))
-        : undefined,
-      scope: latest.scope,
-      refresh_token: latest.refreshToken,
-    };
-  }
-
-  async tokens(): Promise<OAuthTokens | undefined> {
-    if (this.isCachedTokenValid()) {
-      return this.cachedToken;
-    }
-
-    const freshTokens = await this.fetchTokenFromStorageBackedProvider();
-
-    if (!freshTokens?.access_token) {
-      this.cachedToken = undefined;
-      this.tokenExpiryTime = undefined;
-      return undefined;
-    }
-
-    this.cachedToken = freshTokens;
-
-    if (freshTokens.expires_in !== undefined) {
-      this.tokenExpiryTime = Date.now() + freshTokens.expires_in * 1000;
-      return this.cachedToken;
-    }
-
-    //  return fresh token
-    this.cachedToken = undefined;
-    this.tokenExpiryTime = undefined;
-    return freshTokens;
-  }
-
-  saveTokens(_tokens: OAuthTokens): void {}
-  redirectToAuthorization(_authorizationUrl: URL): void {}
-  saveCodeVerifier(_codeVerifier: string): void {}
-  codeVerifier(): string {
-    return '';
-  }
-}
-
 /**
  * Creates an OAuth token provider for transports so token lookup/refresh happens
  * at request/auth time instead of freezing a single token at transport creation.
@@ -2326,39 +2208,23 @@ export async function createTransport(
       (await authProvider?.getRequestHeaders?.()) ?? {};
 
     if (authProvider === undefined) {
-      let shouldUseDynamicOAuthProvider = false;
+      const tokenStorage = new MCPOAuthTokenStorage();
+      const credentials = await tokenStorage.getCredentials(mcpServerName);
+      const shouldUseDynamicOAuthProvider = !!credentials;
 
-      if (mcpServerConfig.oauth?.enabled && mcpServerConfig.oauth) {
-        shouldUseDynamicOAuthProvider = true;
-        const tokenStorage = new MCPOAuthTokenStorage();
-        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-        const accessToken = await mcpAuthProvider.getValidToken(
+      if (!shouldUseDynamicOAuthProvider && mcpServerConfig.oauth?.enabled) {
+        cliConfig.emitMcpDiagnostic(
+          'info',
+          `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
+          undefined,
           mcpServerName,
-          mcpServerConfig.oauth,
         );
-
-        if (!accessToken) {
-          // Emit info message (not error) since this is expected behavior
-          cliConfig.emitMcpDiagnostic(
-            'info',
-            `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
-            undefined,
-            mcpServerName,
-          );
-        }
-      } else {
-        // Stored OAuth credentials imply we should use dynamic token retrieval.
-        const tokenStorage = new MCPOAuthTokenStorage();
-        const credentials = await tokenStorage.getCredentials(mcpServerName);
-        shouldUseDynamicOAuthProvider = !!credentials;
-        if (shouldUseDynamicOAuthProvider) {
-          debugLogger.log(
-            `Found stored OAuth token for server '${mcpServerName}'`,
-          );
-        }
       }
 
       if (shouldUseDynamicOAuthProvider) {
+        debugLogger.log(
+          `Found stored OAuth token for server '${mcpServerName}'`,
+        );
         authProvider = createDynamicOAuthTokenProvider(
           mcpServerName,
           mcpServerConfig,
@@ -2462,7 +2328,6 @@ export async function createTransport(
     `Invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio).`,
   );
 }
-
 interface NamedTool {
   name?: string;
 }

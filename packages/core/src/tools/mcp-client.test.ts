@@ -1778,9 +1778,13 @@ describe('mcp-client', () => {
   describe('createTransport', () => {
     describe('should connect via httpUrl', () => {
       it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
-        const mockGetValidToken = vi.fn().mockResolvedValue('fresh-token');
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
         vi.mocked(MCPOAuthProvider).mockReturnValue({
-          getValidToken: mockGetValidToken,
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
@@ -1819,7 +1823,11 @@ describe('mcp-client', () => {
         const now = Date.now();
         const soonExpiry = now + 10 * 60 * 1000; // 10 minutes
 
-        const mockGetValidToken = vi.fn().mockResolvedValue('fresh-token');
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: soonExpiry,
+        });
         const mockGetCredentials = vi.fn().mockImplementation(async () => ({
           clientId: 'cid',
           token: {
@@ -1830,7 +1838,7 @@ describe('mcp-client', () => {
         }));
 
         vi.mocked(MCPOAuthProvider).mockReturnValue({
-          getValidToken: mockGetValidToken,
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
@@ -1862,15 +1870,17 @@ describe('mcp-client', () => {
         expect(tokens?.expires_in).toBeDefined();
         expect((tokens?.expires_in ?? 0) <= 10 * 60).toBe(true);
 
-        expect(mockGetValidToken).toHaveBeenCalledTimes(1);
-        expect(mockGetCredentials).toHaveBeenCalledTimes(3);
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(1);
+        expect(mockGetCredentials).toHaveBeenCalledTimes(1);
       });
       it('uses dynamic authProvider when stored OAuth token exists', async () => {
-        const mockGetValidToken = vi
-          .fn()
-          .mockResolvedValue('stored-fresh-token');
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'stored-fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
         vi.mocked(MCPOAuthProvider).mockReturnValue({
-          getValidToken: mockGetValidToken,
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
@@ -1905,7 +1915,11 @@ describe('mcp-client', () => {
         expect(tokens?.access_token).toBe('stored-fresh-token');
       });
       it('caches OAuth tokens in dynamic authProvider and avoids repeated lookups', async () => {
-        const mockGetValidToken = vi.fn().mockResolvedValue('cached-token');
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'cached-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
         const mockGetCredentials = vi.fn().mockResolvedValue({
           clientId: 'cid',
           token: {
@@ -1916,7 +1930,7 @@ describe('mcp-client', () => {
         });
 
         vi.mocked(MCPOAuthProvider).mockReturnValue({
-          getValidToken: mockGetValidToken,
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
         } as unknown as MCPOAuthProvider);
 
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
@@ -1949,8 +1963,63 @@ describe('mcp-client', () => {
 
         // one call from createTransport fallback detection + one call in first tokens();
         // second tokens() should come from in-memory cache
-        expect(mockGetCredentials).toHaveBeenCalledTimes(3);
-        expect(mockGetValidToken).toHaveBeenCalledTimes(1);
+        expect(mockGetCredentials).toHaveBeenCalledTimes(1);
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(1);
+      });
+      it('does not long-cache token when metadata has no expiresAt', async () => {
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'no-exp-token',
+          tokenType: 'Bearer',
+          // expiresAt intentionally omitted
+        });
+
+        const mockGetCredentials = vi.fn().mockResolvedValue({
+          clientId: 'cid',
+          token: {
+            accessToken: 'no-exp-token',
+            tokenType: 'Bearer',
+            // expiresAt intentionally omitted
+          },
+        });
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = transport as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<
+              { access_token: string; expires_in?: number } | undefined
+            >;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const t1 = await testableTransport._authProvider!.tokens();
+        const t2 = await testableTransport._authProvider!.tokens();
+
+        expect(t1?.access_token).toBe('no-exp-token');
+        expect(t2?.access_token).toBe('no-exp-token');
+        expect(t1?.expires_in).toBeUndefined();
+        expect(t2?.expires_in).toBeUndefined();
+
+        // no-expiry tokens should not be long-cached in memory
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(2);
       });
     });
 
