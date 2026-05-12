@@ -640,10 +640,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        // Inject loaded memory files (JIT + extension/project memory)
-        const environmentMemory = this.context.config.isJitContextEnabled?.()
-          ? this.context.config.getSessionMemory()
-          : this.context.config.getEnvironmentMemory();
+        // Inject loaded memory files. Some background agents opt out of
+        // extension memory while still retaining project session context.
+        let environmentMemory: string;
+        if (this.context.config.isJitContextEnabled?.()) {
+          environmentMemory =
+            this.definition.includeExtensionContext === false
+              ? this.context.config.getSessionMemory({
+                  includeExtensionContext: false,
+                })
+              : this.context.config.getSessionMemory();
+        } else {
+          environmentMemory = this.context.config.getEnvironmentMemory();
+        }
 
         const initialParts: Part[] = [];
         if (environmentMemory) {

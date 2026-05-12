@@ -23,6 +23,9 @@ import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotP
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
+import { AdaptiveTokenCalculator } from './utils/adaptiveTokenCalculator.js';
+import { NodeBehaviorRegistry } from './graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from './graph/builtinBehaviors.js';
 
 export async function initializeContextManager(
   config: Config,
@@ -85,6 +88,16 @@ export async function initializeContextManager(
 
   const eventBus = new ContextEventBus();
 
+  const charsPerToken = 3;
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+
+  const calculator = new AdaptiveTokenCalculator(
+    charsPerToken,
+    behaviorRegistry,
+    eventBus,
+  );
+
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
     config.getSessionId(),
@@ -92,8 +105,10 @@ export async function initializeContextManager(
     logDir,
     projectTempDir,
     tracer,
-    4,
+    charsPerToken,
     eventBus,
+    calculator,
+    behaviorRegistry,
     {
       calibrateTokenCalculation:
         !!process.env['GEMINI_CONTEXT_CALIBRATE_TOKEN_CALCULATIONS'],
@@ -114,6 +129,7 @@ export async function initializeContextManager(
     tracer,
     orchestrator,
     chat.agentHistory,
+    calculator,
     async () => {
       const parts = await getEnvironmentContext(config);
       return { role: 'user', parts };
