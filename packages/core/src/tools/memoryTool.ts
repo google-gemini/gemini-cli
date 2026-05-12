@@ -49,8 +49,15 @@ export function setGeminiMdFilename(newFilename: string | string[]): void {
   for (const filename of filenames) {
     const trimmed = filename.trim();
     if (trimmed !== '') {
-      const safeFilename = path.basename(trimmed);
-      next.add(safeFilename);
+      const normalized = path.normalize(trimmed);
+      // Sanitize to prevent path traversal while allowing subdirectories
+      if (
+        !path.isAbsolute(normalized) &&
+        !normalized.startsWith('..') &&
+        normalized !== '.'
+      ) {
+        next.add(normalized);
+      }
     }
   }
 
@@ -74,7 +81,16 @@ export function resetGeminiMdFilename(
   filename: string | string[] = DEFAULT_CONTEXT_FILENAME,
 ): void {
   const filenames = Array.isArray(filename) ? filename : [filename];
-  const cleaned = filenames.map((f) => path.basename(f.trim())).filter((f) => f !== '');
+  const cleaned = Array.from(
+    new Set(
+      filenames
+        .map((f) => path.normalize(f.trim()))
+        .filter(
+          (f) =>
+            f !== '' && f !== '.' && !f.startsWith('..') && !path.isAbsolute(f),
+        ),
+    ),
+  );
 
   if (cleaned.length === 0) {
     currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;

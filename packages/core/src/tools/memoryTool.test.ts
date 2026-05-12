@@ -86,8 +86,8 @@ describe('MemoryTool', () => {
       const newName = 'CUSTOM_CONTEXT.md';
       setGeminiMdFilename(newName);
       expect(getAllGeminiMdFilenames()).toEqual([
-        DEFAULT_CONTEXT_FILENAME,
         newName,
+        DEFAULT_CONTEXT_FILENAME,
       ]);
     });
 
@@ -104,8 +104,8 @@ describe('MemoryTool', () => {
       const newNames = ['CUSTOM_CONTEXT.md', 'ANOTHER_CONTEXT.md'];
       setGeminiMdFilename(newNames);
       expect(getAllGeminiMdFilenames()).toEqual([
-        DEFAULT_CONTEXT_FILENAME,
         ...newNames,
+        DEFAULT_CONTEXT_FILENAME,
       ]);
     });
 
@@ -115,8 +115,8 @@ describe('MemoryTool', () => {
 
       setGeminiMdFilename(['NEW.md', 'NEW.md']);
       expect(getAllGeminiMdFilenames()).toEqual([
-        DEFAULT_CONTEXT_FILENAME,
         'NEW.md',
+        DEFAULT_CONTEXT_FILENAME,
       ]);
     });
   });
