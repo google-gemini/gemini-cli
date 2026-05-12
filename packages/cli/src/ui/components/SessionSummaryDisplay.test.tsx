@@ -171,7 +171,7 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
-    it('renders a standard UUID-formatted session ID in the footer (powershell) on Windows', async () => {
+    it('renders a standard UUID-formatted session ID without quotes in the footer (powershell) on Windows', async () => {
       isWindowsMock.mockReturnValue(true);
       getShellConfigurationMock.mockReturnValue({
         executable: 'powershell.exe',
@@ -186,8 +186,11 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes on Windows.
-      expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
+      // escapeShellArg already returns simple alphanumeric strings (like UUIDs)
+      // unquoted for PowerShell, and such strings paste safely into both
+      // PowerShell and cmd.exe. No additional wrapping is required.
+      expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
+      expect(output).not.toContain('"1234-abcd-5678-efgh"');
       unmount();
     });
 
