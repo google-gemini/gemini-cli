@@ -2511,12 +2511,15 @@ export class Config implements McpContext, AgentLoopContext {
    * user message when JIT is enabled. Returns empty string when JIT is
    * disabled (Tier 2 memory is already in the system instruction).
    */
-  getSessionMemory(): string {
+  getSessionMemory(options?: { includeExtensionContext?: boolean }): string {
     if (!this.experimentalJitContext || !this.memoryContextManager) {
       return '';
     }
     const sections: string[] = [];
-    const extension = this.memoryContextManager.getExtensionMemory();
+    const includeExtensionContext = options?.includeExtensionContext ?? true;
+    const extension = includeExtensionContext
+      ? this.memoryContextManager.getExtensionMemory()
+      : '';
     const project = this.memoryContextManager.getEnvironmentMemory();
     if (extension?.trim()) {
       sections.push(
@@ -3088,12 +3091,49 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     resolvedPath: string,
     inboxRoot: string,
+    checkType: 'read' | 'write' = 'write',
   ): boolean {
     if (!hasScopedMemoryInboxAccess()) {
       return false;
     }
 
     const normalizedPath = path.resolve(absolutePath);
+    const resolvedMemoryRoot = resolveToRealPath(
+      this.storage.getProjectMemoryTempDir(),
+    );
+
+    // Reads: allow the inbox root and the per-kind subtrees so the extraction
+    // agent can list/inspect prior patches (including non-canonical filenames
+    // left over from older runs) before deciding how to rewrite the canonical
+    // extraction.patch. Writes still flow through the strict canonical-path
+    // check below so the inbox cannot be backdoored with arbitrary files.
+    if (checkType === 'read') {
+      const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+      const normalizedInboxRoot = path.resolve(inboxRoot);
+      if (
+        resolvedPath === resolvedInboxRoot ||
+        normalizedPath === normalizedInboxRoot
+      ) {
+        return isSubpath(resolvedMemoryRoot, resolvedPath);
+      }
+
+      for (const kind of ['private', 'global'] as const) {
+        const kindRoot = path.join(inboxRoot, kind);
+        const resolvedKindRoot = resolveToRealPath(kindRoot);
+        const normalizedKindRoot = path.resolve(kindRoot);
+        if (
+          resolvedPath === resolvedKindRoot ||
+          normalizedPath === normalizedKindRoot ||
+          isSubpath(resolvedKindRoot, resolvedPath) ||
+          isSubpath(normalizedKindRoot, normalizedPath)
+        ) {
+          return isSubpath(resolvedMemoryRoot, resolvedPath);
+        }
+      }
+
+      return false;
+    }
+
     const isCanonicalPatchPath = (['private', 'global'] as const).some(
       (kind) =>
         normalizedPath === path.resolve(inboxRoot, kind, 'extraction.patch'),
@@ -3102,9 +3142,6 @@ export class Config implements McpContext, AgentLoopContext {
       return false;
     }
 
-    const resolvedMemoryRoot = resolveToRealPath(
-      this.storage.getProjectMemoryTempDir(),
-    );
     return isSubpath(resolvedMemoryRoot, resolvedPath);
   }
 
@@ -3148,7 +3185,9 @@ export class Config implements McpContext, AgentLoopContext {
    * the auto-memory extraction agent and the `/memory inbox` review flow. The
    * main agent is denied access to it even though it falls inside the project
    * temp dir; the extraction agent receives a narrow execution-scoped exception
-   * for `.inbox/{private,global}/extraction.patch`.
+   * for *writes* to `.inbox/{private,global}/extraction.patch`. Scoped *read*
+   * access to the wider `.inbox/{private,global}/` subtree is granted in
+   * `validatePathAccess` so the extractor can enumerate prior patches.
    *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
@@ -3242,6 +3281,28 @@ export class Config implements McpContext, AgentLoopContext {
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
         return null;
+      }
+
+      // The memory inbox is carved out of the standard temp-dir allowlist by
+      // `isPathAllowed`. The extraction agent is granted a scoped read
+      // exception so it can enumerate prior patches (including non-canonical
+      // filenames) before consolidating them into the canonical
+      // extraction.patch. Writes remain restricted to canonical paths.
+      if (hasScopedMemoryInboxAccess()) {
+        const inboxRoot = path.join(
+          this.storage.getProjectMemoryTempDir(),
+          '.inbox',
+        );
+        if (
+          this.isScopedMemoryInboxPatchPathAllowed(
+            absolutePath,
+            resolveToRealPath(absolutePath),
+            inboxRoot,
+            'read',
+          )
+        ) {
+          return null;
+        }
       }
     }
 

@@ -9,12 +9,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
+import { z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
 }
+
+const registryDataSchema = z.object({
+  projects: z.record(z.string(), z.string().regex(/^[a-z0-9-]+$/)),
+});
 
 const PROJECT_ROOT_FILE = '.project_root';
 const LOCK_TIMEOUT_MS = 10000;
@@ -57,8 +62,16 @@ export class ProjectRegistry {
   private async loadData(): Promise<RegistryData> {
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
+
+      if (this.isValidRegistryData(parsed)) {
+        return parsed;
+      }
+
+      debugLogger.warn(
+        `Project registry at ${this.registryPath} has an invalid schema, resetting to empty.`,
+      );
+      return { projects: {} };
     } catch (error: unknown) {
       if (isNodeError(error) && error.code === 'ENOENT') {
         return { projects: {} }; // Normal first run
@@ -406,5 +419,9 @@ export class ProjectRegistry {
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '') || 'project'
     );
+  }
+
+  private isValidRegistryData(data: unknown): data is RegistryData {
+    return registryDataSchema.safeParse(data).success;
   }
 }

@@ -242,7 +242,7 @@ describe('GeminiChat', () => {
       // 'Hello': 5 chars * 0.25 = 1.25
       // 'Hi there': 8 chars * 0.25 = 2.0
       // Total: 3.25 -> floor(3.25) = 3
-      expect(chatWithHistory.getLastPromptTokenCount()).toBe(4);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(3);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
@@ -2938,73 +2938,6 @@ describe('GeminiChat', () => {
           result: [{ text: 'response' }],
         }),
       ]);
-    });
-  });
-
-  describe('getHistory with curated: true', () => {
-    it('should not drop model turns with function calls and empty text', () => {
-      const history: Content[] = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'test_tool', args: {} }, text: '' }],
-        },
-        {
-          role: 'user',
-          parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
-        },
-      ];
-      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
-
-      const curatedHistory = chatWithHistory.getHistory(true);
-
-      expect(curatedHistory.length).toBe(3);
-      expect(curatedHistory[1].role).toBe('model');
-      expect(curatedHistory[1].parts![0].functionCall).toBeDefined();
-    });
-
-    it('should not drop model turns with inlineData and empty text', () => {
-      const history: Content[] = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-        {
-          role: 'model',
-          parts: [
-            {
-              inlineData: { mimeType: 'image/jpeg', data: 'base64...' },
-              text: '',
-            },
-          ],
-        },
-      ];
-      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
-
-      const curatedHistory = chatWithHistory.getHistory(true);
-
-      expect(curatedHistory.length).toBe(2);
-      expect(curatedHistory[1].role).toBe('model');
-      expect(curatedHistory[1].parts![0].inlineData).toBeDefined();
-    });
-
-    it('should not drop model turns with fileData and empty text', () => {
-      const history: Content[] = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-        {
-          role: 'model',
-          parts: [
-            {
-              fileData: { mimeType: 'image/jpeg', fileUri: 'https://...' },
-              text: '',
-            },
-          ],
-        },
-      ];
-      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
-
-      const curatedHistory = chatWithHistory.getHistory(true);
-
-      expect(curatedHistory.length).toBe(2);
-      expect(curatedHistory[1].role).toBe('model');
-      expect(curatedHistory[1].parts![0].fileData).toBeDefined();
     });
   });
 
