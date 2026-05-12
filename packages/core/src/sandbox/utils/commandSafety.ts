@@ -13,20 +13,21 @@ import {
 } from '../../utils/shell-utils.js';
 import { isTrustedSystemPath, resolveToRealPath } from '../../utils/paths.js';
 
-function isRipgrep(cmd: string): boolean {
-  if (cmd === 'rg' || cmd === 'rg.exe') {
-    return true;
-  }
+function isRipgrepCommand(cmd: string): boolean {
   const cmdBasename = path.basename(cmd);
-  if (cmdBasename === 'rg' || cmdBasename === 'rg.exe') {
-    try {
-      const realPath = resolveToRealPath(cmd);
-      return isTrustedSystemPath(realPath);
-    } catch {
-      return false;
-    }
+  return cmdBasename === 'rg' || cmdBasename === 'rg.exe';
+}
+
+function isTrustedCommandPath(cmd: string): boolean {
+  if (!path.isAbsolute(cmd)) {
+    return false;
   }
-  return false;
+  try {
+    const realPath = resolveToRealPath(cmd);
+    return isTrustedSystemPath(realPath);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -209,7 +210,9 @@ function isSafeToCallWithExec(args: string[]): boolean {
     return !args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (isRipgrep(cmd)) {
+  if (isRipgrepCommand(cmd)) {
+    if (!isTrustedCommandPath(cmd)) return false;
+
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 
@@ -471,7 +474,7 @@ export function isDangerousCommand(args: string[]): boolean {
     return args.some((arg) => unsafeOptions.has(arg));
   }
 
-  if (isRipgrep(cmd)) {
+  if (isRipgrepCommand(cmd)) {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
 

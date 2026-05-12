@@ -39,9 +39,9 @@ describe('commandSafety', () => {
       expect(paths.isTrustedSystemPath).toHaveBeenCalledWith('/usr/bin/rg');
     });
 
-    it('should consider rg safe when called without path if it is implicitly trusted', () => {
-      // It assumes 'rg' matches the literal check and doesn't run the basename check if it's literally 'rg'
-      expect(isKnownSafeCommand(['rg', 'pattern', 'file.txt'])).toBe(true);
+    it('should not consider bare rg safe (Search Path Interruption prevention)', () => {
+      // Bare 'rg' is not an absolute path, so it fails `isTrustedCommandPath`
+      expect(isKnownSafeCommand(['rg', 'pattern', 'file.txt'])).toBe(false);
     });
 
     it('should not consider rg safe with unsafe args even if path is trusted', () => {
@@ -86,14 +86,14 @@ describe('commandSafety', () => {
       expect(isKnownSafeCommand(['/some/path/rg', 'pattern'])).toBe(false);
     });
 
-    it('should gracefully ignore untrusted rg when checking for dangerous commands', () => {
+    it('should flag untrusted rg as dangerous if it has unsafe args (Paranoid validation)', () => {
       vi.mocked(paths.resolveToRealPath).mockReturnValue('/tmp/malicious/rg');
       vi.mocked(paths.isTrustedSystemPath).mockReturnValue(false);
 
-      // If it is an untrusted rg, it is not "known dangerous" because the dangerous options
-      // are specific to ripgrep itself. So it falls back to default logic (false if no other matches)
+      // isDangerousCommand relies on isRipgrepCommand, which strictly identifies intent (name)
+      // and doesn't care about path safety. So even an untrusted rg will be flagged if it has unsafe args.
       expect(isDangerousCommand(['/tmp/malicious/rg', '--search-zip'])).toBe(
-        false,
+        true,
       );
     });
   });
