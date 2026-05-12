@@ -2159,7 +2159,7 @@ const SETTINGS_SCHEMA = {
             label: 'Voice Stop Grace Period (ms)',
             category: 'Experimental',
             requiresRestart: false,
-            default: 1000,
+            default: 4000,
             description:
               'How long to wait for final transcription after stopping recording.',
             showInDialog: true,

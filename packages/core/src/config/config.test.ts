@@ -4091,6 +4091,36 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).not.toContain(plansDir);
   });
 
+  it('should gracefully fallback to default plans directory if retrieving custom directory throw an error', async () => {
+    vi.spyOn(coreEvents, 'emitFeedback');
+    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+      planSettings: {
+        directory: '/outside/project/root',
+      },
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    // Should fallback to default project temp plans dir
+    expect(plansDir).toContain('plans');
+    expect(plansDir).not.toContain('/outside/project/root');
+
+    // Should emit a warning feedback
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('Invalid custom plans directory'),
+      expect.any(Error),
+    );
+
+    // Should still add the fallback plans directory to workspace context if it exists
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(plansDir);
+  });
+
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
     const config = new Config({
       ...baseParams,
