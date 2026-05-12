@@ -1432,6 +1432,51 @@ describe('gemini.tsx main function exit codes', () => {
 
     expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
+
+  it('should exit with FATAL_AUTHENTICATION_ERROR when refreshAuth rejects in non-interactive mode', async () => {
+    const refreshAuthSpy = vi
+      .fn()
+      .mockRejectedValue(new Error('ECONNRESET while listing experiments'));
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test prompt',
+        getSandbox: () => undefined,
+        refreshAuth: refreshAuthSpy,
+      }),
+    );
+    vi.mocked(validateNonInteractiveAuth).mockResolvedValue(
+      AuthType.USE_GEMINI,
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: { selectedType: undefined } }, ui: {} },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
+
+    runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
+
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(
+        ExitCodes.FATAL_AUTHENTICATION_ERROR,
+      );
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+    }
+
+    expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
+    expect(runNonInteractiveSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('validateDnsResolutionOrder', () => {

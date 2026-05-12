@@ -865,7 +865,18 @@ export async function main() {
       config,
       settings,
     );
-    await config.refreshAuth(authType);
+    try {
+      await config.refreshAuth(authType);
+    } catch (err) {
+      // Surface auth/network errors (e.g. ECONNRESET while fetching experiments
+      // or refreshing OAuth tokens) instead of letting the rejection bubble out
+      // as an unhandled crash with a raw stack trace.
+      const message = err instanceof Error ? err.message : String(err);
+      writeToStderr(`Failed to authenticate: ${message}\n`);
+      debugLogger.error('refreshAuth failed in non-interactive mode:', err);
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+    }
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);
