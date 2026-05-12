@@ -520,9 +520,10 @@ export function isTrustedSystemPath(filePath: string): boolean {
   const normPath = normalizePath(filePath);
 
   // 1. Explicitly reject paths in current working directory to prevent RCE
+  // Exclude root directories to avoid inadvertently rejecting all system paths.
   const normCwd = normalizePath(process.cwd());
-  const relative = path.relative(normCwd, normPath);
-  if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+  const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
+  if (!isRoot && isSubpath(normCwd, normPath)) {
     return false;
   }
 
