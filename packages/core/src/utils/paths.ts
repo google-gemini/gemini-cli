@@ -547,7 +547,7 @@ export function isTrustedSystemPath(filePath: string): boolean {
       '/usr/local/Cellar',
       '/usr/sbin',
       '/sbin',
-    ];
+    ].map((p) => normalizePath(p));
 
     return trustedPrefixes.some(
       (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
