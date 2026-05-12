@@ -1004,7 +1004,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                 )}
               </Box>
               {optionItem.description && (
-                <Box paddingLeft={1}>
+                // Padding aligns with option label: 4 for multi-select (checkbox + space), 1 for single-select
+                <Box paddingLeft={showCheck ? 4 : 1}>
                   <Text color={theme.text.secondary} wrap="wrap">
                     <RenderInline
                       text={optionItem.description}
