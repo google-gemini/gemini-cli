@@ -600,11 +600,10 @@ async function readLocalFiles(
                 depth: depth + 1,
               });
               if (nestedResult.processedQuery) {
-                if (typeof nestedResult.processedQuery === 'string') {
-                  parts.push({ text: nestedResult.processedQuery });
-                } else {
-                  parts.push(...nestedResult.processedQuery);
-                }
+                const queryParts = Array.isArray(nestedResult.processedQuery)
+                  ? nestedResult.processedQuery
+                  : [nestedResult.processedQuery];
+                parts.push(...queryParts);
               } else {
                 parts.push({ text: fileActualContent });
               }
