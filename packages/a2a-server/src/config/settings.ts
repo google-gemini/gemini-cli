@@ -123,12 +123,44 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
-  // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  return {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // Workspace overrides user for primitives/arrays, but nested objects are
+  // merged recursively so a partial workspace override (e.g. only
+  // fileFiltering.respectGitIgnore) does not silently drop unrelated user keys.
+  return deepMergeSettings(userSettings, workspaceSettings);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+function deepMergeSettings(target: Settings, source: Settings): Settings {
+  const result: Record<string, unknown> = { ...target };
+  const src: Record<string, unknown> = { ...source };
+  for (const key of Object.keys(src)) {
+    // Guard against prototype pollution from untrusted JSON input.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+    const srcValue = src[key];
+    if (srcValue === undefined) {
+      continue;
+    }
+    const targetValue = result[key];
+    if (isPlainObject(targetValue) && isPlainObject(srcValue)) {
+      result[key] = deepMergeSettings(
+        targetValue as Settings,
+        srcValue as Settings,
+      );
+    } else {
+      result[key] = srcValue;
+    }
+  }
+  return result as Settings;
 }
 
 function resolveEnvVarsInString(value: string): string {

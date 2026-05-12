@@ -124,7 +124,7 @@ describe('loadSettings', () => {
     expect(result.experimental?.enableAgents).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should deep merge nested settings from workspace over user', () => {
     const userSettings = {
       showMemoryUsage: false,
       fileFiltering: {
@@ -147,11 +147,55 @@ describe('loadSettings', () => {
     fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
 
     const result = loadSettings(mockWorkspaceDir);
-    // Primitive value overwritten
+    // Primitive value overwritten by workspace.
     expect(result.showMemoryUsage).toBe(true);
 
-    // Object value completely replaced (shallow merge behavior)
+    // Nested keys present only in workspace are taken from workspace.
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    // Nested keys present only in user must survive the partial workspace override.
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+  });
+
+  it('should let workspace arrays replace user arrays', () => {
+    const userSettings = {
+      coreTools: ['user-tool-a', 'user-tool-b'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      coreTools: ['workspace-tool'],
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['workspace-tool']);
+  });
+
+  it('should ignore prototype-polluting keys in either settings file', () => {
+    const userSettings = {
+      fileFiltering: { respectGitIgnore: true },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    // Embedded directly to bypass JSON.stringify's __proto__ filtering.
+    fs.writeFileSync(
+      workspaceSettingsPath,
+      '{"__proto__":{"polluted":true},"fileFiltering":{"respectGeminiIgnore":true}}',
+    );
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.fileFiltering?.respectGitIgnore).toBe(true);
+    expect(result.fileFiltering?.respectGeminiIgnore).toBe(true);
+    expect(
+      (Object.prototype as unknown as Record<string, unknown>)['polluted'],
+    ).toBeUndefined();
   });
 });
