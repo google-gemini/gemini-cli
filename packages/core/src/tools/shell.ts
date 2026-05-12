@@ -58,6 +58,7 @@ import {
 } from '../sandbox/utils/proactivePermissions.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
@@ -502,8 +503,36 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
       let cumulativeOutput: string | AnsiOutput = '';
-      let lastUpdateTime = Date.now();
+      let lastUpdateTime = 0;
+      let hasFlushedOutput = false;
+      let hasPendingOutput = false;
       let isBinaryStream = false;
+
+      const appendToLiveOutputBuffer = (chunk: string) => {
+        const currentOutput =
+          typeof cumulativeOutput === 'string' ? cumulativeOutput : '';
+        if (chunk.length >= LIVE_OUTPUT_MAX_BUFFER_CHARS) {
+          cumulativeOutput = chunk.slice(-LIVE_OUTPUT_MAX_BUFFER_CHARS);
+          return;
+        }
+
+        const nextOutput = currentOutput + chunk;
+        cumulativeOutput =
+          nextOutput.length > LIVE_OUTPUT_MAX_BUFFER_CHARS
+            ? nextOutput.slice(-LIVE_OUTPUT_MAX_BUFFER_CHARS)
+            : nextOutput;
+      };
+
+      const flushOutput = () => {
+        if (!hasPendingOutput || !updateOutput || this.params.is_background) {
+          return;
+        }
+
+        updateOutput(cumulativeOutput);
+        hasPendingOutput = false;
+        hasFlushedOutput = true;
+        lastUpdateTime = Date.now();
+      };
 
       const resetTimeout = () => {
         if (timeoutMs <= 0) {
@@ -529,22 +558,28 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
 
             let shouldUpdate = false;
 
             switch (event.type) {
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (typeof event.chunk === 'string') {
+                  appendToLiveOutputBuffer(event.chunk);
+                  shouldUpdate =
+                    !hasFlushedOutput ||
+                    Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS;
+                } else {
+                  cumulativeOutput = event.chunk;
+                  shouldUpdate = true;
+                }
+                hasPendingOutput = true;
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
                 cumulativeOutput =
                   '[Binary output detected. Halting stream...]';
+                hasPendingOutput = true;
                 shouldUpdate = true;
                 break;
               case 'binary_progress':
@@ -552,11 +587,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
+                hasPendingOutput = true;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                   shouldUpdate = true;
                 }
                 break;
               case 'exit':
+                flushOutput();
                 break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
@@ -564,8 +601,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
 
             if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
+              flushOutput();
             }
           },
           combinedController.signal,
@@ -639,6 +675,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+      if (!result.backgrounded) {
+        flushOutput();
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
