@@ -1417,7 +1417,10 @@ export class ShellExecutionService {
     const logDir = this.getLogDir();
     try {
       mkdirSync(logDir, { recursive: true, mode: 0o700 });
-      const stream = fs.createWriteStream(logPath, { flags: 'wx' });
+      const stream = fs.createWriteStream(logPath, {
+        flags: 'wx',
+        mode: 0o600,
+      });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
       });
