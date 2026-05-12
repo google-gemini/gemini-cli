@@ -25,9 +25,16 @@ export default defineConfig({
     outputFile: {
       junit: 'junit.xml',
     },
-    alias: {
-      react: path.resolve(__dirname, '../../node_modules/react'),
-    },
+    alias: [
+      {
+        find: 'react',
+        replacement: path.resolve(__dirname, '../../node_modules/react'),
+      },
+      {
+        find: /^@google\/gemini-cli-core$/,
+        replacement: path.resolve(__dirname, '../core/src/index.ts'),
+      },
+    ],
     setupFiles: ['./test-setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,

@@ -32,6 +32,7 @@ let currentMission: string | null = null;
 let currentMissionBrief: MissionBrief | null = null;
 let currentMissionCouncil: MissionCouncilResult | null = null;
 let currentPhase: Phase = 'Mission';
+let cockpitDetailsExpanded = false;
 const listeners = new Set<() => void>();
 
 function notifyCockpitListeners(): void {
@@ -60,6 +61,10 @@ export function getCurrentPhase(): string {
   return currentPhase;
 }
 
+export function getCockpitDetailsExpanded(): boolean {
+  return cockpitDetailsExpanded;
+}
+
 export function setCurrentPhase(phase: Phase): void {
   if (currentPhase === phase) {
     return;
@@ -75,7 +80,24 @@ export function setCockpitVisible(visible: boolean): void {
   }
 
   cockpitVisible = visible;
+  if (!visible) {
+    cockpitDetailsExpanded = false;
+  }
   notifyCockpitListeners();
+}
+
+export function setCockpitDetailsExpanded(expanded: boolean): void {
+  if (cockpitDetailsExpanded === expanded) {
+    return;
+  }
+
+  cockpitDetailsExpanded = expanded;
+  notifyCockpitListeners();
+}
+
+export function toggleCockpitDetails(): boolean {
+  setCockpitDetailsExpanded(!cockpitDetailsExpanded);
+  return cockpitDetailsExpanded;
 }
 
 export function activateCockpitMission(request: string): void {
@@ -83,6 +105,7 @@ export function activateCockpitMission(request: string): void {
   currentMissionBrief = createMissionBrief(request);
   currentMissionCouncil = createMissionCouncilResult(request);
   currentPhase = 'Mission';
+  cockpitDetailsExpanded = false;
   cockpitVisible = true;
   notifyCockpitListeners();
 }
@@ -98,6 +121,7 @@ export interface CockpitState {
   missionBrief: MissionBrief | null;
   missionCouncil: MissionCouncilResult | null;
   phase: Phase;
+  detailsExpanded: boolean;
 }
 
 export function useCockpitState(): CockpitState {
@@ -121,6 +145,7 @@ export function useCockpitState(): CockpitState {
     missionBrief: currentMissionBrief,
     missionCouncil: currentMissionCouncil,
     phase: currentPhase,
+    detailsExpanded: cockpitDetailsExpanded,
   };
 }
 

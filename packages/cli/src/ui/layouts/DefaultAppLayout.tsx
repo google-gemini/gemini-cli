@@ -18,14 +18,30 @@ import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
 import { useInputState } from '../contexts/InputContext.js';
-import { useCockpitVisible } from '../cockpit/CockpitState.js';
+import {
+  toggleCockpitDetails,
+  useCockpitVisible,
+} from '../cockpit/CockpitState.js';
 import { StaticCockpitPanel } from '../cockpit/components/StaticCockpitPanel.js';
+import { useBuddyState } from '../companion/BuddyState.js';
+import { BuddyPanel } from '../companion/components/BuddyPanel.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
   const { copyModeEnabled } = useInputState();
   const isAlternateBuffer = useAlternateBuffer();
   const isCockpitVisible = useCockpitVisible();
+  const buddy = useBuddyState();
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'f10') {
+        toggleCockpitDetails();
+      }
+    },
+    { isActive: isCockpitVisible },
+  );
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -41,7 +57,12 @@ export const DefaultAppLayout: React.FC = () => {
       flexGrow={0}
       ref={uiState.rootUiRef}
     >
-      {isCockpitVisible && <StaticCockpitPanel />}
+      {isCockpitVisible && (
+        <StaticCockpitPanel
+          polluxMessage={buddy.visible ? buddy.message : undefined}
+        />
+      )}
+      {!isCockpitVisible && buddy.visible && <BuddyPanel />}
 
       <MainContent />
 

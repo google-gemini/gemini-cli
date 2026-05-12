@@ -19,10 +19,10 @@ export function createMissionBrief(request: string): MissionBrief {
   return {
     goal,
     lane: 'Unknown',
-    likelyFiles: ['Pending inspect phase'],
-    protectedZones: ['Pending project profile'],
-    risks: ['Pending risk scan'],
-    testPlan: ['Pending test planner'],
+    likelyFiles: ['Inspect phase will choose the files'],
+    protectedZones: ['No protected zones identified yet'],
+    risks: ['Risk scan has not found a blocker yet'],
+    testPlan: ['Use the narrowest check that covers the edit'],
     successCriteria: ['Mission brief accepted'],
   };
 }

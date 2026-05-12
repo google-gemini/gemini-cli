@@ -38,7 +38,7 @@ export function createMissionCouncilResult(
   };
   const riskOfficer: MissionCouncilResult['riskOfficer'] = {
     riskLevel: 'Safe',
-    protectedZones: ['Pending project profile'],
+    protectedZones: ['No protected zones identified yet'],
     reasons: ['No explicit protected zone detected yet.'],
   };
   const testCaptain: MissionCouncilResult['testCaptain'] = {

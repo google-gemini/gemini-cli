@@ -170,6 +170,62 @@ describe('PolicyEngine', () => {
   });
 
   describe('check', () => {
+
+    it('should apply Autopilot Command Gate before shell confirmation policy', async () => {
+      engine = new PolicyEngine({
+        autopilotMission: 'fix README typo without touching core',
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      await expect(
+        engine.check(
+          { name: 'run_shell_command', args: { command: 'npm run format' } },
+          undefined,
+        ),
+      ).resolves.toMatchObject({
+        decision: PolicyDecision.SUPPRESS,
+        reason: 'Tiny docs-only mission does not need command ceremony.',
+      });
+
+      await expect(
+        engine.check(
+          { name: 'run_shell_command', args: { command: 'npm test' } },
+          undefined,
+        ),
+      ).resolves.toMatchObject({ decision: PolicyDecision.SUPPRESS });
+
+      await expect(
+        engine.check(
+          {
+            name: 'run_shell_command',
+            args: { command: 'git diff packages/core' },
+          },
+          undefined,
+        ),
+      ).resolves.toMatchObject({ decision: PolicyDecision.SUPPRESS });
+
+      await expect(
+        engine.check(
+          { name: 'run_shell_command', args: { command: 'git diff' } },
+          undefined,
+        ),
+      ).resolves.toMatchObject({ decision: PolicyDecision.ALLOW });
+
+      await expect(
+        engine.check(
+          { name: 'run_shell_command', args: { command: 'git push' } },
+          undefined,
+        ),
+      ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+
+      await expect(
+        engine.check(
+          { name: 'run_shell_command', args: { command: 'rm -rf dist' } },
+          undefined,
+        ),
+      ).resolves.toMatchObject({ decision: PolicyDecision.DENY });
+    });
+
     it('should match tool by name', async () => {
       const rules: PolicyRule[] = [
         { toolName: 'shell', decision: PolicyDecision.ALLOW },

@@ -27,7 +27,9 @@ const root = join(__dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
 
 // check build status, write warnings to file for app to display if needed
-execSync('node ./scripts/check-build-status.js', {
+const buildStatusArgs =
+  process.env.NODE_ENV === 'production' ? '' : ' --auto-build';
+execSync(`node ./scripts/check-build-status.js${buildStatusArgs}`, {
   stdio: 'inherit',
   cwd: root,
 });

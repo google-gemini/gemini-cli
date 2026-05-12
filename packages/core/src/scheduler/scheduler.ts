@@ -68,6 +68,26 @@ export interface SchedulerOptions {
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
+const createSuccessResponse = (
+  request: ToolCallRequestInfo,
+  message: string,
+): ToolCallResponseInfo => ({
+  callId: request.callId,
+  error: undefined,
+  responseParts: [
+    {
+      functionResponse: {
+        id: request.callId,
+        name: request.originalRequestName ?? request.name,
+        response: { output: message },
+      },
+    },
+  ],
+  resultDisplay: message,
+  errorType: undefined,
+  contentLength: message.length,
+});
+
 const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
@@ -627,14 +647,27 @@ export class Scheduler {
     }
 
     // 2. Policy & Security
-    const { decision: policyDecision, rule } = await checkPolicy(
-      toolCall,
-      this.config,
-      this.subagent,
-    );
+    const {
+      decision: policyDecision,
+      rule,
+      reason: policyReason,
+    } = await checkPolicy(toolCall, this.config, this.subagent);
     let decision = policyDecision;
     if (hookDecision === 'ask') {
       decision = PolicyDecision.ASK_USER;
+    }
+
+    if (decision === PolicyDecision.SUPPRESS) {
+      const message = `Command suppressed by Autopilot: ${
+        policyReason ?? 'Tiny docs-only mission does not need command ceremony.'
+      }`;
+
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Success,
+        createSuccessResponse(toolCall.request, message),
+      );
+      return;
     }
 
     if (decision === PolicyDecision.DENY) {

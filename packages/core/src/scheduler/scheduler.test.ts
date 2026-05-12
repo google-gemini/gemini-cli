@@ -661,6 +661,36 @@ describe('Scheduler (Orchestrator)', () => {
   describe('Phase 3: Policy & Confirmation Loop', () => {
     beforeEach(() => {});
 
+    it('should turn SUPPRESS into a virtual success without confirmation or execution', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.SUPPRESS,
+        reason: 'Tiny docs-only mission does not need command ceremony.',
+      });
+
+      await scheduler.schedule(req1, signal);
+
+      expect(resolveConfirmation).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Success,
+        expect.objectContaining({
+          resultDisplay:
+            'Command suppressed by Autopilot: Tiny docs-only mission does not need command ceremony.',
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  output:
+                    'Command suppressed by Autopilot: Tiny docs-only mission does not need command ceremony.',
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
     it('should update state to error with POLICY_VIOLATION if Policy returns DENY', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,

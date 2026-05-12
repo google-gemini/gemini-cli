@@ -27,6 +27,10 @@ import {
   ALWAYS_ALLOW_PRIORITY_FRACTION,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
+import {
+  AutopilotCommandDecision,
+  evaluateAutopilotCommand,
+} from './autopilot-command-gate.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
@@ -200,6 +204,7 @@ export class PolicyEngine {
   private checkers: SafetyCheckerRule[];
   private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
+  private autopilotMission: string | undefined;
   private readonly nonInteractive: boolean;
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
@@ -257,6 +262,7 @@ export class PolicyEngine {
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.autopilotMission = config.autopilotMission;
     this.sandboxManager = config.sandboxManager ?? new NoopSandboxManager();
   }
 
@@ -272,6 +278,14 @@ export class PolicyEngine {
    */
   getApprovalMode(): ApprovalMode {
     return this.approvalMode;
+  }
+
+  setAutopilotMission(mission: string | undefined): void {
+    this.autopilotMission = mission?.trim() || undefined;
+  }
+
+  getAutopilotMission(): string | undefined {
+    return this.autopilotMission;
   }
 
   private isAlwaysAllowRule(rule: PolicyRule): boolean {
@@ -298,6 +312,34 @@ export class PolicyEngine {
     }
 
     return true;
+  }
+
+  private checkAutopilotCommandGate(
+    command: string | undefined,
+  ): CheckResult | undefined {
+    if (!command || !this.autopilotMission) {
+      return undefined;
+    }
+
+    const result = evaluateAutopilotCommand({
+      mission: this.autopilotMission,
+      command,
+    });
+
+    switch (result.decision) {
+      case AutopilotCommandDecision.ALLOW:
+        return { decision: PolicyDecision.ALLOW, reason: result.reason };
+      case AutopilotCommandDecision.SUPPRESS:
+        return { decision: PolicyDecision.SUPPRESS, reason: result.reason };
+      case AutopilotCommandDecision.DENY:
+        return { decision: PolicyDecision.DENY, reason: result.reason };
+      case AutopilotCommandDecision.ASK:
+        return undefined;
+      default: {
+        const _exhaustive: never = result.decision;
+        return _exhaustive;
+      }
+    }
   }
 
   /**
@@ -445,7 +487,10 @@ export class PolicyEngine {
           true,
         );
 
-        if (wrapperResult.decision === PolicyDecision.DENY)
+        if (
+          wrapperResult.decision === PolicyDecision.DENY ||
+          wrapperResult.decision === PolicyDecision.SUPPRESS
+        )
           return wrapperResult;
         if (wrapperResult.decision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
@@ -466,7 +511,11 @@ export class PolicyEngine {
           true,
         );
 
-        if (subResult.decision === PolicyDecision.DENY) return subResult;
+        if (
+          subResult.decision === PolicyDecision.DENY ||
+          subResult.decision === PolicyDecision.SUPPRESS
+        )
+          return subResult;
 
         if (subResult.decision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
@@ -550,6 +599,14 @@ export class PolicyEngine {
       const args = toolCall.args as { command?: string; dir_path?: string };
       command = args?.command;
       shellDirPath = args?.dir_path;
+
+      const autopilotResult = this.checkAutopilotCommandGate(command);
+      if (autopilotResult) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Autopilot command gate decided ${autopilotResult.decision}: ${autopilotResult.reason ?? 'no reason'}`,
+        );
+        return autopilotResult;
+      }
     }
 
     // Find the first matching rule (already sorted by priority)
@@ -703,7 +760,11 @@ export class PolicyEngine {
     }
 
     // Safety checks
-    if (decision !== PolicyDecision.DENY && this.checkerRunner) {
+    if (
+      decision !== PolicyDecision.DENY &&
+      decision !== PolicyDecision.SUPPRESS &&
+      this.checkerRunner
+    ) {
       for (const checkerRule of this.checkers) {
         if (
           ruleMatches(

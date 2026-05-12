@@ -20,10 +20,19 @@ export const missionCommand: SlashCommand = {
   description: 'Generate a structured mission brief from your request.',
   kind: CommandKind.BUILT_IN,
   action: async (
-    _context,
+    context,
     userRequest: string,
   ): Promise<SlashCommandActionReturn> => {
+    const result = performMission(userRequest);
+    if (result.type === 'message') {
+      return result;
+    }
+
     activateCockpitMission(userRequest);
-    return performMission(userRequest);
+    context.services.agentContext?.config
+      .getPolicyEngine()
+      .setAutopilotMission(userRequest);
+
+    return result;
   },
 };

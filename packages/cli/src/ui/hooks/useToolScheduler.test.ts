@@ -20,9 +20,11 @@ import {
   type AnyToolInvocation,
   ROOT_SCHEDULER_ID,
   CoreToolCallStatus,
+  ToolErrorType,
   type WaitingToolCall,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
+import { getBuddyState, resetBuddyState } from '../companion/BuddyState.js';
 
 // Mock Core Scheduler
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -77,6 +79,7 @@ describe('useToolScheduler', () => {
   });
 
   afterEach(() => {
+    resetBuddyState();
     vi.clearAllMocks();
   });
 
@@ -131,6 +134,91 @@ describe('useToolScheduler', () => {
       status: CoreToolCallStatus.Executing,
       liveOutput: 'Loading...',
       responseSubmittedToGemini: false,
+    });
+  });
+
+  it('updates Pollux when Autopilot suppresses a command in a live tool update', async () => {
+    await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const suppressedCall = {
+      status: CoreToolCallStatus.Success as const,
+      request: {
+        callId: 'call-suppressed',
+        name: 'run_shell_command',
+        args: { command: 'npm run format' },
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      response: {
+        callId: 'call-suppressed',
+        resultDisplay:
+          'Command suppressed by Autopilot: Tiny docs-only mission does not need command ceremony.',
+        responseParts: [],
+        error: undefined,
+        errorType: undefined,
+      },
+    } as CompletedToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [suppressedCall],
+        schedulerId: ROOT_SCHEDULER_ID,
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(getBuddyState()).toMatchObject({
+      mood: 'protective',
+      message: 'Skipped npm run format. Still on mission.',
+    });
+  });
+
+  it('updates Pollux when policy denies a command in a live tool update', async () => {
+    await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const deniedCall = {
+      status: CoreToolCallStatus.Error as const,
+      request: {
+        callId: 'call-denied',
+        name: 'run_shell_command',
+        args: { command: 'git push' },
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      response: {
+        callId: 'call-denied',
+        resultDisplay: 'Tool execution denied by policy.',
+        responseParts: [],
+        error: new Error('Tool execution denied by policy.'),
+        errorType: ToolErrorType.POLICY_VIOLATION,
+      },
+    } as CompletedToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [deniedCall],
+        schedulerId: ROOT_SCHEDULER_ID,
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(getBuddyState()).toMatchObject({
+      mood: 'blocked',
+      message: 'Blocked git push. Nope rope cut.',
     });
   });
 

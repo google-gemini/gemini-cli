@@ -15,11 +15,13 @@ import {
   type EditorType,
   type ToolCallsUpdateMessage,
   CoreToolCallStatus,
+  ToolErrorType,
   type SubagentActivityItem,
   type SubagentActivityMessage,
   AGENT_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
+import { applyBuddyReaction } from '../companion/useBuddyReactions.js';
 
 // Re-exporting types compatible with hook expectations
 export type ScheduleFn = (
@@ -102,6 +104,8 @@ export function useToolScheduler(
     getPreferredEditorRef.current = getPreferredEditor;
   }, [getPreferredEditor]);
 
+  const reactedToolCallIdsRef = useRef(new Set<string>());
+
   const scheduler = useMemo(
     () =>
       new Scheduler({
@@ -138,6 +142,11 @@ export function useToolScheduler(
       if (hasExecuting) {
         setLastToolOutputTime(Date.now());
       }
+
+      applyBuddyReactionsForToolCalls(
+        event.toolCalls,
+        reactedToolCallIdsRef.current,
+      );
 
       setToolCallsMap((prev) => {
         const prevCalls = prev[event.schedulerId] ?? [];
@@ -327,6 +336,52 @@ export function useToolScheduler(
 /**
  * ADAPTER: Merges UI metadata (submitted flag).
  */
+
+function getToolCallCommand(call: ToolCall): string {
+  const command = call.request.args['command'];
+  return typeof command === 'string' && command.trim()
+    ? command.trim()
+    : call.request.name;
+}
+
+function applyBuddyReactionsForToolCalls(
+  toolCalls: readonly ToolCall[],
+  reactedToolCallIds: Set<string>,
+): void {
+  for (const call of toolCalls) {
+    const callId = call.request.callId;
+    if (reactedToolCallIds.has(callId)) {
+      continue;
+    }
+
+    if (call.status === CoreToolCallStatus.Success) {
+      const resultDisplay = call.response.resultDisplay;
+      if (
+        typeof resultDisplay === 'string' &&
+        resultDisplay.startsWith('Command suppressed by Autopilot:')
+      ) {
+        reactedToolCallIds.add(callId);
+        applyBuddyReaction({
+          type: 'command_suppressed',
+          command: getToolCallCommand(call),
+        });
+      }
+      continue;
+    }
+
+    if (
+      call.status === CoreToolCallStatus.Error &&
+      call.response.errorType === ToolErrorType.POLICY_VIOLATION
+    ) {
+      reactedToolCallIds.add(callId);
+      applyBuddyReaction({
+        type: 'command_denied',
+        command: getToolCallCommand(call),
+      });
+    }
+  }
+}
+
 function adaptToolCalls(
   coreCalls: ToolCall[],
   prevTracked: TrackedToolCall[],

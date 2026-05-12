@@ -7,12 +7,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   activateCockpitMission,
+  getCockpitDetailsExpanded,
   getCockpitVisible,
   getCurrentMissionBrief,
   getCurrentPhase,
   setCurrentPhase,
+  setCockpitDetailsExpanded,
   setCockpitVisible,
   toggleCockpit,
+  toggleCockpitDetails,
 } from './CockpitState.js';
 
 describe('CockpitState', () => {
@@ -43,5 +46,22 @@ describe('CockpitState', () => {
     const brief = getCurrentMissionBrief();
     expect(brief).not.toBeNull();
     expect(brief?.goal).toBe('Structured test');
+  });
+
+  it('should activate missions in compact mode by default', () => {
+    setCockpitDetailsExpanded(true);
+    activateCockpitMission('Keep this compact');
+
+    expect(getCockpitVisible()).toBe(true);
+    expect(getCockpitDetailsExpanded()).toBe(false);
+  });
+
+  it('should toggle cockpit details for F10 handlers', () => {
+    activateCockpitMission('Toggle details');
+
+    expect(toggleCockpitDetails()).toBe(true);
+    expect(getCockpitDetailsExpanded()).toBe(true);
+    expect(toggleCockpitDetails()).toBe(false);
+    expect(getCockpitDetailsExpanded()).toBe(false);
   });
 });

@@ -84,6 +84,7 @@ export async function checkPolicy(
     return {
       decision: PolicyDecision.ALLOW,
       rule: result.rule,
+      reason: result.reason,
     };
   }
 
@@ -104,6 +105,7 @@ export async function checkPolicy(
   return {
     decision,
     rule: result.rule,
+    reason: result.reason,
   };
 }
 

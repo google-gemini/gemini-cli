@@ -23,7 +23,7 @@ export const cockpitCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: 'info',
-      content: `Cockpit overlay ${visible ? 'enabled' : 'disabled'}.`,
+      content: `Cockpit ${visible ? 'online' : 'hidden'}.`,
     };
   },
 };

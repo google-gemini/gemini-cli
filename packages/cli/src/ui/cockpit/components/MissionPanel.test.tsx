@@ -22,6 +22,6 @@ describe('MissionPanel', () => {
     expect(output).toContain('Lane:');
     expect(output).toContain('Unknown');
     expect(output).toContain('Risks:');
-    expect(output).toContain('Pending risk scan');
+    expect(output).toContain('Risk scan has not found a blocker yet');
   });
 });

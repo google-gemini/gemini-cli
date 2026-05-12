@@ -12,7 +12,7 @@ describe('MissionCouncil', () => {
     const result = createMissionCouncilResult('do something');
     expect(result.riskOfficer.riskLevel).toBe('Safe');
     expect(result.riskOfficer.protectedZones).toContain(
-      'Pending project profile',
+      'No protected zones identified yet',
     );
     expect(result.finalRoute.firstAction).toBe(
       'Inspect likely files before editing',

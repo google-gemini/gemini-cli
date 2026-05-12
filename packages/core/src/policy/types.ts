@@ -11,6 +11,7 @@ export enum PolicyDecision {
   ALLOW = 'allow',
   DENY = 'deny',
   ASK_USER = 'ask_user',
+  SUPPRESS = 'suppress',
 }
 
 /**
@@ -279,6 +280,11 @@ export interface HookCheckerRule {
 
 export interface PolicyEngineConfig {
   /**
+   * Current GC autopilot mission. When set, shell commands are checked by
+   * Autopilot Command Gate before normal confirmation policy.
+   */
+  autopilotMission?: string;
+  /**
    * List of policy rules to apply.
    */
   rules?: PolicyRule[];
@@ -352,6 +358,7 @@ export interface PolicySettings {
 export interface CheckResult {
   decision: PolicyDecision;
   rule?: PolicyRule;
+  reason?: string;
 }
 
 /**

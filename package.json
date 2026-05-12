@@ -81,7 +81,13 @@
     "glob": "^12.0.0",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
-    "cross-spawn": "^7.0.6"
+    "cross-spawn": "^7.0.6",
+    "eslint": {
+      "ajv": "6.14.0"
+    },
+    "@eslint/eslintrc": {
+      "ajv": "6.14.0"
+    }
   },
   "bin": {
     "gemini": "bundle/gemini.js"

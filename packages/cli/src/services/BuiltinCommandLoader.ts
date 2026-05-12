@@ -23,6 +23,7 @@ import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { bugMemoryCommand } from '../ui/commands/bugMemoryCommand.js';
+import { buddyCommand } from '../ui/commands/buddyCommand.js';
 import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { commandsCommand } from '../ui/commands/commandsCommand.js';
@@ -128,6 +129,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       authCommand,
       bugCommand,
       bugMemoryCommand,
+      buddyCommand,
       {
         ...chatCommand,
         subCommands: chatResumeSubCommands,

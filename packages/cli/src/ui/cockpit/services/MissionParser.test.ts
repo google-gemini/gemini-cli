@@ -14,10 +14,10 @@ describe('MissionParser', () => {
 
     expect(brief.goal).toBe(request);
     expect(brief.lane).toBe('Unknown');
-    expect(brief.likelyFiles).toEqual(['Pending inspect phase']);
-    expect(brief.protectedZones).toEqual(['Pending project profile']);
-    expect(brief.risks).toEqual(['Pending risk scan']);
-    expect(brief.testPlan).toEqual(['Pending test planner']);
+    expect(brief.likelyFiles).toEqual(['Inspect phase will choose the files']);
+    expect(brief.protectedZones).toEqual(['No protected zones identified yet']);
+    expect(brief.risks).toEqual(['Risk scan has not found a blocker yet']);
+    expect(brief.testPlan).toEqual(['Use the narrowest check that covers the edit']);
     expect(brief.successCriteria).toEqual(['Mission brief accepted']);
   });
 });
