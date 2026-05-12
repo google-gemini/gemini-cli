@@ -345,7 +345,7 @@ export function isGemini3Model(
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
-    const resolved = resolveModel(model);
+    const resolved = resolveModel(model, false, false, false, true, config);
     return (
       config.modelConfigService.getModelDefinition(resolved)?.family ===
       'gemini-3'

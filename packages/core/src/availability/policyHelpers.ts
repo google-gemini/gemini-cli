@@ -28,6 +28,7 @@ import {
   isGemini3Model,
   resolveModel,
 } from '../config/models.js';
+import { normalizeModelId } from '../utils/modelUtils.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -41,9 +42,13 @@ export function resolvePolicyChain(
   preferredModel?: string,
   wrapsAround: boolean = false,
 ): ModelPolicyChain {
-  const modelFromConfig =
-    preferredModel ?? config.getActiveModel?.() ?? config.getModel();
-  const configuredModel = config.getModel();
+  const normalizedPreferredModel = preferredModel
+    ? normalizeModelId(preferredModel)
+    : undefined;
+  const modelFromConfig = normalizeModelId(
+    normalizedPreferredModel ?? config.getActiveModel?.() ?? config.getModel(),
+  );
+  const configuredModel = normalizeModelId(config.getModel());
 
   let chain: ModelPolicyChain | undefined;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
@@ -52,18 +57,28 @@ export function resolvePolicyChain(
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
-  const resolvedModel = resolveModel(
-    modelFromConfig,
-    useGemini31,
-    useGemini31FlashLite,
-    useCustomToolModel,
-    hasAccessToPreview,
-    config,
+  const resolvedModel = normalizeModelId(
+    resolveModel(
+      modelFromConfig,
+      useGemini31,
+      useGemini31FlashLite,
+      useCustomToolModel,
+      hasAccessToPreview,
+      config,
+    ),
   );
-  const isAutoPreferred = preferredModel
-    ? isAutoModel(preferredModel, config)
+  const isAutoPreferred = normalizedPreferredModel
+    ? isAutoModel(normalizedPreferredModel, config)
     : false;
   const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // We always wrap around for Gemini 3 chains to ensure maximum availability
+  // between models in the same family (e.g. fallback to Pro if Flash is exhausted).
+  const effectiveWrapsAround =
+    wrapsAround ||
+    isAutoPreferred ||
+    isAutoConfigured ||
+    isGemini3Model(resolvedModel, config);
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -76,7 +91,7 @@ export function resolvePolicyChain(
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = config.modelConfigService.resolveChain('lite', context);
     } else if (
-      isGemini3Model(resolvedModel, config) ||
+      isGemini3Model(normalizeModelId(resolvedModel), config) ||
       isAutoPreferred ||
       isAutoConfigured
     ) {
@@ -96,7 +111,7 @@ export function resolvePolicyChain(
         const previewEnabled =
           hasAccessToPreview &&
           (isGemini3Model(resolvedModel, config) ||
-            preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
             configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
         const autoPrefix = isAutoSelection ? 'auto-' : '';
         const chainKey = previewEnabled ? 'preview' : 'default';
@@ -110,7 +125,7 @@ export function resolvePolicyChain(
       // No matching modelChains found, default to single model chain
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
   } else {
     // --- LEGACY PATH ---
 
@@ -125,7 +140,7 @@ export function resolvePolicyChain(
       if (hasAccessToPreview) {
         const previewEnabled =
           isGemini3Model(resolvedModel, config) ||
-          preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+          normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
           configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
         chain = getModelPolicyChain({
           previewEnabled,
@@ -150,7 +165,7 @@ export function resolvePolicyChain(
     } else {
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, effectiveWrapsAround);
   }
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
@@ -171,8 +186,9 @@ function applyDynamicSlicing(
   resolvedModel: string,
   wrapsAround: boolean,
 ): ModelPolicyChain {
+  const normalizedResolved = normalizeModelId(resolvedModel);
   const activeIndex = chain.findIndex(
-    (policy) => policy.model === resolvedModel,
+    (policy) => normalizeModelId(policy.model) === normalizedResolved,
   );
   if (activeIndex !== -1) {
     return wrapsAround
@@ -200,7 +216,10 @@ export function buildFallbackPolicyContext(
   failedPolicy?: ModelPolicy;
   candidates: ModelPolicy[];
 } {
-  const index = chain.findIndex((policy) => policy.model === failedModel);
+  const normalizedFailed = normalizeModelId(failedModel);
+  const index = chain.findIndex(
+    (policy) => normalizeModelId(policy.model) === normalizedFailed,
+  );
   if (index === -1) {
     return { failedPolicy: undefined, candidates: chain };
   }

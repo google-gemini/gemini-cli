@@ -41,6 +41,41 @@ module.exports = async ({ github, context, core }) => {
     now.getTime() - NO_RESPONSE_DAYS * 24 * 60 * 60 * 1000,
   );
 
+  const maintainerCache = new Map();
+  async function isMaintainer(user, association) {
+    if (user?.type === 'Bot') return true;
+    if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(association)) return true;
+
+    const username = user?.login;
+    if (!username) return false;
+
+    if (maintainerCache.has(username)) {
+      return maintainerCache.get(username);
+    }
+
+    try {
+      const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+        owner,
+        repo,
+        username,
+      });
+      // Permission can be admin, write, read, none.
+      // Roles like 'maintain' or 'triage' often map to 'write' or 'read' in the top-level field.
+      const isM =
+        ['admin', 'write'].includes(data.permission) ||
+        ['admin', 'maintain', 'write'].includes(data.role_name);
+
+      maintainerCache.set(username, isM);
+      return isM;
+    } catch (err) {
+      core.warning(
+        `Could not check permissions for ${username}: ${err.message}`,
+      );
+      maintainerCache.set(username, false);
+      return false;
+    }
+  }
+
   async function processItems(query, callback) {
     core.info(`Searching: ${query}`);
     try {
@@ -83,10 +118,7 @@ module.exports = async ({ github, context, core }) => {
       const lastComment = comments[0];
       if (
         lastComment &&
-        !['OWNER', 'MEMBER', 'COLLABORATOR'].includes(
-          lastComment.author_association,
-        ) &&
-        lastComment.user?.type !== 'Bot'
+        !(await isMaintainer(lastComment.user, lastComment.author_association))
       ) {
         core.info(
           `Removing ${NEED_INFO_LABEL} from #${item.number} due to contributor response.`,
@@ -188,11 +220,7 @@ module.exports = async ({ github, context, core }) => {
   await processItems(
     `repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" -label:"status/pr-nudge-sent" created:${prCloseThreshold.toISOString()}..${nudgeThreshold.toISOString()}`,
     async (pr) => {
-      if (
-        ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) ||
-        pr.user?.type === 'Bot'
-      )
-        return;
+      if (await isMaintainer(pr.user, pr.author_association)) return;
 
       core.info(`Nudging PR #${pr.number} for contribution policy.`);
       if (!dryRun) {
@@ -216,11 +244,7 @@ module.exports = async ({ github, context, core }) => {
   await processItems(
     `repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" created:<${prCloseThreshold.toISOString()}`,
     async (pr) => {
-      if (
-        ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) ||
-        pr.user?.type === 'Bot'
-      )
-        return;
+      if (await isMaintainer(pr.user, pr.author_association)) return;
 
       core.info(
         `Closing PR #${pr.number} per contribution policy (no 'help wanted').`,

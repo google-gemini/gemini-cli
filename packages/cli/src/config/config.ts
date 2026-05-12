@@ -97,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionFile?: string | undefined;
   sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
@@ -239,8 +240,14 @@ export async function parseArguments(
         ? query.length > 0
         : !!query;
 
-      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
-        return 'Cannot use both --resume (-r) and --session-id together';
+      const sessionFlags = [
+        argv['resume'] !== undefined,
+        argv['session-id'] !== undefined,
+        argv['session-file'] !== undefined,
+      ].filter(Boolean).length;
+
+      if (sessionFlags > 1) {
+        return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
       }
 
       if (argv['prompt'] && hasPositionalQuery) {
@@ -411,6 +418,11 @@ export async function parseArguments(
             }
             return trimmed;
           },
+        })
+        .option('session-file', {
+          type: 'string',
+          nargs: 1,
+          description: 'Load a session from a JSON file',
         })
         .option('session-id', {
           type: 'string',
@@ -1093,7 +1105,11 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    // In ACP mode, always skip the next-speaker check. This check triggers
+    // recursive continuation turns inside GeminiClient.processTurn() that
+    // conflict with ACP's explicit turn management via session/prompt,
+    // causing infinite agent_thought_chunk loops.
+    skipNextSpeakerCheck: isAcpMode || settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
