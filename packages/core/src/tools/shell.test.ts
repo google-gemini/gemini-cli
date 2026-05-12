@@ -45,7 +45,11 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
+import {
+  ShellTool,
+  OUTPUT_UPDATE_INTERVAL_MS,
+  LIVE_OUTPUT_MAX_BUFFER_CHARS,
+} from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
@@ -77,6 +81,7 @@ import {
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { type SandboxManager } from '../services/sandboxManager.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 interface TestableMockMessageBus extends MessageBus {
   defaultToolDecision: 'allow' | 'deny' | 'ask_user';
@@ -683,6 +688,91 @@ EOF`;
           pid: 12345,
           executionMethod: 'child_process',
         });
+        await promise;
+      });
+
+      it('should show the first text output immediately and throttle subsequent text updates', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'first' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+        expect(updateOutputMock).toHaveBeenLastCalledWith('first');
+
+        mockShellOutputCallback({ type: 'data', chunk: 'second' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
+        mockShellOutputCallback({ type: 'data', chunk: 'third' });
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecondthird');
+
+        resolveShellExecution({ output: 'firstsecondthird' });
+        await promise;
+      });
+
+      it('should flush trailing throttled text output when the command completes', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'first' });
+        mockShellOutputCallback({ type: 'data', chunk: 'second' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        resolveShellExecution({ output: 'firstsecond' });
+        await promise;
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecond');
+      });
+
+      it('should keep only a bounded text buffer for live display', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({
+          type: 'data',
+          chunk: `older${'x'.repeat(LIVE_OUTPUT_MAX_BUFFER_CHARS)}`,
+        });
+
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+        expect(updateOutputMock).toHaveBeenLastCalledWith(
+          'x'.repeat(LIVE_OUTPUT_MAX_BUFFER_CHARS),
+        );
+
+        resolveShellExecution({
+          output: `older${'x'.repeat(LIVE_OUTPUT_MAX_BUFFER_CHARS)}`,
+        });
+        await promise;
+      });
+
+      it('should not throttle PTY AnsiOutput snapshots in the shell tool', async () => {
+        const firstAnsiOutput = [[{ text: 'first' }]] as AnsiOutput;
+        const secondAnsiOutput = [[{ text: 'second' }]] as AnsiOutput;
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: firstAnsiOutput });
+        mockShellOutputCallback({ type: 'data', chunk: secondAnsiOutput });
+
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenNthCalledWith(1, firstAnsiOutput);
+        expect(updateOutputMock).toHaveBeenNthCalledWith(2, secondAnsiOutput);
+
+        resolveShellExecution({ ansiOutput: secondAnsiOutput });
         await promise;
       });
 
