@@ -521,7 +521,8 @@ export function isTrustedSystemPath(filePath: string): boolean {
 
   // 1. Explicitly reject paths in current working directory to prevent RCE
   const normCwd = normalizePath(process.cwd());
-  if (normPath === normCwd || normPath.startsWith(normCwd + '/')) {
+  const relative = path.relative(normCwd, normPath);
+  if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
     return false;
   }
 
