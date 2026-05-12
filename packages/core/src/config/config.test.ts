@@ -111,10 +111,6 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   })),
 }));
 
-vi.mock('../utils/memoryDiscovery.js', () => ({
-  loadServerHierarchicalMemory: vi.fn(),
-}));
-
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
 vi.mock('../tools/read-file');
@@ -129,13 +125,15 @@ vi.mock('../tools/shell');
 vi.mock('../tools/write-file');
 vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
-vi.mock('../tools/memoryTool', () => ({
-  MemoryTool: vi.fn(),
-  setGeminiMdFilename: vi.fn(),
-  getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
-  DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
-  GEMINI_DIR: '.gemini',
-}));
+vi.mock('../tools/memoryTool', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../tools/memoryTool.js')>();
+  return {
+    ...actual,
+    setGeminiMdFilename: vi.fn(),
+    getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'),
+  };
+});
 
 vi.mock('../core/contentGenerator.js');
 
@@ -3487,13 +3485,12 @@ describe('Config JIT Initialization', () => {
     );
   });
 
-  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
       debugMode: false,
       model: 'test-model',
-      experimentalJitContext: true,
       userMemory: 'Initial Memory',
       cwd: '/tmp/test',
     };
@@ -3540,78 +3537,17 @@ describe('Config JIT Initialization', () => {
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
-    const params: ConfigParameters = {
-      sessionId: 'test-session',
-      targetDir: '/tmp/test',
-      debugMode: false,
-      model: 'test-model',
-      experimentalJitContext: false,
-      userMemory: 'Initial Memory',
-      cwd: '/tmp/test',
-    };
-
-    config = new Config(params);
-    await config.initialize();
-
-    expect(MemoryContextManager).not.toHaveBeenCalled();
-    expect(config.getUserMemory()).toBe('Initial Memory');
-  });
-
-  describe('isMemoryV2Enabled', () => {
-    it('should default to true', () => {
+  describe('memory path access', () => {
+    it('should NOT add the global ~/.gemini directory to the workspace', async () => {
+      // Memory does not broaden the workspace to include the global ~/.gemini/
+      // directory. Cross-project personal preferences are routed to
+      // ~/.gemini/GEMINI.md via the surgical isPathAllowed allowlist instead.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should return false when experimentalMemoryV2 is explicitly false', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: false,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(false);
-    });
-
-    it('should return true when experimentalMemoryV2 is true', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
-      // The prompt-driven memoryV2 mode does not broaden the workspace
-      // to include the global ~/.gemini/ directory. Cross-project personal
-      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
-      // isPathAllowed allowlist instead — see the next two tests.
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3622,16 +3558,15 @@ describe('Config JIT Initialization', () => {
     });
 
     it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
-      // Surgical allowlist: when memoryV2 is on, the prompt routes
-      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
-      // agent must be able to edit that exact file via edit/write_file.
+      // Surgical allowlist: the prompt routes cross-project personal
+      // preferences to ~/.gemini/GEMINI.md, so the agent must be able to edit
+      // that exact file via edit/write_file.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3653,7 +3588,6 @@ describe('Config JIT Initialization', () => {
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3945,18 +3879,16 @@ describe('Config JIT Initialization', () => {
       expect(config.getExperimentalGemma()).toBe(true);
     });
 
-    it('should be independent of experimentalMemoryV2', () => {
+    it('should default to disabled', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
       expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
