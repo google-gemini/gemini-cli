@@ -2588,10 +2588,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.contextManagement;
   }
 
-  getAgentSessionSubagentEnabled(): boolean {
-    return this.agentSessionSubagentEnabled;
-  }
-
   getMemoryBoundaryMarkers(): readonly string[] {
     return this.memoryBoundaryMarkers;
   }
