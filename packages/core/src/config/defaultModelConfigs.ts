@@ -646,8 +646,23 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
       {
         model: 'gemini-2.5-flash',
-        isLastResort: true,
         maxAttempts: 10,
+        actions: {
+          terminal: 'prompt',
+          transient: 'prompt',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash-lite',
+        isLastResort: true,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -681,8 +696,23 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
       {
         model: 'gemini-2.5-flash',
-        isLastResort: true,
         maxAttempts: 10,
+        actions: {
+          terminal: 'prompt',
+          transient: 'prompt',
+          not_found: 'prompt',
+          unknown: 'prompt',
+        },
+        stateTransitions: {
+          terminal: 'terminal',
+          transient: 'terminal',
+          not_found: 'terminal',
+          unknown: 'terminal',
+        },
+      },
+      {
+        model: 'gemini-2.5-flash-lite',
+        isLastResort: true,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',

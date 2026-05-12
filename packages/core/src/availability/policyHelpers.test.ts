@@ -68,10 +68,11 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
 
-      // Expect default chain [Pro, Flash]
-      expect(chain).toHaveLength(2);
+      // Expect default chain [Pro, Flash, Flash-Lite]
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash-lite');
     });
 
     it('uses auto chain when preferred model is auto', () => {
@@ -79,9 +80,10 @@ describe('policyHelpers', () => {
         getModel: () => 'gemini-2.5-pro',
       });
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_MODEL_AUTO);
-      expect(chain).toHaveLength(2);
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash-lite');
     });
 
     it('uses auto chain when configured model is auto even if preferred is concrete', () => {
@@ -89,9 +91,10 @@ describe('policyHelpers', () => {
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-pro');
-      expect(chain).toHaveLength(2);
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash-lite');
     });
 
     it('starts chain from preferredModel when model is "auto"', () => {
@@ -99,8 +102,9 @@ describe('policyHelpers', () => {
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
+      expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash-lite');
     });
 
     it('returns flash-lite chain when preferred model is flash-lite', () => {
@@ -130,9 +134,10 @@ describe('policyHelpers', () => {
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash', true);
-      expect(chain).toHaveLength(2);
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
-      expect(chain[1]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
 
     it('proactively returns Gemini 2.5 chain if Gemini 3 requested but user lacks access', () => {
@@ -142,10 +147,11 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
 
-      // Should downgrade to [Pro 2.5, Flash 2.5]
-      expect(chain).toHaveLength(2);
+      // Should downgrade to [Pro 2.5, Flash 2.5, Flash-Lite 2.5]
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash-lite');
     });
 
     it('returns Gemini 3.1 Pro chain when launched and auto-gemini-3 requested', () => {
@@ -176,9 +182,10 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
 
-      expect(chain).toHaveLength(2);
+      expect(chain).toHaveLength(3);
       expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
       expect(chain[1]?.actions).toEqual(SILENT_ACTIONS);
+      expect(chain[2]?.actions).toEqual(SILENT_ACTIONS);
     });
   });
 
