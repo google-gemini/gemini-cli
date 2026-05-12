@@ -33,17 +33,50 @@ export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 export const PROJECT_MEMORY_INDEX_FILENAME = 'MEMORY.md';
 
-// This variable will hold the currently configured filename for GEMINI.md context files.
-// It defaults to DEFAULT_CONTEXT_FILENAME but can be overridden by setGeminiMdFilename.
+// This variable will hold the currently configured filenames for GEMINI.md context files.
+// It defaults to DEFAULT_CONTEXT_FILENAME but can be extended by setGeminiMdFilename.
 let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 
+/**
+ * Adds one or more filenames to the current context filenames.
+ * Ensures uniqueness and maintains order.
+ */
 export function setGeminiMdFilename(newFilename: string | string[]): void {
-  if (Array.isArray(newFilename)) {
-    if (newFilename.length > 0) {
-      currentGeminiMdFilename = newFilename.map((name) => name.trim());
+  const filenames = Array.isArray(newFilename) ? newFilename : [newFilename];
+  const current = getAllGeminiMdFilenames();
+  const next = new Set(current);
+
+  for (const filename of filenames) {
+    const trimmed = filename.trim();
+    if (trimmed !== '') {
+      next.add(trimmed);
     }
-  } else if (newFilename && newFilename.trim() !== '') {
-    currentGeminiMdFilename = newFilename.trim();
+  }
+
+  const result = Array.from(next);
+  if (result.length > 1) {
+    currentGeminiMdFilename = result;
+  } else if (result.length === 1) {
+    currentGeminiMdFilename = result[0];
+  }
+}
+
+/**
+ * Resets the context filenames to the provided value, or the default if none provided.
+ * This replaces all current filenames.
+ */
+export function resetGeminiMdFilename(
+  filename: string | string[] = DEFAULT_CONTEXT_FILENAME,
+): void {
+  const filenames = Array.isArray(filename) ? filename : [filename];
+  const cleaned = filenames.map((f) => f.trim()).filter((f) => f !== '');
+
+  if (cleaned.length === 0) {
+    currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;
+  } else if (cleaned.length === 1) {
+    currentGeminiMdFilename = cleaned[0];
+  } else {
+    currentGeminiMdFilename = cleaned;
   }
 }
 
