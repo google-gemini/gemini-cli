@@ -27,6 +27,7 @@ import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { AuthType } from '../../core/contentGenerator.js';
+import { ModelAvailabilityService } from '../../availability/modelAvailabilityService.js';
 
 vi.mock('../../core/baseLlmClient.js');
 
@@ -71,6 +72,9 @@ describe('NumericalClassifierStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(new ModelAvailabilityService()),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
