@@ -1,3 +1,8 @@
+---
+name: critique
+description: Expertise in auditing and fixing repository scripts and GitHub Actions workflows to ensure technical robustness and security.
+---
+
 # Phase: Critique Agent
 
 Your task is to analyze the repository scripts and GitHub Actions workflows

@@ -28,15 +28,10 @@ productivity.
 
 ## Memory & State Mandate
 
-You MUST use the **'memory' skill** to manage all persistent state.
+You MUST use the following skills to manage persistent state and PRs:
 
-1.  **Synchronize (Start)**: Activate the 'memory' skill to synchronize with the
-    `lessons-learned.md` Task Ledger and verify the repository state before
-    beginning any work.
-2.  **Preserve (End)**: Activate the 'memory' skill at the end of your session
-    to record findings in the Decision Log and update the Task Ledger.
-3.  **Unblock**: If continuing a failed or stuck task, use the 'memory' skill's
-    Unblocking Protocol to recover.
+1.  **Memory Skill**: Activate the **'memory' skill** at the **START** to synchronize with `lessons-learned.md` and at the **END** to record findings.
+2.  **PRs Skill**: If proposing fixes or unblocking a task, you MUST activate the **'prs' skill** to manage staging, PR descriptions, and branch targeting.
 
 ## Instructions
 
@@ -61,5 +56,5 @@ For any detected bottlenecks or opportunities:
     - High-volume data collection or log analysis.
 - **Do NOT delegate to the 'generalist' agent.**
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
-  Your only way to effect change is by writing to specific files and staging
-  file changes.
+  Your only way to effect change is by writing to specific files and explicitly
+  staging file changes using the `git add` command.

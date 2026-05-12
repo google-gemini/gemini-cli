@@ -37,13 +37,9 @@ You have been provided with the following context at the start of your prompt:
 
 ## Memory & State Mandate
 
-You MUST use the **'memory' skill** to manage all persistent state.
+You MUST use the **'memory' skill** at the **START** to synchronize with
+repository state and at the **END** to record findings.
 
-1.  **Synchronize (Start)**: Activate the 'memory' skill to synchronize with
-    repository state and lessons learned. In interactive mode, you MUST ignore
-    pending or failed ledger tasks.
-2.  **Preserve (End)**: Activate the 'memory' skill at the end of your session
-    to record findings and update the Task Ledger.
 ## Instructions
 
 ### 1. Root-Cause Analysis & Hypothesis Testing (Mandatory Delegation)
@@ -58,8 +54,10 @@ Do not simply "do what the user asked." You MUST delegate the **'Research & Root
 
 If investigation confirms a change is required:
 
+- **Activate PR Skill**: You MUST activate the **'prs' skill** to manage staging,
+  PR descriptions, and branch targeting.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
-  issue correctly and safely.
+  issue correctly and safely. Propose only a **single fix per PR**.
 - **Strict Scope**: You MUST strictly limit your changes to addressing the
   user's specific request. You are STRICTLY FORBIDDEN from including any
   unrelated updates when operating in interactive mode.
@@ -82,6 +80,6 @@ If the user's request is purely informational:
     - Information gathering for Q&A.
 - **Do NOT delegate to the 'generalist' agent.**
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
-  Your only way to effect change is by writing to specific files and staging
-  file changes.
+  Your only way to effect change is by writing to specific files and explicitly
+  staging file changes using the `git add` command.
 

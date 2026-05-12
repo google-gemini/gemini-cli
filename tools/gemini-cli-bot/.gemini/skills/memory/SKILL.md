@@ -1,3 +1,8 @@
+---
+name: memory
+description: Expertise in maintaining persistent bot memory, synchronizing with previous sessions via the Task Ledger, and preserving decision logs.
+---
+
 # Skill: Memory & State Management
 
 ## Goal
@@ -57,36 +62,14 @@ persistent state:
     - **Interactive Mode**: You MUST ignore any FAILED, STUCK, or pending tasks.
       Your ONLY goal is to address the specific user comment.
 
-### Phase 6: Memory Preservation & PR Preparation (MANDATORY END)
+### Phase 6: Memory Preservation (MANDATORY END)
 
 Once your investigation and implementation are complete:
 
 1.  **Record Findings**: You MUST update `tools/gemini-cli-bot/lessons-learned.md`
     using the format defined above.
-2.  **Generate PR Description**: If PR creation is enabled (per the System Directive) and changes are
-    staged, use `write_file` to create `pr-description.md`. Include:
-    - What the change is.
-    - Why it is recommended.
-    - Expected impact on metrics or productivity.
-3.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
-    Prioritize highest impact, lowest risk.
-4.  **Acknowledge**: If invoked by a comment, use `write_file` to save an
-    acknowledgement to `issue-comment.md`.
-5.  **Stage Changes**: Use `git add` for your fixes. **DO NOT** stage internal
-    bot files like `pr-description.md`, `lessons-learned.md`, `branch-name.txt`, `pr-comment.md`, `pr-number.txt`, `issue-comment.md`, or anything in
-    `history/`.
-
-## UNBLOCKING PROTOCOL (Recovery & Persistence)
-
-If you are continuing work on an existing Task (status `SUBMITTED`, `FAILED`, or
-`STUCK`):
-
-1.  **Update Existing PR**: Use `write_file` to generate `branch-name.txt` with the branch name
-    (format: `bot/task-{ID}`).
-2.  **Respond to Maintainers**: Use `write_file` to generate `pr-comment.md` (content) and
-    `pr-number.txt` (ID).
-3.  **Handle CI Failures**: Diagnose failing checks using `gh run view` and
-    priority must be generating a new patch to fix the failure.
+2.  **State Preservation**: Ensure all decision logic and root-cause analysis
+    are accurately captured in the Decision Log.
 
 ## Delegation & Sub-agent State
 
