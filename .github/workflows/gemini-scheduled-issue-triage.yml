@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
@@ -61,6 +63,16 @@ jobs:
             const syncIssueTypes = require('./.github/scripts/sync-issue-types.cjs');
             await syncIssueTypes({ github, context, core });
 
+      - name: 'Find Issues with Conflicting Labels'
+        if: |-
+          ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const findConflictingLabels = require('./.github/scripts/find-conflicting-labels.cjs');
+            await findConflictingLabels({ github, context, core });
+
       - name: 'Find untriaged issues'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -81,22 +93,31 @@ jobs:
 
           echo '🏷️ Finding issues missing priority labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body > no_priority_issues.json
+            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body > no_priority_issues.json
 
           echo '📏 Finding issues missing effort labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body > no_effort_issues.json
+            --search 'is:open is:issue -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 5 --json number,title,body > no_effort_issues.json
 
-          echo '🔄 Merging and deduplicating issues...'
-          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json no_effort_issues.json no_type_issues.json > issues_to_triage.json
+          echo '🔄 Merging and deduplicating standard triage issues...'
+          if [ ! -f conflicting_labels_issues.json ]; then echo "[]" > conflicting_labels_issues.json; fi
+          jq -c -s 'add | unique_by(.number)' no_area_issues.json no_kind_issues.json no_priority_issues.json conflicting_labels_issues.json > standard_issues_to_triage.json
 
-          ISSUE_COUNT="$(jq 'length' issues_to_triage.json)"
-          if [ "$ISSUE_COUNT" -gt 0 ]; then
+          echo '📏 Deduplicating effort issues...'
+          jq -c -s 'add | unique_by(.number)' no_effort_issues.json > effort_issues_to_triage.json
+
+          STANDARD_COUNT="$(jq 'length' standard_issues_to_triage.json)"
+          EFFORT_COUNT="$(jq 'length' effort_issues_to_triage.json)"
+          if [ "$STANDARD_COUNT" -gt 0 ] || [ "$EFFORT_COUNT" -gt 0 ]; then
             echo "has_issues=true" >> "${GITHUB_OUTPUT}"
+            echo "has_standard_issues=$([ "$STANDARD_COUNT" -gt 0 ] && echo 'true' || echo 'false')" >> "${GITHUB_OUTPUT}"
+            echo "has_effort_issues=$([ "$EFFORT_COUNT" -gt 0 ] && echo 'true' || echo 'false')" >> "${GITHUB_OUTPUT}"
           else
             echo "has_issues=false" >> "${GITHUB_OUTPUT}"
+            echo "has_standard_issues=false" >> "${GITHUB_OUTPUT}"
+            echo "has_effort_issues=false" >> "${GITHUB_OUTPUT}"
           fi
-          echo "✅ Found ${ISSUE_COUNT} unique issues to triage! 🎯"
+          echo "✅ Found ${STANDARD_COUNT} standard issues and ${EFFORT_COUNT} effort issues to triage! 🎯"
 
       - name: 'Create Gemini CLI Experiments Override'
         if: |-
@@ -129,11 +150,128 @@ jobs:
             core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
             return labelNames;
 
-      - name: 'Run Gemini Issue Analysis'
+      - name: 'Run Standard Triage Analysis'
         if: |-
-          steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_issues == 'true'
+          steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_standard_issues == 'true'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
-        id: 'gemini_issue_analysis'
+        id: 'gemini_standard_issue_analysis'
+        env:
+          GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
+          REPOSITORY: '${{ github.repository }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GEMINI_EXP: 'gemini_exp.json'
+          GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
+            {
+              "maxSessionTurns": 25,
+              "coreTools": [
+                "run_shell_command(echo)",
+                "read_file"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+
+            You are an issue triage assistant. Analyze issues and identify
+            appropriate labels. Use the available tools to gather information;
+            do not ask for information to be provided.
+
+            ## Steps
+
+            1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            2. Use the read_file tool to read the file "standard_issues_to_triage.json" which contains the JSON array of issues to triage.
+            3. Review the issue title, body and any comments provided in the JSON file.
+            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, and priority/*.
+            5. Label Policy:
+               - If the issue already has a kind/ label, do not change it.
+               - If the issue has exactly ONE priority/ label, do not change it.
+               - If the issue is missing a priority/ label, OR if the issue currently has MULTIPLE priority/ labels, you must evaluate the issue's impact to determine exactly ONE priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based the guidelines. If you are fixing an issue with multiple priority/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
+               - If the issue has exactly ONE area/ label, do not change it.
+               - If the issue is missing an area/ label, OR if the issue currently has MULTIPLE area/ labels, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels. If you are fixing an issue with multiple area/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
+               - If any of these are missing, select exactly ONE appropriate label for the missing category.
+            6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
+            7. Give me a single short explanation about why you are selecting each label in the process.
+            8. Output a JSON array of objects, each containing the issue number
+               and the labels to add and remove, along with an explanation. For example:
+               ```
+               [
+                 {
+                   "issue_number": 123,
+                   "labels_to_add": ["area/core", "kind/bug", "priority/p2"],
+                   "labels_to_remove": ["status/need-triage"],
+                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority."
+                 }
+               ]
+               ```
+              If an issue cannot be classified, do not include it in the output array.
+            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
+              - Anything more than 6 versions older than the most recent should add the status/need-retesting label
+            10. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
+            11. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
+            12. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
+
+            ## Guidelines
+
+            - Output only valid JSON format
+            - Do not include any explanation or additional text, just the JSON
+            - Only use labels that already exist in the repository.
+              - Do not add comments or modify the issue content.
+              - Do not remove the following labels maintainer, help wanted or good first issue.
+              - Triage only the current issue.
+              - Identify exactly ONE area/ label. Do NOT assign multiple area/ labels to a single issue.
+              - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
+              - Identify exactly ONE priority/ label. Do NOT assign multiple priority/ labels to a single issue.
+              - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+
+            Categorization Guidelines (Priority):
+            P0 - Urgent Blocking Issues:
+              - Definition: Critical failures breaking core functionality for a large portion of users. Examples: CLI fails to launch globally, core commands (gemini run) crash on valid input, unhandled promise rejections on boot, critical security vulnerability.
+              - Note: You must apply status/manual-triage instead of priority/p0.
+            P1 - Critical but Workable:
+              - Definition: Severe issues without a reasonable workaround, significantly degrading the developer experience but not globally blocking. Examples: Specific tools failing consistently (e.g., `web_search` returns 500s), persistent PTY streaming hangs, memory leaks leading to OOM after short use.
+            P2 - Significant Issues:
+              - Definition: Affect some workflows but a clear workaround exists, or non-critical bugs. Examples: Theme flickering, confusing error messages, minor UI misalignment, failing to read deeply nested config files correctly.
+            P3 - Minor/Enhancements:
+              - Definition: Trivial bugs, typos, documentation requests, or feature requests.
+
+            Categorization Guidelines (Kind):
+            kind/bug: The issue is describing an unexpected behavior or failure in the application.
+            kind/enhancement: The issue is describing a feature request or an improvement to an existing feature.
+            kind/question: The issue is asking a question about how to use the CLI or about a specific feature.
+
+            Categorization Guidelines (Area):
+            area/agent: The "brain" of the CLI. Core agent logic, model quality, tool/function calling, memory, web search, generated code quality, sub-agents.
+            area/core: The fundamental CLI app. UI/UX, installation, OS compatibility, performance, command parsing, theming, flickering.
+            area/documentation: Website docs, READMEs, inline help text.
+            area/enterprise: Telemetry, Policy, Quota / Licensing
+            area/extensions: Gemini CLI extensions capability
+            area/non-interactive: GitHub Actions, SDK, 3P Integrations, Shell Scripting, Command line automation
+            area/platform: Platform specific behavior
+            area/security: Authentication, authorization, privacy, data leaks, credential storage.
+
+      - name: 'Stop Telemetry Collector'
+        if: |-
+          steps.find_issues.outputs.has_effort_issues == 'true'
+        run: 'docker rm -f gemini-telemetry-collector || true'
+
+      - name: 'Run Effort Triage Analysis'
+        if: |-
+          steps.find_issues.outputs.has_effort_issues == 'true'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_effort_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           REPOSITORY: '${{ github.repository }}'
@@ -166,57 +304,30 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze issues and identify
-            appropriate labels. Use the available tools to gather information;
-            do not ask for information to be provided.
+            You are an expert software architect. Analyze the provided GitHub issues and assign the correct `effort/*` label based on the codebase complexity.
 
             ## Steps
 
-            1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
-            2. Use the read_file tool to read the file "issues_to_triage.json" which contains the JSON array of issues to triage.
-            3. Review the issue title, body and any comments provided in the JSON file.
-            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, priority/*, and effort/*.
-            5. Label Policy:
-               - If the issue already has a kind/ label, do not change it.
-               - If the issue already has a priority/ label, do not change it.
-               - If the issue already has an area/ label, do not change it.
-               - If the issue already has an effort/ label, do not change it.
-               - If the issue is missing an effort/ label AND its area is area/core, area/extensions, area/site, or area/non-interactive, you must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort. Do NOT evaluate or assign an effort/ label to issues in any other areas (such as area/agent).
-               - If any of these are missing, select exactly ONE appropriate label for the missing category.
-            6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
-            7. Give me a single short explanation about why you are selecting each label in the process.
-            8. Output a JSON array of objects, each containing the issue number
-               and the labels to add and remove, along with an explanation. If you assigned an effort/ label, you MUST also include an effort_analysis field. This effort_analysis must be highly detailed, technical, and empirical. It MUST NOT contain vague guesses (e.g., avoid words like "likely points to" or "possibly"). You must explicitly cite the specific file paths and architectural mechanisms you discovered using your search tools, explain the root cause, and then explicitly state how that complexity maps to the chosen effort level guidelines. For example:
+            1. Use the read_file tool to read "effort_issues_to_triage.json".
+            2. For each issue in the array:
+               - You must evaluate the architectural complexity to determine the effort level. You MUST NOT guess the root cause. You MUST actively use your codebase search tools (grep_search and glob) to search for keywords from the issue and explore the codebase. You must identify the specific files and components involved before deciding the effort.
+            3. Output a JSON array of objects, each containing the issue number and the effort label to add, along with an explanation and an effort_analysis field. This effort_analysis must be highly detailed, technical, and empirical. It MUST NOT contain vague guesses (e.g., avoid words like "likely points to" or "possibly"). You must explicitly cite the specific file paths and architectural mechanisms you discovered using your search tools, explain the root cause, and then explicitly state how that complexity maps to the chosen effort level guidelines. For example:
                ```
                [
                  {
                    "issue_number": 123,
-                   "labels_to_add": ["area/core", "kind/bug", "priority/p2", "effort/small"],
-                   "labels_to_remove": ["status/need-triage"],
-                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority.",
+                   "labels_to_add": ["effort/small"],
+                   "explanation": "This is a simple logic fix.",
                    "effort_analysis": "The `vscode-ide-companion` extension indiscriminately tracks active text editors via `vscode.window.onDidChangeActiveTextEditor` in `open-files-manager.ts`. When a user opens `.vscode/settings.json`, its content is sent to the CLI's context. The fix is highly localized to the VS Code companion extension's event listener. It involves adding a simple conditional check to exclude specific configuration files from the active editor tracking logic, which is a trivial logic adjustment with a clear root cause."
                  }
                ]
                ```
-              If an issue cannot be classified, do not include it in the output array.
-            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
-              - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            10. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
-            11. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
-            12. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
 
             ## Guidelines
 
             - Output only valid JSON format
             - Do not include any explanation or additional text, just the JSON
-            - Only use labels that already exist in the repository.
-              - Do not add comments or modify the issue content.
-              - Do not remove the following labels maintainer, help wanted or good first issue.
-              - Triage only the current issue.
-              - Identify only one area/ label.
-              - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
-              - Identify only one priority/ label.
-              - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+            - Triage only the current issue.
 
             Categorization Guidelines (Effort):
             effort/small (1 day or less):
@@ -272,13 +383,29 @@ jobs:
             - This product is designed to use different models eg.. using pro, downgrading to flash etc.
             - When users report that they dont expect the model to change those would be categorized as feature requests.
 
-      - name: 'Apply Labels to Issues'
+      - name: 'Apply Standard Labels to Issues'
         if: |-
-          ${{ steps.gemini_issue_analysis.outcome == 'success' &&
-              steps.gemini_issue_analysis.outputs.summary != '[]' }}
+          ${{ steps.gemini_standard_issue_analysis.outcome == 'success' &&
+              steps.gemini_standard_issue_analysis.outputs.summary != '[]' &&
+              steps.gemini_standard_issue_analysis.outputs.summary != '' }}
         env:
           REPOSITORY: '${{ github.repository }}'
-          LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+          LABELS_OUTPUT: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const applyLabels = require('./.github/scripts/apply-issue-labels.cjs');
+            await applyLabels({ github, context, core });
+
+      - name: 'Apply Effort Labels to Issues'
+        if: |-
+          ${{ steps.gemini_effort_issue_analysis.outcome == 'success' &&
+              steps.gemini_effort_issue_analysis.outputs.summary != '[]' &&
+              steps.gemini_effort_issue_analysis.outputs.summary != '' }}
+        env:
+          REPOSITORY: '${{ github.repository }}'
+          LABELS_OUTPUT: '${{ steps.gemini_effort_issue_analysis.outputs.summary }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
