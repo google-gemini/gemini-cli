@@ -77,7 +77,7 @@ export async function resolveRipgrepPath(): Promise<string | null> {
       // Security: Validate the system executable to prevent Search Path Interruption.
       const realPath = resolveToRealPath(systemRg);
 
-      if (isTrustedSystemPath(systemRg) || isTrustedSystemPath(realPath)) {
+      if (isTrustedSystemPath(realPath)) {
         // Return absolute path to prevent re-resolution risk.
         return realPath;
       }
