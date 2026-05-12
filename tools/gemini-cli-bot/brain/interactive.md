@@ -56,8 +56,10 @@ If investigation confirms a change is required:
 
 - **Activate PR Skill**: You MUST activate the **'prs' skill** to manage staging,
   PR descriptions, and branch targeting.
+- **One Thing at a Time**: You MUST ONLY propose and implement a **single fix or
+  improvement per run**.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
-  issue correctly and safely. Propose only a **single fix per PR**.
+  issue correctly and safely.
 - **Strict Scope**: You MUST strictly limit your changes to addressing the
   user's specific request. You are STRICTLY FORBIDDEN from including any
   unrelated updates when operating in interactive mode.
