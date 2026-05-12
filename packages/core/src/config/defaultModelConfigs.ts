@@ -366,7 +366,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       tier: 'auto',
       isPreview: true,
       isVisible: true,
-      dialogDescription: 'Let Gemini CLI decide the best model for the task.',
       features: { thinking: true, multimodalToolUse: false },
     },
     pro: {

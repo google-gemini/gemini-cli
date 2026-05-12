@@ -886,7 +886,6 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "auto",
         "isPreview": true,
         "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task.",
         "features": {
           "thinking": true,
           "multimodalToolUse": false
