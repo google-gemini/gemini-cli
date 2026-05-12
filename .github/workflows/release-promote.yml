@@ -412,7 +412,7 @@ jobs:
           git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
-            git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:${BRANCH_NAME} --follow-tags
+            git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
           else
             echo "Dry run enabled. Skipping push."
           fi

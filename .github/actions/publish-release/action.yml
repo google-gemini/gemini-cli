@@ -121,7 +121,7 @@ runs:
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
-          git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:${BRANCH_NAME} --follow-tags
+          git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
         else
           echo "Dry run enabled. Skipping push."
         fi
