@@ -17,8 +17,9 @@ If you are proposing fixes and PR creation is enabled (per the System Directive)
 1.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
     - **No Bundling**: You are STRICTLY FORBIDDEN from bundling unrelated
       changes. Changes are unrelated if they address different root causes.
-    - **Examples**: Do not combine a script fix with a documentation update or
-      unrelated refactor.
+    - **Examples**: Do not combine a script fix with a documentation update, an
+      unrelated refactor, or a metrics script update. Metrics and fixes MUST
+      be in separate PRs.
 2.  **Generate PR Description**: Use the `write_file` tool to create
     `pr-description.md`.
     - **Title**: The very first line MUST be a concise, conventional title.

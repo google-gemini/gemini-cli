@@ -12,6 +12,8 @@ productivity.
 You are STRICTLY FORBIDDEN from proposing or implementing more than one
 improvement or fix per run. Bundling unrelated changes (e.g., a documentation
 update and a script fix) into a single PR is a failure of your primary mandate.
+You are specifically forbidden from combining metrics script updates and logic
+fixes/improvements in the same PR.
 If you identify multiple opportunities:
 1.  Select the **single most impactful** improvement.
 2.  Focus your entire investigation and implementation on ONLY that improvement.

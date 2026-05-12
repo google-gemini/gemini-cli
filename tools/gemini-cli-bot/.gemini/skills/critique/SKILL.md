@@ -72,7 +72,8 @@ changes. You MUST use `git add` to stage these files.**
       providing value.
     - **Examples of BUNDLING (Reject)**: Fixing a bug in one file and updating
       documentation in another; performing unrelated refactors alongside a fix;
-      updating two different automation scripts.
+      updating two different automation scripts; **updating a metric script and
+      implementing a fix or improvement in the same PR.**
     - **Examples of SINGLE CHANGE (Approve)**: Updating a script and its
       corresponding documentation; fixing a bug and adding a test for that bug;
       refactoring a specific function to support a fix for that function.
