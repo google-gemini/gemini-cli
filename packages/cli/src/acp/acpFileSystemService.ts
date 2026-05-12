@@ -61,8 +61,8 @@ export class AcpFileSystemService implements FileSystemService {
       });
 
       const content: unknown = response.content;
-      if (typeof content !== "string") {
-         throw new Error("content must be a string"); // replace with other response type formats when modified in the future
+      if (typeof content !== 'string') {
+        throw new Error('content must be a string'); // replace with other response type formats when modified in the future
       }
       return content;
     } catch (err: unknown) {

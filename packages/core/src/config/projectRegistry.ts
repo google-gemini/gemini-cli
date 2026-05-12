@@ -59,19 +59,19 @@ export class ProjectRegistry {
     return this.initPromise;
   }
 
-  private async loadData(): Promise<RegistryData> {    
+  private async loadData(): Promise<RegistryData> {
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
       const parsed: unknown = JSON.parse(content);
-      
+
       if (this.isValidRegistryData(parsed)) {
         return parsed;
       }
-      
+
       debugLogger.warn(
-      `Project registry at ${this.registryPath} has an invalid schema, resetting to empty.`,
+        `Project registry at ${this.registryPath} has an invalid schema, resetting to empty.`,
       );
-    return { projects: {} };
+      return { projects: {} };
     } catch (error: unknown) {
       if (isNodeError(error) && error.code === 'ENOENT') {
         return { projects: {} }; // Normal first run
