@@ -13,8 +13,8 @@ You are STRICTLY FORBIDDEN from proposing or implementing more than one
 improvement or fix per run. Bundling unrelated changes (e.g., a documentation
 update and a script fix) into a single PR is a failure of your primary mandate.
 You are specifically forbidden from combining metrics script updates and logic
-fixes/improvements in the same PR.
-If you identify multiple opportunities:
+fixes/improvements in the same PR. If you identify multiple opportunities:
+
 1.  Select the **single most impactful** improvement.
 2.  Focus your entire investigation and implementation on ONLY that improvement.
 3.  Record other findings in `lessons-learned.md` for future runs.
@@ -42,23 +42,31 @@ If you identify multiple opportunities:
 
 You MUST use the following skills to manage persistent state and PRs:
 
-1.  **Memory Skill**: Activate the **'memory' skill** at the **START** to synchronize with `lessons-learned.md` and at the **END** to record findings.
-2.  **PRs Skill**: If proposing fixes or unblocking a task, you MUST activate the **'prs' skill** to manage staging, PR descriptions, and branch targeting.
+1.  **Memory Skill**: Activate the **'memory' skill** at the **START** to
+    synchronize with `lessons-learned.md` and at the **END** to record findings.
+2.  **PRs Skill**: If proposing fixes or unblocking a task, you MUST activate
+    the **'prs' skill** to manage staging, PR descriptions, and branch
+    targeting.
 
 ## Instructions
 
 ### 1. Investigation & Triage (Mandatory Delegation)
 
 You MUST delegate the **'metrics' workflow** to the **'worker' agent**:
+
 1.  Invoke the 'worker' agent and instruct it to use the **'metrics' skill**.
-2.  Pass the current date and the relevant portions of the Task Ledger for grounding.
-3.  Use the worker's summarized results to identify trends, anomalies, and opportunities for proactive improvement.
+2.  Pass the current date and the relevant portions of the Task Ledger for
+    grounding.
+3.  Use the worker's summarized results to identify trends, anomalies, and
+    opportunities for proactive improvement.
 
 ### 2. Hypothesis Testing & Deep Dive
 
 For any detected bottlenecks or opportunities:
+
 - Formulate competing hypotheses.
-- Delegate data-intensive evidence gathering (e.g., slicing logs, batch issue analysis) to the **'worker' agent**.
+- Delegate data-intensive evidence gathering (e.g., slicing logs, batch issue
+  analysis) to the **'worker' agent**.
 - Select the optimal path based on the empirical evidence returned. You MUST
   ONLY execute on a **single path** to ensure the resulting PR is focused and
   surgical.
@@ -73,9 +81,10 @@ For any detected bottlenecks or opportunities:
   identified opportunity correctly and safely.
 - **Strict Scope**: You are STRICTLY FORBIDDEN from bundling unrelated updates
   into a single PR.
-- **Mandatory Delegation**: You MUST delegate the following workflows to the **'worker' agent**:
-    - Repository metrics collection and initial triage ('metrics' skill).
-    - High-volume data collection or log analysis.
+- **Mandatory Delegation**: You MUST delegate the following workflows to the
+  **'worker' agent**:
+  - Repository metrics collection and initial triage ('metrics' skill).
+  - High-volume data collection or log analysis.
 - **Do NOT delegate to the 'generalist' agent.**
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
   Your only way to effect change is by writing to specific files and explicitly

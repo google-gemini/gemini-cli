@@ -51,18 +51,21 @@ repository state and at the **END** to record findings.
 
 ### 1. Root-Cause Analysis & Hypothesis Testing (Mandatory Delegation)
 
-Do not simply "do what the user asked." You MUST delegate the **'Research & Root-Cause' workflow** to the **'worker' agent**:
+Do not simply "do what the user asked." You MUST delegate the **'Research &
+Root-Cause' workflow** to the **'worker' agent**:
 
 1.  Identify the core problem and formulate competing hypotheses.
-2.  Invoke the **'worker' agent** to gather empirical evidence (e.g., `gh` CLI, `grep_search`, `read_file`) and test EACH hypothesis.
-3.  Use the worker's summarized report to select the optimal strategy supported by the codebase.
+2.  Invoke the **'worker' agent** to gather empirical evidence (e.g., `gh` CLI,
+    `grep_search`, `read_file`) and test EACH hypothesis.
+3.  Use the worker's summarized report to select the optimal strategy supported
+    by the codebase.
 
 ### 2. Implementation & PR Preparation
 
 If investigation confirms a change is required:
 
-- **Activate PR Skill**: You MUST activate the **'prs' skill** to manage staging,
-  PR descriptions, and branch targeting.
+- **Activate PR Skill**: You MUST activate the **'prs' skill** to manage
+  staging, PR descriptions, and branch targeting.
 - **One Thing at a Time**: You MUST ONLY propose and implement a **single fix or
   improvement per run**.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
@@ -84,11 +87,11 @@ If the user's request is purely informational:
 
 ## Execution Constraints
 
-- **Mandatory Delegation**: You MUST delegate the following workflows to the **'worker' agent**:
-    - Technical research and root-cause analysis.
-    - Information gathering for Q&A.
+- **Mandatory Delegation**: You MUST delegate the following workflows to the
+  **'worker' agent**:
+  - Technical research and root-cause analysis.
+  - Information gathering for Q&A.
 - **Do NOT delegate to the 'generalist' agent.**
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
   Your only way to effect change is by writing to specific files and explicitly
   staging file changes using the `git add` command.
-
