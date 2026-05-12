@@ -47,10 +47,20 @@ You MUST delegate the **'metrics' workflow** to the **'worker' agent**:
 For any detected bottlenecks or opportunities:
 - Formulate competing hypotheses.
 - Delegate data-intensive evidence gathering (e.g., slicing logs, batch issue analysis) to the **'worker' agent**.
-- Select the optimal path based on the empirical evidence returned.
+- Select the optimal path based on the empirical evidence returned. You MUST
+  ONLY execute on a **single path** to ensure the resulting PR is focused and
+  surgical.
 
 ## Execution Constraints
 
+- **One Thing at a Time**: You MUST ONLY propose and implement a **single
+  improvement or fix per run**. If you identify multiple opportunities, select
+  the one with the highest impact and record the others in `lessons-learned.md`
+  for future runs.
+- **Surgical Changes**: Apply the minimal set of changes needed to address the
+  identified opportunity correctly and safely.
+- **Strict Scope**: You are STRICTLY FORBIDDEN from bundling unrelated updates
+  into a single PR.
 - **Mandatory Delegation**: You MUST delegate the following workflows to the **'worker' agent**:
     - Repository metrics collection and initial triage ('metrics' skill).
     - High-volume data collection or log analysis.
