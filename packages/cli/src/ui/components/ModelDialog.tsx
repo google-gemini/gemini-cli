@@ -27,6 +27,7 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
   getChannelFromVersion,
+  getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -165,19 +166,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     // --- LEGACY PATH ---
-    const proModel =
-      releaseChannel === 'preview'
-        ? useGemini31
-          ? 'gemini-3.1-pro'
-          : 'gemini-3-pro'
-        : 'gemini-2.5-pro';
-    const flashModel = 'gemini-3-flash';
-
     const list = [
       {
         value: GEMINI_MODEL_ALIAS_AUTO,
         title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-        description: `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`,
+        description: getAutoModelDescription(releaseChannel, useGemini31),
         key: GEMINI_MODEL_ALIAS_AUTO,
       },
       {

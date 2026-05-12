@@ -11,6 +11,7 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   isProModel,
+  getAutoModelDescription,
 } from '../config/models.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
@@ -170,14 +171,7 @@ export class ModelConfigService {
       .map(([id, m]) => {
         let description = m.dialogDescription ?? '';
         if (id === 'auto') {
-          const proModel =
-            releaseChannel === 'preview'
-              ? useGemini31
-                ? 'gemini-3.1-pro'
-                : 'gemini-3-pro'
-              : 'gemini-2.5-pro';
-          const flashModel = 'gemini-3-flash';
-          description = `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
+          description = getAutoModelDescription(releaseChannel, useGemini31);
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
         }

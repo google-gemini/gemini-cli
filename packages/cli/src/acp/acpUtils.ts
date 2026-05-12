@@ -23,6 +23,7 @@ import {
   AuthType,
   ToolConfirmationOutcome,
   getChannelFromVersion,
+  getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import type * as acp from '@agentclientprotocol/sdk';
 import { z } from 'zod';
@@ -293,19 +294,11 @@ export function buildAvailableModels(
   }
 
   // --- LEGACY PATH ---
-  const proModel =
-    releaseChannel === 'preview'
-      ? useGemini31
-        ? 'gemini-3.1-pro'
-        : 'gemini-3-pro'
-      : 'gemini-2.5-pro';
-  const flashModel = 'gemini-3-flash';
-
   const mainOptions = [
     {
       value: GEMINI_MODEL_ALIAS_AUTO,
       title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-      description: `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`,
+      description: getAutoModelDescription(releaseChannel, useGemini31),
     },
   ];
 
