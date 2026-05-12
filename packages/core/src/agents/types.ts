@@ -245,6 +245,12 @@ export interface LocalAgentDefinition<
   autoMemoryExtractionWriteAccess?: boolean;
 
   /**
+   * Controls whether extension memory is injected into this agent's initial
+   * session context when JIT context is enabled. Defaults to true.
+   */
+  includeExtensionContext?: boolean;
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
