@@ -88,6 +88,26 @@ advanced triage, or semantic labeling).
   updates)
 ```
 
+## Defensive Scripting & Resilience (MANDATORY)
+
+When implementing or modifying scripts, you must ensure they are robust and
+safe:
+
+1.  **Per-Item Error Handling**: If your script iterates over a list of items
+    (e.g., issues, PRs) and performs an API or CLI call for each, you MUST wrap
+    the body of the loop (or the API call itself) in a `try/catch` block. A
+    failure on a single item (e.g., a 403 error) must not crash the entire
+    workflow or prevent subsequent items from being processed.
+2.  **Preserve Exemptions**: When replacing, refactoring, or consolidating
+    existing policies (like stale bots or auto-closers), you MUST explicitly
+    preserve any existing exemptions (e.g., `-label:security`, `-label:pinned`,
+    `-label:"help wanted"`). Never drop existing protections or safety checks
+    unless you have proven they are the explicit root cause of the issue.
+3.  **Empirical Log Verification**: Never diagnose a CI, workflow, or test
+    failure based purely on static code inspection. You MUST use the `gh` CLI
+    (e.g., `gh run view --log-failed`) to fetch and read the actual error logs
+    before confirming a hypothesis or proposing a fix.
+
 ## Pull Request Preparation (MANDATORY)
 
 If the `ENABLE_PRS` environment variable is `true` and you are proposing script
@@ -99,7 +119,11 @@ or configuration changes:
     - Why it is recommended.
     - Expected impact on metrics or productivity.
 2.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
-    Prioritize highest impact, lowest risk.
+    Prioritize highest impact, lowest risk. While changes should be surgical
+    (one goal per PR), removing duplicated, conflicting, or obsolete legacy
+    workflows is considered the ultimate "surgical" fix. Do not hesitate to
+    delete files or workflows if your evidence shows they are conflicting with
+    standard practices.
 3.  **Acknowledgment**: If invoked by a comment, use the `write_file` tool to
     save a brief acknowledgement to `issue-comment.md`.
 4.  **Stage Files**: Use `git add <file>` to stage files for the PR. **DO NOT**

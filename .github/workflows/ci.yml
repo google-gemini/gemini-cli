@@ -147,10 +147,7 @@ jobs:
       pull-requests: 'write'
     strategy:
       matrix:
-        node-version:
-          - '20.x'
-          - '22.x'
-          - '24.x'
+        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '["20.x"]' || '["20.x", "22.x", "24.x"]') }}
         shard:
           - 'cli'
           - 'others'
@@ -242,10 +239,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        node-version:
-          - '20.x'
-          - '22.x'
-          - '24.x'
+        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '["20.x"]' || '["20.x", "22.x", "24.x"]') }}
         shard:
           - 'cli'
           - 'others'

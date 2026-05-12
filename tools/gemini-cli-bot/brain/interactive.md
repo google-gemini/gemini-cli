@@ -27,7 +27,12 @@ Before beginning your analysis, you MUST perform the following research:
 2.  **Ignore Pending Tasks**: You are in interactive mode. You MUST explicitly
     ignore any FAILED, STUCK, or pending tasks listed in the
     `lessons-learned.md` Task Ledger. Do not attempt to complete or resume them.
-    Your ONLY goal is to address the user's specific comment.
+    Your ONLY goal is to address the user's specific comment. **EXCEPTION:** If
+    the user's comment is located on a PR authored by you, or relates to an
+    active task in your ledger, you MUST NOT ignore the task context. You must
+    engage the UNBLOCKING PROTOCOL, inspect the PR's current state (including CI
+    failures), and ensure your response addresses the technical reality of the
+    PR.
 3.  **Verify Request Context**: Use the GitHub CLI to verify the current state
     of the issue/PR you were mentioned in. If the user's request is already
     addressed or obsolete, inform them by using the `write_file` tool to save a
