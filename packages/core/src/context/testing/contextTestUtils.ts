@@ -30,6 +30,9 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { Mock } from 'vitest';
 import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 import { testTruncateProfile } from './testProfile.js';
+import { StaticTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -171,6 +174,9 @@ export function createMockEnvironment(
     sessionId: 'mock-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
 
   let env = new ContextEnvironmentImpl(
     () => llmClient as BaseLlmClient,
@@ -181,6 +187,8 @@ export function createMockEnvironment(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   if (overrides) {
@@ -194,6 +202,8 @@ export function createMockEnvironment(
         env.tracer,
         env.charsPerToken,
         env.eventBus,
+        calculator,
+        behaviorRegistry,
       );
     }
     const { llmClient: _llmClient, ...restOverrides } = overrides;
@@ -286,6 +296,10 @@ export function setupContextComponentTest(
     sessionId: 'test-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
+
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
     'test prompt-id',
@@ -295,6 +309,8 @@ export function setupContextComponentTest(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   const orchestrator = new PipelineOrchestrator(
@@ -311,8 +327,8 @@ export function setupContextComponentTest(
     tracer,
     orchestrator,
     chatHistory,
+    calculator,
   );
-
   // The async async pipeline is now internally managed by ContextManager
   return { chatHistory, contextManager };
 }

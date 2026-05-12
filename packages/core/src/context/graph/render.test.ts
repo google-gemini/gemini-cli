@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from './render.js';
 import type { ConcreteNode } from './types.js';
 import { NodeType } from './types.js';
+import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
@@ -47,7 +48,6 @@ describe('render', () => {
     };
 
     const env = {
-      advancedTokenCalculator: mockAdvancedTokenCalculator,
       tokenCalculator: {
         calculateConcreteListTokens: vi.fn().mockReturnValue(100),
         calculateTokenBreakdown: vi.fn().mockReturnValue({}),
@@ -68,12 +68,14 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
-      0,
+      undefined,
       previewNodeIds,
     );
 
     expect(result.history).toEqual([{ text: '1' }, { text: '2' }]);
+    expect(result.baseUnits).toBe(100);
   });
 
   it('simulates the boundary knapsack problem (loose boundary policy)', async () => {
@@ -122,22 +124,24 @@ describe('render', () => {
 
     const currentTokens = 160000;
 
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        const tokens =
+          nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+        return { tokens, baseUnits: tokens };
+      }),
+      getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+    };
+
     const env = {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
-      advancedTokenCalculator: {
-        calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
-          const tokens = nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
-          return { tokens, baseUnits: tokens };
-        }),
-        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
-          if (nodes.length === 1) return tokenMap[nodes[0].id];
-          return currentTokens;
-        }),
-      },
       tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+        calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -160,8 +164,9 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
-      0,
+      undefined,
       new Set(),
     );
 
@@ -171,6 +176,7 @@ describe('render', () => {
     // Adding C pushes rolling total (70k) above retainedTokens (65k).
     // Under loose policy, C survives. D is strictly older and drops.
     expect(surviving).toEqual(['C', 'B', 'A']); // D is dropped
+    expect(result.baseUnits).toBe(160000);
   });
 
   it('drops nodes that are STRICTLY older than the boundary node', async () => {
@@ -212,22 +218,24 @@ describe('render', () => {
 
     const currentTokens = 160000;
 
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        const tokens =
+          nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+        return { tokens, baseUnits: tokens };
+      }),
+      getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+    };
+
     const env = {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
-      advancedTokenCalculator: {
-        calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
-          const tokens = nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
-          return { tokens, baseUnits: tokens };
-        }),
-        getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
-          if (nodes.length === 1) return tokenMap[nodes[0].id];
-          return currentTokens;
-        }),
-      },
       tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+        calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -250,8 +258,9 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
-      0,
+      undefined,
       new Set(),
     );
 
@@ -259,5 +268,6 @@ describe('render', () => {
     const surviving = result.history.map((c: any) => c.text);
     // C(40k), B(40k). Adding B pushes total to 80k. B is the boundary node and survives. A drops.
     expect(surviving).toEqual(['B', 'C']); // A is dropped
+    expect(result.baseUnits).toBe(160000);
   });
 });

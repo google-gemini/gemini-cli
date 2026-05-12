@@ -813,18 +813,13 @@ export class GeminiClient {
 
       if (event.type === GeminiEventType.Finished && this.contextManager) {
         const usageMetadata = event.value.usageMetadata;
-        if (
-          usageMetadata &&
-          usageMetadata.promptTokenCount !== undefined &&
-          currentBaseUnits > 0
-        ) {
+        if (usageMetadata && usageMetadata.promptTokenCount !== undefined) {
           this.contextManager.getEnvironment().eventBus.emitTokenGroundTruth({
             actualTokens: usageMetadata.promptTokenCount,
             promptBaseUnits: currentBaseUnits,
           });
         }
       }
-
       this.updateTelemetryTokenCount();
       if (event.type === GeminiEventType.Error) {
         isError = true;

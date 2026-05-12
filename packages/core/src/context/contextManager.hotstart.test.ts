@@ -57,7 +57,7 @@ describe('ContextManager - Hot Start Calibration', () => {
     expect(emitGroundTruthSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         actualTokens: 42,
-        promptBaseUnits: expect.any(Number),
+        promptBaseUnits: 10,
       }),
     );
 

@@ -99,17 +99,14 @@ describe('Context Manager Hysteresis Tests', () => {
     await harness.simulateTurn([{ role: 'user', parts: [{ text: 'B' }] }]); // Make eligible
 
     await new Promise((resolve) => setTimeout(resolve, 500));
-    console.error('[TEST] After Turn 2 wait. Inbox: ', harness.env.inbox.getMessages('PROPOSED_SNAPSHOT').length);
     // Exceed maxTokens (5000) to see it
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'X'.repeat(3000) }] },
     ]);
-    console.error('[TEST] After Turn 3. Inbox: ', harness.env.inbox.getMessages('PROPOSED_SNAPSHOT').length);
-    console.error('[TEST] Nodes in buffer: ', harness.contextManager.getNodes().map(n => n.id));
 
     // Get baseline tokens
     let state = await harness.getGoldenState();
-    console.error('[TEST] Golden state: ', state.finalProjection.map(c => JSON.stringify(c.parts)));    expect(
+    expect(
       state.finalProjection.some((c) =>
         c.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
       ),

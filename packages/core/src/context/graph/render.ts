@@ -11,6 +11,7 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { performCalibration } from '../utils/tokenCalibration.js';
+import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 /**
  * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
@@ -22,6 +23,7 @@ export async function render(
   sidecar: ContextProfile,
   tracer: ContextTracer,
   env: ContextEnvironment,
+  advancedTokenCalculator: AdvancedTokenCalculator,
   protectionReasons: Map<string, string> = new Map(),
   header?: Content,
   previewNodeIds: ReadonlySet<string> = new Set(),
@@ -34,7 +36,7 @@ export async function render(
   let headerBaseUnits = 0;
   if (header) {
     const costs =
-      env.advancedTokenCalculator.calculateContentTokensAndBaseUnits(header);
+      advancedTokenCalculator.calculateContentTokensAndBaseUnits(header);
     headerTokens = costs.tokens;
     headerBaseUnits = costs.baseUnits;
   }
@@ -48,7 +50,7 @@ export async function render(
 
     // In all cases, retrieve raw base units from the token calculator interface
     const baseUnits =
-      env.advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
+      advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
 
     return { history: contents, didApplyManagement: false, baseUnits };
   }
@@ -56,7 +58,7 @@ export async function render(
   const maxTokens = sidecar.config.budget.maxTokens;
 
   const { tokens: graphTokens, baseUnits: graphBaseUnits } =
-    env.advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
+    advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
 
   const currentTokens = graphTokens + headerTokens;
 
@@ -148,7 +150,6 @@ export async function render(
     history: contents,
     didApplyManagement: true,
     baseUnits:
-      env.advancedTokenCalculator.getRawBaseUnits(visibleNodes) +
-      headerBaseUnits,
+      advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerBaseUnits,
   };
 }

@@ -8,21 +8,13 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextEnvironment, RenderOptions } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
-import { AdaptiveTokenCalculator } from '../utils/adaptiveTokenCalculator.js';
-import type {
-  ContextTokenCalculator,
-  AdvancedTokenCalculator,
-} from '../utils/contextTokenCalculator.js';
+import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
-import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
-import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
+import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import { ContextGraphMapper } from '../graph/mapper.js';
 
 export class ContextEnvironmentImpl implements ContextEnvironment {
-  readonly tokenCalculator: ContextTokenCalculator;
-  readonly advancedTokenCalculator: AdvancedTokenCalculator;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: NodeBehaviorRegistry;
   readonly graphMapper: ContextGraphMapper;
 
   constructor(
@@ -34,19 +26,10 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly tracer: ContextTracer,
     readonly charsPerToken: number,
     readonly eventBus: ContextEventBus,
+    readonly tokenCalculator: ContextTokenCalculator,
+    readonly behaviorRegistry: NodeBehaviorRegistry,
     readonly renderOptions?: RenderOptions,
   ) {
-    this.behaviorRegistry = new NodeBehaviorRegistry();
-    registerBuiltInBehaviors(this.behaviorRegistry);
-
-    const calculator = new AdaptiveTokenCalculator(
-      this.charsPerToken,
-      this.behaviorRegistry,
-      this.eventBus,
-    );
-    this.tokenCalculator = calculator;
-    this.advancedTokenCalculator = calculator;
-
     this.inbox = new LiveInbox();
     this.graphMapper = new ContextGraphMapper();
   }

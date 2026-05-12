@@ -298,26 +298,13 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Node Distillation of Large 
 
 exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC via State Snapshots 1`] = `
 {
-  "baseUnits": 2050,
+  "baseUnits": 505,
   "finalProjection": [
     {
       "parts": [
         {
           "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
         },
-      ],
-      "role": "user",
-    },
-    {
-      "parts": [
-        {
-          "text": "Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 Msg 7 ..................................................",
-        },
-      ],
-      "role": "model",
-    },
-    {
-      "parts": [
         {
           "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
         },

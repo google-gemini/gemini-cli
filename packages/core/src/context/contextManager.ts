@@ -18,6 +18,7 @@ import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { hardenHistory } from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
+import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
 
 export class ContextManager {
   // The master state containing the pristine graph and current active graph.
@@ -51,6 +52,7 @@ export class ContextManager {
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
     chatHistory: AgentChatHistory,
+    private readonly advancedTokenCalculator: AdvancedTokenCalculator,
     private readonly headerProvider?: () => Promise<Content | undefined>,
   ) {
     this.eventBus = env.eventBus;
@@ -353,6 +355,7 @@ export class ContextManager {
       this.sidecar,
       this.tracer,
       this.env,
+      this.advancedTokenCalculator,
       protectionReasons,
       header,
       previewNodeIds,
@@ -397,12 +400,14 @@ export class ContextManager {
       const combinedHistory = header ? [header, ...contents] : contents;
 
       const baseUnits =
-        this.env.advancedTokenCalculator.getRawBaseUnits(nodes) +
+        this.advancedTokenCalculator.getRawBaseUnits(nodes) +
         (header
-          ? this.env.advancedTokenCalculator.getRawBaseUnitsForContent(header)
+          ? this.advancedTokenCalculator.getRawBaseUnitsForContent(header)
           : 0);
 
-      if (baseUnits > 0) {
+      // We only make the network call if we have actual contents to send,
+      // avoiding 400 Bad Request errors from the API.
+      if (combinedHistory.length > 0) {
         const result = await this.env.llmClient.countTokens({
           contents: combinedHistory,
           abortSignal,
