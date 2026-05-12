@@ -40,15 +40,16 @@ export interface SubagentInvocationOptions {
  * which wraps the A2A client streaming behind the AgentProtocol interface.
  *
  * Cross-invocation A2A session state (contextId/taskId) is persisted via a
- * static map keyed by agent name, matching the original RemoteAgentInvocation
- * behavior.
+ * static map keyed by a composite of agent name and target URL. This ensures
+ * agents with the same name but different endpoints maintain independent state.
  */
 export class RemoteSessionInvocation extends BaseToolInvocation<
   RemoteAgentInputs,
   ToolResult
 > {
   // Persist A2A conversation state across ephemeral invocation instances.
-  // Keyed by agent name — each remote agent maintains independent state.
+  // Keyed by composite of name + target URL so agents with the same name
+  // but different endpoints don't share state.
   private static readonly sessionState = new Map<
     string,
     { contextId?: string; taskId?: string }
