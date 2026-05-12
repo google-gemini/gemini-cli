@@ -72,7 +72,7 @@ describe('KeychainTokenStorage', () => {
       expect(retrieved?.serverName).toBe('test-server');
     });
 
-    it('should return null if no credentials are found or they are expired', async () => {
+    it('should return null if no credentials are found or they are expired and unrefreshable', async () => {
       expect(await storage.getCredentials('missing')).toBeNull();
 
       const expiredCreds = {
@@ -81,6 +81,20 @@ describe('KeychainTokenStorage', () => {
       };
       await storage.setCredentials(expiredCreds);
       expect(await storage.getCredentials('test-server')).toBeNull();
+
+      // Ensure that if it has a refresh token, it is NOT returned as null
+      const expiredWithRefresh = {
+        ...validCredentials,
+        token: {
+          ...validCredentials.token,
+          expiresAt: Date.now() - 1000,
+          refreshToken: 'some-refresh-token',
+        },
+      };
+      await storage.setCredentials(expiredWithRefresh);
+      const retrieved = await storage.getCredentials('test-server');
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.token.refreshToken).toBe('some-refresh-token');
     });
 
     it('should throw if stored data is corrupted JSON', async () => {
