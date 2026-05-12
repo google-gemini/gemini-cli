@@ -1794,71 +1794,116 @@ describe('resolveRipgrepPath', () => {
   });
 
   describe('Path Fallback Logic', () => {
-    beforeEach(() => {
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
-      vi.spyOn(os, 'arch').mockReturnValue('x64');
-      vi.stubGlobal(
-        'process',
-        Object.create(process, {
-          platform: {
-            get: () => 'linux',
-          },
-        }),
-      );
-    });
-
     afterEach(() => {
       vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
     });
 
-    it('should resolve the SEA (flattened) path first', async () => {
-      vi.mocked(fileExists).mockImplementation(async (checkPath) =>
-        checkPath.includes(path.normalize('vendor/ripgrep')),
-      );
+    describe('on POSIX', () => {
+      beforeEach(() => {
+        vi.spyOn(os, 'platform').mockReturnValue('linux');
+        vi.spyOn(os, 'arch').mockReturnValue('x64');
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => 'linux',
+            },
+          }),
+        );
+      });
 
-      const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).not.toBeNull();
-      expect(resolvedPath).toContain(path.normalize('vendor/ripgrep'));
+      it('should resolve the SEA (flattened) path first', async () => {
+        vi.mocked(fileExists).mockImplementation(async (checkPath) =>
+          checkPath.includes(path.normalize('vendor/ripgrep')),
+        );
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).not.toBeNull();
+        expect(resolvedPath).toContain(path.normalize('vendor/ripgrep'));
+      });
+
+      it('should fall back to system PATH if both bundled paths are missing and system is trusted', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        vi.mocked(resolveExecutable).mockResolvedValue('/usr/bin/rg');
+        vi.mocked(resolveToRealPath).mockReturnValue('/usr/bin/rg');
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe('/usr/bin/rg');
+        expect(resolveExecutable).toHaveBeenCalledWith('rg');
+      });
+
+      it('should reject system PATH if it is in the current working directory', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        const unsafePath = path.join(process.cwd(), 'rg');
+        vi.mocked(resolveExecutable).mockResolvedValue(unsafePath);
+        vi.mocked(resolveToRealPath).mockReturnValue(unsafePath);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBeNull();
+      });
+
+      it('should allow system PATH if the real path is in a trusted directory (e.g. Homebrew Cellar)', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        const trustedLink = '/usr/local/bin/rg';
+        const trustedRealPath = '/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg';
+
+        vi.mocked(resolveExecutable).mockResolvedValue(trustedLink);
+        vi.mocked(resolveToRealPath).mockReturnValue(trustedRealPath);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe(trustedRealPath);
+      });
+
+      it('should return null if binary is missing from both bundled paths and system PATH', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        vi.mocked(resolveExecutable).mockResolvedValue(undefined);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBeNull();
+      });
     });
 
-    it('should fall back to system PATH if both bundled paths are missing and system is trusted', async () => {
-      vi.mocked(fileExists).mockResolvedValue(false);
-      vi.mocked(resolveExecutable).mockResolvedValue('/usr/bin/rg');
-      vi.mocked(resolveToRealPath).mockReturnValue('/usr/bin/rg');
+    describe('on Windows', () => {
+      beforeEach(() => {
+        vi.spyOn(os, 'platform').mockReturnValue('win32');
+        vi.spyOn(os, 'arch').mockReturnValue('x64');
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => 'win32',
+            },
+          }),
+        );
+        vi.stubEnv('SystemRoot', 'C:\\Windows');
+        vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+        vi.stubEnv('ProgramFiles(x86)', 'C:\\Program Files (x86)');
+      });
 
-      const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).toBe('/usr/bin/rg');
-      expect(resolveExecutable).toHaveBeenCalledWith('rg');
-    });
+      it('should fall back to system PATH if system is trusted on Windows', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        vi.mocked(resolveExecutable).mockResolvedValue(
+          'C:\\Windows\\System32\\rg.exe',
+        );
+        vi.mocked(resolveToRealPath).mockReturnValue(
+          'C:\\Windows\\System32\\rg.exe',
+        );
 
-    it('should reject system PATH if it is in the current working directory', async () => {
-      vi.mocked(fileExists).mockResolvedValue(false);
-      const unsafePath = path.join(process.cwd(), 'rg');
-      vi.mocked(resolveExecutable).mockResolvedValue(unsafePath);
-      vi.mocked(resolveToRealPath).mockReturnValue(unsafePath);
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe('C:\\Windows\\System32\\rg.exe');
+        expect(resolveExecutable).toHaveBeenCalledWith('rg');
+      });
 
-      const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).toBeNull();
-    });
+      it('should reject system PATH if it is untrusted on Windows', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        const unsafePath = 'D:\\Downloads\\rg.exe';
+        vi.mocked(resolveExecutable).mockResolvedValue(unsafePath);
+        vi.mocked(resolveToRealPath).mockReturnValue(unsafePath);
 
-    it('should allow system PATH if the real path is in a trusted directory (e.g. Homebrew Cellar)', async () => {
-      vi.mocked(fileExists).mockResolvedValue(false);
-      const trustedLink = '/usr/local/bin/rg';
-      const trustedRealPath = '/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg';
-
-      vi.mocked(resolveExecutable).mockResolvedValue(trustedLink);
-      vi.mocked(resolveToRealPath).mockReturnValue(trustedRealPath);
-
-      const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).toBe(trustedRealPath);
-    });
-
-    it('should return null if binary is missing from both bundled paths and system PATH', async () => {
-      vi.mocked(fileExists).mockResolvedValue(false);
-      vi.mocked(resolveExecutable).mockResolvedValue(undefined);
-
-      const resolvedPath = await resolveRipgrepPath();
-      expect(resolvedPath).toBeNull();
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBeNull();
+      });
     });
   });
 });
