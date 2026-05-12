@@ -1,0 +1,263 @@
+name: '📋 Gemini Scheduled Backlog Deduplication'
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Run daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Number of issues to process'
+        required: false
+        default: '50'
+        type: 'string'
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  deduplicate-backlog:
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      vars.TRIAGE_DEDUPLICATE_ISSUES != ''
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 60
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
+
+      - name: 'Find issues to dedup'
+        id: 'find_issues'
+        env:
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          LIMIT: '${{ github.event.inputs.limit || 20 }}'
+        run: |
+          set -euo pipefail
+          echo "🔍 Finding oldest untriaged issues missing deduplication check..."
+          # We search for issues that:
+          # 1. Are open
+          # 2. Don't have 'status/bot-triaged' (haven't been triaged yet)
+          # 3. Don't have 'status/possible-duplicate' (haven't been flagged as duplicate)
+          # 4. Don't have 'status/checked-for-duplicates' (haven't been checked yet)
+          # 5. Don't have '🔒 maintainer only' (skip internal issues)
+          # We take the oldest ones first to clear the long tail.
+          ISSUES=$(gh issue list --repo "${{ github.repository }}" \
+            --search "is:open is:issue -label:status/bot-triaged -label:status/possible-duplicate -label:status/checked-for-duplicates -label:\"🔒 maintainer only\"" \
+            --limit "${LIMIT}" --json number,title,body --sort created --direction asc)
+          
+          # Truncate body to 2000 characters to avoid env var overflow
+          TRUNCATED_ISSUES=$(echo "${ISSUES}" | jq 'map(.body |= (if . != null then .[:2000] else . end))')
+          
+          echo "issues_json=${TRUNCATED_ISSUES}" >> "${GITHUB_OUTPUT}"
+          COUNT=$(echo "${TRUNCATED_ISSUES}" | jq 'length')
+          echo "✅ Found ${COUNT} issues to process."
+
+      - name: 'Run Gemini Backlog Deduplication'
+        if: |-
+          steps.find_issues.outputs.issues_json != '' && 
+          steps.find_issues.outputs.issues_json != '[]'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_dedup'
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ISSUES_TO_PROCESS: '${{ steps.find_issues.outputs.issues_json }}'
+          REPOSITORY: '${{ github.repository }}'
+          FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
+            {
+              "mcpServers": {
+                "issue_deduplication": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "--network", "host",
+                    "-e", "GITHUB_TOKEN",
+                    "-e", "GEMINI_API_KEY",
+                    "-e", "DATABASE_TYPE",
+                    "-e", "FIRESTORE_DATABASE_ID",
+                    "-e", "GCP_PROJECT",
+                    "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
+                    "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
+                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
+                  ],
+                  "env": {
+                    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+                    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+                    "DATABASE_TYPE":"firestore",
+                    "GCP_PROJECT": "${FIRESTORE_PROJECT}",
+                    "FIRESTORE_DATABASE_ID": "(default)",
+                    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
+                  },
+                  "timeout": 1200000
+                }
+              },
+              "maxSessionTurns": 100,
+              "coreTools": [
+                "run_shell_command(echo)",
+                "run_shell_command(gh issue view)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+            You are a backlog maintenance assistant specializing in issue deduplication.
+
+            ## Goal
+            Analyze a batch of issues and identify potential duplicates among existing open issues.
+
+            ## Context
+            - Repository: ${{ github.repository }}
+            - Issues to process (JSON): ${{ env.ISSUES_TO_PROCESS }}
+
+            ## Steps
+            For EACH issue in the provided JSON array:
+            1.  **Find Potential Duplicates:**
+                - Use the `duplicates` tool with `repo` and `issue_number` to find potential duplicates for the current issue.
+                - If the tool returns potential matches, refine the list by fetching the content of the top matches using `gh issue view <number> --json title,body,comments`.
+                - Compare the original issue with the candidates.
+            2.  **Verify Duplicates:**
+                - Highly confident duplicates should be recorded.
+                - If comments in either issue suggest they are NOT duplicates, respect that and exclude them.
+            3.  **Prepare Output:**
+                - Generate a JSON object for EVERY issue analyzed, even if no duplicates are found.
+                - Each object must contain:
+                  - `target_issue`: The issue number you were analyzing.
+                  - `duplicate_of`: An array of issue numbers that this issue is a duplicate of (empty array `[]` if none).
+                  - `explanation`: A brief explanation of why these are duplicates (or why none were found).
+
+            ## Final Output
+            Provide a single JSON block containing the results for all analyzed issues:
+            ```json
+            [
+              {
+                "target_issue": 123,
+                "duplicate_of": [45, 67],
+                "explanation": "Both issues report the same authentication failure in version 0.1.2."
+              },
+              {
+                "target_issue": 124,
+                "duplicate_of": [],
+                "explanation": "No matching duplicates found after refinement."
+              }
+            ]
+            ```
+
+            ## Guidelines
+            - Only output the JSON block.
+            - Do not include conversational filler.
+            - Only use the provided tools.
+            - Do not modify any issues directly.
+
+      - name: 'Apply Duplicate Labels'
+        if: |-
+          steps.gemini_dedup.outcome == 'success' && 
+          steps.gemini_dedup.outputs.summary != '[]'
+        env:
+          LABELS_OUTPUT: '${{ steps.gemini_dedup.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const rawOutput = process.env.LABELS_OUTPUT;
+            core.info(`Raw output: ${rawOutput}`);
+            let results;
+            try {
+              const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+              const jsonString = jsonMatch ? jsonMatch[1].trim() : rawOutput.trim();
+              results = JSON.parse(jsonString);
+            } catch (err) {
+              core.setFailed(`Failed to parse results: ${err.message}`);
+              return;
+            }
+
+            // Ensure labels exist
+            const labelsToEnsure = [
+              { name: 'status/checked-for-duplicates', color: 'ededed', description: 'This issue has been checked for duplicates by the bot.' },
+              { name: 'status/possible-duplicate', color: 'ffc107', description: 'This issue might be a duplicate of another issue.' }
+            ];
+
+            for (const label of labelsToEnsure) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+              } catch (err) {
+                if (err.status === 404) {
+                  core.info(`Creating label: ${label.name}`);
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            for (const entry of results) {
+              const issueNumber = entry.target_issue;
+              const duplicates = entry.duplicate_of || [];
+              
+              // Always apply the 'checked' label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ['status/checked-for-duplicates'],
+              });
+
+              if (duplicates.length > 0) {
+                core.info(`Flagging #${issueNumber} as duplicate of ${duplicates.join(', ')}`);
+                
+                const body = `Found possible duplicate issues:\n\n${duplicates.map(n => `- #${n}`).join('\n')}\n\n${entry.explanation}\n\nIf you believe this is not a duplicate, please remove the \`status/possible-duplicate\` label.\n<!-- gemini-cli-deduplication -->`;
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: body,
+                });
+                
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: ['status/possible-duplicate'],
+                });
+              } else {
+                core.info(`No duplicates found for #${issueNumber}.`);
+              }
+            }
