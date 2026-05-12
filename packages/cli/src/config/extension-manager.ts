@@ -213,6 +213,11 @@ export class ExtensionManager extends ExtensionLoader {
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
     let extension: GeminiCLIExtension | null;
+    // Backup of the previous extension directory, populated before any
+    // destructive update step so the previous version can be restored on
+    // failure. Kept in the outer scope so the catch/finally can see it.
+    let previousBackupDir: string | undefined;
+    let previousExtensionDirSnapshot: string | undefined;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
         if (
@@ -385,6 +390,14 @@ Would you like to attempt to install via "git clone" instead?`,
             );
             this.extensionEnablementManager.remove(previousName);
           }
+          // Snapshot the previous extension's on-disk state before the
+          // destructive uninstall + copy + load sequence so we can restore it
+          // if any subsequent step fails.
+          if (previous?.path && fs.existsSync(previous.path)) {
+            previousExtensionDirSnapshot = previous.path;
+            previousBackupDir = await ExtensionStorage.createTmpDir();
+            await copyExtension(previous.path, previousBackupDir);
+          }
           await this.uninstallExtension(previousName, isUpdate);
         }
 
@@ -445,8 +458,6 @@ Would you like to attempt to install via "git clone" instead?`,
           installMetadata,
         );
 
-        // TODO: Gracefully handle this call failing, we should back up the old
-        // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath);
         if (!extension) {
           throw new Error(`Extension not found`);
@@ -500,6 +511,31 @@ Would you like to attempt to install via "git clone" instead?`,
       }
       return extension;
     } catch (error) {
+      // Restore the previous extension from the snapshot taken before the
+      // destructive uninstall+copy+load sequence so a failed update does not
+      // leave the user without a working version.
+      if (previousBackupDir && previousExtensionDirSnapshot) {
+        try {
+          if (fs.existsSync(previousExtensionDirSnapshot)) {
+            await fs.promises.rm(previousExtensionDirSnapshot, {
+              recursive: true,
+              force: true,
+            });
+          }
+          await fs.promises.mkdir(previousExtensionDirSnapshot, {
+            recursive: true,
+          });
+          await copyExtension(previousBackupDir, previousExtensionDirSnapshot);
+          debugLogger.warn(
+            `Extension update failed; restored previous version from backup.`,
+          );
+        } catch (restoreError) {
+          debugLogger.error(
+            'Failed to restore previous extension after update failure:',
+            restoreError,
+          );
+        }
+      }
       // Attempt to load config from the source path even if installation fails
       // to get the name and version for logging.
       if (!newExtensionConfig && localSourcePath) {
@@ -540,6 +576,20 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
       throw error;
+    } finally {
+      if (previousBackupDir) {
+        try {
+          await fs.promises.rm(previousBackupDir, {
+            recursive: true,
+            force: true,
+          });
+        } catch (cleanupError) {
+          debugLogger.debug(
+            'Failed to clean up extension update backup:',
+            cleanupError,
+          );
+        }
+      }
     }
   }
 
