@@ -69,7 +69,8 @@ advanced triage, or semantic labeling).
 
 ### 2. Hypothesis Testing & Deep Dive
 
-For each identified trend or opportunity:
+For the **single most significant** identified trend or opportunity (or a small
+set of highly related ones):
 
 - **Develop Competing Hypotheses**: Brainstorm multiple potential root causes or
   improvement strategies.

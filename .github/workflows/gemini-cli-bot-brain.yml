@@ -153,6 +153,7 @@ jobs:
 
           if [ "$ENABLE_PRS" = "true" ]; then
             echo "**System Directive**: PR creation is ENABLED for this run. You MUST activate the **'prs' skill** to stage your changes and generate a \`pr-description.md\` file if you are proposing fixes." >> trigger_context.md
+            echo "**CRITICAL System Directive**: You MUST ONLY propose and implement a **SINGLE** improvement or fix per run. Bundling unrelated changes into a single PR is STRICTLY FORBIDDEN and will result in immediate rejection during the critique phase. If you identify multiple issues, pick the most impactful one and ignore the others for now." >> trigger_context.md
           else
             echo "**System Directive**: PR creation is DISABLED for this run. You MUST NOT stage files or attempt to create a PR description." >> trigger_context.md
           fi
