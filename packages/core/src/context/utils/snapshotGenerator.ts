@@ -207,7 +207,7 @@ ${formatNodesForLlm(nodes)}`;
     try {
       const result = await this.env.llmClient.generateJson({
         role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
-        modelConfigKey: { model: 'gemini-3-flash-base' },
+        modelConfigKey: { model: 'context-snapshotter' },
         contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
         systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
         schema: patchSchema,
