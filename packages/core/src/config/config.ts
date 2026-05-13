@@ -81,14 +81,11 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -445,6 +442,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { getChannelFromVersion } from '../utils/channel.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -762,7 +760,8 @@ export class Config implements McpContext, AgentLoopContext {
   private skillManager!: SkillManager;
   private _sessionId: string;
   private readonly clientName: string | undefined;
-  private clientVersion: string;
+  private _clientVersion: string;
+
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
   readonly topicState = new TopicState();
@@ -982,8 +981,9 @@ export class Config implements McpContext, AgentLoopContext {
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
-    this.clientVersion = params.clientVersion ?? 'unknown';
+    this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.sandbox = params.sandbox
@@ -2009,14 +2009,21 @@ export class Config implements McpContext, AgentLoopContext {
     resetTime?: string;
   } {
     const model = this.getModel();
-    if (!isAutoModel(model)) {
+    if (!isAutoModel(model, this)) {
       return {};
     }
 
-    const isPreview =
-      model === PREVIEW_GEMINI_MODEL_AUTO ||
-      isPreviewModel(this.getActiveModel(), this);
-    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const primaryModel = resolveModel(
+      model,
+      this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
+    );
+
+    const isPreview = isPreviewModel(primaryModel, this);
+    const proModel = primaryModel;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
       : DEFAULT_GEMINI_FLASH_MODEL;
@@ -2511,12 +2518,15 @@ export class Config implements McpContext, AgentLoopContext {
    * user message when JIT is enabled. Returns empty string when JIT is
    * disabled (Tier 2 memory is already in the system instruction).
    */
-  getSessionMemory(): string {
+  getSessionMemory(options?: { includeExtensionContext?: boolean }): string {
     if (!this.experimentalJitContext || !this.memoryContextManager) {
       return '';
     }
     const sections: string[] = [];
-    const extension = this.memoryContextManager.getExtensionMemory();
+    const includeExtensionContext = options?.includeExtensionContext ?? true;
+    const extension = includeExtensionContext
+      ? this.memoryContextManager.getExtensionMemory()
+      : '';
     const project = this.memoryContextManager.getEnvironmentMemory();
     if (extension?.trim()) {
       sections.push(
@@ -2776,6 +2786,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getExperimentalDynamicModelConfiguration(): boolean {
     return this.dynamicModelConfiguration;
+  }
+
+  getReleaseChannel(): string {
+    return getChannelFromVersion(this._clientVersion);
   }
 
   getPendingIncludeDirectories(): string[] {
@@ -3088,12 +3102,49 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     resolvedPath: string,
     inboxRoot: string,
+    checkType: 'read' | 'write' = 'write',
   ): boolean {
     if (!hasScopedMemoryInboxAccess()) {
       return false;
     }
 
     const normalizedPath = path.resolve(absolutePath);
+    const resolvedMemoryRoot = resolveToRealPath(
+      this.storage.getProjectMemoryTempDir(),
+    );
+
+    // Reads: allow the inbox root and the per-kind subtrees so the extraction
+    // agent can list/inspect prior patches (including non-canonical filenames
+    // left over from older runs) before deciding how to rewrite the canonical
+    // extraction.patch. Writes still flow through the strict canonical-path
+    // check below so the inbox cannot be backdoored with arbitrary files.
+    if (checkType === 'read') {
+      const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+      const normalizedInboxRoot = path.resolve(inboxRoot);
+      if (
+        resolvedPath === resolvedInboxRoot ||
+        normalizedPath === normalizedInboxRoot
+      ) {
+        return isSubpath(resolvedMemoryRoot, resolvedPath);
+      }
+
+      for (const kind of ['private', 'global'] as const) {
+        const kindRoot = path.join(inboxRoot, kind);
+        const resolvedKindRoot = resolveToRealPath(kindRoot);
+        const normalizedKindRoot = path.resolve(kindRoot);
+        if (
+          resolvedPath === resolvedKindRoot ||
+          normalizedPath === normalizedKindRoot ||
+          isSubpath(resolvedKindRoot, resolvedPath) ||
+          isSubpath(normalizedKindRoot, normalizedPath)
+        ) {
+          return isSubpath(resolvedMemoryRoot, resolvedPath);
+        }
+      }
+
+      return false;
+    }
+
     const isCanonicalPatchPath = (['private', 'global'] as const).some(
       (kind) =>
         normalizedPath === path.resolve(inboxRoot, kind, 'extraction.patch'),
@@ -3102,9 +3153,6 @@ export class Config implements McpContext, AgentLoopContext {
       return false;
     }
 
-    const resolvedMemoryRoot = resolveToRealPath(
-      this.storage.getProjectMemoryTempDir(),
-    );
     return isSubpath(resolvedMemoryRoot, resolvedPath);
   }
 
@@ -3148,7 +3196,9 @@ export class Config implements McpContext, AgentLoopContext {
    * the auto-memory extraction agent and the `/memory inbox` review flow. The
    * main agent is denied access to it even though it falls inside the project
    * temp dir; the extraction agent receives a narrow execution-scoped exception
-   * for `.inbox/{private,global}/extraction.patch`.
+   * for *writes* to `.inbox/{private,global}/extraction.patch`. Scoped *read*
+   * access to the wider `.inbox/{private,global}/` subtree is granted in
+   * `validatePathAccess` so the extractor can enumerate prior patches.
    *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
@@ -3242,6 +3292,28 @@ export class Config implements McpContext, AgentLoopContext {
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
         return null;
+      }
+
+      // The memory inbox is carved out of the standard temp-dir allowlist by
+      // `isPathAllowed`. The extraction agent is granted a scoped read
+      // exception so it can enumerate prior patches (including non-canonical
+      // filenames) before consolidating them into the canonical
+      // extraction.patch. Writes remain restricted to canonical paths.
+      if (hasScopedMemoryInboxAccess()) {
+        const inboxRoot = path.join(
+          this.storage.getProjectMemoryTempDir(),
+          '.inbox',
+        );
+        if (
+          this.isScopedMemoryInboxPatchPathAllowed(
+            absolutePath,
+            resolveToRealPath(absolutePath),
+            inboxRoot,
+            'read',
+          )
+        ) {
+          return null;
+        }
       }
     }
 
@@ -3466,6 +3538,13 @@ export class Config implements McpContext, AgentLoopContext {
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
     );
+  }
+
+  /**
+   * Returns the client version.
+   */
+  get clientVersion(): string {
+    return this._clientVersion;
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {

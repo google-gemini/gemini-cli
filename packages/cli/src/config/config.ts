@@ -31,7 +31,6 @@ import {
   loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
@@ -867,7 +866,7 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
   const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -1106,7 +1105,11 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    // In ACP mode, always skip the next-speaker check. This check triggers
+    // recursive continuation turns inside GeminiClient.processTurn() that
+    // conflict with ACP's explicit turn management via session/prompt,
+    // causing infinite agent_thought_chunk loops.
+    skipNextSpeakerCheck: isAcpMode || settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,

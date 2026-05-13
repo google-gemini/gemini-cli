@@ -46,6 +46,15 @@ import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
+import * as fs from 'node:fs';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn(actual.realpathSync),
+  };
+});
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -741,6 +750,40 @@ included directory memory
       // projectRoot is still discovered and loaded normally.
       expect(result.memoryContent).toContain('Project root memory content');
       expect(result.filePaths).toContain(projectContextFile);
+    });
+
+    it('should not crash when fs.realpathSync throws EISDIR on virtual drive roots', async () => {
+      // Mock realpathSync to throw EISDIR for a specific path, simulating
+      // the Windows virtual drive issue (#25216).
+      vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = p.toString();
+        if (pathStr.includes('virtual-drive')) {
+          const error = new Error(
+            "EISDIR: illegal operation on a directory, realpath 'A:\\a'",
+          );
+
+          (error as NodeJS.ErrnoException).code = 'EISDIR';
+          throw error;
+        }
+        // For other paths, we need to return something sensible.
+        // Since it's a mock, we can just return the path string itself.
+        return pathStr;
+      });
+
+      const virtualDriveCwd = path.join(testRootDir, 'virtual-drive');
+      await fsPromises.mkdir(virtualDriveCwd, { recursive: true });
+
+      // This should now succeed instead of throwing
+      const result = await loadServerHierarchicalMemory(
+        virtualDriveCwd,
+        [],
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.fileCount).toBe(0);
     });
 
     it('silently skips a GEMINI.md symlink that points to a directory', async () => {
