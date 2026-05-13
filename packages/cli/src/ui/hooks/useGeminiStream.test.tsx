@@ -1836,7 +1836,7 @@ describe('useGeminiStream', () => {
   });
 
   describe('Retry Handling', () => {
-    it('should ignore retryStatus updates when not responding', async () => {
+    it('should retain retryStatus updates even when responding state has not caught up', async () => {
       const { result } = await renderHookWithDefaults();
 
       const retryPayload = {
@@ -1850,7 +1850,7 @@ describe('useGeminiStream', () => {
         coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
       });
 
-      expect(result.current.retryStatus).toBeNull();
+      expect(result.current.retryStatus).toEqual(retryPayload);
     });
 
     it('should reset retryStatus when isResponding becomes false', async () => {

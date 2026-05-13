@@ -316,6 +316,71 @@ describe('<LoadingIndicator />', () => {
     unmount();
   });
 
+  it('should prioritize capacity retry phrase over thought.subject', async () => {
+    const props = {
+      thought: {
+        subject: 'Thinking about something else...',
+        description: 'A description',
+      },
+      currentLoadingPhrase: 'Model capacity exhausted. Retrying (attempt 1)...',
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain(
+      'Model capacity exhausted. Retrying (attempt 1)...',
+    );
+    expect(output).not.toContain('Thinking about something else...');
+    unmount();
+  });
+
+  it('should prioritize request timeout retry phrase over thought.subject', async () => {
+    const props = {
+      thought: {
+        subject: 'Thinking about something else...',
+        description: 'A description',
+      },
+      currentLoadingPhrase: 'Request timed out. Retrying (attempt 2)...',
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Request timed out. Retrying (attempt 2)...');
+    expect(output).not.toContain('Thinking about something else...');
+    unmount();
+  });
+
+  it('should prioritize generic retry phrase over thought.subject', async () => {
+    const props = {
+      thought: {
+        subject: 'Thinking about something else...',
+        description: 'A description',
+      },
+      currentLoadingPhrase:
+        'Trying to reach gemini-3-flash-preview (Attempt 2/10)',
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain(
+      'Trying to reach gemini-3-flash-preview (Attempt 2/10)',
+    );
+    expect(output).not.toContain('Thinking about something else...');
+    unmount();
+  });
+
   it('should not display thought indicator for non-thought loading phrases', async () => {
     const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator

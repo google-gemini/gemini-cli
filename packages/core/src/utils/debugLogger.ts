@@ -22,8 +22,12 @@ import * as util from 'node:util';
  */
 class DebugLogger {
   private logStream: fs.WriteStream | undefined;
+  private readonly logOnlyStreamDebug: boolean;
 
   constructor() {
+    this.logOnlyStreamDebug =
+      process.env['GEMINI_DEBUG_LOG_ONLY_STREAM'] === '1' ||
+      process.env['GEMINI_DEBUG_LOG_ONLY_STREAM'] === 'true';
     this.logStream = process.env['GEMINI_DEBUG_LOG_FILE']
       ? fs.createWriteStream(process.env['GEMINI_DEBUG_LOG_FILE'], {
           flags: 'a',
@@ -39,6 +43,9 @@ class DebugLogger {
   private writeToFile(level: string, args: unknown[]) {
     if (this.logStream) {
       const message = util.format(...args);
+      if (this.logOnlyStreamDebug && !message.includes('[STREAM_DEBUG]')) {
+        return;
+      }
       const timestamp = new Date().toISOString();
       const logEntry = `[${timestamp}] [${level}] ${message}\n`;
       this.logStream.write(logEntry);

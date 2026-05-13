@@ -61,6 +61,23 @@ const RETRYABLE_NETWORK_CODES = [
   'ERR_STREAM_PREMATURE_CLOSE',
 ];
 
+const ERROR_INFO_TYPE = 'type.googleapis.com/google.rpc.ErrorInfo';
+const MODEL_CAPACITY_EXHAUSTED_REASON = 'MODEL_CAPACITY_EXHAUSTED';
+const DEFAULT_MODEL_CAPACITY_MAX_RETRY_DELAY_MS = 3000;
+const MODEL_CAPACITY_MAX_RETRY_DELAY_ENV =
+  'GEMINI_MODEL_CAPACITY_MAX_RETRY_DELAY_MS';
+const DEFAULT_STREAM_STALL_MAX_RETRY_DELAY_MS = 1000;
+const STREAM_STALL_MAX_RETRY_DELAY_ENV =
+  'GEMINI_STREAM_STALL_MAX_RETRY_DELAY_MS';
+const STREAM_STALL_RETRY_CODES = new Set([
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'ERR_STREAM_PREMATURE_CLOSE',
+]);
+
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
 // OpenSSL reason string with spaces replaced by underscores (see
 // TLSWrap::ClearOut in node/src/crypto/crypto_tls.cc). The reason string
@@ -206,6 +223,69 @@ export function isRetryableError(
   }
 
   return false;
+}
+
+function getModelCapacityMaxRetryDelayMs(): number {
+  const configuredValue = process.env[MODEL_CAPACITY_MAX_RETRY_DELAY_ENV];
+  if (!configuredValue) {
+    return DEFAULT_MODEL_CAPACITY_MAX_RETRY_DELAY_MS;
+  }
+
+  const parsed = Number(configuredValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_MODEL_CAPACITY_MAX_RETRY_DELAY_MS;
+  }
+  return parsed;
+}
+
+function getStreamStallMaxRetryDelayMs(): number {
+  const configuredValue = process.env[STREAM_STALL_MAX_RETRY_DELAY_ENV];
+  if (!configuredValue) {
+    return DEFAULT_STREAM_STALL_MAX_RETRY_DELAY_MS;
+  }
+
+  const parsed = Number(configuredValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_STREAM_STALL_MAX_RETRY_DELAY_MS;
+  }
+  return parsed;
+}
+
+function isStreamStallError(error: unknown): boolean {
+  const errorCode = getNetworkErrorCode(error);
+  if (errorCode && STREAM_STALL_RETRY_CODES.has(errorCode)) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const lowerMessage = error.message.toLowerCase();
+  return (
+    lowerMessage.includes('timed out') ||
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('socket hang up')
+  );
+}
+
+function isModelCapacityExhaustedError(error: RetryableQuotaError): boolean {
+  const details = error.cause?.details;
+  if (!Array.isArray(details)) {
+    return false;
+  }
+
+  return details.some((detail) => {
+    if (typeof detail !== 'object' || detail === null) {
+      return false;
+    }
+
+    const typedDetail = detail as { '@type'?: string; reason?: string };
+    return (
+      typedDetail['@type'] === ERROR_INFO_TYPE &&
+      typedDetail.reason === MODEL_CAPACITY_EXHAUSTED_REASON
+    );
+  });
 }
 
 /**
@@ -376,6 +456,32 @@ export async function retryWithBackoff<T>(
 
         if (
           classifiedError instanceof RetryableQuotaError &&
+          isModelCapacityExhaustedError(classifiedError)
+        ) {
+          const maxCapacityDelayMs = getModelCapacityMaxRetryDelayMs();
+          const suggestedDelayMs =
+            classifiedError.retryDelayMs ?? initialDelayMs;
+          const capacityDelayMs = Math.min(
+            maxCapacityDelayMs,
+            Math.max(initialDelayMs, suggestedDelayMs),
+          );
+
+          // Positive jitter up to +20%; keep retries short for capacity errors.
+          const jitter = capacityDelayMs * 0.2 * Math.random();
+          const delayWithJitter = capacityDelayMs + jitter;
+          debugLogger.warn(
+            `Attempt ${attempt} failed: ${classifiedError.message}. Capacity constrained; retrying after ${Math.round(delayWithJitter)}ms (capped at ${maxCapacityDelayMs}ms).`,
+          );
+          if (onRetry) {
+            onRetry(attempt, error, delayWithJitter);
+          }
+          await delay(delayWithJitter, signal);
+          currentDelay = initialDelayMs;
+          continue;
+        }
+
+        if (
+          classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
           currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
@@ -393,16 +499,28 @@ export async function retryWithBackoff<T>(
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
-          logRetryAttempt(attempt, error, errorStatus);
-
-          // Exponential backoff with jitter for non-quota errors
-          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-          const delayWithJitter = Math.max(0, currentDelay + jitter);
+          const streamStall = isStreamStallError(error);
+          const delayWithJitter = streamStall
+            ? getStreamStallMaxRetryDelayMs()
+            : Math.max(
+                0,
+                currentDelay + currentDelay * 0.3 * (Math.random() * 2 - 1),
+              );
+          if (streamStall) {
+            debugLogger.warn(
+              `Attempt ${attempt} failed. Stream stalled; retrying after ${Math.round(delayWithJitter)}ms (capped at ${getStreamStallMaxRetryDelayMs()}ms).`,
+              error,
+            );
+          } else {
+            logRetryAttempt(attempt, error, errorStatus);
+          }
           if (onRetry) {
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          currentDelay = streamStall
+            ? initialDelayMs
+            : Math.min(maxDelayMs, currentDelay * 2);
           continue;
         }
       }
@@ -417,16 +535,28 @@ export async function retryWithBackoff<T>(
       }
 
       const errorStatus = getErrorStatus(error);
-      logRetryAttempt(attempt, error, errorStatus);
-
-      // Exponential backoff with jitter for non-quota errors
-      const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-      const delayWithJitter = Math.max(0, currentDelay + jitter);
+      const streamStall = isStreamStallError(error);
+      const delayWithJitter = streamStall
+        ? getStreamStallMaxRetryDelayMs()
+        : Math.max(
+            0,
+            currentDelay + currentDelay * 0.3 * (Math.random() * 2 - 1),
+          );
+      if (streamStall) {
+        debugLogger.warn(
+          `Attempt ${attempt} failed. Stream stalled; retrying after ${Math.round(delayWithJitter)}ms (capped at ${getStreamStallMaxRetryDelayMs()}ms).`,
+          error,
+        );
+      } else {
+        logRetryAttempt(attempt, error, errorStatus);
+      }
       if (onRetry) {
         onRetry(attempt, error, delayWithJitter);
       }
       await delay(delayWithJitter, signal);
-      currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+      currentDelay = streamStall
+        ? initialDelayMs
+        : Math.min(maxDelayMs, currentDelay * 2);
     }
   }
 

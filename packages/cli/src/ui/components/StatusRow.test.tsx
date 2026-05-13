@@ -78,6 +78,49 @@ describe('<StatusRow />', () => {
     expect(output).toContain('Tip: Test Tip');
   });
 
+  it('passes retry loading phrase through to the loading indicator', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: true,
+      showTips: true,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+    });
+
+    const uiState: Partial<UIState> = {
+      ...defaultUiState,
+      currentTip: 'This stale tip should not be rendered',
+      currentLoadingPhrase: 'Model capacity exhausted. Retrying (attempt 1)...',
+      thought: { subject: 'Thinking...' } as unknown as ThoughtSummary,
+      elapsedTime: 5,
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={false}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState,
+      },
+    );
+
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain(
+      'Model capacity exhausted. Retrying (attempt 1)...',
+    );
+    expect(output).not.toContain('Thinking...');
+    expect(output).not.toContain('This stale tip should not be rendered');
+    expect(output).not.toContain('? for shortcuts');
+  });
+
   it('renders correctly when interactive shell is waiting', async () => {
     (useComposerStatus as Mock).mockReturnValue({
       isInteractiveShellWaiting: true,

@@ -237,6 +237,25 @@ export const useGeminiStream = (
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
 ) => {
+  const isStreamDebugEnabled = useMemo(() => {
+    const value = process.env['GEMINI_STREAM_DEBUG'];
+    return value === '1' || value === 'true';
+  }, []);
+
+  const streamDebug = useCallback(
+    (message: string, details?: unknown) => {
+      if (!isStreamDebugEnabled) {
+        return;
+      }
+      if (details === undefined) {
+        debugLogger.debug(`[STREAM_DEBUG] ${message}`);
+      } else {
+        debugLogger.debug(`[STREAM_DEBUG] ${message}`, details);
+      }
+    },
+    [isStreamDebugEnabled],
+  );
+
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
     null,
@@ -276,7 +295,20 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
-      if (turnCancelledRef.current || !isRespondingRef.current) {
+      streamDebug('retry attempt event received', {
+        attempt: payload.attempt,
+        maxAttempts: payload.maxAttempts,
+        delayMs: Math.round(payload.delayMs),
+        error: payload.error,
+        isResponding: isRespondingRef.current,
+        model: payload.model,
+        turnCancelled: turnCancelledRef.current,
+      });
+      if (turnCancelledRef.current) {
+        streamDebug('retry attempt event ignored after cancellation', {
+          attempt: payload.attempt,
+          model: payload.model,
+        });
         return;
       }
       setRetryStatus(payload);
@@ -285,7 +317,7 @@ export const useGeminiStream = (
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, [isRespondingRef]);
+  }, [isRespondingRef, streamDebug]);
 
   const [
     toolCalls,
@@ -414,6 +446,42 @@ export const useGeminiStream = (
     () => calculateStreamingState(isResponding, toolCalls),
     [isResponding, toolCalls],
   );
+  const activePtyId =
+    activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
+
+  const summarizeToolCallStatuses = useCallback(() => {
+    const summary: Record<string, number> = {};
+    for (const toolCall of toolCalls) {
+      summary[toolCall.status] = (summary[toolCall.status] ?? 0) + 1;
+    }
+    return summary;
+  }, [toolCalls]);
+
+  const previousStreamingStateRef = useRef<StreamingState | null>(null);
+  useEffect(() => {
+    const currentActivePtyId =
+      activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
+    if (
+      !isStreamDebugEnabled ||
+      previousStreamingStateRef.current === streamingState
+    ) {
+      return;
+    }
+    previousStreamingStateRef.current = streamingState;
+    streamDebug(`streamingState=${streamingState}`, {
+      isResponding,
+      toolStatuses: summarizeToolCallStatuses(),
+      hasActivePty: currentActivePtyId != null,
+    });
+  }, [
+    isStreamDebugEnabled,
+    streamDebug,
+    streamingState,
+    isResponding,
+    summarizeToolCallStatuses,
+    activeShellPtyId,
+    activeBackgroundExecutionId,
+  ]);
 
   // Reset tracking when a new batch of tools starts
   useEffect(() => {
@@ -714,9 +782,6 @@ export const useGeminiStream = (
   ] = useState<{
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
-
-  const activePtyId =
-    activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -1463,7 +1528,9 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      streamDebug('processing stream events: begin');
       for await (const event of stream) {
+        streamDebug(`event=${event.type}`);
         if (
           event.type !== ServerGeminiEventType.Thought &&
           thoughtRef.current !== null
@@ -1474,10 +1541,16 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setLastGeminiActivityTime(Date.now());
+            streamDebug('thought event received', {
+              subject: event.value.subject,
+            });
             handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
+            streamDebug('content event received', {
+              length: event.value.length,
+            });
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -1485,6 +1558,10 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            streamDebug('tool_call_request received', {
+              callId: event.value.callId,
+              name: event.value.name,
+            });
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
@@ -1526,6 +1603,9 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.Finished:
+            streamDebug('finished event received', {
+              reason: event.value?.reason,
+            });
             handleFinishedEvent(event, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Citation:
@@ -1551,15 +1631,21 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
+        streamDebug('scheduling tool calls from stream', {
+          count: toolCallRequests.length,
+          names: toolCallRequests.map((request) => request.name),
+        });
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
         }
         await scheduleToolCalls(toolCallRequests, signal);
       }
+      streamDebug('processing stream events: complete');
       return StreamProcessingStatus.Completed;
     },
     [
+      streamDebug,
       handleContentEvent,
       handleThoughtEvent,
       thoughtRef,
@@ -1601,8 +1687,13 @@ export const useGeminiStream = (
               streamingState === StreamingState.Responding ||
               streamingState === StreamingState.WaitingForConfirmation) &&
             !options?.isContinuation
-          )
+          ) {
+            streamDebug('submit skipped because stream is already active', {
+              isResponding: isRespondingRef.current,
+              streamingState,
+            });
             return;
+          }
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
 
@@ -1623,6 +1714,7 @@ export const useGeminiStream = (
           abortControllerRef.current = new AbortController();
           const abortSignal = abortControllerRef.current.signal;
           turnCancelledRef.current = false;
+          setRetryStatus(null);
 
           if (!prompt_id) {
             prompt_id = config.getSessionId() + '########' + getPromptCount();
@@ -1659,12 +1751,18 @@ export const useGeminiStream = (
 
             setIsResponding(true);
             setInitError(null);
+            streamDebug('submit started', {
+              isContinuation: !!options?.isContinuation,
+              promptId: prompt_id,
+              queryType: typeof queryToSend,
+            });
 
             // Store query and prompt_id for potential retry on loop detection
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
             try {
+              streamDebug('opening sendMessageStream');
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
                 abortSignal,
@@ -1677,6 +1775,7 @@ export const useGeminiStream = (
                 userMessageTimestamp,
                 abortSignal,
               );
+              streamDebug('stream processing result', { processingStatus });
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
                 return;
@@ -1723,6 +1822,9 @@ export const useGeminiStream = (
               }
             } catch (error: unknown) {
               spanMetadata.error = error;
+              streamDebug('submit caught error', {
+                error: getErrorMessage(error),
+              });
               if (error instanceof UnauthorizedError) {
                 onAuthError('Session expired or is unauthorized.');
               } else if (
@@ -1749,6 +1851,10 @@ export const useGeminiStream = (
                 maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
+              streamDebug('submit finished', {
+                queryId,
+                isLatestQuery: activeQueryIdRef.current === queryId,
+              });
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
               }
@@ -1761,6 +1867,7 @@ export const useGeminiStream = (
       setModelSwitchedFromQuotaError,
       prepareQueryForGemini,
       processGeminiStreamEvents,
+      streamDebug,
       pendingHistoryItemRef,
       addItem,
       setPendingHistoryItem,
@@ -1778,6 +1885,47 @@ export const useGeminiStream = (
       setIsResponding,
     ],
   );
+
+  useEffect(() => {
+    if (!isStreamDebugEnabled) {
+      return;
+    }
+
+    if (streamingState === StreamingState.Idle) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const currentActivePtyId =
+        activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
+      const now = Date.now();
+      const activityTimestamp = Math.max(
+        lastGeminiActivityTime,
+        lastToolOutputTime,
+        lastShellOutputTime,
+      );
+      const silenceMs =
+        activityTimestamp > 0 ? now - activityTimestamp : Number.NaN;
+      streamDebug('heartbeat', {
+        streamingState,
+        silenceMs: Number.isNaN(silenceMs) ? 'unknown' : silenceMs,
+        hasActivePty: currentActivePtyId != null,
+        toolStatuses: summarizeToolCallStatuses(),
+      });
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [
+    isStreamDebugEnabled,
+    streamDebug,
+    streamingState,
+    lastGeminiActivityTime,
+    lastToolOutputTime,
+    lastShellOutputTime,
+    activeShellPtyId,
+    activeBackgroundExecutionId,
+    summarizeToolCallStatuses,
+  ]);
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {

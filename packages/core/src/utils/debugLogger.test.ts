@@ -79,4 +79,33 @@ describe('DebugLogger', () => {
     expect(warnSpy).toHaveBeenCalledWith();
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('should only write [STREAM_DEBUG] lines when stream-only file filter is enabled', () => {
+    const loggerInternals = debugLogger as unknown as {
+      logOnlyStreamDebug: boolean;
+      logStream: { write: (chunk: string) => void } | undefined;
+    };
+    const originalFilter = loggerInternals.logOnlyStreamDebug;
+    const originalStream = loggerInternals.logStream;
+    const writeSpy = vi.fn();
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    loggerInternals.logOnlyStreamDebug = true;
+    loggerInternals.logStream = { write: writeSpy };
+
+    try {
+      debugLogger.debug('[STREAM_DEBUG] keep this line');
+      debugLogger.debug('drop this line');
+
+      expect(debugSpy).toHaveBeenCalledTimes(2);
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(writeSpy.mock.calls[0]?.[0]).toContain(
+        '[STREAM_DEBUG] keep this line',
+      );
+      expect(writeSpy.mock.calls[0]?.[0]).not.toContain('drop this line');
+    } finally {
+      loggerInternals.logOnlyStreamDebug = originalFilter;
+      loggerInternals.logStream = originalStream;
+    }
+  });
 });

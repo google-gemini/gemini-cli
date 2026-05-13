@@ -57,6 +57,7 @@ describe('retryWithBackoff', () => {
   });
 
   afterEach(() => {
+    delete process.env['GEMINI_STREAM_STALL_MAX_RETRY_DELAY_MS'];
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -454,6 +455,49 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
+    it('should use a short retry delay for stream stall errors', async () => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const error = new Error('connect ETIMEDOUT');
+      (error as any).code = 'ETIMEDOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 5000,
+        maxDelayMs: 30000,
+      });
+
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1000);
+    });
+
+    it('should honor GEMINI_STREAM_STALL_MAX_RETRY_DELAY_MS override', async () => {
+      process.env['GEMINI_STREAM_STALL_MAX_RETRY_DELAY_MS'] = '250';
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const error = new Error(
+        'Code Assist streamGenerateContent request timed out after 10000ms',
+      );
+      (error as any).code = 'ETIMEDOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 5000,
+        maxDelayMs: 30000,
+      });
+
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 250);
+    });
+
     it('should retry on undici timeout error codes (UND_ERR_HEADERS_TIMEOUT)', async () => {
       const error = new Error('Headers timeout error');
       (error as any).code = 'UND_ERR_HEADERS_TIMEOUT';
@@ -644,6 +688,81 @@ describe('retryWithBackoff', () => {
       const calledDelayMs = setTimeoutSpy.mock.calls[0][1];
       expect(calledDelayMs).toBeGreaterThanOrEqual(12345);
       expect(calledDelayMs).toBeLessThanOrEqual(12345 * 1.2);
+    });
+
+    it('should cap retry delay for MODEL_CAPACITY_EXHAUSTED errors', async () => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const mockFn = vi.fn().mockImplementation(async () => {
+        throw new RetryableQuotaError(
+          'No capacity available',
+          {
+            code: 503,
+            message: 'No capacity available',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'MODEL_CAPACITY_EXHAUSTED',
+                domain: 'cloudcode-pa.googleapis.com',
+              },
+            ],
+          } as any,
+          120,
+        );
+      });
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      });
+
+      // eslint-disable-next-line vitest/valid-expect
+      const assertionPromise = expect(promise).rejects.toThrow();
+      await vi.runAllTimersAsync();
+      await assertionPromise;
+
+      const calledDelayMs = setTimeoutSpy.mock.calls[0][1] as number;
+      expect(calledDelayMs).toBeGreaterThanOrEqual(3000);
+      expect(calledDelayMs).toBeLessThanOrEqual(5000 * 1.2);
+    });
+
+    it('should honor GEMINI_MODEL_CAPACITY_MAX_RETRY_DELAY_MS override', async () => {
+      process.env['GEMINI_MODEL_CAPACITY_MAX_RETRY_DELAY_MS'] = '2500';
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const mockFn = vi.fn().mockImplementation(async () => {
+        throw new RetryableQuotaError(
+          'No capacity available',
+          {
+            code: 503,
+            message: 'No capacity available',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'MODEL_CAPACITY_EXHAUSTED',
+                domain: 'cloudcode-pa.googleapis.com',
+              },
+            ],
+          } as any,
+          120,
+        );
+      });
+
+      try {
+        const promise = retryWithBackoff(mockFn, {
+          maxAttempts: 2,
+          initialDelayMs: 100,
+        });
+
+        // eslint-disable-next-line vitest/valid-expect
+        const assertionPromise = expect(promise).rejects.toThrow();
+        await vi.runAllTimersAsync();
+        await assertionPromise;
+
+        const calledDelayMs = setTimeoutSpy.mock.calls[0][1] as number;
+        expect(calledDelayMs).toBeGreaterThanOrEqual(2500);
+        expect(calledDelayMs).toBeLessThanOrEqual(2500 * 1.2);
+      } finally {
+        delete process.env['GEMINI_MODEL_CAPACITY_MAX_RETRY_DELAY_MS'];
+      }
     });
 
     it.each([[AuthType.USE_GEMINI], [AuthType.USE_VERTEX_AI], [undefined]])(

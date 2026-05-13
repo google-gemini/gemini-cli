@@ -64,6 +64,7 @@ import {
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
 import { InvalidChunkEvent, type LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -73,6 +74,109 @@ export interface HttpOptions {
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 const GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS = 1000;
+const DEFAULT_CODE_ASSIST_REQUEST_TIMEOUT_MS = 60000;
+const DEFAULT_CODE_ASSIST_STREAM_TIMEOUT_MS = 15000;
+const CODE_ASSIST_REQUEST_TIMEOUT_ENV = 'GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS';
+const CODE_ASSIST_STREAM_TIMEOUT_ENV = 'GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS';
+
+function isStreamDebugEnabled(): boolean {
+  const value = process.env['GEMINI_STREAM_DEBUG'];
+  return value === '1' || value === 'true';
+}
+
+function streamDebug(message: string, details?: unknown): void {
+  if (!isStreamDebugEnabled()) {
+    return;
+  }
+
+  if (details === undefined) {
+    debugLogger.debug(`[STREAM_DEBUG] ${message}`);
+  } else {
+    debugLogger.debug(`[STREAM_DEBUG] ${message}`, details);
+  }
+}
+
+function parseCodeAssistTimeoutMs(
+  configuredValue: string | undefined,
+  defaultValue: number,
+): number | undefined {
+  if (!configuredValue) {
+    return defaultValue;
+  }
+
+  const parsed = Number(configuredValue);
+  if (!Number.isFinite(parsed)) {
+    return defaultValue;
+  }
+
+  return parsed > 0 ? parsed : undefined;
+}
+
+function getCodeAssistRequestTimeoutMs(): number | undefined {
+  return parseCodeAssistTimeoutMs(
+    process.env[CODE_ASSIST_REQUEST_TIMEOUT_ENV],
+    DEFAULT_CODE_ASSIST_REQUEST_TIMEOUT_MS,
+  );
+}
+
+function getCodeAssistStreamTimeoutMs(): number | undefined {
+  return parseCodeAssistTimeoutMs(
+    process.env[CODE_ASSIST_STREAM_TIMEOUT_ENV] ??
+      process.env[CODE_ASSIST_REQUEST_TIMEOUT_ENV],
+    DEFAULT_CODE_ASSIST_STREAM_TIMEOUT_MS,
+  );
+}
+
+function createRequestTimeoutError(
+  method: string,
+  timeoutMs: number,
+): Error & { code?: string } {
+  const error = new Error(
+    `Code Assist ${method} request timed out after ${timeoutMs}ms`,
+  ) as Error & { code?: string };
+  error.name = 'TimeoutError';
+  error.code = 'ETIMEDOUT';
+  return error;
+}
+
+async function withRequestTimeout<T>(
+  method: string,
+  signal: AbortSignal | undefined,
+  request: (signal?: AbortSignal) => Promise<T>,
+  timeoutMs: number | undefined = getCodeAssistRequestTimeoutMs(),
+): Promise<T> {
+  if (timeoutMs === undefined) {
+    return request(signal);
+  }
+
+  if (signal?.aborted) {
+    return request(signal);
+  }
+
+  const timeoutController = new AbortController();
+  let didTimeout = false;
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    timeoutController.abort(createRequestTimeoutError(method, timeoutMs));
+  }, timeoutMs);
+
+  const abortFromCaller = () => {
+    timeoutController.abort(signal?.reason);
+  };
+  signal?.addEventListener('abort', abortFromCaller, { once: true });
+
+  try {
+    return await request(timeoutController.signal);
+  } catch (error) {
+    if (didTimeout && !signal?.aborted) {
+      throw createRequestTimeoutError(method, timeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', abortFromCaller);
+  }
+}
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
@@ -414,28 +518,45 @@ export class CodeAssistServer implements ContentGenerator {
     signal?: AbortSignal,
     retryDelay: number = 100,
   ): Promise<T> {
-    const res = await this.client.request<T>({
-      url: this.getMethodUrl(method),
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
-      responseType: 'json',
-      body: JSON.stringify(req),
-      signal,
-      retryConfig: {
-        retryDelay,
-        retry: 3,
-        noResponseRetries: 3,
-        statusCodesToRetry: [
-          [429, 429],
-          [499, 499],
-          [500, 599],
-        ],
-      },
-    });
-    return res.data;
+    const startedAt = Date.now();
+    streamDebug('code_assist requestPost started', { method });
+    try {
+      const res = await withRequestTimeout(method, signal, (requestSignal) =>
+        this.client.request<T>({
+          url: this.getMethodUrl(method),
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.httpOptions.headers,
+          },
+          responseType: 'json',
+          body: JSON.stringify(req),
+          signal: requestSignal,
+          retryConfig: {
+            retryDelay,
+            retry: 3,
+            noResponseRetries: 3,
+            statusCodesToRetry: [
+              [429, 429],
+              [499, 499],
+              [500, 599],
+            ],
+          },
+        }),
+      );
+      streamDebug('code_assist requestPost succeeded', {
+        method,
+        durationMs: Date.now() - startedAt,
+      });
+      return res.data;
+    } catch (error) {
+      streamDebug('code_assist requestPost failed', {
+        method,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   private async makeGetRequest<T>(
@@ -468,21 +589,43 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
-    const res = await this.client.request<AsyncIterable<unknown>>({
-      url: this.getMethodUrl(method),
-      method: 'POST',
-      params: {
-        alt: 'sse',
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
-      responseType: 'stream',
-      body: JSON.stringify(req),
-      signal,
-      retry: false,
-    });
+    const startedAt = Date.now();
+    streamDebug('code_assist requestStreamingPost started', { method });
+    let res: { data: AsyncIterable<unknown> };
+    try {
+      res = await withRequestTimeout(
+        method,
+        signal,
+        (requestSignal) =>
+          this.client.request<AsyncIterable<unknown>>({
+            url: this.getMethodUrl(method),
+            method: 'POST',
+            params: {
+              alt: 'sse',
+            },
+            headers: {
+              'Content-Type': 'application/json',
+              ...this.httpOptions.headers,
+            },
+            responseType: 'stream',
+            body: JSON.stringify(req),
+            signal: requestSignal,
+            retry: false,
+          }),
+        getCodeAssistStreamTimeoutMs(),
+      );
+      streamDebug('code_assist requestStreamingPost opened', {
+        method,
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      streamDebug('code_assist requestStreamingPost failed', {
+        method,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
 
     return (async function* (server: CodeAssistServer): AsyncGenerator<T> {
       const rl = readline.createInterface({

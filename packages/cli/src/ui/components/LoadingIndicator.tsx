@@ -16,6 +16,10 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
+const CAPACITY_RETRY_PREFIX = 'Model capacity exhausted. Retrying';
+const REQUEST_TIMEOUT_RETRY_PREFIX = 'Request timed out. Retrying';
+const GENERIC_RETRY_PREFIX = 'Trying to reach ';
+
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
   wittyPhrase?: string;
@@ -59,17 +63,23 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     return null;
   }
 
-  // Prioritize the interactive shell waiting phrase over the thought subject
-  // because it conveys an actionable state for the user (waiting for input).
+  // Prioritize real status phrases over the thought subject because they convey
+  // actionable state for the user (waiting for input, backend retrying).
+  const isRetryPhrase =
+    currentLoadingPhrase?.startsWith(CAPACITY_RETRY_PREFIX) === true ||
+    currentLoadingPhrase?.startsWith(REQUEST_TIMEOUT_RETRY_PREFIX) === true ||
+    currentLoadingPhrase?.startsWith(GENERIC_RETRY_PREFIX) === true;
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject
-        ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase ||
-          (streamingState === StreamingState.Responding
-            ? 'Thinking...'
-            : undefined);
+      : isRetryPhrase
+        ? currentLoadingPhrase
+        : thought?.subject
+          ? (thoughtLabel ?? thought.subject)
+          : currentLoadingPhrase ||
+            (streamingState === StreamingState.Responding
+              ? 'Thinking...'
+              : undefined);
 
   const cancelAndTimerContent =
     showCancelAndTimer && streamingState === StreamingState.Responding
@@ -91,7 +101,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   if (inline) {
     return (
       <Box>
-        <Box marginRight={1}>
+        <Box marginRight={1} flexShrink={0}>
           <GeminiRespondingSpinner
             nonRespondingDisplay={
               spinnerIcon ??
@@ -104,7 +114,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         </Box>
         {primaryText && (
           <Box flexShrink={1}>
-            <Text color={theme.text.primary} italic wrap="truncate-end">
+            <Text
+              key={primaryText}
+              color={theme.text.primary}
+              italic
+              wrap="truncate-end"
+            >
               {primaryText}
             </Text>
             {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (
@@ -148,7 +163,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           </Box>
           {primaryText && (
             <Box flexShrink={1}>
-              <Text color={theme.text.primary} italic wrap="truncate-end">
+              <Text
+                key={primaryText}
+                color={theme.text.primary}
+                italic
+                wrap="truncate-end"
+              >
                 {primaryText}
               </Text>
               {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (

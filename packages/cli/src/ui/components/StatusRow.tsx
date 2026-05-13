@@ -42,6 +42,18 @@ const LAYOUT = {
   COLLISION_GAP: 10,
 };
 
+const RETRY_STATUS_PREFIXES = [
+  'Model capacity exhausted. Retrying',
+  'Request timed out. Retrying',
+  'Trying to reach ',
+];
+
+function isRetryStatusPhrase(phrase: string | undefined): boolean {
+  return RETRY_STATUS_PREFIXES.some(
+    (prefix) => phrase?.startsWith(prefix) === true,
+  );
+}
+
 interface StatusRowProps {
   showUiDetails: boolean;
   isNarrow: boolean;
@@ -59,6 +71,7 @@ export const StatusNode: React.FC<{
   showWit: boolean;
   thought: ThoughtSummary | null;
   elapsedTime: number;
+  currentLoadingPhrase: string | undefined;
   currentWittyPhrase: string | undefined;
   activeHooks: ActiveHook[];
   showLoadingIndicator: boolean;
@@ -69,6 +82,7 @@ export const StatusNode: React.FC<{
   showWit,
   thought,
   elapsedTime,
+  currentLoadingPhrase: uiCurrentLoadingPhrase,
   currentWittyPhrase,
   activeHooks,
   showLoadingIndicator,
@@ -130,6 +144,9 @@ export const StatusNode: React.FC<{
       currentLoadingPhrase = GENERIC_WORKING_LABEL;
     }
   } else {
+    currentLoadingPhrase = uiCurrentLoadingPhrase
+      ? stripAnsi(uiCurrentLoadingPhrase)
+      : undefined;
     // Sanitize thought subject to prevent terminal injection
     currentThought = thought
       ? { ...thought, subject: stripAnsi(thought.subject) }
@@ -211,6 +228,10 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   }, []);
 
   const tipContentStr = (() => {
+    if (isRetryStatusPhrase(uiState.currentLoadingPhrase)) {
+      return undefined;
+    }
+
     // 1. Proactive Tip (Priority)
     if (
       showTips &&
@@ -263,6 +284,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       showWit={showWit}
       thought={uiState.thought}
       elapsedTime={uiState.elapsedTime}
+      currentLoadingPhrase={uiState.currentLoadingPhrase}
       currentWittyPhrase={uiState.currentWittyPhrase}
       activeHooks={uiState.activeHooks}
       showLoadingIndicator={showLoadingIndicator}

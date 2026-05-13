@@ -13,7 +13,10 @@ import {
   type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 
-const LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD = 2;
+const MODEL_CAPACITY_EXHAUSTED_PATTERN =
+  /MODEL_CAPACITY_EXHAUSTED|no capacity available/i;
+const NETWORK_STALL_PATTERN =
+  /ETIMEDOUT|timed out|ECONNRESET|socket hang up|UND_ERR_(CONNECT|HEADERS|BODY)_TIMEOUT/i;
 
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
@@ -33,7 +36,6 @@ export const useLoadingIndicator = ({
   showTips = true,
   showWit = false,
   customWittyPhrases,
-  errorVerbosity = 'full',
   maxLength,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
@@ -79,13 +81,20 @@ export const useLoadingIndicator = ({
     prevStreamingStateRef.current = streamingState;
   }, [streamingState, elapsedTimeFromTimer]);
 
+  const isModelCapacityRetry =
+    retryStatus?.error !== undefined &&
+    MODEL_CAPACITY_EXHAUSTED_PATTERN.test(retryStatus.error);
+  const isNetworkStallRetry =
+    retryStatus?.error !== undefined &&
+    NETWORK_STALL_PATTERN.test(retryStatus.error);
+
   const retryPhrase =
     streamingState === StreamingState.Responding && retryStatus
-      ? errorVerbosity === 'low'
-        ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
-          ? "This is taking a bit longer, we're still on it."
-          : null
-        : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+      ? isModelCapacityRetry
+        ? `Model capacity exhausted. Retrying (attempt ${retryStatus.attempt + 1})...`
+        : isNetworkStallRetry
+          ? `Request timed out. Retrying (attempt ${retryStatus.attempt + 1})...`
+          : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
       : null;
 
   return {

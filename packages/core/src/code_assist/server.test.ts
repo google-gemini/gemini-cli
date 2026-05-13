@@ -40,6 +40,14 @@ function createTestServer(headers: Record<string, string> = {}) {
   return { server, mockRequest, client };
 }
 
+function restoreEnv(key: string, originalValue: string | undefined) {
+  if (originalValue === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = originalValue;
+  }
+}
+
 describe('CodeAssistServer', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -96,7 +104,7 @@ describe('CodeAssistServer', () => {
       },
       responseType: 'json',
       body: expect.any(String),
-      signal: undefined,
+      signal: expect.any(AbortSignal),
       retryConfig: {
         retryDelay: 1000,
         retry: 3,
@@ -116,6 +124,109 @@ describe('CodeAssistServer', () => {
     expect(response.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
       'response',
     );
+  });
+
+  it('should time out stalled requestPost calls with a retryable error code', async () => {
+    const originalTimeout =
+      process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'];
+    process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'] = '5';
+    const { server, mockRequest } = createTestServer();
+    mockRequest.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(signal.reason ?? new Error('aborted')),
+            { once: true },
+          );
+        }),
+    );
+
+    try {
+      await expect(
+        server.requestPost('generateContent', {}),
+      ).rejects.toMatchObject({
+        message: 'Code Assist generateContent request timed out after 5ms',
+        name: 'TimeoutError',
+        code: 'ETIMEDOUT',
+      });
+    } finally {
+      restoreEnv('GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS', originalTimeout);
+    }
+  });
+
+  it('should time out stalled requestStreamingPost calls with the stream timeout env var', async () => {
+    const originalRequestTimeout =
+      process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'];
+    const originalStreamTimeout =
+      process.env['GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS'];
+    process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'] = '50';
+    process.env['GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS'] = '5';
+    const { server, mockRequest } = createTestServer();
+    mockRequest.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(signal.reason ?? new Error('aborted')),
+            { once: true },
+          );
+        }),
+    );
+
+    try {
+      await expect(
+        server.requestStreamingPost('streamGenerateContent', {}),
+      ).rejects.toMatchObject({
+        message:
+          'Code Assist streamGenerateContent request timed out after 5ms',
+        name: 'TimeoutError',
+        code: 'ETIMEDOUT',
+      });
+    } finally {
+      restoreEnv(
+        'GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS',
+        originalRequestTimeout,
+      );
+      restoreEnv('GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS', originalStreamTimeout);
+    }
+  });
+
+  it('should fall back to the request timeout env var for streams when stream timeout is not set', async () => {
+    const originalRequestTimeout =
+      process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'];
+    const originalStreamTimeout =
+      process.env['GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS'];
+    process.env['GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS'] = '5';
+    delete process.env['GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS'];
+    const { server, mockRequest } = createTestServer();
+    mockRequest.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(signal.reason ?? new Error('aborted')),
+            { once: true },
+          );
+        }),
+    );
+
+    try {
+      await expect(
+        server.requestStreamingPost('streamGenerateContent', {}),
+      ).rejects.toMatchObject({
+        message:
+          'Code Assist streamGenerateContent request timed out after 5ms',
+        name: 'TimeoutError',
+        code: 'ETIMEDOUT',
+      });
+    } finally {
+      restoreEnv(
+        'GEMINI_CODE_ASSIST_REQUEST_TIMEOUT_MS',
+        originalRequestTimeout,
+      );
+      restoreEnv('GEMINI_CODE_ASSIST_STREAM_TIMEOUT_MS', originalStreamTimeout);
+    }
   });
 
   it('should detect error in generateContent response', async () => {
@@ -428,7 +539,7 @@ describe('CodeAssistServer', () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: undefined,
+      signal: expect.any(AbortSignal),
       retry: false,
     });
 

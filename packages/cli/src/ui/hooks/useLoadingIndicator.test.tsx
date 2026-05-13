@@ -257,7 +257,7 @@ describe('useLoadingIndicator', () => {
     expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
-  it('should hide low-verbosity retry status for early retry attempts', async () => {
+  it('should show generic retry status in low error verbosity mode for early retry attempts', async () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 1,
@@ -273,12 +273,12 @@ describe('useLoadingIndicator', () => {
       'low',
     );
 
-    expect(result.current.currentLoadingPhrase).not.toBe(
-      "This is taking a bit longer, we're still on it.",
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/5)',
     );
   });
 
-  it('should show a generic retry phrase in low error verbosity mode for later retries', async () => {
+  it('should show generic retry status in low error verbosity mode for later retries', async () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 2,
@@ -295,7 +295,71 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBe(
-      "This is taking a bit longer, we're still on it.",
+      'Trying to reach gemini-pro (Attempt 3/5)',
+    );
+  });
+
+  it('should show capacity retry phrase when model capacity is exhausted', async () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 0,
+      maxAttempts: 5,
+      delayMs: 1000,
+      error:
+        'No capacity available for model gemini-3-flash-preview on the server (MODEL_CAPACITY_EXHAUSTED)',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Model capacity exhausted. Retrying (attempt 1)...',
+    );
+  });
+
+  it('should show capacity retry phrase in low error verbosity mode from attempt 1', async () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 0,
+      maxAttempts: 5,
+      delayMs: 1000,
+      error: 'MODEL_CAPACITY_EXHAUSTED',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      true,
+      true,
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Model capacity exhausted. Retrying (attempt 1)...',
+    );
+  });
+
+  it('should show network stall retry phrase in low error verbosity mode from attempt 1', async () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 0,
+      maxAttempts: 5,
+      delayMs: 1000,
+      error: 'ETIMEDOUT',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      true,
+      true,
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Request timed out. Retrying (attempt 1)...',
     );
   });
 
