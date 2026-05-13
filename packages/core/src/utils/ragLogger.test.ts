@@ -13,7 +13,10 @@ import { debugLogger } from './debugLogger.js';
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
-  appendFileSync: vi.fn(),
+  openSync: vi.fn(),
+  fchmodSync: vi.fn(),
+  writeSync: vi.fn(),
+  closeSync: vi.fn(),
   chmodSync: vi.fn(),
   realpathSync: vi.fn(),
 }));
@@ -37,6 +40,7 @@ describe('RagLogger', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   describe('initialize', () => {
@@ -75,10 +79,10 @@ describe('RagLogger', () => {
       expect(debugLogger.warn).toHaveBeenCalledWith(
         'RagLogger was called before being initialized.',
       );
-      expect(fs.appendFileSync).not.toHaveBeenCalled();
+      expect(fs.openSync).not.toHaveBeenCalled();
     });
 
-    it('should append log entry to the file with correct permissions', () => {
+    it('should create log entry atomically and enforce permissions on first run', () => {
       logger.initialize('/test/logs');
 
       const entry = {
@@ -87,6 +91,8 @@ describe('RagLogger', () => {
         snippets: [{ content: 'test snippet', relevanceScore: 0.9 }],
       };
 
+      vi.mocked(fs.openSync).mockReturnValue(42);
+
       logger.log(entry);
 
       const expectedFullEntry = {
@@ -94,22 +100,31 @@ describe('RagLogger', () => {
         ...entry,
       };
 
-      expect(fs.appendFileSync).toHaveBeenCalledWith(
+      expect(fs.openSync).toHaveBeenCalledWith(
         path.join('/test/logs', 'rag-trace.log'),
-        JSON.stringify(expectedFullEntry) + '\n',
-        { encoding: 'utf8' },
-      );
-      expect(fs.chmodSync).toHaveBeenCalledWith(
-        path.join('/test/logs', 'rag-trace.log'),
+        'a',
         0o600,
       );
+      expect(fs.fchmodSync).toHaveBeenCalledWith(42, 0o600);
+      expect(fs.writeSync).toHaveBeenCalledWith(
+        42,
+        JSON.stringify(expectedFullEntry) + '\n',
+        null,
+        'utf8',
+      );
+      expect(fs.closeSync).toHaveBeenCalledWith(42);
+
+      // Subsequent logs should not call fchmodSync again
+      vi.mocked(fs.fchmodSync).mockClear();
+      logger.log(entry);
+      expect(fs.fchmodSync).not.toHaveBeenCalled();
     });
 
-    it('should log an error to debugLogger if appending to file fails', () => {
+    it('should log an error to debugLogger if writing to file fails', () => {
       logger.initialize('/test/logs');
 
-      const error = new Error('append failed');
-      vi.mocked(fs.appendFileSync).mockImplementation(() => {
+      const error = new Error('open failed');
+      vi.mocked(fs.openSync).mockImplementation(() => {
         throw error;
       });
 

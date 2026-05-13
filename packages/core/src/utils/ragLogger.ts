@@ -26,6 +26,7 @@ export interface RagLogEntry {
 
 export class RagLogger {
   private logPath: string | undefined;
+  private hasInitializedFile = false;
 
   /**
    * Initializes the logger with the project's temporary logs directory.
@@ -61,11 +62,17 @@ export class RagLogger {
     };
 
     try {
-      // Create with strict permissions (0o600) to protect proprietary code snippets
-      fs.appendFileSync(this.logPath, JSON.stringify(fullEntry) + '\n', {
-        encoding: 'utf8',
-      });
-      fs.chmodSync(this.logPath, 0o600);
+      // Use openSync to atomically create the file with strict permissions
+      const fd = fs.openSync(this.logPath, 'a', 0o600);
+
+      if (!this.hasInitializedFile) {
+        // Ensure permissions are strict even if the file was pre-created
+        fs.fchmodSync(fd, 0o600);
+        this.hasInitializedFile = true;
+      }
+
+      fs.writeSync(fd, JSON.stringify(fullEntry) + '\n', null, 'utf8');
+      fs.closeSync(fd);
     } catch (e) {
       debugLogger.error(`Failed to write to ${this.logPath}`, e);
     }
