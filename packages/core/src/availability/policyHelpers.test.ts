@@ -36,7 +36,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
       const authType = config.getContentGeneratorConfig().authType;
       return useGemini31 && authType === AuthType.USE_GEMINI;
     },
-    getHasAccessToPreviewModel: () => true,
     getContentGeneratorConfig: () => ({ authType: undefined }),
     getHasAccessToPreviewModel: () => true,
     getMaxAttemptsPerTurn: () => 3,
