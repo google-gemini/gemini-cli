@@ -55,7 +55,7 @@ export function resolvePolicyChain(
   const useGemini31FlashLite =
     config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
-  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
 
   // Capture the original family intent before any normalization or early downgrade.
   const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
@@ -78,10 +78,7 @@ export function resolvePolicyChain(
   // We always wrap around for Gemini 3 chains to ensure maximum availability
   // between models in the same family (e.g. fallback to Pro if Flash is exhausted).
   const effectiveWrapsAround =
-    wrapsAround ||
-    isAutoPreferred ||
-    isAutoConfigured ||
-    isOriginallyGemini3;
+    wrapsAround || isAutoPreferred || isAutoConfigured || isOriginallyGemini3;
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -93,11 +90,7 @@ export function resolvePolicyChain(
 
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = config.modelConfigService.resolveChain('lite', context);
-    } else if (
-      isOriginallyGemini3 ||
-      isAutoPreferred ||
-      isAutoConfigured
-    ) {
+    } else if (isOriginallyGemini3 || isAutoPreferred || isAutoConfigured) {
       // 1. Try to find a chain specifically for the current configured alias
       if (
         isAutoConfigured &&
@@ -134,11 +127,7 @@ export function resolvePolicyChain(
 
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = getFlashLitePolicyChain();
-    } else if (
-      isOriginallyGemini3 ||
-      isAutoPreferred ||
-      isAutoConfigured
-    ) {
+    } else if (isOriginallyGemini3 || isAutoPreferred || isAutoConfigured) {
       const isAutoSelection = isAutoPreferred || isAutoConfigured;
       if (hasAccessToPreview) {
         const previewEnabled =
