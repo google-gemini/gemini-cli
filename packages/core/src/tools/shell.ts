@@ -63,6 +63,24 @@ export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
 const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
+const LOW_SURROGATE_START = 0xdc00;
+const LOW_SURROGATE_END = 0xdfff;
+
+function trimLiveOutputBuffer(output: string): string {
+  if (output.length <= LIVE_OUTPUT_MAX_BUFFER_CHARS) {
+    return output;
+  }
+
+  let startIndex = output.length - LIVE_OUTPUT_MAX_BUFFER_CHARS;
+  const firstCodeUnit = output.charCodeAt(startIndex);
+  if (
+    firstCodeUnit >= LOW_SURROGATE_START &&
+    firstCodeUnit <= LOW_SURROGATE_END
+  ) {
+    startIndex += 1;
+  }
+  return output.slice(startIndex);
+}
 
 export interface ShellToolParams {
   command: string;
@@ -513,15 +531,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
         const currentOutput =
           typeof cumulativeOutput === 'string' ? cumulativeOutput : '';
         if (chunk.length >= LIVE_OUTPUT_MAX_BUFFER_CHARS) {
-          cumulativeOutput = chunk.slice(-LIVE_OUTPUT_MAX_BUFFER_CHARS);
+          cumulativeOutput = trimLiveOutputBuffer(chunk);
           return;
         }
 
         const nextOutput = currentOutput + chunk;
-        cumulativeOutput =
-          nextOutput.length > LIVE_OUTPUT_MAX_BUFFER_CHARS
-            ? nextOutput.slice(-LIVE_OUTPUT_MAX_BUFFER_CHARS)
-            : nextOutput;
+        cumulativeOutput = trimLiveOutputBuffer(nextOutput);
       };
 
       const cancelTrailingFlush = () => {
@@ -551,10 +566,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ) {
           return;
         }
+        const elapsedSinceLastUpdate = Date.now() - lastUpdateTime;
+        const trailingDelayMs = Math.max(
+          OUTPUT_UPDATE_INTERVAL_MS - elapsedSinceLastUpdate,
+          0,
+        );
         trailingFlushTimer = setTimeout(() => {
           trailingFlushTimer = null;
           flushOutput();
-        }, OUTPUT_UPDATE_INTERVAL_MS);
+        }, trailingDelayMs);
       };
 
       const resetTimeout = () => {

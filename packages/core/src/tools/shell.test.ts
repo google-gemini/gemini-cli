@@ -756,6 +756,28 @@ EOF`;
         await promise;
       });
 
+      it('should not start the bounded live text buffer with a low surrogate', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+        const emoji = '\uD83D\uDE00';
+
+        mockShellOutputCallback({
+          type: 'data',
+          chunk: `${emoji}${'x'.repeat(LIVE_OUTPUT_MAX_BUFFER_CHARS - 1)}`,
+        });
+
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+        const displayedOutput = updateOutputMock.mock.calls[0][0] as string;
+        expect(displayedOutput.charCodeAt(0)).not.toBe(0xde00);
+        expect(displayedOutput).toHaveLength(LIVE_OUTPUT_MAX_BUFFER_CHARS - 1);
+
+        resolveShellExecution();
+        await promise;
+      });
+
       it('should not throttle PTY AnsiOutput snapshots in the shell tool', async () => {
         const firstAnsiOutput = [[{ text: 'first' }]] as AnsiOutput;
         const secondAnsiOutput = [[{ text: 'second' }]] as AnsiOutput;
@@ -792,6 +814,32 @@ EOF`;
 
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
 
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecond');
+
+        resolveShellExecution({ output: 'firstsecond' });
+        await promise;
+      });
+
+      it('should trailing-flush throttled text output after only the remaining interval', async () => {
+        const invocation = shellTool.build({ command: 'printf output' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'first' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+        expect(updateOutputMock).toHaveBeenLastCalledWith('first');
+
+        await vi.advanceTimersByTimeAsync(750);
+        mockShellOutputCallback({ type: 'data', chunk: 'second' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        await vi.advanceTimersByTimeAsync(249);
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        await vi.advanceTimersByTimeAsync(1);
         expect(updateOutputMock).toHaveBeenCalledTimes(2);
         expect(updateOutputMock).toHaveBeenLastCalledWith('firstsecond');
 
