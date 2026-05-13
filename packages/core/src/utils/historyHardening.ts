@@ -340,10 +340,9 @@ function scrubPart(part: Part): Part {
     scrubbed['functionCall'] = scrubbedCall;
   }
   if (isThoughtPart(part)) {
-    if (part.thoughtSignature) {
-      scrubbed['thought_signature'] = part.thoughtSignature;
-    } else if (part.thought_signature) {
-      scrubbed['thought_signature'] = part.thought_signature;
+    const sig = part.thoughtSignature?.trim() ?? part.thought_signature?.trim();
+    if (sig) {
+      scrubbed['thought_signature'] = sig;
     }
   }
   if ('functionResponse' in part && part.functionResponse) {
