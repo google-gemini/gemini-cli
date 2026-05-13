@@ -148,18 +148,20 @@ describe('ReadFileTool', () => {
 
     it('should throw error if start_line is less than 1', () => {
       const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
+        file_path: 'test.txt',
         start_line: 0,
       };
-      expect(() => tool.build(params)).toThrow('start_line must be at least 1');
+      expect(() => tool.build(params)).toThrow(
+        'params/start_line must be >= 1',
+      );
     });
 
     it('should throw error if end_line is less than 1', () => {
       const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
+        file_path: 'test.txt',
         end_line: 0,
       };
-      expect(() => tool.build(params)).toThrow('end_line must be at least 1');
+      expect(() => tool.build(params)).toThrow('params/end_line must be >= 1');
     });
 
     it('should throw error if start_line is greater than end_line', () => {

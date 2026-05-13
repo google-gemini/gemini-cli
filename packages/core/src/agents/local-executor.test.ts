@@ -4199,6 +4199,49 @@ describe('LocalAgentExecutor', () => {
         expect(memoryPart).toBeDefined();
         expect(memoryPart?.text).toContain(mockMemory);
       });
+
+      it('should omit extension context from session memory when disabled by the agent', async () => {
+        const definition = createTestDefinition();
+        definition.includeExtensionContext = false;
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const getSessionMemorySpy = vi
+          .spyOn(mockConfig, 'getSessionMemory')
+          .mockImplementation(
+            (options?: { includeExtensionContext?: boolean }) =>
+              options?.includeExtensionContext === false
+                ? '<loaded_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>'
+                : '<loaded_context>\n<extension_context>\nExtension memory rule\n</extension_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>',
+          );
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
+
+        mockModelResponse([
+          {
+            name: COMPLETE_TASK_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        expect(getSessionMemorySpy).toHaveBeenCalledWith({
+          includeExtensionContext: false,
+        });
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+        const memoryPart = parts.find((p) =>
+          p.text?.includes('<loaded_context>'),
+        );
+
+        expect(memoryPart?.text).toContain('Project memory rule');
+        expect(memoryPart?.text).not.toContain('<extension_context>');
+        expect(memoryPart?.text).not.toContain('Extension memory rule');
+      });
     });
   });
 });
