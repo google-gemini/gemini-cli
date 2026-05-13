@@ -128,7 +128,7 @@ describe('EditTool', () => {
       setUserMemory: vi.fn(),
       getGeminiMdFileCount: () => 0,
       setGeminiMdFileCount: vi.fn(),
-      getToolRegistry: () => ({}) as any,
+      getToolRegistry: () => ({} as any),
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
@@ -153,7 +153,9 @@ describe('EditTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(
+          ', ',
+        )} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
 
@@ -384,6 +386,42 @@ describe('EditTool', () => {
       expect(result.occurrences).toBe(1);
     });
 
+    it('should NOT perform multiple flexible replacements without allow_multiple', async () => {
+      const content = '  alpha\n    beta\n\n  alpha\n    beta\n';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          instruction: 'replace one alpha/beta block',
+          old_string: 'alpha\nbeta',
+          new_string: 'gamma\ndelta',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should NOT perform multiple regex replacements without allow_multiple', async () => {
+      const content = 'function  myFunc( a ) {}\n\nfunction  myFunc( a ) {}\n';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'replace one function',
+          old_string: 'function myFunc(a) {}',
+          new_string: 'function yourFunc(a) {}',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.newContent).toBe(content);
+    });
+
     it('should perform a fuzzy replacement when exact match fails but similarity is high', async () => {
       const content =
         'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
@@ -463,7 +501,7 @@ describe('EditTool', () => {
       expect(result.newContent).toBe(content);
     });
 
-    it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
+    it('should NOT perform multiple fuzzy replacements without allow_multiple', async () => {
       const content = `
 function doIt() {
   console.log("hello");
@@ -493,6 +531,126 @@ function doIt() {
           instruction: 'update',
           old_string: oldString,
           new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // Without allow_multiple, multiple fuzzy matches should be rejected
+      // (returns unchanged content with occurrences count for the error handler).
+      expect(result.occurrences).toBe(2);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should fuzzy replace the matching named function and ignore a similar different function', async () => {
+      const content = `
+function updateUser() {
+  console.log("hello");
+}
+
+function updateOrder() {
+  console.log("hello");
+}
+`;
+      const oldString = `
+function updateUser() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function updateUser() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update updateUser',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      const expectedContent = `
+function updateUser() {
+  console.log("bye");
+}
+
+function updateOrder() {
+  console.log("hello");
+}
+`;
+      expect(result.strategy).toBe('fuzzy');
+      expect(result.occurrences).toBe(1);
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should NOT fuzzy replace a single similar function with different identifiers', async () => {
+      const content = `
+function updateOrder() {
+  console.log("hello");
+}
+`;
+      const oldString = `
+function updateUser() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function updateUser() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update updateUser',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should perform multiple fuzzy replacements when allow_multiple is true', async () => {
+      const content = `
+function doIt() {
+  console.log("hello");
+}
+
+function doIt() {
+  console.log("hello");
+}
+`;
+      const oldString = `
+function doIt() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function doIt() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+          allow_multiple: true,
         },
         currentContent: content,
         abortSignal,

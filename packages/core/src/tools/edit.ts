@@ -187,7 +187,7 @@ async function calculateFlexibleReplacement(
     .map((line: string) => line.trim());
   const replaceLines = normalizedReplace.split('\n');
 
-  let flexibleOccurrences = 0;
+  const matchIndices: number[] = [];
   let i = 0;
   while (i <= sourceLines.length - searchLinesStripped.length) {
     const window = sourceLines.slice(i, i + searchLinesStripped.length);
@@ -197,28 +197,42 @@ async function calculateFlexibleReplacement(
     );
 
     if (isMatch) {
-      flexibleOccurrences++;
-      const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
-      const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = applyIndentation(replaceLines, indentation);
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      i += replaceLines.length;
+      matchIndices.push(i);
+      i += searchLinesStripped.length;
     } else {
       i++;
     }
   }
 
-  if (flexibleOccurrences > 0) {
+  if (matchIndices.length > 0) {
+    if (!params.allow_multiple && matchIndices.length > 1) {
+      return {
+        newContent: currentContent,
+        occurrences: matchIndices.length,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+
+    for (const index of [...matchIndices].sort((a, b) => b - a)) {
+      const firstLineInMatch = sourceLines[index];
+      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+      const newBlockWithIndent = applyIndentation(replaceLines, indentation);
+
+      let replacementText = newBlockWithIndent.join('\n');
+      if (sourceLines[index + searchLinesStripped.length - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(index, searchLinesStripped.length, replacementText);
+    }
+
     let modifiedCode = sourceLines.join('');
     modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
     return {
       newContent: modifiedCode,
-      occurrences: flexibleOccurrences,
+      occurrences: matchIndices.length,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
     };
@@ -271,6 +285,15 @@ async function calculateRegexReplacement(
 
   const occurrences = matches.length;
   const newLines = normalizedReplace.split('\n');
+
+  if (!params.allow_multiple && occurrences > 1) {
+    return {
+      newContent: currentContent,
+      occurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
 
   // Use the appropriate regex for replacement based on allow_multiple.
   const replaceRegex = new RegExp(
@@ -799,7 +822,9 @@ class EditToolInvocation
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`,
+      title: `Confirm Edit: ${shortenPath(
+        makeRelative(this.resolvedPath, this.config.getTargetDir()),
+      )}`,
       fileName,
       filePath: this.resolvedPath,
       fileDiff,
@@ -843,7 +868,9 @@ class EditToolInvocation
     if (this.params.old_string === this.params.new_string) {
       return `No file changes to ${shortenPath(relativePath)}`;
     }
-    return `${shortenPath(relativePath)}: ${oldStringSnippet} => ${newStringSnippet}`;
+    return `${shortenPath(
+      relativePath,
+    )}: ${oldStringSnippet} => ${newStringSnippet}`;
   }
 
   /**
@@ -911,7 +938,9 @@ class EditToolInvocation
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
+        displayResult = `Created ${shortenPath(
+          makeRelative(this.resolvedPath, this.config.getTargetDir()),
+        )}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
@@ -1059,10 +1088,7 @@ export class EditTool
 {
   static readonly Name = EDIT_TOOL_NAME;
 
-  constructor(
-    private readonly config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly config: Config, messageBus: MessageBus) {
     super(
       EditTool.Name,
       EDIT_DISPLAY_NAME,
@@ -1196,6 +1222,90 @@ function stripWhitespace(str: string): string {
   return str.replace(/\s/g, '');
 }
 
+const IDENTIFIER_TOKEN_PATTERN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
+const UNPROTECTED_FUZZY_TOKENS = new Set([
+  'abstract',
+  'and',
+  'as',
+  'async',
+  'await',
+  'boolean',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'default',
+  'def',
+  'delete',
+  'do',
+  'else',
+  'enum',
+  'export',
+  'extends',
+  'false',
+  'final',
+  'finally',
+  'for',
+  'from',
+  'function',
+  'if',
+  'implements',
+  'import',
+  'in',
+  'interface',
+  'let',
+  'new',
+  'none',
+  'null',
+  'number',
+  'or',
+  'private',
+  'protected',
+  'public',
+  'return',
+  'static',
+  'string',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'true',
+  'try',
+  'type',
+  'undefined',
+  'var',
+  'void',
+  'while',
+]);
+
+function getIdentifierTokens(text: string): Set<string> {
+  return new Set(text.match(IDENTIFIER_TOKEN_PATTERN) ?? []);
+}
+
+function getProtectedFuzzyTokens(text: string): Set<string> {
+  const tokens = getIdentifierTokens(text);
+  return new Set(
+    [...tokens].filter(
+      (token) =>
+        token.length >= 3 && !UNPROTECTED_FUZZY_TOKENS.has(token.toLowerCase()),
+    ),
+  );
+}
+
+function preservesProtectedFuzzyTokens(
+  candidateText: string,
+  protectedTokens: Set<string>,
+): boolean {
+  if (protectedTokens.size === 0) {
+    return true;
+  }
+
+  const candidateTokens = getIdentifierTokens(candidateText);
+  return [...protectedTokens].every((token) => candidateTokens.has(token));
+}
+
 /**
  * Applies the target indentation to the lines, while preserving relative indentation.
  * It identifies the common indentation of the provided lines and replaces it with the target indentation.
@@ -1232,7 +1342,9 @@ function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
     const ranges = editData.matchRanges
       .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
       .join(', ');
-    return `Applied fuzzy match at line${editData.matchRanges.length > 1 ? 's' : ''} ${ranges}.`;
+    return `Applied fuzzy match at line${
+      editData.matchRanges.length > 1 ? 's' : ''
+    } ${ranges}.`;
   }
   return null;
 }
@@ -1275,6 +1387,7 @@ async function calculateFuzzyReplacement(
   const N = searchLines.length;
   const candidates: Array<{ index: number; score: number }> = [];
   const searchBlock = searchLines.join('\n');
+  const protectedTokens = getProtectedFuzzyTokens(searchBlock);
 
   // Sliding window
   for (let i = 0; i <= sourceLines.length - N; i++) {
@@ -1300,7 +1413,10 @@ async function calculateFuzzyReplacement(
     const weightedDist = d_norm + (d_raw - d_norm) * WHITESPACE_PENALTY_FACTOR;
     const score = weightedDist / searchBlock.length;
 
-    if (score <= FUZZY_MATCH_THRESHOLD) {
+    if (
+      score <= FUZZY_MATCH_THRESHOLD &&
+      preservesProtectedFuzzyTokens(windowText, protectedTokens)
+    ) {
       candidates.push({ index: i, score });
     }
   }
@@ -1324,6 +1440,20 @@ async function calculateFuzzyReplacement(
     if (!overlaps) {
       selectedMatches.push(candidate);
     }
+  }
+
+  // Guard: When allow_multiple is false, reject ambiguous multi-matches.
+  // This mirrors the guard in calculateExactReplacement (line 147).
+  // Without this, two similar functions both within the fuzzy threshold
+  // would be silently edited. Return unchanged content with the count
+  // so getErrorReplaceResult() surfaces the proper error to the LLM.
+  if (!params.allow_multiple && selectedMatches.length > 1) {
+    return {
+      newContent: currentContent,
+      occurrences: selectedMatches.length,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
   }
 
   // If we found matches, apply them
