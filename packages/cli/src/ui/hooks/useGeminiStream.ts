@@ -26,6 +26,8 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  SHELL_TOOL_NAME,
+  hasRedirection,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -1820,10 +1822,21 @@ export const useGeminiStream = (
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
+        // or shell commands with redirection (which act as edits).
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) =>
-            EDIT_TOOL_NAMES.has(call.request.name),
-          );
+          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) => {
+            if (EDIT_TOOL_NAMES.has(call.request.name)) {
+              return true;
+            }
+
+            if (call.request.name === SHELL_TOOL_NAME) {
+              const command = (call.request.args as { command?: string })
+                .command;
+              return command && hasRedirection(command);
+            }
+
+            return false;
+          });
         }
 
         // Process pending tool calls sequentially to reduce UI chaos
