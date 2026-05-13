@@ -912,12 +912,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        onAuthError(error);
-      }
+      const authMethod = settings.merged.security.auth.selectedType;
+      void (async () => {
+        try {
+          const error = await validateAuthMethod(authMethod);
+          if (
+            error &&
+            authMethod === settings.merged.security.auth.selectedType
+          ) {
+            onAuthError(error);
+          }
+        } catch (e) {
+          if (authMethod === settings.merged.security.auth.selectedType) {
+            onAuthError(getErrorMessage(e));
+          }
+        }
+      })();
     }
   }, [
     settings.merged.security.auth.selectedType,

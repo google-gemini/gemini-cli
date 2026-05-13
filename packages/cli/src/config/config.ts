@@ -30,7 +30,6 @@ import {
   loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
@@ -866,7 +865,7 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
   const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
