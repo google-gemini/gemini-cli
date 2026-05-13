@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import {
+  checkPermissions,
   handleAtCommand,
   escapeAtSymbols,
   unescapeLiteralAt,
@@ -35,6 +36,7 @@ import {
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -1539,5 +1541,59 @@ describe('unescapeLiteralAt', () => {
   it('roundtrips correctly with escapeAtSymbols', () => {
     const input = 'user@example.com and @scope/pkg';
     expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
+  });
+});
+
+describe('checkPermissions', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'check-permissions-test-'),
+    );
+
+    mockConfig = {
+      getTargetDir: () => testRootDir,
+      getAgentRegistry: () => ({
+        getDefinition: () => undefined,
+      }),
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      validatePathAccess: () => null,
+    } as unknown as Config;
+  });
+
+  afterEach(async () => {
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+  });
+
+  // Regression for #22029 (and related #25910 / #25923): when a user pastes
+  // a JSON-like blob after an @, the @-command regex greedily captures it.
+  // The resolved string is longer than NAME_MAX, so fs.realpathSync throws
+  // ENAMETOOLONG. Previously this bubbled up as an unhandled rejection and
+  // crashed the CLI.
+  it('skips @-mentions whose path is too long to be a real filesystem entry', async () => {
+    const longSegment = 'a'.repeat(8192);
+    const query = `@${longSegment}`;
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([]);
+  });
+
+  it('still surfaces real @-mentioned files when a sibling @-mention is unresolvable', async () => {
+    // A real file alongside a giant pasted-blob mention: the bogus mention
+    // should be skipped, the real one should still appear in the result.
+    const realFile = path.join(testRootDir, 'real.txt');
+    await fsPromises.writeFile(realFile, 'hello');
+    const resolvedRealFile = fs.realpathSync(realFile);
+    mockConfig.validatePathAccess = () =>
+      'permission required' as unknown as null;
+    const longSegment = 'b'.repeat(8192);
+    const query = `@real.txt and @${longSegment}`;
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([
+      resolvedRealFile,
+    ]);
   });
 });
