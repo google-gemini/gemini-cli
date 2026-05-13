@@ -121,7 +121,18 @@ export async function loadConversationRecord(
   }
 
   try {
-    const fileStream = fs.createReadStream(filePath);
+    const fileOptions: { start?: number; end?: number } = {};
+    const MAX_FAST_READ = 64 * 1024; // 64KB
+    let fileSize = 0;
+
+    if (options?.fastPreview) {
+      const stats = await fs.promises.stat(filePath).catch(() => null);
+      if (stats) fileSize = stats.size;
+      fileOptions.start = 0;
+      fileOptions.end = MAX_FAST_READ; // Read only first 64KB for metadata/preview
+    }
+
+    const fileStream = fs.createReadStream(filePath, fileOptions);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,
@@ -141,7 +152,49 @@ export async function loadConversationRecord(
     for await (const line of rl) {
       if (!line.trim()) continue;
       try {
-        const record = JSON.parse(line) as unknown;
+        let record: unknown = null;
+        if (options?.metadataOnly) {
+          if (line.includes('"$set"')) {
+            record = JSON.parse(line) as unknown;
+          } else if (line.includes('"$rewindTo"')) {
+            record = JSON.parse(line) as unknown;
+          } else if (line.includes('"sessionId"')) {
+            record = JSON.parse(line) as unknown;
+          } else if (line.includes('"id":')) {
+            if (isTrackingMemoryScratchpadFreshness)
+              memoryScratchpadIsStale = true;
+            const idMatch = line.match(/"id":"([^"]+)"/);
+            if (idMatch) {
+              const id = idMatch[1];
+              const isUser = line.includes('"type":"user"');
+              const isUserOrAssistant =
+                isUser || line.includes('"type":"gemini"');
+              messageIds.push(id);
+              messageKinds.set(id, { isUser, isUserOrAssistant });
+              if (!firstUserMessageStr && isUser) {
+                record = JSON.parse(line) as unknown;
+                if (hasProperty(record, 'content')) {
+                  const rawContent = record.content;
+                  if (Array.isArray(rawContent)) {
+                    firstUserMessageStr = rawContent
+                      .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+                      .join('');
+                  } else if (typeof rawContent === 'string') {
+                    firstUserMessageStr = rawContent;
+                  }
+                }
+              }
+            }
+            if (!record) continue;
+          } else {
+            continue;
+          }
+        }
+
+        if (!record) {
+          record = JSON.parse(line) as unknown;
+        }
+
         if (isRewindRecord(record)) {
           if (isTrackingMemoryScratchpadFreshness) {
             memoryScratchpadIsStale = true;
@@ -235,6 +288,76 @@ export async function loadConversationRecord(
       }
     }
 
+    // Try to get summary from the end of the file if fastPreview skipped it
+    let fastTotalLines = 0;
+    if (options?.fastPreview && fileSize > MAX_FAST_READ) {
+      try {
+        const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+        const SEARCH_LIMIT = 5 * 1024 * 1024; // Max 5MB backward search
+        const minPosition = Math.max(0, fileSize - SEARCH_LIMIT);
+        const fd = await fs.promises.open(filePath, 'r');
+        let position = fileSize;
+        const buffer = Buffer.alloc(CHUNK_SIZE);
+        let leftover = '';
+        const summaryRegex =
+          /"\$set"\s*:\s*\{[^}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
+        while (position > minPosition) {
+          const readSize = Math.min(CHUNK_SIZE, position);
+          position -= readSize;
+
+          await fd.read(buffer, 0, readSize, position);
+          const chunkStr = buffer.toString('utf8', 0, readSize) + leftover;
+
+          if (!metadata.summary) {
+            const matches = [...chunkStr.matchAll(summaryRegex)];
+            if (matches.length > 0) {
+              metadata.summary = matches[matches.length - 1][1];
+            }
+          }
+          leftover = chunkStr.substring(0, 1024);
+          if (metadata.summary) break; // Optimization: stop if we found what we needed
+        }
+        await fd.close();
+      } catch {
+        // Ignore tail read errors
+      }
+
+      // Fast line count for accurate messageCount
+      try {
+        if (process.platform !== 'win32') {
+          const { execFile } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const execFileAsync = promisify(execFile);
+          const { stdout } = await execFileAsync('wc', ['-l', filePath], {
+            encoding: 'utf8',
+          });
+          fastTotalLines = parseInt(stdout.trim().split(/\s+/)[0], 10);
+        } else {
+          // Fallback to async buffer counting for Windows
+          const stream = fs.createReadStream(filePath);
+          fastTotalLines = await new Promise<number>((resolve) => {
+            let lines = 0;
+            stream.on('data', (chunk: Buffer | string) => {
+              if (Buffer.isBuffer(chunk)) {
+                for (let i = 0; i < chunk.length; i++) {
+                  if (chunk[i] === 10) lines++;
+                }
+              } else if (typeof chunk === 'string') {
+                for (let i = 0; i < chunk.length; i++) {
+                  if (chunk.charCodeAt(i) === 10) lines++;
+                }
+              }
+            });
+            stream.on('end', () => resolve(lines));
+            stream.on('error', () => resolve(0));
+          });
+        }
+      } catch {
+        // Ignore line counting errors
+      }
+    }
+
     if (!metadata.sessionId || !metadata.projectHash) {
       return await parseLegacyRecordFallback(filePath, options);
     }
@@ -266,6 +389,13 @@ export async function loadConversationRecord(
       ? Array.from(messageKinds.values()).some((m) => m.isUserOrAssistant)
       : loadedMessages.some((m) => m.type === 'user' || m.type === 'gemini');
 
+    const finalMessageCount =
+      fastTotalLines > 0
+        ? fastTotalLines
+        : options?.metadataOnly
+          ? metadataMessages.length || messageIds.length
+          : loadedMessages.length;
+
     return {
       sessionId: metadata.sessionId,
       projectHash: metadata.projectHash,
@@ -276,9 +406,7 @@ export async function loadConversationRecord(
       directories: metadata.directories,
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
-      messageCount: options?.metadataOnly
-        ? metadataMessages.length || messageIds.length
-        : loadedMessages.length,
+      messageCount: finalMessageCount,
       userMessageCount:
         options?.metadataOnly && metadataMessages.length > 0
           ? metadataMessages.filter((m) => m.type === 'user').length

@@ -264,6 +264,7 @@ export const getAllSessionFiles = async (
         try {
           const content = await loadConversationRecord(filePath, {
             metadataOnly: !options.includeFullContent,
+            fastPreview: !options.includeFullContent,
           });
           if (!content) {
             return { fileName: file, sessionInfo: null };
@@ -275,17 +276,16 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
-          const fileTimestamp =
-            !content.startTime || !content.lastUpdated
-              ? (
-                  await fs.stat(filePath).catch(() => undefined)
-                )?.mtime.toISOString()
-              : undefined;
+          const fileStat = await fs.stat(filePath).catch(() => undefined);
+          const fileTimestamp = fileStat?.mtime.toISOString();
           const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
-          const startTime =
-            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const startTime = content.startTime || fallbackTimestamp;
+
+          // Use mtime as the authoritative last updated time when fastPreview is true
           const lastUpdated =
-            content.lastUpdated || content.startTime || fallbackTimestamp;
+            !options.includeFullContent && fileTimestamp
+              ? fileTimestamp
+              : content.lastUpdated || fallbackTimestamp;
 
           // Skip sessions that only contain system messages (info, error, warning)
           if (!content.hasUserOrAssistantMessage) {
