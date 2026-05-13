@@ -6,7 +6,7 @@
 
 import { render, cleanup } from '../../../test-utils/render.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
-import type { SubagentProgress } from '@google/gemini-cli-core';
+import { type SubagentProgress, SubagentState } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 describe('<SubagentProgressDisplay />', () => {
@@ -25,7 +25,7 @@ describe('<SubagentProgressDisplay />', () => {
           type: 'tool_call',
           content: 'run_shell_command',
           args: '{"command": "echo hello", "description": "Say hello"}',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       ],
     };
@@ -48,7 +48,7 @@ describe('<SubagentProgressDisplay />', () => {
           displayName: 'RunShellCommand',
           description: 'Executing echo hello',
           args: '{"command": "echo hello"}',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       ],
     };
@@ -69,7 +69,7 @@ describe('<SubagentProgressDisplay />', () => {
           type: 'tool_call',
           content: 'run_shell_command',
           args: '{"command": "echo hello"}',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       ],
     };
@@ -90,7 +90,7 @@ describe('<SubagentProgressDisplay />', () => {
           type: 'tool_call',
           content: 'write_file',
           args: '{"file_path": "/tmp/test.txt", "content": "foo"}',
-          status: 'completed',
+          status: SubagentState.COMPLETED,
         },
       ],
     };
@@ -113,7 +113,7 @@ describe('<SubagentProgressDisplay />', () => {
           type: 'tool_call',
           content: 'run_shell_command',
           args: JSON.stringify({ description: longDesc }),
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       ],
     };
@@ -133,7 +133,7 @@ describe('<SubagentProgressDisplay />', () => {
           id: '5',
           type: 'thought',
           content: 'Thinking about life',
-          status: 'running',
+          status: SubagentState.RUNNING,
         },
       ],
     };
@@ -149,7 +149,7 @@ describe('<SubagentProgressDisplay />', () => {
       isSubagentProgress: true,
       agentName: 'TestAgent',
       recentActivity: [],
-      state: 'cancelled',
+      state: SubagentState.CANCELLED,
     };
 
     const { lastFrame } = await render(
@@ -167,7 +167,7 @@ describe('<SubagentProgressDisplay />', () => {
           id: '6',
           type: 'thought',
           content: 'Request cancelled.',
-          status: 'error',
+          status: SubagentState.ERROR,
         },
       ],
     };
@@ -188,7 +188,7 @@ describe('<SubagentProgressDisplay />', () => {
           type: 'tool_call',
           content: 'run_shell_command',
           args: '{"command": "echo hello"}',
-          status: 'error',
+          status: SubagentState.ERROR,
         },
       ],
     };

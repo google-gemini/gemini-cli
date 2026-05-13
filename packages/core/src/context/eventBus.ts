@@ -29,7 +29,20 @@ export interface ChunkReceivedEvent {
   targetNodeIds: Set<string>;
 }
 
+export interface TokenGroundTruthEvent {
+  actualTokens: number;
+  promptBaseUnits: number;
+}
+
 export class ContextEventBus extends EventEmitter {
+  emitTokenGroundTruth(event: TokenGroundTruthEvent) {
+    this.emit('TOKEN_GROUND_TRUTH', event);
+  }
+
+  onTokenGroundTruth(listener: (event: TokenGroundTruthEvent) => void) {
+    this.on('TOKEN_GROUND_TRUTH', listener);
+  }
+
   emitPristineHistoryUpdated(event: PristineHistoryUpdatedEvent) {
     this.emit('PRISTINE_HISTORY_UPDATED', event);
   }
