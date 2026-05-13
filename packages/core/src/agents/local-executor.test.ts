@@ -49,6 +49,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
 }));
 
 import { debugLogger } from '../utils/debugLogger.js';
+import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -708,21 +709,19 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
     });
 
-    it('should use parentPromptId from context to create agentId', async () => {
-      const parentId = 'parent-id';
-      Object.defineProperty(mockConfig, 'promptId', {
-        get: () => parentId,
-        configurable: true,
-      });
-
+    it('should not include parentCallId in agentId even when available', async () => {
       const definition = createTestDefinition();
-      const executor = await LocalAgentExecutor.create(
-        definition,
-        mockConfig,
-        onActivity,
+      const parentCallId = 'parent-call-123';
+
+      const executor = await runWithToolCallContext(
+        { callId: parentCallId, schedulerId: 'test-scheduler' },
+        () => LocalAgentExecutor.create(definition, mockConfig, onActivity),
       );
 
-      expect(executor['agentId']).toBeDefined();
+      expect(executor['agentId']).not.toContain(parentCallId);
+      expect(executor['agentId']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should correctly apply templates to initialMessages', async () => {
