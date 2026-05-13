@@ -166,7 +166,10 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
-    if (entry.explanation || entry.effort_analysis) {
+    if (
+      !process.env.SUPPRESS_COMMENT &&
+      (entry.explanation || entry.effort_analysis)
+    ) {
       let commentBody = '';
       if (entry.explanation) {
         commentBody += entry.explanation;
