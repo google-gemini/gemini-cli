@@ -12,7 +12,7 @@ the global `~/.gemini/GEMINI.md` file.
 
 ## Technical behavior
 
-- **Storage:** Edits markdown files with `write_file` or `replace`.
+- **Storage:** Edits Markdown files with `write_file` or `replace`.
 - **Loading:** The stored facts are automatically included in the hierarchical
   context system for all future sessions.
 - **Format:** Keeps durable instructions concise and avoids duplicating the same
