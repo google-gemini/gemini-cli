@@ -309,18 +309,29 @@ export class Turn {
           !this.hasLoggedRagTrace &&
           this.chat.context.config.getLogRagSnippets?.()
         ) {
-          /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-          const customMetadata = (
-            resp as unknown as {
-              metadata?: { ragStatus?: string; snippets?: RagSnippet[] };
-            }
-          ).metadata;
-          /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
-          if (customMetadata?.ragStatus || customMetadata?.snippets) {
+          let ragStatus: string | undefined;
+          let snippets: RagSnippet[] | undefined;
+
+          if (
+            typeof resp === 'object' &&
+            resp !== null &&
+            'metadata' in resp &&
+            typeof resp.metadata === 'object' &&
+            resp.metadata !== null
+          ) {
+            const metadata = resp.metadata as {
+              ragStatus?: string;
+              snippets?: RagSnippet[];
+            };
+            ragStatus = metadata.ragStatus;
+            snippets = metadata.snippets;
+          }
+
+          if (ragStatus || snippets) {
             ragLogger.log({
               sessionId: this.chat.context.config.getSessionId(),
-              ragStatus: customMetadata.ragStatus ?? 'UNKNOWN',
-              snippets: customMetadata.snippets ?? [],
+              ragStatus: ragStatus ?? 'UNKNOWN',
+              snippets: snippets ?? [],
             });
             this.hasLoggedRagTrace = true;
           }
