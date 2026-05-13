@@ -319,6 +319,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -416,7 +417,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -424,7 +426,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -1149,6 +1152,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -1246,7 +1250,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -1254,7 +1259,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [

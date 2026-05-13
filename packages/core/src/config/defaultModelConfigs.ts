@@ -239,6 +239,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
+    'context-snapshotter': {
+      extends: 'gemini-3-flash-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
     'chat-compression-3-pro': {
       modelConfig: {
         model: 'gemini-3-pro-preview',
@@ -367,9 +380,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
 
     // Aliases
     auto: {
+      displayName: 'Auto',
       tier: 'auto',
       isPreview: true,
-      isVisible: false,
+      isVisible: true,
       features: { thinking: true, multimodalToolUse: false },
     },
     pro: {
@@ -391,22 +405,16 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       features: { thinking: false, multimodalToolUse: false },
     },
     'auto-gemini-3': {
-      displayName: 'Auto (Gemini 3)',
       tier: 'auto',
+      family: 'gemini-3',
       isPreview: true,
-      isVisible: true,
-      dialogDescription:
-        'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-      features: { thinking: true, multimodalToolUse: false },
+      isVisible: false,
     },
     'auto-gemini-2.5': {
-      displayName: 'Auto (Gemini 2.5)',
       tier: 'auto',
+      family: 'gemini-2.5',
       isPreview: false,
-      isVisible: true,
-      dialogDescription:
-        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
-      features: { thinking: false, multimodalToolUse: false },
+      isVisible: false,
     },
   },
   modelIdResolutions: {
@@ -456,23 +464,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       ],
     },
-    'auto-gemini-3': {
-      default: 'gemini-3-pro-preview',
-      contexts: [
-        { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
-        {
-          condition: { useGemini3_1: true, useCustomTools: true },
-          target: 'gemini-3.1-pro-preview-customtools',
-        },
-        {
-          condition: { useGemini3_1: true },
-          target: 'gemini-3.1-pro-preview',
-        },
-      ],
-    },
     auto: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        { condition: { releaseChannel: 'stable' }, target: 'gemini-2.5-pro' },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -497,9 +492,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
           target: 'gemini-3.1-pro-preview',
         },
       ],
-    },
-    'auto-gemini-2.5': {
-      default: 'gemini-2.5-pro',
     },
     'gemini-3.1-flash-lite-preview': {
       default: 'gemini-3.1-flash-lite-preview',
@@ -528,20 +520,35 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       ],
     },
+    'auto-gemini-3': {
+      default: 'gemini-3-pro-preview',
+      contexts: [
+        { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
+        {
+          condition: { useGemini3_1: true, useCustomTools: true },
+          target: 'gemini-3.1-pro-preview-customtools',
+        },
+        {
+          condition: { useGemini3_1: true },
+          target: 'gemini-3.1-pro-preview',
+        },
+      ],
+    },
+    'auto-gemini-2.5': {
+      default: 'gemini-2.5-pro',
+    },
   },
   classifierIdResolutions: {
     flash: {
       default: 'gemini-3-flash-preview',
       contexts: [
         {
-          condition: { requestedModels: ['auto-gemini-2.5', 'gemini-2.5-pro'] },
+          condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
         },
         {
-          condition: {
-            requestedModels: ['auto-gemini-3', 'gemini-3-pro-preview'],
-          },
-          target: 'gemini-3-flash-preview',
+          condition: { requestedModels: ['gemini-2.5-pro', 'auto-gemini-2.5'] },
+          target: 'gemini-2.5-flash',
         },
       ],
     },
@@ -549,7 +556,15 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-pro-preview',
       contexts: [
         {
-          condition: { requestedModels: ['auto-gemini-2.5', 'gemini-2.5-pro'] },
+          condition: { hasAccessToPreview: false },
+          target: 'gemini-2.5-pro',
+        },
+        {
+          condition: { releaseChannel: 'stable', requestedModels: ['auto'] },
+          target: 'gemini-2.5-pro',
+        },
+        {
+          condition: { requestedModels: ['gemini-2.5-pro', 'auto-gemini-2.5'] },
           target: 'gemini-2.5-pro',
         },
         {
