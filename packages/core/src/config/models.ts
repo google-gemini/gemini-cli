@@ -10,6 +10,7 @@ export interface ModelResolutionContext {
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
+  releaseChannel?: string;
 }
 
 /**
@@ -48,6 +49,7 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
+  getReleaseChannel?(): string;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -78,7 +80,9 @@ export const VALID_GEMINI_MODELS = new Set([
   GEMMA_4_26B_A4B_IT_MODEL,
 ]);
 
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
+/** @deprecated Use GEMINI_MODEL_ALIAS_AUTO instead. */
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 // Model aliases for user convenience.
@@ -92,8 +96,22 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
 
+export function getAutoModelDescription(
+  releaseChannel: string = 'stable',
+  useGemini3_1: boolean = false,
+) {
+  const isPreview = releaseChannel === 'preview';
+  const proModel = isPreview
+    ? useGemini3_1
+      ? 'gemini-3.1-pro'
+      : 'gemini-3-pro'
+    : 'gemini-2.5-pro';
+  const flashModel = isPreview ? 'gemini-3-flash' : 'gemini-2.5-flash';
+  return `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
+}
+
 /**
- * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
+ * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
  * to a concrete model name.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
@@ -108,6 +126,7 @@ export function resolveModel(
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
+  releaseChannel?: string,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -116,12 +135,15 @@ export function resolveModel(
       ? String(requestedModel ?? '').trim() || ''
       : requestedModel.trim() || '';
 
+  const currentReleaseChannel = releaseChannel ?? config?.getReleaseChannel?.();
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
+      releaseChannel: currentReleaseChannel,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -140,10 +162,16 @@ export function resolveModel(
 
   let resolved: string;
   switch (normalizedModel) {
-    case PREVIEW_GEMINI_MODEL:
-    case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
+      if (currentReleaseChannel === 'stable') {
+        resolved = DEFAULT_GEMINI_MODEL;
+        break;
+      }
+      // fallthrough
+    }
+    case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_MODEL_AUTO: {
       if (useGemini3_1) {
         resolved = useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
@@ -202,7 +230,7 @@ export function resolveModel(
 /**
  * Resolves the appropriate model based on the classifier's decision.
  *
- * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
+ * @param requestedModel The current requested model (e.g. auto).
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview.
  * @param useCustomToolModel Whether to use the custom tool model.
@@ -240,17 +268,27 @@ export function resolveClassifierModel(
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      requestedModel === PREVIEW_GEMINI_MODEL
+      requestedModel === PREVIEW_GEMINI_MODEL ||
+      requestedModel === GEMINI_MODEL_ALIAS_AUTO
     ) {
-      return PREVIEW_GEMINI_FLASH_MODEL;
+      return hasAccessToPreview
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     }
-    return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
+    return resolveModel(
+      GEMINI_MODEL_ALIAS_FLASH,
+      false,
+      false,
+      false,
+      hasAccessToPreview,
+    );
   }
   return resolveModel(
     requestedModel,
     useGemini3_1,
     useGemini3_1FlashLite,
     useCustomToolModel,
+    hasAccessToPreview,
   );
 }
 
@@ -266,6 +304,8 @@ export function getDisplayString(
   }
 
   switch (model) {
+    case GEMINI_MODEL_ALIAS_AUTO:
+      return 'Auto';
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
