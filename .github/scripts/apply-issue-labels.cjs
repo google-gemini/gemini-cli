@@ -111,30 +111,42 @@ module.exports = async ({ github, context, core }) => {
         repo: context.repo.repo,
         issue_number: issueNumber,
       });
-      const existingLabels = issueData.labels.map((l) => typeof l === 'string' ? l : l.name);
+      const existingLabels = issueData.labels.map((l) =>
+        typeof l === 'string' ? l : l.name,
+      );
 
       const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
       if (hasNewArea) {
-        const existingAreas = existingLabels.filter((l) => l.startsWith('area/'));
+        const existingAreas = existingLabels.filter((l) =>
+          l.startsWith('area/'),
+        );
         labelsToRemove.push(...existingAreas);
       }
 
       const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
       if (hasNewPriority) {
-        const existingPriorities = existingLabels.filter((l) => l.startsWith('priority/'));
+        const existingPriorities = existingLabels.filter((l) =>
+          l.startsWith('priority/'),
+        );
         labelsToRemove.push(...existingPriorities);
       }
 
       const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
       if (hasNewKind) {
-        const existingKinds = existingLabels.filter((l) => l.startsWith('kind/'));
+        const existingKinds = existingLabels.filter((l) =>
+          l.startsWith('kind/'),
+        );
         labelsToRemove.push(...existingKinds);
       }
 
       // Re-deduplicate and filter out labels we are trying to add
-      labelsToRemove = [...new Set(labelsToRemove)].filter(l => !labelsToAdd.includes(l));
+      labelsToRemove = [...new Set(labelsToRemove)].filter(
+        (l) => !labelsToAdd.includes(l),
+      );
     } catch (e) {
-      core.warning(`Failed to fetch existing labels for #${issueNumber}: ${e.message}`);
+      core.warning(
+        `Failed to fetch existing labels for #${issueNumber}: ${e.message}`,
+      );
     }
 
     // Enforce mutually exclusive area labels
