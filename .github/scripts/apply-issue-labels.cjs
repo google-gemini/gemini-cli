@@ -88,6 +88,26 @@ module.exports = async ({ github, context, core }) => {
     let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
 
+    // Programmatic Priority Downgrade Logic
+    if (labelsToAdd.includes('status/need-information')) {
+      const targetPriority = labelsToAdd.find((l) => l.startsWith('priority/'));
+      if (targetPriority) {
+        let downgradedPriority = null;
+        if (targetPriority === 'priority/p0')
+          downgradedPriority = 'priority/p1';
+        if (targetPriority === 'priority/p1')
+          downgradedPriority = 'priority/p2';
+
+        if (downgradedPriority) {
+          core.info(
+            `Programmatically downgrading ${targetPriority} to ${downgradedPriority} due to status/need-information`,
+          );
+          labelsToAdd = labelsToAdd.filter((l) => l !== targetPriority);
+          labelsToAdd.push(downgradedPriority);
+        }
+      }
+    }
+
     labelsToRemove.push('status/need-triage');
 
     if (labelsToAdd.includes('status/manual-triage')) {
@@ -211,25 +231,34 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
-    if (
-      (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') ||
-      entry.effort_analysis
-    ) {
+    // Restrictive Commenting Policy:
+    // - Silence standard triage (Area/Kind/Priority) to avoid spam.
+    // - Only comment if status/need-information is added (to explain what is missing).
+    // - Only comment if effort_analysis is present (deep technical dive).
+    const needsInfoAdded = labelsToAdd.includes('status/need-information');
+    const hasEffortAnalysis = !!entry.effort_analysis;
+
+    if (needsInfoAdded || hasEffortAnalysis) {
       let commentBody = '';
-      if (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') {
+      if (needsInfoAdded && entry.explanation) {
         commentBody += entry.explanation;
       }
-      if (entry.effort_analysis) {
+      if (hasEffortAnalysis) {
         if (commentBody) commentBody += '\n\n';
         commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
       }
 
-      await github.rest.issues.createComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: issueNumber,
-        body: commentBody,
-      });
+      if (commentBody) {
+        await github.rest.issues.createComment({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issueNumber,
+          body: commentBody,
+        });
+        core.info(
+          `Posted required comment (need-info or effort) for #${issueNumber}`,
+        );
+      }
     }
 
     if (

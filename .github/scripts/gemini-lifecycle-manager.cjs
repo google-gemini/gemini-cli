@@ -79,14 +79,16 @@ module.exports = async ({ github, context, core }) => {
   async function processItems(query, callback) {
     core.info(`Searching: ${query}`);
     try {
-      const response = await github.rest.search.issuesAndPullRequests({
-        q: query,
-        per_page: 100,
-        sort: 'updated',
-        order: 'asc',
-      });
-      const items = response.data.items;
-      core.info(`Found ${items.length} items (batch limited).`);
+      const items = await github.paginate(
+        github.rest.search.issuesAndPullRequests,
+        {
+          q: query,
+          per_page: 100,
+          sort: 'updated',
+          order: 'asc',
+        },
+      );
+      core.info(`Found ${items.length} items.`);
       for (const item of items) {
         try {
           await callback(item);
@@ -114,10 +116,11 @@ module.exports = async ({ github, context, core }) => {
         per_page: 5,
       });
 
-      // Check if the last comment is from a non-maintainer
+      // Check if the last comment is from a non-maintainer and not a bot
       const lastComment = comments[0];
       if (
         lastComment &&
+        lastComment.user?.type !== 'Bot' &&
         !(await isMaintainer(lastComment.user, lastComment.author_association))
       ) {
         core.info(
@@ -156,6 +159,7 @@ module.exports = async ({ github, context, core }) => {
           repo,
           issue_number: item.number,
           state: 'closed',
+          state_reason: 'not_planned',
         });
       }
     },
@@ -163,10 +167,18 @@ module.exports = async ({ github, context, core }) => {
 
   // 2. Handle Stale Mark (60 days inactivity, no stale label)
   const exemptQuery = EXEMPT_LABELS.map((l) => `-label:"${l}"`).join(' ');
+
   await processItems(
     `repo:${owner}/${repo} is:open -label:"${STALE_LABEL}" ${exemptQuery} updated:<${staleThreshold.toISOString()}`,
     async (item) => {
       core.info(`Marking #${item.number} as stale.`);
+      const isBug = item.labels.some((l) =>
+        (typeof l === 'string' ? l : l.name).toLowerCase().includes('bug'),
+      );
+      const bodyText = isBug
+        ? `This bug report has been automatically marked as stale due to ${STALE_DAYS} days of inactivity. Many issues are resolved in newer releases. Please verify if the issue persists in the latest Gemini CLI version. If it does, please leave a comment to keep this open. It will be closed in ${CLOSE_DAYS} days if no further activity occurs. Thank you!`
+        : `This item has been automatically marked as stale due to ${STALE_DAYS} days of inactivity. It will be closed in ${CLOSE_DAYS} days if no further activity occurs. Thank you!`;
+
       if (!dryRun) {
         await github.rest.issues.addLabels({
           owner,
@@ -178,16 +190,94 @@ module.exports = async ({ github, context, core }) => {
           owner,
           repo,
           issue_number: item.number,
-          body: `This item has been automatically marked as stale due to ${STALE_DAYS} days of inactivity. It will be closed in ${CLOSE_DAYS} days if no further activity occurs. Thank you!`,
+          body: bodyText,
         });
       }
     },
   );
 
-  // 3. Handle Stale Close (14 days with stale label)
+  // 3. Handle Stale Removal & Close
   await processItems(
-    `repo:${owner}/${repo} is:open label:"${STALE_LABEL}" ${exemptQuery} updated:<${closeThreshold.toISOString()}`,
+    `repo:${owner}/${repo} is:open label:"${STALE_LABEL}" ${exemptQuery}`,
     async (item) => {
+      // Fetch full timeline to see events and comments
+      const timeline = await github.paginate(
+        github.rest.issues.listEventsForTimeline,
+        {
+          owner,
+          repo,
+          issue_number: item.number,
+          per_page: 100,
+        },
+      );
+
+      // Find exactly when the Stale label was added
+      // We look for the last 'labeled' event for STALE_LABEL
+      const staleEventIndex = timeline.findLastIndex(
+        (e) =>
+          e.event === 'labeled' &&
+          e.label?.name?.toLowerCase() === STALE_LABEL.toLowerCase(),
+      );
+
+      if (staleEventIndex === -1) return; // Fallback if no event found
+
+      const staleEvent = timeline[staleEventIndex];
+      const eventsAfterStale = timeline.slice(staleEventIndex + 1);
+
+      // Check for meaningful activity after the Stale label was applied
+      const meaningfulEvents = eventsAfterStale.filter((e) => {
+        const actor = e.actor?.login || '';
+        const isBot =
+          actor.includes('[bot]') || actor.includes('github-actions');
+
+        // Explicit whitelist of meaningful events
+        if (
+          [
+            'commented',
+            'cross-referenced',
+            'connected',
+            'reopened',
+            'assigned',
+          ].includes(e.event)
+        ) {
+          // If a human commented, or ANYONE (even a bot) linked a PR, it's meaningful
+          if (e.event === 'commented' && isBot) return false;
+          return true;
+        }
+
+        // If a human explicitly added or removed a label, it's meaningful
+        if (['labeled', 'unlabeled'].includes(e.event) && !isBot) {
+          return true;
+        }
+
+        return false;
+      });
+
+      if (meaningfulEvents.length > 0) {
+        // Activity detected, remove Stale label
+        core.info(
+          `Removing ${STALE_LABEL} from #${item.number} due to meaningful activity (e.g., comment or PR).`,
+        );
+        if (!dryRun) {
+          await github.rest.issues
+            .removeLabel({
+              owner,
+              repo,
+              issue_number: item.number,
+              name: STALE_LABEL,
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      // No meaningful activity. Check if 14 days have passed.
+      const labeledDate = new Date(staleEvent.created_at);
+      if (labeledDate > closeThreshold) {
+        // Has not been 14 days since it was ACTUALLY marked stale
+        return;
+      }
+
       core.info(`Closing stale item #${item.number}.`);
       if (!dryRun) {
         await github.rest.issues.createComment({
@@ -201,6 +291,7 @@ module.exports = async ({ github, context, core }) => {
           repo,
           issue_number: item.number,
           state: 'closed',
+          state_reason: 'not_planned',
         });
       }
     },
