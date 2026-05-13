@@ -16,6 +16,7 @@ import {
 import {
   MemoryTool,
   setGeminiMdFilename,
+  resetGeminiMdFilename,
   getCurrentGeminiMdFilename,
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -45,14 +46,18 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-vi.mock('fs', () => ({
-  mkdirSync: vi.fn(),
-  createWriteStream: vi.fn(() => ({
-    on: vi.fn(),
-    write: vi.fn(),
-    end: vi.fn(),
-  })),
-}));
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    mkdirSync: vi.fn(),
+    createWriteStream: vi.fn(() => ({
+      on: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+    })),
+  };
+});
 
 vi.mock('os');
 
@@ -77,30 +82,65 @@ describe('MemoryTool', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
   });
 
   describe('setGeminiMdFilename', () => {
-    it('should update currentGeminiMdFilename when a valid new name is provided', () => {
+    it('should append to currentGeminiMdFilename when a valid new name is provided', () => {
       const newName = 'CUSTOM_CONTEXT.md';
       setGeminiMdFilename(newName);
-      expect(getCurrentGeminiMdFilename()).toBe(newName);
+      expect(getAllGeminiMdFilenames()).toEqual([
+        newName,
+        DEFAULT_CONTEXT_FILENAME,
+      ]);
     });
 
     it('should not update currentGeminiMdFilename if the new name is empty or whitespace', () => {
-      const initialName = getCurrentGeminiMdFilename();
+      const initialNames = getAllGeminiMdFilenames();
       setGeminiMdFilename('  ');
-      expect(getCurrentGeminiMdFilename()).toBe(initialName);
+      expect(getAllGeminiMdFilenames()).toEqual(initialNames);
 
       setGeminiMdFilename('');
-      expect(getCurrentGeminiMdFilename()).toBe(initialName);
+      expect(getAllGeminiMdFilenames()).toEqual(initialNames);
     });
 
-    it('should handle an array of filenames', () => {
+    it('should handle adding an array of filenames', () => {
       const newNames = ['CUSTOM_CONTEXT.md', 'ANOTHER_CONTEXT.md'];
       setGeminiMdFilename(newNames);
-      expect(getCurrentGeminiMdFilename()).toBe('CUSTOM_CONTEXT.md');
-      expect(getAllGeminiMdFilenames()).toEqual(newNames);
+      expect(getAllGeminiMdFilenames()).toEqual([
+        ...newNames,
+        DEFAULT_CONTEXT_FILENAME,
+      ]);
+    });
+
+    it('should ensure uniqueness when adding names', () => {
+      setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+      expect(getAllGeminiMdFilenames()).toEqual([DEFAULT_CONTEXT_FILENAME]);
+
+      setGeminiMdFilename(['NEW.md', 'NEW.md']);
+      expect(getAllGeminiMdFilenames()).toEqual([
+        'NEW.md',
+        DEFAULT_CONTEXT_FILENAME,
+      ]);
+    });
+  });
+
+  describe('resetGeminiMdFilename', () => {
+    it('should replace all filenames with the provided one', () => {
+      setGeminiMdFilename('OTHER.md');
+      resetGeminiMdFilename('RESET.md');
+      expect(getAllGeminiMdFilenames()).toEqual(['RESET.md']);
+    });
+
+    it('should reset to default if no argument provided', () => {
+      resetGeminiMdFilename('OTHER.md');
+      resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+      expect(getAllGeminiMdFilenames()).toEqual([DEFAULT_CONTEXT_FILENAME]);
+    });
+
+    it('should handle array reset', () => {
+      resetGeminiMdFilename(['A.md', 'B.md']);
+      expect(getAllGeminiMdFilenames()).toEqual(['A.md', 'B.md']);
     });
   });
 

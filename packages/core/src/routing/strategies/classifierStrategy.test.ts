@@ -27,6 +27,7 @@ import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { AuthType } from '../../core/contentGenerator.js';
+import { ModelAvailabilityService } from '../../availability/modelAvailabilityService.js';
 
 vi.mock('../../core/baseLlmClient.js');
 
@@ -68,6 +69,9 @@ describe('ClassifierStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(new ModelAvailabilityService()),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),

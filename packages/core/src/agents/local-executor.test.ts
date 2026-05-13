@@ -49,6 +49,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
 }));
 
 import { debugLogger } from '../utils/debugLogger.js';
+import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -708,21 +709,19 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
     });
 
-    it('should use parentPromptId from context to create agentId', async () => {
-      const parentId = 'parent-id';
-      Object.defineProperty(mockConfig, 'promptId', {
-        get: () => parentId,
-        configurable: true,
-      });
-
+    it('should not include parentCallId in agentId even when available', async () => {
       const definition = createTestDefinition();
-      const executor = await LocalAgentExecutor.create(
-        definition,
-        mockConfig,
-        onActivity,
+      const parentCallId = 'parent-call-123';
+
+      const executor = await runWithToolCallContext(
+        { callId: parentCallId, schedulerId: 'test-scheduler' },
+        () => LocalAgentExecutor.create(definition, mockConfig, onActivity),
       );
 
-      expect(executor['agentId']).toBeDefined();
+      expect(executor['agentId']).not.toContain(parentCallId);
+      expect(executor['agentId']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should correctly apply templates to initialMessages', async () => {
@@ -4198,6 +4197,49 @@ describe('LocalAgentExecutor', () => {
         );
         expect(memoryPart).toBeDefined();
         expect(memoryPart?.text).toContain(mockMemory);
+      });
+
+      it('should omit extension context from session memory when disabled by the agent', async () => {
+        const definition = createTestDefinition();
+        definition.includeExtensionContext = false;
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const getSessionMemorySpy = vi
+          .spyOn(mockConfig, 'getSessionMemory')
+          .mockImplementation(
+            (options?: { includeExtensionContext?: boolean }) =>
+              options?.includeExtensionContext === false
+                ? '<loaded_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>'
+                : '<loaded_context>\n<extension_context>\nExtension memory rule\n</extension_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>',
+          );
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
+
+        mockModelResponse([
+          {
+            name: COMPLETE_TASK_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        expect(getSessionMemorySpy).toHaveBeenCalledWith({
+          includeExtensionContext: false,
+        });
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+        const memoryPart = parts.find((p) =>
+          p.text?.includes('<loaded_context>'),
+        );
+
+        expect(memoryPart?.text).toContain('Project memory rule');
+        expect(memoryPart?.text).not.toContain('<extension_context>');
+        expect(memoryPart?.text).not.toContain('Extension memory rule');
       });
     });
   });

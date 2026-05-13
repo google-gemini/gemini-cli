@@ -85,13 +85,95 @@ module.exports = async ({ github, context, core }) => {
       continue;
     }
 
-    const labelsToAdd = entry.labels_to_add || [];
-    labelsToAdd.push('status/bot-triaged');
-
+    let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
+
     labelsToRemove.push('status/need-triage');
-    // Deduplicate array
+
+    if (labelsToAdd.includes('status/manual-triage')) {
+      // If the AI flagged it for manual triage, remove bot-triaged if it exists
+      labelsToRemove.push('status/bot-triaged');
+      // Ensure we don't accidentally try to add bot-triaged if the AI returned it
+      labelsToAdd = labelsToAdd.filter((l) => l !== 'status/bot-triaged');
+    } else {
+      // Standard successful bot triage
+      labelsToAdd.push('status/bot-triaged');
+    }
+
+    // Deduplicate arrays
+    labelsToAdd = [...new Set(labelsToAdd)];
     labelsToRemove = [...new Set(labelsToRemove)];
+
+    // Fetch existing labels to auto-resolve conflicts
+    try {
+      const { data: issueData } = await github.rest.issues.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: issueNumber,
+      });
+      const existingLabels = issueData.labels.map((l) =>
+        typeof l === 'string' ? l : l.name,
+      );
+
+      const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
+      if (hasNewArea) {
+        const existingAreas = existingLabels.filter((l) =>
+          l.startsWith('area/'),
+        );
+        labelsToRemove.push(...existingAreas);
+      }
+
+      const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
+      if (hasNewPriority) {
+        const existingPriorities = existingLabels.filter((l) =>
+          l.startsWith('priority/'),
+        );
+        labelsToRemove.push(...existingPriorities);
+      }
+
+      const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
+      if (hasNewKind) {
+        const existingKinds = existingLabels.filter((l) =>
+          l.startsWith('kind/'),
+        );
+        labelsToRemove.push(...existingKinds);
+      }
+
+      // Re-deduplicate and filter out labels we are trying to add
+      labelsToRemove = [...new Set(labelsToRemove)].filter(
+        (l) => !labelsToAdd.includes(l),
+      );
+    } catch (e) {
+      core.warning(
+        `Failed to fetch existing labels for #${issueNumber}: ${e.message}`,
+      );
+    }
+
+    // Enforce mutually exclusive area labels
+    const areaLabelsToAdd = labelsToAdd.filter((l) => l.startsWith('area/'));
+    if (areaLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple area labels to add: ${areaLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstArea = areaLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('area/') || l === firstArea,
+      );
+    }
+
+    // Enforce mutually exclusive priority labels
+    const priorityLabelsToAdd = labelsToAdd.filter((l) =>
+      l.startsWith('priority/'),
+    );
+    if (priorityLabelsToAdd.length > 1) {
+      core.warning(
+        `Issue #${issueNumber} has multiple priority labels to add: ${priorityLabelsToAdd.join(', ')}. Keeping only the first one.`,
+      );
+      const firstPriority = priorityLabelsToAdd[0];
+      labelsToAdd = labelsToAdd.filter(
+        (l) => !l.startsWith('priority/') || l === firstPriority,
+      );
+    }
 
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
@@ -129,9 +211,12 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
-    if (entry.explanation || entry.effort_analysis) {
+    if (
+      (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') ||
+      entry.effort_analysis
+    ) {
       let commentBody = '';
-      if (entry.explanation) {
+      if (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') {
         commentBody += entry.explanation;
       }
       if (entry.effort_analysis) {

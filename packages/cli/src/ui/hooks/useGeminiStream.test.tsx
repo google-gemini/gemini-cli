@@ -49,6 +49,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  SHELL_TOOL_NAME,
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
@@ -2447,6 +2448,44 @@ describe('useGeminiStream', () => {
       expect(mockMessageBus.publish).not.toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'corr-call3' }),
       );
+    });
+
+    it('should auto-approve shell commands with redirection when switching to AUTO_EDIT mode', async () => {
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
+      shellCall.request.args = { command: 'ls > files.txt' };
+
+      const { result } = await renderTestHook([shellCall]);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      // Shell command with redirection should be auto-approved
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: 'corr-call-shell' }),
+      );
+    });
+
+    it('should NOT auto-approve shell commands without redirection when switching to AUTO_EDIT mode', async () => {
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
+      shellCall.request.args = { command: 'ls -la' };
+
+      const { result } = await renderTestHook([shellCall]);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      // Regular shell command should NOT be auto-approved
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
 
     it('should not auto-approve any tools when switching to REQUIRE_CONFIRMATION mode', async () => {
