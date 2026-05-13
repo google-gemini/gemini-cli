@@ -23,6 +23,7 @@ import {
   SUBAGENT_REJECTED_ERROR_PREFIX,
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
   isToolActivityError,
+  SubagentState,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
@@ -117,7 +118,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           isSubagentProgress: true,
           agentName: this.definition.name,
           recentActivity: [],
-          state: 'running',
+          state: SubagentState.RUNNING,
         };
         updateOutput(initialProgress);
       }
@@ -137,7 +138,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             if (
               lastItem &&
               lastItem.type === 'thought' &&
-              lastItem.status === 'running'
+              lastItem.status === SubagentState.RUNNING
             ) {
               lastItem.content = sanitizeThoughtContent(text);
             } else {
@@ -145,7 +146,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                 id: randomUUID(),
                 type: 'thought',
                 content: sanitizeThoughtContent(text),
-                status: 'running',
+                status: SubagentState.RUNNING,
               });
             }
             updated = true;
@@ -174,7 +175,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               displayName,
               description,
               args,
-              status: 'running',
+              status: SubagentState.RUNNING,
             });
             updated = true;
 
@@ -193,9 +194,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               if (
                 recentActivity[i].type === 'tool_call' &&
                 recentActivity[i].content === name &&
-                recentActivity[i].status === 'running'
+                recentActivity[i].status === SubagentState.RUNNING
               ) {
-                recentActivity[i].status = isError ? 'error' : 'completed';
+                recentActivity[i].status = isError
+                  ? SubagentState.ERROR
+                  : SubagentState.COMPLETED;
                 updated = true;
 
                 this.publishActivity(recentActivity[i]);
@@ -224,9 +227,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                 if (
                   recentActivity[i].type === 'tool_call' &&
                   recentActivity[i].content === toolName &&
-                  recentActivity[i].status === 'running'
+                  recentActivity[i].status === SubagentState.RUNNING
                 ) {
-                  recentActivity[i].status = 'cancelled';
+                  recentActivity[i].status = SubagentState.CANCELLED;
                   updated = true;
                   break;
                 }
@@ -237,9 +240,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                 if (
                   recentActivity[i].type === 'tool_call' &&
                   recentActivity[i].content === toolName &&
-                  recentActivity[i].status === 'running'
+                  recentActivity[i].status === SubagentState.RUNNING
                 ) {
-                  recentActivity[i].status = 'error';
+                  recentActivity[i].status = SubagentState.ERROR;
                   updated = true;
                   break;
                 }
@@ -253,7 +256,10 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                 isCancellation || isRejection
                   ? sanitizedError
                   : `Error: ${sanitizedError}`,
-              status: isCancellation || isRejection ? 'cancelled' : 'error',
+              status:
+                isCancellation || isRejection
+                  ? SubagentState.CANCELLED
+                  : SubagentState.ERROR,
             });
             updated = true;
             break;
@@ -267,7 +273,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             isSubagentProgress: true,
             agentName: this.definition.name,
             recentActivity: [...recentActivity], // Copy to avoid mutation issues
-            state: 'running',
+            state: SubagentState.RUNNING,
           };
 
           updateOutput(progress);
@@ -287,7 +293,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           isSubagentProgress: true,
           agentName: this.definition.name,
           recentActivity: [...recentActivity],
-          state: 'cancelled',
+          state: SubagentState.CANCELLED,
         };
 
         if (updateOutput) {
@@ -303,7 +309,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         isSubagentProgress: true,
         agentName: this.definition.name,
         recentActivity: [...recentActivity],
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: output.result,
         terminateReason: output.terminate_reason,
       };
@@ -334,8 +340,8 @@ ${output.result}`;
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
-        if (item.status === 'running') {
-          item.status = isAbort ? 'cancelled' : 'error';
+        if (item.status === SubagentState.RUNNING) {
+          item.status = isAbort ? SubagentState.CANCELLED : SubagentState.ERROR;
         }
       }
 
@@ -343,12 +349,12 @@ ${output.result}`;
       // But only if it's NOT an abort, or if we want to show "Cancelled" as a thought
       if (!isAbort) {
         const lastActivity = recentActivity[recentActivity.length - 1];
-        if (!lastActivity || lastActivity.status !== 'error') {
+        if (!lastActivity || lastActivity.status !== SubagentState.ERROR) {
           recentActivity.push({
             id: randomUUID(),
             type: 'thought',
             content: `Error: ${errorMessage}`,
-            status: 'error',
+            status: SubagentState.ERROR,
           });
           // Maintain size limit
           // No limit on UI events sent via bus
@@ -359,7 +365,7 @@ ${output.result}`;
         isSubagentProgress: true,
         agentName: this.definition.name,
         recentActivity: [...recentActivity],
-        state: isAbort ? 'cancelled' : 'error',
+        state: isAbort ? SubagentState.CANCELLED : SubagentState.ERROR,
       };
 
       if (updateOutput) {

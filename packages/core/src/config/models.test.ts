@@ -595,9 +595,9 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
   });
 
-  it('should return true for Gemma 4 models only when experimentalGemma is true', () => {
-    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(false);
-    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(false);
+  it('should return true for Gemma 4 models when experimentalGemma is not provided (defaults to true)', () => {
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(true);
+    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(true);
     expect(isActiveModel(GEMMA_4_31B_IT_MODEL, false, false, false, true)).toBe(
       true,
     );

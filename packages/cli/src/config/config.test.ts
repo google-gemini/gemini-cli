@@ -234,7 +234,7 @@ describe('parseArguments', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it('should fail if both --resume and --session-id are provided', async () => {
+  it('should fail if multiple session flags are provided', async () => {
     process.argv = [
       'node',
       'script.js',
@@ -255,7 +255,7 @@ describe('parseArguments', () => {
 
     expect(mockConsoleError).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Cannot use both --resume (-r) and --session-id together',
+        'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.',
       ),
     );
   });
@@ -1043,6 +1043,28 @@ describe('loadCliConfig', () => {
 
     expect(config.isInteractive()).toBe(false);
   });
+
+  describe('isAcpMode', () => {
+    it('should force skipNextSpeakerCheck to true when in ACP mode', async () => {
+      process.argv = ['node', 'script.js', '--acp'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(true);
+    });
+
+    it('should respect settings.model.skipNextSpeakerCheck when not in ACP mode', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(false);
+    });
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
@@ -1173,6 +1195,20 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       200,
       ['.git'], // boundaryMarkers
     );
+  });
+
+  it('should NOT call loadServerHierarchicalMemory when skipMemoryLoad is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv, {
+      skipMemoryLoad: true,
+    });
+
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
   });
 });
 
@@ -2022,7 +2058,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argv', async () => {
@@ -2066,7 +2102,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 });
 
@@ -3988,7 +4024,7 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('acp-vscode');
   });
 
-  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+  it('should set acpMode to true and set clientName to acp for generic terminals', async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
     vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
@@ -4000,10 +4036,10 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(true);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('acp');
   });
 
-  it('should set acpMode to false and clientName to undefined by default', async () => {
+  it('should set acpMode to false and clientName to tui by default', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
@@ -4012,6 +4048,6 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(false);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('tui');
   });
 });

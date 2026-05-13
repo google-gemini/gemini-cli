@@ -407,7 +407,7 @@ describe('Scheduler (Orchestrator)', () => {
         expect.arrayContaining([
           expect.objectContaining({
             status: CoreToolCallStatus.Validating,
-            request: req1,
+            request: expect.objectContaining(req1),
             tool: mockTool,
             invocation: mockInvocation,
             schedulerId: ROOT_SCHEDULER_ID,

@@ -30,13 +30,13 @@ import {
   loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  SimpleExtensionLoader,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -96,6 +96,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionFile?: string | undefined;
   sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
@@ -238,8 +239,14 @@ export async function parseArguments(
         ? query.length > 0
         : !!query;
 
-      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
-        return 'Cannot use both --resume (-r) and --session-id together';
+      const sessionFlags = [
+        argv['resume'] !== undefined,
+        argv['session-id'] !== undefined,
+        argv['session-file'] !== undefined,
+      ].filter(Boolean).length;
+
+      if (sessionFlags > 1) {
+        return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
       }
 
       if (argv['prompt'] && hasPositionalQuery) {
@@ -411,6 +418,11 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-file', {
+          type: 'string',
+          nargs: 1,
+          description: 'Load a session from a JSON file',
+        })
         .option('session-id', {
           type: 'string',
           nargs: 1,
@@ -558,6 +570,8 @@ export interface LoadCliConfigOptions {
     disabled?: string[];
   };
   worktreeSettings?: WorktreeSettings;
+  skipExtensions?: boolean;
+  skipMemoryLoad?: boolean;
 }
 
 export async function loadCliConfig(
@@ -566,7 +580,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    skipMemoryLoad = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -641,21 +660,24 @@ export async function loadCliConfig(
     includeDirectories.push(...ideFolders);
   }
 
-  const extensionManager = new ExtensionManager({
-    settings,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
-  });
-  await extensionManager.loadExtensions();
+  let extensionManager: ExtensionManager | undefined;
+  if (!skipExtensions) {
+    extensionManager = new ExtensionManager({
+      settings,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      workspaceDir: cwd,
+      enabledExtensionOverrides: argv.extensions,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
+      clientVersion: await getVersion(),
+    });
+    await extensionManager.loadExtensions();
+  }
 
   const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+    ?.getExtensions()
+    ?.find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
   const experimentalJitContext = settings.experimental.jitContext ?? true;
 
@@ -673,7 +695,10 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  const finalExtensionLoader =
+    extensionManager ?? new SimpleExtensionLoader([]);
+
+  if (!experimentalJitContext && !skipMemoryLoad) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -681,7 +706,7 @@ export async function loadCliConfig(
         ? includeDirectories
         : [],
       fileService,
-      extensionManager,
+      finalExtensionLoader,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
@@ -840,7 +865,7 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
   const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -931,7 +956,13 @@ export async function loadCliConfig(
       (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
     ) {
       clientName = `acp-${ide.name}`;
+    } else {
+      clientName = 'acp';
     }
+  } else if (argv.isCommand) {
+    clientName = 'cli-command';
+  } else {
+    clientName = 'tui';
   }
 
   // TODO(joshualitt): Clean this up alongside removal of the legacy config.
@@ -1031,7 +1062,7 @@ export async function loadCliConfig(
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
-    extensionLoader: extensionManager,
+    extensionLoader: finalExtensionLoader,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
@@ -1073,7 +1104,11 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    // In ACP mode, always skip the next-speaker check. This check triggers
+    // recursive continuation turns inside GeminiClient.processTurn() that
+    // conflict with ACP's explicit turn management via session/prompt,
+    // causing infinite agent_thought_chunk loops.
+    skipNextSpeakerCheck: isAcpMode || settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,

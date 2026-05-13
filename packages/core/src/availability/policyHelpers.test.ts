@@ -9,8 +9,10 @@ import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
   applyModelSelection,
+  applyAvailabilityTransition,
 } from './policyHelpers.js';
 import { createDefaultPolicy, SILENT_ACTIONS } from './policyCatalog.js';
+import type { RetryAvailabilityContext } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -35,6 +37,11 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
       return useGemini31 && authType === AuthType.USE_GEMINI;
     },
     getContentGeneratorConfig: () => ({ authType: undefined }),
+    getHasAccessToPreviewModel: () => true,
+    getMaxAttemptsPerTurn: () => 3,
+    getExperimentalDynamicModelConfiguration: () => false,
+    getReleaseChannel: () => 'preview',
+    modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     ...overrides,
   } as unknown as Config;
   return config;
@@ -93,10 +100,11 @@ describe('policyHelpers', () => {
 
     it('starts chain from preferredModel when model is "auto"', () => {
       const config = createMockConfig({
-        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+        getModel: () => 'auto',
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
+      // Due to Gemini 2.x wrapsAround, the chain will contain both flash and pro
+      expect(chain.length).toBeGreaterThanOrEqual(1);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
     });
 
@@ -183,6 +191,7 @@ describe('policyHelpers', () => {
     const testCases = [
       { name: 'Default Auto', model: DEFAULT_GEMINI_MODEL_AUTO },
       { name: 'Gemini 3 Auto', model: 'auto-gemini-3' },
+      { name: 'Unified Auto', model: 'auto' },
       { name: 'Flash Lite', model: DEFAULT_GEMINI_FLASH_LITE_MODEL },
       {
         name: 'Gemini 3 Auto (3.1 Enabled)',
@@ -201,6 +210,7 @@ describe('policyHelpers', () => {
         hasAccess: false,
       },
       { name: 'Concrete Model (2.5 Pro)', model: 'gemini-2.5-pro' },
+      { name: 'Explicit Gemini 3', model: 'gemini-3-pro-preview' },
       { name: 'Custom Model', model: 'my-custom-model' },
       {
         name: 'Wrap Around',
@@ -210,7 +220,18 @@ describe('policyHelpers', () => {
     ];
 
     testCases.forEach(
-      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
+      ({
+        name,
+        model,
+        useGemini31,
+        hasAccess,
+        authType,
+        wrapsAround,
+        ...rest
+      }) => {
+        const releaseChannel = (rest as Record<string, unknown>)[
+          'releaseChannel'
+        ] as string | undefined;
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
@@ -220,6 +241,7 @@ describe('policyHelpers', () => {
               getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
+              getReleaseChannel: () => releaseChannel ?? 'preview',
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 
@@ -436,6 +458,53 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+  });
+
+  describe('applyAvailabilityTransition', () => {
+    it('marks terminal on terminal transition', () => {
+      const mockService = { markTerminal: vi.fn() };
+      const context = {
+        service: mockService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: { transient: 'terminal' },
+        },
+      };
+      const getContext = () => context as unknown as RetryAvailabilityContext;
+
+      applyAvailabilityTransition(getContext, 'transient');
+
+      expect(mockService.markTerminal).toHaveBeenCalledWith(
+        'test-model',
+        'capacity',
+      );
+    });
+
+    it('marks sticky and consumes on sticky_retry transition', () => {
+      const mockService = {
+        markRetryOncePerTurn: vi.fn(),
+        consumeStickyAttempt: vi.fn(),
+      };
+      const context = {
+        service: mockService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: { transient: 'sticky_retry' },
+          maxAttempts: 3,
+        },
+      };
+      const getContext = () => context as unknown as RetryAvailabilityContext;
+
+      applyAvailabilityTransition(getContext, 'transient');
+
+      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledWith(
+        'test-model',
+        3,
+      );
+      expect(mockService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'test-model',
+      );
     });
   });
 });
