@@ -34,8 +34,7 @@ describe('RagLogger', () => {
   beforeEach(() => {
     logger = new RagLogger();
     vi.clearAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-13T12:00:00.000Z'));
+    vi.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
   });
 
   afterEach(() => {
