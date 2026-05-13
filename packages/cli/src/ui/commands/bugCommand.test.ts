@@ -195,10 +195,10 @@ describe('bugCommand', () => {
       'bug-report-history-1704067200000.json',
     );
     expect(exportHistoryToFile).toHaveBeenCalledWith({
-      history,
       messages: [],
       filePath: expectedPath,
       trajectories: {},
+      history,
     });
 
     const addItemCall = vi.mocked(mockContext.ui.addItem).mock.calls[0];

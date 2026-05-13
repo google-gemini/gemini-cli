@@ -140,9 +140,9 @@ const saveCommand: SlashCommand = {
     if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       const trajectories = await chat.getSubagentTrajectories();
-      const messages = chat.getConversation()?.messages;
+      const messages = chat.getConversation()?.messages ?? [];
       await logger.saveCheckpoint(
-        { history, authType, trajectories, messages },
+        { version: '2.0', authType, trajectories, messages },
         tag,
       );
       return {
@@ -183,7 +183,7 @@ const resumeCheckpointCommand: SlashCommand = {
     const config = context.services.agentContext?.config;
     await logger.initialize();
     const checkpoint = await logger.loadCheckpoint(tag);
-    const conversation = checkpoint.history;
+    const conversation = checkpoint.history ?? [];
 
     if (conversation.length === 0) {
       return {
@@ -233,6 +233,8 @@ const resumeCheckpointCommand: SlashCommand = {
       type: 'load_history',
       history: uiHistory,
       clientHistory: conversation,
+      messages: checkpoint.messages,
+      version: checkpoint.version,
     };
   },
   completion: async (context, partialArg) => {
@@ -330,8 +332,8 @@ const shareCommand: SlashCommand = {
 
     try {
       const trajectories = await chat.getSubagentTrajectories();
-      const messages = chat.getConversation()?.messages;
-      await exportHistoryToFile({ history, filePath, trajectories, messages });
+      const messages = chat.getConversation()?.messages ?? [];
+      await exportHistoryToFile({ messages, filePath, trajectories, history });
       return {
         type: 'message',
         messageType: 'info',

@@ -7,9 +7,10 @@
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { Content } from '@google/genai';
-import type {
-  ConversationRecord,
-  MessageRecord,
+import {
+  type ConversationRecord,
+  type MessageRecord,
+  reconstructHistory,
 } from '@google/gemini-cli-core';
 
 /**
@@ -55,17 +56,21 @@ export function serializeHistoryToMarkdown(
  * Options for exporting chat history.
  */
 export interface ExportHistoryOptions {
-  /** The standard history array used for model requests. */
-  history: readonly Content[];
+  /**
+   * Full message records which contain metadata like agentId for tool calls,
+   * providing the link between history and trajectories.
+   * This is the primary source of truth.
+   */
+  messages: MessageRecord[];
   /** The file path to export to. */
   filePath: string;
   /** Optional subagent trajectories to include. */
   trajectories?: Record<string, ConversationRecord>;
   /**
-   * Optional full message records which contain metadata like agentId for tool calls,
-   * providing the link between history and trajectories.
+   * Optional standard history array used for model requests.
+   * If provided, it is used for Markdown export to avoid reconstruction.
    */
-  messages?: MessageRecord[];
+  history?: readonly Content[];
 }
 
 /**
@@ -74,17 +79,23 @@ export interface ExportHistoryOptions {
 export async function exportHistoryToFile(
   options: ExportHistoryOptions,
 ): Promise<void> {
-  const { history, filePath, trajectories, messages } = options;
+  const {
+    messages,
+    filePath,
+    trajectories,
+    history: providedHistory,
+  } = options;
   const extension = path.extname(filePath).toLowerCase();
 
   let content: string;
   if (extension === '.json') {
-    if (trajectories && Object.keys(trajectories).length > 0) {
-      content = JSON.stringify({ history, messages, trajectories }, null, 2);
-    } else {
-      content = JSON.stringify(history, null, 2);
-    }
+    content = JSON.stringify(
+      { version: '2.0', messages, trajectories },
+      null,
+      2,
+    );
   } else if (extension === '.md') {
+    const history = providedHistory ?? reconstructHistory(messages);
     content = serializeHistoryToMarkdown(history);
   } else {
     throw new Error(

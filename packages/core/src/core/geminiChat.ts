@@ -43,6 +43,7 @@ import {
   ChatRecordingService,
   type ResumedSessionData,
   type ConversationRecord,
+  type MessageRecord,
 } from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
@@ -226,9 +227,9 @@ export class InvalidStreamError extends Error {
     message: string,
     type:
       | 'NO_FINISH_REASON'
-      | 'NO_RESPONSE_TEXT'
-      | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL',
+    | 'NO_RESPONSE_TEXT'
+    | 'MALFORMED_FUNCTION_CALL'
+    | 'UNEXPECTED_TOOL_CALL',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -273,6 +274,7 @@ export class GeminiChat {
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
   private callCounter = 0;
+  private initialMessages?: MessageRecord[];
   agentHistory: AgentChatHistory;
 
   constructor(
@@ -282,6 +284,7 @@ export class GeminiChat {
     history: Array<Content | HistoryTurn> = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
+    messages?: MessageRecord[],
   ) {
     validateHistory(history);
 
@@ -312,6 +315,7 @@ export class GeminiChat {
       initialHistory = [];
     }
 
+    this.initialMessages = messages;
     this.agentHistory = new AgentChatHistory(initialHistory);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
@@ -326,8 +330,15 @@ export class GeminiChat {
   async initialize(
     resumedSessionData?: ResumedSessionData,
     kind: 'main' | 'subagent' = 'main',
+    messages?: MessageRecord[],
   ) {
+    const messagesToUse = messages ?? this.initialMessages;
     await this.chatRecordingService.initialize(resumedSessionData, kind);
+
+    if (messagesToUse) {
+      this.chatRecordingService.resetMessages(messagesToUse);
+    }
+
     // Sync initial history with the recorder to ensure all turns (even bootstrapped ones)
     // are durable and coordinated.
     this.chatRecordingService.updateMessagesFromHistory(
@@ -341,6 +352,18 @@ export class GeminiChat {
 
   getSystemInstruction(): string {
     return this.systemInstruction;
+  }
+
+  getConversation(): ConversationRecord | null {
+    return this.chatRecordingService.getConversation();
+  }
+
+  getChatRecordingService(): ChatRecordingService {
+    return this.chatRecordingService;
+  }
+
+  async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
+    return this.chatRecordingService.getSubagentTrajectories();
   }
 
   /**
@@ -1327,29 +1350,7 @@ export class GeminiChat {
   }
 
   /**
-   * Gets the chat recording service instance.
-   */
-  getChatRecordingService(): ChatRecordingService {
-    return this.chatRecordingService;
-  }
-
-  /**
-   * Gets all subagent trajectories associated with this chat session.
-   */
-  async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
-    return this.chatRecordingService.getSubagentTrajectories();
-  }
-
-  /**
-   * Gets the current conversation record.
-   */
-  getConversation(): ConversationRecord | null {
-    return this.chatRecordingService.getConversation();
-  }
-
-  /**
    * Records completed tool calls with full metadata.
-
    * This is called by external components when tool calls complete, before sending responses to Gemini.
    */
   recordCompletedToolCalls(

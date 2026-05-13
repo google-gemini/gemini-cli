@@ -437,7 +437,11 @@ describe('Logger', () => {
       },
     ])('should save a checkpoint', async ({ tag, encodedTag }) => {
       await logger.saveCheckpoint(
-        { history: conversation, authType: AuthType.LOGIN_WITH_GOOGLE },
+        {
+          history: conversation,
+          messages: [],
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        },
         tag,
       );
       const taggedFilePath = path.join(
@@ -447,6 +451,7 @@ describe('Logger', () => {
       const fileContent = await fs.readFile(taggedFilePath, 'utf-8');
       expect(JSON.parse(fileContent)).toEqual({
         history: conversation,
+        messages: [],
         authType: AuthType.LOGIN_WITH_GOOGLE,
       });
     });
@@ -462,7 +467,10 @@ describe('Logger', () => {
         .mockImplementation(() => {});
 
       await expect(
-        uninitializedLogger.saveCheckpoint({ history: conversation }, 'tag'),
+        uninitializedLogger.saveCheckpoint(
+          { history: conversation, messages: [] },
+          'tag',
+        ),
       ).resolves.not.toThrow();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
@@ -507,6 +515,7 @@ describe('Logger', () => {
           ...conversation,
           { role: 'user', parts: [{ text: 'hello' }] },
         ],
+        messages: [],
         authType: AuthType.USE_GEMINI,
       };
       const taggedFilePath = path.join(
@@ -534,18 +543,18 @@ describe('Logger', () => {
       await fs.writeFile(taggedFilePath, JSON.stringify(conversation, null, 2));
 
       const loaded = await logger.loadCheckpoint(tag);
-      expect(loaded).toEqual({ history: conversation });
+      expect(loaded).toEqual({ history: conversation, messages: [] });
     });
 
-    it('should return an empty history if a tagged checkpoint file does not exist', async () => {
+    it('should return an empty message list if a tagged checkpoint file does not exist', async () => {
       const loaded = await logger.loadCheckpoint('nonexistent-tag');
-      expect(loaded).toEqual({ history: [] });
+      expect(loaded).toEqual({ messages: [] });
     });
 
-    it('should return an empty history if the checkpoint file does not exist', async () => {
+    it('should return an empty message list if the checkpoint file does not exist', async () => {
       await fs.unlink(TEST_CHECKPOINT_FILE_PATH); // Ensure it's gone
       const loaded = await logger.loadCheckpoint('missing');
-      expect(loaded).toEqual({ history: [] });
+      expect(loaded).toEqual({ messages: [] });
     });
 
     it('should return an empty history if the file contains invalid JSON', async () => {
@@ -560,14 +569,14 @@ describe('Logger', () => {
         .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       const loadedCheckpoint = await logger.loadCheckpoint(tag);
-      expect(loadedCheckpoint).toEqual({ history: [] });
+      expect(loadedCheckpoint).toEqual({ messages: [] });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to read or parse checkpoint file'),
         expect.any(Error),
       );
     });
 
-    it('should return an empty history if logger is not initialized', async () => {
+    it('should return an empty message list if logger is not initialized', async () => {
       const uninitializedLogger = new Logger(
         testSessionId,
         new Storage(process.cwd()),
@@ -577,7 +586,7 @@ describe('Logger', () => {
         .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       const loadedCheckpoint = await uninitializedLogger.loadCheckpoint('tag');
-      expect(loadedCheckpoint).toEqual({ history: [] });
+      expect(loadedCheckpoint).toEqual({ messages: [] });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );

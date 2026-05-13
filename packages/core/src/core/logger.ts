@@ -16,6 +16,8 @@ import {
   type MessageRecord,
 } from '../services/chatRecordingService.js';
 
+import { reconstructHistory } from '../utils/history-reconstruction.js';
+
 const LOG_FILE_NAME = 'logs.json';
 
 export enum MessageSenderType {
@@ -31,10 +33,22 @@ export interface LogEntry {
 }
 
 export interface Checkpoint {
-  history: readonly Content[];
+  /**
+   * The rich message records which are the source of truth for the session.
+   */
+  messages: MessageRecord[];
+  /**
+   * The version of the checkpoint format.
+   * Version 2.0 uses messages as the source of truth and reconstructs history.
+   */
+  version?: '2.0';
+  /**
+   * The standard history array used for model requests.
+   * Only included in legacy checkpoints (pre-2.0).
+   */
+  history?: readonly Content[];
   authType?: AuthType;
   trajectories?: Record<string, ConversationRecord>;
-  messages?: MessageRecord[];
 }
 
 // This regex matches any character that is NOT a letter (a-z, A-Z),
@@ -353,7 +367,7 @@ export class Logger {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
-      return { history: [] };
+      return { messages: [] };
     }
 
     const path = await this._getCheckpointPath(tag);
@@ -365,34 +379,46 @@ export class Logger {
       // Handle legacy format (just an array of Content)
       if (Array.isArray(parsedContent)) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return { history: parsedContent as Content[] };
+        return { history: parsedContent as Content[], messages: [] };
       }
 
-      if (
-        typeof parsedContent === 'object' &&
-        parsedContent !== null &&
-        'history' in parsedContent
-      ) {
+      if (typeof parsedContent === 'object' && parsedContent !== null) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return parsedContent as Checkpoint;
+        const checkpoint = parsedContent as Checkpoint;
+
+        // Version 2.0: Reconstruct history from messages
+        if (checkpoint.version === '2.0' && checkpoint.messages) {
+          return {
+            ...checkpoint,
+            history: reconstructHistory(checkpoint.messages),
+          };
+        }
+
+        // Legacy Object format (pre-2.0, had history but maybe not messages)
+        if (checkpoint.history) {
+          return {
+            ...checkpoint,
+            messages: checkpoint.messages ?? [],
+          };
+        }
       }
 
       debugLogger.warn(
         `Checkpoint file at ${path} has an unknown format. Returning empty checkpoint.`,
       );
-      return { history: [] };
+      return { messages: [] };
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         // This is okay, it just means the checkpoint doesn't exist in either format.
-        return { history: [] };
+        return { messages: [] };
       }
       debugLogger.error(
         `Failed to read or parse checkpoint file ${path}:`,
         error,
       );
-      return { history: [] };
+      return { messages: [] };
     }
   }
 

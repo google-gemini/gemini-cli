@@ -40,6 +40,7 @@ import { tokenLimit } from './tokenLimits.js';
 import type {
   ChatRecordingService,
   ResumedSessionData,
+  MessageRecord,
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -339,8 +340,9 @@ export class GeminiClient {
   async resumeChat(
     history: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
+    messages?: MessageRecord[],
   ): Promise<void> {
-    this.chat = await this.startChat(history, resumedSessionData);
+    this.chat = await this.startChat(history, resumedSessionData, messages);
     this.updateTelemetryTokenCount();
   }
 
@@ -380,6 +382,7 @@ export class GeminiClient {
   async startChat(
     extraHistory?: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
+    messages?: MessageRecord[],
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
@@ -409,8 +412,9 @@ export class GeminiClient {
             toolRegistry.getFunctionDeclarations(modelId);
           return [{ functionDeclarations: toolDeclarations }];
         },
+        messages,
       );
-      await chat.initialize(resumedSessionData, 'main');
+      await chat.initialize(resumedSessionData, 'main', messages);
       this.contextManager = await initializeContextManager(
         this.config,
         chat,

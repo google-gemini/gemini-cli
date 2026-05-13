@@ -5,6 +5,8 @@
  */
 
 import type { Content, PartListUnion } from '@google/genai';
+import type { MessageRecord } from '../services/chatRecordingTypes.js';
+
 /**
  * The return type for a command action that results in scheduling a tool call.
  */
@@ -37,6 +39,8 @@ export interface LoadHistoryActionReturn<HistoryType = unknown> {
   type: 'load_history';
   history: HistoryType;
   clientHistory: readonly Content[]; // The history for the generative client
+  messages?: MessageRecord[];
+  version?: '2.0';
 }
 
 /**

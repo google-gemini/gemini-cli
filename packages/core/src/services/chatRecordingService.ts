@@ -695,6 +695,16 @@ export class ChatRecordingService {
   }
 
   /**
+   * Resets the current message history. Used during session resumption.
+   */
+  resetMessages(messages: MessageRecord[]): void {
+    if (!this.cachedConversation) return;
+    this.cachedConversation.messages = [...messages];
+    // We don't append to the log here, as we are resetting the in-memory state
+    // to match a loaded checkpoint.
+  }
+
+  /**
    * Deletes a session file by sessionId, filename, or basename.
    * Derives an 8-character shortId to find and delete all associated files
    * (parent and subagents).

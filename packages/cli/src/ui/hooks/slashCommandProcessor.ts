@@ -549,7 +549,16 @@ export const useSlashCommandProcessor = (
                     }
                   }
                 case 'load_history': {
-                  config?.getGeminiClient()?.setHistory(result.clientHistory);
+                  const client = config?.getGeminiClient();
+                  if (result.version === '2.0' && client) {
+                    await client.resumeChat(
+                      [...result.clientHistory],
+                      undefined,
+                      result.messages,
+                    );
+                  } else {
+                    client?.setHistory(result.clientHistory);
+                  }
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
