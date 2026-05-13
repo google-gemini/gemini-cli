@@ -35,11 +35,14 @@ export class RagLogger {
 
     // Ensure the directory exists
     try {
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
-      }
+      fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
+      const actualPath = fs.realpathSync(logsDir);
+      fs.chmodSync(actualPath, 0o700);
     } catch (e) {
-      debugLogger.error('Failed to create directory for rag-trace.log', e);
+      debugLogger.error(
+        'Failed to create or set permissions for rag-trace.log directory',
+        e,
+      );
     }
   }
 
@@ -60,9 +63,9 @@ export class RagLogger {
     try {
       // Create with strict permissions (0o600) to protect proprietary code snippets
       fs.appendFileSync(this.logPath, JSON.stringify(fullEntry) + '\n', {
-        mode: 0o600,
         encoding: 'utf8',
       });
+      fs.chmodSync(this.logPath, 0o600);
     } catch (e) {
       debugLogger.error(`Failed to write to ${this.logPath}`, e);
     }

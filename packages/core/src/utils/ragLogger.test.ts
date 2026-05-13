@@ -14,6 +14,8 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  chmodSync: vi.fn(),
+  realpathSync: vi.fn(),
 }));
 
 vi.mock('./debugLogger.js', () => ({
@@ -39,28 +41,19 @@ describe('RagLogger', () => {
 
   describe('initialize', () => {
     it('should create the logs directory if it does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.realpathSync).mockReturnValue('/real/test/logs');
 
       logger.initialize('/test/logs');
 
-      expect(fs.existsSync).toHaveBeenCalledWith('/test/logs');
       expect(fs.mkdirSync).toHaveBeenCalledWith('/test/logs', {
         recursive: true,
         mode: 0o700,
       });
-    });
-
-    it('should not create the logs directory if it already exists', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-
-      logger.initialize('/test/logs');
-
-      expect(fs.existsSync).toHaveBeenCalledWith('/test/logs');
-      expect(fs.mkdirSync).not.toHaveBeenCalled();
+      expect(fs.realpathSync).toHaveBeenCalledWith('/test/logs');
+      expect(fs.chmodSync).toHaveBeenCalledWith('/real/test/logs', 0o700);
     });
 
     it('should log an error to debugLogger if directory creation fails', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
       const error = new Error('mkdir failed');
       vi.mocked(fs.mkdirSync).mockImplementation(() => {
         throw error;
@@ -69,7 +62,7 @@ describe('RagLogger', () => {
       logger.initialize('/test/logs');
 
       expect(debugLogger.error).toHaveBeenCalledWith(
-        'Failed to create directory for rag-trace.log',
+        'Failed to create or set permissions for rag-trace.log directory',
         error,
       );
     });
@@ -104,7 +97,11 @@ describe('RagLogger', () => {
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         path.join('/test/logs', 'rag-trace.log'),
         JSON.stringify(expectedFullEntry) + '\n',
-        { mode: 0o600, encoding: 'utf8' },
+        { encoding: 'utf8' },
+      );
+      expect(fs.chmodSync).toHaveBeenCalledWith(
+        path.join('/test/logs', 'rag-trace.log'),
+        0o600,
       );
     });
 
