@@ -17,7 +17,9 @@ import {
   resolveToRealPath,
   makeRelative,
   deduplicateAbsolutePaths,
+  toAbsolutePath,
   toPathKey,
+  isTrustedSystemPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -651,6 +653,40 @@ describe('makeRelative', () => {
   });
 });
 
+describe('toAbsolutePath', () => {
+  it('should resolve a relative path to an absolute path', () => {
+    const result = toAbsolutePath('some/relative/path');
+    expect(result).toMatch(/^\/|^[A-Za-z]:\//);
+  });
+
+  it('should convert all backslashes to forward slashes', () => {
+    const result = toAbsolutePath(path.resolve('some', 'path'));
+    expect(result).not.toContain('\\');
+  });
+
+  describe.skipIf(process.platform !== 'darwin')(
+    'on Darwin (case-preserving)',
+    () => {
+      beforeEach(() => mockPlatform('darwin'));
+      afterEach(() => vi.unstubAllGlobals());
+
+      it('should preserve the original casing of every segment', () => {
+        const result = toAbsolutePath('/Users/Sandy/Memory/MEMORY.md');
+        expect(result).toBe('/Users/Sandy/Memory/MEMORY.md');
+      });
+    },
+  );
+
+  describe.skipIf(
+    process.platform === 'win32' || process.platform === 'darwin',
+  )('on Linux', () => {
+    it('should preserve case', () => {
+      const result = toAbsolutePath('/usr/Local/Bin');
+      expect(result).toBe('/usr/Local/Bin');
+    });
+  });
+});
+
 describe('normalizePath', () => {
   it('should resolve a relative path to an absolute path', () => {
     const result = normalizePath('some/relative/path');
@@ -760,6 +796,63 @@ describe('normalizePath', () => {
 
       mockPlatform('linux');
       expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
+    });
+  });
+
+  describe('isTrustedSystemPath', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    });
+
+    it('should reject paths in the current working directory', () => {
+      const cwd = process.cwd();
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      expect(isTrustedSystemPath(cwd)).toBe(false);
+    });
+
+    it('should allow trusted paths on Windows', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+      vi.stubEnv('ProgramFiles(x86)', 'C:\\Program Files (x86)');
+
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      expect(isTrustedSystemPath('C:\\Program Files\\ripgrep\\rg.exe')).toBe(
+        true,
+      );
+      expect(
+        isTrustedSystemPath('C:\\Program Files (x86)\\ripgrep\\rg.exe'),
+      ).toBe(true);
+
+      // Case insensitive
+      expect(isTrustedSystemPath('c:\\windows\\system32\\rg.exe')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('D:\\Downloads\\rg.exe')).toBe(false);
+      expect(isTrustedSystemPath('C:\\Users\\User\\rg.exe')).toBe(false);
+    });
+
+    it('should allow trusted paths on macOS and Linux', () => {
+      mockPlatform('darwin');
+
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/usr/local/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/opt/homebrew/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath('/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath('/usr/local/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(isTrustedSystemPath('/usr/sbin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/sbin/rg')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('/home/user/bin/rg')).toBe(false);
+      expect(isTrustedSystemPath('/tmp/rg')).toBe(false);
+      expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
   });
 });

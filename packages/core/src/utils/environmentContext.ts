@@ -61,12 +61,7 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   // - Tier 1 (global): system instruction only
   // - Tier 2 (extension + project): first user message (here)
   // - Tier 3 (subdirectory): tool output (JIT)
-  // When JIT is enabled, Tier 2 memory is provided by getSessionMemory().
-  // When JIT is disabled, all memory is in the system instruction and
-  // getEnvironmentMemory() provides the project memory for this message.
-  const environmentMemory = config.isJitContextEnabled?.()
-    ? config.getSessionMemory()
-    : config.getEnvironmentMemory();
+  const environmentMemory = config.getSessionMemory();
 
   const context = `
 <session_context>
