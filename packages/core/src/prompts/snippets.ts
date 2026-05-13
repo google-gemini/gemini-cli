@@ -84,6 +84,7 @@ export interface PrimaryWorkflowsOptions {
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
+  enableShellEfficiency?: boolean;
   topicUpdateNarration: boolean;
   memoryV2Enabled: boolean;
   /**
@@ -395,6 +396,8 @@ export function renderOperationalGuidelines(
   return `
 # Operational Guidelines
 
+${shellEfficiencyGuidelines(options.enableShellEfficiency ?? false)}
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -432,6 +435,20 @@ export function renderOperationalGuidelines(
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
 `.trim();
+}
+
+function shellEfficiencyGuidelines(enabled: boolean): string {
+  if (!enabled) return '';
+  const isWindows = process.platform === 'win32';
+  const platformName = isWindows ? 'Windows' : 'Unix-like';
+  const inspectExample = isWindows
+    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
+    : "using commands like 'grep', 'tail', 'head'";
+  return `
+## Shell tool usage
+
+- The host platform is ${platformName} (${process.platform}). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection ${inspectExample}.`;
 }
 
 export function renderSandbox(options?: SandboxOptions): string {

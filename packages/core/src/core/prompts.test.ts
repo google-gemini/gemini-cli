@@ -673,6 +673,21 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     });
 
+    it('should include Windows host platform guidance for preview models on win32', () => {
+      mockPlatform('win32');
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('The host platform is Windows (win32)');
+      expect(prompt).toContain(
+        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
+      );
+      expect(prompt).not.toContain(
+        "using commands like 'grep', 'tail', 'head'",
+      );
+    });
+
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
