@@ -2451,7 +2451,11 @@ describe('useGeminiStream', () => {
     });
 
     it('should auto-approve shell commands with redirection when switching to AUTO_EDIT mode', async () => {
-      const shellCall = createMockToolCall(SHELL_TOOL_NAME, 'call-shell', 'info');
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
       shellCall.request.args = { command: 'ls > files.txt' };
 
       const { result } = await renderTestHook([shellCall]);
@@ -2467,7 +2471,11 @@ describe('useGeminiStream', () => {
     });
 
     it('should NOT auto-approve shell commands without redirection when switching to AUTO_EDIT mode', async () => {
-      const shellCall = createMockToolCall(SHELL_TOOL_NAME, 'call-shell', 'info');
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
       shellCall.request.args = { command: 'ls -la' };
 
       const { result } = await renderTestHook([shellCall]);
