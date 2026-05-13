@@ -20,6 +20,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -2123,16 +2124,48 @@ function createUrlTransport(
     | StreamableHTTPClientTransportOptions
     | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
-  // Wrap fetch to treat GET 404 as 405 so servers that do not support the
-  // optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
+  // Create a proxy-aware fetcher that respects NO_PROXY for this MCP server
+  // This is especially important for local MCP servers (localhost, 127.0.0.1)
+  // when a company proxy is globally configured.
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const agent = new EnvHttpProxyAgent({ noProxy });
+
+  // Wrap fetch to:
+  // 1. Use the proxy-aware agent (respecting NO_PROXY)
+  // 2. Treat GET 404 as 405 so servers that do not support the
+  //    optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
   // The SDK already silently ignores 405; 404 is semantically equivalent here.
   const baseFetch =
     (transportOptions as StreamableHTTPClientTransportOptions).fetch ??
     globalThis.fetch;
+
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      const res = await baseFetch(url, init);
+      // If we have an explicit NO_PROXY, we use undici's fetch with EnvHttpProxyAgent
+      // to ensure correct routing. Otherwise, we use the base fetch.
+      let res: Response;
+      if (noProxy) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const undiciRes = await undiciFetch(url, {
+          ...init,
+          dispatcher: agent,
+        } as unknown as import('undici').RequestInit);
+
+        // Convert undici response to standard Response for compatibility
+        res = new Response(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          undiciRes.body as unknown as ReadableStream<Uint8Array> | null,
+          {
+            status: undiciRes.status,
+            statusText: undiciRes.statusText,
+            headers: [...undiciRes.headers.entries()],
+          },
+        );
+      } else {
+        res = (await baseFetch(url, init));
+      }
+
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
         : res;
