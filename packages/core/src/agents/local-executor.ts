@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -315,7 +316,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.parentCallId = parentCallId;
     this.cache = new LRUCache<string, string>(10);
 
-    this.agentId = Math.random().toString(36).slice(2, 8);
+    this.agentId = randomUUID();
   }
 
   /**
