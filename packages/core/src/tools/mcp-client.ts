@@ -2163,7 +2163,7 @@ function createUrlTransport(
           },
         );
       } else {
-        res = (await baseFetch(url, init));
+        res = await baseFetch(url, init);
       }
 
       return init?.method === 'GET' && res.status === 404
