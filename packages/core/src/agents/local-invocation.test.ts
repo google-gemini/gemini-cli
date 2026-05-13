@@ -21,6 +21,7 @@ import {
   type SubagentProgress,
   SubagentActivityErrorType,
   SUBAGENT_REJECTED_ERROR_PREFIX,
+  SubagentState,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
@@ -215,7 +216,7 @@ describe('LocalSubagentInvocation', () => {
       ]);
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
-      expect(display.state).toBe('completed');
+      expect(display.state).toBe(SubagentState.COMPLETED);
       expect(display.result).toBe('Analysis complete.');
       expect(display.terminateReason).toBe(AgentTerminateMode.GOAL);
     });
@@ -234,7 +235,7 @@ describe('LocalSubagentInvocation', () => {
 
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
-      expect(display.state).toBe('completed');
+      expect(display.state).toBe(SubagentState.COMPLETED);
       expect(display.result).toBe('Partial progress...');
       expect(display.terminateReason).toBe(AgentTerminateMode.TIMEOUT);
     });
@@ -340,7 +341,7 @@ describe('LocalSubagentInvocation', () => {
         expect.objectContaining({
           type: 'thought',
           content: 'Error: Failed',
-          status: 'error',
+          status: SubagentState.ERROR,
         }),
       );
     });
@@ -376,7 +377,7 @@ describe('LocalSubagentInvocation', () => {
         expect.objectContaining({
           type: 'tool_call',
           content: 'ls',
-          status: 'error',
+          status: SubagentState.ERROR,
         }),
       );
     });
@@ -418,7 +419,7 @@ describe('LocalSubagentInvocation', () => {
         expect.objectContaining({
           type: 'tool_call',
           content: 'ls',
-          status: 'cancelled',
+          status: SubagentState.CANCELLED,
         }),
       );
     });
@@ -443,7 +444,7 @@ describe('LocalSubagentInvocation', () => {
       expect(result.error).toBeUndefined();
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
-      expect(display.state).toBe('completed');
+      expect(display.state).toBe(SubagentState.COMPLETED);
       expect(display.result).toBe('Done');
     });
 
@@ -466,7 +467,7 @@ describe('LocalSubagentInvocation', () => {
         expect.objectContaining({
           type: 'thought',
           content: `Error: ${error.message}`,
-          status: 'error',
+          status: SubagentState.ERROR,
         }),
       );
     });
@@ -488,7 +489,7 @@ describe('LocalSubagentInvocation', () => {
       expect(display.recentActivity).toContainEqual(
         expect.objectContaining({
           content: `Error: ${creationError.message}`,
-          status: 'error',
+          status: SubagentState.ERROR,
         }),
       );
     });
