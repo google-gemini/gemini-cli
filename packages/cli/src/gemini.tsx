@@ -514,7 +514,7 @@ export async function main() {
         partialConfig.isInteractive() &&
         settings.merged.security.auth.selectedType
       ) {
-        const err = validateAuthMethod(
+        const err = await validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
         if (err) {
