@@ -13,16 +13,23 @@ import {
   getGlobalMemoryPaths,
   getExtensionMemoryPaths,
   getEnvironmentMemoryPaths,
+  getUserProjectMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
+  readGeminiMdFiles,
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
+  PROJECT_MEMORY_INDEX_FILENAME,
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
+import {
+  GEMINI_DIR,
+  toAbsolutePath,
+  homedir as pathsHomedir,
+} from './paths.js';
 
 function flattenResult(result: {
   memoryContent: HierarchicalMemory;
@@ -32,7 +39,7 @@ function flattenResult(result: {
   return {
     ...result,
     memoryContent: flattenMemory(result.memoryContent),
-    filePaths: result.filePaths.map((p) => normalizePath(p)),
+    filePaths: result.filePaths,
   };
 }
 import { Config, type GeminiCLIExtension } from '../config/config.js';
@@ -69,17 +76,17 @@ describe('memoryDiscovery', () => {
 
   async function createEmptyDir(fullPath: string) {
     await fsPromises.mkdir(fullPath, { recursive: true });
-    return normalizePath(fullPath);
+    return toAbsolutePath(fullPath);
   }
 
   async function createTestFile(fullPath: string, fileContents: string) {
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, fileContents);
-    return normalizePath(path.resolve(testRootDir, fullPath));
+    return toAbsolutePath(path.resolve(testRootDir, fullPath));
   }
 
   beforeEach(async () => {
-    testRootDir = normalizePath(
+    testRootDir = toAbsolutePath(
       await fsPromises.mkdtemp(
         path.join(os.tmpdir(), 'folder-structure-test-'),
       ),
@@ -96,9 +103,6 @@ describe('memoryDiscovery', () => {
     vi.mocked(os.homedir).mockReturnValue(homedir);
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
-
-  const normMarker = (p: string) =>
-    process.platform === 'win32' ? p.toLowerCase() : p;
 
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -682,6 +686,97 @@ included directory memory
     expect(childOccurrences).toBe(1);
   });
 
+  describe('EISDIR handling for GEMINI.md as a directory', () => {
+    it('readGeminiMdFiles returns null content (without throwing) when path is a directory', async () => {
+      const dirAsFilePath = await createEmptyDir(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+      );
+
+      const results = await readGeminiMdFiles([dirAsFilePath]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].filePath).toBe(dirAsFilePath);
+      expect(results[0].content).toBeNull();
+    });
+
+    it('loadServerHierarchicalMemory ignores a GEMINI.md directory and returns empty memory', async () => {
+      // Create a directory named GEMINI.md where a regular file would be expected.
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // EISDIR is silently skipped, so memory is empty (no readable file
+      // contents) and no exception propagates.
+      expect(result.memoryContent).toBe('');
+    });
+
+    it('falls back to a real GEMINI.md file at a higher level when a directory shadows the same name lower in the tree', async () => {
+      // Lower in the tree (cwd): a directory named GEMINI.md (invalid).
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+      // Higher in the tree (projectRoot): a real GEMINI.md file (valid).
+      const projectContextFile = await createTestFile(
+        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+        'Project root memory content',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // The directory at cwd is silently skipped; the actual file at
+      // projectRoot is still discovered and loaded normally.
+      expect(result.memoryContent).toContain('Project root memory content');
+      expect(result.filePaths).toContain(projectContextFile);
+    });
+
+    it('silently skips a GEMINI.md symlink that points to a directory', async () => {
+      // Create a real directory elsewhere and symlink GEMINI.md to it.
+      const realDir = await createEmptyDir(path.join(cwd, '.geminimd-target'));
+      const symlinkPath = path.join(cwd, DEFAULT_CONTEXT_FILENAME);
+      try {
+        await fsPromises.symlink(realDir, symlinkPath, 'dir');
+      } catch (err) {
+        // Symlink creation may be unsupported on some Windows setups (no
+        // SeCreateSymbolicLinkPrivilege). Skip the test there rather than fail.
+        if (
+          err instanceof Error &&
+          (err as NodeJS.ErrnoException).code === 'EPERM'
+        ) {
+          return;
+        }
+        throw err;
+      }
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // A symlink resolving to a directory triggers EISDIR on read in the
+      // same way a plain directory does and must be skipped silently.
+      expect(result.memoryContent).toBe('');
+    });
+  });
+
   describe('getGlobalMemoryPaths', () => {
     it('should find global memory file if it exists', async () => {
       const globalMemoryFile = await createTestFile(
@@ -697,6 +792,61 @@ included directory memory
 
     it('should return empty array if global memory file does not exist', async () => {
       const result = await getGlobalMemoryPaths();
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getUserProjectMemoryPaths', () => {
+    it('should find MEMORY.md when it exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir1'));
+      const memoryFile = await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(memoryFile);
+    });
+
+    it('should preserve the on-disk casing of the index filename', async () => {
+      // Regression: paths surfaced through /memory list and /memory show
+      // were previously lowercased on macOS/Windows because they passed
+      // through normalizePath. The MEMORY.md filename must be kept as-is
+      // for display.
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir2'));
+      await createTestFile(
+        path.join(memoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+        'project memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toContain(PROJECT_MEMORY_INDEX_FILENAME);
+      expect(result[0]).not.toContain(
+        PROJECT_MEMORY_INDEX_FILENAME.toLowerCase(),
+      );
+    });
+
+    it('should fall back to legacy GEMINI.md when MEMORY.md is absent', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir3'));
+      const legacyFile = await createTestFile(
+        path.join(memoryDir, DEFAULT_CONTEXT_FILENAME),
+        'legacy memory',
+      );
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
+
+      expect(result).toContain(legacyFile);
+    });
+
+    it('should return empty array when neither MEMORY.md nor GEMINI.md exists', async () => {
+      const memoryDir = await createEmptyDir(path.join(testRootDir, 'memdir4'));
+
+      const result = await getUserProjectMemoryPaths(memoryDir);
 
       expect(result).toHaveLength(0);
     });
@@ -808,6 +958,50 @@ included directory memory
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(repoFile);
+    });
+
+    it('should preserve case-distinct files before identity deduplication', async () => {
+      const platformSpy = vi
+        .spyOn(process, 'platform', 'get')
+        .mockReturnValue('win32');
+      vi.resetModules();
+      vi.doMock('node:fs/promises', async () => {
+        const actual =
+          await vi.importActual<typeof fsPromises>('node:fs/promises');
+        return {
+          ...actual,
+          access: vi.fn().mockResolvedValue(undefined),
+          stat: vi.fn(async (filePath) => {
+            const normalizedPath = String(filePath).replace(/\\/g, '/');
+            return {
+              dev: 1,
+              ino: normalizedPath.endsWith('/GEMINI.md') ? 101 : 202,
+            };
+          }),
+        };
+      });
+
+      try {
+        const paths = await import('./paths.js');
+        const memoryTool = await import('../tools/memoryTool.js');
+        const memoryDiscovery = await import('./memoryDiscovery.js');
+        vi.mocked(paths.homedir).mockReturnValue('/home/tester');
+        memoryTool.setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+        const result = await memoryDiscovery.getEnvironmentMemoryPaths(
+          ['/case-root'],
+          [],
+        );
+
+        expect(result).toEqual([
+          paths.toAbsolutePath('/case-root/GEMINI.md'),
+          paths.toAbsolutePath('/case-root/gemini.md'),
+        ]);
+      } finally {
+        platformSpy.mockRestore();
+        vi.doUnmock('node:fs/promises');
+        vi.resetModules();
+      }
     });
 
     it('should recognize .git as a file (submodules/worktrees)', async () => {
@@ -1409,7 +1603,7 @@ included directory memory
     expect(flattenedMemory).toContain('Really cool custom context!');
     expect(config.getUserMemory()).toStrictEqual(refreshResult.memoryContent);
     expect(refreshResult.filePaths[0]).toContain(
-      normMarker(path.join(extensionPath, 'CustomContext.md')),
+      toAbsolutePath(path.join(extensionPath, 'CustomContext.md')),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({

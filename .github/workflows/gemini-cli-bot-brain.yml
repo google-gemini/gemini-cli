@@ -29,7 +29,7 @@ on:
         default: false
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number || github.ref }}'
+  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || github.ref }}'
   cancel-in-progress: true
 
 jobs:
@@ -41,21 +41,35 @@ jobs:
         github.event_name == 'schedule' ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive != 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive == 'true') ||
-        (github.event_name == 'issue_comment' && github.event.comment.user.login != 'gemini-cli[bot]' && contains(github.event.comment.body, '@gemini-cli') && contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association)) ||
-        (github.event_name == 'pull_request_review_comment' && github.event.comment.user.login != 'gemini-cli[bot]' && contains(github.event.comment.body, '@gemini-cli') && contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association))
+        (github.event_name == 'issue_comment' && github.event.comment.user.login != 'gemini-cli[bot]' && contains(github.event.comment.body, '@gemini-cli') && contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association))
       )
     # The reasoning phase is strictly readonly.
     permissions:
       contents: 'read'
       issues: 'read'
-      pull-requests: 'read'
       actions: 'read'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="${{ github.ref }}"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -86,8 +100,15 @@ jobs:
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
 
-            # Download brain memory (all state in one artifact)
-            gh run download "$LAST_RUN_ID" -n brain-data -D . || echo "brain-data not found"
+            # Download brain memory to a temp dir so we can selectively restore only persistent state
+            mkdir -p .temp_brain_data
+            gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
+
+            # Restore only persistent memory files
+            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
+            mkdir -p tools/gemini-cli-bot/history/
+            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv tools/gemini-cli-bot/history/ 2>/dev/null || true
+            rm -rf .temp_brain_data
           else
             echo "No previous successful run found."
           fi
@@ -102,11 +123,12 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
+          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
           ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
           TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
         run: |
-          PROMPT_PATH="tools/gemini-cli-bot/brain/metrics.md"
+          PROMPT_PATH="tools/gemini-cli-bot/brain/scheduled.md"
           if [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
             PROMPT_PATH="tools/gemini-cli-bot/brain/interactive.md"
             export ENABLE_PRS="true"
@@ -129,22 +151,37 @@ jobs:
             echo "</untrusted_context>" >> trigger_context.md
           fi
 
-          cat trigger_context.md "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md > combined_prompt.md
+          if [ "$ENABLE_PRS" = "true" ]; then
+            echo "**System Directive**: PR creation is ENABLED for this run. You MUST activate the **'prs' skill** to stage your changes and generate a \`pr-description.md\` file if you are proposing fixes." >> trigger_context.md
+            echo "**CRITICAL System Directive**: You MUST ONLY propose and implement a **SINGLE** improvement or fix per run. Bundling unrelated changes (e.g., a documentation update and a script fix, or a metrics update and a logic fix) into a single PR is STRICTLY FORBIDDEN and will result in immediate rejection during the critique phase. If you identify multiple issues, pick the most impactful one and ignore the others for now." >> trigger_context.md
+          else
+            echo "**System Directive**: PR creation is DISABLED for this run. You MUST NOT stage files or attempt to create a PR description." >> trigger_context.md
+          fi
+          echo "" >> trigger_context.md
 
-          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
+          cat trigger_context.md "$PROMPT_PATH" > combined_prompt.md
+          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
+
+          if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+            echo "Agent failed to respond. Generating fallback error message."
+            echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
+            echo "" >> "issue-comment.md"
+            echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
+          fi
 
       - name: 'Run Critique Phase'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
+          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
         run: |
           if git diff --staged --quiet; then
              echo "No changes staged. Skipping critique."
              echo "[APPROVED]" > critique_result.txt
           else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/brain/critique.md)" 2>&1 | tee critique_output.log
+             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
 
              if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
                echo "[APPROVED]" > critique_result.txt
@@ -155,7 +192,7 @@ jobs:
           fi
 
       - name: 'Generate Patch'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         run: |
           touch bot-changes.patch
           touch pr-description.md
@@ -193,7 +230,7 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token 🔑'
         id: 'generate_token'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -204,10 +241,25 @@ jobs:
           permission-pull-requests: 'write'
           permission-issues: 'write'
 
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="main"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: 'main'
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -218,7 +270,7 @@ jobs:
           path: '${{ runner.temp }}/brain-data/'
 
       - name: 'Create or Update PR'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
+        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
           FALLBACK_PAT: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
@@ -238,7 +290,7 @@ jobs:
               exit 1
             fi
 
-            git checkout -b "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME"
             git apply "${{ runner.temp }}/brain-data/bot-changes.patch"
             git add .
 
