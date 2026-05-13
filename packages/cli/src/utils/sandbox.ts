@@ -312,7 +312,16 @@ export async function start_sandbox(
 
     // use interactive mode and auto-remove container on exit
     // run init binary inside container to forward signals & reap zombies
-    const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
+    const args = [
+      'run',
+      '-i',
+      '--rm',
+      '--init',
+      '--entrypoint',
+      '',
+      '--workdir',
+      containerWorkdir,
+    ];
 
     // add runsc runtime if using runsc
     if (config.command === 'runsc') {
@@ -716,6 +725,8 @@ export async function start_sandbox(
         'run',
         '--rm',
         '--init',
+        '--entrypoint',
+        '',
         ...(userFlag ? userFlag.split(' ') : []),
         '--name',
         SANDBOX_PROXY_NAME,
