@@ -46,14 +46,18 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-vi.mock('fs', () => ({
-  mkdirSync: vi.fn(),
-  createWriteStream: vi.fn(() => ({
-    on: vi.fn(),
-    write: vi.fn(),
-    end: vi.fn(),
-  })),
-}));
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    mkdirSync: vi.fn(),
+    createWriteStream: vi.fn(() => ({
+      on: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+    })),
+  };
+});
 
 vi.mock('os');
 
@@ -130,7 +134,7 @@ describe('MemoryTool', () => {
 
     it('should reset to default if no argument provided', () => {
       resetGeminiMdFilename('OTHER.md');
-      resetGeminiMdFilename();
+      resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
       expect(getAllGeminiMdFilenames()).toEqual([DEFAULT_CONTEXT_FILENAME]);
     });
 

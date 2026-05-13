@@ -18,7 +18,7 @@ import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
-import { tildeifyPath } from '../utils/paths.js';
+import { resolveToRealPath, tildeifyPath } from '../utils/paths.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -51,11 +51,8 @@ export function setGeminiMdFilename(newFilename: string | string[]): void {
     if (trimmed !== '') {
       const normalized = path.normalize(trimmed);
       // Sanitize to prevent path traversal while allowing subdirectories
-      if (
-        !path.isAbsolute(normalized) &&
-        !normalized.startsWith('..') &&
-        normalized !== '.'
-      ) {
+      const validatedPath = resolveToRealPath(normalized);
+      if (validatedPath) {
         next.add(normalized);
       }
     }
@@ -85,10 +82,7 @@ export function resetGeminiMdFilename(
     new Set(
       filenames
         .map((f) => path.normalize(f.trim()))
-        .filter(
-          (f) =>
-            f !== '' && f !== '.' && !f.startsWith('..') && !path.isAbsolute(f),
-        ),
+        .filter((f) => !!resolveToRealPath(f)),
     ),
   );
 
