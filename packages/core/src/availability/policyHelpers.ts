@@ -57,6 +57,9 @@ export function resolvePolicyChain(
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
+  // Capture the original family intent before any normalization or early downgrade.
+  const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
+
   const resolvedModel = normalizeModelId(
     resolveModel(
       modelFromConfig,
@@ -78,7 +81,7 @@ export function resolvePolicyChain(
     wrapsAround ||
     isAutoPreferred ||
     isAutoConfigured ||
-    isGemini3Model(resolvedModel, config);
+    isOriginallyGemini3;
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -91,7 +94,7 @@ export function resolvePolicyChain(
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = config.modelConfigService.resolveChain('lite', context);
     } else if (
-      isGemini3Model(normalizeModelId(resolvedModel), config) ||
+      isOriginallyGemini3 ||
       isAutoPreferred ||
       isAutoConfigured
     ) {
@@ -132,14 +135,14 @@ export function resolvePolicyChain(
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
       chain = getFlashLitePolicyChain();
     } else if (
-      isGemini3Model(resolvedModel, config) ||
+      isOriginallyGemini3 ||
       isAutoPreferred ||
       isAutoConfigured
     ) {
       const isAutoSelection = isAutoPreferred || isAutoConfigured;
       if (hasAccessToPreview) {
         const previewEnabled =
-          isGemini3Model(resolvedModel, config) ||
+          isOriginallyGemini3 ||
           normalizedPreferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
           configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
         chain = getModelPolicyChain({

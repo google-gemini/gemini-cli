@@ -1630,10 +1630,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const authType = this.contentGeneratorConfig.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (authType === AuthType.USE_GEMINI) {
       this.setHasAccessToPreviewModel(true);
     }
 
