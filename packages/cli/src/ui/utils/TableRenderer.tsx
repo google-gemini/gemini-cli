@@ -250,7 +250,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     };
 
     const char = chars[type];
-    const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
+    const borderParts = adjustedWidths.map((w) =>
+      char.horizontal.repeat(Math.max(0, w || 0)),
+    );
     const border = char.left + borderParts.join(char.middle) + char.right;
 
     return <Text color={theme.border.default}>{border}</Text>;
