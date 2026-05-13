@@ -187,6 +187,24 @@ describe('loggers', () => {
         { tokens_before: 9001, tokens_after: 9000 },
       );
     });
+
+    it('buffers the chat compression OTEL event and metrics', () => {
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
+      const mockConfig = makeFakeConfig();
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
+
+      logChatCompression(mockConfig, event);
+
+      expect(sdk.bufferTelemetryEvent).toHaveBeenCalledOnce();
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordChatCompressionMetrics).not.toHaveBeenCalled();
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(event);
+    });
   });
 
   describe('logCliConfiguration', () => {
