@@ -121,18 +121,101 @@ export async function loadConversationRecord(
   }
 
   try {
-    const fileOptions: { start?: number; end?: number } = {};
     const MAX_FAST_READ = 64 * 1024; // 64KB
-    let fileSize = 0;
+    const stats = await fs.promises.stat(filePath).catch(() => null);
+    const fileSize = stats ? stats.size : 0;
+    const mtime = stats ? stats.mtime.toISOString() : new Date().toISOString();
 
-    if (options?.fastPreview) {
-      const stats = await fs.promises.stat(filePath).catch(() => null);
-      if (stats) fileSize = stats.size;
-      fileOptions.start = 0;
-      fileOptions.end = MAX_FAST_READ; // Read only first 64KB for metadata/preview
+    if (options?.fastPreview && fileSize > MAX_FAST_READ) {
+      // ULTRA-FAST PATH: Regex extraction from raw buffers
+      const fd = await fs.promises.open(filePath, 'r');
+      try {
+        const headBuffer = Buffer.alloc(MAX_FAST_READ);
+        const { bytesRead: headReadCount } = await fd.read(
+          headBuffer,
+          0,
+          MAX_FAST_READ,
+          0,
+        );
+        const headStr = headBuffer.toString('utf8', 0, headReadCount);
+
+        const TAIL_SIZE = 128 * 1024;
+        let tailStr = '';
+        if (fileSize > MAX_FAST_READ) {
+          const tailReadSize = Math.min(TAIL_SIZE, fileSize - headReadCount);
+          if (tailReadSize > 0) {
+            const tailBuffer = Buffer.alloc(tailReadSize);
+            const { bytesRead: tailReadCount } = await fd.read(
+              tailBuffer,
+              0,
+              tailReadSize,
+              fileSize - tailReadSize,
+            );
+            tailStr = tailBuffer.toString('utf8', 0, tailReadCount);
+          }
+        }
+
+        const getMatch = (str: string, reg: RegExp) => {
+          const m = str.match(reg);
+          return m ? m[1] : undefined;
+        };
+
+        const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
+        const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
+        const startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
+        const lastUpdated =
+          getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
+          getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/);
+        const summary =
+          getMatch(tailStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/) ||
+          getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/);
+        const rawKind = getMatch(headStr, /"kind"\s*:\s*"([^"]+)"/);
+        const kind =
+          rawKind === 'main' || rawKind === 'subagent' ? rawKind : undefined;
+        const hasUserOrAssistantMessage =
+          /"type"\s*:\s*"(user|gemini)"/.test(headStr) ||
+          /"type"\s*:\s*"(user|gemini)"/.test(tailStr);
+
+        let firstUserMessage: string | undefined;
+        const userMsgMatch = headStr.match(
+          /"type"\s*:\s*"user"[^}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")/,
+        );
+        if (userMsgMatch) {
+          try {
+            const content = JSON.parse(userMsgMatch[1]) as unknown;
+            if (Array.isArray(content)) {
+              firstUserMessage = content
+                .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                .join('');
+            } else if (typeof content === 'string') {
+              firstUserMessage = content;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
+        if (sessionId && projectHash) {
+          return {
+            sessionId,
+            projectHash,
+            startTime: startTime || mtime,
+            lastUpdated: lastUpdated || mtime,
+            summary,
+            kind,
+            messages: [],
+            messageCount: options?.precalculatedLineCount ?? 0,
+            hasUserOrAssistantMessage,
+            firstUserMessage,
+            memoryScratchpadIsStale: false,
+          };
+        }
+      } finally {
+        await fd.close();
+      }
     }
 
-    const fileStream = fs.createReadStream(filePath, fileOptions);
+    const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,
@@ -177,7 +260,7 @@ export async function loadConversationRecord(
                   const rawContent = record.content;
                   if (Array.isArray(rawContent)) {
                     firstUserMessageStr = rawContent
-                      .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
                       .join('');
                   } else if (typeof rawContent === 'string') {
                     firstUserMessageStr = rawContent;
@@ -288,76 +371,6 @@ export async function loadConversationRecord(
       }
     }
 
-    // Try to get summary from the end of the file if fastPreview skipped it
-    let fastTotalLines = 0;
-    if (options?.fastPreview && fileSize > MAX_FAST_READ) {
-      try {
-        const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
-        const SEARCH_LIMIT = 5 * 1024 * 1024; // Max 5MB backward search
-        const minPosition = Math.max(0, fileSize - SEARCH_LIMIT);
-        const fd = await fs.promises.open(filePath, 'r');
-        let position = fileSize;
-        const buffer = Buffer.alloc(CHUNK_SIZE);
-        let leftover = '';
-        const summaryRegex =
-          /"\$set"\s*:\s*\{[^}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
-
-        while (position > minPosition) {
-          const readSize = Math.min(CHUNK_SIZE, position);
-          position -= readSize;
-
-          await fd.read(buffer, 0, readSize, position);
-          const chunkStr = buffer.toString('utf8', 0, readSize) + leftover;
-
-          if (!metadata.summary) {
-            const matches = [...chunkStr.matchAll(summaryRegex)];
-            if (matches.length > 0) {
-              metadata.summary = matches[matches.length - 1][1];
-            }
-          }
-          leftover = chunkStr.substring(0, 1024);
-          if (metadata.summary) break; // Optimization: stop if we found what we needed
-        }
-        await fd.close();
-      } catch {
-        // Ignore tail read errors
-      }
-
-      // Fast line count for accurate messageCount
-      try {
-        if (process.platform !== 'win32') {
-          const { execFile } = await import('node:child_process');
-          const { promisify } = await import('node:util');
-          const execFileAsync = promisify(execFile);
-          const { stdout } = await execFileAsync('wc', ['-l', filePath], {
-            encoding: 'utf8',
-          });
-          fastTotalLines = parseInt(stdout.trim().split(/\s+/)[0], 10);
-        } else {
-          // Fallback to async buffer counting for Windows
-          const stream = fs.createReadStream(filePath);
-          fastTotalLines = await new Promise<number>((resolve) => {
-            let lines = 0;
-            stream.on('data', (chunk: Buffer | string) => {
-              if (Buffer.isBuffer(chunk)) {
-                for (let i = 0; i < chunk.length; i++) {
-                  if (chunk[i] === 10) lines++;
-                }
-              } else if (typeof chunk === 'string') {
-                for (let i = 0; i < chunk.length; i++) {
-                  if (chunk.charCodeAt(i) === 10) lines++;
-                }
-              }
-            });
-            stream.on('end', () => resolve(lines));
-            stream.on('error', () => resolve(0));
-          });
-        }
-      } catch {
-        // Ignore line counting errors
-      }
-    }
-
     if (!metadata.sessionId || !metadata.projectHash) {
       return await parseLegacyRecordFallback(filePath, options);
     }
@@ -390,17 +403,16 @@ export async function loadConversationRecord(
       : loadedMessages.some((m) => m.type === 'user' || m.type === 'gemini');
 
     const finalMessageCount =
-      fastTotalLines > 0
-        ? fastTotalLines
-        : options?.metadataOnly
-          ? metadataMessages.length || messageIds.length
-          : loadedMessages.length;
+      options?.precalculatedLineCount ??
+      (options?.metadataOnly
+        ? metadataMessages.length || messageIds.length
+        : loadedMessages.length);
 
     return {
       sessionId: metadata.sessionId,
       projectHash: metadata.projectHash,
-      startTime: metadata.startTime || new Date().toISOString(),
-      lastUpdated: metadata.lastUpdated || new Date().toISOString(),
+      startTime: metadata.startTime || mtime,
+      lastUpdated: metadata.lastUpdated || mtime,
       summary: metadata.summary,
       memoryScratchpad: metadata.memoryScratchpad,
       directories: metadata.directories,

@@ -258,98 +258,136 @@ export const getAllSessionFiles = async (
       )
       .sort(); // Sort by filename, which includes timestamp
 
-    const sessionPromises = sessionFiles.map(
-      async (file): Promise<SessionFileEntry> => {
-        const filePath = path.join(chatsDir, file);
+    if (sessionFiles.length === 0) {
+      return [];
+    }
+
+    const getBulkLineCounts = async (): Promise<Map<string, number>> => {
+      const lineCounts = new Map<string, number>();
+      if (!options.includeFullContent && process.platform !== 'win32') {
         try {
-          const content = await loadConversationRecord(filePath, {
-            metadataOnly: !options.includeFullContent,
-            fastPreview: !options.includeFullContent,
-          });
-          if (!content) {
-            return { fileName: file, sessionInfo: null };
+          const { execFile } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const execFileAsync = promisify(execFile);
+          const filePaths = sessionFiles.map((f) => path.join(chatsDir, f));
+
+          const CMD_BATCH_SIZE = 100;
+          for (let i = 0; i < filePaths.length; i += CMD_BATCH_SIZE) {
+            const batch = filePaths.slice(i, i + CMD_BATCH_SIZE);
+            const { stdout } = await execFileAsync('wc', ['-l', ...batch], {
+              encoding: 'utf8',
+              maxBuffer: 10 * 1024 * 1024,
+            });
+            const lines = stdout.trim().split('\n');
+            for (const line of lines) {
+              const parts = line.trim().split(/\s+/);
+              if (parts.length >= 2 && parts[1] !== 'total') {
+                lineCounts.set(path.basename(parts[1]), parseInt(parts[0], 10));
+              }
+            }
           }
-
-          // Validate required fields
-          if (!content.sessionId) {
-            // Missing required fields - treat as corrupted
-            return { fileName: file, sessionInfo: null };
-          }
-
-          const fileStat = await fs.stat(filePath).catch(() => undefined);
-          const fileTimestamp = fileStat?.mtime.toISOString();
-          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
-          const startTime = content.startTime || fallbackTimestamp;
-
-          // Use mtime as the authoritative last updated time when fastPreview is true
-          const lastUpdated =
-            !options.includeFullContent && fileTimestamp
-              ? fileTimestamp
-              : content.lastUpdated || fallbackTimestamp;
-
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
-            return { fileName: file, sessionInfo: null };
-          }
-
-          // Skip subagent sessions - these are implementation details of a tool call
-          // and shouldn't be surfaced for resumption in the main agent history.
-          if (content.kind === 'subagent') {
-            return { fileName: file, sessionInfo: null };
-          }
-
-          const firstUserMessage = content.firstUserMessage
-            ? cleanMessage(content.firstUserMessage)
-            : extractFirstUserMessage(content.messages);
-          const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
-            : false;
-
-          let fullContent: string | undefined;
-          let messages:
-            | Array<{ role: 'user' | 'assistant'; content: string }>
-            | undefined;
-
-          if (options.includeFullContent) {
-            fullContent = content.messages
-              .map((msg) => partListUnionToString(msg.content))
-              .join(' ');
-            messages = content.messages.map((msg) => ({
-              role:
-                msg.type === 'user'
-                  ? ('user' as const)
-                  : ('assistant' as const),
-              content: partListUnionToString(msg.content),
-            }));
-          }
-
-          const sessionInfo: SessionInfo = {
-            id: content.sessionId,
-            file: file.replace(/\.jsonl?$/, ''),
-            fileName: file,
-            startTime,
-            lastUpdated,
-            messageCount: content.messageCount ?? content.messages.length,
-            displayName: content.summary
-              ? stripUnsafeCharacters(content.summary)
-              : firstUserMessage,
-            firstUserMessage,
-            isCurrentSession,
-            index: 0, // Will be set after sorting valid sessions
-            summary: content.summary,
-            fullContent,
-            messages,
-          };
-
-          return { fileName: file, sessionInfo };
         } catch {
-          // File is corrupted (can't read or parse JSON)
-          return { fileName: file, sessionInfo: null };
+          // Fallback handled by individual loadConversationRecord if needed
         }
-      },
-    );
+      }
+      return lineCounts;
+    };
 
-    return await Promise.all(sessionPromises);
+    const [lineCounts, results] = await Promise.all([
+      getBulkLineCounts(),
+      Promise.all(
+        sessionFiles.map(async (file): Promise<SessionFileEntry> => {
+          const filePath = path.join(chatsDir, file);
+          try {
+            const content = await loadConversationRecord(filePath, {
+              metadataOnly: !options.includeFullContent,
+              fastPreview: !options.includeFullContent,
+            });
+            if (!content) {
+              return { fileName: file, sessionInfo: null };
+            }
+
+            if (!content.sessionId) {
+              return { fileName: file, sessionInfo: null };
+            }
+
+            const fileStat = await fs.stat(filePath).catch(() => undefined);
+            const fileTimestamp = fileStat?.mtime.toISOString();
+            const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+            const startTime = content.startTime || fallbackTimestamp;
+
+            const lastUpdated =
+              !options.includeFullContent && fileTimestamp
+                ? fileTimestamp
+                : content.lastUpdated || fallbackTimestamp;
+
+            if (!content.hasUserOrAssistantMessage) {
+              return { fileName: file, sessionInfo: null };
+            }
+
+            if (content.kind === 'subagent') {
+              return { fileName: file, sessionInfo: null };
+            }
+
+            const firstUserMessage = content.firstUserMessage
+              ? cleanMessage(content.firstUserMessage)
+              : extractFirstUserMessage(content.messages);
+            const isCurrentSession = currentSessionId
+              ? file.includes(currentSessionId.slice(0, 8))
+              : false;
+
+            let fullContent: string | undefined;
+            let messages:
+              | Array<{ role: 'user' | 'assistant'; content: string }>
+              | undefined;
+
+            if (options.includeFullContent) {
+              fullContent = content.messages
+                .map((msg) => partListUnionToString(msg.content))
+                .join(' ');
+              messages = content.messages.map((msg) => ({
+                role:
+                  msg.type === 'user'
+                    ? ('user' as const)
+                    : ('assistant' as const),
+                content: partListUnionToString(msg.content),
+              }));
+            }
+
+            const sessionInfo: SessionInfo = {
+              id: content.sessionId,
+              file: file.replace(/\.jsonl?$/, ''),
+              fileName: file,
+              startTime,
+              lastUpdated,
+              messageCount: 0, // Placeholder
+              displayName: content.summary
+                ? stripUnsafeCharacters(content.summary)
+                : firstUserMessage,
+              firstUserMessage,
+              isCurrentSession,
+              index: 0,
+              summary: content.summary,
+              fullContent,
+              messages,
+            };
+
+            return { fileName: file, sessionInfo };
+          } catch {
+            return { fileName: file, sessionInfo: null };
+          }
+        }),
+      ),
+    ]);
+
+    // Patch message counts
+    for (const entry of results) {
+      if (entry.sessionInfo) {
+        entry.sessionInfo.messageCount = lineCounts.get(entry.fileName) ?? 0;
+      }
+    }
+
+    return results;
   } catch (error) {
     // It's expected that the directory might not exist, which is not an error.
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
