@@ -367,7 +367,7 @@ it yourself; just report it.
 | :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.                                                                                      |
 | `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
-| `display_name` | string | No       | Human-readable display name for the agent. Used in UIs and user-facing output to present the agent in a more friendly format.
+| `display_name` | string | No       | Human-readable display name for the agent. Used in UIs and user-facing output to present the agent in a more friendly format.                                                                                 |
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
 | `mcp_servers`  | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
@@ -426,7 +426,7 @@ You can configure tool isolation for a subagent by updating its markdown
 frontmatter. This lets you explicitly state which tools the subagent can use,
 rather than relying on the global registry.
 
-Add an `mcpServers` object to define inline MCP servers that are unique to the
+Add an `mcp_servers` object to define inline MCP servers that are unique to the
 agent.
 
 **Example:**
@@ -437,7 +437,7 @@ name: my-isolated-agent
 tools:
   - grep_search
   - read_file
-mcpServers:
+mcp_servers:
   my-custom-server:
     command: 'node'
     args: ['path/to/server.js']
