@@ -1,7 +1,7 @@
 # Memory files
 
 Gemini CLI persists durable facts, user preferences, and project details by
-editing markdown memory files directly.
+editing Markdown memory files directly.
 
 ## Technical reference
 
