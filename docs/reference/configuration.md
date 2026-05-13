@@ -203,6 +203,11 @@ their corresponding top-level category object in your `settings.json` file.
     chattiness and structured progress reporting.
   - **Default:** `true`
 
+- **`general.logRagSnippets`** (boolean):
+  - **Description:** Log full Code Customization (RAG) retrieved snippets to a
+    local file for debugging.
+  - **Default:** `false`
+
 #### `output`
 
 - **`output.format`** (enum):
