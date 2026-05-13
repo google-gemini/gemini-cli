@@ -76,7 +76,7 @@ export class ProjectRegistry {
       if (isNodeError(error) && error.code === 'ENOENT') {
         return { projects: {} }; // Normal first run
       }
-      if (error instanceof SyntaxError) {
+      if (error instanceof SyntaxError || error instanceof z.ZodError) {
         debugLogger.warn(
           'Failed to load registry (JSON corrupted), resetting to empty: ',
           error,
