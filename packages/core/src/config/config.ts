@@ -34,7 +34,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadMcpResourceTool } from '../tools/read-mcp-resource.js';
 import { ListMcpResourcesTool } from '../tools/list-mcp-resources.js';
 import { GrepTool } from '../tools/grep.js';
-import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
+import { RipGrepTool, resolveRipgrepPath } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
@@ -772,6 +772,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly sandbox: SandboxConfig | undefined;
   private _sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
+  private _ripgrepPathPromise?: Promise<string | null>;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
@@ -2139,6 +2140,32 @@ export class Config implements McpContext, AgentLoopContext {
 
   getProjectRoot(): string {
     return this.targetDir;
+  }
+
+  /**
+   * Returns the path to the ripgrep binary, or null if not found or unsafe.
+   * Uses Promise-based caching to prevent race conditions and redundant I/O.
+   */
+  async getRipgrepPath(): Promise<string | null> {
+    if (!this._ripgrepPathPromise) {
+      this._ripgrepPathPromise = resolveRipgrepPath();
+    }
+    return this._ripgrepPathPromise;
+  }
+
+  /**
+   * Checks if ripgrep is available.
+   */
+  async canUseRipgrep(): Promise<boolean> {
+    return (await this.getRipgrepPath()) !== null;
+  }
+
+  /**
+   * Resets the cached ripgrep path. Used for testing.
+   * @internal
+   */
+  __resetRipgrepPathCache(): void {
+    this._ripgrepPathPromise = undefined;
   }
 
   getWorkspaceContext(): WorkspaceContext {
@@ -3884,7 +3911,7 @@ export class Config implements McpContext, AgentLoopContext {
       let useRipgrep = false;
       let errorString: undefined | string = undefined;
       try {
-        useRipgrep = await canUseRipgrep();
+        useRipgrep = await this.canUseRipgrep();
       } catch (error: unknown) {
         errorString = String(error);
       }
