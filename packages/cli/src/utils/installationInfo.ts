@@ -19,6 +19,7 @@ export enum PackageManager {
   PNPX = 'pnpx',
   BUN = 'bun',
   BUNX = 'bunx',
+  VOLTA = 'volta',
   HOMEBREW = 'homebrew',
   NPX = 'npx',
   BINARY = 'binary',
@@ -30,6 +31,27 @@ export interface InstallationInfo {
   isGlobal: boolean;
   updateCommand?: string;
   updateMessage?: string;
+}
+
+function normalizePathForMatching(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
+}
+
+function isVoltaPath(realPath: string): boolean {
+  const voltaHome = process.env['VOLTA_HOME'];
+  if (voltaHome) {
+    const normalizedVoltaHome = normalizePathForMatching(voltaHome);
+    if (realPath.toLowerCase().startsWith(normalizedVoltaHome.toLowerCase())) {
+      return true;
+    }
+  }
+
+  const lowerRealPath = realPath.toLowerCase();
+  return (
+    lowerRealPath.includes('/.volta/') ||
+    lowerRealPath.includes('/volta/bin/') ||
+    lowerRealPath.includes('/volta/tools/')
+  );
 }
 
 export function getInstallationInfo(
@@ -53,8 +75,10 @@ export function getInstallationInfo(
     }
 
     // Normalize path separators to forward slashes for consistent matching.
-    const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
-    const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
+    const realPath = normalizePathForMatching(fs.realpathSync(cliPath));
+    const normalizedProjectRoot = projectRoot
+      ? normalizePathForMatching(projectRoot)
+      : undefined;
     const isGit = isGitRepository(process.cwd());
 
     // Check for local git clone first
@@ -161,6 +185,20 @@ export function getInstallationInfo(
         updateCommand,
         updateMessage: isAutoUpdateEnabled
           ? 'Installed with bun. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
+      };
+    }
+
+    // Check for Volta before falling back to npm. Volta shims stay pinned
+    // unless the package is updated through Volta itself.
+    if (isVoltaPath(realPath)) {
+      const updateCommand = 'volta install @google/gemini-cli@latest';
+      return {
+        packageManager: PackageManager.VOLTA,
+        isGlobal: true,
+        updateCommand,
+        updateMessage: isAutoUpdateEnabled
+          ? 'Installed with Volta. Attempting to automatically update now...'
           : `Please run ${updateCommand} to update`,
       };
     }
