@@ -142,6 +142,17 @@ async function handleExecuteCommand(
       return res.status(400).json({ error: '"args" field must be an array.' });
     }
 
+    if (args) {
+      const safeArgPattern = /^[a-zA-Z0-9 ._/-]+$/;
+      for (const arg of args as unknown[]) {
+        if (typeof arg !== 'string' || !safeArgPattern.test(arg)) {
+          return res
+            .status(400)
+            .json({ error: 'Invalid characters in "args". Only alphanumeric, spaces, and ._/- are allowed.' });
+        }
+      }
+    }
+
     // Validate command and arguments using allowlist-based validator
     const validation = validateCommandExecution(command, args ?? []);
     if (!validation.valid) {
