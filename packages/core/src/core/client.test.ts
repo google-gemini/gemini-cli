@@ -289,6 +289,7 @@ describe('Gemini Client (client.ts)', () => {
       resetTurn: vi.fn(),
 
       isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
       getModelAvailabilityService: vi
         .fn()
@@ -1516,8 +1517,8 @@ ${JSON.stringify(
       // A string of length 404 is roughly 101 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1576,8 +1577,8 @@ ${JSON.stringify(
       // We need a request > 100 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({

@@ -18,6 +18,36 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.42.0 - 2026-05-12
+
+- **Auto Memory Inbox:** Introduced a new inbox flow for Auto Memory with a
+  canonical-patch contract for seamless skill management
+  ([#26338](https://github.com/google-gemini/gemini-cli/pull/26338) by
+  @SandyTao520).
+- **Gemma 4 by Default:** Enabled Gemma 4 models by default via the Gemini API
+  for all users
+  ([#26307](https://github.com/google-gemini/gemini-cli/pull/26307) by
+  @Abhijit-2592).
+- **Voice Mode Enhancements:** Added wave animations and privacy/compliance UX
+  warnings for the Gemini Live backend
+  ([#26284](https://github.com/google-gemini/gemini-cli/pull/26284) by
+  @devr0306, [#26454](https://github.com/google-gemini/gemini-cli/pull/26454) by
+  @cocosheng-g).
+
+## Announcements: v0.41.0 - 2026-05-05
+
+- **Real-time Voice Mode:** Implemented real-time voice mode with cloud and
+  local backends
+  ([#24174](https://github.com/google-gemini/gemini-cli/pull/24174) by
+  @Abhijit-2592).
+- **Secure Environment Loading:** Enforced workspace trust and secured .env
+  loading in headless mode
+  ([#25814](https://github.com/google-gemini/gemini-cli/pull/25814) by
+  @ehedlund).
+- **Advanced Shell Validation:** Enhanced shell command validation and added
+  core tools allowlist for improved security
+  ([#25720](https://github.com/google-gemini/gemini-cli/pull/25720) by @galz10).
+
 ## Announcements: v0.40.0 - 2026-04-28
 
 - **Offline Search and Themes:** Bundled ripgrep for offline search support and

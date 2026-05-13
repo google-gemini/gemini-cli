@@ -97,12 +97,14 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
         [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_FILE_PATH],
@@ -223,6 +225,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
+          minimum: 0,
         },
         [GREP_PARAM_AFTER]: {
           description:
