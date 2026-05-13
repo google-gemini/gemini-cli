@@ -194,12 +194,7 @@ export async function checkPermissions(
         path.resolve(config.getTargetDir(), pathName),
       );
     } catch {
-      // The @-command regex is greedy and can capture pasted content (e.g.
-      // a JSON blob) that is not actually a path. Resolving such content
-      // through fs.realpathSync throws ENAMETOOLONG / EINVAL, which would
-      // otherwise propagate as an unhandled rejection and crash the CLI.
-      // Skip the entry — downstream rendering will surface a clearer error
-      // if the user really meant to reference a file.
+      // skip if resolveToRealPath errors out
       continue;
     }
 
