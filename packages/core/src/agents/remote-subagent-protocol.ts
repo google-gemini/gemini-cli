@@ -28,6 +28,7 @@ import {
   DEFAULT_QUERY_STRING,
   type RemoteAgentDefinition,
   type SubagentProgress,
+  SubagentState,
   getRemoteAgentTargetUrl,
   getAgentCardLoadOptions,
 } from './types.js';
@@ -233,7 +234,7 @@ class RemoteSubagentProtocol implements AgentProtocol {
       this._latestProgress = {
         isSubagentProgress: true,
         agentName: this._agentName,
-        state: 'running',
+        state: SubagentState.RUNNING,
         recentActivity: reassembler.toActivityItems(),
         result: currentText,
       };
@@ -259,7 +260,7 @@ class RemoteSubagentProtocol implements AgentProtocol {
     const finalProgress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: this._agentName,
-      state: 'completed',
+      state: SubagentState.COMPLETED,
       result: finalOutput,
       recentActivity: reassembler.toActivityItems(),
     };

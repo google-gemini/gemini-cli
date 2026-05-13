@@ -169,31 +169,6 @@ export class AgentRegistry {
       return;
     }
 
-    // Load user-level agents: ~/.gemini/agents/
-    const userAgentsDir = Storage.getUserAgentsDir();
-    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
-    for (const error of userAgents.errors) {
-      debugLogger.warn(
-        `[AgentRegistry] Error loading user agent: ${error.message}`,
-      );
-      const msg = `Agent loading error: ${error.message}`;
-      errors?.push(msg);
-      coreEvents.emitFeedback('error', msg);
-    }
-    await Promise.allSettled(
-      userAgents.agents.map(async (agent) => {
-        try {
-          this.ensureRemoteAgentHash(agent);
-          await this.registerAgent(agent, errors);
-        } catch (e) {
-          const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
-          debugLogger.warn(`[AgentRegistry] ${msg}`, e);
-          errors?.push(msg);
-          coreEvents.emitFeedback('error', msg);
-        }
-      }),
-    );
-
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
     const folderTrustEnabled = this.config.getFolderTrust();
     const isTrustedFolder = this.config.isTrustedFolder();
@@ -255,6 +230,31 @@ export class AgentRegistry {
         'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
       );
     }
+
+    // Load user-level agents: ~/.gemini/agents/
+    const userAgentsDir = Storage.getUserAgentsDir();
+    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+    for (const error of userAgents.errors) {
+      debugLogger.warn(
+        `[AgentRegistry] Error loading user agent: ${error.message}`,
+      );
+      const msg = `Agent loading error: ${error.message}`;
+      errors?.push(msg);
+      coreEvents.emitFeedback('error', msg);
+    }
+    await Promise.allSettled(
+      userAgents.agents.map(async (agent) => {
+        try {
+          this.ensureRemoteAgentHash(agent);
+          await this.registerAgent(agent, errors);
+        } catch (e) {
+          const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+          debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+          errors?.push(msg);
+          coreEvents.emitFeedback('error', msg);
+        }
+      }),
+    );
 
     // Load agents from extensions
     for (const extension of this.config.getExtensions()) {
@@ -336,6 +336,17 @@ export class AgentRegistry {
     definition: AgentDefinition<TOutput>,
     errors?: string[],
   ): Promise<void> {
+    const existing = this.agents.get(definition.name);
+    if (existing && existing !== definition) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Duplicate agent name '${definition.name}' detected. ` +
+          `The later definition will be ignored. ` +
+          `Rename one of the agents to avoid this conflict.`,
+      );
+      return;
+    }
+
     if (definition.kind === 'local') {
       this.registerLocalAgent(definition);
     } else if (definition.kind === 'remote') {

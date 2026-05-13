@@ -497,16 +497,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.fireSessionStartEvent(sessionStartSource);
 
       if (result) {
-        if (result.systemMessage) {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: result.systemMessage,
-            },
-            Date.now(),
-          );
-        }
-
         const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
@@ -549,12 +539,6 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.error('Error during cleanup:', e),
       );
     };
-    // Disable the dependencies check here. historyManager gets flagged
-    // but we don't want to react to changes to it because each new history
-    // item, including the ones from the start session hook will cause a
-    // re-render and an error when we try to reload config.
-    //
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(

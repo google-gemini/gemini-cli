@@ -52,7 +52,7 @@ describe('StateSnapshotAsyncProcessor', () => {
       'PROPOSED_SNAPSHOT',
       expect.objectContaining({
         newText:
-          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}',
+          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":["Mock LLM summary response"]}',
         consumedIds: ['node-A', 'node-B'],
         type: 'point-in-time',
       }),
@@ -107,7 +107,7 @@ describe('StateSnapshotAsyncProcessor', () => {
       'PROPOSED_SNAPSHOT',
       expect.objectContaining({
         newText:
-          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}',
+          '{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":["Mock LLM summary response"]}',
         consumedIds: ['node-A', 'node-B', 'node-C'], // Aggregated!
         type: 'accumulate',
       }),

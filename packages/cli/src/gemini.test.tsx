@@ -1189,6 +1189,39 @@ describe('resolveSessionId', () => {
     expect(sessionId).toBe('new-id');
     expect(resumedSessionData).toBeUndefined();
   });
+
+  it('should exit with FATAL_INPUT_ERROR when explicit resume session is missing', async () => {
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId('explicit-session-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session:'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
+  });
 });
 
 describe('gemini.tsx main function exit codes', () => {
