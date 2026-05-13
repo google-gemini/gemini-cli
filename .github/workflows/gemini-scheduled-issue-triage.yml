@@ -1,10 +1,6 @@
 name: '📋 Gemini Scheduled Issue Triage'
 
 on:
-  issues:
-    types:
-      - 'opened'
-      - 'reopened'
   schedule:
     - cron: '0 * * * *' # Runs every hour
   workflow_dispatch:
