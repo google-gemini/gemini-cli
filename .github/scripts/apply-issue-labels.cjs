@@ -212,12 +212,39 @@ module.exports = async ({ github, context, core }) => {
         commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
       }
 
-      await github.rest.issues.createComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: issueNumber,
-        body: commentBody,
-      });
+      // Check for duplicate comments to prevent spam
+      let isDuplicate = false;
+      try {
+        const { data: existingComments } = await github.rest.issues.listComments({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issueNumber,
+          per_page: 20,
+          sort: 'created',
+          direction: 'desc'
+        });
+        
+        for (const comment of existingComments) {
+          if (comment.user.type === 'Bot' && comment.body === commentBody) {
+            isDuplicate = true;
+            break;
+          }
+        }
+      } catch (e) {
+        core.warning(`Failed to fetch existing comments for #${issueNumber}: ${e.message}`);
+      }
+
+      if (isDuplicate) {
+        core.info(`Skipping duplicate comment for #${issueNumber}.`);
+      } else {
+        await github.rest.issues.createComment({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issueNumber,
+          body: commentBody,
+        });
+        core.info(`Successfully posted comment for #${issueNumber}.`);
+      }
     }
 
     if (
