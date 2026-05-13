@@ -1867,13 +1867,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading. Defaults to
-    true; set to false to opt out and load all GEMINI.md files into the system
-    instruction up-front.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 for pasting. This may be more robust than the
     default system when using remote terminal sessions (if your terminal is
@@ -1934,19 +1927,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The model to use for the classifier. Only tested on
     `gemma3-1b-gpu-custom`.
   - **Default:** `"gemma3-1b-gpu-custom"`
-  - **Requires restart:** Yes
-
-- **`experimental.memoryV2`** (boolean):
-  - **Description:** Disable the built-in save_memory tool and let the main
-    agent persist project context by editing markdown files directly with
-    edit/write_file. Route facts across four tiers: team-shared conventions go
-    to project GEMINI.md files, project-specific personal notes go to the
-    per-project private memory folder (MEMORY.md as index + sibling .md files
-    for detail), and cross-project personal preferences go to the global
-    ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit
-    — settings, credentials, etc. remain off-limits). Set to false to fall back
-    to the legacy save_memory tool.
-  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.stressTestProfile`** (boolean):

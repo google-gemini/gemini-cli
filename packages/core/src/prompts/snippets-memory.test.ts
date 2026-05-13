@@ -7,26 +7,15 @@
 import { describe, it, expect } from 'vitest';
 import { renderOperationalGuidelines } from './snippets.js';
 
-describe('renderOperationalGuidelines - memoryV2Enabled', () => {
+describe('renderOperationalGuidelines - memory', () => {
   const baseOptions = {
     interactive: true,
     interactiveShellEnabled: false,
     topicUpdateNarration: false,
-    memoryV2Enabled: false,
   };
 
-  it('should include standard memory tool guidance when memoryV2Enabled is false', () => {
+  it('should distinguish shared GEMINI.md instructions from private MEMORY.md', () => {
     const result = renderOperationalGuidelines(baseOptions);
-    expect(result).toContain('save_memory');
-    expect(result).toContain('persist facts across sessions');
-    expect(result).not.toContain('Instruction and Memory Files');
-  });
-
-  it('should distinguish shared GEMINI.md instructions from private MEMORY.md when memoryV2Enabled is true', () => {
-    const result = renderOperationalGuidelines({
-      ...baseOptions,
-      memoryV2Enabled: true,
-    });
     expect(result).toContain('Instruction and Memory Files');
     expect(result).toContain('GEMINI.md');
     expect(result).toContain('./GEMINI.md');
@@ -58,10 +47,7 @@ describe('renderOperationalGuidelines - memoryV2Enabled', () => {
   });
 
   it('should NOT include the Private Project Memory bullet when userProjectMemoryPath is undefined', () => {
-    const result = renderOperationalGuidelines({
-      ...baseOptions,
-      memoryV2Enabled: true,
-    });
+    const result = renderOperationalGuidelines(baseOptions);
     expect(result).not.toContain('**Private Project Memory**');
   });
 
@@ -70,7 +56,6 @@ describe('renderOperationalGuidelines - memoryV2Enabled', () => {
       '/Users/test/.gemini/tmp/abc123/memory/MEMORY.md';
     const result = renderOperationalGuidelines({
       ...baseOptions,
-      memoryV2Enabled: true,
       userProjectMemoryPath,
     });
     expect(result).toContain('**Private Project Memory**');
@@ -79,10 +64,7 @@ describe('renderOperationalGuidelines - memoryV2Enabled', () => {
   });
 
   it('should NOT include the Global Personal Memory bullet or cross-project routing rule when globalMemoryPath is undefined', () => {
-    const result = renderOperationalGuidelines({
-      ...baseOptions,
-      memoryV2Enabled: true,
-    });
+    const result = renderOperationalGuidelines(baseOptions);
     expect(result).not.toContain('**Global Personal Memory**');
     expect(result).not.toContain('across all my projects');
     expect(result).not.toContain('cross-project personal preference');
@@ -92,7 +74,6 @@ describe('renderOperationalGuidelines - memoryV2Enabled', () => {
     const globalMemoryPath = '/Users/test/.gemini/GEMINI.md';
     const result = renderOperationalGuidelines({
       ...baseOptions,
-      memoryV2Enabled: true,
       globalMemoryPath,
     });
     expect(result).toContain('**Global Personal Memory**');
