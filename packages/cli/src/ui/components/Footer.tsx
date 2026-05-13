@@ -69,25 +69,35 @@ interface SandboxIndicatorProps {
   isTrustedFolder: boolean | undefined;
 }
 
-const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
-  isTrustedFolder,
-}) => {
-  const config = useConfig();
-  const sandboxEnabled = config.getSandboxEnabled();
+function getSandboxLabel(
+  isTrustedFolder: boolean | undefined,
+  sandboxEnabled: boolean,
+): string {
   if (isTrustedFolder === false) {
-    return <Text color={theme.status.warning}>untrusted</Text>;
+    return 'untrusted';
   }
 
   const sandbox = process.env['SANDBOX'];
   if (sandbox) {
-    return <Text color={theme.status.warning}>current process</Text>;
+    return sandbox === 'sandbox-exec'
+      ? `${sandbox} (${process.env['SEATBELT_PROFILE'] || 'unknown'})`
+      : 'current process';
   }
 
-  if (sandboxEnabled) {
-    return <Text color={theme.status.warning}>all tools</Text>;
-  }
+  return sandboxEnabled ? 'all tools' : 'no sandbox';
+}
 
-  return <Text color={theme.status.error}>no sandbox</Text>;
+const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
+  isTrustedFolder,
+}) => {
+  const config = useConfig();
+  const sandboxLabel = getSandboxLabel(
+    isTrustedFolder,
+    config.getSandboxEnabled(),
+  );
+  const color =
+    sandboxLabel === 'no sandbox' ? theme.status.error : theme.status.warning;
+  return <Text color={color}>{sandboxLabel}</Text>;
 };
 
 const CorgiIndicator: React.FC = () => (
@@ -308,17 +318,16 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'sandbox': {
-        let str = 'no sandbox';
-        const sandbox = process.env['SANDBOX'];
-        if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox) str = 'current process';
-        else if (config.getSandboxEnabled()) str = 'all tools';
+        const sandboxLabel = getSandboxLabel(
+          isTrustedFolder,
+          config.getSandboxEnabled(),
+        );
 
         addCol(
           id,
           header,
           () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
-          str.length,
+          sandboxLabel.length,
         );
         break;
       }
