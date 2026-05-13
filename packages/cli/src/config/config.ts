@@ -16,7 +16,7 @@ import { hooksCommand } from '../commands/hooks.js';
 import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
-  getCurrentGeminiMdFilename,
+  resetGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -620,7 +620,7 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(settings.context.fileName);
   } else {
     // Reset to default if not provided in settings.
-    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+    resetGeminiMdFilename();
   }
 
   const fileService = new FileDiscoveryService(cwd);
