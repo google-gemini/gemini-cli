@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RemoteSessionInvocation } from './remote-session-invocation.js';
 import { RemoteSubagentSession } from './remote-subagent-protocol.js';
-import type { RemoteAgentDefinition, SubagentProgress } from './types.js';
+import {
+  type RemoteAgentDefinition,
+  type SubagentProgress,
+  SubagentState,
+} from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { Config } from '../config/config.js';
@@ -41,7 +45,7 @@ function setupMockSession(options: MockSessionSetupOptions = {}) {
       returnDisplay: {
         isSubagentProgress: true,
         agentName: 'Test Agent',
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: 'done',
         recentActivity: [],
       } satisfies SubagentProgress,
@@ -179,7 +183,7 @@ describe('RemoteSessionInvocation', () => {
       const completedProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName: 'Test Agent',
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: 'Agent output',
         recentActivity: [],
       };
@@ -300,7 +304,7 @@ describe('RemoteSessionInvocation', () => {
       const completedProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName: 'Test Agent',
-        state: 'running',
+        state: SubagentState.RUNNING,
         result: 'partial',
         recentActivity: [],
       };
@@ -416,14 +420,14 @@ describe('RemoteSessionInvocation', () => {
       const partialProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName: 'Test Agent',
-        state: 'running',
+        state: SubagentState.RUNNING,
         result: 'Partial work so far',
         recentActivity: [
           {
             id: 'a1',
             type: 'thought',
             content: 'Thinking...',
-            status: 'running',
+            status: SubagentState.RUNNING,
           },
         ],
       };
