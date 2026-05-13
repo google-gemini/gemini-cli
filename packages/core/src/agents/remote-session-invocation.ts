@@ -129,7 +129,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
 
     // Wire external abort signal to session abort
     const abortListener = () => void session.abort();
-    _signal.addEventListener('abort', abortListener, { once: true });
+    _signal?.addEventListener('abort', abortListener, { once: true });
 
     // Subscribe for parent session observability
     let unsubscribeParent: (() => void) | undefined;
@@ -170,7 +170,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
 
       // The protocol resolves aborts with an empty result rather than
       // rejecting. Detect this and surface proper error state.
-      if (_signal.aborted) {
+      if (_signal?.aborted) {
         const partialProgress = session.getLatestProgress();
         const errorProgress: SubagentProgress = {
           isSubagentProgress: true,
@@ -229,7 +229,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
         stateKey,
         session.getSessionState(),
       );
-      _signal.removeEventListener('abort', abortListener);
+      _signal?.removeEventListener('abort', abortListener);
       unsubscribeProgress();
       unsubscribeParent?.();
     }
