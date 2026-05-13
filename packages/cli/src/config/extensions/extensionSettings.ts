@@ -62,7 +62,7 @@ export const getEnvFilePath = (
 export async function maybePromptForSettings(
   extensionConfig: ExtensionConfig,
   extensionId: string,
-  requestSetting: (setting: ExtensionSetting) => Promise<string>,
+  requestSetting: (setting: ExtensionSetting) => Promise<string | undefined>,
   previousExtensionConfig?: ExtensionConfig,
   previousSettings?: Record<string, string>,
 ): Promise<void> {
@@ -106,7 +106,9 @@ export async function maybePromptForSettings(
     settingsChanges.promptForEnv,
   )) {
     const answer = await requestSetting(setting);
-    allSettings[setting.envVar] = answer;
+    if (answer !== undefined) {
+      allSettings[setting.envVar] = answer;
+    }
   }
 
   const nonSensitiveSettings: Record<string, string> = {};
@@ -159,14 +161,13 @@ function formatEnvContent(settings: Record<string, string>): string {
 
 export async function promptForSetting(
   setting: ExtensionSetting,
-): Promise<string> {
+): Promise<string | undefined> {
   const response = await prompts({
     type: setting.sensitive ? 'password' : 'text',
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
   });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return response.value;
+  return typeof response.value === 'string' ? response.value : undefined;
 }
 
 export async function getScopedEnvContents(
@@ -230,7 +231,7 @@ export async function updateSetting(
   extensionConfig: ExtensionConfig,
   extensionId: string,
   settingKey: string,
-  requestSetting: (setting: ExtensionSetting) => Promise<string>,
+  requestSetting: (setting: ExtensionSetting) => Promise<string | undefined>,
   scope: ExtensionSettingScope,
   workspaceDir: string,
 ): Promise<void> {
@@ -250,6 +251,10 @@ export async function updateSetting(
   }
 
   const newValue = await requestSetting(settingToUpdate);
+  if (newValue === undefined) {
+    return;
+  }
+
   const keychain = new KeychainTokenStorage(
     getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );

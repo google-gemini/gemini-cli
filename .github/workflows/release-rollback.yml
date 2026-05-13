@@ -193,7 +193,7 @@ jobs:
         run: |
           echo "ROLLBACK_TAG=$ROLLBACK_TAG_NAME" >> "$GITHUB_OUTPUT"
           git tag "$ROLLBACK_TAG_NAME" "${ORIGIN_HASH}"
-          git push origin --tags
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" --tags
 
       - name: 'Verify Rollback Tag Added'
         if: "${{ github.event.inputs.dry-run == 'false' }}"

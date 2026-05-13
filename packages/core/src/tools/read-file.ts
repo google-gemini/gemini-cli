@@ -255,12 +255,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
-    if (params.start_line !== undefined && params.start_line < 1) {
-      return 'start_line must be at least 1';
-    }
-    if (params.end_line !== undefined && params.end_line < 1) {
-      return 'end_line must be at least 1';
-    }
     if (
       params.start_line !== undefined &&
       params.end_line !== undefined &&

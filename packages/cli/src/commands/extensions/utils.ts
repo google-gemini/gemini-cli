@@ -27,7 +27,7 @@ export interface ConfigLogger {
 
 export type RequestSettingCallback = (
   setting: ExtensionSetting,
-) => Promise<string>;
+) => Promise<string | undefined>;
 export type RequestConfirmationCallback = (message: string) => Promise<boolean>;
 
 const defaultLogger: ConfigLogger = {
@@ -47,8 +47,7 @@ const defaultRequestConfirmation: RequestConfirmationCallback = async (
     message,
     initial: false,
   });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return response.confirm;
+  return typeof response.confirm === 'boolean' ? response.confirm : false;
 };
 
 export async function getExtensionManager() {
