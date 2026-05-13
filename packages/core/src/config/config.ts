@@ -1622,10 +1622,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const authType = this.contentGeneratorConfig.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (authType === AuthType.USE_GEMINI) {
       this.setHasAccessToPreviewModel(true);
     }
 
@@ -2227,7 +2224,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getHasAccessToPreviewModel(): boolean {
-    return this.hasAccessToPreviewModel !== false;
+    return this.hasAccessToPreviewModel ?? false;
   }
 
   setHasAccessToPreviewModel(hasAccess: boolean | null): void {
@@ -2289,7 +2286,6 @@ export class Config implements McpContext, AgentLoopContext {
             });
           }
         }
-        this.emitQuotaChangedEvent();
       }
 
       const hasAccess =
@@ -2297,6 +2293,11 @@ export class Config implements McpContext, AgentLoopContext {
           (b) => b.modelId && isPreviewModel(b.modelId, this),
         ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
+
+      if (quota.buckets) {
+        this.emitQuotaChangedEvent();
+      }
+
       return quota;
     } catch (e) {
       debugLogger.debug('Failed to retrieve user quota', e);

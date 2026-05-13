@@ -3251,8 +3251,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -3261,8 +3261,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
     it('should derive quota from remainingFraction when remainingAmount is missing', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
