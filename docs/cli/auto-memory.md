@@ -30,7 +30,7 @@ You'll use Auto Memory when you want to:
 - **Bootstrap a skills library** without writing every `SKILL.md` by hand.
 
 Auto Memory complements direct memory-file editing. The agent can still persist
-explicit user instructions by editing the appropriate markdown memory file; Auto
+explicit user instructions by editing the appropriate Markdown memory file; Auto
 Memory infers candidates from past sessions, writes reviewable patches or skill
 drafts, and never applies them without your approval.
 
