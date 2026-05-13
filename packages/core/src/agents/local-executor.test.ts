@@ -4132,40 +4132,7 @@ describe('LocalAgentExecutor', () => {
         expect(systemInstruction).toContain('<loaded_context>');
       });
 
-      it('should inject environment memory into the first message when JIT is disabled', async () => {
-        const definition = createTestDefinition();
-        const executor = await LocalAgentExecutor.create(
-          definition,
-          mockConfig,
-          onActivity,
-        );
-
-        const mockMemory = 'Project memory rule';
-        vi.spyOn(mockConfig, 'getEnvironmentMemory').mockReturnValue(
-          mockMemory,
-        );
-        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(false);
-
-        mockModelResponse([
-          {
-            name: COMPLETE_TASK_TOOL_NAME,
-            args: { finalResult: 'done' },
-            id: 'call1',
-          },
-        ]);
-
-        await executor.run({ goal: 'test' }, signal);
-
-        const { message } = getMockMessageParams(0);
-        const parts = message as Part[];
-
-        expect(parts).toBeDefined();
-        const memoryPart = parts.find((p) => p.text?.includes(mockMemory));
-        expect(memoryPart).toBeDefined();
-        expect(memoryPart?.text).toBe(mockMemory);
-      });
-
-      it('should inject session memory into the first message when JIT is enabled', async () => {
+      it('should inject session memory into the first message', async () => {
         const definition = createTestDefinition();
         const executor = await LocalAgentExecutor.create(
           definition,
@@ -4176,7 +4143,6 @@ describe('LocalAgentExecutor', () => {
         const mockMemory =
           '<loaded_context>\nExtension memory rule\n</loaded_context>';
         vi.spyOn(mockConfig, 'getSessionMemory').mockReturnValue(mockMemory);
-        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
 
         mockModelResponse([
           {
@@ -4216,7 +4182,6 @@ describe('LocalAgentExecutor', () => {
                 ? '<loaded_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>'
                 : '<loaded_context>\n<extension_context>\nExtension memory rule\n</extension_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>',
           );
-        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
 
         mockModelResponse([
           {

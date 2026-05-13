@@ -94,6 +94,7 @@ describe('handleAtCommand', () => {
           p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
         getDirectories: () => [testRootDir],
       }),
+      getMemoryContextManager: () => undefined,
       storage: {
         getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
       },

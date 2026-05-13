@@ -1962,8 +1962,8 @@ describe('InputPrompt', () => {
       },
       {
         name: 'should NOT trigger completion when cursor is after space following /',
-        text: '/memory add',
-        cursor: [0, 11],
+        text: '/memory list',
+        cursor: [0, 12],
         showSuggestions: false,
       },
       {
