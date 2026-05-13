@@ -502,8 +502,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
       let cumulativeOutput: string | AnsiOutput = '';
-      let lastUpdateTime = Date.now();
+      let lastUpdateTime = 0;
       let isBinaryStream = false;
+      let trailingFlushTimer: NodeJS.Timeout | null = null;
 
       const resetTimeout = () => {
         if (timeoutMs <= 0) {
@@ -539,7 +540,25 @@ export class ShellToolInvocation extends BaseToolInvocation<
               case 'data':
                 if (isBinaryStream) break;
                 cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (typeof event.chunk !== 'string') {
+                  // AnsiOutput (PTY) — already debounced in the service layer
+                  shouldUpdate = true;
+                } else if (
+                  Date.now() - lastUpdateTime >
+                  OUTPUT_UPDATE_INTERVAL_MS
+                ) {
+                  shouldUpdate = true;
+                } else {
+                  if (trailingFlushTimer === null) {
+                    trailingFlushTimer = setTimeout(() => {
+                      trailingFlushTimer = null;
+                      if (!this.params.is_background) {
+                        updateOutput(cumulativeOutput);
+                        lastUpdateTime = Date.now();
+                      }
+                    }, OUTPUT_UPDATE_INTERVAL_MS);
+                  }
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
@@ -557,6 +576,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 }
                 break;
               case 'exit':
+                if (trailingFlushTimer !== null) {
+                  clearTimeout(trailingFlushTimer);
+                  trailingFlushTimer = null;
+                }
+                if (cumulativeOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
+                }
                 break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
@@ -564,6 +591,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
 
             if (shouldUpdate && !this.params.is_background) {
+              if (trailingFlushTimer !== null) {
+                clearTimeout(trailingFlushTimer);
+                trailingFlushTimer = null;
+              }
               updateOutput(cumulativeOutput);
               lastUpdateTime = Date.now();
             }

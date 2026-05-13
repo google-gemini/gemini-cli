@@ -366,6 +366,8 @@ export const useExecutionLifecycle = (
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
+        let lastUpdateTime = 0;
+        let trailingFlushTimer: NodeJS.Timeout | null = null;
 
         const initialToolDisplay: IndividualToolCallDisplay = {
           callId,
@@ -434,11 +436,22 @@ export const useExecutionLifecycle = (
                       } else {
                         cumulativeStdout = event.chunk;
                       }
+                      if (
+                        Date.now() - lastUpdateTime >
+                        OUTPUT_UPDATE_INTERVAL_MS
+                      ) {
+                        shouldUpdate = true;
+                      } else if (trailingFlushTimer === null) {
+                        trailingFlushTimer = setTimeout(() => {
+                          trailingFlushTimer = null;
+                          flushDisplayUpdate();
+                        }, OUTPUT_UPDATE_INTERVAL_MS);
+                      }
                     } else {
-                      // AnsiOutput (PTY) is always the full state
+                      // AnsiOutput (PTY) is always the full state — no throttle
                       cumulativeStdout = event.chunk;
+                      shouldUpdate = true;
                     }
-                    shouldUpdate = true;
                     break;
                   case 'binary_detected':
                     isBinaryStream = true;
@@ -450,7 +463,11 @@ export const useExecutionLifecycle = (
                     shouldUpdate = true;
                     break;
                   case 'exit':
-                    // No action needed for exit event during streaming
+                    if (trailingFlushTimer !== null) {
+                      clearTimeout(trailingFlushTimer);
+                      trailingFlushTimer = null;
+                    }
+                    flushDisplayUpdate();
                     break;
                   default:
                     throw new Error('An unhandled ShellOutputEvent was found.');
@@ -467,18 +484,27 @@ export const useExecutionLifecycle = (
                   return;
                 }
 
-                let currentDisplayOutput: string | AnsiOutput;
-                if (isBinaryStream) {
-                  currentDisplayOutput =
-                    binaryBytesReceived > 0
-                      ? `[Receiving binary output... ${formatBytes(binaryBytesReceived)} received]`
-                      : '[Binary output detected. Halting stream...]';
-                } else {
-                  currentDisplayOutput = cumulativeStdout;
+                if (shouldUpdate) {
+                  if (trailingFlushTimer !== null) {
+                    clearTimeout(trailingFlushTimer);
+                    trailingFlushTimer = null;
+                  }
+                  flushDisplayUpdate();
                 }
 
-                if (shouldUpdate) {
-                  dispatch({ type: 'SET_OUTPUT_TIME', time: Date.now() });
+                function flushDisplayUpdate() {
+                  let currentDisplayOutput: string | AnsiOutput;
+                  if (isBinaryStream) {
+                    currentDisplayOutput =
+                      binaryBytesReceived > 0
+                        ? `[Receiving binary output... ${formatBytes(binaryBytesReceived)} received]`
+                        : '[Binary output detected. Halting stream...]';
+                  } else {
+                    currentDisplayOutput = cumulativeStdout;
+                  }
+
+                  lastUpdateTime = Date.now();
+                  dispatch({ type: 'SET_OUTPUT_TIME', time: lastUpdateTime });
                   setPendingHistoryItem((prevItem) => {
                     if (prevItem?.type === 'tool_group') {
                       return {

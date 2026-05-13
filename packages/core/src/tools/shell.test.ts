@@ -713,6 +713,137 @@ EOF`;
 
         await promise;
       });
+
+      it('should render the first text data event immediately', async () => {
+        const invocation = shellTool.build({ command: 'echo hello' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        mockShellOutputCallback({ type: 'data', chunk: 'hello\n' });
+        expect(updateOutputMock).toHaveBeenCalledExactlyOnceWith('hello\n');
+
+        resolveExecutionPromise({
+          rawOutput: Buffer.from('hello\n'),
+          output: 'hello\n',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+        });
+        await promise;
+      });
+
+      it('should throttle rapid text data events to OUTPUT_UPDATE_INTERVAL_MS', async () => {
+        const invocation = shellTool.build({ command: 'build' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        // First event renders immediately (lastUpdateTime starts at 0)
+        mockShellOutputCallback({ type: 'data', chunk: 'line 1\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // Rapid subsequent events are throttled
+        mockShellOutputCallback({ type: 'data', chunk: 'line 2\n' });
+        mockShellOutputCallback({ type: 'data', chunk: 'line 3\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // Advance past twice the throttle interval to ensure trailing flush
+        // fires AND enough time passes for the next event to render
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS * 2 + 1);
+
+        // Trailing flush should have rendered with the last buffered value
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('line 3\n');
+
+        // Next event after the interval should render immediately
+        mockShellOutputCallback({ type: 'data', chunk: 'line 4\n' });
+        expect(updateOutputMock).toHaveBeenCalledTimes(3);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('line 4\n');
+
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: 'line 1\nline 2\nline 3\nline 4\n',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+        });
+        await promise;
+      });
+
+      it('should trailing-flush throttled text when the command goes silent', async () => {
+        const invocation = shellTool.build({ command: 'build' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        // First event renders immediately
+        mockShellOutputCallback({ type: 'data', chunk: 'line 1\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // Second event is throttled
+        mockShellOutputCallback({ type: 'data', chunk: 'line 2\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // After OUTPUT_UPDATE_INTERVAL_MS, trailing flush fires
+        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS);
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('line 2\n');
+
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: 'line 1\nline 2\n',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+        });
+        await promise;
+      });
+
+      it('should flush remaining output on exit event', async () => {
+        const invocation = shellTool.build({ command: 'build' });
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
+
+        // First event renders immediately
+        mockShellOutputCallback({ type: 'data', chunk: 'line 1\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // Second event is throttled
+        mockShellOutputCallback({ type: 'data', chunk: 'final\n' });
+        expect(updateOutputMock).toHaveBeenCalledOnce();
+
+        // Exit event flushes remaining output immediately
+        mockShellOutputCallback({ type: 'exit', exitCode: 0, signal: null });
+        expect(updateOutputMock).toHaveBeenCalledTimes(2);
+        expect(updateOutputMock).toHaveBeenLastCalledWith('final\n');
+
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: 'line 1\nfinal\n',
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+        });
+        await promise;
+      });
     });
   });
 
