@@ -24,6 +24,7 @@ import {
   isSubpath,
   normalizePath,
   toAbsolutePath,
+  resolveToRealPath,
 } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
@@ -702,10 +703,8 @@ export async function loadServerHierarchicalMemory(
   boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = normalizePath(
-    await fs.realpath(path.resolve(currentWorkingDirectory)),
-  );
-  const realHome = normalizePath(await fs.realpath(path.resolve(homedir())));
+  const realCwd = normalizePath(resolveToRealPath(currentWorkingDirectory));
+  const realHome = normalizePath(resolveToRealPath(homedir()));
   const isHomeDirectory = realCwd === realHome;
 
   // If it is the home directory, pass an empty string to the core memory
