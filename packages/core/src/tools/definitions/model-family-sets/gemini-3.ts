@@ -25,6 +25,8 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -104,12 +106,14 @@ export const GEMINI_3_SET: CoreToolSet = {
         [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_FILE_PATH],
@@ -118,7 +122,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files to minimize token usage and simplify reviews.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -228,6 +232,7 @@ export const GEMINI_3_SET: CoreToolSet = {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
+          minimum: 0,
         },
         [GREP_PARAM_AFTER]: {
           description:
@@ -353,7 +358,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
@@ -733,4 +738,37 @@ The agent did not use the todo list because this task could be completed by a ti
   exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
   update_topic: getUpdateTopicDeclaration(),
+
+  read_mcp_resource: {
+    name: READ_MCP_RESOURCE_TOOL_NAME,
+    description:
+      'Reads the content of a specified Model Context Protocol (MCP) resource.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          description: 'The URI of the MCP resource to read.',
+          type: 'string',
+        },
+      },
+      required: ['uri'],
+    },
+  },
+
+  list_mcp_resources: {
+    name: LIST_MCP_RESOURCES_TOOL_NAME,
+    description:
+      'Lists all available resources exposed by connected MCP servers.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        serverName: {
+          description:
+            'Optional filter to list resources from a specific server.',
+          type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
 };

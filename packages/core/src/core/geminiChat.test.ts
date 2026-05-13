@@ -18,6 +18,7 @@ import {
   StreamEventType,
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
+  stripToolCallIdPrefixes,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -38,6 +39,7 @@ import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import { LlmRole } from '../telemetry/types.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -153,6 +155,7 @@ describe('GeminiChat', () => {
       promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
@@ -182,6 +185,7 @@ describe('GeminiChat', () => {
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
           const model = modelConfigKey.model ?? mockConfig.getModel();
@@ -548,6 +552,112 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts![1].functionCall).toBeDefined();
       expect(modelTurn.parts![2].text).toBe('This is the second part.');
     });
+    it('repro: should not overwrite parallel tool calls when they arrive in separate streaming chunks', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      // 1. Mock the API to return parallel tool calls in separate chunks.
+      const parallelCallsStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_A' } }],
+              },
+            },
+          ],
+          functionCalls: [{ name: 'tool_A' }],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'tool_B' } }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [{ name: 'tool_B' }],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        parallelCallsStream,
+      );
+
+      // 2. Action: Send a message and consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test parallel tools',
+        'prompt-parallel-tools',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume
+      }
+
+      // 3. Assert: Check that the final history contains both function calls.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1];
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn.parts?.length).toBe(2);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('tool_A');
+      expect(modelTurn.parts![1].functionCall?.name).toBe('tool_B');
+    });
+    it('repro: should not collide when multiple tool calls with the same name arrive in the same chunk', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      const sameNameStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { functionCall: { name: 'tool_X', args: { id: 1 } } },
+                  { functionCall: { name: 'tool_X', args: { id: 2 } } },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [
+            { name: 'tool_X', args: { id: 1 } },
+            { name: 'tool_X', args: { id: 2 } },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        sameNameStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test same name tools',
+        'prompt-same-name',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording
+      }
+
+      const history = chat.getHistory();
+      const modelTurn = history[1];
+      expect(modelTurn.parts?.length).toBe(2);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('tool_X');
+      expect(modelTurn.parts![0].functionCall?.args).toEqual({ id: 1 });
+      expect(modelTurn.parts![1].functionCall?.name).toBe('tool_X');
+      expect(modelTurn.parts![1].functionCall?.args).toEqual({ id: 2 });
+
+      // If findIndex was used, both would likely point to index 0, and the second one might overwrite the first if consolidated incorrectly,
+      // or they both might end up with the same callIndex and thus the same args in final assembly.
+    });
     it('should preserve text parts that stream in the same chunk as a thought', async () => {
       // 1. Mock the API to return a single chunk containing both a thought and visible text.
       const mixedContentStream = (async function* () {
@@ -742,25 +852,41 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
-      // Setup: Stream with finish reason but empty response (only thoughts)
-      const streamWithEmptyResponse = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ thought: 'thinking...' }],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        streamWithEmptyResponse,
-      );
+    it('should throw InvalidStreamError without retrying when no tool call and empty response text', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          // First attempt: finish reason is present, but the stream has no
+          // non-thought text, which is NO_RESPONSE_TEXT.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // This would succeed if NO_RESPONSE_TEXT were retried.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'valid response after retry' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
 
       const stream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
@@ -777,6 +903,11 @@ describe('GeminiChat', () => {
           }
         })(),
       ).rejects.toThrow(InvalidStreamError);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
     it('should succeed when there is finish reason and response text', async () => {
@@ -2552,6 +2683,153 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('automated binary injection', () => {
+    it('should expand history with synthetic turns when __binary_injection__ is detected', async () => {
+      const audioParts = [
+        {
+          functionResponse: {
+            id: 'call-123',
+            name: 'read_file',
+            response: {
+              output: 'Success',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'base64' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      // Mock API to capture the history it receives
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Analysis done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        audioParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Verify history expansion
+      // Turn 1: Tool response (cleaned)
+      // Turn 2: Model Ack (synthetic)
+      // Turn 3: User Binary data (current request)
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].role).toBe('user');
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success',
+      });
+      expect(capturedContents[1].role).toBe('model');
+      expect(capturedContents[1].parts![0].text).toContain(
+        'Binary content received',
+      );
+      expect(capturedContents[1].parts![0].thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+      expect(capturedContents[2].role).toBe('user');
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+    });
+
+    it('should handle multiple parallel binary injections', async () => {
+      const parallelParts = [
+        {
+          functionResponse: {
+            id: 'call-1',
+            name: 'read_file',
+            response: {
+              output: 'Success 1',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'audio1' } },
+              ],
+            },
+          },
+        },
+        {
+          functionResponse: {
+            id: 'call-2',
+            name: 'read_file',
+            response: {
+              output: 'Success 2',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'video/mp4', data: 'video2' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        parallelParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Turn 1: Cleaned tool responses (both)
+      // Turn 2: Model Ack
+      // Turn 3: Both binary parts combined
+      expect(capturedContents).toHaveLength(3);
+      expect(capturedContents[0].parts).toHaveLength(2);
+      expect(capturedContents[0].parts![0].functionResponse!.response).toEqual({
+        output: 'Success 1',
+      });
+      expect(capturedContents[0].parts![1].functionResponse!.response).toEqual({
+        output: 'Success 2',
+      });
+      expect(capturedContents[2].parts).toHaveLength(2);
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/mpeg',
+      );
+      expect(capturedContents[2].parts![1].inlineData!.mimeType).toBe(
+        'video/mp4',
+      );
+    });
+  });
+
   describe('recordCompletedToolCalls', () => {
     it('should use originalRequestName and originalRequestArgs if present', () => {
       const completedCall: CompletedToolCall = {
@@ -2623,6 +2901,129 @@ describe('GeminiChat', () => {
           result: [{ text: 'response' }],
         }),
       ]);
+    });
+  });
+
+  describe('stripToolCallIdPrefixes', () => {
+    it('should strip tool name prefix matching the tool name', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'my_tool__call_123',
+                name: 'my_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'my_tool__call_123',
+                name: 'my_tool',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+    });
+
+    it('should correctly handle tool names that contain double underscores', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'my__custom__tool__call_abc',
+                name: 'my__custom__tool',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'my__custom__tool__call_abc',
+                name: 'my__custom__tool',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_abc');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_abc');
+    });
+
+    it('should not strip if prefix does not match the tool name', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'other_tool__call_123',
+                name: 'my_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe(
+        'other_tool__call_123',
+      );
+    });
+
+    it('should correctly handle fallback to generic_tool when name is missing or has whitespace', () => {
+      const contents: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'generic_tool__call_123',
+                name: '  ',
+                args: {},
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'generic_tool__call_123',
+                name: undefined as unknown as string,
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
+      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
     });
   });
 });

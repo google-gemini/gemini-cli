@@ -60,6 +60,10 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
     client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
+    quota_project_id:
+      process.env['GOOGLE_CLOUD_QUOTA_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'],
   };
 
   // Execute all registered post-authentication callbacks.
@@ -356,8 +360,10 @@ async function initOauthClient(
 
       // Note that SIGINT might not get raised on Ctrl+C in raw mode
       // so we also need to look for Ctrl+C directly in stdin.
+      // Only match a lone 0x03 byte — some terminals (e.g. Ghostty) embed
+      // 0x03 inside multi-byte escape sequences, causing false cancellations.
       stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
+        if (data.length === 1 && data[0] === 0x03) {
           reject(
             new FatalCancellationError('Authentication cancelled by user.'),
           );
@@ -673,8 +679,13 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(keyFileString);
+      const parsed: unknown = JSON.parse(keyFileString);
+      const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
+        typeof val === 'object' && val !== null;
+      if (isOAuthCreds(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid credentials format');
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(

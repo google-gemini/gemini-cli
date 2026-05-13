@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LocalLiteRtLmClient } from './localLiteRtLmClient.js';
 import type { Config } from '../config/config.js';
+import { GoogleGenAI } from '@google/genai';
+
 const mockGenerateContent = vi.fn();
 
 vi.mock('@google/genai', () => {
@@ -44,6 +46,14 @@ describe('LocalLiteRtLmClient', () => {
     const result = await client.generateJson([], 'test-instruction');
 
     expect(result).toEqual({ key: 'value' });
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiVersion: 'v1beta',
+        httpOptions: expect.objectContaining({
+          baseUrl: 'http://test-host:1234',
+        }),
+      }),
+    );
     expect(mockGenerateContent).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'gemma:latest',

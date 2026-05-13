@@ -6,6 +6,7 @@
 
 import { useMemo } from 'react';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useQuotaState } from '../contexts/QuotaContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { CoreToolCallStatus, ApprovalMode } from '@google/gemini-cli-core';
 import { type HistoryItemToolGroup, StreamingState } from '../types.js';
@@ -18,6 +19,7 @@ import { theme } from '../semantic-colors.js';
  */
 export const useComposerStatus = () => {
   const uiState = useUIState();
+  const quotaState = useQuotaState();
   const settings = useSettings();
 
   const hasPendingToolConfirmation = useMemo(
@@ -40,8 +42,8 @@ export const useComposerStatus = () => {
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.quota.proQuotaRequest) ||
-    Boolean(uiState.quota.validationRequest) ||
+    Boolean(quotaState.proQuotaRequest) ||
+    Boolean(quotaState.validationRequest) ||
     Boolean(uiState.customDialog);
 
   const isInteractiveShellWaiting = Boolean(

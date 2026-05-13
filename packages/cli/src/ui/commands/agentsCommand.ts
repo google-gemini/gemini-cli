@@ -346,12 +346,33 @@ const agentsReloadCommand: SlashCommand = {
       text: 'Reloading agent registry...',
     });
 
-    await agentRegistry.reload();
+    const summary = await agentRegistry.reload();
+
+    let content =
+      summary.errors.length > 0
+        ? 'Agents reloaded with errors:'
+        : 'Agents reloaded successfully:';
+    content += `\n- Total: ${summary.totalLoaded} (${summary.localCount} local, ${summary.remoteCount} remote)`;
+
+    if (summary.newAgents.length > 0) {
+      content += `\n- New: ${summary.newAgents.join(', ')}`;
+    }
+    if (summary.updatedAgents.length > 0) {
+      content += `\n- Updated: ${summary.updatedAgents.join(', ')}`;
+    }
+    if (summary.deletedAgents.length > 0) {
+      content += `\n- Deleted: ${summary.deletedAgents.join(', ')}`;
+    }
+    if (summary.errors.length > 0) {
+      content += `\n- Errors: ${summary.errors.length} encountered during reload`;
+    }
+
+    content += '\n\nRun /agents list to see all available agents.';
 
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents reloaded successfully',
+      content,
     };
   },
 };

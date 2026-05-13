@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
+export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
 /**
  * Returns the home directory.
@@ -319,20 +320,35 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Resolves a path to an absolute path with forward slashes, preserving the
+ * original case of every segment.
+ *
+ * Use this for paths that will be surfaced to the user (e.g. `/memory list`,
+ * `--- Context from: ... ---` headers) or used as the storage form passed
+ * through to file I/O. For comparison/dedup keys on case-insensitive
+ * filesystems use `normalizePath` instead.
+ */
+export function toAbsolutePath(p: string): string {
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+  return pathModule.resolve(p).replace(/\\/g, '/');
+}
+
+/**
  * Normalizes a path for reliable comparison across platforms.
  * - Resolves to an absolute path.
  * - Converts all path separators to forward slashes.
- * - On Windows, converts to lowercase for case-insensitivity.
+ * - On case-insensitive platforms (Windows, macOS), converts to lowercase.
+ *
+ * Use this for comparison keys (Set/Map lookups, equality checks). For paths
+ * that will be displayed to the user or persisted as identifiers, use
+ * `toAbsolutePath` instead so the original casing is preserved.
  */
 export function normalizePath(p: string): string {
+  const absolute = toAbsolutePath(p);
   const platform = process.platform;
-  const isWindows = platform === 'win32';
-  const pathModule = isWindows ? path.win32 : path;
-
-  const resolved = pathModule.resolve(p);
-  const normalized = resolved.replace(/\\/g, '/');
-  const isCaseInsensitive = isWindows || platform === 'darwin';
-  return isCaseInsensitive ? normalized.toLowerCase() : normalized;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? absolute.toLowerCase() : absolute;
 }
 
 /**
@@ -453,4 +469,46 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
     }
     throw e;
   }
+}
+
+/**
+ * Deduplicates an array of paths and ensures all paths are absolute.
+ */
+export function deduplicateAbsolutePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
+
+  const uniquePathsMap = new Map<string, string>();
+  for (const p of paths) {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`Path must be absolute: ${p}`);
+    }
+
+    const key = toPathKey(p);
+    if (!uniquePathsMap.has(key)) {
+      uniquePathsMap.set(key, p);
+    }
+  }
+
+  return Array.from(uniquePathsMap.values());
+}
+
+/**
+ * Returns a stable string key for a path to be used in comparisons or Map lookups.
+ */
+export function toPathKey(p: string): string {
+  // Normalize path segments
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    // On Windows, don't strip the slash from a drive root (e.g., "C:\\")
+    if (!/^[a-zA-Z]:[\\/]$/.test(norm)) {
+      norm = norm.slice(0, -1);
+    }
+  }
+
+  // Convert to lowercase on case-insensitive platforms
+  const platform = process.platform;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
 }

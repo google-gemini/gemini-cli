@@ -148,6 +148,7 @@ jobs:
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+          persist-credentials: false
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -167,6 +168,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
           BUILD_SANDBOX_FLAGS: '--cache-from type=gha --cache-to type=gha,mode=max'
@@ -183,7 +185,7 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     if: |
       github.repository == 'google-gemini/gemini-cli' && always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
@@ -192,6 +194,7 @@ jobs:
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+          persist-credentials: false
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -212,6 +215,7 @@ jobs:
         if: "${{runner.os != 'Windows'}}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -231,6 +235,7 @@ jobs:
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+          persist-credentials: false
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -288,6 +293,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -311,6 +317,7 @@ jobs:
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+          persist-credentials: false
           fetch-depth: 0
 
       - name: 'Set up Node.js 20.x'
@@ -334,6 +341,7 @@ jobs:
         if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: 'gemini-3-pro-preview'
           # Only run always passes behavioral tests.
           EVAL_SUITE_TYPE: 'behavioral'

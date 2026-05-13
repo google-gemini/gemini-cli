@@ -20,6 +20,7 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { normalizeModelId } from '../../utils/modelUtils.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 
@@ -177,15 +178,27 @@ export class ClassifierStrategy implements RoutingStrategy {
           config.getGemini31FlashLiteLaunched(),
           config.getUseCustomToolModel(),
         ]);
-      const selectedModel = resolveClassifierModel(
-        model,
-        routerResponse.model_choice,
-        useGemini3_1,
-        useGemini3_1FlashLite,
-        useCustomToolModel,
-        config.getHasAccessToPreviewModel?.() ?? true,
-        config,
+      const selectedModel = normalizeModelId(
+        resolveClassifierModel(
+          normalizeModelId(model),
+          routerResponse.model_choice,
+          useGemini3_1,
+          useGemini3_1FlashLite,
+          useCustomToolModel,
+          config.getHasAccessToPreviewModel?.() ?? true,
+          config,
+        ),
       );
+
+      const service = config.getModelAvailabilityService();
+      const snapshot = service.snapshot(selectedModel);
+
+      if (!snapshot.available) {
+        debugLogger.warn(
+          `[Routing] Classifier selected unavailable model ${selectedModel} (${snapshot.reason}). Bypassing.`,
+        );
+        return null;
+      }
 
       return {
         model: selectedModel,

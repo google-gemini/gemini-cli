@@ -117,7 +117,12 @@ export function AuthDialog({
         return;
       }
       if (authType) {
-        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+        const needsRestart =
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          (authType === AuthType.USE_VERTEX_AI &&
+            process.env['CLOUD_SHELL'] === 'true');
+
+        if (needsRestart) {
           setAuthContext({ requiresRestart: true });
         } else {
           setAuthContext({});
@@ -147,8 +152,11 @@ export function AuthDialog({
     [settings, config, setAuthState, exiting, setAuthContext],
   );
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethodWithSettings(authMethod, settings);
+  const handleAuthSelect = async (authMethod: AuthType) => {
+    const error = await validateAuthMethodWithSettings(
+      authMethod,
+      settings,
+    ).catch((e) => (e instanceof Error ? e.message : String(e)));
     if (error) {
       onAuthError(error);
     } else {

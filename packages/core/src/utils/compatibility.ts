@@ -85,6 +85,11 @@ export function supports256Colors(): boolean {
     return true;
   }
 
+  // Terminals supporting true color (like kmscon) also support 256 colors
+  if (supportsTrueColor()) {
+    return true;
+  }
+
   return false;
 }
 
@@ -95,7 +100,8 @@ export function supportsTrueColor(): boolean {
   // Check COLORTERM environment variable
   if (
     process.env['COLORTERM'] === 'truecolor' ||
-    process.env['COLORTERM'] === '24bit'
+    process.env['COLORTERM'] === '24bit' ||
+    process.env['COLORTERM'] === 'kmscon'
   ) {
     return true;
   }

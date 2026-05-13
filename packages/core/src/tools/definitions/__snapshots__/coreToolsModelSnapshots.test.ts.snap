@@ -319,6 +319,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -416,7 +417,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -424,7 +426,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -1149,6 +1152,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -1246,7 +1250,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -1254,7 +1259,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -1333,7 +1339,7 @@ Use this tool when the user's query implies needing the content of several files
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: replace 1`] = `
 {
-  "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+  "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.",
   "name": "replace",
   "parametersJsonSchema": {
@@ -1496,7 +1502,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.",
+  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files to minimize token usage and simplify reviews.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {

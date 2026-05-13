@@ -31,6 +31,7 @@ jobs:
       - name: 'Checkout repository'
         uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5' # ratchet:actions/checkout@v4
         with:
+          persist-credentials: false
           # The user-level skills need to be available to the workflow
           fetch-depth: 0
           ref: 'main'
@@ -70,6 +71,8 @@ jobs:
       - name: 'Generate Changelog with Gemini'
         if: "steps.validate_version.outputs.CONTINUE == 'true'"
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |

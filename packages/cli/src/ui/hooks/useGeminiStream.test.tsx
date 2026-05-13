@@ -49,6 +49,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  SHELL_TOOL_NAME,
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
@@ -805,7 +806,6 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal),
       'prompt-id-2',
       undefined,
-      false,
       expectedMergedResponse,
     );
   });
@@ -1532,7 +1532,6 @@ describe('useGeminiStream', () => {
         expect.any(AbortSignal),
         'prompt-id-4',
         undefined,
-        false,
         toolCallResponseParts,
       );
     });
@@ -1637,7 +1636,7 @@ describe('useGeminiStream', () => {
 
       simulateEscapeKeyPress();
 
-      expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
+      expect(cancelSubmitSpy).toHaveBeenCalledWith(false, false);
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
@@ -2027,7 +2026,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/my-custom-command',
         );
 
@@ -2056,7 +2054,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/emptycmd',
         );
       });
@@ -2077,7 +2074,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '// This is a line comment',
         );
       });
@@ -2098,7 +2094,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           '/* This is a block comment */',
         );
       });
@@ -2453,6 +2448,44 @@ describe('useGeminiStream', () => {
       expect(mockMessageBus.publish).not.toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'corr-call3' }),
       );
+    });
+
+    it('should auto-approve shell commands with redirection when switching to AUTO_EDIT mode', async () => {
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
+      shellCall.request.args = { command: 'ls > files.txt' };
+
+      const { result } = await renderTestHook([shellCall]);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      // Shell command with redirection should be auto-approved
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: 'corr-call-shell' }),
+      );
+    });
+
+    it('should NOT auto-approve shell commands without redirection when switching to AUTO_EDIT mode', async () => {
+      const shellCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-shell',
+        'info',
+      );
+      shellCall.request.args = { command: 'ls -la' };
+
+      const { result } = await renderTestHook([shellCall]);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      // Regular shell command should NOT be auto-approved
+      expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
 
     it('should not auto-approve any tools when switching to REQUIRE_CONFIRMATION mode', async () => {
@@ -3058,7 +3091,6 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
       undefined,
-      false,
       rawQuery,
     );
   });
@@ -3709,7 +3741,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           'test query',
         );
       });
@@ -3859,7 +3890,6 @@ describe('useGeminiStream', () => {
           expect.any(AbortSignal),
           expect.any(String),
           undefined,
-          false,
           'second query',
         );
       });
@@ -4004,7 +4034,6 @@ describe('useGeminiStream', () => {
             expect.any(AbortSignal),
             expect.any(String),
             undefined,
-            false,
             'test query',
           );
         });

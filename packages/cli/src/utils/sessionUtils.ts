@@ -270,14 +270,22 @@ export const getAllSessionFiles = async (
           }
 
           // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
+          if (!content.sessionId) {
             // Missing required fields - treat as corrupted
             return { fileName: file, sessionInfo: null };
           }
+
+          const fileTimestamp =
+            !content.startTime || !content.lastUpdated
+              ? (
+                  await fs.stat(filePath).catch(() => undefined)
+                )?.mtime.toISOString()
+              : undefined;
+          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+          const startTime =
+            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const lastUpdated =
+            content.lastUpdated || content.startTime || fallbackTimestamp;
 
           // Skip sessions that only contain system messages (info, error, warning)
           if (!content.hasUserOrAssistantMessage) {
@@ -319,8 +327,8 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
+            startTime,
+            lastUpdated,
             messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
@@ -407,6 +415,36 @@ export const getSessionFiles = async (
  */
 export class SessionSelector {
   constructor(private storage: Storage) {}
+
+  /**
+   * Checks if a session with the given ID already exists on disk.
+   */
+  async sessionExists(id: string): Promise<boolean> {
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+
+    // The filename format is `session-<TIMESTAMP>-<ID_SLICE(0,8)>.jsonl`
+    const shortId = id.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+    );
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (sessionData && sessionData.sessionId === id) {
+          return true;
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    return false;
+  }
 
   /**
    * Lists all available sessions for the current project.
@@ -516,12 +554,17 @@ export class SessionSelector {
       if (!sessionData) {
         throw new Error('Failed to load session data');
       }
+      const normalizedSessionData = {
+        ...sessionData,
+        startTime: sessionData.startTime || sessionInfo.startTime,
+        lastUpdated: sessionData.lastUpdated || sessionInfo.lastUpdated,
+      };
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,
-        sessionData,
+        sessionData: normalizedSessionData,
         displayInfo,
       };
     } catch (error) {

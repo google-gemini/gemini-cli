@@ -25,12 +25,13 @@ import type {
   ErrorData,
   Usage,
   AgentEventType,
+  ToolDisplay,
 } from './types.js';
 import {
   geminiPartsToContentParts,
-  toolResultDisplayToContentParts,
   buildToolResponseData,
 } from './content-utils.js';
+import { toolResultDisplayToDisplayContent } from './tool-display-utils.js';
 
 // ---------------------------------------------------------------------------
 // Translation State
@@ -209,7 +210,7 @@ export function translateEvent(
       out.push(
         makeEvent('error', state, {
           status: 'PERMISSION_DENIED',
-          message: `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`,
+          message: event.value.systemMessage?.trim() || event.value.reason,
           fatal: false,
           _meta: { code: 'AGENT_EXECUTION_BLOCKED' },
         }),
@@ -235,16 +236,23 @@ export function translateEvent(
           requestId: event.value.callId,
           name: event.value.name,
           args: event.value.args,
+          display: event.value.display,
         }),
       );
       break;
 
     case GeminiEventType.ToolCallResponse: {
       ensureStreamStart(state, out);
-      const displayContent = toolResultDisplayToContentParts(
-        event.value.resultDisplay,
-      );
       const data = buildToolResponseData(event.value);
+      const display: ToolDisplay | undefined =
+        event.value.display ??
+        (event.value.resultDisplay
+          ? {
+              result: toolResultDisplayToDisplayContent(
+                event.value.resultDisplay,
+              ),
+            }
+          : undefined);
       out.push(
         makeEvent('tool_response', state, {
           requestId: event.value.callId,
@@ -253,7 +261,7 @@ export function translateEvent(
             ? [{ type: 'text', text: event.value.error.message }]
             : geminiPartsToContentParts(event.value.responseParts),
           isError: event.value.error !== undefined,
-          ...(displayContent ? { displayContent } : {}),
+          ...(display ? { display } : {}),
           ...(data ? { data } : {}),
         }),
       );
@@ -274,7 +282,6 @@ export function translateEvent(
       ((x: never) => {
         throw new Error(`Unhandled event type: ${JSON.stringify(x)}`);
       })(event);
-      break;
   }
 
   return out;
