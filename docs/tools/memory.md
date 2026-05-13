@@ -5,7 +5,7 @@ editing Markdown memory files directly.
 
 ## Technical reference
 
-The agent routes memories to the appropriate markdown file: shared project
+The agent routes memories to the appropriate Markdown file: shared project
 instructions go in repository `GEMINI.md` files, private project notes go in the
 per-project private memory folder, and cross-project personal preferences go in
 the global `~/.gemini/GEMINI.md` file.
