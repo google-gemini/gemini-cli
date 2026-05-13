@@ -71,7 +71,7 @@ Just tell the agent to remember something.
 
 **Prompt:** `Remember that I prefer using 'const' over 'let' wherever possible.`
 
-The agent will edit the appropriate memory markdown file directly so the fact is
+The agent will edit the appropriate memory Markdown file, so the fact is
 loaded in future sessions.
 
 **Prompt:** `Save the fact that the staging server IP is 10.0.0.5.`
