@@ -751,10 +751,10 @@ export class GeminiChat {
       lastContentsToUse = contentsToUse;
 
       // Handle explicit context caching
-      const cachingConfig = this.context.config.getContextCachingConfig();
+      const cachingConfig = this.context.config.getContextCachingConfig?.();
       let effectiveContents = contentsToUse;
 
-      if (cachingConfig.enabled && role === LlmRole.MAIN) {
+      if (cachingConfig?.enabled && role === LlmRole.MAIN) {
         try {
           const userMemory = this.context.config.getSystemInstructionMemory();
           const stableSI = getCoreSystemPrompt(

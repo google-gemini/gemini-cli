@@ -31,6 +31,8 @@ import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_THINKING_MODE } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
+import { getCoreSystemPrompt } from './prompts.js';
+import { contextCacheManager } from '../context/contextCacheManager.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
@@ -139,6 +141,7 @@ describe('GeminiChat', () => {
     } as unknown as ContentGenerator;
 
     mockHandleFallback.mockClear();
+    contextCacheManager.reset();
     // Default mock implementation for tests that don't care about retry logic
     mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
       const result = await apiCall();
@@ -181,9 +184,11 @@ describe('GeminiChat', () => {
       },
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
+        getAllToolNames: vi.fn().mockReturnValue([]),
       }),
       toolRegistry: {
         getTool: vi.fn(),
+        getAllToolNames: vi.fn().mockReturnValue([]),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
@@ -197,16 +202,42 @@ describe('GeminiChat', () => {
         autoRenew: true,
       }),
       getSystemInstructionMemory: vi.fn().mockReturnValue(undefined),
+      getAgentHistoryProviderConfig: vi.fn().mockReturnValue({
+        maxTokens: 100000,
+        retainedTokens: 40000,
+        normalMessageTokens: 2000,
+        maximumMessageTokens: 10000,
+        normalizationHeadRatio: 0.25,
+      }),
+      isTrackerEnabled: vi.fn().mockReturnValue(false),
+      getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getGemini31FlashLiteLaunchedSync: vi.fn().mockReturnValue(false),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      getApprovalMode: vi.fn().mockReturnValue('default'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue([]),
       }),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+      isMemoryV2Enabled: vi.fn().mockReturnValue(false),
+      getSystemInstructionMemorySync: vi.fn().mockReturnValue(undefined),
+      getMemoryBoundaryMarkers: vi.fn().mockReturnValue([]),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       topicState: {
         getTopic: vi.fn().mockReturnValue(undefined),
       },
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
+      }),
+      getAgentRegistry: vi.fn().mockReturnValue({
+        getAgent: vi.fn(),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
@@ -3118,12 +3149,15 @@ describe('GeminiChat', () => {
 
   describe('explicit context caching', () => {
     it('should create a new cache if enabled and SI is large enough', async () => {
-      const si = 'Large system instruction...'.repeat(2000); // Definitely > 32k
-      chat = new GeminiChat(mockConfig, si);
+      const largeMemory = 'Large system instruction...'.repeat(2000); // Definitely > 32k
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        largeMemory,
+      );
+      chat = new GeminiChat(mockConfig, 'some-si');
 
       vi.mocked(mockConfig.getContextCachingConfig).mockReturnValue({
         enabled: true,
-        thresholdTokens: 32768,
+        thresholdTokens: 1000,
         ttlMinutes: 60,
         autoRenew: true,
       });
@@ -3159,11 +3193,29 @@ describe('GeminiChat', () => {
 
       expect(mockContentGenerator.createCachedContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          systemInstruction: { parts: [{ text: si }] },
+          config: expect.objectContaining({
+            systemInstruction: expect.objectContaining({
+              parts: [
+                expect.objectContaining({
+                  text: expect.stringContaining('Large system instruction'),
+                }),
+              ],
+            }),
+          }),
         }),
       );
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
         expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              parts: [
+                expect.objectContaining({
+                  text: expect.stringContaining('<session_context>'),
+                }),
+              ],
+            }),
+          ]),
           config: expect.objectContaining({
             cachedContent: 'cachedContents/new-cache',
           }),
@@ -3177,7 +3229,19 @@ describe('GeminiChat', () => {
       const si = 'Large system instruction...'.repeat(2000);
       chat = new GeminiChat(mockConfig, si);
 
-      const siHash = crypto.createHash('sha256').update(si).digest('hex');
+      // Actually, it's easier to just calculate it from the stable SI
+      const stableSI = getCoreSystemPrompt(
+        mockConfig,
+        undefined,
+        undefined,
+        undefined,
+        'stable',
+      );
+      const realSiHash = crypto
+        .createHash('sha256')
+        .update(stableSI)
+        .digest('hex');
+
       const futureDate = new Date(Date.now() + 3600000).toISOString();
 
       // Seed the metadata file via the mock fs
@@ -3186,7 +3250,7 @@ describe('GeminiChat', () => {
         JSON.stringify({
           version: '1.0',
           entries: {
-            [siHash]: {
+            [realSiHash]: {
               cacheName: 'cachedContents/existing-cache',
               model: 'gemini-pro',
               expiresAt: futureDate,
@@ -3198,7 +3262,7 @@ describe('GeminiChat', () => {
 
       vi.mocked(mockConfig.getContextCachingConfig).mockReturnValue({
         enabled: true,
-        thresholdTokens: 32768,
+        thresholdTokens: 1000,
         ttlMinutes: 60,
         autoRenew: true,
       });
@@ -3235,6 +3299,16 @@ describe('GeminiChat', () => {
       expect(mockContentGenerator.createCachedContent).not.toHaveBeenCalled();
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
         expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              parts: [
+                expect.objectContaining({
+                  text: expect.stringContaining('<session_context>'),
+                }),
+              ],
+            }),
+          ]),
           config: expect.objectContaining({
             cachedContent: 'cachedContents/existing-cache',
           }),

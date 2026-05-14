@@ -1315,6 +1315,19 @@ describe('loggers', () => {
       getExperimentalAgentHistoryTruncationThreshold: () => 30,
       getExperimentalAgentHistoryRetainedMessages: () => 15,
       isExperimentalAgentHistorySummarizationEnabled: () => false,
+      getContextCachingConfig: () => ({
+        enabled: false,
+        thresholdTokens: 32768,
+        ttlMinutes: 60,
+        autoRenew: true,
+      }),
+      getAgentHistoryProviderConfig: () => ({
+        maxTokens: 100000,
+        retainedTokens: 40000,
+        normalMessageTokens: 2000,
+        maximumMessageTokens: 10000,
+        normalizationHeadRatio: 0.25,
+      }),
     } as unknown as Config;
 
     (cfg2 as unknown as { config: Config; promptId: string }).config = cfg2;

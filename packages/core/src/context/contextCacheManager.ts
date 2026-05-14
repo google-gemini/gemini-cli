@@ -39,10 +39,23 @@ export interface ContextCacheMetadata {
  */
 export class ContextCacheManager {
   private metadata: ContextCacheMetadata | undefined;
-  private readonly metadataPath: string;
+  private _metadataPath: string | undefined;
 
-  constructor() {
-    this.metadataPath = Storage.getContextCacheMetadataPath();
+  constructor() {}
+
+  private get metadataPath(): string {
+    if (!this._metadataPath) {
+      this._metadataPath = Storage.getContextCacheMetadataPath();
+    }
+    return this._metadataPath;
+  }
+
+  /**
+   * Resets the in-memory metadata and path. Used for testing.
+   */
+  reset(): void {
+    this.metadata = undefined;
+    this._metadataPath = undefined;
   }
 
   private loadMetadata(): ContextCacheMetadata {

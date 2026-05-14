@@ -291,6 +291,19 @@ describe('Gemini Client (client.ts)', () => {
       isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
       isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
+      getContextCachingConfig: vi.fn().mockReturnValue({
+        enabled: false,
+        thresholdTokens: 32768,
+        ttlMinutes: 60,
+        autoRenew: true,
+      }),
+      getAgentHistoryProviderConfig: vi.fn().mockReturnValue({
+        maxTokens: 100000,
+        retainedTokens: 40000,
+        normalMessageTokens: 2000,
+        maximumMessageTokens: 10000,
+        normalizationHeadRatio: 0.25,
+      }),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
