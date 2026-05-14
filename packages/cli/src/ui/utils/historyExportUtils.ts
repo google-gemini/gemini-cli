@@ -57,10 +57,11 @@ export function serializeHistoryToMarkdown(
  */
 export interface ExportHistoryOptions {
   /**
-   * Optional full message records which contain metadata like agentId for tool calls,
+   * Full message records which contain metadata like agentId for tool calls,
    * providing the link between history and trajectories.
+   * This is the primary source of truth.
    */
-  messages?: MessageRecord[];
+  messages: MessageRecord[];
   /** The file path to export to. */
   filePath: string;
   /** Optional subagent trajectories to include. */
@@ -81,18 +82,21 @@ export async function exportHistoryToFile(
   const {
     messages,
     filePath,
-    trajectories: _trajectories, // Collected but not yet included in Stage 2 JSON output
+    trajectories,
     history: providedHistory,
   } = options;
   const extension = path.extname(filePath).toLowerCase();
 
   let content: string;
   if (extension === '.json') {
-    // Stage 1 & 2: Maintain legacy behavior - only export the raw history array.
-    // Trajectories and messages are collected but not yet included in Stage 2 JSON output.
-    content = JSON.stringify(providedHistory ?? [], null, 2);
+    // Stage 3: Pivot to the new format - export messages and trajectories as an object.
+    content = JSON.stringify(
+      { version: '2.0', messages, trajectories },
+      null,
+      2,
+    );
   } else if (extension === '.md') {
-    const history = providedHistory ?? reconstructHistory(messages ?? []);
+    const history = providedHistory ?? reconstructHistory(messages);
     content = serializeHistoryToMarkdown(history);
   } else {
     throw new Error(

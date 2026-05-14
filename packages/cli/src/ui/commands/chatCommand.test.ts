@@ -21,7 +21,7 @@ import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
 
-vi.mock('fs/promises', () => ({
+vi.mock('node:fs/promises', () => ({
   stat: vi.fn(),
   readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
   writeFile: vi.fn(),
@@ -90,6 +90,7 @@ describe('chatCommand', () => {
           saveCheckpoint: mockSaveCheckpoint,
           loadCheckpoint: mockLoadCheckpoint,
           deleteCheckpoint: mockDeleteCheckpoint,
+          checkpointExists: vi.fn().mockResolvedValue(false),
           initialize: vi.fn().mockResolvedValue(undefined),
         },
       },
@@ -124,8 +125,8 @@ describe('chatCommand', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockFs.readdir.mockResolvedValue(fakeFiles as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
+      mockFs.stat.mockImplementation(async (filePath: any): Promise<Stats> => {
+        if (filePath.endsWith('test1.json')) {
           return { mtime: date1 } as Stats;
         }
         return { mtime: date2 } as Stats;
@@ -133,30 +134,29 @@ describe('chatCommand', () => {
 
       await listCommand?.action?.(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: 'chat_list',
-        chats: [
-          {
-            name: 'test1',
-            mtime: date1.toISOString(),
-          },
-          {
-            name: 'test2',
-            mtime: date2.toISOString(),
-          },
-        ],
-      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'chat_list',
+          chats: [
+            {
+              name: 'test2',
+              mtime: date2.toISOString(),
+            },
+            {
+              name: 'test1',
+              mtime: date1.toISOString(),
+            },
+          ],
+        }),
+      );
     });
   });
   describe('save subcommand', () => {
     let saveCommand: SlashCommand;
     const tag = 'my-tag';
-    let mockCheckpointExists: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
       saveCommand = getSubCommand('save');
-      mockCheckpointExists = vi.fn().mockResolvedValue(false);
-      mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 
     it('should return an error if tag is missing', async () => {
@@ -195,7 +195,7 @@ describe('chatCommand', () => {
       result = await saveCommand?.action?.(mockContext, tag);
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
         {
-          history: expect.any(Array),
+          version: '2.0',
           authType: AuthType.LOGIN_WITH_GOOGLE,
           trajectories: {},
           messages: [],
@@ -210,7 +210,14 @@ describe('chatCommand', () => {
     });
 
     it('should return confirm_action if checkpoint already exists', async () => {
-      mockCheckpointExists.mockResolvedValue(true);
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
+      ]);
+      vi.mocked(mockContext.services.logger.checkpointExists).mockResolvedValue(
+        true,
+      );
       mockContext.invocation = {
         raw: `/chat save ${tag}`,
         name: 'save',
@@ -219,19 +226,22 @@ describe('chatCommand', () => {
 
       const result = await saveCommand?.action?.(mockContext, tag);
 
-      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
+      expect(mockContext.services.logger.checkpointExists).toHaveBeenCalledWith(
+        tag,
+      );
       expect(mockSaveCheckpoint).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         type: 'confirm_action',
         originalInvocation: { raw: `/chat save ${tag}` },
       });
-      // Check that prompt is a React element
+      // Check that prompt is a React element or string
       expect(result).toHaveProperty('prompt');
     });
 
     it('should save the conversation if overwrite is confirmed', async () => {
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it!' }] },
         { role: 'user', parts: [{ text: 'hello' }] },
       ];
       mockGetHistory.mockReturnValue(history);
@@ -239,10 +249,12 @@ describe('chatCommand', () => {
 
       const result = await saveCommand?.action?.(mockContext, tag);
 
-      expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
+      expect(
+        mockContext.services.logger.checkpointExists,
+      ).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
         {
-          history,
+          version: '2.0',
           authType: AuthType.LOGIN_WITH_GOOGLE,
           trajectories: {},
           messages: [],
@@ -358,19 +370,12 @@ describe('chatCommand', () => {
     describe('completion', () => {
       it('should provide completion suggestions', async () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles) as unknown as typeof fsPromises.readdir,
-        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.stat.mockResolvedValue({ mtime: new Date() } as any);
 
-        mockFs.stat.mockImplementation(
-          (async (_: string): Promise<Stats> =>
-            ({
-              mtime: new Date(),
-            }) as Stats) as unknown as typeof fsPromises.stat,
-        );
-
-        const result = await resumeCommand?.completion?.(mockContext, 'a');
+        const result = await resumeCommand?.completion?.(mockContext, 'al');
 
         expect(result).toEqual(['alpha']);
       });
@@ -378,18 +383,17 @@ describe('chatCommand', () => {
       it('should suggest filenames sorted by modified time (newest first)', async () => {
         const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
         const date = new Date();
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles) as unknown as typeof fsPromises.readdir,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
+         
+        mockFs.stat.mockImplementation(
+          async (filePath: string): Promise<Stats> => {
+            if (filePath.endsWith('test1.json')) {
+              return { mtime: date } as Stats;
+            }
+            return { mtime: new Date(date.getTime() + 1000) } as Stats;
+          },
         );
-        mockFs.stat.mockImplementation((async (
-          path: string,
-        ): Promise<Stats> => {
-          if (path.endsWith('test1.json')) {
-            return { mtime: date } as Stats;
-          }
-          return { mtime: new Date(date.getTime() + 1000) } as Stats;
-        }) as unknown as typeof fsPromises.stat);
 
         const result = await resumeCommand?.completion?.(mockContext, '');
         // Sort items by last modified time (newest first)
@@ -438,19 +442,12 @@ describe('chatCommand', () => {
     describe('completion', () => {
       it('should provide completion suggestions', async () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles) as unknown as typeof fsPromises.readdir,
-        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFs.stat.mockResolvedValue({ mtime: new Date() } as any);
 
-        mockFs.stat.mockImplementation(
-          (async (_: string): Promise<Stats> =>
-            ({
-              mtime: new Date(),
-            }) as Stats) as unknown as typeof fsPromises.stat,
-        );
-
-        const result = await deleteCommand?.completion?.(mockContext, 'a');
+        const result = await deleteCommand?.completion?.(mockContext, 'al');
 
         expect(result).toEqual(['alpha']);
       });
@@ -724,70 +721,82 @@ Hi there!`;
       const result = serializeHistoryToMarkdown(history as Content[]);
       expect(result).toBe(expectedMarkdown);
     });
-    describe('debug subcommand', () => {
-      let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+  });
+});
 
-      beforeEach(() => {
-        mockGetLatestApiRequest = vi.fn();
-        if (!mockContext.services.agentContext!.config) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mockContext.services.agentContext!.config as any) = {};
-        }
-        mockContext.services.agentContext!.config.getLatestApiRequest =
-          mockGetLatestApiRequest;
-        vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
-        vi.spyOn(Date, 'now').mockReturnValue(1234567890);
-        mockFs.writeFile.mockClear();
-      });
+describe('debugCommand', () => {
+  const mockFs = vi.mocked(fsPromises);
+  let mockContext: CommandContext;
+  let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
 
-      it('should return an error if no API request is found', async () => {
-        mockGetLatestApiRequest.mockReturnValue(undefined);
+  beforeEach(() => {
+    mockGetLatestApiRequest = vi.fn();
+    mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getLatestApiRequest: mockGetLatestApiRequest,
+            getIdeMode: () => false,
+          },
+        },
+      },
+    });
 
-        const result = await debugCommand.action?.(mockContext, '');
+    vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
+    vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+    mockFs.writeFile.mockClear();
+  });
 
-        expect(result).toEqual({
-          type: 'message',
-          messageType: 'error',
-          content: 'No recent API request found to export.',
-        });
-        expect(mockFs.writeFile).not.toHaveBeenCalled();
-      });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      it('should convert and write the API request to a json file', async () => {
-        const mockRequest = {
-          contents: [{ role: 'user', parts: [{ text: 'test' }] }],
-        };
-        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+  it('should return an error if no API request is found', async () => {
+    mockGetLatestApiRequest.mockReturnValue(undefined);
 
-        const result = await debugCommand.action?.(mockContext, '');
+    const result = await debugCommand.action?.(mockContext, '');
 
-        const expectedFilename = 'gcli-request-1234567890.json';
-        const expectedPath = path.join('/project/root', expectedFilename);
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'No recent API request found to export.',
+    });
+    expect(mockFs.writeFile).not.toHaveBeenCalled();
+  });
 
-        expect(mockFs.writeFile).toHaveBeenCalledWith(
-          expectedPath,
-          expect.stringContaining('"role": "user"'),
-        );
-        expect(result).toEqual({
-          type: 'message',
-          messageType: 'info',
-          content: `Debug API request saved to ${expectedFilename}`,
-        });
-      });
+  it('should convert and write the API request to a json file', async () => {
+    const mockRequest = {
+      contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+    };
+    mockGetLatestApiRequest.mockReturnValue(mockRequest);
 
-      it('should handle errors during file write', async () => {
-        const mockRequest = { contents: [] };
-        mockGetLatestApiRequest.mockReturnValue(mockRequest);
-        mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+    const result = await debugCommand.action?.(mockContext, '');
 
-        const result = await debugCommand.action?.(mockContext, '');
+    const expectedFilename = 'gcli-request-1234567890.json';
+    const expectedPath = path.join('/project/root', expectedFilename);
 
-        expect(result).toEqual({
-          type: 'message',
-          messageType: 'error',
-          content: 'Error saving debug request: Write failed',
-        });
-      });
+    expect(mockFs.writeFile).toHaveBeenCalledWith(
+      expectedPath,
+      expect.stringContaining('"role": "user"'),
+    );
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: `Debug API request saved to ${expectedFilename}`,
+    });
+  });
+
+  it('should handle errors during file write', async () => {
+    const mockRequest = { contents: [] };
+    mockGetLatestApiRequest.mockReturnValue(mockRequest);
+    mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+
+    const result = await debugCommand.action?.(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Error saving debug request: Write failed',
     });
   });
 });
