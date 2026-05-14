@@ -104,7 +104,7 @@ function isSessionIdRecord(record: unknown): record is { sessionId: string } {
 }
 
 const sanitizeSummary = (s: string) =>
-  s.replace(/\r?\n/g, ' ').replace(/[[]\]/g, ' ');
+  s.replace(/\r?\n/g, ' ').replace(/[\x5b\x5d]/g, ' ');
 
 export async function loadConversationRecord(
   filePath: string,
@@ -366,7 +366,7 @@ export async function loadConversationRecord(
           } else if (line.includes('"id":') && line.includes('"type":')) {
             if (isTrackingMemoryScratchpadFreshness)
               memoryScratchpadIsStale = true;
-            const idMatch = line.match(/"id":"([^"]+)"/);
+            const idMatch = line.match(/^\s*\{?"id":"([^"]+)"/);
             if (idMatch) {
               const id = idMatch[1];
               const isUser = /"type"\s*:\s*"user"/.test(line);
