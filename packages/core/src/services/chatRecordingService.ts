@@ -103,6 +103,12 @@ function isSessionIdRecord(record: unknown): record is { sessionId: string } {
   return isStringProperty(record, 'sessionId');
 }
 
+const sanitizeSummary = (s: string) => s
+    .replace(/\r?\n/g, ' ')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\]/g, '&#93;');
+
 export async function loadConversationRecord(
   filePath: string,
   options?: LoadConversationOptions,
@@ -160,6 +166,13 @@ export async function loadConversationRecord(
           return m ? m[1] : undefined;
         };
 
+        const getLastMatch = (str: string, reg: RegExp) => {
+          const matches = Array.from(str.matchAll(new RegExp(reg, 'g')));
+          return matches.length > 0
+            ? matches[matches.length - 1][1]
+            : undefined;
+        };
+
         const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
         const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
         let startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
@@ -185,15 +198,15 @@ export async function loadConversationRecord(
         }
 
         const lastUpdated =
-          getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
+          getLastMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
           getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
           filenameTimestamp;
 
         const isJsonl = filePath.endsWith('.jsonl');
 
         // For .jsonl, summary is strictly inside "$set". For legacy .json, it's at the absolute end of the file.
-        const summary =
-          getMatch(
+        const rawSummary =
+          getLastMatch(
             tailStr,
             /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||
@@ -201,10 +214,15 @@ export async function loadConversationRecord(
             headStr,
             /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||
-          getMatch(tailStr, /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}\s*$/) ||
+          getLastMatch(
+            tailStr,
+            /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}\s*$/,
+          ) ||
           (!isJsonl
             ? getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)
             : undefined);
+
+        const summary = rawSummary ? sanitizeSummary(rawSummary) : undefined;
 
         const rawKind = getMatch(headStr, /"kind"\s*:\s*"([^"]+)"/);
         const kind =
@@ -339,15 +357,15 @@ export async function loadConversationRecord(
             record = JSON.parse(line) as unknown;
           } else if (line.includes('"sessionId"')) {
             record = JSON.parse(line) as unknown;
-          } else if (line.includes('"id":')) {
+          } else if (line.startsWith('{"id":')) {
             if (isTrackingMemoryScratchpadFreshness)
               memoryScratchpadIsStale = true;
-            const idMatch = line.match(/"id":"([^"]+)"/);
+            const idMatch = line.match(/^\{"id":"([^"]+)"/);
             if (idMatch) {
               const id = idMatch[1];
-              const isUser = line.includes('"type":"user"');
+              const isUser = /"type"\s*:\s*"user"/.test(line);
               const isUserOrAssistant =
-                isUser || line.includes('"type":"gemini"');
+                isUser || /"type"\s*:\s*"gemini"/.test(line);
               messageIds.push(id);
               messageKinds.set(id, { isUser, isUserOrAssistant });
               if (!firstUserMessageStr && isUser) {
@@ -415,7 +433,8 @@ export async function loadConversationRecord(
             hasProperty(record, 'type') &&
             (record.type === 'user' || record.type === 'gemini');
           // Track message count and first user message
-          if (options?.metadataOnly) {
+          // (Already tracked in metadataOnly optimization above if applicable)
+          if (options?.metadataOnly && !messageKinds.has(id)) {
             messageIds.push(id);
             messageKinds.set(id, { isUser, isUserOrAssistant });
           }
@@ -454,12 +473,24 @@ export async function loadConversationRecord(
             memoryScratchpadIsStale = false;
           }
           // Metadata update
+          if (
+            hasProperty(record.$set, 'summary') &&
+            typeof record.$set.summary === 'string'
+          ) {
+            record.$set.summary = sanitizeSummary(record.$set.summary);
+          }
           metadata = {
             ...metadata,
             ...record.$set,
           };
         } else if (isPartialMetadataRecord(record)) {
           // Initial metadata line
+          if (
+            hasProperty(record, 'summary') &&
+            typeof record.summary === 'string'
+          ) {
+            record.summary = sanitizeSummary(record.summary);
+          }
           metadata = { ...metadata, ...record };
         }
       } catch {
