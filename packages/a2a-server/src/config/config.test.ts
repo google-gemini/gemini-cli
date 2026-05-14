@@ -53,6 +53,23 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     isHeadlessMode: vi.fn().mockReturnValue(false),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
+    createPolicyEngineConfig: vi.fn().mockImplementation((_settings, mode) => {
+      return {
+        rules:
+          mode === actual.ApprovalMode.YOLO
+            ? [
+                {
+                  toolName: '*',
+                  decision: actual.PolicyDecision.ALLOW,
+                  priority: actual.PRIORITY_YOLO_ALLOW_ALL,
+                  modes: [actual.ApprovalMode.YOLO],
+                  allowRedirection: true,
+                },
+              ]
+            : [],
+        checkers: [],
+      };
+    }),
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },

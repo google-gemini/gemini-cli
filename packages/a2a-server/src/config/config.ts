@@ -25,6 +25,8 @@ import {
   FatalAuthenticationError,
   PolicyDecision,
   PRIORITY_YOLO_ALLOW_ALL,
+  createPolicyEngineConfig,
+  type PolicySettings,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -63,6 +65,24 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  const policySettings: PolicySettings = {
+    mcpServers: settings.mcpServers,
+    tools: {
+      core: settings.coreTools || settings.tools?.core,
+      exclude: settings.excludeTools || settings.tools?.exclude,
+      allowed: settings.allowedTools || settings.tools?.allowed,
+    },
+    policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    true,
+  );
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -78,20 +98,7 @@ export async function loadConfig(
     allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
-    policyEngineConfig: {
-      rules:
-        approvalMode === ApprovalMode.YOLO
-          ? [
-              {
-                toolName: '*',
-                decision: PolicyDecision.ALLOW,
-                priority: PRIORITY_YOLO_ALLOW_ALL,
-                modes: [ApprovalMode.YOLO],
-                allowRedirection: true,
-              },
-            ]
-          : [],
-    },
+    policyEngineConfig,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {

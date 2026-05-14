@@ -51,6 +51,8 @@ export interface Settings {
   experimental?: {
     enableAgents?: boolean;
   };
+  policyPaths?: string[];
+  adminPolicyPaths?: string[];
 }
 
 export interface SettingsError {
