@@ -9,6 +9,7 @@ import path from 'node:path';
 import { sanitizeFilenamePart } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 import { isNodeError } from './errors.js';
+import { isStringProperty } from './typeUtils.js';
 import type { Config } from '../config/config.js';
 import { SESSION_FILE_PREFIX } from '../services/chatRecordingTypes.js';
 
@@ -16,12 +17,7 @@ const LOGS_DIR = 'logs';
 const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 function isSessionIdRecord(record: unknown): record is { sessionId: string } {
-  return (
-    typeof record === 'object' &&
-    record !== null &&
-    'sessionId' in record &&
-    typeof (record as { sessionId: unknown }).sessionId === 'string'
-  );
+  return isStringProperty(record, 'sessionId');
 }
 
 /**
@@ -272,7 +268,8 @@ export async function deleteStoredSession(
     const chatsDir = path.join(tempDir, 'chats');
     const shortId = deriveSessionShortId(sessionIdOrBasename);
 
-    if (!(await fs.stat(chatsDir).catch(() => null))) {
+    const chatsDirStat = await fs.stat(chatsDir).catch(() => null);
+    if (!chatsDirStat || !chatsDirStat.isDirectory()) {
       return;
     }
 
