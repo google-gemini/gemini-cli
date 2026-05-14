@@ -103,7 +103,8 @@ function isSessionIdRecord(record: unknown): record is { sessionId: string } {
   return isStringProperty(record, 'sessionId');
 }
 
-const sanitizeSummary = (s: string) => s
+const sanitizeSummary = (s: string) =>
+  s
     .replace(/\r?\n/g, ' ')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -167,7 +168,7 @@ export async function loadConversationRecord(
         };
 
         const getLastMatch = (str: string, reg: RegExp) => {
-          const matches = Array.from(str.matchAll(new RegExp(reg, 'g')));
+          const matches = Array.from(str.matchAll(new RegExp(reg.source, 'g')));
           return matches.length > 0
             ? matches[matches.length - 1][1]
             : undefined;
