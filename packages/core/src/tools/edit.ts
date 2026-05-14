@@ -204,15 +204,17 @@ async function calculateFlexibleReplacement(
       const newBlockWithIndent = applyIndentation(replaceLines, indentation);
 
       let replacementText = newBlockWithIndent.join('\n');
-      if (window[window.length - 1].endsWith('\n')) {
+      if (
+        new_string !== '' &&
+        window[window.length - 1].endsWith('\n') &&
+        !replacementText.endsWith('\n')
+      ) {
         replacementText += '\n';
       }
 
       sourceLines.splice(i, searchLinesStripped.length, replacementText);
-      i += 1;
-    } else {
-      i++;
     }
+    i++;
   }
 
   if (flexibleOccurrences > 0) {
