@@ -237,6 +237,8 @@ export interface GemmaModelRouterSettings {
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
+  adkAgentSessionNonInteractiveEnabled?: boolean;
+  adkAgentSessionInteractiveEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -913,6 +915,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
+  private readonly adkAgentSessionInteractiveEnabled: boolean;
+  private readonly adkAgentSessionNonInteractiveEnabled: boolean;
 
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -1359,6 +1363,12 @@ export class Config implements McpContext, AgentLoopContext {
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.agentSessionInteractiveEnabled =
       params.adk?.agentSessionInteractiveEnabled ?? false;
+
+    this.adkAgentSessionNonInteractiveEnabled =
+      params.adk?.adkAgentSessionNonInteractiveEnabled ?? false;
+    this.adkAgentSessionInteractiveEnabled =
+      params.adk?.adkAgentSessionInteractiveEnabled ?? false;
+
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -3794,6 +3804,20 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
       this.agentSessionInteractiveEnabled
+    );
+  }
+
+  getAdkAgentSessionNonInteractiveEnabled(): boolean {
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT_ADK'] === 'true' ||
+      this.adkAgentSessionNonInteractiveEnabled
+    );
+  }
+
+  getAdkAgentSessionInteractiveEnabled(): boolean {
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT_ADK'] === 'true' ||
+      this.adkAgentSessionInteractiveEnabled
     );
   }
 
