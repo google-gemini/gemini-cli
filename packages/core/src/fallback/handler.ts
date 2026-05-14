@@ -20,8 +20,6 @@ import {
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
 
-import { isPreviewModel } from '../config/models.js';
-
 export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
@@ -31,11 +29,6 @@ export async function handleFallback(
   error?: unknown,
 ): Promise<string | boolean | null> {
   const failureKind = classifyFailureKind(error);
-
-  // If a preview model is not found, record that the user lacks preview access.
-  if (failureKind === 'not_found' && isPreviewModel(failedModel, config)) {
-    config.setHasAccessToPreviewModel?.(false);
-  }
 
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
