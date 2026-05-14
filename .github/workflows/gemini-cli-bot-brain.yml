@@ -361,7 +361,7 @@ jobs:
             if [ -s "${{ runner.temp }}/brain-data/pr-labels.txt" ]; then
               while IFS= read -r label; do
                 if [ -n "$label" ]; then
-                  gh pr edit --add-label "$label" || true
+                  gh pr edit "$BRANCH_NAME" --add-label "$label" || true
                 fi
               done < "${{ runner.temp }}/brain-data/pr-labels.txt"
             fi
