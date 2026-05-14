@@ -163,23 +163,22 @@ export async function loadConversationRecord(
         const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
         const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
         let startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
-        const filenameTimestamp = startTime
-          ? undefined
-          : (function () {
-              const basename = path.basename(filePath);
-              const timeMatch = basename.match(
-                /session-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})/,
-              );
-              if (timeMatch) {
-                // Convert session-2026-05-10T11-45-... to valid ISO 2026-05-10T11:45:00Z
-                return (
-                  timeMatch[1].replace(/-/g, (m, offset) =>
-                    offset > 10 ? ':' : '-',
-                  ) + ':00Z'
-                );
-              }
-              return undefined;
-            })();
+        let filenameTimestamp: string | undefined;
+
+        // Fallback: Extract startTime from filename if not in header (format: session-YYYY-MM-DDTHH-MM-8CHARS.jsonl)
+        if (!startTime) {
+          const basename = path.basename(filePath);
+          const timeMatch = basename.match(
+            /session-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})/,
+          );
+          if (timeMatch) {
+            // Convert session-2026-05-10T11-45-... to valid ISO 2026-05-10T11:45:00Z
+            filenameTimestamp =
+              timeMatch[1].replace(/-/g, (m, offset) =>
+                offset > 10 ? ':' : '-',
+              ) + ':00Z';
+          }
+        }
 
         if (!startTime) {
           startTime = filenameTimestamp;
@@ -267,9 +266,10 @@ export async function loadConversationRecord(
           }
         } else {
           // FAST PREVIEW (legacy .json): Extract first user message text roughly using regex to avoid 1s+ JSON.parse
+          // Bounded cross-line match to prevent bleeding across records
           const legacyUserMatches = [
             ...headStr.matchAll(
-              /"type"\s*:\s*"user"[\s\S]*?"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g,
+              /"type"\s*:\s*"user"[\s\S]{0,500}?"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g,
             ),
           ];
           for (const match of legacyUserMatches) {
