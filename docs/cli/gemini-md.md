@@ -65,8 +65,6 @@ You can interact with the loaded context files by using the `/memory` command.
   being provided to the model.
 - **`/memory reload`**: Forces a re-scan and reload of all `GEMINI.md` files
   from all configured locations.
-- **`/memory add <text>`**: Appends your text to your global
-  `~/.gemini/GEMINI.md` file. This lets you add persistent memories on the fly.
 
 ## Modularize context with imports
 

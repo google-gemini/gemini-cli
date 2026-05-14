@@ -10,7 +10,6 @@ import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
-  FileDiscoveryService,
   getCodeAssistServer,
   Config,
   ExperimentFlags,
@@ -48,16 +47,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       };
       return mockConfig;
     }),
-    loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
-      memoryContent: { global: '', extension: '', project: '' },
-      fileCount: 0,
-      filePaths: [],
-    }),
     startupProfiler: {
       flush: vi.fn(),
     },
     isHeadlessMode: vi.fn().mockReturnValue(false),
-    FileDiscoveryService: vi.fn(),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
     coreEvents: {
@@ -266,24 +259,6 @@ describe('loadConfig', () => {
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
-  });
-
-  it('should initialize FileDiscoveryService with correct options', async () => {
-    const testPath = '/tmp/ignore';
-    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', testPath);
-    const settings: Settings = {
-      fileFiltering: {
-        respectGitIgnore: false,
-      },
-    };
-
-    await loadConfig(settings, mockExtensionLoader, taskId);
-
-    expect(FileDiscoveryService).toHaveBeenCalledWith(expect.any(String), {
-      respectGitIgnore: false,
-      respectGeminiIgnore: undefined,
-      customIgnoreFilePaths: [testPath],
-    });
   });
 
   describe('tool configuration', () => {

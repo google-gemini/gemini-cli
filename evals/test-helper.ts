@@ -32,7 +32,7 @@ export const EVAL_MODEL =
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
 //   These tests are typically trivial and test basic functionality with unambiguous
-//   prompts. For example: "call save_memory to remember foo" should be fairly reliable.
+//   prompts. For example: "remember foo" should be fairly reliable.
 //   These are the first line of defense against regressions in key behaviors and run in
 //   every CI. You can run these locally with 'npm run test:always_passing_evals'.
 //
