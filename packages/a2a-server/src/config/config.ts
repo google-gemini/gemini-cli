@@ -23,8 +23,6 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
-  PolicyDecision,
-  PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
   type PolicySettings,
   type TelemetryTarget,
