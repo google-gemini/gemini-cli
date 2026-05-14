@@ -24,10 +24,15 @@ export const sortSessions = (
 ): SessionInfo[] => {
   const sorted = [...sessions].sort((a, b) => {
     switch (sortBy) {
-      case 'date':
+      case 'date': {
+        const diff =
+          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+        if (diff !== 0) return diff;
+        // Stable secondary sort by startTime
         return (
-          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+          new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
         );
+      }
       case 'messages':
         return b.messageCount - a.messageCount;
       case 'name':

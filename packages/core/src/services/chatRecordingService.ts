@@ -162,10 +162,32 @@ export async function loadConversationRecord(
 
         const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
         const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
-        const startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
+        let startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
+        let filenameTimestamp: string | undefined;
+
+        // Fallback: Extract startTime from filename if not in header (format: session-YYYY-MM-DDTHH-MM-8CHARS.jsonl)
+        if (!startTime || !getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/)) {
+          const basename = path.basename(filePath);
+          const timeMatch = basename.match(
+            /session-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})/,
+          );
+          if (timeMatch) {
+            // Convert session-2026-05-10T11-45-... to valid ISO 2026-05-10T11:45:00Z
+            filenameTimestamp =
+              timeMatch[1].replace(/-/g, (m, offset) =>
+                offset > 10 ? ':' : '-',
+              ) + ':00Z';
+          }
+        }
+
+        if (!startTime) {
+          startTime = filenameTimestamp;
+        }
+
         const lastUpdated =
           getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
-          getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/);
+          getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
+          filenameTimestamp;
         const summary =
           getMatch(tailStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/) ||
           getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/);
