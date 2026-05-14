@@ -363,10 +363,10 @@ export async function loadConversationRecord(
             record = JSON.parse(line) as unknown;
           } else if (line.includes('"sessionId"')) {
             record = JSON.parse(line) as unknown;
-          } else if (line.includes('"id":') && line.includes('"type":')) {
+          } else if (line.includes('"id"') && line.includes('"type"')) {
             if (isTrackingMemoryScratchpadFreshness)
               memoryScratchpadIsStale = true;
-            const idMatch = line.match(/^\s*\{?"id":"([^"]+)"/);
+            const idMatch = line.match(/"id"\s*:\s*"([^"]+)"/);
             if (idMatch) {
               const id = idMatch[1];
               const isUser = /"type"\s*:\s*"user"/.test(line);
