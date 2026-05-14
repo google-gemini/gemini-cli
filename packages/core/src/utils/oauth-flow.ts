@@ -109,7 +109,6 @@ export function startCallbackServer(
   port: Promise<number>;
   response: Promise<OAuthAuthorizationResponse>;
   close: () => void;
-  server: http.Server;
 } {
   let portResolve: (port: number) => void;
   let portReject: (error: Error) => void;
@@ -119,140 +118,138 @@ export function startCallbackServer(
   });
 
   let timeoutId: NodeJS.Timeout | undefined;
-  let serverPort: number;
+  let server: http.Server;
 
-  let resolveResponse: (value: OAuthAuthorizationResponse) => void;
-  let rejectResponse: (reason: unknown) => void;
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
-      resolveResponse = resolve;
-      rejectResponse = reject;
-    },
-  );
+      let serverPort: number;
 
-  const server = http.createServer(
-    async (req: http.IncomingMessage, res: http.ServerResponse) => {
-      try {
-        const url = new URL(req.url ?? '', 'http://localhost');
+      server = http.createServer(
+        async (req: http.IncomingMessage, res: http.ServerResponse) => {
+          try {
+            const url = new URL(req.url ?? '', 'http://localhost');
 
-        if (url.pathname !== REDIRECT_PATH) {
-          res.writeHead(404);
-          res.end('Not found');
-          return;
-        }
+            if (url.pathname !== REDIRECT_PATH) {
+              res.writeHead(404);
+              res.end('Not found');
+              return;
+            }
 
-        const code = url.searchParams.get('code');
-        const state = url.searchParams.get('state');
-        const error = url.searchParams.get('error');
+            const code = url.searchParams.get('code');
+            const state = url.searchParams.get('state');
+            const error = url.searchParams.get('error');
 
-        if (error) {
-          res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-          res.end(`
-          <html>
-            <body>
-              <h1>Authentication Failed</h1>
-              <p>Error: ${error.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-              <p>${(url.searchParams.get('error_description') || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-              <p>You can close this window.</p>
-            </body>
-          </html>
-        `);
-          server.close();
-          rejectResponse(new Error(`OAuth error: ${error}`));
-          return;
-        }
+            if (error) {
+              res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+              res.end(`
+              <html>
+                <body>
+                  <h1>Authentication Failed</h1>
+                  <p>Error: ${error.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                  <p>${(url.searchParams.get('error_description') || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                  <p>You can close this window.</p>
+                </body>
+              </html>
+            `);
+              server.close();
+              reject(new Error(`OAuth error: ${error}`));
+              return;
+            }
 
-        if (!code || !state) {
-          res.writeHead(400);
-          res.end('Missing code or state parameter');
-          return;
-        }
+            if (!code || !state) {
+              res.writeHead(400);
+              res.end('Missing code or state parameter');
+              return;
+            }
 
-        if (state !== expectedState) {
-          res.writeHead(400);
-          res.end('Invalid state parameter');
-          server.close();
-          rejectResponse(new Error('State mismatch - possible CSRF attack'));
-          return;
-        }
+            if (state !== expectedState) {
+              res.writeHead(400);
+              res.end('Invalid state parameter');
+              server.close();
+              reject(new Error('State mismatch - possible CSRF attack'));
+              return;
+            }
 
-        // Send success response to browser
-        res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-        res.end(`
-        <html>
-          <body>
-            <h1>Authentication Successful!</h1>
-            <p>You can close this window and return to Gemini CLI.</p>
-            <script>window.close();</script>
-          </body>
-        </html>
-      `);
+            // Send success response to browser
+            res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+            res.end(`
+            <html>
+              <body>
+                <h1>Authentication Successful!</h1>
+                <p>You can close this window and return to Gemini CLI.</p>
+                <script>window.close();</script>
+              </body>
+            </html>
+          `);
 
-        server.close();
-        resolveResponse({ code, state });
-      } catch (error) {
-        server.close();
-        rejectResponse(error);
-      }
-    },
-  );
-
-  server.on('error', (error) => {
-    portReject(error);
-    rejectResponse(error);
-  });
-
-  // Determine which port to use (env var, argument, or OS-assigned)
-  let listenPort: number | undefined = 0; // Default to OS-assigned port
-
-  const portStr = process.env['OAUTH_CALLBACK_PORT'];
-  if (portStr) {
-    const envPort = parseInt(portStr, 10);
-    if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
-      const error = new Error(
-        `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
+            server.close();
+            resolve({ code, state });
+          } catch (error) {
+            server.close();
+            reject(error);
+          }
+        },
       );
-      portReject(error);
-      rejectResponse(error);
-      listenPort = undefined;
-    } else {
-      listenPort = envPort;
-    }
-  } else if (port !== undefined) {
-    listenPort = port;
-  }
 
-  if (listenPort !== undefined) {
-    server.listen(listenPort, () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const address = server.address() as net.AddressInfo;
-      serverPort = address.port;
-      debugLogger.log(`OAuth callback server listening on port ${serverPort}`);
-      portResolve(serverPort); // Resolve port promise immediately
-    });
-  }
+      server.on('error', (error) => {
+        portReject(error);
+        reject(error);
+      });
 
-  const abortController = new AbortController();
-  timeoutId = setTimeout(
-    () => {
-      abortController.abort(new Error('OAuth callback timeout'));
+      // Determine which port to use (env var, argument, or OS-assigned)
+      let listenPort: number | undefined = 0; // Default to OS-assigned port
+
+      const portStr = process.env['OAUTH_CALLBACK_PORT'];
+      if (portStr) {
+        const envPort = parseInt(portStr, 10);
+        if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
+          const error = new Error(
+            `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
+          );
+          portReject(error);
+          reject(error);
+          listenPort = undefined;
+        } else {
+          listenPort = envPort;
+        }
+      } else if (port !== undefined) {
+        listenPort = port;
+      }
+
+      if (listenPort !== undefined) {
+        server.listen(listenPort, () => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const address = server.address() as net.AddressInfo;
+          serverPort = address.port;
+          debugLogger.log(
+            `OAuth callback server listening on port ${serverPort}`,
+          );
+          portResolve(serverPort); // Resolve port promise immediately
+        });
+      }
+
+      const abortController = new AbortController();
+      timeoutId = setTimeout(
+        () => {
+          abortController.abort(new Error('OAuth callback timeout'));
+        },
+        5 * 60 * 1000,
+      );
+      timeoutId.unref();
+
+      const onAbort = () => {
+        server.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
+
+      server.on('close', () => {
+        abortController.signal.removeEventListener('abort', onAbort);
+      });
     },
-    5 * 60 * 1000,
   );
-  timeoutId.unref();
 
-  const onAbort = () => {
-    server.close();
-    rejectResponse(abortController.signal.reason);
-  };
-  abortController.signal.addEventListener('abort', onAbort, { once: true });
-
-  server.on('close', () => {
-    abortController.signal.removeEventListener('abort', onAbort);
-  });
-
-  // Attach a no-op catch to prevent unhandled rejections if the promise is abandoned.
-  // The caller can still await it and catch their own errors.
+  // Safety catch to prevent unhandled rejections if the promise is abandoned
   responsePromise.catch(() => {});
 
   return {
@@ -263,9 +260,8 @@ export function startCallbackServer(
         clearTimeout(timeoutId);
         timeoutId = undefined;
       }
-      server.close();
+      server?.close();
     },
-    server,
   };
 }
 
