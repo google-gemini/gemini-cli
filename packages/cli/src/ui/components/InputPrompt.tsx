@@ -816,6 +816,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShortcutsHelpVisible(false);
         }
 
+        // Capture the logical position synchronously before the async operation
+        const initialOffset = buffer.getOffset();
+
         // When the terminal intercepts Ctrl+V and sends a bracketed paste
         // event, we also need to check for clipboard images. This is
         // especially important on Windows Terminal where Ctrl+V is always
@@ -836,13 +839,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 );
                 const escapedPath = escapePath(relativePath);
                 const insertText = `@${escapedPath}`;
+
+                // Use a stable mechanism to update the latest buffer state
                 const currentBuffer = bufferRef.current;
                 const currentText = currentBuffer.text;
-                const offset = currentBuffer.getOffset();
+
                 let textToInsert = insertText;
-                const charBefore = offset > 0 ? currentText[offset - 1] : '';
+                const charBefore =
+                  initialOffset > 0 ? currentText[initialOffset - 1] : '';
                 const charAfter =
-                  offset < currentText.length ? currentText[offset] : '';
+                  initialOffset < currentText.length
+                    ? currentText[initialOffset]
+                    : '';
                 if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
                   textToInsert = ' ' + textToInsert;
                 }
@@ -850,8 +858,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   textToInsert = textToInsert + ' ';
                 }
                 currentBuffer.replaceRangeByOffset(
-                  offset,
-                  offset,
+                  initialOffset,
+                  initialOffset,
                   textToInsert,
                 );
               }
