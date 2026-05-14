@@ -1208,6 +1208,8 @@ async function parseLegacyRecordFallback(
   | null
 > {
   try {
+    const stats = await fs.promises.stat(filePath).catch(() => null);
+    const mtime = stats ? stats.mtime.toISOString() : new Date().toISOString();
     const fileContent = await fs.promises.readFile(filePath, 'utf8');
     const parsed = JSON.parse(fileContent) as unknown;
 
@@ -1233,6 +1235,8 @@ async function parseLegacyRecordFallback(
         }
         return {
           ...legacyRecord,
+          startTime: legacyRecord.startTime || mtime,
+          lastUpdated: legacyRecord.lastUpdated || mtime,
           messages: [],
           messageCount: legacyRecord.messages?.length || 0,
           userMessageCount:
@@ -1246,12 +1250,11 @@ async function parseLegacyRecordFallback(
       }
       return {
         ...legacyRecord,
+        startTime: legacyRecord.startTime || mtime,
+        lastUpdated: legacyRecord.lastUpdated || mtime,
         userMessageCount:
           legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
-        hasUserOrAssistantMessage:
-          legacyRecord.messages?.some(
-            (m) => m.type === 'user' || m.type === 'gemini',
-          ) || false,
+        messageCount: legacyRecord.messages?.length || 0,
       };
     }
   } catch {
