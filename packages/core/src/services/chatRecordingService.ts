@@ -104,11 +104,7 @@ function isSessionIdRecord(record: unknown): record is { sessionId: string } {
 }
 
 const sanitizeSummary = (s: string) =>
-  s
-    .replace(/\r?\n/g, ' ')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\]/g, '&#93;');
+  s.replace(/\r?\n/g, ' ').replace(/[[]\]/g, ' ');
 
 export async function loadConversationRecord(
   filePath: string,
@@ -174,9 +170,18 @@ export async function loadConversationRecord(
             : undefined;
         };
 
-        const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
-        const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
-        let startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
+        const sessionId = getMatch(
+          headStr,
+          /"sessionId"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+        );
+        const projectHash = getMatch(
+          headStr,
+          /"projectHash"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+        );
+        let startTime = getMatch(
+          headStr,
+          /"startTime"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+        );
         let filenameTimestamp: string | undefined;
 
         // Fallback: Extract startTime from filename if not in header (format: session-YYYY-MM-DDTHH-MM-8CHARS.jsonl)
@@ -358,10 +363,10 @@ export async function loadConversationRecord(
             record = JSON.parse(line) as unknown;
           } else if (line.includes('"sessionId"')) {
             record = JSON.parse(line) as unknown;
-          } else if (line.startsWith('{"id":')) {
+          } else if (line.includes('"id":') && line.includes('"type":')) {
             if (isTrackingMemoryScratchpadFreshness)
               memoryScratchpadIsStale = true;
-            const idMatch = line.match(/^\{"id":"([^"]+)"/);
+            const idMatch = line.match(/"id":"([^"]+)"/);
             if (idMatch) {
               const id = idMatch[1];
               const isUser = /"type"\s*:\s*"user"/.test(line);

@@ -311,8 +311,9 @@ export const getAllSessionFiles = async (
                 const buffer = Buffer.isBuffer(chunk)
                   ? chunk
                   : Buffer.from(chunk);
-                for (let i = 0; i < buffer.length; i++) {
-                  if (buffer[i] === 10) lines++;
+                let pos = -1;
+                while ((pos = buffer.indexOf(10, pos + 1)) !== -1) {
+                  lines++;
                 }
               });
               stream.on('end', () => resolve(lines));
