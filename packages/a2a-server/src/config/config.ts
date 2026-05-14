@@ -11,9 +11,7 @@ import * as dotenv from 'dotenv';
 import {
   AuthType,
   Config,
-  FileDiscoveryService,
   ApprovalMode,
-  loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   startupProfiler,
@@ -128,23 +126,6 @@ export async function loadConfig(
     ptyInfo: 'auto',
     enableAgents: settings.experimental?.enableAgents ?? true,
   };
-
-  const fileService = new FileDiscoveryService(workspaceDir, {
-    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
-    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
-    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
-  });
-  const { memoryContent, fileCount, filePaths } =
-    await loadServerHierarchicalMemory(
-      workspaceDir,
-      [workspaceDir],
-      fileService,
-      extensionLoader,
-      folderTrust,
-    );
-  configParams.userMemory = memoryContent;
-  configParams.geminiMdFileCount = fileCount;
-  configParams.geminiMdFilePaths = filePaths;
 
   // Set an initial config to use to get a code assist server.
   // This is needed to fetch admin controls.

@@ -15,7 +15,6 @@ import {
   TOPIC_PARAM_SUMMARY,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -85,23 +84,16 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
   topicUpdateNarration: boolean;
-  memoryV2Enabled: boolean;
   /**
    * Absolute path to the user's per-project private memory index
-   * (e.g. ~/.gemini/tmp/<project-hash>/memory/MEMORY.md). Surfaced to the
-   * model when memoryV2Enabled is true so the prompt-driven memory flow
-   * can route project-specific personal notes there instead of the committed
-   * project GEMINI.md.
+   * (e.g. ~/.gemini/tmp/<project-hash>/memory/MEMORY.md).
    */
   userProjectMemoryPath?: string;
   /**
    * Absolute path to the user's global personal memory file
-   * (e.g. ~/.gemini/GEMINI.md). Surfaced to the model when memoryV2Enabled
-   * is true so the prompt-driven memory flow can route cross-project personal
-   * preferences (preferences that follow the user across all workspaces) there
-   * instead of the project-scoped tiers. Config.isPathAllowed surgically
-   * allowlists this exact file (only this file, not the rest of `~/.gemini/`)
-   * so the agent can edit it directly.
+   * (e.g. ~/.gemini/GEMINI.md). Config.isPathAllowed surgically allowlists
+   * this exact file (only this file, not the rest of `~/.gemini/`) so the
+   * agent can edit it directly.
    */
   globalMemoryPath?: string;
 }
@@ -840,20 +832,19 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
-  if (options.memoryV2Enabled) {
-    const userProjectBullet = options.userProjectMemoryPath
-      ? `
+  const userProjectBullet = options.userProjectMemoryPath
+    ? `
   - **Private Project Memory** (\`${options.userProjectMemoryPath}\`): Personal-to-the-user, project-specific notes that must **NOT** be committed to the repo. Keep this file concise: it is the private index for this workspace. Store richer detail in sibling \`*.md\` files in the same folder and use \`MEMORY.md\` to point to them.`
-      : '';
-    const globalMemoryBullet = options.globalMemoryPath
-      ? `
+    : '';
+  const globalMemoryBullet = options.globalMemoryPath
+    ? `
   - **Global Personal Memory** (\`${options.globalMemoryPath}\`): Cross-project personal preferences and facts about the user that should follow them into every workspace (e.g. preferred testing framework across all projects, language preferences, coding-style defaults). Loaded automatically in every session. Keep entries concise and durable — never workspace-specific.`
-      : '';
-    const globalRoutingRule = options.globalMemoryPath
-      ? `
+    : '';
+  const globalRoutingRule = options.globalMemoryPath
+    ? `
   - When the user states a **cross-project personal preference** that should follow them into every workspace ("I always prefer X", "across all my projects", "my personal coding style is Y", "in general I like Z"), update the global personal memory file. Do **not** also write it into a \`GEMINI.md\` file or the private memory folder.`
-      : '';
-    return `
+    : '';
+  return `
 - **Instruction and Memory Files:** You persist long-lived project context by editing markdown files directly with ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)}. There is no \`save_memory\` tool. The current contents of all loaded \`GEMINI.md\` files and the private project \`MEMORY.md\` index are already in your context — do not re-read them before editing.
   - **Project Instructions** (\`./GEMINI.md\`): Team-shared architecture, conventions, workflows, and other repo guidance. **Committed to the repo and shared with the team.**
   - **Subdirectory Instructions** (e.g. \`./src/GEMINI.md\`): Scoped instructions for one part of the project. Reference them from \`./GEMINI.md\` so they remain discoverable.${userProjectBullet}${globalMemoryBullet}
@@ -864,16 +855,6 @@ function toolUsageRememberingFacts(
   **Never duplicate or mirror the same fact across tiers** — each fact lives in exactly one file across all four tiers (project \`GEMINI.md\`, subdirectory \`GEMINI.md\`, private project memory, global personal memory). Do not add cross-references between any of them.
   **Inside the private memory folder:** \`MEMORY.md\` is the index for its sibling \`*.md\` notes **in that same folder only** — never use it to point at, summarize, or duplicate content from any \`GEMINI.md\` file. For brief facts, write the entry directly into \`MEMORY.md\`. When a note has substantial detail (multiple sections, procedures, or fields), put the detail in a sibling \`*.md\` file in the same folder and add a one-line pointer entry in \`MEMORY.md\`.
   Never save transient session state, summaries of code changes, bug fixes, or task-specific findings — these files are loaded into every session and must stay lean.`;
-  }
-  const base = `
-- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
-  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
-  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
-  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.`;
-  const suffix = options.interactive
-    ? ' If unsure whether a fact is global or project-specific, ask the user.'
-    : '';
-  return base + suffix;
 }
 
 function gitRepoKeepUserInformed(interactive: boolean): string {

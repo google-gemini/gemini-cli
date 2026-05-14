@@ -49,6 +49,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
 }));
 
 import { debugLogger } from '../utils/debugLogger.js';
+import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -708,21 +709,19 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
     });
 
-    it('should use parentPromptId from context to create agentId', async () => {
-      const parentId = 'parent-id';
-      Object.defineProperty(mockConfig, 'promptId', {
-        get: () => parentId,
-        configurable: true,
-      });
-
+    it('should not include parentCallId in agentId even when available', async () => {
       const definition = createTestDefinition();
-      const executor = await LocalAgentExecutor.create(
-        definition,
-        mockConfig,
-        onActivity,
+      const parentCallId = 'parent-call-123';
+
+      const executor = await runWithToolCallContext(
+        { callId: parentCallId, schedulerId: 'test-scheduler' },
+        () => LocalAgentExecutor.create(definition, mockConfig, onActivity),
       );
 
-      expect(executor['agentId']).toBeDefined();
+      expect(executor['agentId']).not.toContain(parentCallId);
+      expect(executor['agentId']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('should correctly apply templates to initialMessages', async () => {
@@ -2227,6 +2226,69 @@ describe('LocalAgentExecutor', () => {
       // Agent should terminate with ABORTED status
       expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
     });
+
+    it('should throw a critical error when a tool response is dropped by the scheduler', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls two tools
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: 'dir1' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: 'dir2' }, id: 'call2' },
+      ]);
+
+      // Simulate scheduler returning only ONE result for TWO calls (dropped response)
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: { callId: 'call1', name: LS_TOOL_NAME },
+          response: {
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  id: 'call1',
+                  response: { ok: true },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      await expect(
+        executor.run({ goal: 'Protocol test' }, signal),
+      ).rejects.toThrow(
+        'Critical System Failure: Tool execution result was lost/dropped by the scheduler',
+      );
+    });
+
+    it('should throw a critical error when all scheduler results are missing/dropped', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls one tool
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: 'dir1' }, id: 'call1' },
+      ]);
+
+      // Simulate scheduler returning NO results (dropped response)
+      mockScheduleAgentTools.mockResolvedValueOnce([]);
+
+      await expect(
+        executor.run({ goal: 'Protocol test 2' }, signal),
+      ).rejects.toThrow(
+        'Critical System Failure: Tool execution result was lost/dropped by the scheduler',
+      );
+    });
   });
 
   describe('Model Routing', () => {
@@ -2271,6 +2333,97 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockRouter.route).toHaveBeenCalled();
       expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
+      );
+    });
+
+    it('should cache the routing decision across multiple turns', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'auto';
+      definition.runConfig.maxTurns = 3;
+
+      const mockRouter = {
+        route: vi.fn().mockResolvedValue({
+          model: 'routed-model',
+          metadata: { source: 'test', reasoning: 'test' },
+        }),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'auto',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: LS_TOOL_NAME,
+          args: {},
+          id: 'call1',
+        },
+      ]);
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call2',
+        },
+      ]);
+
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: {},
+            prompt_id: 'test-prompt',
+          },
+          response: {
+            resultDisplay: 'ls result',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  id: 'call1',
+                  response: { ok: true },
+                },
+              },
+            ],
+            data: {},
+          },
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+        LlmRole.SUBAGENT,
+      );
+      expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({ model: 'routed-model' }),
         expect.any(Array),
         expect.any(String),
@@ -3979,40 +4132,7 @@ describe('LocalAgentExecutor', () => {
         expect(systemInstruction).toContain('<loaded_context>');
       });
 
-      it('should inject environment memory into the first message when JIT is disabled', async () => {
-        const definition = createTestDefinition();
-        const executor = await LocalAgentExecutor.create(
-          definition,
-          mockConfig,
-          onActivity,
-        );
-
-        const mockMemory = 'Project memory rule';
-        vi.spyOn(mockConfig, 'getEnvironmentMemory').mockReturnValue(
-          mockMemory,
-        );
-        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(false);
-
-        mockModelResponse([
-          {
-            name: COMPLETE_TASK_TOOL_NAME,
-            args: { finalResult: 'done' },
-            id: 'call1',
-          },
-        ]);
-
-        await executor.run({ goal: 'test' }, signal);
-
-        const { message } = getMockMessageParams(0);
-        const parts = message as Part[];
-
-        expect(parts).toBeDefined();
-        const memoryPart = parts.find((p) => p.text?.includes(mockMemory));
-        expect(memoryPart).toBeDefined();
-        expect(memoryPart?.text).toBe(mockMemory);
-      });
-
-      it('should inject session memory into the first message when JIT is enabled', async () => {
+      it('should inject session memory into the first message', async () => {
         const definition = createTestDefinition();
         const executor = await LocalAgentExecutor.create(
           definition,
@@ -4023,7 +4143,6 @@ describe('LocalAgentExecutor', () => {
         const mockMemory =
           '<loaded_context>\nExtension memory rule\n</loaded_context>';
         vi.spyOn(mockConfig, 'getSessionMemory').mockReturnValue(mockMemory);
-        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
 
         mockModelResponse([
           {
@@ -4044,6 +4163,48 @@ describe('LocalAgentExecutor', () => {
         );
         expect(memoryPart).toBeDefined();
         expect(memoryPart?.text).toContain(mockMemory);
+      });
+
+      it('should omit extension context from session memory when disabled by the agent', async () => {
+        const definition = createTestDefinition();
+        definition.includeExtensionContext = false;
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const getSessionMemorySpy = vi
+          .spyOn(mockConfig, 'getSessionMemory')
+          .mockImplementation(
+            (options?: { includeExtensionContext?: boolean }) =>
+              options?.includeExtensionContext === false
+                ? '<loaded_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>'
+                : '<loaded_context>\n<extension_context>\nExtension memory rule\n</extension_context>\n<project_context>\nProject memory rule\n</project_context>\n</loaded_context>',
+          );
+
+        mockModelResponse([
+          {
+            name: COMPLETE_TASK_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        expect(getSessionMemorySpy).toHaveBeenCalledWith({
+          includeExtensionContext: false,
+        });
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+        const memoryPart = parts.find((p) =>
+          p.text?.includes('<loaded_context>'),
+        );
+
+        expect(memoryPart?.text).toContain('Project memory rule');
+        expect(memoryPart?.text).not.toContain('<extension_context>');
+        expect(memoryPart?.text).not.toContain('Extension memory rule');
       });
     });
   });

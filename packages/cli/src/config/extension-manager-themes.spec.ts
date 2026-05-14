@@ -109,6 +109,7 @@ describe('ExtensionManager theme loading', () => {
       getFileExclusions: () => ({
         isIgnored: () => false,
       }),
+      getMemoryContextManager: () => undefined,
       getGeminiMdFilePaths: () => [],
       getMcpServers: () => ({}),
       getAllowedMcpServers: () => [],
@@ -185,6 +186,7 @@ describe('ExtensionManager theme loading', () => {
       getWorkspaceContext: () => ({
         getDirectories: () => [],
       }),
+      getMemoryContextManager: () => undefined,
       getDebugMode: () => false,
       getFileService: () => ({
         findFiles: async () => [],
