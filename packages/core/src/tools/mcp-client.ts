@@ -5,6 +5,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type {
   jsonSchemaValidator,
@@ -54,9 +55,11 @@ import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
-import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
+import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
+
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   getErrorMessage,
@@ -82,6 +85,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
+
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -1024,6 +1028,16 @@ function createAuthProvider(
     return new GoogleCredentialProvider(mcpServerConfig);
   }
   return undefined;
+}
+/**
+ * Creates an OAuth token provider for transports so token lookup/refresh happens
+ * at request/auth time instead of freezing a single token at transport creation.
+ */
+function createDynamicOAuthTokenProvider(
+  mcpServerName: string,
+  mcpServerConfig: MCPServerConfig,
+): McpAuthProvider {
+  return new DynamicStoredOAuthProvider(mcpServerName, mcpServerConfig);
 }
 
 /**
@@ -2205,41 +2219,32 @@ export async function createTransport(
     }
   }
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
-    const authProvider = createAuthProvider(mcpServerConfig);
+    let authProvider = createAuthProvider(mcpServerConfig);
     const headers: Record<string, string> =
       (await authProvider?.getRequestHeaders?.()) ?? {};
 
     if (authProvider === undefined) {
-      // Check if we have OAuth configuration or stored tokens
-      let accessToken: string | null = null;
-      if (mcpServerConfig.oauth?.enabled && mcpServerConfig.oauth) {
-        const tokenStorage = new MCPOAuthTokenStorage();
-        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-        accessToken = await mcpAuthProvider.getValidToken(
-          mcpServerName,
-          mcpServerConfig.oauth,
-        );
+      const tokenStorage = new MCPOAuthTokenStorage();
+      const credentials = await tokenStorage.getCredentials(mcpServerName);
+      const shouldUseDynamicOAuthProvider = !!credentials;
 
-        if (!accessToken) {
-          // Emit info message (not error) since this is expected behavior
-          cliConfig.emitMcpDiagnostic(
-            'info',
-            `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
-            undefined,
-            mcpServerName,
-          );
-        }
-      } else {
-        // Check if we have stored OAuth tokens for this server (from previous authentication)
-        accessToken = await getStoredOAuthToken(mcpServerName);
-        if (accessToken) {
-          debugLogger.log(
-            `Found stored OAuth token for server '${mcpServerName}'`,
-          );
-        }
+      if (!shouldUseDynamicOAuthProvider && mcpServerConfig.oauth?.enabled) {
+        cliConfig.emitMcpDiagnostic(
+          'info',
+          `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
+          undefined,
+          mcpServerName,
+        );
       }
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
+
+      if (shouldUseDynamicOAuthProvider) {
+        debugLogger.log(
+          `Found stored OAuth token for server '${mcpServerName}'`,
+        );
+        authProvider = createDynamicOAuthTokenProvider(
+          mcpServerName,
+          mcpServerConfig,
+        );
       }
     }
 
@@ -2339,7 +2344,6 @@ export async function createTransport(
     `Invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio).`,
   );
 }
-
 interface NamedTool {
   name?: string;
 }

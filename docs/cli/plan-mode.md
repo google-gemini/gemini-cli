@@ -138,7 +138,6 @@ These are the only allowed tools:
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
-- **Memory:** [`save_memory`](../tools/memory.md)
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
   instructions and resources in a read-only manner)
 

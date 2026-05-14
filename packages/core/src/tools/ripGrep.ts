@@ -19,7 +19,12 @@ import {
   type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  resolveToRealPath,
+  shortenPath,
+  makeRelative,
+  isTrustedSystemPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
@@ -30,7 +35,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -41,46 +46,48 @@ import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function getRipgrepPath(): Promise<string | null> {
-  const platform = os.platform();
-  const arch = os.arch();
+/**
+ * Resolves the path to the ripgrep binary, either bundled or system-level.
+ * Validates system binaries against trusted directories to prevent RCE.
+ */
+export async function resolveRipgrepPath(): Promise<string | null> {
+  try {
+    const platform = os.platform();
+    const arch = os.arch();
 
-  // Map to the correct bundled binary
-  const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+    // Map to the correct bundled binary
+    const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
 
-  const candidatePaths = [
-    // 1. SEA runtime layout: everything is flattened into the root dir
-    path.resolve(__dirname, 'vendor/ripgrep', binName),
-    // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
-    path.resolve(__dirname, '../../vendor/ripgrep', binName),
-  ];
+    const candidatePaths = [
+      // 1. SEA runtime layout: everything is flattened into the root dir
+      path.resolve(__dirname, 'vendor/ripgrep', binName),
+      // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      path.resolve(__dirname, '../../vendor/ripgrep', binName),
+    ];
 
-  for (const candidate of candidatePaths) {
-    if (await fileExists(candidate)) {
-      return candidate;
+    for (const candidate of candidatePaths) {
+      if (await fileExists(candidate)) {
+        return candidate;
+      }
     }
+
+    // 3. Fallback: check system PATH
+    const systemRg = await resolveExecutable('rg');
+    if (systemRg) {
+      // Security: Validate the system executable to prevent Search Path Interruption.
+      const realPath = resolveToRealPath(systemRg);
+
+      if (isTrustedSystemPath(realPath)) {
+        // Return absolute path to prevent re-resolution risk.
+        return realPath;
+      }
+    }
+
+    return null;
+  } catch (error: unknown) {
+    debugLogger.error('Error resolving ripgrep path:', error);
+    return null;
   }
-
-  return null;
-}
-
-/**
- * Checks if `rg` exists in the bundled vendor directory.
- */
-export async function canUseRipgrep(): Promise<boolean> {
-  const binPath = await getRipgrepPath();
-  return binPath !== null;
-}
-
-/**
- * Ensures `rg` is available, or throws.
- */
-export async function ensureRgPath(): Promise<string> {
-  const binPath = await getRipgrepPath();
-  if (binPath !== null) {
-    return binPath;
-  }
-  throw new Error(`Cannot find bundled ripgrep binary.`);
 }
 
 /**
@@ -475,7 +482,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     const results: GrepMatch[] = [];
     try {
-      const rgPath = await ensureRgPath();
+      const rgPath = await this.config.getRipgrepPath();
+      if (!rgPath) {
+        throw new Error('Cannot find bundled ripgrep binary.');
+      }
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
