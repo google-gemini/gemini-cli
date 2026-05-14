@@ -49,7 +49,7 @@ import {
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
+import { McpComplianceTransport } from './mcp-compliance-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -1055,7 +1055,7 @@ async function createTransportWithOAuth(
   mcpServerConfig: MCPServerConfig,
   accessToken: string,
   cliConfig: McpContext,
-): Promise<StreamableHTTPClientTransport | SSEClientTransport | null> {
+): Promise<Transport | null> {
   try {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
@@ -1070,7 +1070,12 @@ async function createTransportWithOAuth(
       ),
     };
 
-    return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
+    const transport = createUrlTransport(
+      mcpServerName,
+      mcpServerConfig,
+      transportOptions,
+    );
+    return transport ? new McpComplianceTransport(transport) : null;
   } catch (error) {
     cliConfig.emitMcpDiagnostic(
       'error',
@@ -2318,7 +2323,9 @@ export async function createTransport(
       authProvider,
     };
 
-    return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
+    return new McpComplianceTransport(
+      createUrlTransport(mcpServerName, mcpServerConfig, transportOptions),
+    );
   }
 
   if (mcpServerConfig.command) {
@@ -2354,32 +2361,23 @@ export async function createTransport(
       }
     }
 
-    let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
-      env: finalEnv,
-      cwd: mcpServerConfig.cwd,
-      stderr: 'pipe',
-    });
-
-    // Fix for Xcode 26.3 mcpbridge non-compliant responses
-    // It returns JSON in `content` instead of `structuredContent`
-    if (
-      mcpServerConfig.command === 'xcrun' &&
-      mcpServerConfig.args?.includes('mcpbridge')
-    ) {
-      transport = new XcodeMcpBridgeFixTransport(transport);
-    }
+    const transport: Transport = new McpComplianceTransport(
+      new StdioClientTransport({
+        command: mcpServerConfig.command,
+        args: mcpServerConfig.args || [],
+        env: finalEnv,
+        cwd: mcpServerConfig.cwd,
+        stderr: 'pipe',
+      }),
+    );
 
     if (debugMode) {
-      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // The `McpComplianceTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
-        transport instanceof XcodeMcpBridgeFixTransport
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-            (transport as any).transport
+        transport instanceof McpComplianceTransport
+          ? transport.transport
           : transport;
 
       if (
