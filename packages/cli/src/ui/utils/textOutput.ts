@@ -10,6 +10,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import { stripLineColumnSuffixes } from '@google/gemini-cli-core';
 
 export class TextOutput {
   private atStartOfLine = true;
@@ -27,8 +28,9 @@ export class TextOutput {
     if (str.length === 0) {
       return;
     }
-    this.outputStream.write(str);
-    const strippedStr = stripAnsi(str);
+    const processedStr = stripLineColumnSuffixes(str);
+    this.outputStream.write(processedStr);
+    const strippedStr = stripAnsi(processedStr);
     if (strippedStr.length > 0) {
       this.atStartOfLine = strippedStr.endsWith('\n');
     }

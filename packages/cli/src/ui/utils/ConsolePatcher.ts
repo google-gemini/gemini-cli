@@ -7,6 +7,7 @@
 /* eslint-disable no-console */
 
 import util from 'node:util';
+import { stripLineColumnSuffixes } from '@google/gemini-cli-core';
 import type { ConsoleMessageItem } from '../types.js';
 
 interface ConsolePatcherParams {
@@ -45,7 +46,10 @@ export class ConsolePatcher {
     console.info = this.originalConsoleInfo;
   };
 
-  private formatArgs = (args: unknown[]): string => util.format(...args);
+  private formatArgs = (args: unknown[]): string => {
+    const formatted = util.format(...args);
+    return stripLineColumnSuffixes(formatted);
+  };
 
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>

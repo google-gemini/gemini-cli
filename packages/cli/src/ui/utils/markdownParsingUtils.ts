@@ -11,7 +11,7 @@ import {
   INK_NAME_TO_HEX_MAP,
 } from '../themes/color-utils.js';
 import { theme } from '../semantic-colors.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, stripLineColumnSuffixes } from '@google/gemini-cli-core';
 import { convertLatexToUnicode } from './latexToUnicode.js';
 
 // Constants for Markdown parsing
@@ -108,6 +108,12 @@ export const parseMarkdownToANSI = (
   defaultColor?: string,
 ): string => {
   const baseColor = defaultColor ?? theme.text.primary;
+  // Strip line and column number suffixes from Windows paths BEFORE any other
+  // processing. This ensures that we don't break markdown parsing or URL
+  // detection, and that the final output is safe for Windows terminal links.
+  // See issue #26902.
+  const sanitizedRawText = stripLineColumnSuffixes(rawText);
+
   // Convert LaTeX-style math/commands to Unicode BEFORE tokenizing markdown,
   // so constructs like `$\{P_0, \dots, P_n\}$` are handled as a whole even
   // when they contain underscores (which the tokenizer would otherwise treat
@@ -115,7 +121,7 @@ export const parseMarkdownToANSI = (
   // conversion so their contents are preserved verbatim. Unknown `\foo`
   // sequences are left alone, so Windows paths and regex escapes survive.
   // See issue #25656.
-  const text = convertLatexPreservingSpans(rawText);
+  const text = convertLatexPreservingSpans(sanitizedRawText);
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
     return ansiColorize(text, baseColor);

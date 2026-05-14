@@ -7,6 +7,7 @@
 /* eslint-disable no-console */
 import * as fs from 'node:fs';
 import * as util from 'node:util';
+import { stripLineColumnSuffixes } from './textUtils.js';
 
 /**
  * A simple, centralized logger for developer-facing debug messages.
@@ -47,23 +48,32 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
-    console.log(...args);
+    console.log(...stripLineColumnSuffixesFromArgs(args));
   }
 
   warn(...args: unknown[]): void {
     this.writeToFile('WARN', args);
-    console.warn(...args);
+    console.warn(...stripLineColumnSuffixesFromArgs(args));
   }
 
   error(...args: unknown[]): void {
     this.writeToFile('ERROR', args);
-    console.error(...args);
+    console.error(...stripLineColumnSuffixesFromArgs(args));
   }
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
-    console.debug(...args);
+    console.debug(...stripLineColumnSuffixesFromArgs(args));
   }
+}
+
+function stripLineColumnSuffixesFromArgs(args: unknown[]): unknown[] {
+  return args.map((arg) => {
+    if (typeof arg === 'string') {
+      return stripLineColumnSuffixes(arg);
+    }
+    return arg;
+  });
 }
 
 export const debugLogger = new DebugLogger();

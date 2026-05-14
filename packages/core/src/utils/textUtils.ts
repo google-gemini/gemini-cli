@@ -151,3 +151,29 @@ export function sanitizeOutput(output: string): string {
   const escaped = trimmed.replaceAll('</output>', '&lt;/output&gt;');
   return `<output>\n${escaped}\n</output>`;
 }
+
+/**
+ * Matches absolute Windows paths (C:\...) or relative Windows paths with at
+ * least one backslash, followed by a :line[:col] suffix.
+ * e.g., "C:\file.ts:10:5" or "src\file.ts:10"
+ *
+ * This regex is carefully constructed to avoid matching URLs (which don't use
+ * backslashes in the host/port part).
+ */
+const WINDOWS_PATH_WITH_SUFFIX_REGEX =
+  /(([a-zA-Z]:\\|[^\s:<>|"]+\\)[^\s:<>|"]+):\d+(?::\d+)?/g;
+
+/**
+ * Strips line and column number suffixes from absolute and relative Windows
+ * file paths.
+ * e.g., "C:\path\to\file.ts:10:5" -> "C:\path\to\file.ts"
+ *
+ * This is a workaround for issue #26902 where some Windows terminal link
+ * handlers fail to correctly parse and stat paths with these suffixes.
+ */
+export function stripLineColumnSuffixes(text: string): string {
+  if (process.platform !== 'win32' || !text.includes(':')) {
+    return text;
+  }
+  return text.replace(WINDOWS_PATH_WITH_SUFFIX_REGEX, '$1');
+}

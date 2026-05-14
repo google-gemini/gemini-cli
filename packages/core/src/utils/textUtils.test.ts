@@ -4,12 +4,63 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   safeLiteralReplace,
   truncateString,
   safeTemplateReplace,
+  stripLineColumnSuffixes,
 } from './textUtils.js';
+
+describe('stripLineColumnSuffixes', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should strip line and column numbers from absolute and relative Windows paths on Windows', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+
+    expect(stripLineColumnSuffixes('C:\\foo\\bar.js:10:5')).toBe('C:\\foo\\bar.js');
+    expect(stripLineColumnSuffixes('D:\\project\\index.ts:42')).toBe(
+      'D:\\project\\index.ts',
+    );
+    expect(stripLineColumnSuffixes('src\\utils\\file.ts:10:5')).toBe(
+      'src\\utils\\file.ts',
+    );
+    expect(stripLineColumnSuffixes('C:\\path with spaces\\file.txt:1:1')).toBe(
+      'C:\\path with spaces\\file.txt',
+    );
+    expect(stripLineColumnSuffixes('Found at C:\\foo.js:10:5.')).toBe(
+      'Found at C:\\foo.js.',
+    );
+  });
+
+  it('should not strip suffixes from non-absolute Windows paths or URLs', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+
+    expect(stripLineColumnSuffixes('http://localhost:3000')).toBe(
+      'http://localhost:3000',
+    );
+    expect(stripLineColumnSuffixes('ftp://127.0.0.1:21')).toBe(
+      'ftp://127.0.0.1:21',
+    );
+    expect(stripLineColumnSuffixes('some text with :10:5 suffix')).toBe(
+      'some text with :10:5 suffix',
+    );
+  });
+
+  it('should not strip anything on non-Windows platforms', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+    expect(stripLineColumnSuffixes('C:\\foo\\bar.js:10:5')).toBe(
+      'C:\\foo\\bar.js:10:5',
+    );
+    expect(stripLineColumnSuffixes('/home/user/file.ts:10:5')).toBe(
+      '/home/user/file.ts:10:5',
+    );
+  });
+});
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
