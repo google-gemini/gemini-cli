@@ -178,23 +178,25 @@ export async function loadConversationRecord(
 
         let firstUserMessage: string | undefined;
         // FAST PREVIEW: Find the first line that is a 'user' message and extract its content
-        const userMsgMatch =
-          headStr.match(
-            /\{[^{}]*"type"\s*:\s*"user"[^{}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")[^{}]*\}/,
-          ) ||
-          headStr.match(
-            /\{[^{}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")[^{}]*"type"\s*:\s*"user"[^{}]*\}/,
+        const userLine = headStr
+          .split('\n')
+          .find(
+            (line) =>
+              line.includes('"type":"user"') || line.includes('"type": "user"'),
           );
 
-        if (userMsgMatch) {
+        if (userLine) {
           try {
-            const content = JSON.parse(userMsgMatch[1]) as unknown;
-            if (Array.isArray(content)) {
-              firstUserMessage = content
-                .map((p: unknown) => (isTextPart(p) ? p.text : ''))
-                .join('');
-            } else if (typeof content === 'string') {
-              firstUserMessage = content;
+            const record = JSON.parse(userLine) as unknown;
+            if (hasProperty(record, 'content')) {
+              const content = record.content;
+              if (Array.isArray(content)) {
+                firstUserMessage = content
+                  .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                  .join('');
+              } else if (typeof content === 'string') {
+                firstUserMessage = content;
+              }
             }
           } catch {
             /* ignore */
