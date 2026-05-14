@@ -695,6 +695,63 @@ export class ChatRecordingService {
   }
 
   /**
+   * Recursively finds all subagent trajectories called from this session.
+   */
+  async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
+    const trajectories: Record<string, ConversationRecord> = {};
+    const conversation = this.getConversation();
+    if (!conversation) return trajectories;
+
+    const agentIds = new Set<string>();
+    for (const message of conversation.messages) {
+      if (message.type === 'gemini' && message.toolCalls) {
+        for (const toolCall of message.toolCalls) {
+          if (toolCall.agentId) {
+            agentIds.add(toolCall.agentId);
+          }
+        }
+      }
+    }
+
+    if (agentIds.size === 0) return trajectories;
+
+    const tempDir = this.context.config.storage.getProjectTempDir();
+    const chatsDir = path.join(tempDir, 'chats');
+
+    for (const agentId of agentIds) {
+      const subagentFilePath = path.join(chatsDir, `${agentId}.json`);
+      try {
+        const content = await fs.promises.readFile(subagentFilePath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const subagentRecord = JSON.parse(content) as ConversationRecord;
+        trajectories[agentId] = subagentRecord;
+
+        // Recursive discovery: Create a temporary service to find nested trajectories
+        const subService = new ChatRecordingService(this.context);
+        // Manual override of cached state for discovery
+        subService.cachedConversation = subagentRecord;
+        subService.conversationFile = subagentFilePath;
+        const nested = await subService.getSubagentTrajectories();
+        Object.assign(trajectories, nested);
+      } catch (err) {
+        debugLogger.warn(`Failed to load subagent trajectory ${agentId}:`, err);
+      }
+    }
+
+    return trajectories;
+  }
+
+  /**
+   * Resets the current message history. Used during session resumption.
+   */
+  resetMessages(messages: MessageRecord[]): void {
+    if (!this.cachedConversation) return;
+    this.cachedConversation.messages = [...messages];
+    // We don't append to the log here, as we are resetting the in-memory state
+    // to match a loaded checkpoint.
+  }
+
+  /**
    * Deletes a session file by sessionId, filename, or basename.
    * Derives an 8-character shortId to find and delete all associated files
    * (parent and subagents).
