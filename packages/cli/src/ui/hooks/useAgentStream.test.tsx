@@ -6,12 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import type { LegacyAgentProtocol } from '@google/gemini-cli-core';
+import type { AgentProtocol } from '@google/gemini-cli-core';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 
 // --- MOCKS ---
 
-const mockLegacyAgentProtocol = vi.hoisted(() => ({
+const mockAgentProtocol = vi.hoisted(() => ({
   send: vi.fn().mockResolvedValue({ streamId: 'test-stream-id' }),
   subscribe: vi.fn().mockReturnValue(() => {}),
   abort: vi.fn().mockResolvedValue(undefined),
@@ -43,21 +43,24 @@ describe('useAgentStream', () => {
   it('should initialize on mount', async () => {
     await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: vi.fn().mockResolvedValue(false),
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
     );
 
-    expect(mockLegacyAgentProtocol.subscribe).toHaveBeenCalled();
+    expect(mockAgentProtocol.subscribe).toHaveBeenCalled();
   });
 
   it('should call agent.send when submitQuery is called', async () => {
+    const mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
     const { result } = await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: mockHandleSlashCommand,
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
@@ -67,7 +70,7 @@ describe('useAgentStream', () => {
       await result.current.submitQuery('hello');
     });
 
-    expect(mockLegacyAgentProtocol.send).toHaveBeenCalledWith({
+    expect(mockAgentProtocol.send).toHaveBeenCalledWith({
       message: { content: [{ type: 'text', text: 'hello' }] },
     });
     expect(mockAddItem).toHaveBeenCalledWith(
@@ -76,17 +79,73 @@ describe('useAgentStream', () => {
     );
   });
 
-  it('should update streamingState based on agent_start and agent_end events', async () => {
+  it('should intercept slash commands and not call agent.send if handled', async () => {
+    const mockHandleSlashCommand = vi
+      .fn()
+      .mockResolvedValue({ type: 'handled' });
     const { result } = await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: mockHandleSlashCommand,
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
     );
 
-    const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
+    await act(async () => {
+      await result.current.submitQuery('/about');
+    });
+
+    expect(mockHandleSlashCommand).toHaveBeenCalledWith('/about');
+    expect(mockAgentProtocol.send).not.toHaveBeenCalled();
+  });
+
+  it('should intercept slash commands and call agent.send with new content if submit_prompt', async () => {
+    const mockHandleSlashCommand = vi.fn().mockResolvedValue({
+      type: 'submit_prompt',
+      content: 'modified prompt',
+    });
+    const { result } = await renderHookWithProviders(() =>
+      useAgentStream({
+        agent: mockAgentProtocol as unknown as AgentProtocol,
+        addItem: mockAddItem,
+        handleSlashCommand: mockHandleSlashCommand,
+        onCancelSubmit: mockOnCancelSubmit,
+        isShellFocused: false,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.submitQuery('/mcp-prompt');
+    });
+
+    expect(mockHandleSlashCommand).toHaveBeenCalledWith('/mcp-prompt');
+    expect(mockAgentProtocol.send).toHaveBeenCalledWith({
+      message: { content: [{ type: 'text', text: 'modified prompt' }] },
+    });
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.USER,
+        text: 'modified prompt',
+      }),
+      expect.any(Number),
+    );
+  });
+
+  it('should update streamingState based on agent_start and agent_end events', async () => {
+    const mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
+    const { result } = await renderHookWithProviders(() =>
+      useAgentStream({
+        agent: mockAgentProtocol as unknown as AgentProtocol,
+        addItem: mockAddItem,
+        handleSlashCommand: mockHandleSlashCommand,
+        onCancelSubmit: mockOnCancelSubmit,
+        isShellFocused: false,
+      }),
+    );
+
+    const eventHandler = vi.mocked(mockAgentProtocol.subscribe).mock
       .calls[0][0];
 
     expect(result.current.streamingState).toBe(StreamingState.Idle);
@@ -116,14 +175,15 @@ describe('useAgentStream', () => {
   it('should accumulate text content and update pendingHistoryItems', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: vi.fn().mockResolvedValue(false),
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
     );
 
-    const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
+    const eventHandler = vi.mocked(mockAgentProtocol.subscribe).mock
       .calls[0][0];
 
     act(() => {
@@ -160,14 +220,15 @@ describe('useAgentStream', () => {
   it('should process thought events and update thought state', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: vi.fn().mockResolvedValue(false),
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
     );
 
-    const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
+    const eventHandler = vi.mocked(mockAgentProtocol.subscribe).mock
       .calls[0][0];
 
     act(() => {
@@ -190,8 +251,9 @@ describe('useAgentStream', () => {
   it('should call agent.abort when cancelOngoingRequest is called', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        agent: mockAgentProtocol as unknown as AgentProtocol,
         addItem: mockAddItem,
+        handleSlashCommand: vi.fn().mockResolvedValue(false),
         onCancelSubmit: mockOnCancelSubmit,
         isShellFocused: false,
       }),
@@ -201,7 +263,7 @@ describe('useAgentStream', () => {
       await result.current.cancelOngoingRequest();
     });
 
-    expect(mockLegacyAgentProtocol.abort).toHaveBeenCalled();
+    expect(mockAgentProtocol.abort).toHaveBeenCalled();
     expect(mockOnCancelSubmit).toHaveBeenCalledWith(false, true);
   });
 });

@@ -238,6 +238,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
+  isActive: boolean = true,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -276,6 +277,7 @@ export const useGeminiStream = (
   }, [config]);
 
   useEffect(() => {
+    if (!isActive) return;
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
       if (turnCancelledRef.current || !isRespondingRef.current) {
         return;
@@ -286,7 +288,7 @@ export const useGeminiStream = (
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, [isRespondingRef]);
+  }, [isRespondingRef, isActive]);
 
   const [
     toolCalls,
@@ -387,6 +389,11 @@ export const useGeminiStream = (
     [setIsResponding],
   );
 
+  const streamingState = useMemo(
+    () => calculateStreamingState(isResponding, toolCalls),
+    [isResponding, toolCalls],
+  );
+
   const {
     handleShellCommand,
     activeShellPtyId,
@@ -409,15 +416,13 @@ export const useGeminiStream = (
     terminalWidth,
     terminalHeight,
     activeBackgroundExecutionId,
-  );
-
-  const streamingState = useMemo(
-    () => calculateStreamingState(isResponding, toolCalls),
-    [isResponding, toolCalls],
+    streamingState === StreamingState.WaitingForConfirmation,
+    isActive,
   );
 
   // Reset tracking when a new batch of tools starts
   useEffect(() => {
+    if (!isActive) return;
     if (toolCalls.length > 0) {
       const isNewBatch = !toolCalls.some((tc) =>
         pushedToolCallIdsRef.current.has(tc.request.callId),
@@ -437,10 +442,12 @@ export const useGeminiStream = (
     setPushedToolCallIds,
     setIsFirstToolInGroup,
     streamingState,
+    isActive,
   ]);
 
   // Push completed tools to history as they finish
   useEffect(() => {
+    if (!isActive) return;
     const toolsToPush: TrackedToolCall[] = [];
     for (let i = 0; i < toolCalls.length; i++) {
       const tc = toolCalls[i];
@@ -598,8 +605,11 @@ export const useGeminiStream = (
     isShellFocused,
     backgroundTasks,
     settings.merged.ui?.compactToolOutput,
+    isActive,
   ]);
+
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
+    if (!isActive) return [];
     const remainingTools = toolCalls.filter(
       (tc) => !pushedToolCallIds.has(tc.request.callId),
     );
@@ -704,6 +714,7 @@ export const useGeminiStream = (
     isShellFocused,
     backgroundTasks,
     settings.merged.ui?.compactToolOutput,
+    isActive,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -721,6 +732,7 @@ export const useGeminiStream = (
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
+    if (!isActive) return;
     if (
       turnCancelledRef.current &&
       prevActiveShellPtyIdRef.current !== null &&
@@ -730,9 +742,10 @@ export const useGeminiStream = (
       setIsResponding(false);
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
-  }, [activeShellPtyId, addItem, setIsResponding]);
+  }, [activeShellPtyId, addItem, setIsResponding, isActive]);
 
   useEffect(() => {
+    if (!isActive) return;
     if (
       config.getApprovalMode() === ApprovalMode.YOLO &&
       streamingState === StreamingState.Idle
@@ -751,7 +764,7 @@ export const useGeminiStream = (
         );
       }
     }
-  }, [streamingState, config, history]);
+  }, [streamingState, config, history, isActive]);
 
   useEffect(() => {
     if (!isResponding) {
@@ -809,6 +822,7 @@ export const useGeminiStream = (
 
   const cancelOngoingRequest = useCallback(
     (clearBuffer: boolean = true) => {
+      if (!isActive) return;
       // If we are already cancelled, do nothing
       if (turnCancelledRef.current) {
         if (clearBuffer) {
@@ -920,6 +934,7 @@ export const useGeminiStream = (
       toolCalls,
       activeShellPtyId,
       setIsResponding,
+      isActive,
     ],
   );
 
@@ -933,8 +948,9 @@ export const useGeminiStream = (
     },
     {
       isActive:
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation,
+        isActive &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation),
     },
   );
 

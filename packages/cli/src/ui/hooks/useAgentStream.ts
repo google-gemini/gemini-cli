@@ -5,12 +5,14 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { type PartListUnion } from '@google/genai';
 import {
   getErrorMessage,
   MessageSenderType,
   debugLogger,
   geminiPartsToContentParts,
   displayContentToString,
+  partToString,
   parseThought,
   CoreToolCallStatus,
   type ApprovalMode,
@@ -20,15 +22,16 @@ import {
   type AgentEvent,
   type AgentProtocol,
   type Logger,
-  type Part,
 } from '@google/gemini-cli-core';
 import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
   IndividualToolCallDisplay,
   HistoryItemToolDisplayGroup,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundTask } from './useExecutionLifecycle.js';
@@ -41,12 +44,16 @@ import { useKeypress } from './useKeypress.js';
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
   addItem: UseHistoryManagerReturn['addItem'];
+  handleSlashCommand: (
+    cmd: string,
+  ) => Promise<SlashCommandProcessorResult | false>;
   onCancelSubmit: (
     shouldRestorePrompt?: boolean,
     clearBuffer?: boolean,
   ) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
+  isActive?: boolean;
 }
 
 /**
@@ -56,9 +63,11 @@ export interface UseAgentStreamOptions {
 export const useAgentStream = ({
   agent,
   addItem,
+  handleSlashCommand,
   onCancelSubmit,
   isShellFocused,
   logger,
+  isActive = true,
 }: UseAgentStreamOptions) => {
   const [initError] = useState<string | null>(null);
   const [retryStatus] = useState<RetryAttemptPayload | null>(null);
@@ -327,9 +336,10 @@ export const useAgentStream = ({
   );
 
   useEffect(() => {
+    if (!isActive) return;
     const unsubscribe = agent?.subscribe(handleEvent);
     return () => unsubscribe?.();
-  }, [agent, handleEvent]);
+  }, [agent, handleEvent, isActive]);
 
   useKeypress(
     (key) => {
@@ -341,14 +351,15 @@ export const useAgentStream = ({
     },
     {
       isActive:
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation,
+        isActive &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation),
     },
   );
 
   const submitQuery = useCallback(
     async (
-      query: Part[] | string,
+      query: PartListUnion,
       options?: { isContinuation: boolean },
       _prompt_id?: string,
     ) => {
@@ -360,16 +371,40 @@ export const useAgentStream = ({
 
       geminiMessageBufferRef.current = '';
 
+      let localQuery: PartListUnion = query;
+
       if (!options?.isContinuation) {
-        if (typeof query === 'string') {
-          addItem({ type: MessageType.USER, text: query }, timestamp);
-          void logger?.logMessage(MessageSenderType.USER, query);
+        if (typeof localQuery === 'string') {
+          const trimmedQuery = localQuery.trim();
+
+          if (isSlashCommand(trimmedQuery)) {
+            const slashResult = await handleSlashCommand(trimmedQuery);
+            if (slashResult) {
+              if (slashResult.type === 'handled') {
+                return;
+              }
+              if (slashResult.type === 'submit_prompt') {
+                localQuery = slashResult.content;
+              }
+              // schedule_tool is not yet supported in useAgentStream (mirrors handleAtCommand lack of support here)
+            }
+          }
         }
+
+        const queryText =
+          typeof localQuery === 'string'
+            ? localQuery
+            : partToString(localQuery);
+
+        addItem({ type: MessageType.USER, text: queryText }, timestamp);
+        void logger?.logMessage(MessageSenderType.USER, queryText);
         startNewPrompt();
       }
 
       const parts = geminiPartsToContentParts(
-        typeof query === 'string' ? [{ text: query }] : query,
+        (Array.isArray(localQuery) ? localQuery : [localQuery]).map((p) =>
+          typeof p === 'string' ? { text: p } : p,
+        ),
       );
 
       try {
@@ -384,10 +419,11 @@ export const useAgentStream = ({
         );
       }
     },
-    [agent, addItem, logger, startNewPrompt],
+    [agent, addItem, logger, startNewPrompt, handleSlashCommand],
   );
 
   useEffect(() => {
+    if (!isActive) return;
     if (trackedTools.length > 0) {
       const isNewBatch = !trackedTools.some((tc) =>
         pushedToolCallIdsRef.current.has(tc.callId),
@@ -406,11 +442,12 @@ export const useAgentStream = ({
     setPushedToolCallIds,
     setIsFirstToolInGroup,
     streamingState,
+    isActive,
   ]);
 
   // Push completed tools to history
   useEffect(() => {
-    if (trackedTools.length === 0) return;
+    if (!isActive || trackedTools.length === 0) return;
 
     // We only push to history once all currently known tools in the turn are terminal.
     // This allows ToolGroupDisplay to correctly hoist ALL notices (topics) for the turn.
@@ -480,6 +517,7 @@ export const useAgentStream = ({
     activePtyId,
     isShellFocused,
     backgroundTasks,
+    isActive,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
