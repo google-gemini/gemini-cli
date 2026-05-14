@@ -321,8 +321,8 @@ jobs:
             fi
 
             if [[ ! "$BRANCH_NAME" =~ ^bot/ ]]; then
-              echo "Error: Branch name '$BRANCH_NAME' does not start with 'bot/'. Safety abort."
-              exit 1
+              echo "Warning: Branch name '$BRANCH_NAME' does not start with 'bot/'. Prepending 'bot/' for safety."
+              BRANCH_NAME="bot/$BRANCH_NAME"
             fi
 
             git checkout -B "$BRANCH_NAME"

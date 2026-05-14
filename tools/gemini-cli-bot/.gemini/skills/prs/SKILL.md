@@ -37,9 +37,13 @@ If you are proposing fixes and PR creation is enabled (per the System Directive)
     - **Title**: The very first line MUST be a concise, conventional title.
     - **Body**: Explain the change and expected impact. You MUST identify the domain expert for the affected files and mention them (cc @<user>).
     - **Labels**: Use the `write_file` tool to create `pr-labels.txt` containing one label per line. You MUST ALWAYS add the `bot-fix` label.
-3.  **Stage Fixes**: You MUST explicitly stage your fixes using the
+3.  **Branch Naming (Optional)**: If you wish to specify a custom branch name,
+    use `write_file` to create `branch-name.txt`. **CRITICAL**: The branch name
+    MUST start with the `bot/` prefix. If you do not specify a branch name, one
+    will be generated for you.
+4.  **Stage Fixes**: You MUST explicitly stage your fixes using the
     `git add <files>` command.
-4.  **Internal File Protection (CRITICAL)**: You are STRICTLY FORBIDDEN from
+5.  **Internal File Protection (CRITICAL)**: You are STRICTLY FORBIDDEN from
     staging internal bot management files. If they are accidentally staged, you
     MUST unstage them using `git reset <file>`.
     - **NEVER STAGE**: `pr-description.md`, `lessons-learned.md`,
@@ -52,7 +56,9 @@ If you are continuing work on an existing Task or responding to a comment on an
 existing bot PR:
 
 1.  **Target Existing Branch**: Use `write_file` to generate `branch-name.txt`
-    containing the current branch name (e.g., `bot/task-BT-01`).
+    containing the current branch name. **CRITICAL**: The branch name MUST start
+    with the `bot/` prefix (e.g., `bot/task-BT-01`). If it does not, your PR
+    creation will be rejected by the safety gate.
 2.  **Track PR ID**: Use `write_file` to generate `pr-number.txt` containing the
     numeric PR ID.
 3.  **Respond to Maintainers**:
