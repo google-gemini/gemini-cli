@@ -22,7 +22,7 @@ import { FileKeychain } from './fileKeychain.js';
 export const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
 
 /**
- * Service for interacting with OS-level secure storage (e.g. keytar).
+ * Service for interacting with OS-level secure storage (e.g. @github/keytar).
  */
 export class KeychainService {
   // Track an ongoing initialization attempt to avoid race conditions.
@@ -114,12 +114,12 @@ export class KeychainService {
     }
 
     // If native failed or was skipped, return the secure file fallback.
-    debugLogger.log('Using FileKeychain fallback for secure storage.');
+    debugLogger.debug('Using FileKeychain fallback for secure storage.');
     return new FileKeychain();
   }
 
   /**
-   * Attempts to load and verify the native keychain module (keytar).
+   * Attempts to load and verify the native keychain module (@github/keytar).
    */
   private async getNativeKeychain(): Promise<Keychain | null> {
     try {
@@ -130,7 +130,7 @@ export class KeychainService {
 
       // Probing macOS prevents process-blocking popups when no keychain exists.
       if (os.platform() === 'darwin' && !this.isMacOSKeychainAvailable()) {
-        debugLogger.log(
+        debugLogger.debug(
           'MacOS default keychain not found; skipping functional verification.',
         );
         return null;
@@ -140,19 +140,22 @@ export class KeychainService {
         return keychainModule;
       }
 
-      debugLogger.log('Keychain functional verification failed');
+      debugLogger.debug('Keychain functional verification failed or timed out');
       return null;
     } catch (error) {
       // Avoid logging full error objects to prevent PII exposure.
       const message = error instanceof Error ? error.message : String(error);
-      debugLogger.log('Keychain initialization encountered an error:', message);
+      debugLogger.debug(
+        'Keychain initialization encountered an error:',
+        message,
+      );
       return null;
     }
   }
 
   // Low-level dynamic loading and structural validation.
   private async loadKeychainModule(): Promise<Keychain | null> {
-    const moduleName = 'keytar';
+    const moduleName = '@github/keytar';
     const module: unknown = await import(moduleName);
     const potential = (isRecord(module) && module['default']) || module;
 
@@ -162,7 +165,7 @@ export class KeychainService {
       return potential as Keychain;
     }
 
-    debugLogger.log(
+    debugLogger.debug(
       'Keychain module failed structural validation:',
       result.error.flatten().fieldErrors,
     );
@@ -170,18 +173,32 @@ export class KeychainService {
   }
 
   // Performs a set-get-delete cycle to verify keychain functionality.
+  // Capped with a 2s timeout so a non-responsive Secret Service (common on
+  // headless Linux: WSL/SSH/Docker without gnome-keyring or D-Bus) falls back
+  // to FileKeychain instead of hanging the CLI indefinitely.
   private async isKeychainFunctional(keychain: Keychain): Promise<boolean> {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
 
-    await keychain.setPassword(this.serviceName, testAccount, testPassword);
-    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
-    const deleted = await keychain.deletePassword(
-      this.serviceName,
-      testAccount,
-    );
+    const probe = async (): Promise<boolean> => {
+      await keychain.setPassword(this.serviceName, testAccount, testPassword);
+      const retrieved = await keychain.getPassword(
+        this.serviceName,
+        testAccount,
+      );
+      const deleted = await keychain.deletePassword(
+        this.serviceName,
+        testAccount,
+      );
+      return deleted && retrieved === testPassword;
+    };
 
-    return deleted && retrieved === testPassword;
+    return Promise.race([
+      probe(),
+      new Promise<false>((resolve) =>
+        setTimeout(() => resolve(false), 2000).unref(),
+      ),
+    ]);
   }
 
   /**
@@ -189,7 +206,7 @@ export class KeychainService {
    */
   private isMacOSKeychainAvailable(): boolean {
     // Probing via the `security` CLI avoids a blocking OS-level popup that
-    // occurs when calling keytar without a configured keychain.
+    // occurs when calling @github/keytar without a configured keychain.
     const result = spawnSync('security', ['default-keychain'], {
       encoding: 'utf8',
       // We pipe stdout to read the path, but ignore stderr to suppress

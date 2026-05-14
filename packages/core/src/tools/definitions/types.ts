@@ -37,16 +37,19 @@ export interface CoreToolSet {
   run_shell_command: (
     enableInteractiveShell: boolean,
     enableEfficiency: boolean,
+    enableToolSandboxing: boolean,
   ) => FunctionDeclaration;
   replace: FunctionDeclaration;
   google_web_search: FunctionDeclaration;
   web_fetch: FunctionDeclaration;
   read_many_files: FunctionDeclaration;
-  save_memory: FunctionDeclaration;
   write_todos: FunctionDeclaration;
   get_internal_docs: FunctionDeclaration;
   ask_user: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
-  exit_plan_mode: (plansDir: string) => FunctionDeclaration;
+  exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
+  read_mcp_resource: FunctionDeclaration;
+  list_mcp_resources: FunctionDeclaration;
+  update_topic?: FunctionDeclaration;
 }

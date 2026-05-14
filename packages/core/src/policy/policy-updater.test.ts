@@ -26,6 +26,7 @@ vi.mock('../config/storage.js');
 vi.mock('../utils/shell-utils.js', () => ({
   getCommandRoots: vi.fn(),
   stripShellWrapper: vi.fn(),
+  hasRedirection: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
@@ -177,6 +178,25 @@ describe('createPolicyUpdater', () => {
     );
   });
 
+  it('should pass allowRedirection to policyEngine.addRule', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'run_shell_command',
+      commandPrefix: 'ls',
+      persist: false,
+      allowRedirection: true,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'run_shell_command',
+        allowRedirection: true,
+      }),
+    );
+  });
+
   it('should persist multiple rules correctly to TOML', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
     vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
@@ -238,6 +258,7 @@ describe('ShellToolInvocation Policy Update', () => {
     vi.mocked(shellUtils.stripShellWrapper).mockImplementation(
       (c: string) => c,
     );
+    vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
   });
 
   it('should extract multiple root commands for chained commands', () => {
@@ -278,5 +299,27 @@ describe('ShellToolInvocation Policy Update', () => {
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
     expect(options!.commandPrefix).toEqual(['ls']);
     expect(shellUtils.getCommandRoots).toHaveBeenCalledWith('ls -la /tmp');
+  });
+
+  it('should include allowRedirection if command has redirection', () => {
+    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['echo']);
+    vi.mocked(shellUtils.hasRedirection).mockReturnValue(true);
+
+    const invocation = new ShellToolInvocation(
+      mockConfig,
+      { command: 'echo "hello" > file.txt' },
+      mockMessageBus,
+      'run_shell_command',
+      'Shell',
+    );
+
+    const options = (
+      invocation as unknown as TestableShellToolInvocation
+    ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
+    expect(options!.commandPrefix).toEqual(['echo']);
+    expect(options!.allowRedirection).toBe(true);
+    expect(shellUtils.hasRedirection).toHaveBeenCalledWith(
+      'echo "hello" > file.txt',
+    );
   });
 });

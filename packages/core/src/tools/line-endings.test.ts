@@ -85,6 +85,10 @@ const mockConfigInternal = {
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
+  isPlanMode: () => false,
+  storage: {
+    getPlansDir: () => '/tmp/plans',
+  },
 };
 const mockConfig = mockConfigInternal as unknown as Config;
 
@@ -188,7 +192,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
       // Expect all newlines to be CRLF
@@ -213,7 +217,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
 
@@ -261,7 +265,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
 

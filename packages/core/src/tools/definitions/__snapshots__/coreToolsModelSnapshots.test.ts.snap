@@ -88,7 +88,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -109,7 +109,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -118,7 +118,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
@@ -165,17 +165,17 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for formal user approval. You MUST reach an informal agreement with the user in the chat regarding the proposed strategy BEFORE calling this tool. This tool MUST be used to exit Plan Mode before any source code edits can be performed.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -319,6 +319,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -416,7 +417,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -424,7 +426,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -583,9 +586,42 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
+      },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
       },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
@@ -602,33 +638,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     },
     "required": [
       "command",
-    ],
-    "type": "object",
-  },
-}
-`;
-
-exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: save_memory 1`] = `
-{
-  "description": "
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
-
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
-
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.",
-  "name": "save_memory",
-  "parametersJsonSchema": {
-    "additionalProperties": false,
-    "properties": {
-      "fact": {
-        "description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
-        "type": "string",
-      },
-    },
-    "required": [
-      "fact",
     ],
     "type": "object",
   },
@@ -877,7 +886,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -898,7 +907,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -907,7 +916,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
@@ -954,17 +963,17 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for formal user approval. You MUST reach an informal agreement with the user in the chat regarding the proposed strategy BEFORE calling this tool. This tool MUST be used to exit Plan Mode before any source code edits can be performed.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -1108,6 +1117,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -1205,7 +1215,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -1213,7 +1224,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -1292,7 +1304,7 @@ Use this tool when the user's query implies needing the content of several files
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: replace 1`] = `
 {
-  "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+  "description": "Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.",
   "name": "replace",
   "parametersJsonSchema": {
@@ -1348,9 +1360,42 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
+      },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
       },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
@@ -1367,26 +1412,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     },
     "required": [
       "command",
-    ],
-    "type": "object",
-  },
-}
-`;
-
-exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: save_memory 1`] = `
-{
-  "description": "Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike 'write_file', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.",
-  "name": "save_memory",
-  "parametersJsonSchema": {
-    "additionalProperties": false,
-    "properties": {
-      "fact": {
-        "description": "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
-        "type": "string",
-      },
-    },
-    "required": [
-      "fact",
     ],
     "type": "object",
   },
@@ -1414,7 +1439,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.",
+  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files to minimize token usage and simplify reviews.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {

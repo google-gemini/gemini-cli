@@ -109,6 +109,7 @@ describe('ExtensionManager theme loading', () => {
       getFileExclusions: () => ({
         isIgnored: () => false,
       }),
+      getMemoryContextManager: () => undefined,
       getGeminiMdFilePaths: () => [],
       getMcpServers: () => ({}),
       getAllowedMcpServers: () => [],
@@ -185,6 +186,7 @@ describe('ExtensionManager theme loading', () => {
       getWorkspaceContext: () => ({
         getDirectories: () => [],
       }),
+      getMemoryContextManager: () => undefined,
       getDebugMode: () => false,
       getFileService: () => ({
         findFiles: async () => [],
@@ -199,6 +201,7 @@ describe('ExtensionManager theme loading', () => {
         respectGeminiIgnore: true,
       }),
       getDiscoveryMaxDirs: () => 200,
+      getMemoryBoundaryMarkers: () => ['.git'],
       getMcpClientManager: () => ({
         getMcpInstructions: () => '',
         startExtension: vi.fn().mockResolvedValue(undefined),

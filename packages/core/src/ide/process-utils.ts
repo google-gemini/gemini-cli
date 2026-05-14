@@ -49,7 +49,7 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       processes = JSON.parse(stdout);
-    } catch (_e) {
+    } catch {
       return processMap;
     }
 
@@ -67,7 +67,7 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
         });
       }
     }
-  } catch (_e) {
+  } catch {
     // Fallback or error handling if PowerShell fails
   }
   return processMap;
@@ -102,7 +102,7 @@ async function getProcessInfo(pid: number): Promise<{
       name: processName,
       command: fullCommand,
     };
-  } catch (_e) {
+  } catch {
     return { parentPid: 0, name: '', command: '' };
   }
 }

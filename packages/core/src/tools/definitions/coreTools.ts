@@ -17,6 +17,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from './dynamic-declaration-helpers.js';
 
 // Re-export names for compatibility
@@ -32,12 +33,17 @@ export {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -74,7 +80,6 @@ export {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -89,8 +94,11 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -186,13 +194,6 @@ export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
   overrides: (modelId) => getToolSet(modelId).read_many_files,
 };
 
-export const MEMORY_DEFINITION: ToolDefinition = {
-  get base() {
-    return DEFAULT_LEGACY_SET.save_memory;
-  },
-  overrides: (modelId) => getToolSet(modelId).save_memory,
-};
-
 export const WRITE_TODOS_DEFINITION: ToolDefinition = {
   get base() {
     return DEFAULT_LEGACY_SET.write_todos;
@@ -221,6 +222,13 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
 };
 
+export const UPDATE_TOPIC_DEFINITION: ToolDefinition = {
+  get base() {
+    return getUpdateTopicDeclaration();
+  },
+  overrides: (modelId) => getToolSet(modelId).update_topic,
+};
+
 // ============================================================================
 // DYNAMIC TOOL DEFINITIONS (LEGACY EXPORTS)
 // ============================================================================
@@ -233,21 +241,27 @@ export {
 export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableToolSandboxing: boolean = false,
 ): ToolDefinition {
   return {
-    base: getShellDeclaration(enableInteractiveShell, enableEfficiency),
+    base: getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
+        enableToolSandboxing,
       ),
   };
 }
 
-export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+export function getExitPlanModeDefinition(): ToolDefinition {
   return {
-    base: getExitPlanModeDeclaration(plansDir),
-    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(plansDir),
+    base: getExitPlanModeDeclaration(),
+    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(),
   };
 }
 
@@ -259,3 +273,17 @@ export function getActivateSkillDefinition(
     overrides: (modelId) => getToolSet(modelId).activate_skill(skillNames),
   };
 }
+
+export const READ_MCP_RESOURCE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.read_mcp_resource;
+  },
+  overrides: (modelId) => getToolSet(modelId).read_mcp_resource,
+};
+
+export const LIST_MCP_RESOURCES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.list_mcp_resources;
+  },
+  overrides: (modelId) => getToolSet(modelId).list_mcp_resources,
+};

@@ -9,9 +9,10 @@ import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import Spinner from 'ink-spinner';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import type {
-  SubagentProgress,
-  SubagentActivityItem,
+import {
+  type SubagentProgress,
+  type SubagentActivityItem,
+  SubagentState,
 } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
 import { STATUS_INDICATOR_WIDTH } from './ToolShared.js';
@@ -20,6 +21,7 @@ import { safeJsonToMarkdown } from '@google/gemini-cli-core';
 export interface SubagentProgressDisplayProps {
   progress: SubagentProgress;
   terminalWidth: number;
+  historyOverrides?: SubagentActivityItem[];
 }
 
 export const formatToolArgs = (args?: string): string => {
@@ -57,17 +59,17 @@ export const formatToolArgs = (args?: string): string => {
 
 export const SubagentProgressDisplay: React.FC<
   SubagentProgressDisplayProps
-> = ({ progress, terminalWidth }) => {
+> = ({ progress, terminalWidth, historyOverrides }) => {
   let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
-  if (progress.state === 'cancelled') {
+  if (progress.state === SubagentState.CANCELLED) {
     headerText = `Subagent ${progress.agentName} was cancelled.`;
     headerColor = theme.status.warning;
-  } else if (progress.state === 'error') {
+  } else if (progress.state === SubagentState.ERROR) {
     headerText = `Subagent ${progress.agentName} failed.`;
     headerColor = theme.status.error;
-  } else if (progress.state === 'completed') {
+  } else if (progress.state === SubagentState.COMPLETED) {
     headerText = `Subagent ${progress.agentName} completed.`;
     headerColor = theme.status.success;
   } else {
@@ -85,75 +87,82 @@ export const SubagentProgressDisplay: React.FC<
         </Box>
       )}
       <Box flexDirection="column" marginLeft={0} gap={0}>
-        {progress.recentActivity.map((item: SubagentActivityItem) => {
-          if (item.type === 'thought') {
-            const isCancellation = item.content === 'Request cancelled.';
-            const icon = isCancellation ? 'ℹ ' : '💭';
-            const color = isCancellation
-              ? theme.status.warning
-              : theme.text.secondary;
+        {(historyOverrides ?? progress.recentActivity).map(
+          (item: SubagentActivityItem) => {
+            if (item.type === 'thought') {
+              const isCancellation = item.content === 'Request cancelled.';
+              const icon = isCancellation ? 'ℹ ' : '💭';
+              const color = isCancellation
+                ? theme.status.warning
+                : theme.text.secondary;
 
-            return (
-              <Box key={item.id} flexDirection="row">
-                <Box minWidth={STATUS_INDICATOR_WIDTH}>
-                  <Text color={color}>{icon}</Text>
+              return (
+                <Box key={item.id} flexDirection="row">
+                  <Box minWidth={STATUS_INDICATOR_WIDTH}>
+                    <Text color={color}>{icon}</Text>
+                  </Box>
+                  <Box flexGrow={1}>
+                    <Text color={color}>{item.content}</Text>
+                  </Box>
                 </Box>
-                <Box flexGrow={1}>
-                  <Text color={color}>{item.content}</Text>
-                </Box>
-              </Box>
-            );
-          } else if (item.type === 'tool_call') {
-            const statusSymbol =
-              item.status === 'running' ? (
-                <Spinner type="dots" />
-              ) : item.status === 'completed' ? (
-                <Text color={theme.status.success}>{TOOL_STATUS.SUCCESS}</Text>
-              ) : item.status === 'cancelled' ? (
-                <Text color={theme.status.warning} bold>
-                  {TOOL_STATUS.CANCELED}
-                </Text>
-              ) : (
-                <Text color={theme.status.error}>{TOOL_STATUS.ERROR}</Text>
               );
-
-            const formattedArgs = item.description || formatToolArgs(item.args);
-            const displayArgs =
-              formattedArgs.length > 60
-                ? formattedArgs.slice(0, 60) + '...'
-                : formattedArgs;
-
-            return (
-              <Box key={item.id} flexDirection="row">
-                <Box minWidth={STATUS_INDICATOR_WIDTH}>{statusSymbol}</Box>
-                <Box flexDirection="row" flexGrow={1} flexWrap="wrap">
-                  <Text
-                    bold
-                    color={theme.text.primary}
-                    strikethrough={item.status === 'cancelled'}
-                  >
-                    {item.displayName || item.content}
+            } else if (item.type === 'tool_call') {
+              const statusSymbol =
+                item.status === SubagentState.RUNNING ? (
+                  <Spinner type="dots" />
+                ) : item.status === SubagentState.COMPLETED ? (
+                  <Text color={theme.status.success}>
+                    {TOOL_STATUS.SUCCESS}
                   </Text>
-                  {displayArgs && (
-                    <Box marginLeft={1}>
-                      <Text
-                        color={theme.text.secondary}
-                        wrap="truncate"
-                        strikethrough={item.status === 'cancelled'}
-                      >
-                        {displayArgs}
-                      </Text>
-                    </Box>
-                  )}
+                ) : item.status === SubagentState.CANCELLED ? (
+                  <Text color={theme.status.warning} bold>
+                    {TOOL_STATUS.CANCELED}
+                  </Text>
+                ) : (
+                  <Text color={theme.status.error}>{TOOL_STATUS.ERROR}</Text>
+                );
+
+              const formattedArgs =
+                item.description || formatToolArgs(item.args);
+              const displayArgs =
+                formattedArgs.length > 60
+                  ? formattedArgs.slice(0, 60) + '...'
+                  : formattedArgs;
+
+              return (
+                <Box key={item.id} flexDirection="row">
+                  <Box minWidth={STATUS_INDICATOR_WIDTH}>{statusSymbol}</Box>
+                  <Box flexDirection="row" flexGrow={1} flexWrap="wrap">
+                    <Text
+                      bold
+                      color={theme.text.primary}
+                      strikethrough={item.status === SubagentState.CANCELLED}
+                    >
+                      {item.displayName || item.content}
+                    </Text>
+                    {displayArgs && (
+                      <Box marginLeft={1}>
+                        <Text
+                          color={theme.text.secondary}
+                          wrap="truncate"
+                          strikethrough={
+                            item.status === SubagentState.CANCELLED
+                          }
+                        >
+                          {displayArgs}
+                        </Text>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
-              </Box>
-            );
-          }
-          return null;
-        })}
+              );
+            }
+            return null;
+          },
+        )}
       </Box>
 
-      {progress.state === 'completed' && progress.result && (
+      {progress.result && (
         <Box flexDirection="column" marginTop={1}>
           {progress.terminateReason && progress.terminateReason !== 'GOAL' && (
             <Box marginBottom={1}>
@@ -164,7 +173,7 @@ export const SubagentProgressDisplay: React.FC<
           )}
           <MarkdownDisplay
             text={safeJsonToMarkdown(progress.result)}
-            isPending={false}
+            isPending={progress.state !== SubagentState.COMPLETED}
             terminalWidth={terminalWidth}
           />
         </Box>

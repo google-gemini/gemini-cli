@@ -59,7 +59,7 @@ describe('validateNonInterActiveAuth', () => {
       .mockImplementation((code?: string | number | null | undefined) => {
         throw new Error(`process.exit(${code}) called`);
       });
-    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
+    vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue(null);
     mockSettings = {
       system: { path: '', settings: {} },
       systemDefaults: { path: '', settings: {} },
@@ -247,7 +247,7 @@ describe('validateNonInterActiveAuth', () => {
 
   it('exits if validateAuthMethod returns error', async () => {
     // Mock validateAuthMethod to return error
-    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+    vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue('Auth error!');
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
       getContentGeneratorConfig: vi
@@ -277,7 +277,7 @@ describe('validateNonInterActiveAuth', () => {
     // Mock validateAuthMethod to return error to ensure it's not being called
     const validateAuthMethodSpy = vi
       .spyOn(auth, 'validateAuthMethod')
-      .mockReturnValue('Auth error!');
+      .mockResolvedValue('Auth error!');
     const nonInteractiveConfig = createLocalMockConfig({});
     // Even with an invalid auth type, it should not exit
     // because validation is skipped.
@@ -294,7 +294,7 @@ describe('validateNonInterActiveAuth', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('succeeds if effectiveAuthType matches enforcedAuthType', async () => {
+  it('succeeds if effectiveAuthType matches enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({});
@@ -308,7 +308,7 @@ describe('validateNonInterActiveAuth', () => {
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
-  it('exits if configuredAuthType does not match enforcedAuthType', async () => {
+  it('exits if configuredAuthType does not match enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
@@ -334,7 +334,7 @@ describe('validateNonInterActiveAuth', () => {
     );
   });
 
-  it('exits if auth from env var does not match enforcedAuthType', async () => {
+  it('exits if auth from env var does not match enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({
@@ -432,7 +432,7 @@ describe('validateNonInterActiveAuth', () => {
     });
 
     it(`prints JSON error when validateAuthMethod fails and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
-      vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+      vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue('Auth error!');
       process.env['GEMINI_API_KEY'] = 'fake-key';
 
       const nonInteractiveConfig = createLocalMockConfig({

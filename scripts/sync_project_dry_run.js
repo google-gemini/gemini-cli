@@ -32,7 +32,7 @@ function runCommand(command) {
       stdio: ['ignore', 'pipe', 'ignore'],
       maxBuffer: 10 * 1024 * 1024,
     });
-  } catch (_e) {
+  } catch {
     return null;
   }
 }

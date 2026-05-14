@@ -12,6 +12,15 @@ export enum ReleaseChannel {
   STABLE = 'stable',
 }
 
+/**
+ * Stability ranking for release channels. Higher number means more stable.
+ */
+export const RELEASE_CHANNEL_STABILITY: Record<ReleaseChannel, number> = {
+  [ReleaseChannel.NIGHTLY]: 0,
+  [ReleaseChannel.PREVIEW]: 1,
+  [ReleaseChannel.STABLE]: 2,
+};
+
 const cache = new Map<string, ReleaseChannel>();
 
 /**
@@ -22,6 +31,19 @@ export function _clearCache() {
   cache.clear();
 }
 
+/**
+ * Determines the release channel for a given version string.
+ */
+export function getChannelFromVersion(version: string): ReleaseChannel {
+  if (!version || version.includes('nightly')) {
+    return ReleaseChannel.NIGHTLY;
+  }
+  if (version.includes('preview')) {
+    return ReleaseChannel.PREVIEW;
+  }
+  return ReleaseChannel.STABLE;
+}
+
 export async function getReleaseChannel(cwd: string): Promise<ReleaseChannel> {
   if (cache.has(cwd)) {
     return cache.get(cwd)!;
@@ -30,14 +52,7 @@ export async function getReleaseChannel(cwd: string): Promise<ReleaseChannel> {
   const packageJson = await getPackageJson(cwd);
   const version = packageJson?.version ?? '';
 
-  let channel: ReleaseChannel;
-  if (version.includes('nightly') || version === '') {
-    channel = ReleaseChannel.NIGHTLY;
-  } else if (version.includes('preview')) {
-    channel = ReleaseChannel.PREVIEW;
-  } else {
-    channel = ReleaseChannel.STABLE;
-  }
+  const channel = getChannelFromVersion(version);
   cache.set(cwd, channel);
   return channel;
 }

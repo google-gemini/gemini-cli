@@ -15,25 +15,24 @@ import type { Config } from '../config/config.js';
  *
  * @param config - The runtime configuration.
  * @param accessedPath - The absolute path being accessed by the tool.
- * @returns The discovered context string, or empty string if none found or JIT is disabled.
+ * @returns The discovered context string, or empty string if none found.
  */
 export async function discoverJitContext(
   config: Config,
   accessedPath: string,
 ): Promise<string> {
-  if (!config.isJitContextEnabled?.()) {
-    return '';
-  }
-
-  const contextManager = config.getContextManager();
-  if (!contextManager) {
+  const memoryContextManager = config.getMemoryContextManager();
+  if (!memoryContextManager) {
     return '';
   }
 
   const trustedRoots = [...config.getWorkspaceContext().getDirectories()];
 
   try {
-    return await contextManager.discoverContext(accessedPath, trustedRoots);
+    return await memoryContextManager.discoverContext(
+      accessedPath,
+      trustedRoots,
+    );
   } catch {
     // JIT context is supplementary — never fail the tool's primary operation.
     return '';

@@ -13,6 +13,7 @@ interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
   stderr?: boolean;
+  interactive?: boolean;
 }
 
 export class ConsolePatcher {
@@ -49,12 +50,19 @@ export class ConsolePatcher {
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      if (this.params.stderr) {
-        if (type !== 'debug' || this.params.debugMode) {
-          this.originalConsoleError(this.formatArgs(args));
+      // When it is non interactive mode, do not show info logging unless
+      // it is debug mode. default to true if it is undefined.
+      if (this.params.interactive === false) {
+        if ((type === 'info' || type === 'log') && !this.params.debugMode) {
+          return;
         }
-      } else {
-        if (type !== 'debug' || this.params.debugMode) {
+      }
+      // When it is in the debug mode, redirect console output to stderr
+      // depending on if it is stderr only mode.
+      if (type !== 'debug' || this.params.debugMode) {
+        if (this.params.stderr) {
+          this.originalConsoleError(this.formatArgs(args));
+        } else {
           this.params.onNewMessage?.({
             type,
             content: this.formatArgs(args),

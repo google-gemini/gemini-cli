@@ -8,6 +8,7 @@ import {
   ProjectIdRequiredError,
   setupUser,
   ValidationCancelledError,
+  InvalidNumericProjectIdError,
   resetUserDataCacheForTesting,
 } from './setup.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
@@ -15,8 +16,20 @@ import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
 import { UserTierId, type GeminiUserTier } from './types.js';
 import type { Config } from '../config/config.js';
+import {
+  logOnboardingSuccess,
+  OnboardingSuccessEvent,
+} from '../telemetry/index.js';
 
 vi.mock('../code_assist/server.js');
+vi.mock('../telemetry/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../telemetry/index.js')>();
+  return {
+    ...actual,
+    logOnboardingStart: vi.fn(),
+    logOnboardingSuccess: vi.fn(),
+  };
+});
 
 const mockPaidTier: GeminiUserTier = {
   id: UserTierId.STANDARD,
@@ -206,6 +219,21 @@ describe('setupUser', () => {
         ProjectIdRequiredError,
       );
     });
+
+    it('should throw InvalidNumericProjectIdError when GOOGLE_CLOUD_PROJECT is numeric', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '1234567890');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidNumericProjectIdError,
+      );
+    });
+
+    it('should throw InvalidNumericProjectIdError when GOOGLE_CLOUD_PROJECT_ID is numeric', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '1234567890');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidNumericProjectIdError,
+      );
+    });
   });
 
   describe('new user', () => {
@@ -214,7 +242,20 @@ describe('setupUser', () => {
       mockLoad.mockResolvedValue({
         allowedTiers: [mockPaidTier],
       });
-      const userData = await setupUser({} as OAuth2Client, mockConfig);
+      mockOnboardUser.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        return {
+          done: true,
+          response: {
+            cloudaicompanionProject: {
+              id: 'server-project',
+            },
+          },
+        };
+      });
+      const userDataPromise = setupUser({} as OAuth2Client, mockConfig);
+      await vi.advanceTimersByTimeAsync(1500);
+      const userData = await userDataPromise;
       expect(mockOnboardUser).toHaveBeenCalledWith(
         expect.objectContaining({
           tierId: UserTierId.STANDARD,
@@ -227,6 +268,13 @@ describe('setupUser', () => {
         userTierName: 'paid',
         hasOnboardedPreviously: false,
       });
+      expect(logOnboardingSuccess).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(OnboardingSuccessEvent),
+      );
+      const event = vi.mocked(logOnboardingSuccess).mock.calls[0][1];
+      expect(event.userTier).toBe('paid');
+      expect(event.duration_ms).toBeGreaterThanOrEqual(1500);
     });
 
     it('should onboard a new free user when project ID is not set', async () => {

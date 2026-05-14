@@ -6,6 +6,7 @@
 
 import type { Part } from '@google/genai';
 import type { ContentPart } from './types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Converts Gemini API Part objects to framework-agnostic ContentPart objects.
@@ -93,30 +94,15 @@ export function contentPartsToGeminiParts(content: ContentPart[]): Part[] {
         result.push({ text: part.text });
         break;
       default:
+        debugLogger.warn(
+          `Unhandled ContentPart type: ${JSON.stringify(part)} fallback to serialization`,
+        );
         // Serialize unknown ContentPart variants instead of dropping them
         result.push({ text: JSON.stringify(part) });
         break;
     }
   }
   return result;
-}
-
-/**
- * Converts a ToolCallResponseInfo.resultDisplay value into ContentPart[].
- * Handles string, object-valued (FileDiff, SubagentProgress, etc.),
- * and undefined resultDisplay consistently.
- */
-export function toolResultDisplayToContentParts(
-  resultDisplay: unknown,
-): ContentPart[] | undefined {
-  if (resultDisplay === undefined || resultDisplay === null) {
-    return undefined;
-  }
-  const text =
-    typeof resultDisplay === 'string'
-      ? resultDisplay
-      : JSON.stringify(resultDisplay);
-  return [{ type: 'text', text }];
 }
 
 /**

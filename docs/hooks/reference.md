@@ -20,8 +20,8 @@ including JSON schemas and API details.
 
 ## Configuration schema
 
-Hooks are defined in `settings.json` within the `hooks` object. Each event
-(e.g., `BeforeTool`) contains an array of **hook definitions**.
+Hooks are defined in `settings.json` within the `hooks` object. Each event (for
+example, `BeforeTool`) contains an array of **hook definitions**.
 
 ### Hook definition
 
@@ -52,7 +52,7 @@ All hooks receive these common fields via `stdin`:
   "session_id": string,      // Unique ID for the current session
   "transcript_path": string, // Absolute path to session transcript JSON
   "cwd": string,             // Current working directory
-  "hook_event_name": string, // The firing event (e.g. "BeforeTool")
+  "hook_event_name": string, // The firing event (for example "BeforeTool")
   "timestamp": string        // ISO 8601 execution time
 }
 ```
@@ -81,12 +81,12 @@ Most hooks support these fields in their `stdout` JSON:
 For `BeforeTool` and `AfterTool` events, the `matcher` field in your settings is
 compared against the name of the tool being executed.
 
-- **Built-in Tools**: You can match any built-in tool (e.g., `read_file`,
+- **Built-in Tools**: You can match any built-in tool (for example, `read_file`,
   `run_shell_command`). See the [Tools Reference](../reference/tools) for a full
   list of available tool names.
 - **MCP Tools**: Tools from MCP servers follow the naming pattern
   `mcp_<server_name>_<tool_name>`.
-- **Regex Support**: Matchers support regular expressions (e.g.,
+- **Regex Support**: Matchers support regular expressions (for example,
   `matcher: "read_.*"` matches all file reading tools).
 
 ### `BeforeTool`
@@ -194,7 +194,7 @@ request format.
     (generation params).
 - **Relevant Output Fields**:
   - `hookSpecificOutput.llm_request`: An object that **overrides** parts of the
-    outgoing request (e.g., changing models or temperature).
+    outgoing request (for example, changing models or temperature).
   - `hookSpecificOutput.llm_response`: A **Synthetic Response** object. If
     provided, the CLI skips the LLM call entirely and uses this as the response.
   - `decision`: Set to `"deny"` to block the request and abort the turn.
@@ -271,14 +271,14 @@ telemetry.
 
 ### `Notification`
 
-Fires when the CLI emits a system alert (e.g., Tool Permissions). Used for
-external logging or cross-platform alerts.
+Fires when the CLI emits a system alert (for example, Tool Permissions). Used
+for external logging or cross-platform alerts.
 
 - **Input Fields**:
   - `notification_type`: (`"ToolPermission"`)
   - `message`: Summary of the alert.
-  - `details`: JSON object with alert-specific metadata (e.g., tool name, file
-    path).
+  - `details`: JSON object with alert-specific metadata (for example, tool name,
+    file path).
 - **Relevant Output Fields**:
   - `systemMessage`: Displayed alongside the system alert.
 - **Observability Only**: This hook **cannot** block alerts or grant permissions

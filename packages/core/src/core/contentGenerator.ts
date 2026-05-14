@@ -80,6 +80,9 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
     return AuthType.USE_VERTEX_AI;
   }
+  if (process.env['GOOGLE_GEMINI_BASE_URL']) {
+    return AuthType.GATEWAY;
+  }
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
   }
@@ -99,7 +102,28 @@ export type ContentGeneratorConfig = {
   proxy?: string;
   baseUrl?: string;
   customHeaders?: Record<string, string>;
+  vertexAiRouting?: VertexAiRoutingConfig;
 };
+
+export type VertexAiRequestType = 'dedicated' | 'shared';
+export type VertexAiSharedRequestType = 'priority' | 'flex';
+
+export interface VertexAiRoutingConfig {
+  requestType?: VertexAiRequestType;
+  sharedRequestType?: VertexAiSharedRequestType;
+}
+
+const VERTEX_AI_REQUEST_TYPE_HEADER = 'X-Vertex-AI-LLM-Request-Type';
+const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
+  'X-Vertex-AI-LLM-Shared-Request-Type';
+
+function validateBaseUrl(baseUrl: string): void {
+  try {
+    new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+}
 
 export async function createContentGeneratorConfig(
   config: Config,
@@ -107,7 +131,26 @@ export async function createContentGeneratorConfig(
   apiKey?: string,
   baseUrl?: string,
   customHeaders?: Record<string, string>,
+  vertexAiRouting?: VertexAiRoutingConfig,
 ): Promise<ContentGeneratorConfig> {
+  const contentGeneratorConfig: ContentGeneratorConfig = {
+    authType,
+    proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
+    vertexAiRouting,
+  };
+
+  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
+  // Return before touching the API-key keychain: on Linux without a Secret Service
+  // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
+  if (
+    authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.COMPUTE_ADC
+  ) {
+    return contentGeneratorConfig;
+  }
+
   const geminiApiKey =
     apiKey ||
     process.env['GEMINI_API_KEY'] ||
@@ -119,21 +162,6 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
-
-  const contentGeneratorConfig: ContentGeneratorConfig = {
-    authType,
-    proxy: config?.getProxy(),
-    baseUrl,
-    customHeaders,
-  };
-
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
-  if (
-    authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
-  ) {
-    return contentGeneratorConfig;
-  }
 
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
@@ -153,7 +181,8 @@ export async function createContentGeneratorConfig(
   }
 
   if (authType === AuthType.GATEWAY) {
-    contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
+    contentGeneratorConfig.apiKey =
+      apiKey || process.env['GEMINI_API_KEY'] || '';
     contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
@@ -180,6 +209,9 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
         config.authType === AuthType.USE_VERTEX_AI ||
         ((await gcConfig.getGemini31Launched?.()) ?? false),
+      config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI ||
+        ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false),
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
@@ -262,6 +294,21 @@ export async function createContentGenerator(
       if (config.customHeaders) {
         headers = { ...headers, ...config.customHeaders };
       }
+      if (
+        config.authType === AuthType.USE_VERTEX_AI &&
+        config.vertexAiRouting
+      ) {
+        const { requestType, sharedRequestType } = config.vertexAiRouting;
+        headers = {
+          ...headers,
+          ...(requestType
+            ? { [VERTEX_AI_REQUEST_TYPE_HEADER]: requestType }
+            : {}),
+          ...(sharedRequestType
+            ? { [VERTEX_AI_SHARED_REQUEST_TYPE_HEADER]: sharedRequestType }
+            : {}),
+        };
+      }
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
@@ -270,11 +317,15 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
+      if (config.authType === AuthType.GATEWAY && config.apiKey === '') {
+        headers['x-goog-api-key'] = '';
+      }
       let baseUrl = config.baseUrl;
       if (!baseUrl) {
-        const envBaseUrl = config.vertexai
-          ? process.env['GOOGLE_VERTEX_BASE_URL']
-          : process.env['GOOGLE_GEMINI_BASE_URL'];
+        const envBaseUrl =
+          config.authType === AuthType.USE_VERTEX_AI
+            ? process.env['GOOGLE_VERTEX_BASE_URL']
+            : process.env['GOOGLE_GEMINI_BASE_URL'];
         if (envBaseUrl) {
           validateBaseUrl(envBaseUrl);
           baseUrl = envBaseUrl;
@@ -282,6 +333,7 @@ export async function createContentGenerator(
       } else {
         validateBaseUrl(baseUrl);
       }
+
       const httpOptions: {
         baseUrl?: string;
         headers: Record<string, string>;
@@ -292,8 +344,13 @@ export async function createContentGenerator(
       }
 
       const googleGenAI = new GoogleGenAI({
-        apiKey: config.apiKey === '' ? undefined : config.apiKey,
-        vertexai: config.vertexai,
+        apiKey:
+          config.authType === AuthType.GATEWAY
+            ? config.apiKey
+            : config.apiKey === ''
+              ? undefined
+              : config.apiKey,
+        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
@@ -309,18 +366,4 @@ export async function createContentGenerator(
   }
 
   return generator;
-}
-
-const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
-
-export function validateBaseUrl(baseUrl: string): void {
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    throw new Error(`Invalid custom base URL: ${baseUrl}`);
-  }
-  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
-    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
-  }
 }

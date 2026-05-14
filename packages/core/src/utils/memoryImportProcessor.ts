@@ -48,18 +48,31 @@ export interface ProcessImportsResult {
   importTree: MemoryFile;
 }
 
-// Helper to find the project root (looks for .git directory or file for worktrees)
-async function findProjectRoot(startDir: string): Promise<string> {
+// Helper to find the project root (looks for boundary marker directories/files)
+async function findProjectRoot(
+  startDir: string,
+  boundaryMarkers: readonly string[] = ['.git'],
+): Promise<string> {
+  if (boundaryMarkers.length === 0) {
+    return path.resolve(startDir);
+  }
+
   let currentDir = path.resolve(startDir);
   while (true) {
-    const gitPath = path.join(currentDir, '.git');
-    try {
-      // Check for existence only — .git can be a directory (normal repos)
-      // or a file (submodules / worktrees).
-      await fs.access(gitPath);
-      return currentDir;
-    } catch {
-      // .git not found, continue to parent
+    for (const marker of boundaryMarkers) {
+      // Sanitize: skip markers with path traversal or absolute paths
+      if (path.isAbsolute(marker) || marker.includes('..')) {
+        continue;
+      }
+      const markerPath = path.join(currentDir, marker);
+      try {
+        // Check for existence only — marker can be a directory (normal repos)
+        // or a file (submodules / worktrees).
+        await fs.access(markerPath);
+        return currentDir;
+      } catch {
+        // marker not found, continue
+      }
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
@@ -68,7 +81,7 @@ async function findProjectRoot(startDir: string): Promise<string> {
     }
     currentDir = parentDir;
   }
-  // Fallback to startDir if .git not found
+  // Fallback to startDir if no marker found
   return path.resolve(startDir);
 }
 
@@ -185,9 +198,10 @@ export async function processImports(
   },
   projectRoot?: string,
   importFormat: 'flat' | 'tree' = 'tree',
+  boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<ProcessImportsResult> {
   if (!projectRoot) {
-    projectRoot = await findProjectRoot(basePath);
+    projectRoot = await findProjectRoot(basePath, boundaryMarkers);
   }
 
   if (importState.currentDepth >= importState.maxDepth) {
@@ -346,6 +360,7 @@ export async function processImports(
         newImportState,
         projectRoot,
         importFormat,
+        boundaryMarkers,
       );
       result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
       imports.push(imported.importTree);

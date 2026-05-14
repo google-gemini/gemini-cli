@@ -116,7 +116,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
     await waitUntilReady();
 
     // Verify truncation is occurring (standard mode uses MaxSizedBox)
-    await waitFor(() => expect(lastFrame()).toContain('hidden (Ctrl+O'));
+    await waitFor(() => expect(lastFrame()).not.toContain('line 1\n'));
 
     unmount();
   });

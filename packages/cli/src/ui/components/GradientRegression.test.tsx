@@ -10,7 +10,7 @@ import * as SessionContext from '../contexts/SessionContext.js';
 import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { Banner } from './Banner.js';
 import { Footer } from './Footer.js';
-import { Header } from './Header.js';
+import { AppHeader } from './AppHeader.js';
 import { ModelDialog } from './ModelDialog.js';
 import { StatsDisplay } from './StatsDisplay.js';
 
@@ -71,9 +71,9 @@ useSessionStatsMock.mockReturnValue({
 });
 
 describe('Gradient Crash Regression Tests', () => {
-  it('<Header /> should not crash when theme.ui.gradient is empty', async () => {
+  it('<AppHeader /> should not crash when theme.ui.gradient is empty', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
-      <Header version="1.0.0" nightly={false} />,
+      <AppHeader version="1.0.0" />,
       {
         width: 120,
       },

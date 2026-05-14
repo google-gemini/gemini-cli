@@ -19,6 +19,7 @@ using the `/theme` command within Gemini CLI:
   - `Holiday`
   - `Shades Of Purple`
   - `Solarized Dark`
+  - `Tokyo Night`
 - **Light themes:**
   - `ANSI Light`
   - `Ayu Light`
@@ -116,8 +117,8 @@ least `background.primary`, `text.primary`, `text.secondary`, and the various
 accent colors via `text.link`, `text.accent`, and `status` to ensure a cohesive
 UI.
 
-You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names
-(e.g., `coral`, `teal`, `blue`) for any color value. See
+You can use either hex codes (for example, `#FF0000`) **or** standard CSS color
+names (for example, `coral`, `teal`, `blue`) for any color value. See
 [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords)
 for a full list of supported names.
 
@@ -251,6 +252,10 @@ identify their source, for example: `shades-of-green (green-extension)`.
 ### Solarized Dark
 
 <img src="/docs/assets/theme-solarized-dark.png" alt="Solarized Dark theme" width="600">
+
+### Tokyo Night
+
+<img src="/docs/assets/theme-tokyonight-dark.png" alt="Tokyo Night theme" width="600">
 
 ## Light themes
 

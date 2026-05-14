@@ -36,7 +36,7 @@ runs:
       run: 'echo "$JSON_INPUTS"'
 
     - name: 'setup node'
-      uses: 'actions/setup-node@v4'
+      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
       with:
         node-version: '20'
 
@@ -98,6 +98,7 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        GEMINI_CLI_TRUST_WORKSPACE: true
         INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
         # We must diable CI mode here because it interferes with interactive tests.
         # See https://github.com/google-gemini/gemini-cli/issues/10517

@@ -138,7 +138,7 @@ class ExtensionIntegrityStore {
     let rawStore: IntegrityStore;
     try {
       rawStore = IntegrityStoreSchema.parse(JSON.parse(content));
-    } catch (_) {
+    } catch {
       throw new Error(
         `Failed to parse extension integrity store. ${resetInstruction}}`,
       );

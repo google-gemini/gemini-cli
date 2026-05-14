@@ -32,6 +32,16 @@ export class ProjectIdRequiredError extends Error {
     super(
       'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
     );
+    this.name = 'ProjectIdRequiredError';
+  }
+}
+
+export class InvalidNumericProjectIdError extends Error {
+  constructor(projectId: string) {
+    super(
+      `Invalid Google Cloud Project ID: "${projectId}". The GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) environment variable must be set to your string-based Project ID (e.g., "my-project-123"), not your numeric Project Number. Please update your environment variables.`,
+    );
+    this.name = 'InvalidNumericProjectIdError';
   }
 }
 
@@ -42,6 +52,7 @@ export class ProjectIdRequiredError extends Error {
 export class ValidationCancelledError extends Error {
   constructor() {
     super('User cancelled account validation');
+    this.name = 'ValidationCancelledError';
   }
 }
 
@@ -51,6 +62,7 @@ export class IneligibleTierError extends Error {
   constructor(ineligibleTiers: IneligibleTier[]) {
     const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
     super(reasons);
+    this.name = 'IneligibleTierError';
     this.ineligibleTiers = ineligibleTiers;
   }
 }
@@ -118,6 +130,10 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  if (projectId && /^\d+$/.test(projectId)) {
+    throw new InvalidNumericProjectIdError(projectId);
+  }
 
   const projectCache = userDataCache.getOrCreate(client, () =>
     createCache<string | undefined, Promise<UserData>>({
@@ -251,6 +267,7 @@ async function _doSetupUser(
   }
 
   logOnboardingStart(config, new OnboardingStartEvent());
+  const onboardingStartTime = Date.now();
 
   let lroRes = await caServer.onboardUser(onboardReq);
   if (!lroRes.done && lroRes.name) {
@@ -261,8 +278,10 @@ async function _doSetupUser(
     }
   }
 
-  const userTier = tier.id ?? UserTierId.STANDARD;
-  logOnboardingSuccess(config, new OnboardingSuccessEvent(userTier));
+  logOnboardingSuccess(
+    config,
+    new OnboardingSuccessEvent(tier.name, Date.now() - onboardingStartTime),
+  );
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
     if (projectId) {

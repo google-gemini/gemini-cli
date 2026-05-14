@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -20,7 +21,7 @@ import {
  * Action for the default `/commands` invocation.
  * Displays a message prompting the user to use a subcommand.
  */
-async function listAction(
+async function defaultAction(
   _context: CommandContext,
   _args: string,
 ): Promise<void | SlashCommandActionReturn> {
@@ -28,8 +29,62 @@ async function listAction(
     type: 'message',
     messageType: 'info',
     content:
-      'Use "/commands reload" to reload custom command definitions from .toml files.',
+      'Use "/commands list" to view available .toml files, or "/commands reload" to reload custom command definitions.',
   };
+}
+
+/**
+ * Action for `/commands list`.
+ * Lists available .toml command files from user, project, and extension directories.
+ */
+async function listSubcommandAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  try {
+    const config = context.services.agentContext?.config ?? null;
+    const loader = new FileCommandLoader(config);
+    const groups = await loader.listAvailableFiles();
+
+    const results: string[] = [];
+    for (const group of groups) {
+      results.push(`### ${group.displayName} Commands (${group.path})`);
+      if (group.error) {
+        results.push(`- (Error reading directory: ${group.error})`);
+      } else {
+        group.files.forEach((file) => results.push(`- ${file}`));
+      }
+    }
+
+    results.push(
+      '\n_Note: MCP prompts are dynamically loaded from configured MCP servers._',
+    );
+
+    if (results.length === 1) {
+      // Only the note is present
+      return {
+        type: 'message',
+        messageType: 'info',
+        content:
+          'No custom command files (.toml) found.\n\n_Note: MCP prompts are dynamically loaded from configured MCP servers._',
+      };
+    }
+
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: results.join('\n'),
+      } as HistoryItemInfo,
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to list commands: ${error instanceof Error ? error.message : String(error)}`,
+      } as HistoryItemError,
+      Date.now(),
+    );
+  }
 }
 
 /**
@@ -63,10 +118,18 @@ async function reloadAction(
 
 export const commandsCommand: SlashCommand = {
   name: 'commands',
-  description: 'Manage custom slash commands. Usage: /commands [reload]',
+  description: 'Manage custom slash commands. Usage: /commands [list|reload]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
+    {
+      name: 'list',
+      description:
+        'List available custom command .toml files. Usage: /commands list',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: listSubcommandAction,
+    },
     {
       name: 'reload',
       altNames: ['refresh'],
@@ -77,5 +140,5 @@ export const commandsCommand: SlashCommand = {
       action: reloadAction,
     },
   ],
-  action: listAction,
+  action: defaultAction,
 };

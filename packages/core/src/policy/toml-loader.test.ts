@@ -123,6 +123,7 @@ priority = 70
     it('should transform mcpName = "*" to wildcard toolName', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
@@ -263,6 +264,20 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allowRedirection property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowRedirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -273,7 +288,21 @@ deny_message = "Deletion is permanent"
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should parse denyMessage property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+denyMessage = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
       expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
       expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
       expect(getErrors(result)).toHaveLength(0);
@@ -448,6 +477,21 @@ name = "allowed-path"
   });
 
   describe('Negative Tests', () => {
+    it('should return a schema_validation error if toolName is missing in safety_checker', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
+    });
+
     it('should return a schema_validation error if priority is missing', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -541,6 +585,19 @@ priority = 100
       const error = result.errors[0];
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('decision');
+    });
+
+    it('should return a schema_validation error if toolName is missing', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+decision = "allow"
+priority = 100
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
     });
 
     it('should return a schema_validation error if toolName is not a string or array', async () => {
@@ -767,9 +824,10 @@ priority = 100
       expect(result.rules).toHaveLength(2);
     });
 
-    it('should not warn for catch-all rules (no toolName)', async () => {
+    it('should not warn for catch-all rules (toolName = "*")', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 100
 `);
@@ -827,26 +885,27 @@ priority = 100
           'Should have loaded a rule with toolAnnotations',
         ).toBeDefined();
         expect(annotationRule!.toolName).toBe('mcp_*');
+        expect(annotationRule!.mcpName).toBe('*');
         expect(annotationRule!.toolAnnotations).toEqual({
           readOnlyHint: true,
         });
         expect(annotationRule!.decision).toBe(PolicyDecision.ASK_USER);
-        // Priority 70 in tier 1 => 1.070
-        expect(annotationRule!.priority).toBe(1.07);
+        // Priority 50 in tier 1 => 1.050
+        expect(annotationRule!.priority).toBe(1.05);
 
         // Verify deny rule was loaded correctly
         const denyRule = result.rules.find(
           (r) =>
             r.decision === PolicyDecision.DENY &&
-            r.toolName === undefined &&
+            r.toolName === '*' &&
             r.denyMessage?.includes('Plan Mode'),
         );
         expect(
           denyRule,
           'Should have loaded the catch-all deny rule',
         ).toBeDefined();
-        // Priority 60 in tier 1 => 1.060
-        expect(denyRule!.priority).toBe(1.06);
+        // Priority 40 in tier 1 => 1.040
+        expect(denyRule!.priority).toBe(1.04);
 
         // 2. Initialize Policy Engine in Plan Mode
         const engine = new PolicyEngine({
@@ -915,12 +974,23 @@ priority = 100
 
     it('should override default subagent rules when in Plan Mode for unknown subagents', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
-      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const readOnlyTomlPath = path.resolve(
+        __dirname,
+        'policies',
+        'read-only.toml',
+      );
+      const planContent = await fs.readFile(planTomlPath, 'utf-8');
+      const readOnlyContent = await fs.readFile(readOnlyTomlPath, 'utf-8');
+
       const tempPolicyDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'plan-policy-test-'),
       );
       try {
-        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), planContent);
+        await fs.writeFile(
+          path.join(tempPolicyDir, 'read-only.toml'),
+          readOnlyContent,
+        );
         const getPolicyTier = () => 1; // Default tier
 
         // 1. Load the actual Plan Mode policies
@@ -937,7 +1007,8 @@ priority = 100
 
         // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
         engine.addRule({
-          toolName: 'unknown_subagent',
+          toolName: 'invoke_agent',
+          argsPattern: /"agent_name":\s*"unknown_subagent"/,
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
@@ -945,8 +1016,9 @@ priority = 100
 
         // 4. Verify Behavior:
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
+        // Plan Mode Deny (1.04) > Subagent Allow (1.03)
         const checkResult = await engine.check(
-          { name: 'unknown_subagent' },
+          { name: 'invoke_agent', args: { agent_name: 'unknown_subagent' } },
           undefined,
         );
 
@@ -956,7 +1028,7 @@ priority = 100
         ).toBe(PolicyDecision.DENY);
 
         // 5. Verify Explicit Allows still work
-        // e.g. 'read_file' should be allowed because its priority in plan.toml (70) is higher than the deny (60)
+        // e.g. 'read_file' should be allowed because its priority in read-only.toml (50) is higher than the deny (40)
         const readResult = await engine.check({ name: 'read_file' }, undefined);
         expect(
           readResult.decision,
@@ -964,8 +1036,12 @@ priority = 100
         ).toBe(PolicyDecision.ALLOW);
 
         // 6. Verify Built-in Research Subagents are ALLOWED
+        // codebase_investigator is priority 50 in read-only.toml
         const codebaseResult = await engine.check(
-          { name: 'codebase_investigator' },
+          {
+            name: 'invoke_agent',
+            args: { agent_name: 'codebase_investigator' },
+          },
           undefined,
         );
         expect(
@@ -974,12 +1050,31 @@ priority = 100
         ).toBe(PolicyDecision.ALLOW);
 
         const cliHelpResult = await engine.check(
-          { name: 'cli_help' },
+          { name: 'invoke_agent', args: { agent_name: 'cli_help' } },
           undefined,
         );
         expect(
           cliHelpResult.decision,
           'cli_help should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        // 7. Verify MCP resource tools are ALLOWED
+        const listMcpResult = await engine.check(
+          { name: 'list_mcp_resources' },
+          undefined,
+        );
+        expect(
+          listMcpResult.decision,
+          'list_mcp_resources should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        const readMcpResult = await engine.check(
+          { name: 'read_mcp_resource', args: { uri: 'test://resource' } },
+          undefined,
+        );
+        expect(
+          readMcpResult.decision,
+          'read_mcp_resource should be ALLOWED in Plan Mode',
         ).toBe(PolicyDecision.ALLOW);
       } finally {
         await fs.rm(tempPolicyDir, { recursive: true, force: true });
@@ -1061,13 +1156,12 @@ priority = 100
       expect(warnings).toHaveLength(0);
     });
 
-    it('should skip rules without toolName', () => {
+    it('should skip wildcard rules (matching all tools)', () => {
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: undefined }],
+        [{ toolName: '*', mcpName: 'my-server' }],
       );
-
       expect(warnings).toHaveLength(0);
     });
 

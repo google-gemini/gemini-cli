@@ -6,6 +6,18 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { spawnAsync } from './shell-utils.js';
+
+/**
+ * Gets the absolute path to the git directory (.git) for the given working directory.
+ * This handles standard git repositories, subdirectories, and worktrees.
+ */
+export async function getAbsoluteGitDir(cwd: string): Promise<string> {
+  const result = await spawnAsync('git', ['rev-parse', '--absolute-git-dir'], {
+    cwd,
+  });
+  return result.stdout.trim();
+}
 
 /**
  * Checks if a directory is within a git repository
@@ -35,7 +47,7 @@ export function isGitRepository(directory: string): boolean {
     }
 
     return false;
-  } catch (_error) {
+  } catch {
     // If any filesystem error occurs, assume not a git repo
     return false;
   }
@@ -67,7 +79,7 @@ export function findGitRoot(directory: string): string | null {
     }
 
     return null;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }

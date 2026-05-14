@@ -27,6 +27,7 @@ import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { AuthType } from '../../core/contentGenerator.js';
+import { ModelAvailabilityService } from '../../availability/modelAvailabilityService.js';
 
 vi.mock('../../core/baseLlmClient.js');
 
@@ -59,6 +60,7 @@ describe('ClassifierStrategy', () => {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig().authType;
@@ -67,6 +69,9 @@ describe('ClassifierStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(new ModelAvailabilityService()),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),

@@ -21,10 +21,11 @@ import {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -58,7 +59,6 @@ import {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -78,6 +78,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from '../dynamic-declaration-helpers.js';
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -102,12 +103,14 @@ export const GEMINI_3_SET: CoreToolSet = {
         [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_FILE_PATH],
@@ -116,7 +119,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files to minimize token usage and simplify reviews.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -226,6 +229,7 @@ export const GEMINI_3_SET: CoreToolSet = {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
+          minimum: 0,
         },
         [GREP_PARAM_AFTER]: {
           description:
@@ -338,12 +342,20 @@ export const GEMINI_3_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool is preferred for surgical edits to existing files as it minimizes token usage, simplifies code reviews, and avoids accidental deletions. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
@@ -481,23 +493,6 @@ Use this tool when the user's query implies needing the content of several files
         },
       },
       required: [READ_MANY_PARAM_INCLUDE],
-    },
-  },
-
-  save_memory: {
-    name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        [MEMORY_PARAM_FACT]: {
-          type: 'string',
-          description:
-            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
-        },
-      },
-      required: [MEMORY_PARAM_FACT],
-      additionalProperties: false,
     },
   },
 
@@ -655,12 +650,12 @@ The agent did not use the todo list because this task could be completed by a ti
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
-                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               },
               [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
-                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
                 items: {
                   type: 'object',
                   required: [
@@ -689,7 +684,7 @@ The agent did not use the todo list because this task could be completed by a ti
               [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
-                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               },
             },
           },
@@ -714,6 +709,40 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  update_topic: getUpdateTopicDeclaration(),
+
+  read_mcp_resource: {
+    name: READ_MCP_RESOURCE_TOOL_NAME,
+    description:
+      'Reads the content of a specified Model Context Protocol (MCP) resource.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          description: 'The URI of the MCP resource to read.',
+          type: 'string',
+        },
+      },
+      required: ['uri'],
+    },
+  },
+
+  list_mcp_resources: {
+    name: LIST_MCP_RESOURCES_TOOL_NAME,
+    description:
+      'Lists all available resources exposed by connected MCP servers.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        serverName: {
+          description:
+            'Optional filter to list resources from a specific server.',
+          type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
 };

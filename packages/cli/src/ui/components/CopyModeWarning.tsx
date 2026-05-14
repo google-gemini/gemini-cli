@@ -6,22 +6,20 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { useUIState } from '../contexts/UIStateContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import { theme } from '../semantic-colors.js';
 
 export const CopyModeWarning: React.FC = () => {
-  const { copyModeEnabled } = useUIState();
-
-  if (!copyModeEnabled) {
-    return null;
-  }
+  const { copyModeEnabled } = useInputState();
 
   return (
-    <Box>
-      <Text color={theme.status.warning}>
-        In Copy Mode. Use Page Up/Down to scroll. Press Ctrl+S or any other key
-        to exit.
-      </Text>
+    <Box height={1}>
+      {copyModeEnabled && (
+        <Text color={theme.status.warning}>
+          In Copy Mode. Use Page Up/Down to scroll. Press Ctrl+S or any other
+          key to exit.
+        </Text>
+      )}
     </Box>
   );
 };

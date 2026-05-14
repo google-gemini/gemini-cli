@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -464,7 +464,7 @@ describe('useSlashCompletion', () => {
         () =>
           useTestHarnessForSlashCompletion(
             true,
-            '/chat',
+            '/chat ',
             slashCommands,
             mockCommandContext,
           ),
@@ -484,7 +484,7 @@ describe('useSlashCompletion', () => {
         () =>
           useTestHarnessForSlashCompletion(
             true,
-            '/resume',
+            '/resume ',
             slashCommands,
             mockCommandContext,
           ),
@@ -513,23 +513,13 @@ describe('useSlashCompletion', () => {
       unmountResume();
     });
 
-    it('should show the grouped /resume menu for unique /resum prefix input', async () => {
+    it('should NOT suggest the auto-list command when typing a non-matching partial after /chat', async () => {
       const slashCommands = [
         createTestCommand({
-          name: 'resume',
-          description: 'Resume command',
-          action: vi.fn(),
+          name: 'chat',
+          description: 'Manage chat history',
           subCommands: [
-            createTestCommand({
-              name: 'list',
-              description: 'List checkpoints',
-              suggestionGroup: 'checkpoints',
-            }),
-            createTestCommand({
-              name: 'save',
-              description: 'Save checkpoint',
-              suggestionGroup: 'checkpoints',
-            }),
+            createTestCommand({ name: 'list', description: 'List chats' }),
           ],
         }),
       ];
@@ -537,7 +527,7 @@ describe('useSlashCompletion', () => {
       const { result, unmount } = await renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/resum',
+          '/chat x', // 'x' does not match 'list'
           slashCommands,
           mockCommandContext,
         ),
@@ -546,17 +536,44 @@ describe('useSlashCompletion', () => {
       await resolveMatch();
 
       await waitFor(() => {
-        expect(result.current.suggestions[0]).toMatchObject({
-          label: 'list',
-          sectionTitle: 'auto',
-          submitValue: '/resume',
-        });
-        expect(result.current.isPerfectMatch).toBe(false);
-        expect(result.current.suggestions.slice(1).map((s) => s.label)).toEqual(
-          expect.arrayContaining(['list', 'save']),
+        // It should NOT have the 'auto' section 'list' suggestion
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
         );
+        expect(autoSuggestion).toBeUndefined();
       });
+      unmount();
+    });
 
+    it('should STILL suggest the auto-list command when typing a matching partial after /chat', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat l', // 'l' matches 'list'
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeDefined();
+        expect(autoSuggestion?.label).toBe('list');
+      });
       unmount();
     });
 
@@ -594,7 +611,7 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
-    it('should suggest subcommands when a parent command is fully typed without a trailing space', async () => {
+    it('should suggest the command itself instead of subcommands when a parent command is fully typed without a trailing space', async () => {
       const slashCommands = [
         createTestCommand({
           name: 'chat',
@@ -618,18 +635,47 @@ describe('useSlashCompletion', () => {
       await resolveMatch();
 
       await waitFor(() => {
-        // Should show the auto-session entry plus subcommands of 'chat'
-        expect(result.current.suggestions).toHaveLength(3);
-        expect(result.current.suggestions[0]).toMatchObject({
-          label: 'list',
-          sectionTitle: 'auto',
-          submitValue: '/chat',
-        });
-        expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['list', 'save']),
-        );
-        // completionStart should be at the end of '/chat' to append subcommands
-        expect(result.current.completionStart).toBe(5);
+        // Should show 'chat' as the suggestion, NOT its subcommands
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0].label).toBe('chat');
+        // completionStart should be at 1 (to replace 'chat')
+        expect(result.current.completionStart).toBe(1);
+      });
+      unmount();
+    });
+
+    it('should NOT suggest subcommands when a parent command is fully typed without a trailing space (fix for over-eager completion)', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'stats',
+          description: 'Check session stats',
+          action: vi.fn(), // Has action
+          subCommands: [
+            createTestCommand({
+              name: 'session',
+              description: 'Show session-specific usage statistics',
+            }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stats',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // Should show 'stats' as the suggestion, NOT 'session'
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0].label).toBe('stats');
+        // isPerfectMatch should be true because it has an action
+        expect(result.current.isPerfectMatch).toBe(true);
       });
       unmount();
     });
@@ -706,6 +752,40 @@ describe('useSlashCompletion', () => {
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
         expect(result.current.suggestions[0].label).toBe('visible');
+      });
+      unmount();
+    });
+
+    it('should rank primary name prefix matches higher than alias prefix matches', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'footer',
+          altNames: ['statusline'],
+          description: 'Configure footer',
+        }),
+        createTestCommand({
+          name: 'stats',
+          altNames: ['usage'],
+          description: 'Check stats',
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stat',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // 'stats' should be first because 'stat' is a prefix match on its name
+        // while 'footer' only matches 'stat' via its alias 'statusline'
+        expect(result.current.suggestions[0].label).toBe('stats');
+        expect(result.current.suggestions[1].label).toBe('footer');
       });
       unmount();
     });

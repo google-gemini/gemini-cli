@@ -1,0 +1,359 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge Tool Output & Images 1`] = `
+{
+  "baseUnits": 787,
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "System Instructions",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Ack.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hello!",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hi, how can I help?",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Read the logs.",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "functionCall": {
+            "args": {
+              "cmd": "cat server.log",
+            },
+            "name": "run_shell_command",
+          },
+          "thoughtSignature": "skip_thought_signature_validator",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "run_shell_command",
+            "response": {
+              "output": "<tool_output_masked>
+[Tool observation string (0.02MB, 1 lines) masked to preserve context window. Full string saved to: <MOCKED_DIR>]
+</tool_output_masked>",
+            },
+          },
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "The logs are very long.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Look at this architecture diagram:",
+        },
+        {
+          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Nice diagram.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Can we refactor?",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Yes we can.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 33,
+      "tokensBeforeBackground": 33,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 68,
+      "tokensBeforeBackground": 68,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 497,
+      "tokensBeforeBackground": 20232,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 750,
+      "tokensBeforeBackground": 3554,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 787,
+      "tokensBeforeBackground": 787,
+      "turnIndex": 4,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modifications) 1`] = `
+{
+  "baseUnits": 68,
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "System Instructions",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Ack.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hello!",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hi, how can I help?",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 33,
+      "tokensBeforeBackground": 33,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 68,
+      "tokensBeforeBackground": 68,
+      "turnIndex": 1,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 3: Node Distillation of Large Historical Messages 1`] = `
+{
+  "baseUnits": 5370,
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "Mock response from: utility_compressor, for: {"text":"A...AAAAAAAA"}",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Mock response from: utility_compressor, for: {"text":"B...BBBBBBBB"}",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Mock response from: utility_compressor, for: {"text":"C...CCCCCCCC"}",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Mock response from: utility_compressor, for: {"text":"D...DDDDDDDD"}",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Mock response from: utility_compressor, for: {"text":"E...EEEEEEEE"}",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 5078,
+      "tokensBeforeBackground": 10010,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 5224,
+      "tokensBeforeBackground": 15088,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 5370,
+      "tokensBeforeBackground": 15234,
+      "turnIndex": 2,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC via State Snapshots 1`] = `
+{
+  "baseUnits": 505,
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
+        },
+        {
+          "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 ..................................................",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 410,
+      "tokensBeforeBackground": 410,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 820,
+      "tokensBeforeBackground": 820,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 1230,
+      "tokensBeforeBackground": 1230,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 1640,
+      "tokensBeforeBackground": 1640,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 2050,
+      "tokensBeforeBackground": 2050,
+      "turnIndex": 4,
+    },
+  ],
+}
+`;

@@ -31,6 +31,7 @@ import {
   createProxyAwareFetch,
   type StdioConfig,
 } from './ide-connection-utils.js';
+import { getVersion } from '../utils/version.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,14 +348,16 @@ export class IdeClient {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const parsedJson = JSON.parse(textPart.text);
-          if (parsedJson && typeof parsedJson.content === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return parsedJson.content;
+          if (parsedJson) {
+            const content: unknown = parsedJson.content;
+            if (typeof content === 'string') {
+              return content;
+            }
           }
           if (parsedJson && parsedJson.content === null) {
             return undefined;
           }
-        } catch (_e) {
+        } catch {
           logger.debug(
             `Invalid JSON in closeDiff response for ${filePath}:`,
             textPart.text,
@@ -588,8 +591,7 @@ export class IdeClient {
       logger.debug(`Server URL: ${serverUrl}`);
       this.client = new Client({
         name: 'streamable-http-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: await getVersion(),
       });
       transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
         fetch: await createProxyAwareFetch(ideServerHost),
@@ -602,7 +604,7 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch {
       if (transport) {
         try {
           await transport.close();
@@ -623,8 +625,7 @@ export class IdeClient {
       logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
         name: 'stdio-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: await getVersion(),
       });
 
       transport = new StdioClientTransport({
@@ -636,7 +637,7 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch {
       if (transport) {
         try {
           await transport.close();

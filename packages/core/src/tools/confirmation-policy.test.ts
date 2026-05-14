@@ -71,6 +71,7 @@ describe('Tool Confirmation Policy Updates', () => {
       getDisableLLMCorrection: () => true,
       getIdeMode: () => false,
       getActiveModel: () => 'test-model',
+      isPlanMode: () => false,
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
