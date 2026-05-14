@@ -183,9 +183,9 @@ const resumeCheckpointCommand: SlashCommand = {
     const config = context.services.agentContext?.config;
     await logger.initialize();
     const checkpoint = await logger.loadCheckpoint(tag);
-    const conversation = checkpoint.history;
+    const conversation = checkpoint.history ?? [];
 
-    if (conversation.length === 0) {
+    if (conversation.length === 0 && !checkpoint.messages) {
       return {
         type: 'message',
         messageType: 'info',
@@ -233,6 +233,8 @@ const resumeCheckpointCommand: SlashCommand = {
       type: 'load_history',
       history: uiHistory,
       clientHistory: conversation,
+      messages: checkpoint.messages,
+      version: checkpoint.version,
     };
   },
   completion: async (context, partialArg) => {

@@ -546,6 +546,33 @@ describe('Logger', () => {
       expect(loaded).toEqual({ history: conversation, messages: [] });
     });
 
+    it('should load a version 2.0 checkpoint and reconstruct history', async () => {
+      const tag = 'v2-tag';
+      const v2Checkpoint = {
+        version: '2.0',
+        history: [{ role: 'user', parts: [{ text: 'preserved' }] }],
+        messages: [
+          {
+            id: '1',
+            type: 'user',
+            content: 'hello',
+            timestamp: '2025-01-01T12:00:00.000Z',
+          },
+        ],
+      };
+      const taggedFilePath = path.join(
+        TEST_GEMINI_DIR,
+        'checkpoint-v2-tag.json',
+      );
+      await fs.writeFile(taggedFilePath, JSON.stringify(v2Checkpoint, null, 2));
+
+      const loaded = await logger.loadCheckpoint(tag);
+      expect(loaded.messages).toEqual(v2Checkpoint.messages);
+      expect(loaded.history).toEqual([
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ]);
+    });
+
     it('should return an empty message list if a tagged checkpoint file does not exist', async () => {
       const loaded = await logger.loadCheckpoint('nonexistent-tag');
       expect(loaded).toEqual({ history: [], messages: [] });

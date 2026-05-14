@@ -11,6 +11,7 @@ import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { reconstructHistory } from '../utils/history-reconstruction.js';
 
 import {
   type ConversationRecord,
@@ -32,7 +33,11 @@ export interface LogEntry {
 }
 
 export interface Checkpoint {
-  history: readonly Content[];
+  /**
+   * The standard history array used for model requests.
+   * Only included in legacy checkpoints (pre-2.0).
+   */
+  history?: readonly Content[];
   authType?: AuthType;
   /**
    * The rich message records which are the source of truth for the session.
@@ -372,34 +377,37 @@ export class Logger {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedContent = JSON.parse(fileContent);
 
-      // Handle legacy format (just an array of Content)
       if (Array.isArray(parsedContent)) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return { history: parsedContent as Content[], messages: [] };
       }
 
-      if (
-        typeof parsedContent === 'object' &&
-        parsedContent !== null &&
-        'history' in parsedContent
-      ) {
+      if (typeof parsedContent === 'object' && parsedContent !== null) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const checkpoint = parsedContent as Checkpoint;
+        const raw = parsedContent as Record<string, unknown>;
+        if (raw['version'] === '2.0') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const msgs = (raw['messages'] as MessageRecord[]) ?? [];
+          return {
+            ...raw,
+            history: reconstructHistory(msgs),
+            messages: msgs,
+          };
+        }
         return {
-          ...checkpoint,
-          messages: checkpoint.messages ?? [],
+          ...raw,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          history: (raw['history'] as Content[]) ?? [],
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          messages: (raw['messages'] as MessageRecord[]) ?? [],
         };
       }
 
-      debugLogger.warn(
-        `Checkpoint file at ${path} has an unknown format. Returning empty checkpoint.`,
-      );
       return { history: [], messages: [] };
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
-        // This is okay, it just means the checkpoint doesn't exist in either format.
         return { history: [], messages: [] };
       }
       debugLogger.error(
