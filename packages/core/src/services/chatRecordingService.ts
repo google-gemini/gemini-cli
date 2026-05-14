@@ -164,7 +164,14 @@ export async function loadConversationRecord(
         };
 
         const getLastMatch = (str: string, reg: RegExp) => {
-          const matches = Array.from(str.matchAll(new RegExp(reg.source, 'g')));
+          const matches = Array.from(
+            str.matchAll(
+              new RegExp(
+                reg.source,
+                reg.flags.includes('g') ? reg.flags : reg.flags + 'g',
+              ),
+            ),
+          );
           return matches.length > 0
             ? matches[matches.length - 1][1]
             : undefined;
@@ -205,7 +212,7 @@ export async function loadConversationRecord(
 
         const lastUpdated =
           getLastMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
-          getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
+          getLastMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
           filenameTimestamp;
 
         const isJsonl = filePath.endsWith('.jsonl');
@@ -216,7 +223,7 @@ export async function loadConversationRecord(
             tailStr,
             /"\$set"\s*:\s*\{.*?"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||
-          getMatch(
+          getLastMatch(
             headStr,
             /"\$set"\s*:\s*\{.*?"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||

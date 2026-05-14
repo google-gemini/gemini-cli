@@ -320,7 +320,7 @@ export const getAllSessionFiles = async (
           }
         } catch {
           // Fallback to individual counting if bulk fails
-          const CONCURRENT_LIMIT = 100;
+          const CONCURRENT_LIMIT = 20;
           for (let i = 0; i < sessionFiles.length; i += CONCURRENT_LIMIT) {
             const batch = sessionFiles.slice(i, i + CONCURRENT_LIMIT);
             const batchPromises = batch.map((f) =>
