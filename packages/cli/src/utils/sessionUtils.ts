@@ -360,10 +360,7 @@ export const getAllSessionFiles = async (
             const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
             const startTime = content.startTime || fallbackTimestamp;
 
-            const lastUpdated =
-              !options.includeFullContent && fileTimestamp
-                ? fileTimestamp
-                : content.lastUpdated || fallbackTimestamp;
+            const lastUpdated = content.lastUpdated || fallbackTimestamp;
 
             if (!content.hasUserOrAssistantMessage) {
               return { fileName: file, sessionInfo: null };
