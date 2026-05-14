@@ -393,12 +393,12 @@ export async function loadConversationRecord(
           } else if (line.includes('"id"') && line.includes('"type"')) {
             if (isTrackingMemoryScratchpadFreshness)
               memoryScratchpadIsStale = true;
-            const idMatch = line.match(/"id"\s*:\s*"([^"]+)"/);
+            const idMatch = line.match(/(?:^|\{|,)\s*"id"\s*:\s*"((?:[^"\\]|\\.)*)"/);
             if (idMatch) {
               const id = idMatch[1];
-              const isUser = /"type"\s*:\s*"user"/.test(line);
-              const isUserOrAssistant =
-                isUser || /"type"\s*:\s*"gemini"/.test(line);
+              const typeMatch = line.match(/(?:^|\{|,)\s*"type"\s*:\s*"(user|gemini)"/);
+              const isUser = typeMatch?.[1] === 'user';
+              const isUserOrAssistant = !!typeMatch;
               messageIds.push(id);
               messageKinds.set(id, { isUser, isUserOrAssistant });
               if (!firstUserMessageStr && isUser) {
