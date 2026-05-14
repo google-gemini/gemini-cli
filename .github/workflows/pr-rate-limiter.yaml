@@ -18,6 +18,7 @@ jobs:
       pull-requests: 'write'
     steps:
       - name: 'Limit open pull requests per user'
+        if: "github.actor != 'gemini-cli[bot]' && github.actor != 'gemini-cli-robot'"
         uses: 'Homebrew/actions/limit-pull-requests@9ceb7934560eb61d131dde205a6c2d77b2e1529d' # master
         with:
           except-author-associations: 'MEMBER,OWNER,COLLABORATOR'
