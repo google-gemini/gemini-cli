@@ -84,7 +84,19 @@ export async function deleteSessionArtifactsAsync(
     // a crafted session file from causing one of the project's top-level
     // temp directories to be deleted. Case-insensitive because macOS and
     // Windows resolve `Chats` and `chats` to the same path.
-    if (!RESERVED_SESSION_DIR_NAMES.has(safeSessionId.toLowerCase())) {
+    //
+    // `safeSessionId` should never contain path separators (sanitizeFilenamePart
+    // replaces every non-`[a-zA-Z0-9_-]` character with `_`), but we re-assert
+    // it here so this deletion path is internally defended against future
+    // changes to the sanitizer.
+    const hasSeparator =
+      safeSessionId.includes(path.sep) ||
+      safeSessionId.includes('/') ||
+      safeSessionId.includes('\\');
+    if (
+      !hasSeparator &&
+      !RESERVED_SESSION_DIR_NAMES.has(safeSessionId.toLowerCase())
+    ) {
       const sessionDir = path.join(tempDir, safeSessionId);
       await fs
         .rm(sessionDir, { recursive: true, force: true })
