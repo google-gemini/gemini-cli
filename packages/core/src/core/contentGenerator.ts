@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
+import {
   EmbedContentResponse,
   GoogleGenAI,
   type Content,
