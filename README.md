@@ -16,6 +16,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 🚀 Why Gemini CLI?
 
+- **✨ Gemini 1.5 Flash**: Access to our fastest and most efficient multimodal model.
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
   account.
 - **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
