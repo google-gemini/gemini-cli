@@ -15,7 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import { resolveToRealPath } from './paths.js';
+
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
   MAX_LINE_LENGTH_TEXT_FILE,
@@ -351,10 +351,9 @@ export async function isEmpty(filePath: string): Promise<boolean> {
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
-    const resolvedPath = resolveToRealPath(filePath);
-    const stats = await fsPromises.stat(resolvedPath);
-    if (stats.isDirectory()) return false;
-    return await isBinaryFileCheck(resolvedPath, stats.size);
+    const stats = await fsPromises.stat(filePath);
+    if (!stats.isFile()) return false;
+    return await isBinaryFileCheck(filePath, stats.size);
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
