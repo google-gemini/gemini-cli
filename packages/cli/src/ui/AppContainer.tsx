@@ -1835,16 +1835,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (
         keyMatchers[Command.QUIT](key) &&
-        keyMatchers[Command.CLEAR_INPUT](key) &&
         isInputActive &&
         streamingState === StreamingState.Idle &&
-        buffer.text.length > 0
+        bufferRef.current.text.length > 0
       ) {
-        // Let InputPrompt handle Ctrl+C as edit.clear when there is text.
-        // This preserves documented behavior and allows prompt-level state
-        // (completions/history) to reset correctly.
+        // Prevent quit flow when there is text.
         resetCtrlCPress();
-        return false;
+
+        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+          // Let InputPrompt handle it as edit.clear.
+          // This preserves documented behavior and allows prompt-level state
+          // (completions/history) to reset correctly.
+          return false;
+        }
+
+        // If QUIT is not also CLEAR_INPUT, we should still clear the buffer
+        // to match user expectations for Ctrl+C (or equivalent).
+        bufferRef.current.setText('');
+        return true;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -2081,7 +2089,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       mouseMode,
       isInputActive,
       streamingState,
-      buffer,
       resetCtrlCPress,
     ],
   );
