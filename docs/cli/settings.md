@@ -40,6 +40,7 @@ they appear in the UI.
 | Enable Session Cleanup        | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                                                                                                              | `true`      |
 | Keep chat history             | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                                                                                                       | `"30d"`     |
 | Topic & Update Narration      | `general.topicUpdateNarration`     | Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.                                                                                                                                                       | `true`      |
+| Log RAG Snippets              | `general.logRagSnippets`           | Log full Code Customization (RAG) retrieved snippets to a local file for debugging.                                                                                                                                                                           | `false`     |
 
 ### Output
 

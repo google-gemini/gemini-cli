@@ -216,6 +216,13 @@
           "markdownDescription": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "logRagSnippets": {
+          "title": "Log RAG Snippets",
+          "description": "Log full Code Customization (RAG) retrieved snippets to a local file for debugging.",
+          "markdownDescription": "Log full Code Customization (RAG) retrieved snippets to a local file for debugging.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
