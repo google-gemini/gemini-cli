@@ -110,14 +110,14 @@ jobs:
           fi
 
           # Find the last successful run of this workflow
-          LAST_RUN_ID=$(gh run list --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          LAST_RUN_ID=$(gh run list -R "${{ github.repository }}" --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
 
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
 
             # Download brain memory to a temp dir so we can selectively restore only persistent state
             mkdir -p .temp_brain_data
-            gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
+            gh run download "$LAST_RUN_ID" -R "${{ github.repository }}" -n brain-data -D .temp_brain_data || echo "brain-data not found"
 
             # Restore only persistent memory files
             cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md repo-target/tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
