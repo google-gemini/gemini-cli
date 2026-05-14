@@ -6,7 +6,11 @@
 
 import { renderWithProviders as render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
-import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
+import {
+  SCROLL_TO_ITEM_END,
+  VirtualizedList,
+  type VirtualizedListRef,
+} from './VirtualizedList.js';
 import { Text, Box } from 'ink';
 import {
   createRef,
@@ -413,6 +417,118 @@ describe('<VirtualizedList />', () => {
       ref.current?.scrollTo(0);
     });
     expect(ref.current?.getScrollIndex()).toBe(90);
+
+    unmount();
+  });
+
+  it('culls the backbuffer by measured row height instead of item count', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const renderedIndices = new Set<number>();
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { unmount, waitUntilReady } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item, index }) => {
+            renderedIndices.add(index);
+            return (
+              <Box height={2}>
+                <Text>{item}</Text>
+              </Box>
+            );
+          }}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 2}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollHeight).toBe(20);
+    expect(state?.innerHeight).toBe(10);
+    expect(renderedIndices.has(90)).toBe(true);
+    expect(renderedIndices.has(85)).toBe(false);
+
+    unmount();
+  });
+
+  it('keeps keyboard scrolling in logical history coordinates after culling', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    expect(ref.current?.getScrollState().scrollTop).toBe(10);
+
+    await act(async () => {
+      ref.current?.scrollBy(-1);
+    });
+    await waitUntilReady();
+
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollTop).toBeGreaterThan(0);
+    expect(lastFrame()).not.toContain('Item 79');
+    expect(lastFrame()).not.toContain('Item 80');
+
+    unmount();
+  });
+
+  it('measures mounted zero-height items instead of keeping their estimate', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const data = ['Item 0', 'Item 1', 'pending'];
+    const { unmount, waitUntilReady } = await render(
+      <Box height={50} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={data}
+          renderItem={({ item }) =>
+            item === 'pending' ? (
+              <Box height={0} />
+            ) : (
+              <Box height={1}>
+                <Text>{item}</Text>
+              </Box>
+            )
+          }
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 10}
+          initialScrollIndex={2}
+          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    expect(ref.current?.getScrollState()).toEqual({
+      scrollTop: 0,
+      scrollHeight: 2,
+      innerHeight: 50,
+    });
 
     unmount();
   });

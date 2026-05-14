@@ -120,6 +120,25 @@ function findLastIndex<T>(
   return -1;
 }
 
+function findOffsetIndexAtOrBefore(offsets: number[], target: number): number {
+  let low = 0;
+  let high = offsets.length - 1;
+  let result = 0;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const offset = offsets[mid] ?? 0;
+    if (offset <= target) {
+      result = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return Math.min(result, Math.max(0, offsets.length - 2));
+}
+
 const extractClickableAreas = (rootNode: DOMElement): ClickableArea[] => {
   const rootBox = getBoundingBox(rootNode);
   const results: ClickableArea[] = [];
@@ -394,7 +413,7 @@ function VirtualizedList<T>(
       };
       const height = Math.round(currentHack.yogaNode?.getComputedHeight() ?? 0);
       if (
-        height > 0 &&
+        height >= 0 &&
         (state.current.measuredHeights[index] !== height ||
           state.current.measuredKeys[index] !== key)
       ) {
@@ -440,9 +459,9 @@ function VirtualizedList<T>(
           const key = target._virtualKey;
           if (typeof index === 'number' && key !== undefined) {
             const height = Math.round(entry.contentRect.height);
-            // Ignore 0 height measurements which can happen when an element is unmounting
             if (
-              height > 0 &&
+              height >= 0 &&
+              state.current.itemRefs[index] === entry.target &&
               (state.current.measuredHeights[index] !== height ||
                 state.current.measuredKeys[index] !== key)
             ) {
@@ -551,13 +570,14 @@ function VirtualizedList<T>(
 
       if (isNearBottom) {
         const scrollBottom = scrollTop + scrollableContainerHeight;
-        const index = findLastIndex(
+        const rawIndex = findLastIndex(
           offsets,
           (offset) => offset <= scrollBottom,
         );
-        if (index === -1) {
+        if (rawIndex === -1) {
           return { index: 0, offset: 0, isBottom: true };
         }
+        const index = Math.min(rawIndex, Math.max(0, offsets.length - 2));
         return {
           index,
           offset: scrollBottom - offsets[index],
@@ -565,10 +585,11 @@ function VirtualizedList<T>(
         };
       }
 
-      const index = findLastIndex(offsets, (offset) => offset <= scrollTop);
-      if (index === -1) {
+      const rawIndex = findLastIndex(offsets, (offset) => offset <= scrollTop);
+      if (rawIndex === -1) {
         return { index: 0, offset: 0 };
       }
+      const index = Math.min(rawIndex, Math.max(0, offsets.length - 2));
 
       return { index, offset: scrollTop - offsets[index] };
     },
@@ -646,24 +667,28 @@ function VirtualizedList<T>(
       ? data.length - 1
       : Math.min(data.length - 1, endIndexOffset);
 
-  const culledHeight = useMemo(() => {
+  const backbufferStartIndex = useMemo(() => {
     if (
       overflowToBackbuffer &&
       typeof maxScrollbackLength === 'number' &&
       maxScrollbackLength > 0
     ) {
-      // Keep maxScrollbackLength items before the viewport to satisfy the backbuffer budget.
-      // We use items as a proxy for lines to be robust against estimation errors.
-      // We add 1 to startIndex to account for the 1-item overscan it includes.
-      const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
-      return offsets[targetIndex] ?? 0;
+      // Cull at measured item boundaries. If the target line falls inside a
+      // tall item, keep that whole item so the backbuffer has no blank gap.
+      const targetOffset = Math.max(0, actualScrollTop - maxScrollbackLength);
+      return findOffsetIndexAtOrBefore(offsets, targetOffset);
     }
     return 0;
-  }, [overflowToBackbuffer, maxScrollbackLength, startIndex, offsets]);
+  }, [overflowToBackbuffer, maxScrollbackLength, actualScrollTop, offsets]);
 
-  const scrollTop = isStickingToBottom
+  const culledHeight =
+    overflowToBackbuffer && maxScrollbackLength > 0
+      ? (offsets[backbufferStartIndex] ?? 0)
+      : 0;
+
+  const logicalScrollTop = isStickingToBottom
     ? Number.MAX_SAFE_INTEGER
-    : actualScrollTop - culledHeight;
+    : actualScrollTop;
 
   useLayoutEffect(() => {
     if (state.current.prevDataLength === -1) {
@@ -842,15 +867,17 @@ function VirtualizedList<T>(
   const renderRangeStart = useMemo(() => {
     if (overflowToBackbuffer) {
       if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
-        // We render everything from the culledHeight boundary to ensure the
-        // backbuffer is fully populated.
-        const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
-        return targetIndex;
+        return backbufferStartIndex;
       }
       return 0;
     }
     return startIndex;
-  }, [overflowToBackbuffer, maxScrollbackLength, startIndex]);
+  }, [
+    overflowToBackbuffer,
+    maxScrollbackLength,
+    backbufferStartIndex,
+    startIndex,
+  ]);
 
   const topSpacerHeight = Math.max(0, offsets[renderRangeStart] - culledHeight);
 
@@ -1039,7 +1066,8 @@ function VirtualizedList<T>(
     toggledKeys,
   ]);
 
-  const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
+  const { getScrollTop, setPendingScrollTop } =
+    useBatchedScroll(logicalScrollTop);
 
   const { broadcast } = useMouseContext();
 
