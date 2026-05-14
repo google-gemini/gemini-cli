@@ -22,7 +22,9 @@ maintain existing PRs to reduce the repository backlog.
 
 ## Workflow
 
-1.  **Inventory & Drive PRs**: Use the `prs` skill to list all open PRs labeled `bot-fix`.
+1.  **Inventory & Drive PRs**:
+    - **ACTIVATE SKILLS**: You MUST call `activate_skill(name="memory")` and `activate_skill(name="prs")` before continuing.
+    - Use the `prs` skill to list all open PRs labeled `bot-fix`.
     - If any require attention (CI failure, requested changes), focus your entire run on resolving ONE of them.
     - Do NOT start a new issue fix if an existing PR needs work.
 2.  **Search for Candidates**: If no PRs need attention, search for `effort/small` issues: `gh issue list --label "effort/small" --limit 10 --json number,title,url`.
@@ -30,4 +32,4 @@ maintain existing PRs to reduce the repository backlog.
 3.  **Select ONE Issue** and implement a fix on a new branch.
     -   **Efficient Searching**: When searching the codebase with `grep_search`, you MUST search one top-level folder at a time (e.g. `packages/core`, `packages/cli`) to avoid timeouts. Avoid searching problematic directories with large data files like `memory-tests` and `last_brain_data` unless absolutely necessary.
 4.  **Verify**: You MUST run `timeout 10m npm run preflight` to verify. Wrapping test commands in `timeout` is mandatory to prevent hanging the CI environment if your changes introduce an infinite loop.
-5.  **Use the `prs` Skill** to stage changes and prepare the draft PR (labels: `bot-fix`, `issue-fixer`).
+5.  **Use the `prs` Skill** to stage changes and prepare the draft PR (labels: `bot-fix`, `issue-fixer`). Ensure you write `pr-description.md` and `pr-labels.txt` to the **workspace root**.
