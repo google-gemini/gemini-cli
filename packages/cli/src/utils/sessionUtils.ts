@@ -270,14 +270,22 @@ export const getAllSessionFiles = async (
           }
 
           // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
+          if (!content.sessionId) {
             // Missing required fields - treat as corrupted
             return { fileName: file, sessionInfo: null };
           }
+
+          const fileTimestamp =
+            !content.startTime || !content.lastUpdated
+              ? (
+                  await fs.stat(filePath).catch(() => undefined)
+                )?.mtime.toISOString()
+              : undefined;
+          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+          const startTime =
+            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const lastUpdated =
+            content.lastUpdated || content.startTime || fallbackTimestamp;
 
           // Skip sessions that only contain system messages (info, error, warning)
           if (!content.hasUserOrAssistantMessage) {
@@ -319,8 +327,8 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
+            startTime,
+            lastUpdated,
             messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
@@ -546,12 +554,17 @@ export class SessionSelector {
       if (!sessionData) {
         throw new Error('Failed to load session data');
       }
+      const normalizedSessionData = {
+        ...sessionData,
+        startTime: sessionData.startTime || sessionInfo.startTime,
+        lastUpdated: sessionData.lastUpdated || sessionInfo.lastUpdated,
+      };
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,
-        sessionData,
+        sessionData: normalizedSessionData,
         displayInfo,
       };
     } catch (error) {

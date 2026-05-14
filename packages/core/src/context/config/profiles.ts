@@ -139,6 +139,8 @@ export const generalistProfile: ContextProfile = {
             env,
             resolveProcessorOptions(config, 'StateSnapshotSync', {
               target: 'max',
+              maxStateTokens: 4000,
+              maxSummaryTurns: 5,
             }),
           ),
         ],
@@ -157,6 +159,8 @@ export const generalistProfile: ContextProfile = {
           env,
           resolveProcessorOptions(config, 'StateSnapshotAsync', {
             type: 'accumulate',
+            maxStateTokens: 4000,
+            maxSummaryTurns: 5,
           }),
         ),
       ],

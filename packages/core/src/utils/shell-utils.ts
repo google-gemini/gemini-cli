@@ -695,9 +695,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':

@@ -84,8 +84,8 @@
     <text x="711" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="308" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="308" fill="#ffffff" textLength="180" lengthAdjust="spacingAndGlyphs"> Allow execution of </text>
-    <text x="189" y="308" fill="#ffffaf" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">[echo]</text>
-    <text x="243" y="308" fill="#ffffff" textLength="468" lengthAdjust="spacingAndGlyphs">?                                                   </text>
+    <text x="189" y="308" fill="#ffffaf" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">[Shell]</text>
+    <text x="252" y="308" fill="#ffffff" textLength="459" lengthAdjust="spacingAndGlyphs">?                                                  </text>
     <text x="711" y="308" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="711" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

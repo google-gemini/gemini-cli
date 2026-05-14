@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { MessageType, type HistoryItem } from '../types.js';
@@ -195,6 +196,25 @@ describe('<HistoryItemDisplay />', () => {
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');
+    unmount();
+  });
+
+  it('renders ExportSessionMessage for "export_session" type', async () => {
+    const testPath = path.join(path.sep, 'test', 'path.json');
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'export_session',
+      exportSession: {
+        isPending: false,
+        targetPath: testPath,
+      },
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain(
+      `Successfully exported session to ${testPath}`,
+    );
     unmount();
   });
 

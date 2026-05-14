@@ -15,10 +15,7 @@ import {
   type CommandContext,
 } from './types.js';
 import { MessageType, type HistoryItem } from '../types.js';
-import {
-  refreshServerHierarchicalMemory,
-  type Config,
-} from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import {
   expandHomeDir,
   getDirectorySuggestions,
@@ -47,7 +44,7 @@ async function finishAddingDirectories(
   if (added.length > 0) {
     try {
       if (config.shouldLoadMemoryFromIncludeDirectories()) {
-        await refreshServerHierarchicalMemory(config);
+        await config.getMemoryContextManager()?.refresh();
       }
       addItem({
         type: MessageType.INFO,

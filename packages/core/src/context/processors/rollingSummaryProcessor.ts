@@ -18,6 +18,7 @@ import {
 } from '../graph/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
+import { formatNodesForLlm } from '../utils/formatNodesForLlm.js';
 
 export interface RollingSummaryProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
@@ -47,19 +48,7 @@ export function createRollingSummaryProcessor(
   const generateRollingSummary = async (
     nodes: ConcreteNode[],
   ): Promise<string> => {
-    let transcript = '';
-    for (const node of nodes) {
-      const payload = node.payload;
-      let nodeContent = '';
-      if (payload.text) {
-        nodeContent = payload.text;
-      } else if (payload.functionCall) {
-        nodeContent = `CALL: ${payload.functionCall.name}(${JSON.stringify(payload.functionCall.args)})`;
-      } else if (payload.functionResponse) {
-        nodeContent = `RESPONSE: ${JSON.stringify(payload.functionResponse.response)}`;
-      }
-      transcript += `[${node.type}]: ${nodeContent}\n`;
-    }
+    const transcript = formatNodesForLlm(nodes);
 
     const systemPrompt =
       options.systemInstruction ??
