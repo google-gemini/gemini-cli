@@ -352,7 +352,6 @@ describe('useGeminiStream', () => {
     isInteractive: () => false,
     getExperiments: () => {},
     getMaxSessionTurns: vi.fn(() => 100),
-    isJitContextEnabled: vi.fn(() => false),
     getGlobalMemory: vi.fn(() => ''),
     getUserMemory: vi.fn(() => ''),
     getMessageBus: vi.fn(() => mockMessageBus),
@@ -1951,23 +1950,23 @@ describe('useGeminiStream', () => {
     it('should schedule a tool call when the command processor returns a schedule_tool action', async () => {
       const clientToolRequest: SlashCommandProcessorResult = {
         type: 'schedule_tool',
-        toolName: 'save_memory',
-        toolArgs: { fact: 'test fact' },
+        toolName: 'activate_skill',
+        toolArgs: { name: 'test-skill' },
       };
       mockHandleSlashCommand.mockResolvedValue(clientToolRequest);
 
       const { result } = await renderTestHook();
 
       await act(async () => {
-        await result.current.submitQuery('/memory add "test fact"');
+        await result.current.submitQuery('/memory show');
       });
 
       await waitFor(() => {
         expect(mockScheduleToolCalls).toHaveBeenCalledWith(
           [
             expect.objectContaining({
-              name: 'save_memory',
-              args: { fact: 'test fact' },
+              name: 'activate_skill',
+              args: { name: 'test-skill' },
               isClientInitiated: true,
             }),
           ],
@@ -2195,25 +2194,25 @@ describe('useGeminiStream', () => {
       });
     });
 
-    it('should NOT record other client-initiated tool calls (like save_memory) in history', async () => {
+    it('should NOT record other client-initiated tool calls in history', async () => {
       const { result, client: mockGeminiClient } = await renderTestHook();
 
       mockHandleSlashCommand.mockResolvedValue({
         type: 'schedule_tool',
-        toolName: 'save_memory',
-        toolArgs: { fact: 'test fact' },
+        toolName: 'write_todos',
+        toolArgs: { todos: [] },
       });
 
       await act(async () => {
-        await result.current.submitQuery('/memory add "test fact"');
+        await result.current.submitQuery('/todos');
       });
 
       // Simulate tool completion
       const completedTool = {
         request: {
           callId: 'test-call-id',
-          name: 'save_memory',
-          args: { fact: 'test fact' },
+          name: 'write_todos',
+          args: { todos: [] },
           isClientInitiated: true,
         },
         status: CoreToolCallStatus.Success,
@@ -2227,7 +2226,7 @@ describe('useGeminiStream', () => {
           responseParts: [
             {
               functionResponse: {
-                name: 'save_memory',
+                name: 'write_todos',
                 response: { success: true },
               },
             },
@@ -2243,91 +2242,6 @@ describe('useGeminiStream', () => {
 
       // Verify that addHistory was NOT called
       expect(mockGeminiClient.addHistory).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Memory Refresh on save_memory', () => {
-    it('should call performMemoryRefresh when a save_memory tool call completes successfully', async () => {
-      const mockPerformMemoryRefresh = vi.fn();
-      const completedToolCall: TrackedCompletedToolCall = {
-        request: {
-          callId: 'save-mem-call-1',
-          name: 'save_memory',
-          args: { fact: 'test' },
-          isClientInitiated: true,
-          prompt_id: 'prompt-id-6',
-        },
-        status: CoreToolCallStatus.Success,
-        responseSubmittedToGemini: false,
-        response: {
-          callId: 'save-mem-call-1',
-          responseParts: [{ text: 'Memory saved' }],
-          resultDisplay: 'Success: Memory saved',
-          error: undefined,
-          errorType: undefined, // FIX: Added missing property
-        },
-        tool: {
-          name: 'save_memory',
-          displayName: 'save_memory',
-          description: 'Saves memory',
-          build: vi.fn(),
-        } as unknown as AnyDeclarativeTool,
-        invocation: {
-          getDescription: () => `Mock description`,
-        } as unknown as AnyToolInvocation,
-      };
-
-      // Capture the onComplete callback
-      let capturedOnComplete:
-        | ((completedTools: TrackedToolCall[]) => Promise<void>)
-        | null = null;
-
-      mockUseToolScheduler.mockImplementation((onComplete) => {
-        capturedOnComplete = onComplete;
-        return [
-          [],
-          mockScheduleToolCalls,
-          mockMarkToolsAsSubmitted,
-          vi.fn(),
-          mockCancelAllToolCalls,
-          0,
-        ];
-      });
-
-      await renderHookWithProviders(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          mockPerformMemoryRefresh,
-          false,
-          () => {},
-          () => {},
-          () => {},
-          80,
-          24,
-        ),
-      );
-
-      // Trigger the onComplete callback with the completed save_memory tool
-      await act(async () => {
-        if (capturedOnComplete) {
-          // Wait a tick for refs to be set up
-          await new Promise((resolve) => setTimeout(resolve, 0));
-          await capturedOnComplete([completedToolCall]);
-        }
-      });
-
-      await waitFor(() => {
-        expect(mockPerformMemoryRefresh).toHaveBeenCalledTimes(1);
-      });
     });
   });
 

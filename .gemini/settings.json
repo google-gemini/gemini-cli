@@ -3,7 +3,6 @@
     "extensionReloading": true,
     "modelSteering": true,
     "autoMemory": true,
-    "memoryManager": true,
     "topicUpdateNarration": true,
     "voiceMode": true,
     "adk": {

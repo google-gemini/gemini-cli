@@ -29,6 +29,9 @@ describe('Auto Routing Fallback Integration', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.spyOn(Config.prototype, 'getHasAccessToPreviewModel').mockReturnValue(
+      true,
+    );
 
     // Mock fs to avoid real file system access
     vi.mocked(fs.existsSync).mockReturnValue(true);
