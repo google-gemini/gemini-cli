@@ -6,7 +6,6 @@
 
 import React from 'react';
 import {
-  addMemory,
   type Config,
   listMemoryFiles,
   refreshMemory,
@@ -38,30 +37,6 @@ const showSubCommand: SlashCommand = {
       },
       Date.now(),
     );
-  },
-};
-
-const addSubCommand: SlashCommand = {
-  name: 'add',
-  description: 'Add content to the memory',
-  kind: CommandKind.BUILT_IN,
-  autoExecute: false,
-  action: (context, args): SlashCommandActionReturn | void => {
-    const result = addMemory(args);
-
-    if (result.type === 'message') {
-      return result;
-    }
-
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Attempting to save to memory: "${args.trim()}"`,
-      },
-      Date.now(),
-    );
-
-    return result;
   },
 };
 
@@ -170,14 +145,9 @@ const inboxSubCommand: SlashCommand = {
   },
 };
 
-export const memoryCommand = (config: Config | null): SlashCommand => {
-  // The `add` subcommand depends on the `save_memory` tool, which is not
-  // registered when Memory v2 is enabled. Omit it in that case.
-  const isMemoryV2 = config?.isMemoryV2Enabled() ?? false;
-
+export const memoryCommand = (_config: Config | null): SlashCommand => {
   const subCommands: SlashCommand[] = [
     showSubCommand,
-    ...(isMemoryV2 ? [] : [addSubCommand]),
     reloadSubCommand,
     listSubCommand,
     inboxSubCommand,
