@@ -1,25 +1,22 @@
-# Memory tool (`save_memory`)
+# Memory files
 
-The `save_memory` tool allows the Gemini agent to persist specific facts, user
-preferences, and project details across sessions.
+Gemini CLI persists durable facts, user preferences, and project details by
+editing Markdown memory files directly.
 
 ## Technical reference
 
-This tool appends information to the `## Gemini Added Memories` section of your
-global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
-
-### Arguments
-
-- `fact` (string, required): A clear, self-contained statement in natural
-  language.
+The agent routes memories to the appropriate Markdown file: shared project
+instructions go in repository `GEMINI.md` files, private project notes go in the
+per-project private memory folder, and cross-project personal preferences go in
+the global `~/.gemini/GEMINI.md` file.
 
 ## Technical behavior
 
-- **Storage:** Appends to the global context file in the user's home directory.
+- **Storage:** Edits Markdown files with `write_file` or `replace`.
 - **Loading:** The stored facts are automatically included in the hierarchical
   context system for all future sessions.
-- **Format:** Saves data as a bulleted list item within a dedicated Markdown
-  section.
+- **Format:** Keeps durable instructions concise and avoids duplicating the same
+  fact across multiple memory tiers.
 
 ## Use cases
 
