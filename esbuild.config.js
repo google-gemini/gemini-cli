@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
 
-function createWasmPlugins() {
+export function createWasmPlugins() {
   const wasmBinaryPlugin = {
     name: 'wasm-binary',
     setup(build) {
@@ -54,7 +54,7 @@ function createWasmPlugins() {
   return [wasmBinaryPlugin, wasmLoader({ mode: 'embedded' })];
 }
 
-const external = [
+export const external = [
   '@lydell/node-pty',
   'node-pty',
   '@lydell/node-pty-darwin-arm64',
@@ -66,7 +66,7 @@ const external = [
   '@google/gemini-cli-devtools',
 ];
 
-const baseConfig = {
+export const baseConfig = {
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -75,7 +75,7 @@ const baseConfig = {
   write: true,
 };
 
-const commonAliases = {
+export const commonAliases = {
   punycode: 'punycode/',
 };
 
