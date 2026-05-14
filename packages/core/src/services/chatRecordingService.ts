@@ -403,10 +403,7 @@ export class ChatRecordingService {
         if (this.kind === 'subagent') {
           filename = `${safeSessionId}.jsonl`;
         } else {
-          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId.slice(
-            0,
-            8,
-          )}.jsonl`;
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId}.jsonl`;
         }
         this.conversationFile = path.join(chatsDir, filename);
 
@@ -684,7 +681,7 @@ export class ChatRecordingService {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
-      const shortId = this.deriveShortId(sessionIdOrBasename);
+      const searchId = this.deriveSessionIdForSearch(sessionIdOrBasename);
 
       // Using stat instead of existsSync for async sanity
       if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
@@ -693,7 +690,7 @@ export class ChatRecordingService {
 
       const matchingFiles = await this.getMatchingSessionFiles(
         chatsDir,
-        shortId,
+        searchId,
       );
       for (const file of matchingFiles) {
         await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
@@ -704,34 +701,32 @@ export class ChatRecordingService {
     }
   }
 
-  private deriveShortId(sessionIdOrBasename: string): string {
-    let shortId = sessionIdOrBasename;
+  private deriveSessionIdForSearch(sessionIdOrBasename: string): string {
+    let searchId = sessionIdOrBasename;
     if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
       const withoutExt = sessionIdOrBasename.replace(/\.jsonl?$/, '');
       const parts = withoutExt.split('-');
-      shortId = parts[parts.length - 1];
+      searchId = parts[parts.length - 1];
     } else if (sessionIdOrBasename.length >= 8) {
-      shortId = sessionIdOrBasename.slice(0, 8);
+      // For UUIDs or other long IDs, we keep the whole thing if it's longer than 8,
+      // or at least what was provided.
+      searchId = sessionIdOrBasename;
     } else {
       throw new Error('Invalid sessionId or basename provided for deletion');
     }
 
-    if (shortId.length !== 8) {
-      throw new Error('Derived shortId must be exactly 8 characters');
-    }
-
-    return shortId;
+    return searchId;
   }
 
   private async getMatchingSessionFiles(
     chatsDir: string,
-    shortId: string,
+    searchId: string,
   ): Promise<string[]> {
     const files = await fs.promises.readdir(chatsDir);
     return files.filter(
       (f) =>
         f.startsWith(SESSION_FILE_PREFIX) &&
-        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+        (f.endsWith(`-${searchId}.json`) || f.endsWith(`-${searchId}.jsonl`)),
     );
   }
 

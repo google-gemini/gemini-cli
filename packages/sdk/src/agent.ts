@@ -83,14 +83,16 @@ export class GeminiCliAgent {
     }
 
     const truncatedId = sessionId.slice(0, 8);
-    // Optimization: filenames include first 8 chars of sessionId.
-    // Filter sessions that might match.
-    const candidates = sessions.filter((s) => s.filePath.includes(truncatedId));
+    // Optimization: filenames include the sessionId (or at least the first 8 chars).
+    // Try full sessionId first for better precision.
+    let candidates = sessions.filter((s) => s.filePath.includes(sessionId));
 
-    // If optimization fails (e.g. old files), check all?
-    // Assuming filenames always follow convention if created by this tool.
-    // But we can fallback to checking all if needed, but let's stick to candidates first.
-    // If candidates is empty, maybe fallback to all.
+    // Fallback: Try truncated sessionId (8 chars) for older sessions
+    if (candidates.length === 0) {
+      candidates = sessions.filter((s) => s.filePath.includes(truncatedId));
+    }
+
+    // If still no candidates, or if we want to be absolutely sure, we fallback to all
     const filesToCheck = candidates.length > 0 ? candidates : sessions;
 
     for (const sessionFile of filesToCheck) {
