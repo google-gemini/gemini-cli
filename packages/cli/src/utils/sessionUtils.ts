@@ -14,7 +14,8 @@ import {
   type MessageRecord,
   loadConversationRecord,
 } from '@google/gemini-cli-core';
-import * as fs from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
+import * as fs from 'node:fs';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
@@ -249,7 +250,7 @@ export const getAllSessionFiles = async (
   options: GetSessionOptions = {},
 ): Promise<SessionFileEntry[]> => {
   try {
-    const files = await fs.readdir(chatsDir);
+    const files = await fsPromises.readdir(chatsDir);
     const sessionFiles = files
       .filter(
         (f) =>
@@ -264,7 +265,12 @@ export const getAllSessionFiles = async (
 
     const getBulkLineCounts = async (): Promise<Map<string, number>> => {
       const lineCounts = new Map<string, number>();
-      if (!options.includeFullContent && process.platform !== 'win32') {
+      if (options.includeFullContent || sessionFiles.length === 0) {
+        return lineCounts;
+      }
+
+      if (process.platform !== 'win32') {
+        // POSIX FAST PATH: Use native wc -l for maximum speed
         try {
           const { execFile } = await import('node:child_process');
           const { promisify } = await import('node:util');
@@ -287,8 +293,33 @@ export const getAllSessionFiles = async (
             }
           }
         } catch {
-          // Fallback handled by individual loadConversationRecord if needed
+          /* Fallback to individual counting if bulk fails */
         }
+      } else {
+        // WINDOWS FALLBACK: Parallelized Node.js buffer scanning
+        const countLines = async (filePath: string): Promise<number> => new Promise((resolve) => {
+            try {
+              let lines = 0;
+              const stream = fs.createReadStream(filePath);
+              stream.on('data', (chunk: Buffer | string) => {
+                const buffer = Buffer.isBuffer(chunk)
+                  ? chunk
+                  : Buffer.from(chunk);
+                for (let i = 0; i < buffer.length; i++) {
+                  if (buffer[i] === 10) lines++;
+                }
+              });
+              stream.on('end', () => resolve(lines));
+              stream.on('error', () => resolve(0));
+            } catch {
+              resolve(0);
+            }
+          });
+
+        const counts = await Promise.all(
+          sessionFiles.map((f) => countLines(path.join(chatsDir, f))),
+        );
+        sessionFiles.forEach((f, i) => lineCounts.set(f, counts[i]));
       }
       return lineCounts;
     };
@@ -311,7 +342,9 @@ export const getAllSessionFiles = async (
               return { fileName: file, sessionInfo: null };
             }
 
-            const fileStat = await fs.stat(filePath).catch(() => undefined);
+            const fileStat = await fsPromises
+              .stat(filePath)
+              .catch(() => undefined);
             const fileTimestamp = fileStat?.mtime.toISOString();
             const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
             const startTime = content.startTime || fallbackTimestamp;
@@ -360,7 +393,7 @@ export const getAllSessionFiles = async (
               fileName: file,
               startTime,
               lastUpdated,
-              messageCount: 0, // Placeholder
+              messageCount: 0, // Patched below after parallel getBulkLineCounts completes
               displayName: content.summary
                 ? stripUnsafeCharacters(content.summary)
                 : firstUserMessage,
@@ -459,7 +492,7 @@ export class SessionSelector {
    */
   async sessionExists(id: string): Promise<boolean> {
     const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
-    const files = await fs.readdir(chatsDir).catch(() => []);
+    const files = await fsPromises.readdir(chatsDir).catch(() => []);
 
     // The filename format is `session-<TIMESTAMP>-<ID_SLICE(0,8)>.jsonl`
     const shortId = id.slice(0, 8);
