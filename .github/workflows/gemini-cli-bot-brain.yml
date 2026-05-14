@@ -63,20 +63,17 @@ jobs:
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
-      - name: 'Determine Checkout Ref'
-        id: 'determine_ref'
-        run: |
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-
-      - name: 'Checkout'
+      - name: 'Checkout Branch (Agent Code)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ steps.determine_ref.outputs.ref }}'
+          ref: '${{ github.ref }}'
+          path: 'agent-code'
           fetch-depth: 0
           persist-credentials: false
 
       - name: 'Get Current SHA'
         id: 'get_sha'
+        working-directory: agent-code
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: 'Setup Node.js'
@@ -86,10 +83,20 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
+        working-directory: agent-code
         run: 'npm ci'
 
       - name: 'Build Gemini CLI'
+        working-directory: agent-code
         run: 'npm run bundle'
+
+      - name: 'Checkout Main (Target Repo)'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: 'main'
+          path: 'repo-target'
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Download Previous State'
         env:
@@ -112,9 +119,9 @@ jobs:
             gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
 
             # Restore only persistent memory files
-            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
-            mkdir -p tools/gemini-cli-bot/history/
-            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv tools/gemini-cli-bot/history/ 2>/dev/null || true
+            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md repo-target/tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
+            mkdir -p repo-target/tools/gemini-cli-bot/history/
+            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv repo-target/tools/gemini-cli-bot/history/ 2>/dev/null || true
             rm -rf .temp_brain_data
           else
             echo "No previous successful run found."
@@ -124,6 +131,7 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        working-directory: agent-code
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
       - name: 'Run Brain Phases'
@@ -132,7 +140,7 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
+          GEMINI_CLI_HOME: '../agent-code/tools/gemini-cli-bot'
           ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'true' }}"
           TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
@@ -142,12 +150,13 @@ jobs:
           GEMINI_TELEMETRY_OUTFILE: 'brain-telemetry.json'
           GEMINI_DEBUG_LOG_FILE: 'brain-debug.log'
           GH_PAGER: ''
+        working-directory: repo-target
         run: |
           # Determine intent and prompt
           MANDATE_INPUT="${{ github.event.inputs.mandate || 'auto' }}"
 
           # Initialize defaults
-          PROMPT_FILE="tools/gemini-cli-bot/brain/scheduled.md"
+          PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/scheduled.md"
           MANDATE="Your specific mandate for this run: Implement surgical fixes for repository issues (issue-fixer skill)."
 
           # Resolve Mandate and Prompt File
@@ -159,11 +168,11 @@ jobs:
              MANDATE="Your specific mandate for this run: Analyze repository metrics to identify bottlenecks and self-evolve (metrics skill)."
           elif [ "$MANDATE_INPUT" = "interactive" ]; then
              echo "Trigger: Manual Override (interactive)"
-             PROMPT_FILE="tools/gemini-cli-bot/brain/interactive.md"
+             PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/interactive.md"
              MANDATE="Your specific mandate for this run: Respond to the user request in <untrusted_context>."
           elif [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
             echo "Trigger: Issue/PR Comment or Interactive Dispatch"
-            PROMPT_FILE="tools/gemini-cli-bot/brain/interactive.md"
+            PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/interactive.md"
             MANDATE="Your specific mandate for this run: Respond to the user request in <untrusted_context>."
           elif [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then
             echo "Trigger: Nightly Schedule (Metrics)"
@@ -204,7 +213,7 @@ jobs:
           cat trigger_context.md "$PROMPT_FILE" >> combined_prompt.md
           echo -e "\n\n# MANDATE FOR THIS RUN\n$MANDATE" >> combined_prompt.md
 
-          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
+          node ../agent-code/bundle/gemini.js --policy ../agent-code/tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
 
           if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
             echo "Agent failed to respond. Generating fallback error message."
@@ -252,23 +261,28 @@ jobs:
              echo "Critique did not approve. Skipping patch generation."
           fi
 
+      - name: 'Stage Artifacts'
+        if: always()
+        run: |
+          mkdir -p staged-artifacts/tools/gemini-cli-bot/history
+          cp repo-target/tools/gemini-cli-bot/lessons-learned.md staged-artifacts/tools/gemini-cli-bot/ 2>/dev/null || true
+          cp repo-target/tools/gemini-cli-bot/history/*.csv staged-artifacts/tools/gemini-cli-bot/history/ 2>/dev/null || true
+          cp repo-target/brain-telemetry.json staged-artifacts/ 2>/dev/null || true
+          cp repo-target/brain-debug.log staged-artifacts/ 2>/dev/null || true
+          cp repo-target/bot-changes.patch staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-description.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/branch-name.txt staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-comment.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-number.txt staged-artifacts/ 2>/dev/null || true
+          cp repo-target/issue-comment.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-labels.txt staged-artifacts/ 2>/dev/null || true
+
       - name: 'Archive Brain Data'
         if: always()
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'brain-data'
-          path: |
-            tools/gemini-cli-bot/lessons-learned.md
-            tools/gemini-cli-bot/history/*.csv
-            brain-telemetry.json
-            brain-debug.log
-            bot-changes.patch
-            pr-description.md
-            branch-name.txt
-            pr-comment.md
-            pr-number.txt
-            issue-comment.md
-            pr-labels.txt
+          path: staged-artifacts/
           retention-days: 90
 
   publish:
