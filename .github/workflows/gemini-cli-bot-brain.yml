@@ -81,6 +81,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: 'agent-code/package-lock.json'
 
       - name: 'Install dependencies'
         working-directory: agent-code
@@ -224,19 +225,20 @@ jobs:
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        working-directory: repo-target
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
+          GEMINI_CLI_HOME: '../agent-code/tools/gemini-cli-bot'
           GH_PAGER: ''
         run: |
           if git diff --staged --quiet; then
              echo "No changes staged. Skipping critique."
              echo "[APPROVED]" > critique_result.txt
           else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
+             node ../agent-code/bundle/gemini.js --policy ../agent-code/tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat ../agent-code/tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
 
              if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
                echo "[APPROVED]" > critique_result.txt
@@ -248,6 +250,7 @@ jobs:
 
       - name: 'Generate Patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        working-directory: repo-target
         run: |
           touch bot-changes.patch
           touch pr-description.md
