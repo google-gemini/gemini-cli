@@ -235,8 +235,8 @@ describe('AcpSessionManager', () => {
     expect(response.models?.availableModels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          modelId: 'gemini-3.1-flash-lite-preview',
-          name: 'gemini-3.1-flash-lite-preview',
+          modelId: 'gemini-3.1-flash-lite',
+          name: 'gemini-3.1-flash-lite',
         }),
       ]),
     );
