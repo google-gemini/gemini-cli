@@ -270,6 +270,27 @@ export const getAllSessionFiles = async (
         return lineCounts;
       }
 
+      const countLines = (filePath: string): Promise<number> =>
+        new Promise((resolve) => {
+          try {
+            let lines = 0;
+            const stream = fs.createReadStream(filePath);
+            stream.on('data', (chunk: Buffer | string) => {
+              const buffer = Buffer.isBuffer(chunk)
+                ? chunk
+                : Buffer.from(chunk);
+              let pos = -1;
+              while ((pos = buffer.indexOf(10, pos + 1)) !== -1) {
+                lines++;
+              }
+            });
+            stream.on('end', () => resolve(lines));
+            stream.on('error', () => resolve(0));
+          } catch {
+            resolve(0);
+          }
+        });
+
       if (process.platform !== 'win32') {
         // POSIX FAST PATH: Use native wc -l for maximum speed
         try {
@@ -298,53 +319,44 @@ export const getAllSessionFiles = async (
             }
           }
         } catch {
-          /* Fallback to individual counting if bulk fails */
+          // Fallback to individual counting if bulk fails
+          const CONCURRENT_LIMIT = 100;
+          for (let i = 0; i < sessionFiles.length; i += CONCURRENT_LIMIT) {
+            const batch = sessionFiles.slice(i, i + CONCURRENT_LIMIT);
+            const batchPromises = batch.map((f) =>
+              countLines(path.join(chatsDir, f)),
+            );
+            const batchCounts = await Promise.all(batchPromises);
+            batchCounts.forEach((count, j) => {
+              lineCounts.set(batch[j], count);
+            });
+          }
         }
       } else {
         // WINDOWS FALLBACK: Batch-limited Node.js buffer scanning to avoid FD exhaustion
-        const countLines = (filePath: string): Promise<number> =>
-          new Promise((resolve) => {
-            try {
-              let lines = 0;
-              const stream = fs.createReadStream(filePath);
-              stream.on('data', (chunk: Buffer | string) => {
-                const buffer = Buffer.isBuffer(chunk)
-                  ? chunk
-                  : Buffer.from(chunk);
-                let pos = -1;
-                while ((pos = buffer.indexOf(10, pos + 1)) !== -1) {
-                  lines++;
-                }
-              });
-              stream.on('end', () => resolve(lines));
-              stream.on('error', () => resolve(0));
-            } catch {
-              resolve(0);
-            }
-          });
-
         const CONCURRENT_LIMIT = 20;
-        const counts: number[] = sessionFiles.map(() => 0);
-
         for (let i = 0; i < sessionFiles.length; i += CONCURRENT_LIMIT) {
           const batch = sessionFiles.slice(i, i + CONCURRENT_LIMIT);
-          const batchPromises: Array<Promise<number>> = batch.map((f) =>
+          const batchPromises = batch.map((f) =>
             countLines(path.join(chatsDir, f)),
           );
-          const batchCounts: number[] = await Promise.all(batchPromises);
+          const batchCounts = await Promise.all(batchPromises);
           batchCounts.forEach((count, j) => {
-            counts[i + j] = count;
+            lineCounts.set(batch[j], count);
           });
         }
-        sessionFiles.forEach((f, i) => lineCounts.set(f, counts[i]));
       }
       return lineCounts;
     };
 
-    const [lineCounts, results] = await Promise.all([
-      getBulkLineCounts(),
-      Promise.all(
-        sessionFiles.map(async (file): Promise<SessionFileEntry> => {
+    const lineCountsPromise = getBulkLineCounts();
+    const results: SessionFileEntry[] = [];
+    const SESSION_BATCH_SIZE = 100;
+
+    for (let i = 0; i < sessionFiles.length; i += SESSION_BATCH_SIZE) {
+      const batch = sessionFiles.slice(i, i + SESSION_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (file): Promise<SessionFileEntry> => {
           const filePath = path.join(chatsDir, file);
           try {
             const content = await loadConversationRecord(filePath, {
@@ -359,14 +371,8 @@ export const getAllSessionFiles = async (
               return { fileName: file, sessionInfo: null };
             }
 
-            const fileStat = await fsPromises
-              .stat(filePath)
-              .catch(() => undefined);
-            const fileTimestamp = fileStat?.mtime.toISOString();
-            const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
-            const startTime = content.startTime || fallbackTimestamp;
-
-            const lastUpdated = content.lastUpdated || fallbackTimestamp;
+            const startTime = content.startTime;
+            const lastUpdated = content.lastUpdated;
 
             if (!content.hasUserOrAssistantMessage) {
               return { fileName: file, sessionInfo: null };
@@ -424,8 +430,11 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
         }),
-      ),
-    ]);
+      );
+      results.push(...batchResults);
+    }
+
+    const lineCounts = await lineCountsPromise;
 
     // Patch message counts
     for (const entry of results) {

@@ -1255,6 +1255,10 @@ async function parseLegacyRecordFallback(
         userMessageCount:
           legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
         messageCount: legacyRecord.messages?.length || 0,
+        hasUserOrAssistantMessage:
+          legacyRecord.messages?.some(
+            (m) => m.type === 'user' || m.type === 'gemini',
+          ) || false,
       };
     }
   } catch {
