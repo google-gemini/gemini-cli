@@ -56,6 +56,7 @@ import {
   coreEvents,
   debugLogger,
   type Config,
+  escapePath,
 } from '@google/gemini-cli-core';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import {
@@ -550,7 +551,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const relativePath = path.relative(config.getTargetDir(), imagePath);
 
           // Insert @path reference at cursor position
-          const escapedPath = relativePath.replace(/ /g, '\\ ');
+          const escapedPath = escapePath(relativePath);
           const insertText = `@${escapedPath}`;
           const currentBuffer = bufferRef.current;
           const currentText = currentBuffer.text;
@@ -833,7 +834,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   config.getTargetDir(),
                   imagePath,
                 );
-                const escapedPath = relativePath.replace(/ /g, '\\ ');
+                const escapedPath = escapePath(relativePath);
                 const insertText = `@${escapedPath}`;
                 const currentBuffer = bufferRef.current;
                 const currentText = currentBuffer.text;
