@@ -351,10 +351,10 @@ export async function isEmpty(filePath: string): Promise<boolean> {
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
-    const realPath = resolveToRealPath(filePath);
-    const stats = await fsPromises.stat(realPath);
+    const resolvedPath = resolveToRealPath(filePath);
+    const stats = await fsPromises.stat(resolvedPath);
     if (stats.isDirectory()) return false;
-    return await isBinaryFileCheck(realPath);
+    return await isBinaryFileCheck(resolvedPath, stats.size);
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
