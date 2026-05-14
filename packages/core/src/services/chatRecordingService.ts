@@ -177,9 +177,15 @@ export async function loadConversationRecord(
           /"type"\s*:\s*"(user|gemini)"/.test(tailStr);
 
         let firstUserMessage: string | undefined;
-        const userMsgMatch = headStr.match(
-          /"type"\s*:\s*"user"[^}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")/,
-        );
+        // FAST PREVIEW: Find the first line that is a 'user' message and extract its content
+        const userMsgMatch =
+          headStr.match(
+            /\{[^{}]*"type"\s*:\s*"user"[^{}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")[^{}]*\}/,
+          ) ||
+          headStr.match(
+            /\{[^{}]*"content"\s*:\s*(\[[^\]]*\]|"(?:[^"\\\\]|\\\\.)*")[^{}]*"type"\s*:\s*"user"[^{}]*\}/,
+          );
+
         if (userMsgMatch) {
           try {
             const content = JSON.parse(userMsgMatch[1]) as unknown;

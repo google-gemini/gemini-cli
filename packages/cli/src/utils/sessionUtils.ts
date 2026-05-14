@@ -296,8 +296,9 @@ export const getAllSessionFiles = async (
           /* Fallback to individual counting if bulk fails */
         }
       } else {
-        // WINDOWS FALLBACK: Parallelized Node.js buffer scanning
-        const countLines = async (filePath: string): Promise<number> => new Promise((resolve) => {
+        // WINDOWS FALLBACK: Batch-limited Node.js buffer scanning to avoid FD exhaustion
+        const countLines = (filePath: string): Promise<number> =>
+          new Promise((resolve) => {
             try {
               let lines = 0;
               const stream = fs.createReadStream(filePath);
@@ -316,9 +317,19 @@ export const getAllSessionFiles = async (
             }
           });
 
-        const counts = await Promise.all(
-          sessionFiles.map((f) => countLines(path.join(chatsDir, f))),
-        );
+        const CONCURRENT_LIMIT = 20;
+        const counts: number[] = sessionFiles.map(() => 0);
+
+        for (let i = 0; i < sessionFiles.length; i += CONCURRENT_LIMIT) {
+          const batch = sessionFiles.slice(i, i + CONCURRENT_LIMIT);
+          const batchPromises: Array<Promise<number>> = batch.map((f) =>
+            countLines(path.join(chatsDir, f)),
+          );
+          const batchCounts: number[] = await Promise.all(batchPromises);
+          batchCounts.forEach((count, j) => {
+            counts[i + j] = count;
+          });
+        }
         sessionFiles.forEach((f, i) => lineCounts.set(f, counts[i]));
       }
       return lineCounts;
