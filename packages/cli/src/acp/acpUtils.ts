@@ -19,7 +19,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  GEMINI_3_1_FLASH_LITE_MODEL,
   getDisplayString,
   AuthType,
   ToolConfirmationOutcome,
@@ -346,8 +346,8 @@ export function buildAvailableModels(
 
     if (useGemini31FlashLite) {
       previewOptions.push({
-        value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+        value: GEMINI_3_1_FLASH_LITE_MODEL,
+        title: getDisplayString(GEMINI_3_1_FLASH_LITE_MODEL),
       });
     }
 

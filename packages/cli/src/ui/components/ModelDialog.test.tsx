@@ -19,7 +19,7 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  GEMINI_3_1_FLASH_LITE_MODEL,
   AuthType,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
@@ -43,6 +43,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL: 'gemini-3.1-flash-lite-preview',
+    GEMINI_3_1_FLASH_LITE_MODEL: 'gemini-3.1-flash-lite',
   };
 });
 
@@ -155,9 +156,7 @@ describe('<ModelDialog />', () => {
 
     // Verify order: Flash Preview -> Flash Lite Preview -> Flash -> Flash Lite
     const flashPreviewIdx = output.indexOf(PREVIEW_GEMINI_FLASH_MODEL);
-    const flashLitePreviewIdx = output.indexOf(
-      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-    );
+    const flashLitePreviewIdx = output.indexOf(GEMINI_3_1_FLASH_LITE_MODEL);
     const flashIdx = output.indexOf(DEFAULT_GEMINI_FLASH_MODEL);
     const flashLiteIdx = output.indexOf(DEFAULT_GEMINI_FLASH_LITE_MODEL);
 
@@ -468,7 +467,7 @@ describe('<ModelDialog />', () => {
       await waitUntilReady();
 
       const output = lastFrame();
-      expect(output).toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
+      expect(output).toContain(GEMINI_3_1_FLASH_LITE_MODEL);
       unmount();
     });
   });

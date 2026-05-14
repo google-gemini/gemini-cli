@@ -57,6 +57,7 @@ export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL =
   'gemini-3.1-flash-lite-preview';
+export const GEMINI_3_1_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
@@ -70,6 +71,7 @@ export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  GEMINI_3_1_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -163,7 +165,7 @@ export function resolveModel(
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       resolved = useGemini3_1FlashLite
-        ? PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
+        ? GEMINI_3_1_FLASH_LITE_MODEL
         : DEFAULT_GEMINI_FLASH_LITE_MODEL;
       break;
     }
@@ -282,6 +284,8 @@ export function getDisplayString(
       return PREVIEW_GEMINI_3_1_MODEL;
     case PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL:
       return PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL;
+    case GEMINI_3_1_FLASH_LITE_MODEL:
+      return GEMINI_3_1_FLASH_LITE_MODEL;
     default:
       return model;
   }
@@ -463,7 +467,10 @@ export function isActiveModel(
   if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
     return experimentalGemma;
   }
-  if (model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL) {
+  if (
+    model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL ||
+    model === GEMINI_3_1_FLASH_LITE_MODEL
+  ) {
     return useGemini3_1FlashLite;
   }
   if (useGemini3_1) {
