@@ -14,6 +14,7 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  GEMINI_3_1_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -96,6 +97,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       PREVIEW_GEMINI_3_1_MODEL,
       PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
       PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+      GEMINI_3_1_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
     ];
     if (manualModels.includes(preferredModel)) {
@@ -281,9 +283,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
       if (useGemini31FlashLite) {
         previewOptions.push({
-          value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-          title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
-          key: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+          value: GEMINI_3_1_FLASH_LITE_MODEL,
+          title: getDisplayString(GEMINI_3_1_FLASH_LITE_MODEL),
+          key: GEMINI_3_1_FLASH_LITE_MODEL,
         });
       }
 
