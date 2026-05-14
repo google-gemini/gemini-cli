@@ -106,6 +106,18 @@ function isSessionIdRecord(record: unknown): record is { sessionId: string } {
 const sanitizeSummary = (s: string) =>
   s.replace(/\r?\n/g, ' ').replace(/[\x5b\x5d]/g, ' ');
 
+// Unescapes JSON strings extracted via regex (e.g., converting literal \n to actual newlines)
+// Only applied to strings displayed in the UI to avoid unnecessary overhead on structural IDs.
+const decodeJsonString = (s: string | undefined): string | undefined => {
+  if (!s) return undefined;
+  try {
+    const parsed = JSON.parse('"' + s + '"') as unknown;
+    return typeof parsed === 'string' ? parsed : s;
+  } catch {
+    return s;
+  }
+};
+
 export async function loadConversationRecord(
   filePath: string,
   options?: LoadConversationOptions,
@@ -235,7 +247,9 @@ export async function loadConversationRecord(
             ? getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)
             : undefined);
 
-        const summary = rawSummary ? sanitizeSummary(rawSummary) : undefined;
+        const summary = rawSummary
+          ? sanitizeSummary(decodeJsonString(rawSummary)!)
+          : undefined;
 
         const rawKind = getMatch(headStr, /"kind"\s*:\s*"([^"]+)"/);
         const kind =
@@ -310,7 +324,7 @@ export async function loadConversationRecord(
             ),
           ];
           for (const match of legacyUserMatches) {
-            const msgText = match[1];
+            const msgText = decodeJsonString(match[1]) || match[1];
             if (!fallbackFirstUserMessage) {
               fallbackFirstUserMessage = msgText;
             }
