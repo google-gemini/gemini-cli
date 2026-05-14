@@ -15,6 +15,20 @@ import { SESSION_FILE_PREFIX } from '../services/chatRecordingTypes.js';
 
 const LOGS_DIR = 'logs';
 const TOOL_OUTPUTS_DIR = 'tool-outputs';
+const CHATS_DIR = 'chats';
+
+/**
+ * Reserved directory names that must never be treated as a session id. A
+ * crafted JSONL session file whose first record had `sessionId: "chats"`
+ * (or any other reserved name) could otherwise resolve to the project's
+ * top-level chats/logs/tool-outputs directory and have it deleted by
+ * `deleteSessionArtifactsAsync`.
+ */
+const RESERVED_SESSION_DIR_NAMES: ReadonlySet<string> = new Set([
+  CHATS_DIR,
+  LOGS_DIR,
+  TOOL_OUTPUTS_DIR,
+]);
 
 function isSessionIdRecord(record: unknown): record is { sessionId: string } {
   return isStringProperty(record, 'sessionId');
@@ -65,13 +79,18 @@ export async function deleteSessionArtifactsAsync(
         if (err.code !== 'ENOENT') throw err;
       });
 
-    // Top-level session directory (e.g., tempDir/safeSessionId)
-    const sessionDir = path.join(tempDir, safeSessionId);
-    await fs
-      .rm(sessionDir, { recursive: true, force: true })
-      .catch((err: NodeJS.ErrnoException) => {
-        if (err.code !== 'ENOENT') throw err;
-      });
+    // Top-level session directory (e.g., tempDir/safeSessionId). Reserved
+    // directory names (chats, logs, tool-outputs) are skipped here to prevent
+    // a crafted session file from causing one of the project's top-level
+    // temp directories to be deleted.
+    if (!RESERVED_SESSION_DIR_NAMES.has(safeSessionId)) {
+      const sessionDir = path.join(tempDir, safeSessionId);
+      await fs
+        .rm(sessionDir, { recursive: true, force: true })
+        .catch((err: NodeJS.ErrnoException) => {
+          if (err.code !== 'ENOENT') throw err;
+        });
+    }
   } catch (error) {
     debugLogger.error(
       `Error deleting session artifacts for ${sessionId}:`,
@@ -236,10 +255,15 @@ export async function deleteSessionFileAndArtifacts(
       );
     }
   } catch (error) {
-    debugLogger.error(
-      `Error deleting artifacts for session file ${file}:`,
-      error,
-    );
+    // ENOENT here is most likely a concurrent deletion race (another caller
+    // unlinked the file between `getMatchingSessionFiles` returning it and
+    // our `fs.open`). Don't log that as an error to avoid noise.
+    if (!isNodeError(error) || error.code !== 'ENOENT') {
+      debugLogger.error(
+        `Error deleting artifacts for session file ${file}:`,
+        error,
+      );
+    }
   } finally {
     try {
       await fs.unlink(filePath);
