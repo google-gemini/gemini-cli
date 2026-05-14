@@ -394,18 +394,18 @@ const instances: InkInstance[] = [];
 export const render = async (
   tree: React.ReactElement,
   terminalWidth?: number,
+  terminalHeight?: number,
 ): Promise<
   Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
 > => {
   const cols = terminalWidth ?? 100;
   // We use 1000 rows to avoid windows with incorrect snapshots if a correct
-  // value was used (e.g. 40 rows). The alternatives to make things worse are
-  // windows unfortunately with odd duplicate content in the backbuffer
-  // which does not match actual behavior in xterm.js on windows.
-  const rows = 1000;
+  // value was used (e.g. 40 rows).
+  const rows = terminalHeight ?? 1000;
   const terminal = new Terminal({
     cols,
     rows,
+    scrollback: 10000,
     allowProposedApi: true,
     convertEol: true,
   });
@@ -627,6 +627,7 @@ export const renderWithProviders = async (
     quotaState: providedQuotaState,
     inputState: providedInputState,
     width,
+    height,
     mouseEventsEnabled = false,
     config,
     uiActions,
@@ -640,6 +641,7 @@ export const renderWithProviders = async (
     quotaState?: Partial<QuotaState>;
     inputState?: Partial<InputState>;
     width?: number;
+    height?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
@@ -813,6 +815,7 @@ export const renderWithProviders = async (
   const renderResult = await render(
     wrapWithProviders(component),
     terminalWidth,
+    height,
   );
 
   return {

@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useEffect, useId, useRef, useCallback } from 'react';
-import { Box, Text, type DOMElement } from 'ink';
+import { useEffect, useId, useCallback } from 'react';
+import { Box, Text } from 'ink';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
@@ -18,12 +18,13 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
-import { useMouseClick } from '../../hooks/useMouseClick.js';
+import { useVirtualizedListClick } from '../../hooks/useVirtualizedListClick.js';
 
 interface TopicMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   availableTerminalHeight?: number;
   isExpandable?: boolean;
+  itemKey?: string;
 }
 
 export const isTopicTool = (name: string): boolean =>
@@ -34,6 +35,7 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   args,
   availableTerminalHeight,
   isExpandable = true,
+  itemKey,
 }) => {
   const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
 
@@ -47,7 +49,6 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   const overflowActions = useOverflowActions();
   const uniqueId = useId();
   const overflowId = `topic-${uniqueId}`;
-  const containerRef = useRef<DOMElement>(null);
 
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
   const title = typeof rawTitle === 'string' ? rawTitle : undefined;
@@ -75,9 +76,14 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
     }
   }, [toggleExpansion, hasExtraSummary, callId]);
 
-  useMouseClick(containerRef, handleToggle, {
-    isActive: isExpandable && hasExtraSummary,
-  });
+  const clickableProps = useVirtualizedListClick(
+    itemKey,
+    'toggle',
+    handleToggle,
+    {
+      isActive: isExpandable && hasExtraSummary,
+    },
+  );
 
   useEffect(() => {
     // Only register if there is more content (summary) and it's currently hidden
@@ -95,7 +101,7 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   }, [isExpandable, hasExtraSummary, isExpanded, overflowActions, overflowId]);
 
   return (
-    <Box ref={containerRef} flexDirection="column" marginLeft={2}>
+    <Box ref={clickableProps.ref} flexDirection="column" marginLeft={2}>
       <Box flexDirection="row" flexWrap="wrap">
         <Text color={theme.text.primary} bold wrap="truncate-end">
           {title || 'Topic'}

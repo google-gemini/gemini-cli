@@ -205,17 +205,25 @@ export const MainContent = () => {
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
-      { type: 'header' as const },
-      ...augmentedHistory.map((data, index) => ({
+  const headerItem = useMemo(() => ({ type: 'header' as const }), []);
+
+  const historyVirtualizedItems = useMemo(
+    () =>
+      augmentedHistory.map((data, index) => ({
         type: 'history' as const,
         item: data.item,
         element: historyItems[index],
       })),
-      { type: 'pending' as const },
-    ],
     [augmentedHistory, historyItems],
+  );
+
+  const virtualizedData = useMemo(
+    () => [
+      headerItem,
+      ...historyVirtualizedItems,
+      { type: 'pending' as const, pendingHistoryItems },
+    ],
+    [headerItem, historyVirtualizedItems, pendingHistoryItems],
   );
 
   const renderItem = useCallback(

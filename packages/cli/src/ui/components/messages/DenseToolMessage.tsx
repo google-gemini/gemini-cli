@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useContext } from 'react';
+import { useMemo, useContext, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import {
   CoreToolCallStatus,
@@ -39,6 +39,7 @@ import { colorizeCode } from '../../utils/CodeColorizer.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { getFileExtension } from '../../utils/fileUtils.js';
 import { VirtualizedListContext } from '../shared/VirtualizedList.js';
+import { useVirtualizedListClick } from '../../hooks/useVirtualizedListClick.js';
 
 const PAYLOAD_MARGIN_LEFT = 6;
 const PAYLOAD_BORDER_CHROME_WIDTH = 4; // paddingX=1 (2 cols) + borders (2 cols)
@@ -47,6 +48,7 @@ const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
   itemKey?: string;
+  groupKey?: string;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -262,6 +264,7 @@ function getGenericSuccessData(
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
     itemKey,
+    groupKey,
     callId,
     name,
     status,
@@ -275,7 +278,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
-  const { isExpanded: isExpandedInContext } = useToolActions();
+  const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
   const virtualizedListContext = useContext(VirtualizedListContext);
 
   // Determine expansion state based on list context or fallback to tool actions
@@ -285,6 +288,20 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     }
     return isExpandedInContext ? isExpandedInContext(callId) : false;
   }, [itemKey, virtualizedListContext, isExpandedInContext, callId]);
+
+  const handleToggle = useCallback(() => {
+    if (itemKey && virtualizedListContext?.toggleItem) {
+      virtualizedListContext.toggleItem(itemKey);
+    } else if (toggleExpansion) {
+      toggleExpansion(callId);
+    }
+  }, [itemKey, virtualizedListContext, toggleExpansion, callId]);
+
+  const clickableProps = useVirtualizedListClick(
+    groupKey ?? itemKey,
+    `toggle-${callId}`,
+    handleToggle,
+  );
 
   // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
@@ -432,7 +449,12 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   return (
     <Box flexDirection="column">
-      <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
+      <Box
+        ref={clickableProps.ref}
+        marginLeft={2}
+        flexDirection="row"
+        flexWrap="wrap"
+      >
         <Box flexDirection="row" flexShrink={1}>
           <ToolStatusIndicator status={status} name={name} />
           <Box maxWidth={25} flexShrink={0} flexGrow={0}>
@@ -467,7 +489,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           borderColor={theme.border.default}
           borderDimColor={true}
           maxWidth={Math.min(
-            PAYLOAD_MAX_WIDTH,
+            PAYLOAD_MAX_WIDTH + PAYLOAD_BORDER_CHROME_WIDTH,
             terminalWidth - PAYLOAD_MARGIN_LEFT,
           )}
         >
@@ -478,13 +500,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
             keyExtractor={keyExtractor}
             estimatedItemHeight={() => 1}
             hasFocus={false}
-            width={Math.min(
-              PAYLOAD_MAX_WIDTH,
-              terminalWidth -
-                PAYLOAD_MARGIN_LEFT -
-                PAYLOAD_BORDER_CHROME_WIDTH -
-                PAYLOAD_SCROLL_GUTTER,
-            )}
+            width="100%"
           />
         </Box>
       )}

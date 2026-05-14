@@ -440,10 +440,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const commonProps = {
           ...tool,
           itemKey: uniqueItemKey,
+          groupKey: itemKey,
           availableTerminalHeight: availableTerminalHeightPerToolMessage,
           terminalWidth: contentWidth,
           emphasis: 'medium' as const,
-          isFirst: isCompact ? false : isFirstProp,
+          isFirst: isFirstProp,
           borderColor,
           borderDimColor,
           isExpandable,

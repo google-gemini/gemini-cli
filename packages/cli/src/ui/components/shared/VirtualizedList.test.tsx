@@ -377,6 +377,46 @@ describe('<VirtualizedList />', () => {
     unmount();
   });
 
+  it('crops the document height when maxScrollbackLength is exceeded', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { unmount, waitUntilReady } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    // Viewport height is 10.
+    // maxScrollbackLength = 10.
+    // Total expected scrollHeight = 10 + 10 = 20.
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollHeight).toBe(20);
+
+    // The top of the projected document (offset 0) should correspond to absolute offset 80.
+    // getAnchorForScrollTop(80) will return index 90 because it's near the bottom and uses a bottom anchor.
+    await act(async () => {
+      ref.current?.scrollTo(0);
+    });
+    expect(ref.current?.getScrollIndex()).toBe(90);
+
+    unmount();
+  });
+
   it('does not forget item heights when items are prepended', async () => {
     const ref = createRef<VirtualizedListRef<string>>();
     const data = ['Item 1', 'Item 2'];

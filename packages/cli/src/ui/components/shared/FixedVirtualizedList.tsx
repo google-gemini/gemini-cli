@@ -345,10 +345,6 @@ function FixedVirtualizedList<T>(
   prevScrollTop.current = rawDerivedActualScrollTop;
   prevContainerHeight.current = scrollableContainerHeight;
 
-  const scrollTop = currentIsStickingToBottom
-    ? Number.MAX_SAFE_INTEGER
-    : derivedActualScrollTop;
-
   const startIndex = Math.max(
     0,
     Math.floor(derivedActualScrollTop / itemHeight) - 1,
@@ -362,16 +358,31 @@ function FixedVirtualizedList<T>(
     Math.ceil((derivedActualScrollTop + viewHeightForEndIndex) / itemHeight),
   );
 
+  const culledHeight = useMemo(() => {
+    if (
+      overflowToBackbuffer &&
+      typeof maxScrollbackLength === 'number' &&
+      maxScrollbackLength > 0
+    ) {
+      // Keep maxScrollbackLength items before the viewport.
+      // We add 1 to startIndex to account for the 1-item overscan it includes.
+      const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
+      return targetIndex * itemHeight;
+    }
+    return 0;
+  }, [overflowToBackbuffer, maxScrollbackLength, startIndex, itemHeight]);
+
+  const scrollTop = currentIsStickingToBottom
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0, derivedActualScrollTop - culledHeight);
+
   const renderRangeStart = (() => {
     if (renderStatic) return 0;
     if (overflowToBackbuffer) {
       if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
-        const targetOffset = Math.max(
-          0,
-          derivedActualScrollTop - maxScrollbackLength,
-        );
-        const index = Math.floor(targetOffset / itemHeight);
-        return Math.max(0, index - 1);
+        // Render from the culled boundary.
+        const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
+        return targetIndex;
       }
       return 0;
     }
@@ -380,7 +391,10 @@ function FixedVirtualizedList<T>(
 
   const renderRangeEnd = renderStatic ? maxEndIndex : endIndex;
 
-  const topSpacerHeight = renderRangeStart * itemHeight;
+  const topSpacerHeight = Math.max(
+    0,
+    renderRangeStart * itemHeight - culledHeight,
+  );
   const bottomSpacerHeight = renderStatic
     ? 0
     : totalHeight - (renderRangeEnd + 1) * itemHeight;
@@ -446,7 +460,11 @@ function FixedVirtualizedList<T>(
         );
       },
       scrollTo: (offset: number) => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         if (offset >= maxScroll || offset === SCROLL_TO_ITEM_END) {
           setIsStickingToBottom(true);
           setPendingScrollTop(Number.MAX_SAFE_INTEGER);
@@ -458,7 +476,7 @@ function FixedVirtualizedList<T>(
           }
         } else {
           setIsStickingToBottom(false);
-          const newScrollTop = Math.max(0, offset);
+          const newScrollTop = Math.max(0, offset + culledHeight);
           setPendingScrollTop(newScrollTop);
           setScrollAnchor(getAnchorForScrollTop(newScrollTop));
         }
@@ -530,10 +548,17 @@ function FixedVirtualizedList<T>(
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         return {
-          scrollTop: Math.min(getScrollTop(), maxScroll),
-          scrollHeight: totalHeight,
+          scrollTop: Math.min(
+            Math.max(0, getScrollTop() - culledHeight),
+            maxScroll,
+          ),
+          scrollHeight: effectiveTotalHeight,
           innerHeight: scrollableContainerHeight,
         };
       },
@@ -547,6 +572,7 @@ function FixedVirtualizedList<T>(
       getScrollTop,
       setPendingScrollTop,
       itemHeight,
+      culledHeight,
     ],
   );
 
@@ -554,7 +580,11 @@ function FixedVirtualizedList<T>(
     <Box
       overflowY="scroll"
       overflowX="hidden"
-      scrollTop={scrollTop}
+      scrollTop={
+        isStickingToBottom
+          ? Number.MAX_SAFE_INTEGER
+          : Math.max(0, getScrollTop() - culledHeight)
+      }
       scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       backgroundColor={props.backgroundColor}
       width="100%"

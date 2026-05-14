@@ -27,6 +27,7 @@ import {
   StaticRender,
   getBoundingBox,
   getScrollTop as getInkScrollTop,
+  useApp,
 } from 'ink';
 import {
   useMouse,
@@ -38,6 +39,11 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
 
+export interface ClickableArea {
+  id: string;
+  box: { x: number; y: number; width: number; height: number };
+}
+
 export interface VirtualizedListContextValue {
   registerInteractivity: (
     itemKey: string,
@@ -47,6 +53,12 @@ export interface VirtualizedListContextValue {
   getItemState: (itemKey: string, stateKey: string) => unknown;
   isItemToggled: (itemKey: string) => boolean;
   toggleItem: (itemKey: string) => void;
+  registerClickCallback: (
+    itemKey: string,
+    areaId: string,
+    callback: () => void,
+  ) => void;
+  unregisterClickCallback: (itemKey: string, areaId: string) => void;
 }
 
 export const VirtualizedListContext =
@@ -108,6 +120,60 @@ function findLastIndex<T>(
   return -1;
 }
 
+const extractClickableAreas = (rootNode: DOMElement): ClickableArea[] => {
+  const rootBox = getBoundingBox(rootNode);
+  const results: ClickableArea[] = [];
+
+  const traverse = (current: DOMElement) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const currentHack = current as unknown as {
+      attributes?: Record<string, unknown>;
+      yogaNode?: {
+        getComputedWidth: () => number;
+        getComputedHeight: () => number;
+      };
+    };
+    const attributes = currentHack.attributes;
+
+    const clickableId =
+      attributes?.['data-clickable'] ||
+      attributes?.['id'] ||
+      attributes?.['name'] ||
+      attributes?.['clickableId'] ||
+      attributes?.['nodeType'];
+
+    if (clickableId && typeof clickableId === 'string') {
+      const childBox = getBoundingBox(current);
+
+      // If getBoundingBox returns null/0 for dimensions, try to look at internal layout if available
+      const width = childBox.width ?? currentHack.yogaNode?.getComputedWidth();
+      const height =
+        childBox.height ?? currentHack.yogaNode?.getComputedHeight();
+
+      results.push({
+        id: clickableId,
+        box: {
+          x: (childBox.x ?? 0) - (rootBox.x ?? 0),
+          y: (childBox.y ?? 0) - (rootBox.y ?? 0),
+          width: width ?? 0,
+          height: height ?? 0,
+        },
+      });
+    }
+
+    for (const child of current.childNodes || []) {
+      if (child.nodeName && child.nodeName !== '#text') {
+        // Ensure it's a DOMElement
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+        traverse(child as any as DOMElement);
+      }
+    }
+  };
+
+  traverse(rootNode);
+  return results;
+};
+
 const VirtualizedListItem = memo(
   ({
     content,
@@ -128,7 +194,14 @@ const VirtualizedListItem = memo(
     );
 
     return (
-      <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
+      <Box
+        width="100%"
+        flexDirection="column"
+        flexShrink={0}
+        ref={itemRef}
+        // @ts-expect-error custom attribute for testing
+        nodeType="item-root"
+      >
         {content}
       </Box>
     );
@@ -169,8 +242,12 @@ function VirtualizedList<T>(
     overflowToBackbuffer,
     scrollbar = true,
     stableScrollback,
-    maxScrollbackLength,
+    maxScrollbackLength: maxScrollbackLengthProp,
   } = props;
+
+  const app = useApp();
+  const maxScrollbackLength =
+    maxScrollbackLengthProp ?? app.options.maxScrollbackLength ?? 1000;
 
   const [scrollAnchor, setScrollAnchor] = useState<{
     index: number;
@@ -229,6 +306,8 @@ function VirtualizedList<T>(
   );
   const itemStates = useRef(new Map<string, Map<string, unknown>>());
   const [toggledKeys, setToggledKeys] = useState(() => new Set<string>());
+  const toggledKeysRef = useRef(toggledKeys);
+  toggledKeysRef.current = toggledKeys;
   const [temporarilyInteractiveIndexes, setTemporarilyInteractiveIndexes] =
     useState(() => new Set<number>());
   const renderedAsStatic = useRef<boolean[]>([]);
@@ -237,6 +316,11 @@ function VirtualizedList<T>(
     index: number;
     event: MouseEvent;
   } | null>(null);
+
+  const itemClickableAreas = useRef<Map<string, ClickableArea[]>>(new Map());
+  const clickCallbacks = useRef<Map<string, Map<string, () => void>>>(
+    new Map(),
+  );
 
   const virtualizedListContextValue = useMemo<VirtualizedListContextValue>(
     () => ({
@@ -265,6 +349,23 @@ function VirtualizedList<T>(
           return next;
         });
       },
+      registerClickCallback: (itemKey, areaId, callback) => {
+        let itemMap = clickCallbacks.current.get(itemKey);
+        if (!itemMap) {
+          itemMap = new Map();
+          clickCallbacks.current.set(itemKey, itemMap);
+        }
+        itemMap.set(areaId, callback);
+      },
+      unregisterClickCallback: (itemKey, areaId) => {
+        const itemMap = clickCallbacks.current.get(itemKey);
+        if (itemMap) {
+          itemMap.delete(areaId);
+          if (itemMap.size === 0) {
+            clickCallbacks.current.delete(itemKey);
+          }
+        }
+      },
     }),
     [toggledKeys],
   );
@@ -285,7 +386,13 @@ function VirtualizedList<T>(
 
   const onStaticRender = useCallback(
     (index: number, key: string, node: DOMElement) => {
-      const height = Math.round(getBoundingBox(node).height);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const currentHack = node as unknown as {
+        yogaNode?: {
+          getComputedHeight: () => number;
+        };
+      };
+      const height = Math.round(currentHack.yogaNode?.getComputedHeight() ?? 0);
       if (
         height > 0 &&
         (state.current.measuredHeights[index] !== height ||
@@ -294,6 +401,26 @@ function VirtualizedList<T>(
         state.current.measuredHeights[index] = height;
         state.current.measuredKeys[index] = key;
         setMeasurementVersion((v) => v + 1);
+      }
+
+      if (itemClickableAreas.current.has(key)) {
+        // If we already have areas for this item, don't re-extract.
+        // This is especially important for static items because children might
+        // have null dimensions in some environments (like tests) or might be
+        // cleared from the DOM after caching.
+        return;
+      }
+
+      const areas = extractClickableAreas(node);
+      if (areas.length > 0) {
+        // In some test environments, dimensions might be null/0.
+        // We only overwrite if we get valid dimensions or if we don't have areas yet.
+        const hasValidDimensions = areas.some(
+          (a) => a.box.width > 0 || a.box.height > 0,
+        );
+        if (hasValidDimensions || !itemClickableAreas.current.has(key)) {
+          itemClickableAreas.current.set(key, areas);
+        }
       }
     },
     [],
@@ -323,6 +450,14 @@ function VirtualizedList<T>(
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               state.current.measuredKeys[index] = key;
               changed = true;
+            }
+            if (height > 0) {
+              const areas = extractClickableAreas(entry.target);
+              if (areas.length > 0) {
+                itemClickableAreas.current.set(key, areas);
+              } else {
+                itemClickableAreas.current.delete(key);
+              }
             }
           }
         }
@@ -497,9 +632,38 @@ function VirtualizedList<T>(
     estimatedItemHeight,
   ]);
 
+  const startIndex = Math.max(
+    0,
+    findLastIndex(offsets, (offset) => offset <= actualScrollTop) - 1,
+  );
+  const viewHeightForEndIndex =
+    scrollableContainerHeight > 0 ? scrollableContainerHeight : 50;
+  const endIndexOffset = offsets.findIndex(
+    (offset) => offset > actualScrollTop + viewHeightForEndIndex,
+  );
+  const endIndex =
+    endIndexOffset === -1
+      ? data.length - 1
+      : Math.min(data.length - 1, endIndexOffset);
+
+  const culledHeight = useMemo(() => {
+    if (
+      overflowToBackbuffer &&
+      typeof maxScrollbackLength === 'number' &&
+      maxScrollbackLength > 0
+    ) {
+      // Keep maxScrollbackLength items before the viewport to satisfy the backbuffer budget.
+      // We use items as a proxy for lines to be robust against estimation errors.
+      // We add 1 to startIndex to account for the 1-item overscan it includes.
+      const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
+      return offsets[targetIndex] ?? 0;
+    }
+    return 0;
+  }, [overflowToBackbuffer, maxScrollbackLength, startIndex, offsets]);
+
   const scrollTop = isStickingToBottom
     ? Number.MAX_SAFE_INTEGER
-    : actualScrollTop;
+    : actualScrollTop - culledHeight;
 
   useLayoutEffect(() => {
     if (state.current.prevDataLength === -1) {
@@ -660,20 +824,6 @@ function VirtualizedList<T>(
     props.targetScrollIndex,
   ]);
 
-  const startIndex = Math.max(
-    0,
-    findLastIndex(offsets, (offset) => offset <= actualScrollTop) - 1,
-  );
-  const viewHeightForEndIndex =
-    scrollableContainerHeight > 0 ? scrollableContainerHeight : 50;
-  const endIndexOffset = offsets.findIndex(
-    (offset) => offset > actualScrollTop + viewHeightForEndIndex,
-  );
-  const endIndex =
-    endIndexOffset === -1
-      ? data.length - 1
-      : Math.min(data.length - 1, endIndexOffset);
-
   useEffect(() => {
     setTemporarilyInteractiveIndexes((prev) => {
       if (prev.size === 0) return prev;
@@ -692,25 +842,17 @@ function VirtualizedList<T>(
   const renderRangeStart = useMemo(() => {
     if (overflowToBackbuffer) {
       if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
-        const targetOffset = Math.max(0, actualScrollTop - maxScrollbackLength);
-        const index = findLastIndex(
-          offsets,
-          (offset) => offset <= targetOffset,
-        );
-        return Math.max(0, index - 1);
+        // We render everything from the culledHeight boundary to ensure the
+        // backbuffer is fully populated.
+        const targetIndex = Math.max(0, startIndex + 1 - maxScrollbackLength);
+        return targetIndex;
       }
       return 0;
     }
     return startIndex;
-  }, [
-    overflowToBackbuffer,
-    maxScrollbackLength,
-    actualScrollTop,
-    offsets,
-    startIndex,
-  ]);
+  }, [overflowToBackbuffer, maxScrollbackLength, startIndex]);
 
-  const topSpacerHeight = offsets[renderRangeStart];
+  const topSpacerHeight = Math.max(0, offsets[renderRangeStart] - culledHeight);
 
   let renderRangeEnd = endIndex;
   if (maxRenderRangeEnd.current > endIndex) {
@@ -735,8 +877,10 @@ function VirtualizedList<T>(
   }
   maxRenderRangeEnd.current = renderRangeEnd;
 
-  const bottomSpacerHeight =
-    totalHeight - (offsets[renderRangeEnd + 1] ?? totalHeight);
+  const bottomSpacerHeight = Math.max(
+    0,
+    totalHeight - (offsets[renderRangeEnd + 1] ?? totalHeight),
+  );
 
   // Always evaluate shouldBeStatic, width, etc. if we have a known width from the prop.
   // If containerHeight or containerWidth is 0 we defer rendering unless a static render or defined width overrides.
@@ -744,10 +888,23 @@ function VirtualizedList<T>(
   // BUT the initial render MUST render *something* with a width if width prop is provided to avoid layout shifts.
   // We MUST wait for containerHeight > 0 before rendering, especially if renderStatic is true.
   // If containerHeight is 0, we will misclassify items as isOutsideViewport and permanently print them to StaticRender!
+  const itemCache = useRef(
+    new Map<
+      string,
+      {
+        item: T;
+        element: React.ReactElement;
+        shouldBeStatic: boolean;
+        width: number | string | undefined;
+        containerWidth: number;
+        index: number;
+        isToggled: boolean;
+      }
+    >(),
+  );
+
   const isReady =
-    containerHeight > 0 ||
-    process.env['NODE_ENV'] === 'test' ||
-    (width !== undefined && typeof width === 'number');
+    containerHeight > 0 || (width !== undefined && typeof width === 'number');
 
   const renderedItems = useMemo(() => {
     if (!isReady) {
@@ -768,30 +925,56 @@ function VirtualizedList<T>(
         const shouldBeStatic = isStaticByDefault && !isTemporarilyInteractive;
         renderedAsStatic.current[i] = shouldBeStatic;
 
-        const content = renderItem({ item, index: i });
         const key = keyExtractor(item, i);
+        const cached = itemCache.current.get(key);
 
-        if (shouldBeStatic) {
-          items.push(
-            <StaticRender
-              key={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
-              width={typeof width === 'number' ? width : containerWidth}
-              onRender={(node: DOMElement) => onStaticRender(i, key, node)}
-            >
-              {() => content}
-            </StaticRender>,
-          );
+        const isToggled = toggledKeys.has(key);
+
+        let contentElement: React.ReactElement;
+        if (
+          cached &&
+          cached.item === item &&
+          cached.shouldBeStatic === shouldBeStatic &&
+          cached.width === width &&
+          cached.containerWidth === containerWidth &&
+          cached.index === i &&
+          cached.isToggled === isToggled
+        ) {
+          contentElement = cached.element;
         } else {
-          items.push(
-            <VirtualizedListItem
-              key={key}
-              itemKey={key}
-              content={content}
-              index={i}
-              onSetRef={onSetRef}
-            />,
-          );
+          if (shouldBeStatic) {
+            contentElement = (
+              <StaticRender
+                key={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
+                width={typeof width === 'number' ? width : containerWidth}
+                onRender={(node: DOMElement) => onStaticRender(i, key, node)}
+              >
+                {() => renderItem({ item, index: i })}
+              </StaticRender>
+            );
+          } else {
+            contentElement = (
+              <VirtualizedListItem
+                key={key}
+                itemKey={key}
+                content={renderItem({ item, index: i })}
+                index={i}
+                onSetRef={onSetRef}
+              />
+            );
+          }
+          itemCache.current.set(key, {
+            item,
+            element: contentElement,
+            shouldBeStatic,
+            width,
+            containerWidth,
+            index: i,
+            isToggled,
+          });
         }
+
+        items.push(contentElement);
 
         if (
           !renderStatic &&
@@ -811,6 +994,30 @@ function VirtualizedList<T>(
         }
       }
     }
+
+    // Cleanup cache to avoid memory leaks
+    if (
+      itemCache.current.size >
+      Math.max(100, (renderRangeEnd - renderRangeStart + 1) * 3)
+    ) {
+      const keysToKeep = new Set<string>();
+      for (
+        let i = Math.max(0, renderRangeStart - 50);
+        i <= Math.min(data.length - 1, renderRangeEnd + 50);
+        i++
+      ) {
+        const item = data[i];
+        if (item) {
+          keysToKeep.add(keyExtractor(item, i));
+        }
+      }
+      for (const key of itemCache.current.keys()) {
+        if (!keysToKeep.has(key)) {
+          itemCache.current.delete(key);
+        }
+      }
+    }
+
     return items;
   }, [
     isReady,
@@ -829,6 +1036,7 @@ function VirtualizedList<T>(
     estimatedItemHeight,
     temporarilyInteractiveIndexes,
     onStaticRender,
+    toggledKeys,
   ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
@@ -873,15 +1081,11 @@ function VirtualizedList<T>(
       ) {
         // getScrollTop() might return MAX_SAFE_INTEGER if stuck to bottom.
         // We need the true rendered layout scroll top which ink exposes directly via getScrollTop.
-        const trueScrollTop = getInkScrollTop(state.current.container);
+        const trueScrollTop =
+          getInkScrollTop(state.current.container) + culledHeight;
         const absoluteY = trueScrollTop + relativeY;
 
         const index = findLastIndex(offsets, (offset) => offset <= absoluteY);
-
-        // DEBUG LOGGING
-        debugLogger.log(
-          `[Mouse] event=${event.name} index=${index} static=${renderedAsStatic.current[index]}`,
-        );
 
         if (index !== -1) {
           const item = data[index];
@@ -889,15 +1093,76 @@ function VirtualizedList<T>(
             const itemKey = keyExtractor(item, index);
             const options = interactiveKeys.current.get(itemKey);
 
+            // Determine if the click was exactly on the first line of the item
+            const itemStartY = offsets[index] ?? 0;
+            const isFirstLineClick = isClick && absoluteY === itemStartY;
+
+            // Hit-test against explicitly defined clickable areas inside the item
+            if (isClick && itemClickableAreas.current.has(itemKey)) {
+              const mouseRelativeY = absoluteY - itemStartY;
+              const areas = itemClickableAreas.current.get(itemKey) ?? [];
+
+              for (const area of areas) {
+                if (
+                  relativeX >= area.box.x &&
+                  relativeX < area.box.x + area.box.width &&
+                  mouseRelativeY >= area.box.y &&
+                  mouseRelativeY < area.box.y + area.box.height
+                ) {
+                  debugLogger.log(
+                    `[Mouse] Clicked inside tagged area: ${area.id} in itemKey: ${itemKey}`,
+                  );
+
+                  if (renderedAsStatic.current[index]) {
+                    debugLogger.log(
+                      `[Mouse] Waking up static item index=${index} due to click on area=${area.id}`,
+                    );
+                    setTemporarilyInteractiveIndexes((prev) => {
+                      const next = new Set(prev);
+                      next.add(index);
+                      return next;
+                    });
+                    setPendingReplayEvent({ index, event });
+                    // Also toggle immediately if it was a first-line click
+                    if (isFirstLineClick) {
+                      virtualizedListContextValue.toggleItem(itemKey);
+                    }
+                    return;
+                  }
+
+                  const callback = clickCallbacks.current
+                    .get(itemKey)
+                    ?.get(area.id);
+                  if (callback) {
+                    debugLogger.log(
+                      `[Mouse] Dispatching click callback for area=${area.id} in itemKey=${itemKey}`,
+                    );
+                    callback();
+                    return;
+                  }
+
+                  break;
+                }
+              }
+            }
+
             debugLogger.log(
               `[Mouse] itemKey=${itemKey} options=${JSON.stringify(options)}`,
             );
             if (options) {
-              // Determine if the click was exactly on the first line of the item
-              const itemStartY = offsets[index];
-              const isFirstLineClick = isClick && absoluteY === itemStartY;
-
               if (isFirstLineClick && options.click) {
+                if (renderedAsStatic.current[index]) {
+                  debugLogger.log(
+                    `[Mouse] Waking up static item index=${index} due to first-line click`,
+                  );
+                  setTemporarilyInteractiveIndexes((prev) => {
+                    const next = new Set(prev);
+                    next.add(index);
+                    return next;
+                  });
+                  setPendingReplayEvent({ index, event });
+                  return;
+                }
                 debugLogger.log(
                   `[Mouse] First line click detected. Toggling itemKey=${itemKey}.`,
                 );
@@ -920,7 +1185,7 @@ function VirtualizedList<T>(
         }
       }
     },
-    [offsets, data, keyExtractor, virtualizedListContextValue],
+    [offsets, data, keyExtractor, virtualizedListContextValue, culledHeight],
   );
 
   useMouse(handleMouse, { isActive: true });
@@ -951,7 +1216,11 @@ function VirtualizedList<T>(
         );
       },
       scrollTo: (offset: number) => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         if (offset >= maxScroll || offset === SCROLL_TO_ITEM_END) {
           setIsStickingToBottom(true);
           setPendingScrollTop(Number.MAX_SAFE_INTEGER);
@@ -963,7 +1232,7 @@ function VirtualizedList<T>(
           }
         } else {
           setIsStickingToBottom(false);
-          const newScrollTop = Math.max(0, offset);
+          const newScrollTop = Math.max(0, offset + culledHeight);
           setPendingScrollTop(newScrollTop);
           setScrollAnchor(
             getAnchorForScrollTop(
@@ -1058,10 +1327,17 @@ function VirtualizedList<T>(
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         return {
-          scrollTop: Math.min(getScrollTop(), maxScroll),
-          scrollHeight: totalHeight,
+          scrollTop: Math.min(
+            Math.max(0, getScrollTop() - culledHeight),
+            maxScroll,
+          ),
+          scrollHeight: effectiveTotalHeight,
           innerHeight: scrollableContainerHeight,
         };
       },
@@ -1075,6 +1351,7 @@ function VirtualizedList<T>(
       scrollableContainerHeight,
       getScrollTop,
       setPendingScrollTop,
+      culledHeight,
     ],
   );
 
@@ -1084,7 +1361,11 @@ function VirtualizedList<T>(
         ref={containerRefCallback}
         overflowY="scroll"
         overflowX="hidden"
-        scrollTop={scrollTop}
+        scrollTop={
+          isStickingToBottom
+            ? Number.MAX_SAFE_INTEGER
+            : Math.max(0, getScrollTop() - culledHeight)
+        }
         scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
         backgroundColor={props.backgroundColor}
         width="100%"
