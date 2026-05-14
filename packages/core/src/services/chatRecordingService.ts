@@ -209,11 +209,11 @@ export async function loadConversationRecord(
         const rawSummary =
           getLastMatch(
             tailStr,
-            /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+            /"\$set"\s*:\s*\{.*?"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||
           getMatch(
             headStr,
-            /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+            /"\$set"\s*:\s*\{.*?"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
           ) ||
           getLastMatch(
             tailStr,
