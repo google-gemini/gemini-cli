@@ -440,7 +440,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       e &&
       typeof e === 'object' &&
       'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
+      (e.code === 'ENOENT' ||
+        e.code === 'EISDIR' ||
+        e.code === 'ENAMETOOLONG' ||
+        e.code === 'ENOTDIR')
     ) {
       try {
         const stat = fs.lstatSync(p);
@@ -457,7 +460,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+            (lstatError.code === 'ENOENT' ||
+              lstatError.code === 'EISDIR' ||
+              lstatError.code === 'ENAMETOOLONG' ||
+              lstatError.code === 'ENOTDIR')
           )
         ) {
           throw lstatError;
