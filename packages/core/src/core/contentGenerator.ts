@@ -338,9 +338,9 @@ export async function createContentGenerator(
         httpOptions.baseUrl = baseUrl;
       }
 
-      const proxyUrl = config.proxy;
+      const proxyUrl = config.proxy?.trim();
       const proxyAgent = proxyUrl
-        ? proxyUrl.startsWith('http://')
+        ? baseUrl?.startsWith('http://')
           ? new HttpProxyAgent(proxyUrl)
           : new HttpsProxyAgent(proxyUrl)
         : undefined;

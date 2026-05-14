@@ -462,7 +462,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should inject HttpProxyAgent into googleAuthOptions when proxy URL uses http://', async () => {
+  it('should still use HttpsProxyAgent for HTTPS destinations even when proxy URL uses http://', async () => {
     const mockConfigWithProxy = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue('http://proxy.example.com:8080'),
@@ -490,7 +490,81 @@ describe('createContentGenerator', () => {
         googleAuthOptions: {
           clientOptions: {
             transporterOptions: {
+              agent: expect.any(HttpsProxyAgent),
+            },
+          },
+        },
+      }),
+    );
+  });
+
+  it('should inject HttpProxyAgent when destination baseUrl uses http://', async () => {
+    const mockConfigWithProxy = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue('http://proxy.example.com:8080'),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator);
+
+    vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'http://localhost:9999');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        vertexai: true,
+        authType: AuthType.USE_VERTEX_AI,
+        proxy: 'http://proxy.example.com:8080',
+      },
+      mockConfigWithProxy,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googleAuthOptions: {
+          clientOptions: {
+            transporterOptions: {
               agent: expect.any(HttpProxyAgent),
+            },
+          },
+        },
+      }),
+    );
+  });
+
+  it('should trim whitespace from proxy URL before instantiating agent', async () => {
+    const mockConfigWithProxy = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue('  https://proxy.example.com:8080  '),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        vertexai: true,
+        authType: AuthType.USE_VERTEX_AI,
+        proxy: '  https://proxy.example.com:8080  ',
+      },
+      mockConfigWithProxy,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googleAuthOptions: {
+          clientOptions: {
+            transporterOptions: {
+              agent: expect.any(HttpsProxyAgent),
             },
           },
         },
