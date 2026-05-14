@@ -20,6 +20,9 @@ import {
   toAbsolutePath,
   toPathKey,
   isTrustedSystemPath,
+  isWSL,
+  resetWslCache,
+  translateWindowsPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -40,6 +43,79 @@ const mockPlatform = (platform: string) => {
     }),
   );
 };
+
+describe('translateWindowsPath', () => {
+  beforeEach(() => {
+    resetWslCache();
+  });
+
+  afterEach(() => {
+    resetWslCache();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('should detect WSL from environment variables and cache the result', () => {
+    mockPlatform('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+    expect(isWSL()).toBe(true);
+
+    vi.stubEnv('WSL_DISTRO_NAME', '');
+    expect(isWSL()).toBe(true);
+
+    resetWslCache();
+    mockPlatform('darwin');
+    expect(isWSL()).toBe(false);
+  });
+
+  it('should translate Windows drive paths when running in WSL', () => {
+    mockPlatform('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+    expect(translateWindowsPath('C:\\Users\\test\\project')).toBe(
+      '/mnt/c/Users/test/project',
+    );
+    expect(translateWindowsPath('D:/repo/src')).toBe('/mnt/d/repo/src');
+    expect(translateWindowsPath('E:')).toBe('/mnt/e/');
+    expect(translateWindowsPath('Z:\\')).toBe('/mnt/z/');
+  });
+
+  it('should preserve UNC and network paths in WSL', () => {
+    mockPlatform('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+    expect(translateWindowsPath('\\\\server\\share\\file.txt')).toBe(
+      '\\\\server\\share\\file.txt',
+    );
+    expect(translateWindowsPath('//server/share/file.txt')).toBe(
+      '//server/share/file.txt',
+    );
+  });
+
+  it('should leave paths unchanged outside WSL', () => {
+    mockPlatform('darwin');
+
+    expect(translateWindowsPath('C:\\Users\\test')).toBe('C:\\Users\\test');
+    expect(translateWindowsPath('/home/user/test')).toBe('/home/user/test');
+  });
+
+  it('should apply WSL drive translation in path helpers', () => {
+    mockPlatform('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+
+    expect(toAbsolutePath('C:\\Users\\test\\project')).toBe(
+      '/mnt/c/Users/test/project',
+    );
+    expect(normalizePath('D:/Repo/Src')).toBe('/mnt/d/Repo/Src');
+    expect(isSubpath('C:\\Users\\test', 'C:\\Users\\test\\project')).toBe(
+      true,
+    );
+    expect(resolveToRealPath('C:\\Users\\test\\missing.txt')).toBe(
+      '/mnt/c/Users/test/missing.txt',
+    );
+  });
+});
 
 describe('escapePath', () => {
   afterEach(() => vi.unstubAllGlobals());
