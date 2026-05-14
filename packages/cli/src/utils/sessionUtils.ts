@@ -13,6 +13,7 @@ import {
   type ConversationRecord,
   type MessageRecord,
   loadConversationRecord,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import * as fsPromises from 'node:fs/promises';
 import * as fs from 'node:fs';
@@ -286,9 +287,13 @@ export const getAllSessionFiles = async (
             });
             const lines = stdout.trim().split('\n');
             for (const line of lines) {
-              const parts = line.trim().split(/\s+/);
-              if (parts.length >= 2 && parts[1] !== 'total') {
-                lineCounts.set(path.basename(parts[1]), parseInt(parts[0], 10));
+              const match = line.trim().match(/^(\d+)\s+(.+)$/);
+              if (match && match[2] !== 'total') {
+                const resolvedPath = resolveToRealPath(match[2]);
+                lineCounts.set(
+                  path.basename(resolvedPath),
+                  parseInt(match[1], 10),
+                );
               }
             }
           }
