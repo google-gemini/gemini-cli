@@ -210,7 +210,7 @@ To update an extension's settings:
 gemini extensions config <name> [setting] [--scope <scope>]
 ```
 
-#### Environment Variable Sanitization
+#### Environment variable sanitization
 
 For security reasons, sensitive environment variables are filtered out and not
 passed to extensions or MCP servers by default.
