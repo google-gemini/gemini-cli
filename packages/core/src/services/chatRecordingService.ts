@@ -240,6 +240,12 @@ export async function loadConversationRecord(
         const rawKind = getMatch(headStr, /"kind"\s*:\s*"([^"]+)"/);
         const kind =
           rawKind === 'main' || rawKind === 'subagent' ? rawKind : undefined;
+
+        // Note: fastPreview checks only the head (64KB) and tail (128KB) buffers.
+        // We acknowledge the theoretical risk of a message falling in the unread gap for massive files.
+        // However, simpler truncation logic is preferred here because the potential inaccuracy is trivial
+        // compared to the overall buffer sizes. Introducing a full-file or binary search would defeat
+        // the O(1) performance benefits of this fast path.
         const hasUserOrAssistantMessage =
           /"type"\s*:\s*"(user|gemini)"/.test(headStr) ||
           /"type"\s*:\s*"(user|gemini)"/.test(tailStr);
