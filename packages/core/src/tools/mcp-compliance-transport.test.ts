@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { EventEmitter } from 'node:events';
 
