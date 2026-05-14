@@ -41,6 +41,7 @@ import {
   getAdminBlockedMcpServersMessage,
   getProjectRootForWorktree,
   isGeminiWorktree,
+  isPrivilegedApprovalModeString,
   type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
@@ -84,6 +85,7 @@ export interface CliArgs {
   worktree?: string;
 
   yolo: boolean | undefined;
+  fullAccess: boolean | undefined;
   approvalMode: string | undefined;
   policy: string[] | undefined;
   adminPolicy: string[] | undefined;
@@ -253,8 +255,15 @@ export async function parseArguments(
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
-      if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      const activeApprovalModeFlags: string[] = [];
+      if (argv['fullAccess']) activeApprovalModeFlags.push('--full-access');
+      if (argv['yolo']) activeApprovalModeFlags.push('--yolo (-y)');
+      if (argv['approvalMode']) {
+        activeApprovalModeFlags.push('--approval-mode');
+      }
+
+      if (activeApprovalModeFlags.length > 1) {
+        return `Detected multiple approval mode flags: ${activeApprovalModeFlags.join(', ')}. Please use only one.`;
       }
 
       const outputFormat = argv['outputFormat'];
@@ -331,16 +340,28 @@ export async function parseArguments(
         .option('yolo', {
           alias: 'y',
           type: 'boolean',
+          description: 'Deprecated alias for --full-access.',
+          default: false,
+        })
+        .option('full-access', {
+          type: 'boolean',
           description:
-            'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
+            'Automatically approve all tool calls in a trusted workspace.',
           default: false,
         })
         .option('approval-mode', {
           type: 'string',
           nargs: 1,
-          choices: ['default', 'auto_edit', 'yolo', 'plan'],
+          choices: [
+            'default',
+            'auto_edit',
+            'full_access',
+            'full-access',
+            'yolo',
+            'plan',
+          ],
           description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), full_access (auto-approve all tools), plan (read-only mode)',
         })
         .option('policy', {
           type: 'array',
@@ -684,13 +705,18 @@ export async function loadCliConfig(
   let approvalMode: ApprovalMode;
   const rawApprovalMode =
     argv.approvalMode ||
+    (argv.fullAccess ? 'full_access' : undefined) ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
+    (!isPrivilegedApprovalModeString(
+      settings.general?.defaultApprovalMode as string | undefined,
+    )
       ? settings.general?.defaultApprovalMode
       : undefined);
 
   if (rawApprovalMode) {
     switch (rawApprovalMode) {
+      case 'full_access':
+      case 'full-access':
       case 'yolo':
         approvalMode = ApprovalMode.YOLO;
         break;
@@ -712,7 +738,7 @@ export async function loadCliConfig(
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: full_access, full-access, yolo, auto_edit, plan, default`,
         );
     }
   } else {
@@ -724,21 +750,17 @@ export async function loadCliConfig(
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
-          'YOLO mode is disabled by "secureModeEnabled" setting.',
+          'Full Access mode is disabled by "secureModeEnabled" setting.',
         );
       } else {
         debugLogger.error(
-          'YOLO mode is disabled by the "disableYolo" setting.',
+          'Full Access mode is disabled by the "disableYolo" setting.',
         );
       }
       throw new FatalConfigError(
-        getAdminErrorMessage('YOLO mode', undefined /* config */),
+        getAdminErrorMessage('Full Access mode', undefined /* config */),
       );
     }
-  } else if (approvalMode === ApprovalMode.YOLO) {
-    debugLogger.warn(
-      'YOLO mode is enabled. All tool calls will be automatically approved.',
-    );
   }
 
   // Force approval mode to default if the folder is not trusted.
@@ -747,6 +769,10 @@ export async function loadCliConfig(
       `Approval mode overridden to "default" because the current folder is not trusted.`,
     );
     approvalMode = ApprovalMode.DEFAULT;
+  } else if (approvalMode === ApprovalMode.YOLO) {
+    debugLogger.warn(
+      'Full Access mode is enabled. All tool calls will be automatically approved.',
+    );
   }
 
   let telemetrySettings;

@@ -491,7 +491,7 @@ describe('useApprovalModeIndicator', () => {
       }
     });
 
-    it('should not enable YOLO mode when Ctrl+Y is pressed and add an info message', async () => {
+    it('should not enable Full Access mode when Ctrl+Y is pressed and add an info message', async () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
       mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
         strictModeDisabled: true,
@@ -516,7 +516,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+          text: 'You cannot enter Full Access mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );
@@ -524,7 +524,7 @@ describe('useApprovalModeIndicator', () => {
       expect(result.current).toBe(ApprovalMode.DEFAULT);
     });
 
-    it('should show admin error message when YOLO mode is disabled by admin', async () => {
+    it('should show admin error message when Full Access mode is disabled by admin', async () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
       mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
         mcpEnabled: true,
@@ -545,7 +545,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: '[Mock] YOLO mode is disabled',
+          text: '[Mock] Full Access mode is disabled',
         },
         expect.any(Number),
       );
@@ -570,7 +570,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+          text: 'You cannot enter Full Access mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );

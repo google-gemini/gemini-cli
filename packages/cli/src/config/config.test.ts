@@ -133,8 +133,8 @@ vi.mock('@google/gemini-cli-core', async () => {
       }),
     ),
     getAdminErrorMessage: vi.fn(
-      (_feature) =>
-        `YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
+      (feature) =>
+        `${feature} is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
     ),
     isHeadlessMode: vi.fn((opts) => {
       if (process.env['VITEST'] === 'true') {
@@ -561,14 +561,49 @@ describe('parseArguments', () => {
     {
       description: 'long flags',
       argv: ['node', 'script.js', '--yolo', '--approval-mode', 'default'],
+      expectedMessage:
+        'Detected multiple approval mode flags: --yolo (-y), --approval-mode. Please use only one.',
     },
     {
       description: 'short flags',
       argv: ['node', 'script.js', '-y', '--approval-mode', 'yolo'],
+      expectedMessage:
+        'Detected multiple approval mode flags: --yolo (-y), --approval-mode. Please use only one.',
+    },
+    {
+      description: 'full access and approval-mode',
+      argv: [
+        'node',
+        'script.js',
+        '--full-access',
+        '--approval-mode',
+        'default',
+      ],
+      expectedMessage:
+        'Detected multiple approval mode flags: --full-access, --approval-mode. Please use only one.',
+    },
+    {
+      description: 'full access and legacy yolo',
+      argv: ['node', 'script.js', '--full-access', '--yolo'],
+      expectedMessage:
+        'Detected multiple approval mode flags: --full-access, --yolo (-y). Please use only one.',
+    },
+    {
+      description: 'all approval mode flags',
+      argv: [
+        'node',
+        'script.js',
+        '--full-access',
+        '--yolo',
+        '--approval-mode',
+        'default',
+      ],
+      expectedMessage:
+        'Detected multiple approval mode flags: --full-access, --yolo (-y), --approval-mode. Please use only one.',
     },
   ])(
-    'should throw an error when using conflicting yolo/approval-mode flags ($description)',
-    async ({ argv }) => {
+    'should throw an error when using conflicting approval mode flags ($description)',
+    async ({ argv, expectedMessage }) => {
       process.argv = argv;
 
       vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -584,9 +619,7 @@ describe('parseArguments', () => {
       );
 
       expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
-        ),
+        expect.stringContaining(expectedMessage),
       );
     },
   );
@@ -595,18 +628,24 @@ describe('parseArguments', () => {
     {
       description: 'should allow --approval-mode without --yolo',
       argv: ['node', 'script.js', '--approval-mode', 'auto_edit'],
-      expected: { approvalMode: 'auto_edit', yolo: false },
+      expected: { approvalMode: 'auto_edit', yolo: false, fullAccess: false },
     },
     {
       description: 'should allow --yolo without --approval-mode',
       argv: ['node', 'script.js', '--yolo'],
-      expected: { approvalMode: undefined, yolo: true },
+      expected: { approvalMode: undefined, yolo: true, fullAccess: false },
+    },
+    {
+      description: 'should allow --full-access without --approval-mode',
+      argv: ['node', 'script.js', '--full-access'],
+      expected: { approvalMode: undefined, yolo: false, fullAccess: true },
     },
   ])('$description', async ({ argv, expected }) => {
     process.argv = argv;
     const parsedArgs = await parseArguments(createTestMergedSettings());
     expect(parsedArgs.approvalMode).toBe(expected.approvalMode);
     expect(parsedArgs.yolo).toBe(expected.yolo);
+    expect(parsedArgs.fullAccess).toBe(expected.fullAccess);
   });
 
   it('should reject invalid --approval-mode values', async () => {
@@ -1346,6 +1385,27 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
+  it('should exclude only ask_user in non-interactive mode with full_access approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'full_access',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
+  });
+
   it('should exclude all interactive tools in non-interactive mode with plan approval mode', async () => {
     process.argv = [
       'node',
@@ -1393,6 +1453,9 @@ describe('Approval mode tool exclusion logic', () => {
       { args: ['node', 'script.js', '--approval-mode', 'default'] },
       { args: ['node', 'script.js', '--approval-mode', 'auto_edit'] },
       { args: ['node', 'script.js', '--approval-mode', 'yolo'] },
+      { args: ['node', 'script.js', '--approval-mode', 'full_access'] },
+      { args: ['node', 'script.js', '--approval-mode', 'full-access'] },
+      { args: ['node', 'script.js', '--full-access'] },
       { args: ['node', 'script.js', '--yolo'] },
     ];
 
@@ -1445,7 +1508,7 @@ describe('Approval mode tool exclusion logic', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      'Full Access mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -1462,7 +1525,7 @@ describe('Approval mode tool exclusion logic', () => {
     await expect(
       loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
-      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
+      'Invalid approval mode: invalid_mode. Valid values are: full_access, full-access, yolo, auto_edit, plan, default',
     );
   });
 
@@ -2698,6 +2761,31 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
+  it('should set YOLO approval mode when --full-access flag is used', async () => {
+    process.argv = ['node', 'script.js', '--full-access'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it.each(['full_access', 'full-access'])(
+    'should set YOLO approval mode when --approval-mode=%s',
+    async (approvalMode) => {
+      process.argv = ['node', 'script.js', '--approval-mode', approvalMode];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    },
+  );
+
   it('should set YOLO approval mode when -y flag is used', async () => {
     process.argv = ['node', 'script.js', '-y'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -2870,6 +2958,28 @@ describe('loadCliConfig approval mode', () => {
         argv,
       );
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+
+    it('should not log Full Access as enabled after trust fallback', async () => {
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      process.argv = ['node', 'script.js', '--full-access'];
+      const argv = await parseArguments(createTestMergedSettings());
+
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Approval mode overridden to "default" because the current folder is not trusted.',
+      );
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        'Full Access mode is enabled. All tool calls will be automatically approved.',
+      );
     });
 
     it('should remain DEFAULT when --approval-mode=default', async () => {
@@ -3583,13 +3693,13 @@ describe('loadCliConfig disableYoloMode', () => {
   });
 
   it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
-    process.argv = ['node', 'script.js', '--yolo'];
+    process.argv = ['node', 'script.js', '--full-access'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      'Full Access mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 });
@@ -3621,12 +3731,12 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      'Full Access mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
-  it('should throw an error if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode=yolo'];
+  it('should throw an error if approval-mode=full_access is attempted when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode=full_access'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       admin: {
@@ -3635,7 +3745,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      'Full Access mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
