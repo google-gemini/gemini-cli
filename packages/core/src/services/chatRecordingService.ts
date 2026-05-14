@@ -163,22 +163,23 @@ export async function loadConversationRecord(
         const sessionId = getMatch(headStr, /"sessionId"\s*:\s*"([^"]+)"/);
         const projectHash = getMatch(headStr, /"projectHash"\s*:\s*"([^"]+)"/);
         let startTime = getMatch(headStr, /"startTime"\s*:\s*"([^"]+)"/);
-        let filenameTimestamp: string | undefined;
-
-        // Fallback: Extract startTime from filename if not in header (format: session-YYYY-MM-DDTHH-MM-8CHARS.jsonl)
-        if (!startTime || !getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/)) {
-          const basename = path.basename(filePath);
-          const timeMatch = basename.match(
-            /session-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})/,
-          );
-          if (timeMatch) {
-            // Convert session-2026-05-10T11-45-... to valid ISO 2026-05-10T11:45:00Z
-            filenameTimestamp =
-              timeMatch[1].replace(/-/g, (m, offset) =>
-                offset > 10 ? ':' : '-',
-              ) + ':00Z';
-          }
-        }
+        const filenameTimestamp = startTime
+          ? undefined
+          : (function () {
+              const basename = path.basename(filePath);
+              const timeMatch = basename.match(
+                /session-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})/,
+              );
+              if (timeMatch) {
+                // Convert session-2026-05-10T11-45-... to valid ISO 2026-05-10T11:45:00Z
+                return (
+                  timeMatch[1].replace(/-/g, (m, offset) =>
+                    offset > 10 ? ':' : '-',
+                  ) + ':00Z'
+                );
+              }
+              return undefined;
+            })();
 
         if (!startTime) {
           startTime = filenameTimestamp;
@@ -188,9 +189,24 @@ export async function loadConversationRecord(
           getMatch(tailStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
           getMatch(headStr, /"lastUpdated"\s*:\s*"([^"]+)"/) ||
           filenameTimestamp;
+
+        const isJsonl = filePath.endsWith('.jsonl');
+
+        // For .jsonl, summary is strictly inside "$set". For legacy .json, it's at the absolute end of the file.
         const summary =
-          getMatch(tailStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/) ||
-          getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/);
+          getMatch(
+            tailStr,
+            /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+          ) ||
+          getMatch(
+            headStr,
+            /"\$set"\s*:\s*\{[^{}]*"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+          ) ||
+          getMatch(tailStr, /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}\s*$/) ||
+          (!isJsonl
+            ? getMatch(headStr, /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+            : undefined);
+
         const rawKind = getMatch(headStr, /"kind"\s*:\s*"([^"]+)"/);
         const kind =
           rawKind === 'main' || rawKind === 'subagent' ? rawKind : undefined;
@@ -199,33 +215,79 @@ export async function loadConversationRecord(
           /"type"\s*:\s*"(user|gemini)"/.test(tailStr);
 
         let firstUserMessage: string | undefined;
-        // FAST PREVIEW: Find the first line that is a 'user' message and extract its content
-        const userLine = headStr
-          .split('\n')
-          .find(
-            (line) =>
-              line.includes('"type":"user"') || line.includes('"type": "user"'),
-          );
+        let fallbackFirstUserMessage: string | undefined;
 
-        if (userLine) {
-          try {
-            const record = JSON.parse(userLine) as unknown;
+        if (isJsonl) {
+          // FAST PREVIEW (.jsonl): Find all potential user message lines
+          const lines = headStr.split('\n');
+          for (const line of lines) {
             if (
-              hasProperty(record, 'type') &&
-              record.type === 'user' &&
-              hasProperty(record, 'content')
+              line.includes('"type":"user"') ||
+              line.includes('"type": "user"')
             ) {
-              const content = record.content;
-              if (Array.isArray(content)) {
-                firstUserMessage = content
-                  .map((p: unknown) => (isTextPart(p) ? p.text : ''))
-                  .join('');
-              } else if (typeof content === 'string') {
-                firstUserMessage = content;
+              try {
+                const record = JSON.parse(line) as unknown;
+                if (
+                  hasProperty(record, 'type') &&
+                  record.type === 'user' &&
+                  hasProperty(record, 'content')
+                ) {
+                  const content = record.content;
+                  let msgText = '';
+                  if (Array.isArray(content)) {
+                    msgText = content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else if (typeof content === 'string') {
+                    msgText = content;
+                  }
+
+                  if (msgText) {
+                    if (!fallbackFirstUserMessage) {
+                      fallbackFirstUserMessage = msgText; // Keep the very first one as a fallback
+                    }
+                    // Like extractFirstUserMessage, filter out slash commands
+                    if (
+                      !msgText.startsWith('/') &&
+                      !msgText.startsWith('?') &&
+                      msgText.trim().length > 0
+                    ) {
+                      firstUserMessage = msgText;
+                      break; // Found the true first user message
+                    }
+                  }
+                }
+              } catch {
+                /* ignore */
               }
             }
-          } catch {
-            /* ignore */
+          }
+          if (!firstUserMessage) {
+            firstUserMessage = fallbackFirstUserMessage;
+          }
+        } else {
+          // FAST PREVIEW (legacy .json): Extract first user message text roughly using regex to avoid 1s+ JSON.parse
+          const legacyUserMatches = [
+            ...headStr.matchAll(
+              /"type"\s*:\s*"user"[\s\S]*?"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g,
+            ),
+          ];
+          for (const match of legacyUserMatches) {
+            const msgText = match[1];
+            if (!fallbackFirstUserMessage) {
+              fallbackFirstUserMessage = msgText;
+            }
+            if (
+              !msgText.startsWith('/') &&
+              !msgText.startsWith('?') &&
+              msgText.trim().length > 0
+            ) {
+              firstUserMessage = msgText;
+              break;
+            }
+          }
+          if (!firstUserMessage) {
+            firstUserMessage = fallbackFirstUserMessage;
           }
         }
 
