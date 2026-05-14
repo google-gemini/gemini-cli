@@ -800,16 +800,6 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": true
         }
       },
-      "gemini-3.1-flash-lite-preview": {
-        "tier": "flash-lite",
-        "family": "gemini-3",
-        "isPreview": true,
-        "isVisible": true,
-        "features": {
-          "thinking": false,
-          "multimodalToolUse": true
-        }
-      },
       "gemini-3.1-pro-preview": {
         "tier": "pro",
         "family": "gemini-3",
@@ -1083,17 +1073,6 @@ their corresponding top-level category object in your `settings.json` file.
               "useGemini3_1": true
             },
             "target": "gemini-3.1-pro-preview"
-          }
-        ]
-      },
-      "gemini-3.1-flash-lite-preview": {
-        "default": "gemini-3.1-flash-lite-preview",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": false
-            },
-            "target": "gemini-2.5-flash-lite"
           }
         ]
       },

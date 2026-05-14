@@ -9,8 +9,8 @@ import type { ModelPolicy } from '../availability/modelPolicy.js';
 import {
   getDisplayString,
   PREVIEW_GEMINI_3_1_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-  GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   isProModel,
   getAutoModelDescription,
 } from '../config/models.js';
@@ -194,8 +194,8 @@ export class ModelConfigService {
           return false;
         if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
         if (
-          (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL ||
-            id === GEMINI_3_1_FLASH_LITE_MODEL) &&
+          (id === PREVIEW_GEMINI_FLASH_LITE_MODEL ||
+            id === DEFAULT_GEMINI_FLASH_LITE_MODEL) &&
           !useGemini31FlashLite
         )
           return false;

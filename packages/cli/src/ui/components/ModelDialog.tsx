@@ -13,8 +13,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-  GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -96,8 +95,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       PREVIEW_GEMINI_MODEL,
       PREVIEW_GEMINI_3_1_MODEL,
       PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-      GEMINI_3_1_FLASH_LITE_MODEL,
+      PREVIEW_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
     ];
     if (manualModels.includes(preferredModel)) {
@@ -283,9 +281,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
       if (useGemini31FlashLite) {
         previewOptions.push({
-          value: GEMINI_3_1_FLASH_LITE_MODEL,
-          title: getDisplayString(GEMINI_3_1_FLASH_LITE_MODEL),
-          key: GEMINI_3_1_FLASH_LITE_MODEL,
+          value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
+          key: PREVIEW_GEMINI_FLASH_LITE_MODEL,
         });
       }
 
@@ -308,7 +306,17 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     config,
   ]);
 
-  const options = view === 'main' ? mainOptions : manualOptions;
+  const options = useMemo(() => {
+    const rawOptions = view === 'main' ? mainOptions : manualOptions;
+    const seen = new Set<string>();
+    return rawOptions.filter((option) => {
+      if (seen.has(option.value)) {
+        return false;
+      }
+      seen.add(option.value);
+      return true;
+    });
+  }, [view, mainOptions, manualOptions]);
 
   // Calculate the initial index based on the preferred model.
   const initialIndex = useMemo(() => {
