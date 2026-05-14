@@ -65,19 +65,8 @@ jobs:
     steps:
       - name: 'Determine Checkout Ref'
         id: 'determine_ref'
-        env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
         run: |
-          REF="${{ github.ref }}"
-          if [ -n "$ISSUE_NUMBER" ]; then
-            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
-            if [ -n "$PR_HEAD" ]; then
-              REF="$PR_HEAD"
-            fi
-          fi
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "ref=main" >> "$GITHUB_OUTPUT"
 
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
