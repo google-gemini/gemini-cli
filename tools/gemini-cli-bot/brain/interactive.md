@@ -64,8 +64,8 @@ Root-Cause' workflow** to the **'worker' agent**:
 
 If investigation confirms a change is required:
 
-- **Activate PR Skill**: You MUST activate the **'prs' skill** to manage
-  staging, PR descriptions, and branch targeting.
+- **ACTIVATE PR SKILL FIRST**: You MUST activate the **'prs' skill** BEFORE
+  staging any changes or generating PR data.
 - **One Thing at a Time**: You MUST ONLY propose and implement a **single fix or
   improvement per run**.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the

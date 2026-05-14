@@ -1,5 +1,19 @@
 # Phase: Scheduled Agent
 
+## 1. MANDATORY START: Activate Mandate Skill
+
+Your **MANDATE FOR THIS RUN** (provided at the end of this prompt) explicitly
+dictates your task for this session. It will ask you to use a specific skill
+(e.g., `issue-fixer` or `metrics`).
+
+**You MUST call the `activate_skill` tool as the VERY FIRST ACTION of your FIRST
+TURN to load the instructions for your mandate.**
+
+1.  Identify the skill name from your **MANDATE FOR THIS RUN**.
+2.  Call `activate_skill(name="<skill-name>")`.
+3.  Follow the detailed workflow and instructions provided by the activated
+    skill. Do NOT perform any other actions until the skill is activated.
+
 ## Goal
 
 Execute the task specified in your **MANDATE FOR THIS RUN**. Maintain high
@@ -47,21 +61,7 @@ You MUST use the following skills to manage persistent state and PRs:
 
 ## Instructions
 
-### 1. Mandate Execution (MANDATORY START)
-
-Your **MANDATE FOR THIS RUN** (provided at the end of this prompt) explicitly
-dictates your task for this session. It will ask you to use a specific skill
-(e.g. `issue-fixer` or `metrics`).
-
-**You MUST call the `activate_skill` tool at the very beginning of your FIRST
-TURN to load the instructions for your mandate.**
-
-1. Identify the skill name from your **MANDATE FOR THIS RUN**.
-2. Call `activate_skill(name="<skill-name>")`.
-3. Follow the detailed workflow and instructions provided by the activated skill
-   to complete your mandate. Do NOT skip this step to perform unrelated fixes.
-
-### 2. Hypothesis Testing & Strategic Pivoting
+### 1. Hypothesis Testing & Strategic Pivoting
 
 For any detected bugs, bottlenecks, or opportunities:
 
