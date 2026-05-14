@@ -33,12 +33,12 @@ If you are proposing fixes and PR creation is enabled (per the System Directive)
       unrelated refactor, or a metrics script update. Metrics and fixes MUST
       be in separate PRs.
 2.  **Generate PR Description**: Use the `write_file` tool to create
-    `pr-description.md`.
+    `pr-description.md` **at the workspace root**.
     - **Title**: The very first line MUST be a concise, conventional title.
     - **Body**: Explain the change and expected impact. You MUST identify the domain expert for the affected files and mention them (cc @<user>).
-    - **Labels**: Use the `write_file` tool to create `pr-labels.txt` containing one label per line. You MUST ALWAYS add the `bot-fix` label.
+    - **Labels**: Use the `write_file` tool to create `pr-labels.txt` **at the workspace root** containing one label per line. You MUST ALWAYS add the `bot-fix` label.
 3.  **Branch Naming (Optional)**: If you wish to specify a custom branch name,
-    use `write_file` to create `branch-name.txt`. **CRITICAL**: The branch name
+    use `write_file` to create `branch-name.txt` **at the workspace root**. **CRITICAL**: The branch name
     MUST start with the `bot/` prefix. If you do not specify a branch name, one
     will be generated for you.
 4.  **Stage Fixes**: You MUST explicitly stage your fixes using the
@@ -56,14 +56,14 @@ If you are continuing work on an existing Task or responding to a comment on an
 existing bot PR:
 
 1.  **Target Existing Branch**: Use `write_file` to generate `branch-name.txt`
-    containing the current branch name. **CRITICAL**: The branch name MUST start
+    **at the workspace root** containing the current branch name. **CRITICAL**: The branch name MUST start
     with the `bot/` prefix (e.g., `bot/task-BT-01`). If it does not, your PR
     creation will be rejected by the safety gate.
-2.  **Track PR ID**: Use `write_file` to generate `pr-number.txt` containing the
+2.  **Track PR ID**: Use `write_file` to generate `pr-number.txt` **at the workspace root** containing the
     numeric PR ID.
 3.  **Respond to Maintainers**:
-    - For general responses, write your markdown comment to `issue-comment.md`.
-    - For specific PR feedback, write your markdown response to `pr-comment.md`.
+    - For general responses, write your markdown comment to `issue-comment.md` **at the workspace root**.
+    - For specific PR feedback, write your markdown response to `pr-comment.md` **at the workspace root**.
 4.  **Handle CI Failures**: Diagnose failing checks using `gh --no-pager run view` or `gh api`. Your
     priority must be generating a new patch and staging it with `git add` to fix
     the failure.

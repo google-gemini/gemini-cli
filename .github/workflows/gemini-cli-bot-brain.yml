@@ -242,6 +242,10 @@ jobs:
         run: |
           touch bot-changes.patch
           touch pr-description.md
+          touch pr-labels.txt
+          touch branch-name.txt
+          touch issue-comment.md
+          touch pr-comment.md
           if [ -f critique_result.txt ] && grep -q "\[APPROVED\]" critique_result.txt && ! grep -q "\[REJECTED\]" critique_result.txt; then
              git diff --staged > bot-changes.patch
           else

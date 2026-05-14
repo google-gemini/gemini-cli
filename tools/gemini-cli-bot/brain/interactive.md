@@ -74,7 +74,7 @@ If investigation confirms a change is required:
   user's specific request. You are STRICTLY FORBIDDEN from including any
   unrelated updates when operating in interactive mode.
 - **Acknowledgment**: Use the `write_file` tool to write a brief acknowledgement
-  to `issue-comment.md`.
+  to `issue-comment.md` **at the workspace root**.
 
 ### 3. Question & Answer (Q&A)
 
@@ -83,7 +83,8 @@ If the user's request is purely informational:
 - **Evidence-Based Answers**: Delegate the information gathering to the
   **'worker' agent** to verify facts before answering.
 - **Output**: You MUST use the `write_file` tool to save your response to
-  `issue-comment.md`. DO NOT simply output your response to the console.
+  `issue-comment.md` **at the workspace root**. DO NOT simply output your
+  response to the console.
 
 ## Execution Constraints
 
