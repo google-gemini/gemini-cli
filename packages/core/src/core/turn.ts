@@ -472,10 +472,21 @@ export class Turn {
    */
   getResponseText(): string {
     if (this.cachedResponseText === undefined) {
-      this.cachedResponseText = this.debugResponses
-        .map((response) => getResponseText(response))
-        .filter((text): text is string => text !== null)
-        .join(' ');
+      let result = '';
+      for (const response of this.debugResponses) {
+        const text = getResponseText(response);
+        if (text) {
+          // Heuristic to handle both delta and cumulative responses:
+          // If the new text starts with our current result, it's likely a cumulative
+          // update (or a redundant final consolidated response).
+          if (result && text.startsWith(result)) {
+            result = text;
+          } else {
+            result += text;
+          }
+        }
+      }
+      this.cachedResponseText = result;
     }
     return this.cachedResponseText;
   }

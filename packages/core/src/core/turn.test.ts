@@ -134,6 +134,44 @@ describe('Turn', () => {
       expect(turn.getDebugResponses().length).toBe(2);
     });
 
+    it('should not duplicate text in getResponseText when both chunks and consolidated response are present', async () => {
+      const mockResponseStream = (async function* () {
+        // Chunk 1
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+          } as GenerateContentResponse,
+        };
+        // Chunk 2
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{ content: { parts: [{ text: ' world' }] } }],
+          } as GenerateContentResponse,
+        };
+        // Final consolidated response (as yielded by GeminiChat)
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{
+              content: { parts: [{ text: 'Hello world' }] },
+              finishReason: 'STOP'
+            }],
+          } as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      for await (const _ of turn.run({ model: 'm' }, [{ text: 'req' }], new AbortController().signal)) {
+        // consume stream
+      }
+
+      const text = turn.getResponseText();
+      // CURRENT BUGGY BEHAVIOR: "Hello  world Hello world"
+      expect(text).toBe('Hello world');
+    });
+
     it('should yield tool_call_request events for function calls', async () => {
       const mockResponseStream = (async function* () {
         yield {
