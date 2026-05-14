@@ -21,6 +21,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -2137,16 +2138,34 @@ function createUrlTransport(
     | StreamableHTTPClientTransportOptions
     | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
-  // Wrap fetch to treat GET 404 as 405 so servers that do not support the
-  // optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
+  // Create a proxy-aware fetcher that respects NO_PROXY for this MCP server
+  // This is especially important for local MCP servers (localhost, 127.0.0.1)
+  // when a company proxy is globally configured.
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const agent = new EnvHttpProxyAgent({ noProxy });
+
+  // Wrap fetch to:
+  // 1. Use the proxy-aware agent (respecting NO_PROXY)
+  // 2. Treat GET 404 as 405 so servers that do not support the
+  //    optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
   // The SDK already silently ignores 405; 404 is semantically equivalent here.
   const baseFetch =
     (transportOptions as StreamableHTTPClientTransportOptions).fetch ??
     globalThis.fetch;
+
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      const res = await baseFetch(url, init);
+      // If we have an explicit NO_PROXY, we use a proxy-aware dispatcher.
+      // We use the global fetch but pass a custom dispatcher in the init options.
+      // This avoids manual response reconstruction and dangerous type casts.
+      const res = noProxy
+        ? await globalThis.fetch(url, {
+            ...init,
+            dispatcher: agent,
+          } as RequestInit)
+        : await baseFetch(url, init);
+
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
         : res;
