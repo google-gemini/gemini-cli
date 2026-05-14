@@ -122,7 +122,7 @@ export function startCallbackServer(
   let serverPort: number;
 
   let resolveResponse: (value: OAuthAuthorizationResponse) => void;
-  let rejectResponse: (reason: any) => void;
+  let rejectResponse: (reason: unknown) => void;
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
       resolveResponse = resolve;
@@ -133,7 +133,7 @@ export function startCallbackServer(
   const server = http.createServer(
     async (req: http.IncomingMessage, res: http.ServerResponse) => {
       try {
-        const url = new URL(req.url!, `http://localhost:${serverPort}`);
+        const url = new URL(req.url ?? '', 'http://localhost');
 
         if (url.pathname !== REDIRECT_PATH) {
           res.writeHead(404);
@@ -203,7 +203,7 @@ export function startCallbackServer(
   });
 
   // Determine which port to use (env var, argument, or OS-assigned)
-  let listenPort = 0; // Default to OS-assigned port
+  let listenPort: number | undefined = 0; // Default to OS-assigned port
 
   const portStr = process.env['OAUTH_CALLBACK_PORT'];
   if (portStr) {
@@ -214,7 +214,7 @@ export function startCallbackServer(
       );
       portReject(error);
       rejectResponse(error);
-      // We still return the object, but the promises will be rejected
+      listenPort = undefined;
     } else {
       listenPort = envPort;
     }
@@ -222,7 +222,7 @@ export function startCallbackServer(
     listenPort = port;
   }
 
-  if (listenPort !== undefined || !portStr) {
+  if (listenPort !== undefined) {
     server.listen(listenPort, () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const address = server.address() as net.AddressInfo;

@@ -139,14 +139,14 @@ vi.mock('node:http', () => ({
 
 // Mock startCallbackServer to return what the new implementation returns
 vi.mock('../utils/oauth-flow.js', async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
+  const actual = (await importOriginal()) as typeof import('../utils/oauth-flow.js');
   return {
     ...actual,
     startCallbackServer: vi.fn((expectedState: string, port?: number) => {
       const result = actual.startCallbackServer(expectedState, port);
       // Ensure the mock server is used if createServer is mocked
       if (vi.isMockFunction(http.createServer)) {
-        result.server = mockHttpServer;
+        result.server = mockHttpServer as unknown as http.Server;
       }
       return result;
     }),

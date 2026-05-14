@@ -12,8 +12,8 @@ describe('OAuth Flow Repro', () => {
   });
 
   it('should not have an unhandled rejection when close() is called before timeout', async () => {
-    let unhandledRejection: any = null;
-    const handler = (reason: any) => {
+    let unhandledRejection: unknown = null;
+    const handler = (reason: unknown) => {
       unhandledRejection = reason;
     };
     process.on('unhandledRejection', handler);
@@ -39,8 +39,8 @@ describe('OAuth Flow Repro', () => {
   });
 
   it('should not have an unhandled rejection even if NOT closed, due to internal catch', async () => {
-    let unhandledRejection: any = null;
-    const handler = (reason: any) => {
+    let unhandledRejection: unknown = null;
+    const handler = (reason: unknown) => {
       unhandledRejection = reason;
     };
     process.on('unhandledRejection', handler);
