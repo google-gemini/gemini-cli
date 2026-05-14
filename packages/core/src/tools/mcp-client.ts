@@ -20,7 +20,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
+import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -2142,29 +2142,15 @@ function createUrlTransport(
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      // If we have an explicit NO_PROXY, we use undici's fetch with EnvHttpProxyAgent
-      // to ensure correct routing. Otherwise, we use the base fetch.
-      let res: Response;
-      if (noProxy) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const undiciRes = await undiciFetch(url, {
-          ...init,
-          dispatcher: agent,
-        } as unknown as import('undici').RequestInit);
-
-        // Convert undici response to standard Response for compatibility
-        res = new Response(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          undiciRes.body as unknown as ReadableStream<Uint8Array> | null,
-          {
-            status: undiciRes.status,
-            statusText: undiciRes.statusText,
-            headers: [...undiciRes.headers.entries()],
-          },
-        );
-      } else {
-        res = await baseFetch(url, init);
-      }
+      // If we have an explicit NO_PROXY, we use a proxy-aware dispatcher.
+      // We use the global fetch but pass a custom dispatcher in the init options.
+      // This avoids manual response reconstruction and dangerous type casts.
+      const res = noProxy
+        ? await globalThis.fetch(url, {
+            ...init,
+            dispatcher: agent,
+          } as RequestInit)
+        : await baseFetch(url, init);
 
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
