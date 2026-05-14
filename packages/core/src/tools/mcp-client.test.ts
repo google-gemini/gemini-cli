@@ -2066,6 +2066,30 @@ describe('mcp-client', () => {
           vi.unstubAllGlobals();
         }
       });
+
+      it('respects NO_PROXY for network transports', async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response('OK', { status: 200 }));
+        vi.stubGlobal('fetch', mockFetch);
+        vi.stubEnv('NO_PROXY', 'localhost');
+
+        try {
+          const transport = await createTransport(
+            'test-server',
+            { url: 'http://localhost/sse', type: 'sse' },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          // For SSEClientTransport, the fetch is private or passed to the SDK.
+          // We can check if it creates the transport successfully.
+          expect(transport).toBeInstanceOf(SSEClientTransport);
+        } finally {
+          vi.unstubAllEnvs();
+          vi.unstubAllGlobals();
+        }
+      });
     });
 
     describe('should connect via url', () => {

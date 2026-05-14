@@ -69,7 +69,10 @@ export class AcpSessionManager {
     );
 
     const authType =
-      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
+      loadedSettings.merged.security.auth.selectedType ||
+      (authDetails.baseUrl || process.env['GOOGLE_GEMINI_BASE_URL']
+        ? AuthType.GATEWAY
+        : AuthType.USE_GEMINI);
 
     let isAuthenticated = false;
     let authErrorMessage = '';
@@ -231,7 +234,12 @@ export class AcpSessionManager {
     mcpServers: acp.McpServer[],
     authDetails: AuthDetails,
   ): Promise<Config> {
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    const selectedAuthType =
+      this.settings.merged.security.auth.selectedType ||
+      (authDetails.baseUrl || process.env['GOOGLE_GEMINI_BASE_URL']
+        ? AuthType.GATEWAY
+        : undefined);
+
     if (!selectedAuthType) {
       throw acp.RequestError.authRequired();
     }

@@ -676,22 +676,34 @@ export async function start_sandbox(
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
       const homeDir = getContainerPath(homedir());
-
-      const setupUserCommands = [
-        // Use -f with groupadd to avoid errors if the group already exists.
-        `groupadd -f -g ${gid} ${username}`,
-        // Create user only if it doesn't exist. Use -o for non-unique UID.
-        `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username}`,
-      ].join(' && ');
+      const quotedHomeDir = quote([homeDir]);
 
       const originalCommand = finalEntrypoint[2];
       const escapedOriginalCommand = originalCommand.replace(/'/g, "'\\''");
 
-      // Use `su -p` to preserve the environment.
-      const suCommand = `su -p ${username} -c '${escapedOriginalCommand}'`;
+      // Use defensive entrypoint logic that checks for useradd availability.
+      // This ensures we can support UID/GID mapping on distros that have these
+      // tools. If useradd is missing (e.g. on minimal images), we fail explicitly
+      // to avoid insecurely falling back to root execution with host mounts.
+      const defensiveEntrypoint = [
+        `if command -v useradd >/dev/null 2>&1; then`,
+        `  (groupadd -g ${gid} -o ${username} 2>/dev/null || true) &&`,
+        `  (id ${uid} >/dev/null 2>&1 || useradd -o -u ${uid} -g ${gid} -d ${quotedHomeDir} -s /bin/bash ${username} 2>/dev/null || true) &&`,
+        `  USER_NAME=$(id -nu ${uid} 2>/dev/null);`,
+        `  if [ -n "$USER_NAME" ]; then`,
+        `    su -p "$USER_NAME" -c '${escapedOriginalCommand}';`,
+        `  else`,
+        `    echo "Error: Failed to map host UID ${uid} to a user in the container." >&2;`,
+        `    exit 1;`,
+        `  fi`,
+        `else`,
+        `  echo "Error: 'useradd' not found in container. UID/GID mapping is required for Linux distros like NixOS/Arch to avoid permission issues. Please use a container image that includes standard user management tools (like 'ubuntu' or 'debian')." >&2;`,
+        `  exit 1;`,
+        `fi`,
+      ].join('\n');
 
       // The entrypoint is always `['bash', '-c', '<command>']`, so we modify the command part.
-      finalEntrypoint[2] = `${setupUserCommands} && ${suCommand}`;
+      finalEntrypoint[2] = defensiveEntrypoint;
 
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
