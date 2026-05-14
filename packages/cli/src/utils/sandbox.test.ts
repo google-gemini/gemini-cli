@@ -336,7 +336,14 @@ describe('sandbox', () => {
       await expect(promise).resolves.toBe(0);
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['run', '-i', '--rm', '--init']),
+        expect.arrayContaining([
+          'run',
+          '-i',
+          '--rm',
+          '--init',
+          '--entrypoint',
+          '',
+        ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
 
