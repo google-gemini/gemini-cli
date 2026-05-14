@@ -82,8 +82,9 @@ export async function deleteSessionArtifactsAsync(
     // Top-level session directory (e.g., tempDir/safeSessionId). Reserved
     // directory names (chats, logs, tool-outputs) are skipped here to prevent
     // a crafted session file from causing one of the project's top-level
-    // temp directories to be deleted.
-    if (!RESERVED_SESSION_DIR_NAMES.has(safeSessionId)) {
+    // temp directories to be deleted. Case-insensitive because macOS and
+    // Windows resolve `Chats` and `chats` to the same path.
+    if (!RESERVED_SESSION_DIR_NAMES.has(safeSessionId.toLowerCase())) {
       const sessionDir = path.join(tempDir, safeSessionId);
       await fs
         .rm(sessionDir, { recursive: true, force: true })
