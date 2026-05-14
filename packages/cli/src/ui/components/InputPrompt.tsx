@@ -813,6 +813,49 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
         }
+
+        // When the terminal intercepts Ctrl+V and sends a bracketed paste
+        // event, we also need to check for clipboard images. This is
+        // especially important on Windows Terminal where Ctrl+V is always
+        // converted to a bracketed paste, bypassing the PASTE_CLIPBOARD
+        // command handler that normally detects images.
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        (async () => {
+          try {
+            if (await clipboardHasImage()) {
+              const imagePath = await saveClipboardImage(config.getTargetDir());
+              if (imagePath) {
+                cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
+                  // Ignore cleanup errors
+                });
+                const relativePath = path.relative(
+                  config.getTargetDir(),
+                  imagePath,
+                );
+                const insertText = `@${relativePath}`;
+                const currentText = buffer.text;
+                const offset = buffer.getOffset();
+                let textToInsert = insertText;
+                const charBefore = offset > 0 ? currentText[offset - 1] : '';
+                const charAfter =
+                  offset < currentText.length ? currentText[offset] : '';
+                if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+                  textToInsert = ' ' + textToInsert;
+                }
+                if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+                  textToInsert = textToInsert + ' ';
+                }
+                buffer.replaceRangeByOffset(offset, offset, textToInsert);
+              }
+            }
+          } catch (error) {
+            debugLogger.error(
+              'Error checking clipboard for image during paste:',
+              error,
+            );
+          }
+        })();
+
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
@@ -1370,6 +1413,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmit,
       shellHistory,
       reverseSearchCompletion,
+      config,
       handleClipboardPaste,
       resetCompletionState,
       resetEscapeState,

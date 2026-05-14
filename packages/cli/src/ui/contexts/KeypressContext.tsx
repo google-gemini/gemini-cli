@@ -331,17 +331,15 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
         buffer += key.sequence;
       }
 
-      if (buffer.length > 0) {
-        keypressHandler({
-          name: 'paste',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: buffer,
-        });
-      }
+      keypressHandler({
+        name: 'paste',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        insertable: true,
+        sequence: buffer,
+      });
     }
   })();
   bufferer.next(); // prime the generator so it starts listening.

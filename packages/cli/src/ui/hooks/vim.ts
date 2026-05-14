@@ -499,8 +499,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false;
       }
 
-      // Let InputPrompt handle Ctrl+V for clipboard image pasting
-      if (normalizedKey.ctrl && normalizedKey.name === 'v') {
+      // Let InputPrompt handle Ctrl+V, Cmd+V, and Alt+V for clipboard image pasting
+      if (
+        (normalizedKey.ctrl || normalizedKey.cmd || normalizedKey.alt) &&
+        normalizedKey.name === 'v'
+      ) {
         return false; // Let InputPrompt handle clipboard functionality
       }
 
@@ -673,6 +676,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Let InputPrompt handle Ctrl+C for clearing input (works in all modes)
       if (keyMatchers[Command.CLEAR_INPUT](normalizedKey)) {
+        return false;
+      }
+
+      // Let InputPrompt handle bracketed paste in all modes
+      if (normalizedKey.name === 'paste') {
         return false;
       }
 

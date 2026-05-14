@@ -900,6 +900,9 @@ export interface Transformation {
 export const imagePathRegex =
   /@((?:\\.|[^\s\r\n\\])+?\.(?:png|jpg|jpeg|gif|webp|svg|bmp))\b/gi;
 
+const clipboardImageIdMap = new Map<string, number>();
+let nextClipboardImageId = 1;
+
 export function getTransformedImagePath(filePath: string): string {
   const raw = filePath;
 
@@ -921,6 +924,16 @@ export function getTransformedImagePath(filePath: string): string {
 
   const extension = path.extname(fileName);
   const baseName = path.basename(fileName, extension);
+
+  if (baseName.startsWith('clipboard-')) {
+    let id = clipboardImageIdMap.get(baseName);
+    if (id === undefined) {
+      id = nextClipboardImageId++;
+      clipboardImageIdMap.set(baseName, id);
+    }
+    return `[📸 Pasted Image #${id}]`;
+  }
+
   const maxBaseLength = 10;
 
   const truncatedBase =
@@ -928,7 +941,7 @@ export function getTransformedImagePath(filePath: string): string {
       ? `...${baseName.slice(-maxBaseLength)}`
       : baseName;
 
-  return `[Image ${truncatedBase}${extension}]`;
+  return `[🖼️ ${truncatedBase}${extension}]`;
 }
 
 const transformationsCache = new LRUCache<string, Transformation[]>(

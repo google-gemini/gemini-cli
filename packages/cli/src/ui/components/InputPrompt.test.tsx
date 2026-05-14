@@ -1014,6 +1014,36 @@ describe('InputPrompt', () => {
       debugLoggerErrorSpy.mockRestore();
       unmount();
     });
+
+    it('should detect clipboard image during bracketed paste events', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/test/.gemini-clipboard/clipboard-789.png',
+      );
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+      );
+
+      // Simulate bracketed paste (how Windows Terminal sends Ctrl+V).
+      // When the clipboard contains an image, the terminal may still send
+      // a text paste event (possibly empty or with text representation).
+      await act(async () => {
+        stdin.write('\x1b[200~some text\x1b[201~');
+      });
+      // The clipboard image check is async, so we need to wait for it
+      await waitFor(() => {
+        expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+          props.config.getTargetDir(),
+        );
+        expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
+          props.config.getTargetDir(),
+        );
+        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      });
+      unmount();
+    });
   });
 
   describe('clipboard text paste', () => {
