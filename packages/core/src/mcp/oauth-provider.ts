@@ -375,84 +375,87 @@ export class MCPOAuthProvider {
     // This ensures we only create one server and eliminates race conditions
     const callbackServer = startCallbackServer(pkceParams.state, preferredPort);
 
-    // Wait for server to start and get the allocated port
-    // We need this port for client registration and auth URL building
-    const redirectPort = await callbackServer.port;
-    debugLogger.debug(`Callback server listening on port ${redirectPort}`);
+    try {
+      // Wait for server to start and get the allocated port
+      // We need this port for client registration and auth URL building
+      const redirectPort = await callbackServer.port;
+      debugLogger.debug(`Callback server listening on port ${redirectPort}`);
 
-    // If no client ID is provided, try dynamic client registration
-    if (!config.clientId) {
-      let registrationUrl = config.registrationUrl;
+      // If no client ID is provided, try dynamic client registration
+      if (!config.clientId) {
+        let registrationUrl = config.registrationUrl;
 
-      // If no registration URL was previously discovered, try to discover it
-      if (!registrationUrl) {
-        // Use the issuer to discover registration endpoint
-        if (!config.issuer) {
-          throw new Error('Cannot perform dynamic registration without issuer');
+        // If no registration URL was previously discovered, try to discover it
+        if (!registrationUrl) {
+          // Use the issuer to discover registration endpoint
+          if (!config.issuer) {
+            throw new Error(
+              'Cannot perform dynamic registration without issuer',
+            );
+          }
+
+          debugLogger.debug('→ Attempting dynamic client registration...');
+          const { metadata: authServerMetadata } =
+            await this.discoverAuthServerMetadataForRegistration(config.issuer);
+          registrationUrl = authServerMetadata.registration_endpoint;
         }
 
-        debugLogger.debug('→ Attempting dynamic client registration...');
-        const { metadata: authServerMetadata } =
-          await this.discoverAuthServerMetadataForRegistration(config.issuer);
-        registrationUrl = authServerMetadata.registration_endpoint;
+        // Register client if registration endpoint is available
+        if (registrationUrl) {
+          const clientRegistration = await this.registerClient(
+            registrationUrl,
+            config,
+            redirectPort,
+          );
+
+          config.clientId = clientRegistration.client_id;
+          if (clientRegistration.client_secret) {
+            config.clientSecret = clientRegistration.client_secret;
+          }
+
+          debugLogger.debug('✓ Dynamic client registration successful');
+        } else {
+          throw new Error(
+            'No client ID provided and dynamic registration not supported',
+          );
+        }
       }
 
-      // Register client if registration endpoint is available
-      if (registrationUrl) {
-        const clientRegistration = await this.registerClient(
-          registrationUrl,
-          config,
-          redirectPort,
-        );
-
-        config.clientId = clientRegistration.client_id;
-        if (clientRegistration.client_secret) {
-          config.clientSecret = clientRegistration.client_secret;
-        }
-
-        debugLogger.debug('✓ Dynamic client registration successful');
-      } else {
+      // Validate configuration
+      if (!config.clientId || !config.authorizationUrl || !config.tokenUrl) {
         throw new Error(
-          'No client ID provided and dynamic registration not supported',
+          'Missing required OAuth configuration after discovery and registration',
         );
       }
-    }
 
-    // Validate configuration
-    if (!config.clientId || !config.authorizationUrl || !config.tokenUrl) {
-      throw new Error(
-        'Missing required OAuth configuration after discovery and registration',
+      // Build flow config for shared utilities
+      const flowConfig: OAuthFlowConfig = {
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        authorizationUrl: config.authorizationUrl,
+        tokenUrl: config.tokenUrl,
+        scopes: config.scopes,
+        audiences: config.audiences,
+        redirectUri: config.redirectUri,
+      };
+
+      // Build authorization URL
+      const resource = this.buildResourceParam(mcpServerUrl);
+      const authUrl = buildAuthorizationUrl(
+        flowConfig,
+        pkceParams,
+        redirectPort,
+        resource,
       );
-    }
 
-    // Build flow config for shared utilities
-    const flowConfig: OAuthFlowConfig = {
-      clientId: config.clientId,
-      clientSecret: config.clientSecret,
-      authorizationUrl: config.authorizationUrl,
-      tokenUrl: config.tokenUrl,
-      scopes: config.scopes,
-      audiences: config.audiences,
-      redirectUri: config.redirectUri,
-    };
+      const userConsent = await getConsentForOauth(
+        `Authentication required for MCP Server: '${serverName}.'`,
+      );
+      if (!userConsent) {
+        throw new FatalCancellationError('Authentication cancelled by user.');
+      }
 
-    // Build authorization URL
-    const resource = this.buildResourceParam(mcpServerUrl);
-    const authUrl = buildAuthorizationUrl(
-      flowConfig,
-      pkceParams,
-      redirectPort,
-      resource,
-    );
-
-    const userConsent = await getConsentForOauth(
-      `Authentication required for MCP Server: '${serverName}.'`,
-    );
-    if (!userConsent) {
-      throw new FatalCancellationError('Authentication cancelled by user.');
-    }
-
-    displayMessage(`→ Opening your browser for OAuth sign-in...
+      displayMessage(`→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}
@@ -460,82 +463,85 @@ ${authUrl}
 💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
 ⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
-    // Open browser securely (callback server is already running)
-    try {
-      await openBrowserSecurely(authUrl);
-    } catch (error) {
-      debugLogger.warn(
-        'Failed to open browser automatically:',
-        getErrorMessage(error),
-      );
-    }
-
-    // Wait for callback
-    const { code } = await callbackServer.response;
-
-    debugLogger.debug(
-      '✓ Authorization code received, exchanging for tokens...',
-    );
-
-    // Exchange code for tokens
-    const tokenResponse = await exchangeCodeForToken(
-      flowConfig,
-      code,
-      pkceParams.codeVerifier,
-      redirectPort,
-      resource,
-    );
-
-    // Convert to our token format
-    if (!tokenResponse.access_token) {
-      throw new Error('No access token received from token endpoint');
-    }
-
-    const token: OAuthToken = {
-      accessToken: tokenResponse.access_token,
-      tokenType: tokenResponse.token_type || 'Bearer',
-      refreshToken: tokenResponse.refresh_token,
-      scope: tokenResponse.scope,
-    };
-
-    if (tokenResponse.expires_in) {
-      token.expiresAt = Date.now() + tokenResponse.expires_in * 1000;
-    }
-
-    // Save token
-    try {
-      await this.tokenStorage.saveToken(
-        serverName,
-        token,
-        config.clientId,
-        config.tokenUrl,
-        mcpServerUrl,
-      );
-      debugLogger.debug('✓ Authentication successful! Token saved.');
-
-      // Verify token was saved
-      const savedToken = await this.tokenStorage.getCredentials(serverName);
-      if (savedToken && savedToken.token && savedToken.token.accessToken) {
-        // Avoid leaking token material; log a short SHA-256 fingerprint instead.
-        const tokenFingerprint = crypto
-          .createHash('sha256')
-          .update(savedToken.token.accessToken)
-          .digest('hex')
-          .slice(0, 8);
-        debugLogger.debug(
-          `✓ Token verification successful (fingerprint: ${tokenFingerprint})`,
-        );
-      } else {
+      // Open browser securely (callback server is already running)
+      try {
+        await openBrowserSecurely(authUrl);
+      } catch (error) {
         debugLogger.warn(
-          'Token verification failed: token not found or invalid after save',
+          'Failed to open browser automatically:',
+          getErrorMessage(error),
         );
       }
-    } catch (saveError) {
-      debugLogger.error('Failed to save auth token.', saveError);
-      throw saveError;
-    }
 
-    return token;
+      // Wait for callback
+      const { code } = await callbackServer.response;
+
+      debugLogger.debug(
+        '✓ Authorization code received, exchanging for tokens...',
+      );
+
+      // Exchange code for tokens
+      const tokenResponse = await exchangeCodeForToken(
+        flowConfig,
+        code,
+        pkceParams.codeVerifier,
+        redirectPort,
+        resource,
+      );
+
+      // Convert to our token format
+      if (!tokenResponse.access_token) {
+        throw new Error('No access token received from token endpoint');
+      }
+
+      const token: OAuthToken = {
+        accessToken: tokenResponse.access_token,
+        tokenType: tokenResponse.token_type || 'Bearer',
+        refreshToken: tokenResponse.refresh_token,
+        scope: tokenResponse.scope,
+      };
+
+      if (tokenResponse.expires_in) {
+        token.expiresAt = Date.now() + tokenResponse.expires_in * 1000;
+      }
+
+      // Save token
+      try {
+        await this.tokenStorage.saveToken(
+          serverName,
+          token,
+          config.clientId,
+          config.tokenUrl,
+          mcpServerUrl,
+        );
+        debugLogger.debug('✓ Authentication successful! Token saved.');
+
+        // Verify token was saved
+        const savedToken = await this.tokenStorage.getCredentials(serverName);
+        if (savedToken && savedToken.token && savedToken.token.accessToken) {
+          // Avoid leaking token material; log a short SHA-256 fingerprint instead.
+          const tokenFingerprint = crypto
+            .createHash('sha256')
+            .update(savedToken.token.accessToken)
+            .digest('hex')
+            .slice(0, 8);
+          debugLogger.debug(
+            `✓ Token verification successful (fingerprint: ${tokenFingerprint})`,
+          );
+        } else {
+          debugLogger.warn(
+            'Token verification failed: token not found or invalid after save',
+          );
+        }
+      } catch (saveError) {
+        debugLogger.error('Failed to save auth token.', saveError);
+        throw saveError;
+      }
+
+      return token;
+    } finally {
+      callbackServer.close();
+    }
   }
 
   /**

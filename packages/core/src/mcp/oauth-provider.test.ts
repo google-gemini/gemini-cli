@@ -137,6 +137,22 @@ vi.mock('node:http', () => ({
   createServer: vi.fn(() => mockHttpServer),
 }));
 
+// Mock startCallbackServer to return what the new implementation returns
+vi.mock('../utils/oauth-flow.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    startCallbackServer: vi.fn((expectedState: string, port?: number) => {
+      const result = actual.startCallbackServer(expectedState, port);
+      // Ensure the mock server is used if createServer is mocked
+      if (vi.isMockFunction(http.createServer)) {
+        result.server = mockHttpServer;
+      }
+      return result;
+    }),
+  };
+});
+
 describe('MCPOAuthProvider', () => {
   const mockConfig: MCPOAuthConfig = {
     enabled: true,
