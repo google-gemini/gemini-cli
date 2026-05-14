@@ -386,9 +386,20 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    const hardenedHistory = hardenHistory(renderedHistory, {
+    // We must temporarily append the pendingRequest (if any) before hardening.
+    // Otherwise, the hardener will see dangling functionCalls and inject sentinels
+    // even though the pendingRequest provides the required functionResponses.
+    const fullHistoryToHarden = pendingRequest
+      ? [...renderedHistory, pendingRequest]
+      : renderedHistory;
+
+    const hardenedHistory = hardenHistory(fullHistoryToHarden, {
       sentinels: this.sidecar.sentinels,
     });
+
+    if (pendingRequest) {
+      hardenedHistory.pop(); // Remove the pending request from the final output
+    }
 
     const apiHistory = hardenedHistory.map((h) => h.content);
     if (header) {

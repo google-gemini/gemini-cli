@@ -42,7 +42,9 @@ export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
   private handleGroundTruth(actualTokens: number, promptBaseUnits: number) {
     if (promptBaseUnits <= 0) return;
 
-    const overheadTokens = this.getOverheadTokens ? this.getOverheadTokens() : 0;
+    const overheadTokens = this.getOverheadTokens
+      ? this.getOverheadTokens()
+      : 0;
 
     // The Gemini API token count includes the static overhead (system instruction + tools)
     // and the dynamic chat history (which we measure as promptBaseUnits).

@@ -134,6 +134,84 @@ describe('hardenHistory', () => {
     expect(hardened[2].id).toBe(deriveStableId(['2', 'sentinel_resp']));
   });
 
+  it('should successfully match parallel tool calls and responses even if responses are originally split across separate user turns', () => {
+    const history: HistoryTurn[] = [
+      { id: '1', content: { role: 'user', parts: [{ text: 'do it' }] } },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { id: 'call_1', name: 'toolA', args: {} },
+              thoughtSignature: 'sig',
+            },
+            { functionCall: { id: 'call_2', name: 'toolB', args: {} } },
+          ],
+        },
+      },
+      // Responses arrive as separate user turns
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call_1',
+                name: 'toolA',
+                response: { ok: true },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: '4',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call_2',
+                name: 'toolB',
+                response: { ok: true },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    // The hardener should coalesce Turn 3 and Turn 4 *before* it tries to pair them with Turn 2.
+    // Otherwise, it would look at Turn 3, see 'call_2' is missing, inject a sentinel for 'call_2',
+    // and then look at Turn 4 and consider 'call_2' to be orphaned.
+    const hardened = hardenHistory(history);
+
+    // Total turns: User(1), Model(2), User(3+4 merged)
+    expect(hardened.length).toBe(3);
+
+    const userResponseTurn = hardened[2];
+    expect(userResponseTurn.content.role).toBe('user');
+    expect(userResponseTurn.content.parts).toHaveLength(2);
+
+    // Verify no sentinels were injected and original responses were preserved
+    expect(userResponseTurn.content.parts![0].functionResponse?.id).toBe(
+      'call_1',
+    );
+    expect(userResponseTurn.content.parts![1].functionResponse?.id).toBe(
+      'call_2',
+    );
+
+    // Ensure no error properties exist
+    expect(
+      userResponseTurn.content.parts![0].functionResponse?.response,
+    ).toEqual({ ok: true });
+    expect(
+      userResponseTurn.content.parts![1].functionResponse?.response,
+    ).toEqual({ ok: true });
+  });
+
   it('should drop orphaned functionResponses', () => {
     const history: HistoryTurn[] = [
       { id: '1', content: { role: 'user', parts: [{ text: 'hello' }] } },
