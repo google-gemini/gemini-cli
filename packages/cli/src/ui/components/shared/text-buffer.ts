@@ -926,6 +926,9 @@ export function getTransformedImagePath(filePath: string): string {
   const baseName = path.basename(fileName, extension);
 
   if (baseName.startsWith('clipboard-')) {
+    if (clipboardImageIdMap.size > 1000) {
+      clipboardImageIdMap.clear();
+    }
     let id = clipboardImageIdMap.get(baseName);
     if (id === undefined) {
       id = nextClipboardImageId++;

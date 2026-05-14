@@ -252,6 +252,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     shortcutsHelpVisible,
     isVoiceModeEnabled,
   } = useUIState();
+
+  const bufferRef = useRef(buffer);
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
+
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
     useRepeatedKeyPress({
@@ -544,9 +550,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const relativePath = path.relative(config.getTargetDir(), imagePath);
 
           // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
-          const currentText = buffer.text;
-          const offset = buffer.getOffset();
+          const escapedPath = relativePath.replace(/ /g, '\\ ');
+          const insertText = `@${escapedPath}`;
+          const currentBuffer = bufferRef.current;
+          const currentText = currentBuffer.text;
+          const offset = currentBuffer.getOffset();
 
           // Add spaces around the path if needed
           let textToInsert = insertText;
@@ -562,7 +570,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
 
           // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          currentBuffer.replaceRangeByOffset(offset, offset, textToInsert);
         }
       }
 
@@ -573,7 +581,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const escapedText = settings.ui?.escapePastedAtSymbols
           ? escapeAtSymbols(textToInsert)
           : textToInsert;
-        buffer.insert(escapedText, { paste: true });
+        bufferRef.current.insert(escapedText, { paste: true });
 
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
@@ -585,14 +593,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [
-    buffer,
-    config,
-    stdout,
-    settings,
-    shortcutsHelpVisible,
-    setShortcutsHelpVisible,
-  ]);
+  }, [config, stdout, settings, shortcutsHelpVisible, setShortcutsHelpVisible]);
 
   useMouseClick(
     innerBoxRef,
@@ -832,9 +833,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   config.getTargetDir(),
                   imagePath,
                 );
-                const insertText = `@${relativePath}`;
-                const currentText = buffer.text;
-                const offset = buffer.getOffset();
+                const escapedPath = relativePath.replace(/ /g, '\\ ');
+                const insertText = `@${escapedPath}`;
+                const currentBuffer = bufferRef.current;
+                const currentText = currentBuffer.text;
+                const offset = currentBuffer.getOffset();
                 let textToInsert = insertText;
                 const charBefore = offset > 0 ? currentText[offset - 1] : '';
                 const charAfter =
@@ -845,7 +848,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
                   textToInsert = textToInsert + ' ';
                 }
-                buffer.replaceRangeByOffset(offset, offset, textToInsert);
+                currentBuffer.replaceRangeByOffset(
+                  offset,
+                  offset,
+                  textToInsert,
+                );
               }
             }
           } catch (error) {
