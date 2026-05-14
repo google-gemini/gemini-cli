@@ -202,12 +202,14 @@ async function calculateFlexibleReplacement(
       const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
       const newBlockWithIndent = applyIndentation(replaceLines, indentation);
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      i += replaceLines.length;
+
+      let replacementText = newBlockWithIndent.join('\n');
+      if (window[window.length - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(i, searchLinesStripped.length, replacementText);
+      i += 1;
     } else {
       i++;
     }
