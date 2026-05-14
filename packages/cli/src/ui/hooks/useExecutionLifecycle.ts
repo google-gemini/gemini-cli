@@ -151,14 +151,13 @@ export const useExecutionLifecycle = (
 
   useEffect(
     () => () => {
-      if (!isActive) return;
       // Unsubscribe from all background task events on unmount
       for (const unsubscribe of m.subscriptions.values()) {
         unsubscribe();
       }
       m.subscriptions.clear();
     },
-    [m, isActive],
+    [m],
   );
 
   const toggleBackgroundTasks = useCallback(() => {
@@ -330,7 +329,6 @@ export const useExecutionLifecycle = (
   // ExecutionLifecycleService.createExecution() or attachExecution()
   // automatically gets Ctrl+B support — no UI changes needed per tool.
   useEffect(() => {
-    if (!isActive) return;
     const listener = (info: {
       executionId: number;
       label: string;
@@ -352,7 +350,7 @@ export const useExecutionLifecycle = (
     return () => {
       ExecutionLifecycleService.offBackground(listener);
     };
-  }, [registerBackgroundTask, m, isActive]);
+  }, [registerBackgroundTask, m]);
 
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
