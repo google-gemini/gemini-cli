@@ -10,18 +10,24 @@ import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const dateStr = sevenDaysAgo.toISOString().split('T')[0];
+
   const query = `
-  query($owner: String!, $repo: String!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequests(last: 100, states: MERGED) {
-        nodes {
+  query($prQuery: String!, $issueQuery: String!) {
+    prSearch: search(query: $prQuery, type: ISSUE, first: 1000) {
+      nodes {
+        ... on PullRequest {
           authorAssociation
           comments { totalCount }
           reviews { totalCount }
         }
       }
-      issues(last: 100, states: CLOSED) {
-        nodes {
+    }
+    issueSearch: search(query: $issueQuery, type: ISSUE, first: 1000) {
+      nodes {
+        ... on Issue {
           authorAssociation
           comments { totalCount }
         }
@@ -29,14 +35,21 @@ try {
     }
   }
   `;
+
+  const prQuery = `repo:${GITHUB_OWNER}/${GITHUB_REPO} is:pr updated:>=${dateStr}`;
+  const issueQuery = `repo:${GITHUB_OWNER}/${GITHUB_REPO} is:issue updated:>=${dateStr}`;
+
   const output = execSync(
-    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
+    `gh api graphql -F prQuery='${prQuery}' -F issueQuery='${issueQuery}' -f query='${query}'`,
     { encoding: 'utf-8' },
   );
-  const data = JSON.parse(output).data.repository;
+  const data = JSON.parse(output).data;
+  if (!data) {
+    throw new Error('No data returned from GraphQL API');
+  }
 
-  const prs = data.pullRequests.nodes;
-  const issues = data.issues.nodes;
+  const prs = data.prSearch?.nodes || [];
+  const issues = data.issueSearch?.nodes || [];
 
   const allItems = [
     ...prs.map(

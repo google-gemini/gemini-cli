@@ -10,11 +10,15 @@ import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const dateStr = sevenDaysAgo.toISOString().split('T')[0];
+
   const query = `
-  query($owner: String!, $repo: String!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequests(last: 100) {
-        nodes {
+  query($prQuery: String!, $issueQuery: String!) {
+    prSearch: search(query: $prQuery, type: ISSUE, first: 1000) {
+      nodes {
+        ... on PullRequest {
           authorAssociation
           author { login }
           createdAt
@@ -32,15 +36,17 @@ try {
           }
         }
       }
-      issues(last: 100) {
-        nodes {
-          authorAssociation
-          author { login }
-          createdAt
-          comments(first: 20) {
-            nodes {
-              author { login }
-              createdAt
+    }
+    issueSearch: search(query: $issueQuery, type: ISSUE, first: 1000) {
+          ... on Issue {
+            authorAssociation
+            author { login }
+            createdAt
+            comments(first: 20) {
+              nodes {
+                author { login }
+                createdAt
+              }
             }
           }
         }
@@ -48,11 +54,18 @@ try {
     }
   }
   `;
+
+  const prQuery = `repo:${GITHUB_OWNER}/${GITHUB_REPO} is:pr created:>=${dateStr}`;
+  const issueQuery = `repo:${GITHUB_OWNER}/${GITHUB_REPO} is:issue created:>=${dateStr}`;
+
   const output = execSync(
-    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
+    `gh api graphql -F prQuery='${prQuery}' -F issueQuery='${issueQuery}' -f query='${query}'`,
     { encoding: 'utf-8' },
   );
-  const data = JSON.parse(output).data.repository;
+  const data = JSON.parse(output).data;
+  if (!data) {
+    throw new Error('No data returned from GraphQL API');
+  }
 
   const getFirstResponseTime = (item: {
     createdAt: string;
@@ -91,31 +104,23 @@ try {
     }
     return null; // No response yet
   };
+
   const processItems = (
-    items: {
-      authorAssociation: string;
-      createdAt: string;
-      author: { login: string };
-      comments: {
-        nodes: { createdAt: string; author?: { login: string } }[];
-      };
-      reviews?: {
-        nodes: { createdAt: string; author?: { login: string } }[];
-      };
-    }[],
+    items: any[],
   ) => {
-    return items
+    return (items || [])
       .map((item) => ({
-        association: item.authorAssociation,
-        ttfr: getFirstResponseTime(item),
+        association: item?.authorAssociation,
+        ttfr: item ? getFirstResponseTime(item) : null,
       }))
       .filter((i) => i.ttfr !== null) as {
       association: string;
       ttfr: number;
     }[];
   };
-  const prs = processItems(data.pullRequests.nodes);
-  const issues = processItems(data.issues.nodes);
+
+  const prs = processItems(data.prSearch?.nodes);
+  const issues = processItems(data.issueSearch?.nodes);
   const allItems = [...prs, ...issues];
 
   const isMaintainer = (assoc: string) =>
