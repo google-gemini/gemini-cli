@@ -188,7 +188,11 @@ export async function loadConversationRecord(
         if (userLine) {
           try {
             const record = JSON.parse(userLine) as unknown;
-            if (hasProperty(record, 'content')) {
+            if (
+              hasProperty(record, 'type') &&
+              record.type === 'user' &&
+              hasProperty(record, 'content')
+            ) {
               const content = record.content;
               if (Array.isArray(content)) {
                 firstUserMessage = content
