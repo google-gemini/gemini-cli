@@ -14,6 +14,13 @@ import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import type { ContextEventBus, TokenGroundTruthEvent } from '../eventBus.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
+export interface AdaptiveLearningConfig {
+  /** The momentum factor for the Exponential Moving Average (EMA). Defaults to 0.2. */
+  learningRate?: number;
+  /** The absolute maximum change allowed to the weight in a single turn. Defaults to 0.15. */
+  maxStep?: number;
+}
+
 /**
  * An Adaptive Token Calculator that dynamically learns the true token cost of the user's
  * conversation by applying an Exponential Moving Average (EMA) gradient descent to
@@ -26,13 +33,18 @@ import { debugLogger } from '../../utils/debugLogger.js';
 export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
   private learnedWeight = 1.0;
   private readonly baseCalculator: StaticTokenCalculator;
+  private readonly learningRate: number;
+  private readonly maxStep: number;
 
   constructor(
     charsPerToken: number,
     registry: NodeBehaviorRegistry,
     eventBus: ContextEventBus,
     private readonly getOverheadTokens?: () => number,
+    config?: AdaptiveLearningConfig,
   ) {
+    this.learningRate = config?.learningRate ?? 0.2;
+    this.maxStep = config?.maxStep ?? 0.15;
     this.baseCalculator = new StaticTokenCalculator(charsPerToken, registry);
     eventBus.onTokenGroundTruth((event: TokenGroundTruthEvent) => {
       this.handleGroundTruth(event.actualTokens, event.promptBaseUnits);
@@ -53,20 +65,33 @@ export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
     const actualGraphTokens = Math.max(0, actualTokens - overheadTokens);
 
     // Determine what ratio we should have used
-    const targetWeight = actualGraphTokens / promptBaseUnits;
+    const rawTargetWeight = actualGraphTokens / promptBaseUnits;
     const oldWeight = this.learnedWeight;
 
-    // Apply Momentum (Learning Rate)
-    const learningRate = 0.2;
-    const newWeight =
-      oldWeight * (1 - learningRate) + targetWeight * learningRate;
+    // Dampen extreme outliers *before* applying the EMA by capping the target weight
+    // to a reasonable multiple of the current weight. This prevents a single massive
+    // anomaly from destroying the running average.
+    const targetWeight = Math.max(
+      oldWeight * 0.5,
+      Math.min(rawTargetWeight, oldWeight * 2.0),
+    );
 
-    // Clamp to reasonable safety bounds to prevent rogue metadata poisoning the system
+    // Apply Momentum (Learning Rate)
+    let newWeight =
+      oldWeight * (1 - this.learningRate) + targetWeight * this.learningRate;
+
+    // Hard limit the maximum step size per turn to prevent violent oscillation
+    if (newWeight > oldWeight + this.maxStep)
+      newWeight = oldWeight + this.maxStep;
+    if (newWeight < oldWeight - this.maxStep)
+      newWeight = oldWeight - this.maxStep;
+
+    // Clamp to reasonable absolute safety bounds
     this.learnedWeight = Math.max(0.5, Math.min(newWeight, 2.0));
 
     debugLogger.log(
       `[AdaptiveTokenCalculator] Learned weight updated to ${this.learnedWeight.toFixed(3)} ` +
-        `(API Tokens: ${actualTokens}, Base Units: ${promptBaseUnits}, Target Ratio: ${targetWeight.toFixed(3)})`,
+        `(API Tokens: ${actualTokens}, Overhead: ${overheadTokens}, Graph Tokens: ${actualGraphTokens}, Base Units: ${promptBaseUnits}, Target Ratio: ${targetWeight.toFixed(3)})`,
     );
   }
 

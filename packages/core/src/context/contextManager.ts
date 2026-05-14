@@ -147,11 +147,11 @@ export class ContextManager {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
 
-      // Identify active tool calls that must NEVER be truncated
+      // Identify nodes that must NEVER be truncated
       const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
       if (protectedIds.size > 0) {
         debugLogger.log(
-          `[ContextManager] Pinning ${protectedIds.size} active tool call nodes to prevent truncation.`,
+          `[ContextManager] Pinning ${protectedIds.size} nodes (recent_turn or external_active_task) to prevent truncation.`,
         );
       }
 

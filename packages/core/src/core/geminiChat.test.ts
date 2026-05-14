@@ -41,6 +41,7 @@ import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils
 import type { HookSystem } from '../hooks/hookSystem.js';
 import { LlmRole } from '../telemetry/types.js';
 import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
+import type { ResumedSessionData } from '../services/chatRecordingTypes.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -249,6 +250,60 @@ describe('GeminiChat', () => {
     it('should initialize lastPromptTokenCount for empty history', () => {
       const chatEmpty = new GeminiChat(mockConfig);
       expect(chatEmpty.getLastPromptTokenCount()).toBe(0);
+    });
+
+    it('should prioritize in-memory history over resumedSessionData', () => {
+      // This test simulates a "hot restart" after a context management operation
+      // like compression, where the in-memory history is shorter and more up-to-date
+      // than the session data that might be on disk.
+
+      // 1. A stale, longer history from a persisted session record
+      const resumedSessionData = {
+        conversation: {
+          messages: [
+            {
+              id: 'a',
+              type: 'user',
+              content: [{ text: 'turn 1' }],
+              create_time: new Date(),
+            },
+            {
+              id: 'b',
+              type: 'gemini',
+              content: [{ text: 'turn 2' }],
+              create_time: new Date(),
+            },
+            {
+              id: 'c',
+              type: 'user',
+              content: [{ text: 'turn 3' }],
+              create_time: new Date(),
+            },
+          ],
+        },
+      } as unknown as ResumedSessionData;
+
+      // 2. A fresh, compressed in-memory history
+      const compressedHistory: HistoryTurn[] = [
+        {
+          id: 'summary-1',
+          content: { role: 'user', parts: [{ text: 'summary of turns 1-3' }] },
+        },
+      ];
+
+      // 3. Instantiate the chat, providing both.
+      const chat = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        compressedHistory, // This should be prioritized
+        resumedSessionData, // This should be ignored
+      );
+
+      // 4. Assert that the shorter, in-memory history was used.
+      const finalHistory = chat.getHistoryTurns();
+      expect(finalHistory).toHaveLength(1);
+      expect(finalHistory[0].id).toBe('summary-1');
     });
   });
 

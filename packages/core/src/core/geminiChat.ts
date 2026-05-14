@@ -283,24 +283,33 @@ export class GeminiChat {
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
-    const initialHistory: HistoryTurn[] = resumedSessionData
-      ? resumedSessionData.conversation.messages
-          .filter((m) => m.type === 'user' || m.type === 'gemini')
-          .map((m) => ({
-            id: m.id,
-            content: {
-              role: m.type === 'user' ? 'user' : 'model',
-              parts: Array.isArray(m.content)
-                ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                  (m.content as Part[])
-                : [{ text: String(m.content) }],
-            },
-          }))
-      : history.map((item) =>
-          'id' in item && 'content' in item
-            ? item
-            : { id: randomUUID(), content: item },
-        );
+
+    let initialHistory: HistoryTurn[];
+    // If history is passed, it is the most up-to-date in-memory state and takes precedence.
+    // This is critical for hot-restarts after operations like context compression.
+    if (history.length > 0) {
+      initialHistory = history.map((item) =>
+        'id' in item && 'content' in item
+          ? item
+          : { id: randomUUID(), content: item },
+      );
+    } else if (resumedSessionData) {
+      // Otherwise, if resuming from disk, build from the persisted record.
+      initialHistory = resumedSessionData.conversation.messages
+        .filter((m) => m.type === 'user' || m.type === 'gemini')
+        .map((m) => ({
+          id: m.id,
+          content: {
+            role: m.type === 'user' ? 'user' : 'model',
+            parts: Array.isArray(m.content)
+              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                (m.content as Part[])
+              : [{ text: String(m.content) }],
+          },
+        }));
+    } else {
+      initialHistory = [];
+    }
 
     this.agentHistory = new AgentChatHistory(initialHistory);
     this.chatRecordingService = new ChatRecordingService(context);
