@@ -122,4 +122,29 @@ describe('AdaptiveTokenCalculator', () => {
 
     expect(calculator.getLearnedWeight()).toBe(1.0);
   });
+
+  it('should subtract overhead tokens from actual tokens when determining target weight', () => {
+    const eventBus = new ContextEventBus();
+    const getOverheadTokens = () => 40;
+    const calculator = new AdaptiveTokenCalculator(
+      charsPerToken,
+      registry,
+      eventBus,
+      getOverheadTokens,
+    );
+
+    // Initial state: weight = 1.0
+
+    // Simulate an event where the API reported 100 tokens, and our base units were 100
+    // But overhead is 40.
+    // actualGraphTokens = 100 - 40 = 60
+    // targetWeight = 60 / 100 = 0.6
+    // newWeight = 1.0 * 0.8 + 0.6 * 0.2 = 0.8 + 0.12 = 0.92
+    eventBus.emitTokenGroundTruth({
+      actualTokens: 100,
+      promptBaseUnits: 100,
+    });
+
+    expect(calculator.getLearnedWeight()).toBeCloseTo(0.92, 5);
+  });
 });

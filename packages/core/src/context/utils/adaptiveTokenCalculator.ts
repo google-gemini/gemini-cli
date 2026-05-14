@@ -31,6 +31,7 @@ export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
     charsPerToken: number,
     registry: NodeBehaviorRegistry,
     eventBus: ContextEventBus,
+    private readonly getOverheadTokens?: () => number,
   ) {
     this.baseCalculator = new StaticTokenCalculator(charsPerToken, registry);
     eventBus.onTokenGroundTruth((event: TokenGroundTruthEvent) => {
@@ -41,8 +42,16 @@ export class AdaptiveTokenCalculator implements AdvancedTokenCalculator {
   private handleGroundTruth(actualTokens: number, promptBaseUnits: number) {
     if (promptBaseUnits <= 0) return;
 
+    const overheadTokens = this.getOverheadTokens ? this.getOverheadTokens() : 0;
+
+    // The Gemini API token count includes the static overhead (system instruction + tools)
+    // and the dynamic chat history (which we measure as promptBaseUnits).
+    // We subtract the overhead so the adaptive calculator is comparing "apples to apples"
+    // when learning the weight multiplier for the graph nodes.
+    const actualGraphTokens = Math.max(0, actualTokens - overheadTokens);
+
     // Determine what ratio we should have used
-    const targetWeight = actualTokens / promptBaseUnits;
+    const targetWeight = actualGraphTokens / promptBaseUnits;
     const oldWeight = this.learnedWeight;
 
     // Apply Momentum (Learning Rate)

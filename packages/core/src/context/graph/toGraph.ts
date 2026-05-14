@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { NodeIdService } from './nodeIdService.js';
 import type { HistoryTurn } from '../../core/agentChatHistory.js';
+import { isSnapshotState } from '../utils/snapshotGenerator.js';
 
 // Global WeakMap to cache hashes for Part objects.
 // This optimizes getStableId by avoiding redundant stringify/hash operations
@@ -215,12 +216,16 @@ export class ContextGraphBuilder {
             ? `${apiId}_${turnSalt}_${partIdx}`
             : `${turnSalt}_${partIdx}`;
 
+          const isSnapshot = isTextPart(part) && isSnapshotState(part.text);
+
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
             type: isFunctionResponsePart(part)
               ? NodeType.TOOL_EXECUTION
-              : NodeType.USER_PROMPT,
+              : isSnapshot
+                ? NodeType.SNAPSHOT
+                : NodeType.USER_PROMPT,
             role: 'user',
             payload: part,
             turnId,

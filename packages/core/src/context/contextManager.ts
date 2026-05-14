@@ -9,7 +9,7 @@ import type {
   AgentChatHistory,
   HistoryTurn,
 } from '../core/agentChatHistory.js';
-import { isToolExecution, type ConcreteNode } from './graph/types.js';
+import type { ConcreteNode } from './graph/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
@@ -235,24 +235,7 @@ export class ContextManager {
       }
     }
 
-    // 2. Identify active tool calls that must NEVER be truncated
-    const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
-    const responses = new Set(
-      nodes
-        .filter((n) => isToolExecution(n) && n.role === 'user')
-        .map((n) => n.payload.functionResponse?.id)
-        .filter((id): id is string => !!id),
-    );
-
-    for (const call of calls) {
-      const id = call.payload.functionCall?.id;
-      // If we have a call but no response in the current graph, it's 'in flight'
-      if (id && !responses.has(id)) {
-        protectionMap.set(call.id, 'in_flight_tool_call');
-      }
-    }
-
-    // 3. Any externally requested protections
+    // 2. Any externally requested protections
     for (const id of extraProtectedIds) {
       protectionMap.set(id, 'external_active_task');
     }

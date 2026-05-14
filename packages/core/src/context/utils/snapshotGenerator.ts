@@ -48,6 +48,25 @@ export interface SnapshotState {
   recent_arc: string[];
 }
 
+export function isSnapshotState(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return false;
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!isRecord(parsed)) return false;
+    return (
+      Array.isArray(parsed['active_tasks']) &&
+      Array.isArray(parsed['discovered_facts']) &&
+      Array.isArray(parsed['constraints_and_preferences']) &&
+      Array.isArray(parsed['recent_arc'])
+    );
+  } catch {
+    return false;
+  }
+}
+
 export interface BaselineSnapshotInfo {
   text: string;
   abstractsIds: string[];
