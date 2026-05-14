@@ -791,6 +791,7 @@ export class GeminiClient {
       displayContent,
     );
     let isError = false;
+    let streamedResponseText = '';
 
     let loopDetectedAbort = false;
     let loopRecoverResult: { detail?: string } | undefined;
@@ -808,6 +809,9 @@ export class GeminiClient {
         }
         loopRecoverResult = loopResult;
         break;
+      }
+      if (event.type === GeminiEventType.Content) {
+        streamedResponseText += event.value;
       }
       yield event;
 
@@ -847,7 +851,7 @@ export class GeminiClient {
     // We do this immediately after the stream finishes for THIS turn.
     const hooksEnabled = this.config.getEnableHooks();
     if (hooksEnabled) {
-      const responseText = turn.getResponseText() || '';
+      const responseText = streamedResponseText || turn.getResponseText() || '';
       const hookState = this.hookStateMap.get(prompt_id);
       if (hookState && responseText) {
         // Append with newline if not empty

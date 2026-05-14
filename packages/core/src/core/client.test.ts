@@ -3304,6 +3304,159 @@ ${JSON.stringify(
         );
       });
 
+      it('should build AfterAgent prompt_response from streamed content events', async () => {
+        const promptId = 'test-prompt-hook-streamed-response';
+        const request = { text: 'Hi' };
+        const signal = new AbortController().signal;
+
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue(
+            'Hello! I am ready Hello! I am ready to help',
+          );
+          yield { type: GeminiEventType.Content, value: 'Hello! I am ready' };
+          yield { type: GeminiEventType.Content, value: ' to help' };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Hello! I am ready to help',
+          false,
+        );
+      });
+
+      it('should preserve turn boundaries when building AfterAgent prompt_response from recursive streamed content', async () => {
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        vi.mocked(checkNextSpeaker)
+          .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
+          .mockResolvedValueOnce(null);
+
+        const promptId = 'test-prompt-hook-recursive-streamed-response';
+        const request = { text: 'Continue twice' };
+        const signal = new AbortController().signal;
+
+        let callCount = 0;
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          callCount++;
+          const response = `Response ${callCount}`;
+          this.getResponseText.mockReturnValue(`${response} ${response}`);
+          yield { type: GeminiEventType.Content, value: response };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Response 1\nResponse 2',
+          false,
+        );
+      });
+
+      it('should fall back to turn response text when no content events are streamed', async () => {
+        const promptId = 'test-prompt-hook-response-fallback';
+        const request = { text: 'Hi' };
+        const signal = new AbortController().signal;
+
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Fallback response');
+          yield { type: GeminiEventType.Finished, value: {} };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Fallback response',
+          false,
+        );
+      });
+
+      it('should match AfterAgent prompt_response to yielded content across mixed stream events', async () => {
+        const promptId = 'test-prompt-hook-mixed-stream-response';
+        const request = { text: 'Show formatted output' };
+        const signal = new AbortController().signal;
+
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue(
+            'First line First line Second line',
+          );
+          yield { type: GeminiEventType.ModelInfo, value: 'gemini-test' };
+          yield { type: GeminiEventType.Content, value: 'First line\n' };
+          yield {
+            type: GeminiEventType.Citation,
+            value: 'Citations:\n(Source) https://example.com/source',
+          };
+          yield { type: GeminiEventType.Content, value: '  Second line' };
+          yield { type: GeminiEventType.Finished, value: {} };
+        });
+
+        const events = await fromAsync(
+          client.sendMessageStream(request, signal, promptId),
+        );
+        const yieldedText = events
+          .filter((event) => event.type === GeminiEventType.Content)
+          .map((event) => event.value)
+          .join('');
+
+        expect(yieldedText).toBe('First line\n  Second line');
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          yieldedText,
+          false,
+        );
+      });
+
+      it('should keep streamed and fallback response sources isolated across recursive turns', async () => {
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        vi.mocked(checkNextSpeaker)
+          .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
+          .mockResolvedValueOnce(null);
+
+        const promptId = 'test-prompt-hook-mixed-recursive-sources';
+        const request = { text: 'Continue with fallback' };
+        const signal = new AbortController().signal;
+
+        let callCount = 0;
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          callCount++;
+          if (callCount === 1) {
+            this.getResponseText.mockReturnValue('First turn First turn');
+            yield { type: GeminiEventType.Content, value: 'First turn' };
+            return;
+          }
+
+          this.getResponseText.mockReturnValue('Second turn fallback');
+          yield { type: GeminiEventType.Finished, value: {} };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'First turn\nSecond turn fallback',
+          false,
+        );
+      });
+
       it('should cleanup state when prompt_id changes', async () => {
         const signal = new AbortController().signal;
         mockTurnRunFn.mockImplementation(async function* (
