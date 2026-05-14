@@ -87,9 +87,28 @@ export async function resolveExecutable(
       return undefined;
     }
   }
+
+  const isWindows = os.platform() === 'win32';
+  const isLinux = os.platform() === 'linux';
+
   const paths = (process.env['PATH'] || '').split(path.delimiter);
-  const extensions =
-    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+  // On Linux (especially RHEL/CentOS), add common shell locations as fallback
+  // since PATH might not include them in some environments.
+  if (isLinux && (exe === 'bash' || exe === 'sh')) {
+    for (const fallbackPath of [
+      '/bin',
+      '/usr/bin',
+      '/usr/local/bin',
+      '/sbin',
+      '/usr/sbin',
+    ]) {
+      if (!paths.includes(fallbackPath)) {
+        paths.push(fallbackPath);
+      }
+    }
+  }
+
+  const extensions = isWindows ? ['.exe', '.cmd', '.bat', ''] : [''];
 
   for (const p of paths) {
     for (const ext of extensions) {
