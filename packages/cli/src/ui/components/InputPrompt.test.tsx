@@ -1005,7 +1005,7 @@ describe('InputPrompt', () => {
       });
       await waitFor(() => {
         expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-          'Error handling paste:',
+          'Error checking clipboard for image during paste:',
           expect.any(Error),
         );
       });
@@ -4406,7 +4406,7 @@ describe('InputPrompt', () => {
         <TestInputPrompt {...props} />,
       );
       await waitFor(() => {
-        expect(stdout.lastFrame()).toContain('[Image');
+        expect(stdout.lastFrame()).toContain('[🖼️');
       });
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();

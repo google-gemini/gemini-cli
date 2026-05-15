@@ -139,13 +139,6 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match
 "
 `;
 
-exports[`InputPrompt > image path transformation snapshots > should snapshot collapsed image path 1`] = `
-"▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- > [Image ...reenshot2x.png]                                                                        
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-"
-`;
-
 exports[`InputPrompt > image path transformation snapshots > should snapshot expanded image path when cursor is on it 1`] = `
 "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  > @/path/to/screenshots/screenshot2x.png                                                           
@@ -171,24 +164,6 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  > [Pasted Text: 10 lines]                                                                          
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-"
-`;
-
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 4`] = `
-"
- > [Pasted Text: 10 lines]
-"
-`;
-
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 5`] = `
-"
- > [Pasted Text: 10 lines]
-"
-`;
-
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 6`] = `
-"
- > [Pasted Text: 10 lines]
 "
 `;
 

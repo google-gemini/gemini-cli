@@ -533,6 +533,63 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     return false;
   }, [buffer, popAllMessages, inputHistory]);
 
+  const handleImagePaste = useCallback(
+    async (pasteOffset: number): Promise<boolean> => {
+      try {
+        if (await clipboardHasImage()) {
+          const imagePath = await saveClipboardImage(config.getTargetDir());
+          if (imagePath) {
+            // Clean up old images
+            cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
+              // Ignore cleanup errors
+            });
+
+            // Get relative path from current directory
+            const relativePath = path.relative(
+              config.getTargetDir(),
+              imagePath,
+            );
+
+            // Insert @path reference at cursor position
+            const escapedPath = escapePath(relativePath);
+            const insertText = `@${escapedPath}`;
+            const currentBuffer = bufferRef.current;
+            const currentText = currentBuffer.text;
+
+            // Add spaces around the path if needed
+            let textToInsert = insertText;
+            const charBefore =
+              pasteOffset > 0 ? currentText[pasteOffset - 1] : '';
+            const charAfter =
+              pasteOffset < currentText.length ? currentText[pasteOffset] : '';
+
+            if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+              textToInsert = ' ' + textToInsert;
+            }
+            if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+              textToInsert = textToInsert + ' ';
+            }
+
+            // Insert at synchronously captured cursor position
+            currentBuffer.replaceRangeByOffset(
+              pasteOffset,
+              pasteOffset,
+              textToInsert,
+            );
+            return true;
+          }
+        }
+      } catch (error) {
+        debugLogger.error(
+          'Error checking clipboard for image during paste:',
+          error,
+        );
+      }
+      return false;
+    },
+    [config],
+  );
+
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
     if (shortcutsHelpVisible) {
@@ -542,44 +599,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const pasteOffset = bufferRef.current.getOffset();
 
     try {
-      if (await clipboardHasImage()) {
-        const imagePath = await saveClipboardImage(config.getTargetDir());
-        if (imagePath) {
-          // Clean up old images
-          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
-            // Ignore cleanup errors
-          });
-
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
-
-          // Insert @path reference at cursor position
-          const escapedPath = escapePath(relativePath);
-          const insertText = `@${escapedPath}`;
-          const currentBuffer = bufferRef.current;
-          const currentText = currentBuffer.text;
-
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore =
-            pasteOffset > 0 ? currentText[pasteOffset - 1] : '';
-          const charAfter =
-            pasteOffset < currentText.length ? currentText[pasteOffset] : '';
-
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at synchronously captured cursor position
-          currentBuffer.replaceRangeByOffset(
-            pasteOffset,
-            pasteOffset,
-            textToInsert,
-          );
-        }
+      if (await handleImagePaste(pasteOffset)) {
+        return;
       }
 
       if (settings.experimental?.useOSC52Paste) {
@@ -601,7 +622,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [config, stdout, settings, shortcutsHelpVisible, setShortcutsHelpVisible]);
+  }, [
+    settings,
+    shortcutsHelpVisible,
+    setShortcutsHelpVisible,
+    stdout,
+    handleImagePaste,
+  ]);
 
   useMouseClick(
     innerBoxRef,
@@ -832,52 +859,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // converted to a bracketed paste, bypassing the PASTE_CLIPBOARD
         // command handler that normally detects images.
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        (async () => {
-          try {
-            if (await clipboardHasImage()) {
-              const imagePath = await saveClipboardImage(config.getTargetDir());
-              if (imagePath) {
-                cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
-                  // Ignore cleanup errors
-                });
-                const relativePath = path.relative(
-                  config.getTargetDir(),
-                  imagePath,
-                );
-                const escapedPath = escapePath(relativePath);
-                const insertText = `@${escapedPath}`;
-
-                // Use a stable mechanism to update the latest buffer state
-                const currentBuffer = bufferRef.current;
-                const currentText = currentBuffer.text;
-
-                let textToInsert = insertText;
-                const charBefore =
-                  initialOffset > 0 ? currentText[initialOffset - 1] : '';
-                const charAfter =
-                  initialOffset < currentText.length
-                    ? currentText[initialOffset]
-                    : '';
-                if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-                  textToInsert = ' ' + textToInsert;
-                }
-                if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-                  textToInsert = textToInsert + ' ';
-                }
-                currentBuffer.replaceRangeByOffset(
-                  initialOffset,
-                  initialOffset,
-                  textToInsert,
-                );
-              }
-            }
-          } catch (error) {
-            debugLogger.error(
-              'Error checking clipboard for image during paste:',
-              error,
-            );
-          }
-        })();
+        handleImagePaste(initialOffset);
 
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
@@ -1425,6 +1407,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return handled;
     },
     [
+      handleImagePaste,
       focus,
       buffer,
       completion,
@@ -1436,7 +1419,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmit,
       shellHistory,
       reverseSearchCompletion,
-      config,
       handleClipboardPaste,
       resetCompletionState,
       resetEscapeState,
