@@ -694,6 +694,12 @@ describe('Server Config (config.ts)', () => {
         },
       );
 
+      it('should use an auth override before contentGeneratorConfig is assigned', () => {
+        const config = new Config(baseParams);
+
+        expect(config.getGemini31LaunchedSync(AuthType.GATEWAY)).toBe(true);
+      });
+
       it('should fallback to experiments for other auth types', async () => {
         vi.mocked(getExperiments).mockResolvedValue({
           experimentIds: [],
@@ -757,6 +763,21 @@ describe('Server Config (config.ts)', () => {
           await expect(config.getUseCustomToolModel()).resolves.toBe(false);
         },
       );
+
+      it('should use an auth override before contentGeneratorConfig is assigned', async () => {
+        const config = new Config(baseParams);
+
+        expect(config.getUseCustomToolModelSync(AuthType.USE_VERTEX_AI)).toBe(
+          true,
+        );
+        await expect(
+          config.getUseCustomToolModel(AuthType.USE_VERTEX_AI),
+        ).resolves.toBe(true);
+        expect(config.getUseCustomToolModelSync(AuthType.GATEWAY)).toBe(false);
+        await expect(
+          config.getUseCustomToolModel(AuthType.GATEWAY),
+        ).resolves.toBe(false);
+      });
     });
 
     describe('getGemini31FlashLiteLaunchedSync', () => {
@@ -771,6 +792,14 @@ describe('Server Config (config.ts)', () => {
           expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
         },
       );
+
+      it('should use an auth override before contentGeneratorConfig is assigned', () => {
+        const config = new Config(baseParams);
+
+        expect(config.getGemini31FlashLiteLaunchedSync(AuthType.GATEWAY)).toBe(
+          true,
+        );
+      });
     });
 
     describe('getProModelNoAccessSync', () => {

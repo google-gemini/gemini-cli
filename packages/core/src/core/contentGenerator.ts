@@ -207,17 +207,11 @@ export async function createContentGenerator(
     }
     const version = await getVersion();
     const useGemini31 =
-      config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI ||
-      ((await gcConfig.getGemini31Launched?.()) ?? false);
+      (await gcConfig.getGemini31Launched?.(config.authType)) ?? false;
     const useGemini31FlashLite =
-      config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI ||
-      ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false);
+      (await gcConfig.getGemini31FlashLiteLaunched?.(config.authType)) ?? false;
     const useCustomToolModel =
-      useGemini31 &&
-      (config.authType === AuthType.USE_GEMINI ||
-        config.authType === AuthType.USE_VERTEX_AI);
+      (await gcConfig.getUseCustomToolModel?.(config.authType)) ?? false;
     const model = resolveModel(
       gcConfig.getModel(),
       useGemini31,

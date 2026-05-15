@@ -3460,26 +3460,28 @@ export class Config implements McpContext, AgentLoopContext {
    * Returns whether Gemini 3.1 Pro has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
-  async getGemini31Launched(): Promise<boolean> {
+  async getGemini31Launched(authTypeOverride?: AuthType): Promise<boolean> {
     await this.ensureExperimentsLoaded();
-    return this.getGemini31LaunchedSync();
+    return this.getGemini31LaunchedSync(authTypeOverride);
   }
 
   /**
    * Returns whether Gemini 3.1 Flash Lite has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
-  async getGemini31FlashLiteLaunched(): Promise<boolean> {
+  async getGemini31FlashLiteLaunched(
+    authTypeOverride?: AuthType,
+  ): Promise<boolean> {
     await this.ensureExperimentsLoaded();
-    return this.getGemini31FlashLiteLaunchedSync();
+    return this.getGemini31FlashLiteLaunchedSync(authTypeOverride);
   }
 
   /**
    * Returns whether the custom tool model should be used.
    */
-  async getUseCustomToolModel(): Promise<boolean> {
-    const useGemini3_1 = await this.getGemini31Launched();
-    const authType = this.contentGeneratorConfig?.authType;
+  async getUseCustomToolModel(authTypeOverride?: AuthType): Promise<boolean> {
+    const useGemini3_1 = await this.getGemini31Launched(authTypeOverride);
+    const authType = authTypeOverride ?? this.contentGeneratorConfig?.authType;
     return useGemini3_1 && this.supportsCustomToolModel(authType);
   }
 
@@ -3488,9 +3490,9 @@ export class Config implements McpContext, AgentLoopContext {
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
-  getUseCustomToolModelSync(): boolean {
-    const useGemini3_1 = this.getGemini31LaunchedSync();
-    const authType = this.contentGeneratorConfig?.authType;
+  getUseCustomToolModelSync(authTypeOverride?: AuthType): boolean {
+    const useGemini3_1 = this.getGemini31LaunchedSync(authTypeOverride);
+    const authType = authTypeOverride ?? this.contentGeneratorConfig?.authType;
     return useGemini3_1 && this.supportsCustomToolModel(authType);
   }
 
@@ -3515,8 +3517,8 @@ export class Config implements McpContext, AgentLoopContext {
    * If you need to call this during startup or from an async context, use
    * getGemini31Launched instead.
    */
-  getGemini31LaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
+  getGemini31LaunchedSync(authTypeOverride?: AuthType): boolean {
+    const authType = authTypeOverride ?? this.contentGeneratorConfig?.authType;
     if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
@@ -3548,8 +3550,8 @@ export class Config implements McpContext, AgentLoopContext {
    * If you need to call this during startup or from an async context, use
    * getGemini31FlashLiteLaunched instead.
    */
-  getGemini31FlashLiteLaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
+  getGemini31FlashLiteLaunchedSync(authTypeOverride?: AuthType): boolean {
+    const authType = authTypeOverride ?? this.contentGeneratorConfig?.authType;
     if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
