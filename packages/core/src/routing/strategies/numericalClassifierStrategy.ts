@@ -15,12 +15,17 @@ import type {
 import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { normalizeModelId } from '../../utils/modelUtils.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 
 // The number of recent history turns to provide to the router for context.
-const HISTORY_TURNS_FOR_CONTEXT = 8;
+export const HISTORY_TURNS_FOR_CONTEXT = 8;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
@@ -115,7 +120,22 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
 
       const promptId = getPromptIdWithFallback('classifier-router');
 
-      const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+      const candidateSlice = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
+      // Find the first non-tool turn. The server cannot always handle tool-related
+      // turns in the first slots of the contents array, so we strip them if they appear at the start.
+      let firstTextIndex = -1;
+      for (let i = 0; i < candidateSlice.length; i++) {
+        if (
+          !isFunctionCall(candidateSlice[i]) &&
+          !isFunctionResponse(candidateSlice[i])
+        ) {
+          firstTextIndex = i;
+          break;
+        }
+      }
+      const finalHistory =
+        firstTextIndex === -1 ? [] : candidateSlice.slice(firstTextIndex);
 
       // Wrap the user's request in tags to prevent prompt injection
       const requestParts = Array.isArray(context.request)
@@ -153,15 +173,27 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getGemini31FlashLiteLaunched(),
           config.getUseCustomToolModel(),
         ]);
-      const selectedModel = resolveClassifierModel(
-        model,
-        modelAlias,
-        useGemini3_1,
-        useGemini3_1FlashLite,
-        useCustomToolModel,
-        config.getHasAccessToPreviewModel?.() ?? true,
-        config,
+      const selectedModel = normalizeModelId(
+        resolveClassifierModel(
+          normalizeModelId(model),
+          modelAlias,
+          useGemini3_1,
+          useGemini3_1FlashLite,
+          useCustomToolModel,
+          config.getHasAccessToPreviewModel?.() ?? true,
+          config,
+        ),
       );
+
+      const service = config.getModelAvailabilityService();
+      const snapshot = service.snapshot(selectedModel);
+
+      if (!snapshot.available) {
+        debugLogger.warn(
+          `[Routing] Numerical classifier selected unavailable model ${selectedModel} (${snapshot.reason}). Bypassing.`,
+        );
+        return null;
+      }
 
       const latencyMs = Date.now() - startTime;
 

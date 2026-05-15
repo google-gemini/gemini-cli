@@ -68,6 +68,9 @@ export async function runNonInteractive(
 ): Promise<void> {
   const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
   if (useAgentSession) {
+    debugLogger.debug(
+      '[ADK] Running non-interactive mode with ADK agent session',
+    );
     return runNonInteractiveAgentSession(params);
   }
 
@@ -400,6 +403,20 @@ export async function runNonInteractive(
                   durationMs,
                 ),
               });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  [...warnings, stopMessage],
+                ),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {

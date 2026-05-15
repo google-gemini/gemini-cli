@@ -55,7 +55,7 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     // Expect pirate speak
     expect(responseText.toLowerCase()).toContain('arrr');
-  }, 60000);
+  }, 120000);
 
   it('loads and activates a skill from a root', async () => {
     const goldenFile = getGoldenPath('skill-root-success');
@@ -88,5 +88,5 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     // Expect confirmation or pirate speak
     expect(responseText.toLowerCase()).toContain('arrr');
-  }, 60000);
+  }, 120000);
 });

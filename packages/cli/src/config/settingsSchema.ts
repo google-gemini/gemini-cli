@@ -429,6 +429,16 @@ const SETTINGS_SCHEMA = {
           'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,
       },
+      logRagSnippets: {
+        type: 'boolean',
+        label: 'Log RAG Snippets',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Log full Code Customization (RAG) retrieved snippets to a local file for debugging.',
+        showInDialog: true,
+      },
     },
   },
   output: {
@@ -2030,6 +2040,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
@@ -2099,7 +2119,11 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: false,
             default: 'gemini-live',
-            description: 'The backend to use for voice transcription.',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
             showInDialog: true,
             options: [
               { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
@@ -2135,7 +2159,7 @@ const SETTINGS_SCHEMA = {
             label: 'Voice Stop Grace Period (ms)',
             category: 'Experimental',
             requiresRestart: false,
-            default: 1000,
+            default: 4000,
             description:
               'How long to wait for final transcription after stopping recording.',
             showInDialog: true,
@@ -2236,16 +2260,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enables extension loading/unloading within the CLI session.',
-        showInDialog: false,
-      },
-      jitContext: {
-        type: 'boolean',
-        label: 'JIT Context Loading',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.',
         showInDialog: false,
       },
       useOSC52Paste: {
@@ -2378,16 +2392,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      memoryV2: {
-        type: 'boolean',
-        label: 'Memory v2',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
-        showInDialog: true,
-      },
       stressTestProfile: {
         type: 'boolean',
         label:
@@ -2406,7 +2410,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
       generalistProfile: {
@@ -3457,7 +3461,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       family: { type: 'string' },
       isPreview: { type: 'boolean' },
       isVisible: { type: 'boolean' },
-      dialogDescription: { type: 'string' },
+      dialogDescription: {
+        type: 'string',
+        description:
+          "A description of the model to display in the model selection dialog. For the 'auto' alias, this value is dynamically generated and any value provided here will be ignored.",
+      },
       features: {
         type: 'object',
         properties: {

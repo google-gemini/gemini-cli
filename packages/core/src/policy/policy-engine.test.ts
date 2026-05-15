@@ -1898,6 +1898,30 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should NOT downgrade to ASK_USER for redirected commands in YOLO mode even without sandbox', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'npm test 2>&1 | tail -80';
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
@@ -3066,12 +3090,6 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
-            toolName: 'save_memory',
-            decision: PolicyDecision.ASK_USER,
-            priority: 70,
-            modes: [ApprovalMode.PLAN],
-          },
-          {
             toolName: 'exit_plan_mode',
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -3115,7 +3133,6 @@ describe('PolicyEngine', () => {
         'web_fetch',
         'write_todos',
         'memory',
-        'save_memory',
         'mcp_mcp-server_read_tool',
         'mcp_mcp-server_write_tool',
       ]);
@@ -3151,7 +3168,6 @@ describe('PolicyEngine', () => {
       expect(excluded.has('web_fetch')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
-      expect(excluded.has('save_memory')).toBe(false);
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
       expect(excluded.has('mcp_mcp-server_read_tool')).toBe(false);
     });
