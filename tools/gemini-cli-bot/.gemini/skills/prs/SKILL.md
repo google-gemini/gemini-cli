@@ -69,6 +69,8 @@ existing bot PR:
 3.  **Respond to Maintainers**:
     - For general responses, write your markdown comment to `issue-comment.md` **at the workspace root**.
     - For specific PR feedback, write your markdown response to `pr-comment.md` **at the workspace root**.
-4.  **Handle CI Failures**: Diagnose failing checks using `gh --no-pager run view` or `gh api`. Your
+4.  **Handle CI Failures & Feedback**: Diagnose failing checks using `gh --no-pager run view` or `gh api`. Your
     priority must be generating a new patch and staging it with `git add` to fix
     the failure.
+5.  **Stage Code Changes (MANDATORY)**: If you make any code changes to address feedback or fix CI, you MUST explicitly stage them using the `git add <files>` command.
+6.  **Update PR Description (Optional)**: If your changes significantly alter the scope or implementation of the PR, you SHOULD update `pr-description.md` at the workspace root to reflect the new state.
