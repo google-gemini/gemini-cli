@@ -65,6 +65,14 @@ describe('sanitizeEnvironment', () => {
     expect(sanitized).toEqual(env);
   });
 
+  it('should NOT redact GEMINI_CLI_ variables even if their value looks like a secret (fully trusted)', () => {
+    const env = {
+      GEMINI_CLI_SECRET: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual(env);
+  });
+
   it('should redact variables with sensitive names from the denylist', () => {
     const env = {
       CLIENT_ID: 'sensitive-id',
