@@ -41,6 +41,7 @@ If you are proposing fixes and PR creation is enabled (per the System Directive)
     `pr-description.md` **at the workspace root**.
     - **Title**: The very first line MUST be a concise, conventional title.
     - **Body**: Explain the change and expected impact. You MUST identify the domain expert for the affected files by using `git blame` to find recent contributors. Cross-reference these authors with the `.github/CODEOWNERS` file to ensure they are maintainers before mentioning them (cc @<user>). Do not use generic team handles like `@google-gemini-maintainers`.
+    - **Issue Linking**: You MUST include a line like "Fixes: #12345" or "Closes: #12345" in the body to automatically link and close the issue when the PR is merged.
     - **Labels**: Use the `write_file` tool to create `pr-labels.txt` **at the workspace root** containing one label per line. You MUST ALWAYS add the `bot-fix` label.
 3.  **Branch Naming (Optional)**: If you wish to specify a custom branch name,
     use `write_file` to create `branch-name.txt` **at the workspace root**. **CRITICAL**: The branch name
