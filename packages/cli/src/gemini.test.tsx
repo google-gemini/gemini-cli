@@ -777,6 +777,93 @@ describe('gemini.tsx main function kitty protocol', () => {
     processExitSpy.mockRestore();
   });
 
+  it('should inject piped stdin into sandbox prompt only once', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+    const originalArgv = process.argv;
+    process.argv = ['node', 'gemini', '--model', 'test-model'];
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const readStdinSpy = vi
+      .spyOn(readStdinModule, 'readStdin')
+      .mockResolvedValue('stdin-data');
+    vi.mocked(start_sandbox).mockImplementationOnce(async () => {
+      expect(process.env['GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED']).toBe(
+        '1',
+      );
+      return 0;
+    });
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: { selectedType: 'google' } },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    const mockConfig = createMockConfig({
+      isInteractive: () => false,
+      getQuestion: () => '',
+      getSandbox: () =>
+        createMockSandboxConfig({ command: 'docker', image: 'test-image' }),
+    });
+
+    vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+
+    // Mock stdin to be non-TTY so sandbox startup consumes and injects it.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
+
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+      process.argv = originalArgv;
+    }
+
+    expect(readStdinSpy).toHaveBeenCalledTimes(1);
+    expect(start_sandbox).toHaveBeenCalled();
+    const sandboxArgs = vi.mocked(start_sandbox).mock.calls[0][3];
+    expect(sandboxArgs).toEqual([
+      'node',
+      'gemini',
+      '--model',
+      'test-model',
+      '--prompt',
+      'stdin-data',
+    ]);
+    expect(
+      process.env['GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED'],
+    ).toBeUndefined();
+    expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
+
   it('should log warning when theme is not found', async () => {
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi
@@ -1058,6 +1145,63 @@ describe('gemini.tsx main function kitty protocol', () => {
       terminalNotificationMocks.buildRunEventNotificationContent,
     ).not.toHaveBeenCalled();
     expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
+    expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
+
+  it('should not reread stdin when sandbox parent already injected it into the prompt', async () => {
+    vi.stubEnv('SANDBOX', 'true');
+    vi.stubEnv('GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED', '1');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    const readStdinSpy = vi.spyOn(readStdinModule, 'readStdin');
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: {} },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'stdin-data\n\ntest-question',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    // Mock stdin to be non-TTY like a sandbox child inheriting a pipe.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
+
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+    }
+
+    expect(readStdinSpy).not.toHaveBeenCalled();
+    expect(runNonInteractive).toHaveBeenCalled();
+    const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
+    expect(callArgs.input).toBe('stdin-data\n\ntest-question');
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });

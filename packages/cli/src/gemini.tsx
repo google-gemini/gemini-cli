@@ -119,6 +119,7 @@ export function validateDnsResolutionOrder(
 }
 
 const DEFAULT_EPT_SIZE = (256 * 1024 * 1024).toString();
+const STDIN_PROMPT_INJECTED_ENV = 'GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED';
 
 export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -610,10 +611,23 @@ export async function main() {
       };
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+      const previousStdinPromptInjected =
+        process.env[STDIN_PROMPT_INJECTED_ENV];
+      if (stdinData) {
+        process.env[STDIN_PROMPT_INJECTED_ENV] = '1';
+      }
 
-      await relaunchOnExitCode(() =>
-        start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
-      );
+      try {
+        await relaunchOnExitCode(() =>
+          start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
+        );
+      } finally {
+        if (previousStdinPromptInjected === undefined) {
+          delete process.env[STDIN_PROMPT_INJECTED_ENV];
+        } else {
+          process.env[STDIN_PROMPT_INJECTED_ENV] = previousStdinPromptInjected;
+        }
+      }
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     }
@@ -809,7 +823,10 @@ export async function main() {
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
     let stdinData: string | undefined = undefined;
-    if (!process.stdin.isTTY) {
+    if (
+      !process.stdin.isTTY &&
+      process.env[STDIN_PROMPT_INJECTED_ENV] !== '1'
+    ) {
       stdinData = await readStdin();
       if (stdinData) {
         input = input ? `${stdinData}\n\n${input}` : stdinData;

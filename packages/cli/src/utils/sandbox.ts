@@ -577,6 +577,12 @@ export async function start_sandbox(
     if (process.env['GEMINI_MODEL']) {
       args.push('--env', `GEMINI_MODEL=${process.env['GEMINI_MODEL']}`);
     }
+    if (process.env['GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED']) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED=${process.env['GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED']}`,
+      );
+    }
 
     // copy TERM and COLORTERM to try to maintain terminal setup
     if (process.env['TERM']) {
@@ -993,6 +999,8 @@ async function start_lxc_sandbox(
       GOOGLE_CLOUD_PROJECT: process.env['GOOGLE_CLOUD_PROJECT'],
       GOOGLE_CLOUD_LOCATION: process.env['GOOGLE_CLOUD_LOCATION'],
       GEMINI_MODEL: process.env['GEMINI_MODEL'],
+      GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED:
+        process.env['GEMINI_CLI_INTERNAL_STDIN_PROMPT_INJECTED'],
       TERM: process.env['TERM'],
       COLORTERM: process.env['COLORTERM'],
       GEMINI_CLI_IDE_SERVER_PORT: process.env['GEMINI_CLI_IDE_SERVER_PORT'],
