@@ -587,7 +587,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "gemini-3.1-flash-lite": {
-        "extends": "chat-base-2.5",
+        "extends": "chat-base-3",
         "modelConfig": {
           "model": "gemini-3.1-flash-lite"
         }
@@ -1095,15 +1095,7 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "gemini-3.1-flash-lite": {
-        "default": "gemini-3.1-flash-lite",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": false
-            },
-            "target": "gemini-2.5-flash-lite"
-          }
-        ]
+        "default": "gemini-3.1-flash-lite"
       },
       "flash": {
         "default": "gemini-3-flash-preview",
@@ -1117,15 +1109,7 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "flash-lite": {
-        "default": "gemini-3.1-flash-lite",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": false
-            },
-            "target": "gemini-2.5-flash-lite"
-          }
-        ]
+        "default": "gemini-3.1-flash-lite"
       },
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
