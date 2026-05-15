@@ -52,7 +52,7 @@ export interface ModelCapabilityContext {
   getGemini31LaunchedSync(): boolean;
   getGemini31FlashLiteLaunchedSync(): boolean;
   getUseCustomToolModelSync(): boolean;
-  getHasAccessToPreviewModel(): boolean;
+  getHasAccessToPreviewModelSync(): boolean;
   getReleaseChannel?(): string;
 }
 
