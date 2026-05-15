@@ -91,6 +91,10 @@ export function useApprovalModeIndicator({
     }
   }, [config, addItem, onApprovalModeChange]);
 
+  /**
+   * Cycles through available approval modes.
+   * See: https://github.com/google-gemini/gemini-cli/issues/27035
+   */
   const cycleApprovalMode = useCallback(() => {
     const currentMode = config.getApprovalMode();
     let nextApprovalMode: ApprovalMode | undefined;

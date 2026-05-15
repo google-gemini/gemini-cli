@@ -28,6 +28,10 @@ export const ApprovalModeIndicator: FC<ApprovalModeIndicatorProps> = ({
   const { cycleApprovalMode } = useUIActions();
   const boxRef = useRef(null);
 
+  /**
+   * Click handler for switching approval modes.
+   * See: https://github.com/google-gemini/gemini-cli/issues/27035
+   */
   useMouseClick(boxRef, () => {
     cycleApprovalMode();
   });
