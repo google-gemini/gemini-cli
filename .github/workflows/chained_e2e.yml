@@ -68,6 +68,14 @@ jobs:
           name: 'repo_name'
           run-id: '${{ env.RUN_ID }}'
           path: '${{ runner.temp }}/artifacts'
+      - name: 'Verify PR origin is not a fork'
+        run: |
+          REPO=$(cat "${{ runner.temp }}/artifacts/repo_name" 2>/dev/null | tr -d '[:space:]' || echo '')
+          if [[ -n "$REPO" && "$REPO" != "google-gemini/gemini-cli" ]]; then
+            echo "::error::Fork PR detected (origin: $REPO). Blocking secret-privileged execution."
+            exit 1
+          fi
+
       - name: 'Output Repo Name and SHA'
         id: 'output-repo-name'
         uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8

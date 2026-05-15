@@ -15,7 +15,12 @@ on:
 
 jobs:
   save_repo_name:
-    if: "github.repository == 'google-gemini/gemini-cli'"
+    # Only save repo metadata for internal PRs (same repo) or manual dispatches.
+    # Fork PRs must not inject their repo/SHA into the privileged workflow_run chain.
+    if: >-
+      github.repository == 'google-gemini/gemini-cli' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Save Repo name'
