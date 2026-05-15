@@ -140,7 +140,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": 8192
+        "thinkingLevel": "HIGH"
       },
       "topK": 64
     }
