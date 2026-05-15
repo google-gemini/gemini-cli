@@ -223,7 +223,6 @@ describe('Gemini Client (client.ts)', () => {
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       getSystemInstructionMemory: vi.fn().mockReturnValue(''),
       getSessionMemory: vi.fn().mockReturnValue(''),
-      isJitContextEnabled: vi.fn().mockReturnValue(false),
       getMemoryContextManager: vi.fn().mockReturnValue(undefined),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
       getToolOutputMaskingConfig: vi.fn().mockReturnValue({
@@ -1517,8 +1516,8 @@ ${JSON.stringify(
       // A string of length 404 is roughly 101 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1577,8 +1576,8 @@ ${JSON.stringify(
       // We need a request > 100 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -2005,8 +2004,7 @@ ${JSON.stringify(
       });
     });
 
-    it('should use getSystemInstructionMemory for system instruction when JIT is enabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
+    it('should use getSystemInstructionMemory for system instruction', async () => {
       vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
         'Global JIT Memory',
       );
@@ -2019,23 +2017,6 @@ ${JSON.stringify(
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
         'Global JIT Memory',
-      );
-    });
-
-    it('should use getSystemInstructionMemory for system instruction when JIT is disabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
-        'Legacy Memory',
-      );
-
-      const { getCoreSystemPrompt } = await import('./prompts.js');
-      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
-
-      client.updateSystemInstruction();
-
-      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
-        mockConfig,
-        'Legacy Memory',
       );
     });
 

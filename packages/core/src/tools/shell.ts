@@ -58,10 +58,29 @@ import {
 } from '../sandbox/utils/proactivePermissions.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
 const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
+const LOW_SURROGATE_START = 0xdc00;
+const LOW_SURROGATE_END = 0xdfff;
+
+function trimLiveOutputBuffer(output: string): string {
+  if (output.length <= LIVE_OUTPUT_MAX_BUFFER_CHARS) {
+    return output;
+  }
+
+  let startIndex = output.length - LIVE_OUTPUT_MAX_BUFFER_CHARS;
+  const firstCodeUnit = output.charCodeAt(startIndex);
+  if (
+    firstCodeUnit >= LOW_SURROGATE_START &&
+    firstCodeUnit <= LOW_SURROGATE_END
+  ) {
+    startIndex += 1;
+  }
+  return output.slice(startIndex);
+}
 
 export interface ShellToolParams {
   command: string;
@@ -470,6 +489,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
     let timeoutTimer: NodeJS.Timeout | undefined;
+    let trailingFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Handle signal combination manually to avoid TS issues or runtime missing features
     const combinedController = new AbortController();
@@ -502,8 +522,60 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
       let cumulativeOutput: string | AnsiOutput = '';
-      let lastUpdateTime = Date.now();
+      let lastUpdateTime = 0;
+      let hasFlushedOutput = false;
+      let hasPendingOutput = false;
       let isBinaryStream = false;
+
+      const appendToLiveOutputBuffer = (chunk: string) => {
+        const currentOutput =
+          typeof cumulativeOutput === 'string' ? cumulativeOutput : '';
+        if (chunk.length >= LIVE_OUTPUT_MAX_BUFFER_CHARS) {
+          cumulativeOutput = trimLiveOutputBuffer(chunk);
+          return;
+        }
+
+        const nextOutput = currentOutput + chunk;
+        cumulativeOutput = trimLiveOutputBuffer(nextOutput);
+      };
+
+      const cancelTrailingFlush = () => {
+        if (trailingFlushTimer !== null) {
+          clearTimeout(trailingFlushTimer);
+          trailingFlushTimer = null;
+        }
+      };
+
+      const flushOutput = () => {
+        cancelTrailingFlush();
+        if (!hasPendingOutput || !updateOutput || this.params.is_background) {
+          return;
+        }
+
+        updateOutput(cumulativeOutput);
+        hasPendingOutput = false;
+        hasFlushedOutput = true;
+        lastUpdateTime = Date.now();
+      };
+
+      const scheduleTrailingFlush = () => {
+        if (
+          trailingFlushTimer !== null ||
+          !updateOutput ||
+          this.params.is_background
+        ) {
+          return;
+        }
+        const elapsedSinceLastUpdate = Date.now() - lastUpdateTime;
+        const trailingDelayMs = Math.max(
+          OUTPUT_UPDATE_INTERVAL_MS - elapsedSinceLastUpdate,
+          0,
+        );
+        trailingFlushTimer = setTimeout(() => {
+          trailingFlushTimer = null;
+          flushOutput();
+        }, trailingDelayMs);
+      };
 
       const resetTimeout = () => {
         if (timeoutMs <= 0) {
@@ -529,22 +601,31 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
 
             let shouldUpdate = false;
 
             switch (event.type) {
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (typeof event.chunk === 'string') {
+                  appendToLiveOutputBuffer(event.chunk);
+                  shouldUpdate =
+                    !hasFlushedOutput ||
+                    Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS;
+                  if (!shouldUpdate) {
+                    scheduleTrailingFlush();
+                  }
+                } else {
+                  cumulativeOutput = event.chunk;
+                  shouldUpdate = true;
+                }
+                hasPendingOutput = true;
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
                 cumulativeOutput =
                   '[Binary output detected. Halting stream...]';
+                hasPendingOutput = true;
                 shouldUpdate = true;
                 break;
               case 'binary_progress':
@@ -552,11 +633,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
+                hasPendingOutput = true;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                   shouldUpdate = true;
                 }
                 break;
               case 'exit':
+                flushOutput();
                 break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
@@ -564,8 +647,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
 
             if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
+              flushOutput();
             }
           },
           combinedController.signal,
@@ -639,6 +721,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+      if (!result.backgrounded) {
+        flushOutput();
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -966,6 +1051,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (trailingFlushTimer) {
+        clearTimeout(trailingFlushTimer);
+        trailingFlushTimer = null;
+      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       if (tempFilePath) {
