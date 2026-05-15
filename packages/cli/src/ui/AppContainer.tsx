@@ -2296,13 +2296,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
 
-  const showApprovalModeIndicator = useApprovalModeIndicator({
-    config,
-    addItem: historyManager.addItem,
-    onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
-    isActive: !embeddedShellFocused,
-    allowPlanMode,
-  });
+  const { approvalMode: showApprovalModeIndicator, cycleApprovalMode } =
+    useApprovalModeIndicator({
+      config,
+      addItem: historyManager.addItem,
+      onApprovalModeChange: handleApprovalModeChangeWithUiReveal,
+      isActive: !embeddedShellFocused,
+      allowPlanMode,
+    });
 
   useRunEventNotifications({
     notificationsEnabled,
@@ -2789,6 +2790,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setVoiceModeEnabled: (value: boolean) => {
         setVoiceModeEnabled(value);
       },
+      cycleApprovalMode,
     }),
     [
       handleThemeSelect,
@@ -2848,6 +2850,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager,
       getPreferredEditor,
       setVoiceModeEnabled,
+      cycleApprovalMode,
     ],
   );
 

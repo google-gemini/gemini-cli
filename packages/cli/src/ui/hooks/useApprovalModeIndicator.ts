@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ApprovalMode,
   type Config,
@@ -23,13 +23,19 @@ export interface UseApprovalModeIndicatorArgs {
   allowPlanMode?: boolean;
 }
 
+export interface UseApprovalModeIndicatorResult {
+  approvalMode: ApprovalMode;
+  cycleApprovalMode: () => void;
+  toggleYolo: () => void;
+}
+
 export function useApprovalModeIndicator({
   config,
   addItem,
   onApprovalModeChange,
   isActive = true,
   allowPlanMode = false,
-}: UseApprovalModeIndicatorArgs): ApprovalMode {
+}: UseApprovalModeIndicatorArgs): UseApprovalModeIndicatorResult {
   const keyMatchers = useKeyMatchers();
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
@@ -38,84 +44,107 @@ export function useApprovalModeIndicator({
     setApprovalMode(currentConfigValue);
   }, [currentConfigValue]);
 
-  useKeypress(
-    (key) => {
-      let nextApprovalMode: ApprovalMode | undefined;
-
-      if (keyMatchers[Command.TOGGLE_YOLO](key)) {
-        if (
-          config.isYoloModeDisabled() &&
-          config.getApprovalMode() !== ApprovalMode.YOLO
-        ) {
-          if (addItem) {
-            let text =
-              'You cannot enter YOLO mode since it is disabled in your settings.';
-            const adminSettings = config.getRemoteAdminSettings();
-            const hasSettings =
-              adminSettings && Object.keys(adminSettings).length > 0;
-            if (hasSettings && !adminSettings.strictModeDisabled) {
-              text = getAdminErrorMessage('YOLO mode', config);
-            }
-
-            addItem(
-              {
-                type: MessageType.WARNING,
-                text,
-              },
-              Date.now(),
-            );
-          }
-          return;
+  const toggleYolo = useCallback(() => {
+    if (
+      config.isYoloModeDisabled() &&
+      config.getApprovalMode() !== ApprovalMode.YOLO
+    ) {
+      if (addItem) {
+        let text =
+          'You cannot enter YOLO mode since it is disabled in your settings.';
+        const adminSettings = config.getRemoteAdminSettings();
+        const hasSettings =
+          adminSettings && Object.keys(adminSettings).length > 0;
+        if (hasSettings && !adminSettings.strictModeDisabled) {
+          text = getAdminErrorMessage('YOLO mode', config);
         }
-        nextApprovalMode =
-          config.getApprovalMode() === ApprovalMode.YOLO
-            ? ApprovalMode.DEFAULT
-            : ApprovalMode.YOLO;
-      } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
-        const currentMode = config.getApprovalMode();
-        switch (currentMode) {
-          case ApprovalMode.DEFAULT:
-            nextApprovalMode = ApprovalMode.AUTO_EDIT;
-            break;
-          case ApprovalMode.AUTO_EDIT:
-            nextApprovalMode = allowPlanMode
-              ? ApprovalMode.PLAN
-              : ApprovalMode.DEFAULT;
-            break;
-          case ApprovalMode.PLAN:
-            nextApprovalMode = ApprovalMode.DEFAULT;
-            break;
-          case ApprovalMode.YOLO:
-            nextApprovalMode = ApprovalMode.AUTO_EDIT;
-            break;
-          default:
+
+        addItem(
+          {
+            type: MessageType.WARNING,
+            text,
+          },
+          Date.now(),
+        );
+      }
+      return;
+    }
+    const nextApprovalMode =
+      config.getApprovalMode() === ApprovalMode.YOLO
+        ? ApprovalMode.DEFAULT
+        : ApprovalMode.YOLO;
+
+    try {
+      config.setApprovalMode(nextApprovalMode);
+      setApprovalMode(nextApprovalMode);
+      onApprovalModeChange?.(nextApprovalMode);
+    } catch (e) {
+      if (addItem) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: e instanceof Error ? e.message : String(e),
+          },
+          Date.now(),
+        );
+      }
+    }
+  }, [config, addItem, onApprovalModeChange]);
+
+  const cycleApprovalMode = useCallback(() => {
+    const currentMode = config.getApprovalMode();
+    let nextApprovalMode: ApprovalMode | undefined;
+    switch (currentMode) {
+      case ApprovalMode.DEFAULT:
+        nextApprovalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      case ApprovalMode.AUTO_EDIT:
+        nextApprovalMode = allowPlanMode
+          ? ApprovalMode.PLAN
+          : ApprovalMode.DEFAULT;
+        break;
+      case ApprovalMode.PLAN:
+        nextApprovalMode = ApprovalMode.DEFAULT;
+        break;
+      case ApprovalMode.YOLO:
+        nextApprovalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      default:
+    }
+
+    if (nextApprovalMode) {
+      try {
+        config.setApprovalMode(nextApprovalMode);
+        setApprovalMode(nextApprovalMode);
+        onApprovalModeChange?.(nextApprovalMode);
+      } catch (e) {
+        if (addItem) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: e instanceof Error ? e.message : String(e),
+            },
+            Date.now(),
+          );
         }
       }
+    }
+  }, [config, allowPlanMode, onApprovalModeChange, addItem]);
 
-      if (nextApprovalMode) {
-        try {
-          config.setApprovalMode(nextApprovalMode);
-          // Update local state immediately for responsiveness
-          setApprovalMode(nextApprovalMode);
-
-          // Notify the central handler about the approval mode change
-          onApprovalModeChange?.(nextApprovalMode);
-        } catch (e) {
-          if (addItem) {
-            addItem(
-              {
-                type: MessageType.INFO,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                text: (e as Error).message,
-              },
-              Date.now(),
-            );
-          }
-        }
+  useKeypress(
+    (key) => {
+      if (keyMatchers[Command.TOGGLE_YOLO](key)) {
+        toggleYolo();
+      } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
+        cycleApprovalMode();
       }
     },
     { isActive },
   );
 
-  return showApprovalMode;
+  return {
+    approvalMode: showApprovalMode,
+    cycleApprovalMode,
+    toggleYolo,
+  };
 }
