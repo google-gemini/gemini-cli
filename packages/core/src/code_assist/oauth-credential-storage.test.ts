@@ -242,6 +242,39 @@ describe('OAuthCredentialStorage', () => {
       );
     });
 
+    it('should merge existing refresh token when new payload lacks one', async () => {
+      const oldCredentials: OAuthCredentials = {
+        serverName: 'main-account',
+        token: {
+          accessToken: 'old-access-token',
+          refreshToken: 'persistent-refresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600000,
+          scope: 'email',
+        },
+        updatedAt: Date.now(),
+      };
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        oldCredentials,
+      );
+
+      const newTokens: Credentials = {
+        access_token: 'new-access-token',
+        expiry_date: Date.now() + 3600000,
+      };
+
+      await OAuthCredentialStorage.saveCredentials(newTokens);
+
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith(
+        expect.objectContaining({
+          token: expect.objectContaining({
+            accessToken: 'new-access-token',
+            refreshToken: 'persistent-refresh-token', // correctly merged
+          }),
+        }),
+      );
+    });
+
     it('should throw an error if access_token is missing', async () => {
       const invalidCredentials: Credentials = {
         ...mockCredentials,

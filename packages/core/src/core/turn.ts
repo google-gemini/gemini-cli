@@ -19,6 +19,7 @@ import type {
 } from '../tools/tools.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
+import { ragLogger, type RagSnippet } from '../utils/ragLogger.js';
 import {
   getErrorMessage,
   UnauthorizedError,
@@ -244,6 +245,7 @@ export class Turn {
   private pendingCitations = new Set<string>();
   private cachedResponseText: string | undefined = undefined;
   finishReason: FinishReason | undefined = undefined;
+  private hasLoggedRagTrace = false;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -301,6 +303,39 @@ export class Turn {
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
+
+        // Log RAG trace if enabled (only once per turn to avoid log bloat on streams)
+        if (
+          !this.hasLoggedRagTrace &&
+          this.chat.context.config.getLogRagSnippets?.()
+        ) {
+          let ragStatus: string | undefined;
+          let snippets: RagSnippet[] | undefined;
+
+          if (
+            typeof resp === 'object' &&
+            resp !== null &&
+            'metadata' in resp &&
+            typeof resp.metadata === 'object' &&
+            resp.metadata !== null
+          ) {
+            const metadata = resp.metadata as {
+              ragStatus?: string;
+              snippets?: RagSnippet[];
+            };
+            ragStatus = metadata.ragStatus;
+            snippets = metadata.snippets;
+          }
+
+          if (ragStatus || snippets) {
+            ragLogger.log({
+              sessionId: this.chat.context.config.getSessionId(),
+              ragStatus: ragStatus ?? 'UNKNOWN',
+              snippets: snippets ?? [],
+            });
+            this.hasLoggedRagTrace = true;
+          }
+        }
 
         this.debugResponses.push(resp);
 

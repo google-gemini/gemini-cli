@@ -13,7 +13,6 @@ import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -39,7 +38,6 @@ export const ToolMaskingProcessorOptionsSchema: JSONSchemaType<ToolMaskingProces
 
 const UNMASKABLE_TOOLS = new Set([
   ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,

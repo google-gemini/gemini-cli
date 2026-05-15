@@ -26,6 +26,8 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  SHELL_TOOL_NAME,
+  hasRedirection,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -224,7 +226,7 @@ export const useGeminiStream = (
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: (error: string) => void,
-  performMemoryRefresh: () => Promise<void>,
+  _performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onCancelSubmit: (
@@ -264,7 +266,6 @@ export const useGeminiStream = (
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
-  const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger(config);
   const gitService = useMemo(() => {
@@ -1820,10 +1821,21 @@ export const useGeminiStream = (
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
+        // or shell commands with redirection (which act as edits).
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) =>
-            EDIT_TOOL_NAMES.has(call.request.name),
-          );
+          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) => {
+            if (EDIT_TOOL_NAMES.has(call.request.name)) {
+              return true;
+            }
+
+            if (call.request.name === SHELL_TOOL_NAME) {
+              const command = (call.request.args as { command?: string })
+                .command;
+              return command && hasRedirection(command);
+            }
+
+            return false;
+          });
         }
 
         // Process pending tool calls sequentially to reduce UI chaos
@@ -1884,8 +1896,8 @@ export const useGeminiStream = (
         if (geminiClient) {
           for (const tool of clientTools) {
             // Only manually record skill activations in the chat history.
-            // Other client-initiated tools (like save_memory) update the system
-            // prompt/context and don't strictly need to be in the history.
+            // Other client-initiated tools update context and don't strictly
+            // need to be in the history.
             if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
               continue;
             }
@@ -1912,14 +1924,6 @@ export const useGeminiStream = (
         }
       }
 
-      // Identify new, successful save_memory calls that we haven't processed yet.
-      const newSuccessfulMemorySaves = completedAndReadyToSubmitTools.filter(
-        (t) =>
-          t.request.name === 'save_memory' &&
-          t.status === 'success' &&
-          !processedMemoryToolsRef.current.has(t.request.callId),
-      );
-
       for (const toolCall of completedAndReadyToSubmitTools) {
         const backgroundedTool = getBackgroundedToolInfo(toolCall);
         if (backgroundedTool) {
@@ -1929,15 +1933,6 @@ export const useGeminiStream = (
             backgroundedTool.initialOutput,
           );
         }
-      }
-
-      if (newSuccessfulMemorySaves.length > 0) {
-        // Perform the refresh only if there are new ones.
-        void performMemoryRefresh();
-        // Mark them as processed so we don't do this again on the next render.
-        newSuccessfulMemorySaves.forEach((t) =>
-          processedMemoryToolsRef.current.add(t.request.callId),
-        );
       }
 
       const geminiTools = completedAndReadyToSubmitTools.filter(
@@ -2063,7 +2058,6 @@ export const useGeminiStream = (
       submitQuery,
       markToolsAsSubmitted,
       geminiClient,
-      performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundTask,

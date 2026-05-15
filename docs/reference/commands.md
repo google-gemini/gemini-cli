@@ -265,9 +265,6 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Manage the AI's instructional context (hierarchical memory
   loaded from `GEMINI.md` files).
 - **Sub-commands:**
-  - **`add`**:
-    - **Description:** Adds the following text to the AI's memory. Usage:
-      `/memory add <text to remember>`
   - **`list`**:
     - **Description:** Lists the paths of the GEMINI.md files in use for
       hierarchical memory.

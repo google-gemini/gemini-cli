@@ -68,6 +68,9 @@ export async function runNonInteractive(
 ): Promise<void> {
   const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
   if (useAgentSession) {
+    debugLogger.debug(
+      '[ADK] Running non-interactive mode with ADK agent session',
+    );
     return runNonInteractiveAgentSession(params);
   }
 

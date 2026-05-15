@@ -30,6 +30,9 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { Mock } from 'vitest';
 import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 import { testTruncateProfile } from './testProfile.js';
+import { StaticTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -134,17 +137,30 @@ export function createMockLlmClient(
       );
     });
 
-  const generateJsonMock = vi.fn().mockImplementation(async () => ({
-    active_tasks: [],
-    discovered_facts: [],
-    constraints_and_preferences: [],
-    recent_arc: [],
-  }));
+  const generateJsonMock = vi.fn().mockImplementation(async () => {
+    let mockStr = '';
+    if (responses && responses.length > 0) {
+      const callCount = generateJsonMock.mock.calls.length - 1;
+      const idx =
+        callCount < responses.length ? callCount : responses.length - 1;
+      const res = responses[idx];
+      if (typeof res === 'string') {
+        mockStr = res;
+      }
+    }
+    return {
+      active_tasks: [],
+      discovered_facts: [],
+      constraints_and_preferences: [],
+      chronological_summary: mockStr,
+    };
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     generateContent: generateContentMock,
     generateJson: generateJsonMock,
+    countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
   } as unknown as MockLlmClient;
 }
 
@@ -158,6 +174,9 @@ export function createMockEnvironment(
     sessionId: 'mock-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
 
   let env = new ContextEnvironmentImpl(
     () => llmClient as BaseLlmClient,
@@ -168,6 +187,8 @@ export function createMockEnvironment(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   if (overrides) {
@@ -181,6 +202,8 @@ export function createMockEnvironment(
         env.tracer,
         env.charsPerToken,
         env.eventBus,
+        calculator,
+        behaviorRegistry,
       );
     }
     const { llmClient: _llmClient, ...restOverrides } = overrides;
@@ -273,6 +296,10 @@ export function setupContextComponentTest(
     sessionId: 'test-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
+
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
     'test prompt-id',
@@ -282,6 +309,8 @@ export function setupContextComponentTest(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   const orchestrator = new PipelineOrchestrator(
@@ -298,8 +327,8 @@ export function setupContextComponentTest(
     tracer,
     orchestrator,
     chatHistory,
+    calculator,
   );
-
   // The async async pipeline is now internally managed by ContextManager
   return { chatHistory, contextManager };
 }
