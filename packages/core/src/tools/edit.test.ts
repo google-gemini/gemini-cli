@@ -511,6 +511,42 @@ function doIt() {
       expect(result.newContent).toBe(expectedContent);
     });
 
+    it('should preserve trailing newlines in flexible replacement (regression)', async () => {
+      const content = '  line1\n  line2\n  line3\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          old_string: 'line1\nline2',
+          new_string: 'line1-replaced\nline2-replaced',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe(
+        '  line1-replaced\n  line2-replaced\n  line3\n',
+      );
+    });
+
+    it('should correctly increment loop index in flexible replacement when allow_multiple is true (regression)', async () => {
+      const content = '  match1\n  match2\n  match1\n  match2\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          old_string: 'match1\nmatch2',
+          new_string: 'replaced1\nreplaced2\nreplaced3',
+          allow_multiple: true,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.newContent).toBe(
+        '  replaced1\n  replaced2\n  replaced3\n  replaced1\n  replaced2\n  replaced3\n',
+      );
+    });
+
     it('should correctly rebase indentation in flexible replacement without double-indenting', async () => {
       const content = '    if (a) {\n        foo();\n    }\n';
       // old_string and new_string are unindented. They should be rebased to 4-space.
