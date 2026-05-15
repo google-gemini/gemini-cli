@@ -433,10 +433,10 @@ export function isCustomModel(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = resolveModel(
       model,
-      config.getGemini31LaunchedSync?.() ?? false,
-      config.getGemini31FlashLiteLaunchedSync?.() ?? false,
-      config.getUseCustomToolModelSync?.() ?? false,
-      config.getHasAccessToPreviewModel?.() ?? true,
+      config.getGemini31LaunchedSync(),
+      config.getGemini31FlashLiteLaunchedSync(),
+      config.getUseCustomToolModelSync(),
+      config.getHasAccessToPreviewModelSync(),
       config,
     );
     return (
