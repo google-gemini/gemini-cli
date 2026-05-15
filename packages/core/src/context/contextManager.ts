@@ -401,7 +401,10 @@ export class ContextManager {
       const last = hardenedHistory[hardenedHistory.length - 1];
       if (last && last.content.parts) {
         const numPartsToRemove = pendingRequest.content.parts?.length || 0;
-        if (numPartsToRemove > 0 && last.content.parts.length > numPartsToRemove) {
+        if (
+          numPartsToRemove > 0 &&
+          last.content.parts.length > numPartsToRemove
+        ) {
           last.content.parts.splice(-numPartsToRemove);
         } else {
           hardenedHistory.pop();

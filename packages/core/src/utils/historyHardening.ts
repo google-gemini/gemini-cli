@@ -179,6 +179,7 @@ function pairToolsAndEnforceSignatures(
       const prevTurn = result[result.length - 1];
       const parts = turn.content.parts || [];
       const validParts: Part[] = [];
+      const orphanedResponses: Part[] = [];
 
       for (const p of parts) {
         if (p.functionResponse) {
@@ -195,13 +196,47 @@ function pairToolsAndEnforceSignatures(
             validParts.push(p);
           } else {
             debugLogger.log(
-              `[HistoryHardener] Dropping orphaned functionResponse id='${id}' (name='${name}')`,
+              `[HistoryHardener] Orphaned functionResponse id='${id}' (name='${name}'). Injecting synthetic functionCall.`,
             );
+            orphanedResponses.push(p);
+            validParts.push(p);
           }
         } else {
           validParts.push(p);
         }
       }
+
+      if (orphanedResponses.length > 0) {
+        let targetModelTurn: HistoryTurn;
+        if (prevTurn?.content.role === 'model') {
+          targetModelTurn = prevTurn;
+        } else {
+          targetModelTurn = {
+            id: deriveStableId([turn.id, 'sentinel_call']),
+            content: { role: 'model', parts: [] },
+          };
+          result.push(targetModelTurn);
+        }
+
+        for (const orph of orphanedResponses) {
+          targetModelTurn.content.parts = targetModelTurn.content.parts || [];
+          const hasExistingCall = targetModelTurn.content.parts.some(
+            (p) => !!p.functionCall,
+          );
+          const callPart: Part = {
+            functionCall: {
+              name: orph.functionResponse!.name,
+              id: orph.functionResponse!.id,
+              args: {},
+            },
+          };
+          if (!hasExistingCall) {
+            callPart.thoughtSignature = SYNTHETIC_THOUGHT_SIGNATURE;
+          }
+          targetModelTurn.content.parts.push(callPart);
+        }
+      }
+
       turn.content.parts = validParts;
     }
 

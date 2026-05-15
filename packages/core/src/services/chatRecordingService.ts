@@ -898,7 +898,6 @@ export class ChatRecordingService {
 
       // 1. Sync content and IDs
       const newMessages: MessageRecord[] = history.map((turn) => {
-        import('node:fs').then(fs => fs.appendFileSync('/tmp/gemini_sync.log', `[${new Date().toISOString()}] [updateMessages] Turn ID: ${turn.id}, text: ${turn.content.parts?.[0]?.text?.substring(0, 50)}\n`));
         const existing = this.cachedConversation?.messages.find(
           (m) => m.id === turn.id,
         );

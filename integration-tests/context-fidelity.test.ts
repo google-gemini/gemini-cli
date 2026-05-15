@@ -20,7 +20,7 @@ describe('Context Management Fidelity E2E', () => {
 
   afterEach(async () => await rig.cleanup());
 
-  it('should reproduce the exact context working buffer on resume', { timeout: 30000 }, async () => {
+  it('should reproduce the exact context working buffer on resume', async () => {
     // Mock responses to trigger GC (summarization)
     const snapshotResponse: FakeResponse = {
       method: 'generateContent',
@@ -205,35 +205,28 @@ describe('Context Management Fidelity E2E', () => {
       contextBeforeExit!.length,
     );
 
-    try {
-      for (let i = 0; i < contextBeforeExit!.length; i++) {
-        expect(contextAfterResume![i].id).toBe(contextBeforeExit![i].id);
-        expect(contextAfterResume![i].content).toEqual(
-          contextBeforeExit![i].content,
-        );
-      }
-
-      // Most importantly, synthetic IDs (like summaries) must be stable.
-      const syntheticTurns = contextBeforeExit!.filter(
-        (t: HistoryTurn) => t.id && t.id.length === 32,
-      ); // deriveStableId produces 32-char hex
-      expect(syntheticTurns.length).toBeGreaterThan(0);
-
-      const syntheticTurnsAfter = contextAfterResume!.filter(
-        (t: HistoryTurn) => t.id && t.id.length === 32,
+    for (let i = 0; i < contextBeforeExit!.length; i++) {
+      expect(contextAfterResume![i].id).toBe(contextBeforeExit![i].id);
+      expect(contextAfterResume![i].content).toEqual(
+        contextBeforeExit![i].content,
       );
-      expect(syntheticTurnsAfter.length).toBeGreaterThanOrEqual(
-        syntheticTurns.length,
-      );
-
-      // Check if the first synthetic turn is identical
-      expect(syntheticTurnsAfter[0].id).toBe(syntheticTurns[0].id);
-      expect(syntheticTurnsAfter[0].content).toEqual(syntheticTurns[0].content);
-    } catch (e) {
-      console.error('--- DEBUG LOG ---');
-      console.error(fs.readFileSync(commonEnv.GEMINI_DEBUG_LOG_FILE, 'utf-8'));
-      console.error('-----------------');
-      throw e;
     }
-  }, 30000);
+
+    // Most importantly, synthetic IDs (like summaries) must be stable.
+    const syntheticTurns = contextBeforeExit!.filter(
+      (t: HistoryTurn) => t.id && t.id.length === 32,
+    ); // deriveStableId produces 32-char hex
+    expect(syntheticTurns.length).toBeGreaterThan(0);
+
+    const syntheticTurnsAfter = contextAfterResume!.filter(
+      (t: HistoryTurn) => t.id && t.id.length === 32,
+    );
+    expect(syntheticTurnsAfter.length).toBeGreaterThanOrEqual(
+      syntheticTurns.length,
+    );
+
+    // Check if the first synthetic turn is identical
+    expect(syntheticTurnsAfter[0].id).toBe(syntheticTurns[0].id);
+    expect(syntheticTurnsAfter[0].content).toEqual(syntheticTurns[0].content);
+  });
 });

@@ -52,7 +52,7 @@ export function convertSessionToClientHistory(
         content: {
           role: 'user',
           parts: ensurePartArray(msg.content),
-        }
+        },
       });
     } else if (msg.type === 'gemini') {
       const modelParts: Part[] = [];
@@ -93,7 +93,7 @@ export function convertSessionToClientHistory(
           content: {
             role: 'model',
             parts: modelParts,
-          }
+          },
         });
 
         const functionResponseParts: Part[] = [];
@@ -128,7 +128,7 @@ export function convertSessionToClientHistory(
             content: {
               role: 'user',
               parts: functionResponseParts,
-            }
+            },
           });
         }
       } else {

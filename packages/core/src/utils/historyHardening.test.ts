@@ -212,7 +212,7 @@ describe('hardenHistory', () => {
     ).toEqual({ ok: true });
   });
 
-  it('should drop orphaned functionResponses', () => {
+  it('should synthesize a functionCall for a singleton orphaned functionResponse', () => {
     const history: HistoryTurn[] = [
       { id: '1', content: { role: 'user', parts: [{ text: 'hello' }] } },
       { id: '2', content: { role: 'model', parts: [{ text: 'hi' }] } },
@@ -231,9 +231,86 @@ describe('hardenHistory', () => {
     ];
 
     const hardened = hardenHistory(history);
+    // Turn 1: user, Turn 2: model (with synthetic call), Turn 3: user
     expect(hardened.length).toBe(3);
-    expect(hardened[2].content.parts).toHaveLength(1);
-    expect(hardened[2].content.parts![0]).toEqual({ text: 'text is kept' });
+
+    const modelTurn = hardened[1];
+    expect(modelTurn.content.role).toBe('model');
+    expect(modelTurn.content.parts).toHaveLength(2); // text + synthetic call
+    expect(modelTurn.content.parts![1].functionCall).toBeDefined();
+    expect(modelTurn.content.parts![1].functionCall?.id).toBe('orphan_1');
+    expect(
+      (modelTurn.content.parts![1] as unknown as { thoughtSignature: string })
+        .thoughtSignature,
+    ).toBe(SYNTHETIC_THOUGHT_SIGNATURE);
+
+    const userTurn = hardened[2];
+    expect(userTurn.content.parts).toHaveLength(2); // hoisted response + text
+    expect(userTurn.content.parts![0].functionResponse?.id).toBe('orphan_1');
+    expect(userTurn.content.parts![1]).toEqual({ text: 'text is kept' });
+  });
+
+  it('should synthesize functionCalls for multiple orphaned functionResponses in parallel', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: { role: 'user', parts: [{ text: 'Parallel action' }] },
+      },
+      // Previous model turn exists but has NO tool calls
+      {
+        id: '2',
+        content: { role: 'model', parts: [{ text: 'I will do nothing' }] },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: { id: 'orphan_A', name: 'toolA', response: {} },
+            },
+            {
+              functionResponse: { id: 'orphan_B', name: 'toolB', response: {} },
+            },
+            {
+              functionResponse: { id: 'orphan_C', name: 'toolC', response: {} },
+            },
+          ],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    expect(hardened.length).toBe(3);
+
+    const modelTurn = hardened[1];
+    expect(modelTurn.content.role).toBe('model');
+    expect(modelTurn.content.parts).toHaveLength(4); // original text + 3 synthetic calls
+
+    // Only the FIRST function call should get the synthetic signature
+    const callA = modelTurn.content.parts![1];
+    expect(callA.functionCall?.id).toBe('orphan_A');
+    expect(
+      (callA as unknown as { thoughtSignature?: string }).thoughtSignature,
+    ).toBe(SYNTHETIC_THOUGHT_SIGNATURE);
+
+    const callB = modelTurn.content.parts![2];
+    expect(callB.functionCall?.id).toBe('orphan_B');
+    expect(
+      (callB as unknown as { thoughtSignature?: string }).thoughtSignature,
+    ).toBeUndefined();
+
+    const callC = modelTurn.content.parts![3];
+    expect(callC.functionCall?.id).toBe('orphan_C');
+    expect(
+      (callC as unknown as { thoughtSignature?: string }).thoughtSignature,
+    ).toBeUndefined();
+
+    const userTurn = hardened[2];
+    expect(userTurn.content.parts).toHaveLength(3);
+    expect(userTurn.content.parts![0].functionResponse?.id).toBe('orphan_A');
+    expect(userTurn.content.parts![1].functionResponse?.id).toBe('orphan_B');
+    expect(userTurn.content.parts![2].functionResponse?.id).toBe('orphan_C');
   });
 
   it('should hoist and re-order tool responses to match functionCall order', () => {

@@ -27,7 +27,7 @@ export function fromGraph(
   let currentTurn: { id: string; content: Content } | null = null;
 
   for (const node of nodes) {
-    const turnId = node.turnId || 'orphan'; debugLogger.log("[ID-TRACK] fromGraph converting node:", node.id, "turnId:", turnId);
+    const turnId = node.turnId || 'orphan';
     const durableId = turnId.startsWith('turn_') ? turnId.slice(5) : turnId;
 
     // Register the payload in the identity service to ensure stability

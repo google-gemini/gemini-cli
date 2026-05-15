@@ -51,9 +51,6 @@ export interface SnapshotState {
 import { debugLogger } from '../../utils/debugLogger.js';
 
 export function isSnapshotState(text: string): boolean {
-  import('../../utils/debugLogger.js').then(({ debugLogger }) => {
-    debugLogger.log('[isSnapshotState] CALLED WITH:', text.substring(0, 50));
-  });
   const trimmed = text.trim();
   if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
     return false;
@@ -61,15 +58,19 @@ export function isSnapshotState(text: string): boolean {
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (!isRecord(parsed)) return false;
-    const isSnap = Array.isArray(parsed['active_tasks']) &&
+    const isSnap =
+      Array.isArray(parsed['active_tasks']) &&
       Array.isArray(parsed['discovered_facts']) &&
       Array.isArray(parsed['constraints_and_preferences']) &&
       Array.isArray(parsed['recent_arc']);
     if (!isSnap) {
-      debugLogger.log('[isSnapshotState] FAILED FOR JSON:', JSON.stringify(parsed));
+      debugLogger.log(
+        '[isSnapshotState] FAILED FOR JSON:',
+        JSON.stringify(parsed),
+      );
     }
     return isSnap;
-  } catch (e) {
+  } catch {
     debugLogger.log('[isSnapshotState] PARSE FAILED FOR:', trimmed);
     return false;
   }
@@ -89,9 +90,20 @@ export interface BaselineSnapshotInfo {
 export function findLatestSnapshotBaseline(
   targets: readonly ConcreteNode[],
 ): BaselineSnapshotInfo | undefined {
-  import('../../utils/debugLogger.js').then(({ debugLogger }) => {
-    debugLogger.log('[findLatestSnapshotBaseline] Targets:', targets.map(t => ({ id: t.id, type: t.type, text: (t.payload as any).text?.substring(0, 20) })));
-  });
+  debugLogger.log(
+    '[findLatestSnapshotBaseline] Targets:',
+    targets.map((t) => ({
+      id: t.id,
+      type: t.type,
+      text:
+        t.payload &&
+        typeof t.payload === 'object' &&
+        'text' in t.payload &&
+        typeof t.payload.text === 'string'
+          ? t.payload.text.substring(0, 20)
+          : '',
+    })),
+  );
   const lastSnapshotNode = [...targets]
     .reverse()
     .find((n) => n.type === NodeType.SNAPSHOT && n.payload.text);

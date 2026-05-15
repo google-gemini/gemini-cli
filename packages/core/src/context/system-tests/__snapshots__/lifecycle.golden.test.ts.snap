@@ -71,6 +71,13 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
             },
             "thoughtSignature": "skip_thought_signature_validator",
           },
+          {
+            "functionCall": {
+              "args": {},
+              "id": "undefined",
+              "name": "run_shell_command",
+            },
+          },
         ],
         "role": "model",
       },
@@ -86,6 +93,15 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
                 "output": "<tool_output_masked>
 [Tool observation string (0.02MB, 1 lines) masked to preserve context window. Full string saved to: <MOCKED_DIR>]
 </tool_output_masked>",
+              },
+            },
+          },
+          {
+            "functionResponse": {
+              "id": "undefined",
+              "name": "run_shell_command",
+              "response": {
+                "error": "The tool execution result was lost due to context management truncation.",
               },
             },
           },
