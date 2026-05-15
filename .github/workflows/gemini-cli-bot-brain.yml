@@ -338,7 +338,10 @@ jobs:
 
             BRANCH_NAME="bot/productivity-updates-$(date +'%Y%m%d%H%M%S')-${{ github.run_id }}"
             if [ -f "${{ runner.temp }}/brain-data/branch-name.txt" ]; then
-              BRANCH_NAME=$(cat "${{ runner.temp }}/brain-data/branch-name.txt")
+              FILE_BRANCH=$(cat "${{ runner.temp }}/brain-data/branch-name.txt" | tr -d '[:space:]')
+              if [ -n "$FILE_BRANCH" ] && [ "$FILE_BRANCH" != "bot/" ]; then
+                BRANCH_NAME="$FILE_BRANCH"
+              fi
             fi
 
             if [[ ! "$BRANCH_NAME" =~ ^bot/ ]]; then
