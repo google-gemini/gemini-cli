@@ -707,9 +707,9 @@ describe('Gemini 3.1 Config Resolution', () => {
     ).toBeDefined();
   });
 
-  it('PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+  it('PREVIEW_GEMINI_FLASH_LITE_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
     const resolved = modelConfigService.getResolvedConfig({
-      model: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+      model: PREVIEW_GEMINI_FLASH_LITE_MODEL,
       isChatModel: true,
     });
     expect(
