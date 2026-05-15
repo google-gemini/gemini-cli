@@ -1836,6 +1836,123 @@ ${INSTALL_WARNING_MESSAGE}`,
       expect(extensionManager.getExtensions()[0].version).toBe('1.1.0');
     });
 
+    it('should restore the previous extension if update loading fails', async () => {
+      const oldSourceExtDir = createExtension({
+        extensionsDir: path.join(tempHomeDir, 'old-source'),
+        name: 'my-local-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: oldSourceExtDir,
+        type: 'local',
+      });
+      mockIntegrityManager.store.mockClear();
+
+      const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
+      const oldOnlyFile = path.join(targetExtDir, 'old-only.txt');
+      fs.writeFileSync(oldOnlyFile, 'old version');
+
+      const previousExtensionConfig =
+        await extensionManager.loadExtensionConfig(targetExtDir);
+      const newSourceExtDir = createExtension({
+        extensionsDir: path.join(tempHomeDir, 'new-source'),
+        name: 'my-local-extension',
+        version: '1.1.0',
+      });
+      fs.writeFileSync(
+        path.join(newSourceExtDir, 'new-only.txt'),
+        'new version',
+      );
+
+      vi.spyOn(extensionManager, 'loadExtension').mockRejectedValueOnce(
+        new Error('load failed'),
+      );
+
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { source: newSourceExtDir, type: 'local' },
+          previousExtensionConfig,
+        ),
+      ).rejects.toThrow('load failed');
+
+      const restoredConfig = JSON.parse(
+        fs.readFileSync(
+          path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
+          'utf-8',
+        ),
+      );
+      expect(restoredConfig.version).toBe('1.0.0');
+      expect(fs.existsSync(oldOnlyFile)).toBe(true);
+      expect(fs.existsSync(path.join(targetExtDir, 'new-only.txt'))).toBe(
+        false,
+      );
+
+      const extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('my-local-extension');
+      expect(extensions[0].version).toBe('1.0.0');
+      expect(mockIntegrityManager.store).not.toHaveBeenCalled();
+    });
+
+    it('should restore the previous extension if update startup fails after loading', async () => {
+      const oldSourceExtDir = createExtension({
+        extensionsDir: path.join(tempHomeDir, 'old-source'),
+        name: 'my-local-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: oldSourceExtDir,
+        type: 'local',
+      });
+      mockIntegrityManager.store.mockClear();
+
+      const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
+      const previousExtensionConfig =
+        await extensionManager.loadExtensionConfig(targetExtDir);
+      const newSourceExtDir = createExtension({
+        extensionsDir: path.join(tempHomeDir, 'new-source'),
+        name: 'my-local-extension',
+        version: '1.1.0',
+      });
+
+      const maybeStartExtensionSpy = vi
+        .spyOn(
+          extensionManager as unknown as {
+            maybeStartExtension: (
+              extension: GeminiCLIExtension,
+            ) => Promise<void>;
+          },
+          'maybeStartExtension',
+        )
+        .mockRejectedValueOnce(new Error('start failed'));
+
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { source: newSourceExtDir, type: 'local' },
+          previousExtensionConfig,
+        ),
+      ).rejects.toThrow('start failed');
+
+      const restoredConfig = JSON.parse(
+        fs.readFileSync(
+          path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
+          'utf-8',
+        ),
+      );
+      expect(restoredConfig.version).toBe('1.0.0');
+
+      const extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('my-local-extension');
+      expect(extensions[0].version).toBe('1.0.0');
+      expect(mockIntegrityManager.store).not.toHaveBeenCalled();
+      maybeStartExtensionSpy.mockRestore();
+    });
+
     it('should throw an error for invalid extension names', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,

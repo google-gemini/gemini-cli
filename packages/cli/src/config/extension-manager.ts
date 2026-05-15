@@ -8,7 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
-import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import {
+  ExtensionEnablementManager,
+  type ExtensionEnablementConfig,
+} from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
@@ -95,6 +98,14 @@ interface ExtensionManagerParams {
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
   integrityManager?: IExtensionIntegrity;
+}
+
+interface ExtensionUpdateBackup {
+  backupDir: string;
+  backupPath: string;
+  restorePath: string;
+  extensionName: string;
+  enablementConfig?: ExtensionEnablementConfig;
 }
 
 /**
@@ -215,6 +226,9 @@ export class ExtensionManager extends ExtensionLoader {
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
     let extension: GeminiCLIExtension | null;
+    let updateBackup: ExtensionUpdateBackup | undefined;
+    let updateRemovedPreviousExtension = false;
+    let updateDestinationPath: string | undefined;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
         if (
@@ -354,6 +368,7 @@ Would you like to attempt to install via "git clone" instead?`,
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+        updateDestinationPath = destinationPath;
 
         if (
           (!isUpdate || newExtensionName !== previousName) &&
@@ -368,6 +383,9 @@ Would you like to attempt to install via "git clone" instead?`,
         let wasEnabledGlobally = false;
         let wasEnabledWorkspace = false;
         if (isUpdate && previousExtensionConfig) {
+          if (previous) {
+            updateBackup = await this.backupInstalledExtension(previous);
+          }
           const previousExtensionId = previous?.installMetadata
             ? getExtensionId(previousExtensionConfig, previous.installMetadata)
             : extensionId;
@@ -388,6 +406,7 @@ Would you like to attempt to install via "git clone" instead?`,
             this.extensionEnablementManager.remove(previousName);
           }
           await this.uninstallExtension(previousName, isUpdate);
+          updateRemovedPreviousExtension = true;
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
@@ -441,14 +460,6 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
-        // Establish trust at point of installation
-        await this.storeExtensionIntegrity(
-          newExtensionConfig.name,
-          installMetadata,
-        );
-
-        // TODO: Gracefully handle this call failing, we should back up the old
-        // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath);
         if (!extension) {
           throw new Error(`Extension not found`);
@@ -495,6 +506,13 @@ Would you like to attempt to install via "git clone" instead?`,
             SettingScope.User,
           );
         }
+
+        // Establish trust only after the new extension has loaded and any
+        // update rollback point has passed.
+        await this.storeExtensionIntegrity(
+          newExtensionConfig.name,
+          installMetadata,
+        );
       } finally {
         if (tempDir) {
           await fs.promises.rm(tempDir, { recursive: true, force: true });
@@ -502,6 +520,19 @@ Would you like to attempt to install via "git clone" instead?`,
       }
       return extension;
     } catch (error) {
+      if (
+        updateBackup &&
+        updateRemovedPreviousExtension &&
+        updateDestinationPath
+      ) {
+        await this.restoreInstalledExtension(
+          updateBackup,
+          updateDestinationPath,
+          newExtensionConfig?.name,
+        );
+        updateRemovedPreviousExtension = false;
+      }
+
       // Attempt to load config from the source path even if installation fails
       // to get the name and version for logging.
       if (!newExtensionConfig && localSourcePath) {
@@ -542,6 +573,13 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
       throw error;
+    } finally {
+      if (updateBackup) {
+        await fs.promises.rm(updateBackup.backupDir, {
+          recursive: true,
+          force: true,
+        });
+      }
     }
   }
 
@@ -586,6 +624,71 @@ Would you like to attempt to install via "git clone" instead?`,
         CoreToolCallStatus.Success,
       ),
     );
+  }
+
+  private getStoredExtensionDir(extension: GeminiCLIExtension): string {
+    const storageName =
+      extension.installMetadata?.type === 'link'
+        ? extension.name
+        : path.basename(extension.path);
+    return new ExtensionStorage(storageName).getExtensionDir();
+  }
+
+  private async backupInstalledExtension(
+    extension: GeminiCLIExtension,
+  ): Promise<ExtensionUpdateBackup | undefined> {
+    const restorePath = this.getStoredExtensionDir(extension);
+    if (!fs.existsSync(restorePath)) {
+      return undefined;
+    }
+
+    const backupDir = await ExtensionStorage.createTmpDir();
+    const backupPath = path.join(backupDir, 'previous-extension');
+    const enablementConfig =
+      this.extensionEnablementManager.readConfig()[extension.name];
+    await copyExtension(restorePath, backupPath);
+    return {
+      backupDir,
+      backupPath,
+      restorePath,
+      extensionName: extension.name,
+      enablementConfig,
+    };
+  }
+
+  private async restoreInstalledExtension(
+    backup: ExtensionUpdateBackup,
+    failedInstallPath: string,
+    failedExtensionName?: string,
+  ): Promise<void> {
+    const failedExtension = this.loadedExtensions?.find(
+      (extension) =>
+        extension.path === failedInstallPath ||
+        extension.name === failedExtensionName,
+    );
+    if (failedExtension) {
+      await this.unloadExtension(failedExtension);
+    }
+
+    await fs.promises.rm(failedInstallPath, {
+      recursive: true,
+      force: true,
+    });
+    await fs.promises.rm(backup.restorePath, {
+      recursive: true,
+      force: true,
+    });
+    await copyExtension(backup.backupPath, backup.restorePath);
+
+    const enablementConfig = this.extensionEnablementManager.readConfig();
+    if (backup.enablementConfig) {
+      enablementConfig[backup.extensionName] = backup.enablementConfig;
+    } else {
+      delete enablementConfig[backup.extensionName];
+    }
+    this.extensionEnablementManager.writeConfig(enablementConfig);
+
+    await this.loadExtension(backup.restorePath);
   }
 
   protected override async startExtension(extension: GeminiCLIExtension) {
