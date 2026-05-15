@@ -148,6 +148,20 @@ function getConfiguredBaseUrlForAuthType(
   }
 }
 
+/**
+ * Assign a quality rank to Gemma 4 model IDs for sorting.
+ * Lower number = higher quality (bigger model).
+ */
+function getModelQualityRank(modelId: string): number {
+  const id = modelId.toLowerCase();
+  if (id.includes('31b') && !id.includes('cloud')) return 1;
+  if (id.includes('31b') && id.includes('cloud')) return 2;
+  if (id.includes('26b')) return 3;
+  if (id.includes('e4b')) return 4;
+  if (id.includes('e2b')) return 5;
+  return 6;
+}
+
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
@@ -366,8 +380,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }> = [];
     for (const backend of discoveredBackends) {
       const label = BACKEND_DISPLAY[backend.backend] || backend.backend;
-      for (const model of backend.gemma4Models) {
+      const sortedModels = [...backend.gemma4Models].sort(
+        (a, b) => getModelQualityRank(a.id) - getModelQualityRank(b.id),
+      );
+      for (const model of sortedModels) {
         const displayName = getDisplayString(model.id, config ?? undefined);
+        const isCloudModel = model.id.toLowerCase().includes('cloud');
         const metadata = backend.gemma4Metadata.find(
           (meta) => meta.id === model.id,
         );
@@ -378,7 +396,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           : 'running';
         result.push({
           value: encodeLocalModelChoice(backend.authType, model.id),
-          title: `${displayName} [Local]`,
+          title: isCloudModel ? displayName : `${displayName} [Local]`,
           description: `Provider: ${label} ● ${details}`,
           key: `local:${backend.backend}:${model.id}`,
         });
@@ -435,14 +453,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             key: GEMMA_MODEL_ALIAS_4,
           },
           {
-            value: GEMMA_MODEL_ALIAS_4_26B,
-            title: getDisplayString(
-              GEMMA_MODEL_ALIAS_4_26B,
-              config ?? undefined,
-            ),
-            key: GEMMA_MODEL_ALIAS_4_26B,
-          },
-          {
             value: GEMMA_MODEL_ALIAS_4_31B,
             title: getDisplayString(
               GEMMA_MODEL_ALIAS_4_31B,
@@ -457,6 +467,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
               config ?? undefined,
             ),
             key: GEMMA_MODEL_ALIAS_4_31B_CLOUD,
+          },
+          {
+            value: GEMMA_MODEL_ALIAS_4_26B,
+            title: getDisplayString(
+              GEMMA_MODEL_ALIAS_4_26B,
+              config ?? undefined,
+            ),
+            key: GEMMA_MODEL_ALIAS_4_26B,
           },
           {
             value: GEMMA_MODEL_ALIAS_4_E4B,
@@ -492,8 +510,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       };
       for (const backend of discoveredBackends) {
         const label = BACKEND_DISPLAY[backend.backend] || backend.backend;
-        for (const model of backend.gemma4Models) {
+        const sortedModels = [...backend.gemma4Models].sort(
+          (a, b) => getModelQualityRank(a.id) - getModelQualityRank(b.id),
+        );
+        for (const model of sortedModels) {
           const displayName = getDisplayString(model.id, config ?? undefined);
+          const isCloudModel = model.id.toLowerCase().includes('cloud');
           const metadata = backend.gemma4Metadata.find(
             (meta) => meta.id === model.id,
           );
@@ -504,7 +526,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             : 'running';
           options.push({
             value: encodeLocalModelChoice(backend.authType, model.id),
-            title: `${displayName} [Local]`,
+            title: isCloudModel ? displayName : `${displayName} [Local]`,
             description: `Provider: ${label} ● ${details}`,
             key: `${backend.backend}:${model.id}`,
           });
