@@ -58,6 +58,7 @@ jobs:
       contents: 'read'
       issues: 'read'
       actions: 'read'
+      pull-requests: 'read'
     outputs:
       sha: ${{ steps.get_sha.outputs.sha }}
     env:
