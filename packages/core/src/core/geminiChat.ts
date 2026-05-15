@@ -771,7 +771,7 @@ export class GeminiChat {
           }
 
           throw new AgentExecutionBlockedError(
-            beforeModelResult.reason || 'Model call blocked by hook',
+            beforeModelResult.reason || 'Agent execution blocked by hook',
             syntheticResponse,
           );
         }
@@ -1208,7 +1208,7 @@ export class GeminiChat {
 
         if (hookResult.blocked) {
           throw new AgentExecutionBlockedError(
-            hookResult.reason || 'Model call blocked by hook',
+            hookResult.reason || 'Agent execution blocked by hook',
             hookResult.response,
           );
         }

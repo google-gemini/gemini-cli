@@ -81,7 +81,7 @@ export async function exportHistoryToFile(
   const {
     messages,
     filePath,
-    trajectories: _trajectories, // Collected but not yet included in Stage 1 JSON output
+    trajectories: _trajectories, // Collected but not yet included in Stage 2 JSON output
     history: providedHistory,
   } = options;
   const extension = path.extname(filePath).toLowerCase();
