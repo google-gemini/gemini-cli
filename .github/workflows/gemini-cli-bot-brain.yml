@@ -61,6 +61,7 @@ jobs:
       pull-requests: 'read'
     outputs:
       sha: ${{ steps.get_sha.outputs.sha }}
+      target_sha: ${{ steps.get_target_sha.outputs.sha }}
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
@@ -99,6 +100,11 @@ jobs:
           path: 'repo-target'
           fetch-depth: 0
           persist-credentials: false
+
+      - name: 'Get Target SHA'
+        id: 'get_target_sha'
+        working-directory: repo-target
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: 'Download Previous State'
         env:
@@ -316,7 +322,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: 'main'
+          ref: '${{ needs.reasoning.outputs.target_sha }}'
           fetch-depth: 0
           persist-credentials: false
 
