@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { normalizeModelId } from '../utils/modelUtils.js';
+
 export interface ModelResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
@@ -110,6 +112,20 @@ export function getAutoModelDescription(
   return `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
 }
 
+export function isValidModel(model: string): boolean {
+  const normalized = normalizeModelId(model);
+  return (
+    VALID_GEMINI_MODELS.has(normalized) ||
+    normalized === GEMINI_MODEL_ALIAS_AUTO ||
+    normalized === GEMINI_MODEL_ALIAS_PRO ||
+    normalized === GEMINI_MODEL_ALIAS_FLASH ||
+    normalized === GEMINI_MODEL_ALIAS_FLASH_LITE ||
+    normalized === PREVIEW_GEMINI_MODEL_AUTO ||
+    normalized === DEFAULT_GEMINI_MODEL_AUTO ||
+    !normalized.startsWith('gemini-')
+  );
+}
+
 /**
  * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
  * to a concrete model name.
@@ -196,7 +212,12 @@ export function resolveModel(
       break;
     }
     default: {
-      resolved = normalizedModel;
+      if (!isValidModel(normalizedModel)) {
+        // Fallback to stable default for unknown/obsolete models.
+        resolved = DEFAULT_GEMINI_MODEL;
+      } else {
+        resolved = normalizedModel;
+      }
       break;
     }
   }
