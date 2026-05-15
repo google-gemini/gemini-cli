@@ -76,6 +76,37 @@ export class LocalModelService {
       .filter((item) => item.id.length > 0);
   }
 
+  /**
+   * Lightweight ping to check if a local backend is reachable.
+   * Returns `true` if the backend responds with a non-error status,
+   * `false` otherwise (including timeouts).
+   */
+  async pingBackend(
+    authType: AuthType,
+    baseUrl?: string,
+  ): Promise<boolean> {
+    if (!isLocalBackendAuthType(authType)) {
+      return false;
+    }
+
+    const resolvedBaseUrl = resolveLocalBackendBaseUrl(authType, baseUrl);
+    const url = new URL(
+      'models',
+      ensureTrailingSlash(resolvedBaseUrl),
+    ).toString();
+
+    try {
+      const response = await this.fetchImpl(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   filterGemma4Models(models: LocalModel[]): LocalModel[] {
     return models.filter((model) => {
       const normalizedId = model.id.toLowerCase();

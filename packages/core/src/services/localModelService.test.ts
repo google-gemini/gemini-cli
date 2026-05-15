@@ -82,4 +82,45 @@ describe('LocalModelService', () => {
       service.resolveModelId(AuthType.USE_LOCAL_OLLAMA, 'gemma4'),
     ).rejects.toThrow(/Available Gemma 4 models: none found/);
   });
+
+  it('pingBackend returns true when backend responds ok', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const service = new LocalModelService(fetchMock as unknown as typeof fetch);
+
+    const result = await service.pingBackend(AuthType.USE_LOCAL_OLLAMA);
+
+    expect(result).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:11434/v1/models',
+      expect.any(Object),
+    );
+  });
+
+  it('pingBackend returns false when backend responds with error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+    const service = new LocalModelService(fetchMock as unknown as typeof fetch);
+
+    const result = await service.pingBackend(AuthType.USE_LOCAL_OLLAMA);
+
+    expect(result).toBe(false);
+  });
+
+  it('pingBackend returns false on network failure', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('Connection refused'));
+    const service = new LocalModelService(fetchMock as unknown as typeof fetch);
+
+    const result = await service.pingBackend(AuthType.USE_LOCAL_OLLAMA);
+
+    expect(result).toBe(false);
+  });
+
+  it('pingBackend returns false for non-local auth type', async () => {
+    const fetchMock = vi.fn();
+    const service = new LocalModelService(fetchMock as unknown as typeof fetch);
+
+    const result = await service.pingBackend(AuthType.USE_GEMINI);
+
+    expect(result).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
