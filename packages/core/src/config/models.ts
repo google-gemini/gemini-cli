@@ -57,7 +57,7 @@ export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
-export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
+export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
@@ -500,10 +500,7 @@ export function isActiveModel(
   if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
     return experimentalGemma;
   }
-  if (
-    model === PREVIEW_GEMINI_FLASH_LITE_MODEL ||
-    model === DEFAULT_GEMINI_FLASH_LITE_MODEL
-  ) {
+  if (model === PREVIEW_GEMINI_FLASH_LITE_MODEL) {
     return useGemini3_1FlashLite;
   }
   if (useGemini3_1) {

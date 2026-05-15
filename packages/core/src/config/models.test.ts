@@ -609,7 +609,6 @@ describe('isActiveModel', () => {
 
   it('should return false for Gemini 3.1 models when Gemini 3.1 is not launched', () => {
     expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL)).toBe(false);
-    expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL)).toBe(false);
   });
 
   it('should return true for unknown models and aliases', () => {
@@ -625,11 +624,11 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
   });
 
-  it('should return true for PREVIEW_GEMINI_FLASH_LITE_MODEL and DEFAULT_GEMINI_FLASH_LITE_MODEL only when useGemini3_1FlashLite is true', () => {
+  it('should return true for PREVIEW_GEMINI_FLASH_LITE_MODEL only when useGemini3_1FlashLite is true, and always true for DEFAULT_GEMINI_FLASH_LITE_MODEL', () => {
     expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, true)).toBe(
       true,
     );
-    expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false, true)).toBe(
+    expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
       true,
     );
     expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, true, true)).toBe(
@@ -642,7 +641,7 @@ describe('isActiveModel', () => {
       false,
     );
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true, false)).toBe(
-      false,
+      true,
     );
   });
 
@@ -664,7 +663,7 @@ describe('isActiveModel', () => {
     ).toBe(false);
   });
 
-  it('should return false for Gemini 3.1 models when useGemini3_1 and useGemini3_1FlashLite are false', () => {
+  it('should return false for Gemini 3.1 preview models when useGemini3_1 and useGemini3_1FlashLite are false', () => {
     expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, false, false, true)).toBe(
       false,
     );
@@ -681,7 +680,7 @@ describe('isActiveModel', () => {
       false,
     );
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
-      false,
+      true,
     );
   });
 });
