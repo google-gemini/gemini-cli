@@ -15,7 +15,6 @@ import { logToolOutputMasking } from '../telemetry/loggers.js';
 import {
   SHELL_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -36,7 +35,6 @@ export const TOOL_OUTPUTS_DIR = 'tool-outputs';
  */
 const EXEMPT_TOOLS = new Set([
   ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,

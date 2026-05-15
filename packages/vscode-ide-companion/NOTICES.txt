@@ -2238,7 +2238,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-express-rate-limit@8.3.1
+express-rate-limit@8.5.2
 (git+https://github.com/express-rate-limit/express-rate-limit.git)
 
 ﻿# MIT License
@@ -2264,7 +2264,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-ip-address@10.1.0
+ip-address@10.2.0
 (git://github.com/beaugunderson/ip-address.git)
 
 Copyright (C) 2011 by Beau Gunderson
@@ -2289,7 +2289,7 @@ THE SOFTWARE.
 
 
 ============================================================
-hono@4.12.12
+hono@4.12.18
 (git+https://github.com/honojs/hono.git)
 
 MIT License
