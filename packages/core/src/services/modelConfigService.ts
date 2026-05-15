@@ -103,6 +103,7 @@ export interface ResolutionContext {
   hasAccessToProModel?: boolean;
   requestedModel?: string;
   releaseChannel?: string;
+  authType?: string;
 }
 
 /** The requirements defined in the registry. */
@@ -114,6 +115,7 @@ export interface ResolutionCondition {
   /** Matches if the current model is in this list. */
   requestedModels?: string[];
   releaseChannel?: string;
+  authType?: string;
 }
 
 export interface ModelConfigServiceConfig {
@@ -267,6 +269,8 @@ export class ModelConfigService {
           );
         case 'releaseChannel':
           return value === context.releaseChannel;
+        case 'authType':
+          return value === context.authType;
         default:
           return false;
       }

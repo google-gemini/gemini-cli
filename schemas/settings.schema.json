@@ -1240,6 +1240,12 @@
             "contexts": [
               {
                 "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
                   "releaseChannel": "stable"
                 },
                 "target": "gemini-2.5-pro"
@@ -1270,6 +1276,12 @@
             "contexts": [
               {
                 "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
                   "hasAccessToPreview": false
                 },
                 "target": "gemini-2.5-pro"
@@ -1294,6 +1306,12 @@
             "contexts": [
               {
                 "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-flash-lite"
+              },
+              {
+                "condition": {
                   "useGemini3_1FlashLite": false
                 },
                 "target": "gemini-2.5-flash-lite"
@@ -1303,6 +1321,12 @@
           "flash": {
             "default": "gemini-3-flash-preview",
             "contexts": [
+              {
+                "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-flash"
+              },
               {
                 "condition": {
                   "hasAccessToPreview": false
@@ -1316,7 +1340,15 @@
             "contexts": [
               {
                 "condition": {
-                  "useGemini3_1FlashLite": true
+                  "useGemini3_1FlashLite": true,
+                  "authType": "gemini-api-key"
+                },
+                "target": "gemini-3.1-flash-lite-preview"
+              },
+              {
+                "condition": {
+                  "useGemini3_1FlashLite": true,
+                  "authType": "vertex-ai"
                 },
                 "target": "gemini-3.1-flash-lite-preview"
               }
@@ -1325,6 +1357,12 @@
           "auto-gemini-3": {
             "default": "gemini-3-pro-preview",
             "contexts": [
+              {
+                "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-pro"
+              },
               {
                 "condition": {
                   "hasAccessToPreview": false
@@ -1356,13 +1394,22 @@
             "contexts": [
               {
                 "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-flash"
+              },
+              {
+                "condition": {
                   "hasAccessToPreview": false
                 },
                 "target": "gemini-2.5-flash"
               },
               {
                 "condition": {
-                  "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
+                  "requestedModels": [
+                    "gemini-2.5-pro",
+                    "auto-gemini-2.5"
+                  ]
                 },
                 "target": "gemini-2.5-flash"
               }
@@ -1373,6 +1420,12 @@
             "contexts": [
               {
                 "condition": {
+                  "authType": "oauth-personal"
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
                   "hasAccessToPreview": false
                 },
                 "target": "gemini-2.5-pro"
@@ -1380,13 +1433,18 @@
               {
                 "condition": {
                   "releaseChannel": "stable",
-                  "requestedModels": ["auto"]
+                  "requestedModels": [
+                    "auto"
+                  ]
                 },
                 "target": "gemini-2.5-pro"
               },
               {
                 "condition": {
-                  "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
+                  "requestedModels": [
+                    "gemini-2.5-pro",
+                    "auto-gemini-2.5"
+                  ]
                 },
                 "target": "gemini-2.5-pro"
               },

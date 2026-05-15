@@ -217,6 +217,8 @@ export async function createContentGenerator(
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
+      undefined,
+      config.authType,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
