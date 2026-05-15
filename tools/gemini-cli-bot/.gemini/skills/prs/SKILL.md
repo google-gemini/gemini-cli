@@ -13,7 +13,7 @@ descriptions, and manages the lifecycle of both new and existing PRs.
 ## Mandatory PR Driver (Ownership)
 
 You are the "owner" of all PRs labeled `bot-fix`. You MUST proactively drive them toward a resolution (either completion or informed escalation):
-1.  **Inventory**: Use `gh pr list --label "bot-fix" --json number,title,headRefName,statusCheckRollup,comments` to find your active PRs.
+1.  **Inventory**: Use `gh pr list --search "is:open is:pr label:bot-fix" --repo google-gemini/gemini-cli --json number,title,headRefName,statusCheckRollup,comments` to find your active PRs.
 2.  **Resolution Priority**:
     - **Fixable CI/Feedback**: If a `bot-fix` PR needs attention, you MUST prioritize driving it to completion by resolving issues. Specifically:
         1. **Merge Conflicts**: Attempt to resolve merge conflicts by pulling the target branch or rebasing.
