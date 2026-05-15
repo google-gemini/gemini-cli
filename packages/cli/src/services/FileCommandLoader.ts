@@ -9,7 +9,13 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import { Storage, coreEvents, type Config } from '@google/gemini-cli-core';
+import {
+  Storage,
+  coreEvents,
+  normalizePath,
+  resolveToRealPath,
+  type Config,
+} from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,
@@ -46,6 +52,17 @@ export interface CommandFileGroup {
   path: string;
   files: string[];
   error?: string;
+}
+
+function areSameCommandDirectory(left: string, right: string): boolean {
+  try {
+    return (
+      normalizePath(resolveToRealPath(left)) ===
+      normalizePath(resolveToRealPath(right))
+    );
+  } catch {
+    return normalizePath(left) === normalizePath(right);
+  }
 }
 
 /**
@@ -220,9 +237,13 @@ export class FileCommandLoader implements ICommandLoader {
 
     // 2. Project commands (skip if same directory as user commands, e.g. when
     //    cwd is the user's home directory, to avoid false conflict warnings)
-    if (!storage.isWorkspaceHomeDir()) {
+    const projectCommandsDir = storage.getProjectCommandsDir();
+    if (
+      !storage.isWorkspaceHomeDir() &&
+      !areSameCommandDirectory(userCommandsDir, projectCommandsDir)
+    ) {
       dirs.push({
-        path: storage.getProjectCommandsDir(),
+        path: projectCommandsDir,
         kind: CommandKind.WORKSPACE_FILE,
       });
     }

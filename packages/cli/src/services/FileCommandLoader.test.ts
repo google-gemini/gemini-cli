@@ -348,6 +348,32 @@ describe('FileCommandLoader', () => {
     expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
   });
 
+  it('does not duplicate commands when command directories resolve to the same path', async () => {
+    const userCommandsDir = Storage.getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'test.toml': 'prompt = "User prompt"',
+      },
+    });
+
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => homedir()),
+      getExtensions: vi.fn(() => []),
+      getFolderTrust: vi.fn(() => false),
+      isTrustedFolder: vi.fn(() => false),
+      storage: {
+        isWorkspaceHomeDir: vi.fn(() => false),
+        getProjectCommandsDir: vi.fn(() => userCommandsDir),
+      },
+    } as unknown as Config;
+    const loader = new FileCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(signal);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0].name).toBe('test');
+    expect(commands[0].kind).toBe(CommandKind.USER_FILE);
+  });
+
   it('ignores files with TOML syntax errors', async () => {
     const userCommandsDir = Storage.getUserCommandsDir();
     mock({
