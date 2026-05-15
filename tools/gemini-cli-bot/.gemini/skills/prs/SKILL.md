@@ -15,7 +15,12 @@ descriptions, and manages the lifecycle of both new and existing PRs.
 You are the "owner" of all PRs labeled `bot-fix`. You MUST proactively drive them toward a resolution (either completion or informed escalation):
 1.  **Inventory**: Use `gh pr list --label "bot-fix" --json number,title,headRefName,statusCheckRollup,comments` to find your active PRs.
 2.  **Resolution Priority**:
-    - **Fixable CI/Feedback**: If a `bot-fix` PR has failing status checks or new maintainer comments, you MUST prioritize fixing the CI or responding to the feedback before starting new work.
+    - **Fixable CI/Feedback**: If a `bot-fix` PR needs attention, you MUST prioritize driving it to completion by resolving issues. Specifically:
+        1. **Merge Conflicts**: Attempt to resolve merge conflicts by pulling the target branch or rebasing.
+        2. **Test Failures**: Fix any failing unit or integration tests related to the PR.
+        3. **Failing Checks**: Resolve any failing status checks (e.g., lint, build, typecheck).
+        4. **PR Comments**: Address and resolve all maintainer comments and requested changes.
+      You MUST prioritize this maintenance before starting new work.
     - **Unresolvable Roadblocks**: If you identify a persistent failure that appears to be an environment issue, a flaky test, or a fundamental architectural blocker that requires human intervention, you MUST NOT keep looping. Instead:
         1. Summarize the blocker and your failed attempts in `pr-comment.md`.
         2. Explicitly ask for maintainer help.
