@@ -219,7 +219,11 @@ export class GeminiClient {
   }
 
   private isPureFunctionResponseRequest(request: PartListUnion): boolean {
-    return isFunctionResponse(createUserContent(request));
+    if (Array.isArray(request) && request.length === 0) {
+      return false;
+    }
+    const content = createUserContent(request);
+    return (content.parts?.length ?? 0) > 0 && isFunctionResponse(content);
   }
 
   private async fireAfterAgentHookSafe(

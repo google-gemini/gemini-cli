@@ -3278,6 +3278,43 @@ ${JSON.stringify(
         expect(client['hookStateMap'].size).toBe(0);
       });
 
+      it('should append BeforeAgent hook context to empty requests', async () => {
+        const promptId = 'test-prompt-hook-empty-request';
+        const signal = new AbortController().signal;
+        const request: Part[] = [];
+
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getAdditionalContext: () => 'external context',
+        });
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Empty response handled');
+          yield {
+            type: GeminiEventType.Content,
+            value: 'Empty response handled',
+          };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          expect.anything(),
+          [{ text: '<hook_context>external context</hook_context>' }],
+          signal,
+          undefined,
+        );
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Empty response handled',
+          false,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
       it('should append BeforeAgent hook context to mixed functionResponse requests', async () => {
         const promptId = 'test-prompt-hook-mixed-function-response';
         const signal = new AbortController().signal;
