@@ -366,7 +366,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('should display "current process" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
+    it('should display the profile for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
@@ -374,7 +374,47 @@ describe('<Footer />', () => {
         width: 120,
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
-      expect(lastFrame()).toContain('current process');
+      expect(lastFrame()).toContain('sandbox-exec (test-profile)');
+      vi.unstubAllEnvs();
+      unmount();
+    });
+
+    it('should display unknown when macOS Seatbelt profile is not set', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      vi.stubEnv('SEATBELT_PROFILE', '');
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
+        width: 120,
+        uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
+      });
+      expect(lastFrame()).toContain('sandbox-exec (unknown)');
+      vi.unstubAllEnvs();
+      unmount();
+    });
+
+    it('should account for Seatbelt profile width when filtering narrow footer columns', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      vi.stubEnv('SEATBELT_PROFILE', 'strict-open');
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
+        width: 59,
+        uiState: {
+          isTrustedFolder: true,
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['workspace', 'sandbox', 'model-name'],
+              showLabels: true,
+            },
+          },
+        }),
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('sandbox-exec (strict-open)');
+      expect(output).not.toContain('/model');
       vi.unstubAllEnvs();
       unmount();
     });
