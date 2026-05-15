@@ -429,6 +429,16 @@ const SETTINGS_SCHEMA = {
           'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,
       },
+      logRagSnippets: {
+        type: 'boolean',
+        label: 'Log RAG Snippets',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Log full Code Customization (RAG) retrieved snippets to a local file for debugging.',
+        showInDialog: true,
+      },
     },
   },
   output: {
