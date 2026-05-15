@@ -10,17 +10,17 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL,
+  type ModelCapabilityContext,
 } from './models.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import type { Config } from './config.js';
 
 const modelConfigService = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
 
 const dynamicConfig = {
   getExperimentalDynamicModelConfiguration: () => true,
   modelConfigService,
-} as unknown as Config;
+} as unknown as ModelCapabilityContext;
 
 describe('resolveModel with authType', () => {
   it('should resolve auto-gemini-3 to gemini-3-pro-preview for non-personal auth', () => {
@@ -55,7 +55,7 @@ describe('resolveModel with authType', () => {
     const configWithAuth = {
       ...dynamicConfig,
       getAuthType: () => 'oauth-personal',
-    } as unknown as Config;
+    } as unknown as ModelCapabilityContext;
 
     const model = resolveModel(
       PREVIEW_GEMINI_MODEL_AUTO,

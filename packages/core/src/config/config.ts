@@ -2802,7 +2802,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getAuthType(): string | undefined {
-    return this.contentGeneratorConfig.authType;
+    return this.contentGeneratorConfig?.authType;
   }
 
   getPendingIncludeDirectories(): string[] {
