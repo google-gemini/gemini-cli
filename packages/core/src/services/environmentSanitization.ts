@@ -213,6 +213,12 @@ export function getSecureSanitizationConfig(
     if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(upperKey)) {
       return false;
     }
+    // Never allow variables that match sensitive name patterns
+    for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
+      if (pattern.test(upperKey)) {
+        return false;
+      }
+    }
     return true;
   });
 
