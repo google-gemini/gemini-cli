@@ -114,7 +114,7 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_FLASH_LITE_MODEL);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
@@ -125,7 +125,7 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
