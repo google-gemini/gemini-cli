@@ -398,7 +398,17 @@ export class ContextManager {
     });
 
     if (pendingRequest) {
-      hardenedHistory.pop(); // Remove the pending request from the final output
+      const last = hardenedHistory[hardenedHistory.length - 1];
+      if (last && last.content.parts) {
+        const numPartsToRemove = pendingRequest.content.parts?.length || 0;
+        if (numPartsToRemove > 0 && last.content.parts.length > numPartsToRemove) {
+          last.content.parts.splice(-numPartsToRemove);
+        } else {
+          hardenedHistory.pop();
+        }
+      } else {
+        hardenedHistory.pop();
+      }
     }
 
     const apiHistory = hardenedHistory.map((h) => h.content);

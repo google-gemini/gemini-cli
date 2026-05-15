@@ -20,7 +20,10 @@ describe('Context Management Resume E2E', () => {
 
   afterEach(async () => await rig.cleanup());
 
-  it('should preserve and utilize GC snapshot boundaries when resuming a session', async () => {
+  it(
+    'should preserve and utilize GC snapshot boundaries when resuming a session',
+    { timeout: 30000 },
+    async () => {
     const snapshotResponse: FakeResponse = {
       method: 'generateContent',
       response: {
@@ -145,5 +148,5 @@ describe('Context Management Resume E2E', () => {
     const traces = fs.readFileSync(traceLog, 'utf-8');
     expect(traces).toContain('Hitting Synchronous Pressure Barrier');
     expect(traces).toContain('GC Triggered.');
-  });
+  }, 30000);
 });

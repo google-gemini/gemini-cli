@@ -337,7 +337,7 @@ export class GeminiClient {
   }
 
   async resumeChat(
-    history: Content[],
+    history: any[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
@@ -378,7 +378,7 @@ export class GeminiClient {
   }
 
   async startChat(
-    extraHistory?: Content[],
+    extraHistory?: any[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
@@ -394,13 +394,16 @@ export class GeminiClient {
       : await getInitialChatHistory(this.config, extraHistory);
 
     try {
+      import('node:fs').then((fs) => {
+        fs.appendFileSync('/tmp/gemini_startChat_history.log', JSON.stringify(history, null, 2) + '\n');
+      });
       const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       const chat = new GeminiChat(
         this.config,
         systemInstruction,
         tools,
-        history,
+        history as any[],
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
@@ -421,7 +424,7 @@ export class GeminiClient {
       await reportError(
         error,
         'Error initializing Gemini chat session.',
-        history,
+        history as Content[],
         'startChat',
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
@@ -665,6 +668,7 @@ export class GeminiClient {
         currentBaseUnits = baseUnits;
 
         if (didApplyManagement) {
+          import('node:fs').then(fs => fs.appendFileSync('/tmp/gemini_sync.log', `[client.ts] setHistory called with ${newHistory.length} items!\n`));
           // If the manager pruned history, we update the chat before continuing.
           // Note: we don't include the pendingRequest in this setHistory,
           // because Turn.run will add it normally.

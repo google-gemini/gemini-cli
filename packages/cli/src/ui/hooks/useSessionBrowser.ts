@@ -19,7 +19,6 @@ import {
   convertSessionToHistoryFormats,
   type SessionInfo,
 } from '../../utils/sessionUtils.js';
-import type { Part } from '@google/genai';
 
 export { convertSessionToHistoryFormats };
 
@@ -27,7 +26,7 @@ export const useSessionBrowser = (
   config: Config,
   onLoadHistory: (
     uiHistory: HistoryItemWithoutId[],
-    clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+    clientHistory: any[],
     resumedSessionData: ResumedSessionData,
   ) => Promise<void>,
 ) => {

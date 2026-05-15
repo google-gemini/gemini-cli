@@ -11,7 +11,6 @@ import {
   type ResumedSessionData,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
-import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
@@ -54,7 +53,7 @@ export function useSessionResume({
   const loadHistoryForResume = useCallback(
     async (
       uiHistory: HistoryItemWithoutId[],
-      clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+      clientHistory: any[],
       resumedData: ResumedSessionData,
     ) => {
       // Wait for the client.

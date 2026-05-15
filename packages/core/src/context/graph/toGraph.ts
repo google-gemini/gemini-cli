@@ -211,12 +211,12 @@ export class ContextGraphBuilder {
                 ? part.functionCall.id
                 : undefined;
 
+          const isSnapshot = isTextPart(part) && isSnapshotState(part.text);
+
           // Use stable API ID if available, otherwise anchor to the turn and index.
           const id = apiId
             ? `${apiId}_${turnSalt}_${partIdx}`
             : `${turnSalt}_${partIdx}`;
-
-          const isSnapshot = isTextPart(part) && isSnapshotState(part.text);
 
           const node: ConcreteNode = {
             id,
