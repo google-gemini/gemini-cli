@@ -605,7 +605,7 @@ export class GeminiClient {
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
       this.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
-      false,
+      this.config.getUseCustomToolModelSync?.() ?? false,
       this.config.getHasAccessToPreviewModel?.() ?? true,
       this.config,
     );

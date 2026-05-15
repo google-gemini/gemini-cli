@@ -3480,7 +3480,7 @@ export class Config implements McpContext, AgentLoopContext {
   async getUseCustomToolModel(): Promise<boolean> {
     const useGemini3_1 = await this.getGemini31Launched();
     const authType = this.contentGeneratorConfig?.authType;
-    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+    return useGemini3_1 && this.supportsCustomToolModel(authType);
   }
 
   /**
@@ -3491,7 +3491,13 @@ export class Config implements McpContext, AgentLoopContext {
   getUseCustomToolModelSync(): boolean {
     const useGemini3_1 = this.getGemini31LaunchedSync();
     const authType = this.contentGeneratorConfig?.authType;
-    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+    return useGemini3_1 && this.supportsCustomToolModel(authType);
+  }
+
+  private supportsCustomToolModel(authType?: AuthType): boolean {
+    return (
+      authType === AuthType.USE_GEMINI || authType === AuthType.USE_VERTEX_AI
+    );
   }
 
   private isGemini31LaunchedForAuthType(authType?: AuthType): boolean {

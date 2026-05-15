@@ -16,6 +16,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   GEMINI_MODEL_ALIAS_AUTO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
 } from '../../config/models.js';
 import { AuthType } from '../../core/contentGenerator.js';
 import { ApprovalMode } from '../../policy/types.js';
@@ -48,7 +49,11 @@ describe('ApprovalModeStrategy', () => {
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig?.()?.authType;
-        return launched && authType === AuthType.USE_GEMINI;
+        return (
+          launched &&
+          (authType === AuthType.USE_GEMINI ||
+            authType === AuthType.USE_VERTEX_AI)
+        );
       }),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
@@ -222,6 +227,23 @@ describe('ApprovalModeStrategy', () => {
     );
 
     expect(implementationDecision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+  });
+
+  it('should route to custom tools model in PLAN mode for Vertex AI', async () => {
+    vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
+    vi.mocked(mockConfig.getGemini31Launched).mockResolvedValue(true);
+    vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+      authType: AuthType.USE_VERTEX_AI,
+    });
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
   });
 
   it('should route to Preview Flash model when an approved plan exists and Gemini 3.1 is launched', async () => {

@@ -716,6 +716,49 @@ describe('Server Config (config.ts)', () => {
       });
     });
 
+    describe('getUseCustomToolModel', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI])(
+        'should return true for %s when Gemini 3.1 is launched',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+
+          await config.refreshAuth(authType);
+
+          expect(config.getUseCustomToolModelSync()).toBe(true);
+          await expect(config.getUseCustomToolModel()).resolves.toBe(true);
+        },
+      );
+
+      it.each([AuthType.GATEWAY, AuthType.LOGIN_WITH_GOOGLE])(
+        'should return false for %s when Gemini 3.1 is launched',
+        async (authType) => {
+          const config = new Config({
+            ...baseParams,
+            experiments: {
+              experimentIds: [],
+              flags: {
+                [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: {
+                  flagId: ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED,
+                  boolValue: true,
+                },
+              },
+            },
+          } as unknown as ConfigParameters);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+
+          await config.refreshAuth(authType);
+
+          expect(config.getUseCustomToolModelSync()).toBe(false);
+          await expect(config.getUseCustomToolModel()).resolves.toBe(false);
+        },
+      );
+    });
+
     describe('getGemini31FlashLiteLaunchedSync', () => {
       it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
         'should return true for %s',

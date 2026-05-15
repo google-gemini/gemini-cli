@@ -15,6 +15,8 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
 } from '../../config/models.js';
 import { selectModelForAvailability } from '../../availability/policyHelpers.js';
 
@@ -26,6 +28,10 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getModelAvailabilityService: vi.fn(),
     getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+    getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+    getGemini31FlashLiteLaunchedSync: vi.fn().mockReturnValue(false),
+    getUseCustomToolModelSync: vi.fn().mockReturnValue(false),
+    getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
     ...overrides,
   }) as unknown as Config;
 
@@ -128,6 +134,29 @@ describe('FallbackStrategy', () => {
     expect(decision).toBeNull();
     // Important: check that it queried snapshot with the RESOLVED model, not 'auto'
     expect(mockService.snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should check custom tools model availability when configured', async () => {
+    vi.mocked(mockService.snapshot).mockReturnValue({ available: true });
+    vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_PRO);
+    vi.mocked(mockConfig.getGemini31LaunchedSync).mockReturnValue(true);
+    vi.mocked(mockConfig.getGemini31FlashLiteLaunchedSync).mockReturnValue(
+      true,
+    );
+    vi.mocked(mockConfig.getUseCustomToolModelSync).mockReturnValue(true);
+    vi.mocked(mockConfig.getHasAccessToPreviewModel).mockReturnValue(true);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockService.snapshot).toHaveBeenCalledWith(
+      PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+    );
   });
 
   it('should respect requestedModel from context', async () => {

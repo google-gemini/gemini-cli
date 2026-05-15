@@ -27,7 +27,7 @@ export class DefaultStrategy implements TerminalStrategy {
       config.getModel(),
       config.getGemini31LaunchedSync?.() ?? false,
       config.getGemini31FlashLiteLaunchedSync?.() ?? false,
-      false,
+      config.getUseCustomToolModelSync?.() ?? false,
       config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );

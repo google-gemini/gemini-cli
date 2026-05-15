@@ -206,15 +206,23 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
+    const useGemini31 =
+      config.authType === AuthType.USE_GEMINI ||
+      config.authType === AuthType.USE_VERTEX_AI ||
+      ((await gcConfig.getGemini31Launched?.()) ?? false);
+    const useGemini31FlashLite =
+      config.authType === AuthType.USE_GEMINI ||
+      config.authType === AuthType.USE_VERTEX_AI ||
+      ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false);
+    const useCustomToolModel =
+      useGemini31 &&
+      (config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI);
     const model = resolveModel(
       gcConfig.getModel(),
-      config.authType === AuthType.USE_GEMINI ||
-        config.authType === AuthType.USE_VERTEX_AI ||
-        ((await gcConfig.getGemini31Launched?.()) ?? false),
-      config.authType === AuthType.USE_GEMINI ||
-        config.authType === AuthType.USE_VERTEX_AI ||
-        ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false),
-      false,
+      useGemini31,
+      useGemini31FlashLite,
+      useCustomToolModel,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
     );

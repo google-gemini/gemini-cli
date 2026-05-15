@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { OverrideStrategy } from './overrideStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Config } from '../../config/config.js';
-import { DEFAULT_GEMINI_MODEL_AUTO } from '../../config/models.js';
+import {
+  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+} from '../../config/models.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 describe('OverrideStrategy', () => {
@@ -90,5 +94,25 @@ describe('OverrideStrategy', () => {
 
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(requestedModel);
+  });
+
+  it('should resolve pro alias to custom tools model when configured', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue(GEMINI_MODEL_ALIAS_PRO),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getGemini31FlashLiteLaunchedSync: vi.fn().mockReturnValue(true),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(true),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
   });
 });

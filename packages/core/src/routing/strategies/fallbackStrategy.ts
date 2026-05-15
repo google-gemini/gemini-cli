@@ -29,7 +29,7 @@ export class FallbackStrategy implements RoutingStrategy {
       requestedModel,
       config.getGemini31LaunchedSync?.() ?? false,
       config.getGemini31FlashLiteLaunchedSync?.() ?? false,
-      false,
+      config.getUseCustomToolModelSync?.() ?? false,
       config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );

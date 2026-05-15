@@ -64,7 +64,11 @@ describe('ClassifierStrategy', () => {
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig().authType;
-        return launched && authType === AuthType.USE_GEMINI;
+        return (
+          launched &&
+          (authType === AuthType.USE_GEMINI ||
+            authType === AuthType.USE_VERTEX_AI)
+        );
       }),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
@@ -414,6 +418,30 @@ describe('ClassifierStrategy', () => {
       vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
       vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
         authType: AuthType.USE_GEMINI,
+      });
+      const mockApiResponse = {
+        reasoning: 'Complex task',
+        model_choice: 'pro',
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+    });
+
+    it('should route to PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL when Gemini 3.1 is launched and auth is USE_VERTEX_AI', async () => {
+      vi.mocked(mockConfig.getGemini31Launched).mockResolvedValue(true);
+      vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+        authType: AuthType.USE_VERTEX_AI,
       });
       const mockApiResponse = {
         reasoning: 'Complex task',

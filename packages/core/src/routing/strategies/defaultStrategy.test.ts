@@ -15,6 +15,8 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 import type { Config } from '../../config/config.js';
@@ -94,6 +96,36 @@ describe('DefaultStrategy', () => {
         source: 'default',
         latencyMs: 0,
         reasoning: `Routing to default model: ${PREVIEW_GEMINI_MODEL}`,
+      },
+    });
+  });
+
+  it('should route pro alias to custom tools model when configured', async () => {
+    const strategy = new DefaultStrategy();
+    const mockContext = {} as RoutingContext;
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue(GEMINI_MODEL_ALIAS_PRO),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getGemini31FlashLiteLaunchedSync: vi.fn().mockReturnValue(true),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(true),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+    const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toEqual({
+      model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      metadata: {
+        source: 'default',
+        latencyMs: 0,
+        reasoning: `Routing to default model: ${PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL}`,
       },
     });
   });

@@ -270,7 +270,8 @@ export function buildAvailableModels(
     config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
-    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+    config.getUseCustomToolModelSync?.() ??
+    (useGemini31 && selectedAuthType === AuthType.USE_GEMINI);
 
   const releaseChannel = getChannelFromVersion(config.clientVersion);
 

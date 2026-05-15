@@ -53,6 +53,7 @@ describe('<ModelDialog />', () => {
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
   const mockGetGemini31FlashLiteLaunchedSync = vi.fn();
+  const mockGetUseCustomToolModelSync = vi.fn();
   const mockGetProModelNoAccess = vi.fn();
   const mockGetProModelNoAccessSync = vi.fn();
 
@@ -63,6 +64,7 @@ describe('<ModelDialog />', () => {
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
     getGemini31FlashLiteLaunchedSync: () => boolean;
+    getUseCustomToolModelSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
     getExperimentalGemma: () => boolean;
@@ -84,6 +86,7 @@ describe('<ModelDialog />', () => {
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
     getGemini31FlashLiteLaunchedSync: mockGetGemini31FlashLiteLaunchedSync,
+    getUseCustomToolModelSync: mockGetUseCustomToolModelSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
     getExperimentalGemma: () => false,
@@ -97,6 +100,7 @@ describe('<ModelDialog />', () => {
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
     mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(false);
+    mockGetUseCustomToolModelSync.mockReturnValue(false);
     mockGetProModelNoAccess.mockResolvedValue(false);
     mockGetProModelNoAccessSync.mockReturnValue(false);
 
@@ -418,9 +422,43 @@ describe('<ModelDialog />', () => {
 
     it('uses custom tools model when Gemini 3.1 IS launched and auth is Gemini API Key', async () => {
       mockGetGemini31LaunchedSync.mockReturnValue(true);
+      mockGetUseCustomToolModelSync.mockReturnValue(true);
       const { stdin, waitUntilReady, unmount } = await renderComponent(
         mockConfig as Config,
         AuthType.USE_GEMINI,
+      );
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      // Select Gemini 3.1 (first item in preview section)
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(mockSetModel).toHaveBeenCalledWith(
+          PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+          true,
+        );
+      });
+      unmount();
+    });
+
+    it('uses custom tools model when Gemini 3.1 IS launched and auth is Vertex AI', async () => {
+      mockGetGemini31LaunchedSync.mockReturnValue(true);
+      mockGetUseCustomToolModelSync.mockReturnValue(true);
+      const { stdin, waitUntilReady, unmount } = await renderComponent(
+        mockConfig as Config,
+        AuthType.USE_VERTEX_AI,
       );
 
       // Go to manual view

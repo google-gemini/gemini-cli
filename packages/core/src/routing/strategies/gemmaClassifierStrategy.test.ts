@@ -12,6 +12,8 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from '../../config/models.js';
 import type { Content } from '@google/genai';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -36,7 +38,7 @@ describe('GemmaClassifierStrategy', () => {
         enabled: true,
         classifier: { model: 'gemma3-1b-gpu-custom' },
       }),
-      getModel: () => DEFAULT_GEMINI_MODEL,
+      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: () => false,
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
@@ -158,6 +160,26 @@ describe('GemmaClassifierStrategy', () => {
         reasoning: mockApiResponse.reasoning,
       },
     });
+  });
+
+  it('should route to custom tools model when configured', async () => {
+    const mockApiResponse = {
+      reasoning: 'This is a complex task.',
+      model_choice: 'pro',
+    };
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+    vi.mocked(mockConfig.getGemini31Launched).mockResolvedValue(true);
+    vi.mocked(mockConfig.getUseCustomToolModel).mockResolvedValue(true);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
   });
 
   it('should return null if the classifier API call fails', async () => {
