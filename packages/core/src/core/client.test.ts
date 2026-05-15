@@ -3234,6 +3234,98 @@ ${JSON.stringify(
         expect(client['hookStateMap'].size).toBe(0);
       });
 
+      it('should not append BeforeAgent hook context to pure functionResponse continuations', async () => {
+        const promptId = 'test-prompt-hook-function-response';
+        const signal = new AbortController().signal;
+        const request: Part[] = [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { output: 'done' },
+            },
+          },
+        ];
+
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getAdditionalContext: () => 'external context',
+        });
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Tool response handled');
+          yield {
+            type: GeminiEventType.Content,
+            value: 'Tool response handled',
+          };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockHookSystem.fireBeforeAgentEvent).toHaveBeenCalledTimes(1);
+        const turnRequest = mockTurnRunFn.mock.calls[0][1] as Part[];
+        expect(turnRequest).toEqual(request);
+        expect(turnRequest).not.toContainEqual({
+          text: '<hook_context>external context</hook_context>',
+        });
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Tool response handled',
+          false,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
+      it('should append BeforeAgent hook context to mixed functionResponse requests', async () => {
+        const promptId = 'test-prompt-hook-mixed-function-response';
+        const signal = new AbortController().signal;
+        const request: Part[] = [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { output: 'done' },
+            },
+          },
+          { text: 'Explain this result.' },
+        ];
+
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getAdditionalContext: () => 'external context',
+        });
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Mixed response handled');
+          yield {
+            type: GeminiEventType.Content,
+            value: 'Mixed response handled',
+          };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          expect.anything(),
+          [
+            ...request,
+            { text: '<hook_context>external context</hook_context>' },
+          ],
+          signal,
+          undefined,
+        );
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
+          'Mixed response handled',
+          false,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
       it('should fire BeforeAgent once and AfterAgent once even with recursion', async () => {
         const { checkNextSpeaker } = await import(
           '../utils/nextSpeakerChecker.js'

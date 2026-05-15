@@ -10,6 +10,7 @@ import {
   ThinkingLevel,
   type Content,
   type GenerateContentResponse,
+  type Part,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -230,6 +231,91 @@ describe('GeminiChat', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetAllMocks();
+  });
+
+  describe('recording functionResponse requests', () => {
+    beforeEach(() => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'done' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+    });
+
+    it('should not record pure functionResponse continuations as user messages', async () => {
+      const recordMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordMessage',
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { output: 'contents' },
+            },
+          },
+        ],
+        'prompt-id-pure-function-response',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // Consume the stream to finish the turn.
+      }
+
+      expect(recordMessageSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'user' }),
+      );
+    });
+
+    it('should still record mixed functionResponse and text requests as user messages', async () => {
+      const recordMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordMessage',
+      );
+      const mixedParts: Part[] = [
+        {
+          functionResponse: {
+            name: 'read_file',
+            response: { output: 'contents' },
+          },
+        },
+        { text: 'Explain the result.' },
+      ];
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        mixedParts,
+        'prompt-id-mixed-function-response',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // Consume the stream to finish the turn.
+      }
+
+      expect(recordMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'user',
+          content: mixedParts,
+        }),
+      );
+    });
   });
 
   describe('constructor', () => {

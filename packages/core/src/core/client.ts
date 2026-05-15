@@ -73,6 +73,7 @@ import {
   type ApprovalModeChangedPayload,
 } from '../utils/events.js';
 import { initializeContextManager } from '../context/initializer.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 
 const MAX_TURNS = 100;
 
@@ -215,6 +216,10 @@ export class GeminiClient {
       return { additionalContext };
     }
     return undefined;
+  }
+
+  private isPureFunctionResponseRequest(request: PartListUnion): boolean {
+    return isFunctionResponse(createUserContent(request));
   }
 
   private async fireAfterAgentHookSafe(
@@ -931,7 +936,10 @@ export class GeminiClient {
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
           const additionalContext = hookResult.additionalContext;
-          if (additionalContext) {
+          if (
+            additionalContext &&
+            !this.isPureFunctionResponseRequest(request)
+          ) {
             const requestArray = Array.isArray(request) ? request : [request];
             request = [
               ...requestArray,
