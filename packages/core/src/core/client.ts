@@ -852,11 +852,11 @@ export class GeminiClient {
     const hooksEnabled = this.config.getEnableHooks();
     if (hooksEnabled) {
       let responseText = streamedResponseText;
-      if (!responseText) {
+      if (!responseText.trim()) {
         responseText = turn.getResponseText() || '';
       }
       const hookState = this.hookStateMap.get(prompt_id);
-      if (hookState && responseText) {
+      if (hookState && responseText.trim()) {
         // Append with newline if not empty
         hookState.cumulativeResponse = hookState.cumulativeResponse
           ? `${hookState.cumulativeResponse}\n${responseText}`
