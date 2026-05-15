@@ -97,7 +97,10 @@ For any detected bugs, bottlenecks, or opportunities:
   artifacts do not yet exist. These are environment issues, not code bugs.
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
   Your only way to effect change is by writing to specific files and explicitly
-  staging file changes using the `git add` command.
+  staging file changes using the `git add` command. **You MUST NOT claim to have
+  made changes or staged files in your response or in `lessons-learned.md`
+  unless you have successfully executed the corresponding tool calls in the
+  current session.**
 
 ## Loop Prevention & Success Criteria
 
