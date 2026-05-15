@@ -62,6 +62,7 @@ jobs:
     outputs:
       sha: ${{ steps.get_sha.outputs.sha }}
       target_sha: ${{ steps.get_target_sha.outputs.sha }}
+      patch_base_sha: ${{ steps.generate_patch.outputs.patch_base_sha }}
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
@@ -256,6 +257,7 @@ jobs:
           fi
 
       - name: 'Generate Patch'
+        id: 'generate_patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         working-directory: repo-target
         run: |
@@ -265,6 +267,7 @@ jobs:
           touch branch-name.txt
           touch issue-comment.md
           touch pr-comment.md
+          echo "patch_base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -f critique_result.txt ] && grep -q "\[APPROVED\]" critique_result.txt && ! grep -q "\[REJECTED\]" critique_result.txt; then
              git diff --staged > bot-changes.patch
           else
@@ -322,7 +325,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ needs.reasoning.outputs.target_sha }}'
+          ref: '${{ needs.reasoning.outputs.patch_base_sha || needs.reasoning.outputs.target_sha }}'
           fetch-depth: 0
           persist-credentials: false
 
