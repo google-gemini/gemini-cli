@@ -63,6 +63,52 @@ export interface CheckpointingSettings {
 }
 
 /**
+ * Recursively merges `source` into `target`.
+ *
+ * For each key present in `source`:
+ * - If both `target[key]` and `source[key]` are plain objects, they are merged recursively.
+ * - Otherwise, `source[key]` replaces `target[key]` (workspace overrides user).
+ *
+ * This avoids the shallow-spread bug where nested objects in workspace settings
+ * would entirely replace the corresponding user settings object, silently dropping
+ * unrelated keys.
+ */
+function deepMerge(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+   
+): Record<string, unknown> {
+  const result = { ...target } as Record<string, unknown>;
+
+  for (const key of Object.keys(source)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+
+    const targetValue = result[key];
+    const sourceValue = source[key];
+
+    if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+      result[key] = deepMerge(
+         
+        targetValue,
+         
+        sourceValue,
+      );
+    } else {
+      result[key] = sourceValue;
+    }
+  }
+
+   
+  return result;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  *
@@ -123,12 +169,20 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
-  // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  return {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // Deep merge user and workspace settings so that nested objects (e.g.
+  // fileFiltering, tools, telemetry) are merged recursively rather than
+  // replaced wholesale. Workspace values still override user values for
+  // explicitly provided keys.
+  return (
+     
+    deepMerge(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      userSettings as Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      workspaceSettings as Record<string, unknown>,
+       
+    ) as Settings
+  );
 }
 
 function resolveEnvVarsInString(value: string): string {

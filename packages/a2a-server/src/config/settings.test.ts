@@ -124,7 +124,7 @@ describe('loadSettings', () => {
     expect(result.experimental?.enableAgents).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should deep merge nested settings from user and workspace', () => {
     const userSettings = {
       showMemoryUsage: false,
       fileFiltering: {
@@ -150,8 +150,125 @@ describe('loadSettings', () => {
     // Primitive value overwritten
     expect(result.showMemoryUsage).toBe(true);
 
-    // Object value completely replaced (shallow merge behavior)
+    // Nested object deep merged: workspace overrides respectGitIgnore,
+    // but user's enableRecursiveFileSearch is preserved
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+  });
+
+  it('should preserve unrelated user nested keys not present in workspace', () => {
+    const userSettings = {
+      fileFiltering: {
+        respectGitIgnore: true,
+        enableRecursiveFileSearch: true,
+        customIgnoreFilePaths: ['path1'],
+      },
+      telemetry: { enabled: true },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      fileFiltering: {
+        respectGitIgnore: false,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+
+    expect(result.fileFiltering).toEqual({
+      respectGitIgnore: false,
+      enableRecursiveFileSearch: true,
+      customIgnoreFilePaths: ['path1'],
+    });
+
+    // Unrelated top-level keys from user are preserved
+    expect(result.telemetry).toEqual({ enabled: true });
+  });
+
+  it('should deep merge tools settings from user and workspace', () => {
+    const userSettings = {
+      tools: {
+        allowed: ['tool-a', 'tool-b'],
+        exclude: ['tool-c'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      tools: {
+        exclude: ['tool-d'],
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+
+    // Arrays are replaced (not concatenated), but unrelated keys are preserved
+    expect(result.tools).toEqual({
+      allowed: ['tool-a', 'tool-b'],
+      exclude: ['tool-d'],
+    });
+  });
+
+  it('should deep merge experimental settings from user and workspace', () => {
+    const userSettings = {
+      experimental: {
+        enableAgents: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      experimental: {
+        enableAgents: false,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+
+    expect(result.experimental).toEqual({
+      enableAgents: false,
+    });
+  });
+
+  it('should handle workspace adding new nested keys not in user', () => {
+    const userSettings = {
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      fileFiltering: {
+        enableRecursiveFileSearch: true,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+
+    expect(result.fileFiltering).toEqual({
+      respectGitIgnore: true,
+      enableRecursiveFileSearch: true,
+    });
   });
 });
