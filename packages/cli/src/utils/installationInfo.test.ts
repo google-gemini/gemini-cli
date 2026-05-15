@@ -56,6 +56,20 @@ describe('getInstallationInfo', () => {
 
   afterEach(() => {
     process.argv = originalArgv;
+    vi.unstubAllEnvs();
+  });
+
+  it('should detect running as a standalone binary', () => {
+    vi.stubEnv('IS_BINARY', 'true');
+    process.argv[1] = '/path/to/binary';
+    const info = getInstallationInfo(projectRoot, true);
+    expect(info.packageManager).toBe(PackageManager.BINARY);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateMessage).toBe(
+      'Running as a standalone binary. Please update by downloading the latest version from GitHub.',
+    );
+    expect(info.updateCommand).toBeUndefined();
+    vi.unstubAllEnvs();
   });
 
   it('should return UNKNOWN when cliPath is not available', () => {
@@ -250,6 +264,42 @@ describe('getInstallationInfo', () => {
     // isAutoUpdateEnabled = false -> "Please run..."
     const infoDisabled = getInstallationInfo(projectRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run bun add');
+  });
+
+  it('should detect Volta installation from VOLTA_HOME', () => {
+    vi.stubEnv('VOLTA_HOME', 'C:\\Users\\test\\AppData\\Local\\Volta');
+    const voltaPath = 'C:\\Users\\test\\AppData\\Local\\Volta\\bin\\gemini.cmd';
+    process.argv[1] = voltaPath;
+    mockedRealPathSync.mockReturnValue(voltaPath);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(info.packageManager).toBe(PackageManager.VOLTA);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBe('volta install @google/gemini-cli@latest');
+    expect(info.updateMessage).toContain('Attempting to automatically update');
+
+    const infoDisabled = getInstallationInfo(projectRoot, false);
+    expect(infoDisabled.updateMessage).toContain('Please run volta install');
+  });
+
+  it('should detect Volta installation from standard tool paths', () => {
+    const voltaPath =
+      '/Users/test/.volta/tools/image/packages/@google/gemini-cli/0.40.1/bin/gemini';
+    process.argv[1] = voltaPath;
+    mockedRealPathSync.mockReturnValue(voltaPath);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(info.packageManager).toBe(PackageManager.VOLTA);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBe('volta install @google/gemini-cli@latest');
   });
 
   it('should detect local installation and identify yarn from lockfile', () => {
