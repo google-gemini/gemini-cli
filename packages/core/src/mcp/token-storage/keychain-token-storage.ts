@@ -13,6 +13,13 @@ import {
   SECRET_PREFIX,
 } from '../../services/keychainTypes.js';
 
+function isCredentialAccount(account: string): boolean {
+  return (
+    !account.startsWith(KEYCHAIN_TEST_PREFIX) &&
+    !account.startsWith(SECRET_PREFIX)
+  );
+}
+
 export class KeychainTokenStorage
   extends BaseTokenStorage
   implements SecretStorage
@@ -64,6 +71,9 @@ export class KeychainTokenStorage
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
+    if (!isCredentialAccount(sanitizedName)) {
+      return;
+    }
     await this.keychainService.deletePassword(sanitizedName);
   }
 
@@ -71,11 +81,7 @@ export class KeychainTokenStorage
     try {
       const credentials = await this.keychainService.findCredentials();
       return credentials
-        .filter(
-          (cred) =>
-            !cred.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
-            !cred.account.startsWith(SECRET_PREFIX),
-        )
+        .filter((cred) => isCredentialAccount(cred.account))
         .map((cred: { account: string }) => cred.account);
     } catch (error) {
       coreEvents.emitFeedback(
@@ -91,9 +97,7 @@ export class KeychainTokenStorage
     const result = new Map<string, OAuthCredentials>();
     try {
       const credentials = (await this.keychainService.findCredentials()).filter(
-        (c) =>
-          !c.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
-          !c.account.startsWith(SECRET_PREFIX),
+        (c) => isCredentialAccount(c.account),
       );
 
       for (const cred of credentials) {
@@ -128,8 +132,11 @@ export class KeychainTokenStorage
       const errors: Error[] = [];
 
       for (const cred of credentials) {
+        if (!isCredentialAccount(cred.account)) {
+          continue;
+        }
         try {
-          await this.deleteCredentials(cred.account);
+          await this.keychainService.deletePassword(cred.account);
         } catch (error) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           errors.push(error as Error);

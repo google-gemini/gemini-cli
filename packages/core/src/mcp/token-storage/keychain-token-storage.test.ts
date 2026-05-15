@@ -9,7 +9,10 @@ import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
 import { KeychainService } from '../../services/keychainService.js';
 import { coreEvents } from '../../utils/events.js';
-import { KEYCHAIN_TEST_PREFIX } from '../../services/keychainTypes.js';
+import {
+  KEYCHAIN_TEST_PREFIX,
+  SECRET_PREFIX,
+} from '../../services/keychainTypes.js';
 
 describe('KeychainTokenStorage', () => {
   let storage: KeychainTokenStorage;
@@ -110,6 +113,17 @@ describe('KeychainTokenStorage', () => {
       );
     });
 
+    it('should not delete internal keychain entries through deleteCredentials', async () => {
+      storageState.set(`${SECRET_PREFIX}key1`, 'secret');
+      storageState.set(`${KEYCHAIN_TEST_PREFIX}internal`, 'test');
+
+      await storage.deleteCredentials(`${SECRET_PREFIX}key1`);
+      await storage.deleteCredentials(`${KEYCHAIN_TEST_PREFIX}internal`);
+
+      expect(storageState.has(`${SECRET_PREFIX}key1`)).toBe(true);
+      expect(storageState.has(`${KEYCHAIN_TEST_PREFIX}internal`)).toBe(true);
+    });
+
     it('should list servers and filter internal keys', async () => {
       await storage.setCredentials(validCredentials);
       await storage.setCredentials({
@@ -155,6 +169,26 @@ describe('KeychainTokenStorage', () => {
         .mockResolvedValueOnce(false);
 
       await expect(storage.clearAll()).resolves.toBe(undefined);
+    });
+
+    it('should skip internal keychain entries during clearAll', async () => {
+      storageState.set('server1', '...');
+      storageState.set(`${SECRET_PREFIX}key1`, 'secret');
+      storageState.set(`${KEYCHAIN_TEST_PREFIX}internal`, 'test');
+
+      await storage.clearAll();
+
+      expect(storageState.has('server1')).toBe(false);
+      expect(storageState.has(`${SECRET_PREFIX}key1`)).toBe(true);
+      expect(storageState.has(`${KEYCHAIN_TEST_PREFIX}internal`)).toBe(true);
+    });
+
+    it('should clear raw account names returned from the keychain', async () => {
+      storageState.set('server/name', '...');
+
+      await storage.clearAll();
+
+      expect(storageState.has('server/name')).toBe(false);
     });
 
     it('should manage secrets with prefix independently', async () => {
