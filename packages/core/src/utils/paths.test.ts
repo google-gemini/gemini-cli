@@ -602,19 +602,6 @@ describe('resolveToRealPath', () => {
       /Infinite recursion detected/,
     );
   });
-
-  it('should handle ENAMETOOLONG gracefully', () => {
-    const longPath = path.resolve('/' + 'a'.repeat(5000));
-
-    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
-      const err = new Error('ENAMETOOLONG') as NodeJS.ErrnoException;
-      err.code = 'ENAMETOOLONG';
-      throw err;
-    });
-
-    // Should return the path itself if realpathSync fails with ENAMETOOLONG
-    expect(resolveToRealPath(longPath)).toBe(longPath);
-  });
 });
 
 describe('makeRelative', () => {

@@ -17,7 +17,6 @@ import {
   handleAtCommand,
   escapeAtSymbols,
   unescapeLiteralAt,
-  checkPermissions,
 } from './atCommandProcessor.js';
 import {
   FileDiscoveryService,
@@ -1539,24 +1538,5 @@ describe('unescapeLiteralAt', () => {
   it('roundtrips correctly with escapeAtSymbols', () => {
     const input = 'user@example.com and @scope/pkg';
     expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
-  });
-
-  describe('checkPermissions', () => {
-    it('should handle ENAMETOOLONG gracefully in checkPermissions', async () => {
-      const longPath = 'a'.repeat(5000);
-      const query = `@${longPath}`;
-
-      const localMockConfig = {
-        getTargetDir: () => '.',
-        validatePathAccess: () => true,
-        getResourceRegistry: () => ({
-          findResourceByUri: () => undefined,
-        }),
-      } as unknown as Config;
-
-      // checkPermissions should not throw ENAMETOOLONG
-      const permissions = await checkPermissions(query, localMockConfig);
-      expect(permissions).toEqual([]);
-    });
   });
 });

@@ -188,15 +188,9 @@ export async function checkPermissions(
     const pathName = part.content.substring(1);
     if (!pathName) continue;
 
-    let resolvedPathName: string;
-    try {
-      resolvedPathName = resolveToRealPath(
-        path.resolve(config.getTargetDir(), pathName),
-      );
-    } catch {
-      // If path resolution fails (e.g. ENAMETOOLONG), skip this path
-      continue;
-    }
+    const resolvedPathName = resolveToRealPath(
+      path.resolve(config.getTargetDir(), pathName),
+    );
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
       if (await fileExists(resolvedPathName)) {

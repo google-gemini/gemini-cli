@@ -3,7 +3,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "lib": ["ES2023", "dom"],
+    "lib": ["ES2022", "dom"],
     "sourceMap": true,
     /*
      * skipLibCheck is necessary because the a2a-server package depends on

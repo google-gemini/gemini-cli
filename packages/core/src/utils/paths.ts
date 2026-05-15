@@ -460,10 +460,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            (lstatError.code === 'ENOENT' ||
-              lstatError.code === 'EISDIR' ||
-              lstatError.code === 'ENAMETOOLONG' ||
-              lstatError.code === 'EINVAL')
+            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
           )
         ) {
           throw lstatError;
