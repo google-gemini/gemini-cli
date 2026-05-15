@@ -32,7 +32,7 @@ describe('resolveModel with authType', () => {
       true,
       dynamicConfig,
       'stable',
-      'gemini-api-key'
+      'gemini-api-key',
     );
     expect(model).toBe(PREVIEW_GEMINI_MODEL);
   });
@@ -46,7 +46,7 @@ describe('resolveModel with authType', () => {
       true,
       dynamicConfig,
       'stable',
-      'oauth-personal'
+      'oauth-personal',
     );
     expect(model).toBe(DEFAULT_GEMINI_MODEL);
   });
@@ -63,7 +63,7 @@ describe('resolveModel with authType', () => {
       false,
       false,
       true,
-      configWithAuth
+      configWithAuth,
     );
     expect(model).toBe(DEFAULT_GEMINI_MODEL);
   });
