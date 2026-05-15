@@ -550,6 +550,24 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-flash-preview"
         }
       },
+      "gemini-3.1-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview"
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview-customtools"
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {

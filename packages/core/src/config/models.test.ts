@@ -685,3 +685,35 @@ describe('isActiveModel', () => {
     );
   });
 });
+
+describe('Gemini 3.1 Config Resolution', () => {
+  it('PREVIEW_GEMINI_3_1_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+
+  it('PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+
+  it('PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+});
