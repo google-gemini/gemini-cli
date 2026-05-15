@@ -77,7 +77,7 @@ describe('validateNonInterActiveAuth', () => {
       .mockImplementation((code?: string | number | null | undefined) => {
         throw new Error(`process.exit(${code}) called`);
       });
-    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
+    vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue(null);
     mockSettings = {
       system: { path: '', settings: {} },
       systemDefaults: { path: '', settings: {} },
@@ -442,7 +442,7 @@ describe('validateNonInterActiveAuth', () => {
 
   it('exits if validateAuthMethod returns error', async () => {
     // Mock validateAuthMethod to return error
-    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+    vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue('Auth error!');
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
       getContentGeneratorConfig: vi
@@ -472,7 +472,7 @@ describe('validateNonInterActiveAuth', () => {
     // Mock validateAuthMethod to return error to ensure it's not being called
     const validateAuthMethodSpy = vi
       .spyOn(auth, 'validateAuthMethod')
-      .mockReturnValue('Auth error!');
+      .mockResolvedValue('Auth error!');
     const nonInteractiveConfig = createLocalMockConfig({});
     // Even with an invalid auth type, it should not exit
     // because validation is skipped.
@@ -627,7 +627,7 @@ describe('validateNonInterActiveAuth', () => {
     });
 
     it(`prints JSON error when validateAuthMethod fails and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
-      vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+      vi.spyOn(auth, 'validateAuthMethod').mockResolvedValue('Auth error!');
       process.env['GEMINI_API_KEY'] = 'fake-key';
 
       const nonInteractiveConfig = createLocalMockConfig({

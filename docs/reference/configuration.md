@@ -203,6 +203,11 @@ their corresponding top-level category object in your `settings.json` file.
     chattiness and structured progress reporting.
   - **Default:** `true`
 
+- **`general.logRagSnippets`** (boolean):
+  - **Description:** Log full Code Customization (RAG) retrieved snippets to a
+    local file for debugging.
+  - **Default:** `false`
+
 #### `output`
 
 - **`output.format`** (enum):
@@ -706,6 +711,19 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
+      "context-snapshotter": {
+        "extends": "gemini-3-flash-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            },
+            "temperature": 1,
+            "topP": 0.95,
+            "topK": 64
+          }
+        }
+      },
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
@@ -875,9 +893,10 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         }
       },
       "auto": {
+        "displayName": "Auto",
         "tier": "auto",
         "isPreview": true,
-        "isVisible": false,
+        "isVisible": true,
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -911,26 +930,16 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         }
       },
       "auto-gemini-3": {
-        "displayName": "Auto (Gemini 3)",
         "tier": "auto",
+        "family": "gemini-3",
         "isPreview": true,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
-        "features": {
-          "thinking": true,
-          "multimodalToolUse": false
-        }
+        "isVisible": false
       },
       "auto-gemini-2.5": {
-        "displayName": "Auto (Gemini 2.5)",
         "tier": "auto",
+        "family": "gemini-2.5",
         "isPreview": false,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
-        "features": {
-          "thinking": false,
-          "multimodalToolUse": false
-        }
+        "isVisible": false
       }
     }
     ```
@@ -1013,33 +1022,15 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
           }
         ]
       },
-      "auto-gemini-3": {
-        "default": "gemini-3-pro-preview",
-        "contexts": [
-          {
-            "condition": {
-              "hasAccessToPreview": false
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
-              "useGemini3_1": true,
-              "useCustomTools": true
-            },
-            "target": "gemini-3.1-pro-preview-customtools"
-          },
-          {
-            "condition": {
-              "useGemini3_1": true
-            },
-            "target": "gemini-3.1-pro-preview"
-          }
-        ]
-      },
       "auto": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "releaseChannel": "stable"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1084,9 +1075,6 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
             "target": "gemini-3.1-pro-preview"
           }
         ]
-      },
-      "auto-gemini-2.5": {
-        "default": "gemini-2.5-pro"
       },
       "gemini-3.1-flash-lite-preview": {
         "default": "gemini-3.1-flash-lite-preview",
@@ -1120,6 +1108,33 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
             "target": "gemini-3.1-flash-lite-preview"
           }
         ]
+      },
+      "auto-gemini-3": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "auto-gemini-2.5": {
+        "default": "gemini-2.5-pro"
       }
     }
     ```
@@ -1138,15 +1153,15 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
           },
           {
             "condition": {
-              "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
-            "target": "gemini-3-flash-preview"
+            "target": "gemini-2.5-flash"
           }
         ]
       },
@@ -1155,7 +1170,20 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "releaseChannel": "stable",
+              "requestedModels": ["auto"]
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
             "target": "gemini-2.5-pro"
           },
@@ -1850,13 +1878,6 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading. Defaults to
-    true; set to false to opt out and load all GEMINI.md files into the system
-    instruction up-front.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 for pasting. This may be more robust than the
     default system when using remote terminal sessions (if your terminal is
@@ -1917,19 +1938,6 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
   - **Description:** The model to use for the classifier. Only tested on
     `gemma3-1b-gpu-custom`.
   - **Default:** `"gemma3-1b-gpu-custom"`
-  - **Requires restart:** Yes
-
-- **`experimental.memoryV2`** (boolean):
-  - **Description:** Disable the built-in save_memory tool and let the main
-    agent persist project context by editing markdown files directly with
-    edit/write_file. Route facts across four tiers: team-shared conventions go
-    to project GEMINI.md files, project-specific personal notes go to the
-    per-project private memory folder (MEMORY.md as index + sibling .md files
-    for detail), and cross-project personal preferences go to the global
-    ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit
-    — settings, credentials, etc. remain off-limits). Set to false to fall back
-    to the legacy save_memory tool.
-  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.stressTestProfile`** (boolean):
