@@ -12,6 +12,7 @@ if (process.env.NO_COLOR !== undefined) {
 import { setSimulate429 } from './src/utils/testUtils.js';
 import { vi, afterEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';
+import { uiTelemetryService } from './src/telemetry/uiTelemetry.js';
 
 // Increase max listeners to avoid warnings in large test suites
 coreEvents.setMaxListeners(100);
@@ -21,6 +22,8 @@ setSimulate429(false);
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  coreEvents.removeAllListeners();
+  uiTelemetryService.removeAllListeners();
 });
 
 // Default mocks for Storage and ProjectRegistry to prevent disk access in most tests.

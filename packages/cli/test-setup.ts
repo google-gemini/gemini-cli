@@ -6,7 +6,11 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  debugLogger,
+  uiTelemetryService,
+} from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
 
@@ -116,6 +120,9 @@ afterEach(() => {
   warnSpy?.mockRestore();
   errorSpy?.mockRestore();
   debugSpy?.mockRestore();
+
+  coreEvents.removeAllListeners();
+  uiTelemetryService.removeAllListeners();
 
   vi.unstubAllEnvs();
   if (actWarnings.length > 0) {

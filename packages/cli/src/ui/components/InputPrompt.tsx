@@ -538,6 +538,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     if (shortcutsHelpVisible) {
       setShortcutsHelpVisible(false);
     }
+    // Capture cursor offset synchronously to avoid race conditions with async operations
+    const pasteOffset = bufferRef.current.getOffset();
+
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -555,13 +558,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const insertText = `@${escapedPath}`;
           const currentBuffer = bufferRef.current;
           const currentText = currentBuffer.text;
-          const offset = currentBuffer.getOffset();
 
           // Add spaces around the path if needed
           let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
+          const charBefore =
+            pasteOffset > 0 ? currentText[pasteOffset - 1] : '';
           const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
+            pasteOffset < currentText.length ? currentText[pasteOffset] : '';
 
           if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
             textToInsert = ' ' + textToInsert;
@@ -570,8 +573,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             textToInsert = textToInsert + ' ';
           }
 
-          // Insert at cursor position
-          currentBuffer.replaceRangeByOffset(offset, offset, textToInsert);
+          // Insert at synchronously captured cursor position
+          currentBuffer.replaceRangeByOffset(
+            pasteOffset,
+            pasteOffset,
+            textToInsert,
+          );
         }
       }
 
