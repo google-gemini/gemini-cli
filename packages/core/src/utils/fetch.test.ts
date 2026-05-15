@@ -5,7 +5,7 @@
  */
 
 import { updateGlobalFetchTimeouts } from './fetch.js';
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
@@ -34,18 +34,14 @@ const {
   fetchWithTimeout,
   setGlobalProxy,
 } = await import('./fetch.js');
-
-// Mock global fetch
-const originalFetch = global.fetch;
-global.fetch = vi.fn();
-
 interface ErrorWithCode extends Error {
   code?: string;
 }
 
 describe('fetch utils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(global, 'fetch').mockImplementation(vi.fn() as any);
     // Default DNS lookup to return a public IP, or the IP itself if valid
     vi.mocked(
       dnsPromises.lookup as (
@@ -60,8 +56,8 @@ describe('fetch utils', () => {
     });
   });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('isAddressPrivate', () => {

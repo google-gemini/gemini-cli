@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage, isNodeError } from './errors.js';
+import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
@@ -202,7 +202,7 @@ export async function fetchWithTimeout(
     });
     return response;
   } catch (error) {
-    if (isNodeError(error) && error.code === 'ABORT_ERR') {
+    if (isAbortError(error)) {
       // If the caller's own signal was already aborted, this is a user-initiated
       // cancellation (e.g. Ctrl+C), not an internal timeout. Re-throw as a plain
       // AbortError so the retry layer does NOT treat it as a retryable ETIMEDOUT.
