@@ -114,9 +114,15 @@ export const useSlashCommandProcessor = (
     undefined,
   );
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  const reloadTimerRef = (0, import_react95.useRef)<NodeJS.Timeout | null>(null);
 
   const reloadCommands = useCallback(() => {
-    setReloadTrigger((v) => v + 1);
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current);
+    }
+    reloadTimerRef.current = setTimeout(() => {
+      setReloadTrigger((v) => v + 1);
+    }, 500);
   }, []);
   const [confirmationRequest, setConfirmationRequest] = useState<null | {
     prompt: React.ReactNode;
@@ -325,31 +331,44 @@ export const useSlashCommandProcessor = (
   }, [config, reloadCommands]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let isActive = true;
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
-      const commandService = await CommandService.create(
-        [
-          new BuiltinCommandLoader(config),
-          new SkillCommandLoader(config),
-          new McpPromptLoader(config),
-          new FileCommandLoader(config),
-        ],
-        controller.signal,
-      );
+      try {
+        const commandService = await CommandService.create(
+          [
+            new BuiltinCommandLoader(config),
+            new SkillCommandLoader(config),
+            new McpPromptLoader(config),
+            new FileCommandLoader(config),
+          ],
+          // We don't pass a signal because we want the heavy OS I/O (process discovery)
+          // to finish and populate the cache even if this effect becomes inactive.
+        );
 
-      if (controller.signal.aborted) {
-        return;
+        if (!isActive) {
+          return;
+        }
+
+        setCommands(commandService.getCommands());
+      } catch (error) {
+        if (isActive) {
+          addItem(
+            {
+              type: MessageType.ERROR,
+              text: `Failed to load slash commands: ${error instanceof Error ? error.message : String(error)}`,
+            },
+            Date.now(),
+          );
+        }
       }
-
-      setCommands(commandService.getCommands());
     })();
 
     return () => {
-      controller.abort();
+      isActive = false;
     };
-  }, [config, reloadTrigger, isConfigInitialized]);
+  }, [config, reloadTrigger, isConfigInitialized, addItem]);
 
   const handleSlashCommand = useCallback(
     async (

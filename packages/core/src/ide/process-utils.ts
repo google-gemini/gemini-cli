@@ -27,50 +27,74 @@ interface RawProcessInfo {
   CommandLine?: string;
 }
 
+let _processCache: Map<number, ProcessInfo> | null = null;
+let _lastCacheTime = 0;
+let _pendingProcessPromise: Promise<Map<number, ProcessInfo>> | null = null;
+const CACHE_TTL = 60 * 1000;
+
 /**
  * Fetches the entire process table on Windows.
  */
 async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
-  const processMap = new Map<number, ProcessInfo>();
-  try {
-    // Fetch ProcessId, ParentProcessId, Name, and CommandLine for all processes.
-    const powershellCommand =
-      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress';
-    // Increase maxBuffer to handle large process lists (default is 1MB)
-    const { stdout } = await execAsync(`powershell "${powershellCommand}"`, {
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    if (!stdout.trim()) {
-      return processMap;
-    }
-
-    let processes: RawProcessInfo | RawProcessInfo[];
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      processes = JSON.parse(stdout);
-    } catch {
-      return processMap;
-    }
-
-    if (!Array.isArray(processes)) {
-      processes = [processes];
-    }
-
-    for (const p of processes) {
-      if (p && typeof p.ProcessId === 'number') {
-        processMap.set(p.ProcessId, {
-          pid: p.ProcessId,
-          parentPid: p.ParentProcessId || 0,
-          name: p.Name || '',
-          command: p.CommandLine || '',
-        });
-      }
-    }
-  } catch {
-    // Fallback or error handling if PowerShell fails
+  const now = Date.now();
+  if (_processCache && now - _lastCacheTime < CACHE_TTL) {
+    return _processCache;
   }
-  return processMap;
+  if (_pendingProcessPromise) {
+    return _pendingProcessPromise;
+  }
+
+  _pendingProcessPromise = (async () => {
+    const processMap = new Map<number, ProcessInfo>();
+    try {
+      // Use server-side filtering for significant performance boost on Windows.
+      const ideFilter =
+        "'code.exe','idea64.exe','cursor.exe','windsurf.exe','codium.exe'";
+      const powershellCommand = `Get-CimInstance Win32_Process -Filter "Name IN (${ideFilter})" | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress`;
+
+      const { stdout } = await execAsync(`powershell "${powershellCommand}"`, {
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 5000,
+      });
+
+      if (!stdout.trim()) {
+        _processCache = processMap;
+        _lastCacheTime = now;
+        return processMap;
+      }
+
+      let processes: RawProcessInfo | RawProcessInfo[];
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(stdout);
+        processes = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return processMap;
+      }
+
+      for (const p of processes) {
+        if (p && typeof p.ProcessId === 'number') {
+          processMap.set(p.ProcessId, {
+            pid: p.ProcessId,
+            parentPid: p.ParentProcessId || 0,
+            name: p.Name || '',
+            command: p.CommandLine || '',
+          });
+        }
+      }
+    } catch {
+      // Fallback or error handling if PowerShell fails
+    }
+    _processCache = processMap;
+    _lastCacheTime = Date.now();
+    return processMap;
+  })();
+
+  try {
+    return await _pendingProcessPromise;
+  } finally {
+    _pendingProcessPromise = null;
+  }
 }
 
 /**
