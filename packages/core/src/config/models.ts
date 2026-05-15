@@ -48,6 +48,10 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
+  getGemini31LaunchedSync(): boolean;
+  getGemini31FlashLiteLaunchedSync(): boolean;
+  getUseCustomToolModelSync(): boolean;
+  getHasAccessToPreviewModel(): boolean;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -345,7 +349,14 @@ export function isGemini3Model(
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
-    const resolved = resolveModel(model, false, false, false, true, config);
+    const resolved = resolveModel(
+      model,
+      config.getGemini31LaunchedSync?.() ?? false,
+      config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      config.getUseCustomToolModelSync?.() ?? false,
+      config.getHasAccessToPreviewModel?.() ?? true,
+      config,
+    );
     return (
       config.modelConfigService.getModelDefinition(resolved)?.family ===
       'gemini-3'
@@ -380,7 +391,14 @@ export function isCustomModel(
   config?: ModelCapabilityContext,
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = resolveModel(model, false, false, false, true, config);
+    const resolved = resolveModel(
+      model,
+      config.getGemini31LaunchedSync?.() ?? false,
+      config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      config.getUseCustomToolModelSync?.() ?? false,
+      config.getHasAccessToPreviewModel?.() ?? true,
+      config,
+    );
     return (
       config.modelConfigService.getModelDefinition(resolved)?.tier ===
         'custom' || !resolved.startsWith('gemini-')
