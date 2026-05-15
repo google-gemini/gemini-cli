@@ -342,8 +342,28 @@ export class ModelConfigService {
     this.runtimeAliases[aliasName] = alias;
   }
 
+  clearRuntimeModelConfigs(
+    predicate: (name: string, alias: ModelConfigAlias) => boolean,
+  ): void {
+    for (const [key, alias] of Object.entries(this.runtimeAliases)) {
+      if (predicate(key, alias)) {
+        delete this.runtimeAliases[key];
+      }
+    }
+  }
+
   registerRuntimeModelOverride(override: ModelConfigOverride): void {
     this.runtimeOverrides.push(override);
+  }
+
+  clearRuntimeModelOverrides(
+    predicate: (override: ModelConfigOverride) => boolean,
+  ): void {
+    for (let i = this.runtimeOverrides.length - 1; i >= 0; i--) {
+      if (predicate(this.runtimeOverrides[i])) {
+        this.runtimeOverrides.splice(i, 1);
+      }
+    }
   }
 
   /**

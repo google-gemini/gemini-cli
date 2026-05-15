@@ -33,26 +33,13 @@ export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
  */
 const SHADOW_REPO_GIT_OPTIONS: Partial<SimpleGitOptions> = {
   unsafe: {
-    allowUnsafeAlias: true,
-    allowUnsafeAskPass: true,
-    allowUnsafeConfigEnvCount: true,
-    allowUnsafeConfigPaths: true,
-    allowUnsafeCredentialHelper: true,
     allowUnsafeCustomBinary: true,
     allowUnsafeDiffExternal: true,
-    allowUnsafeDiffTextConv: true,
-    allowUnsafeEditor: true,
-    allowUnsafeFilter: true,
-    allowUnsafeFsMonitor: true,
     allowUnsafeGitProxy: true,
-    allowUnsafeGpgProgram: true,
     allowUnsafeHooksPath: true,
-    allowUnsafeMergeDriver: true,
     allowUnsafePack: true,
-    allowUnsafePager: true,
     allowUnsafeProtocolOverride: true,
     allowUnsafeSshCommand: true,
-    allowUnsafeTemplateDir: true,
   },
 };
 

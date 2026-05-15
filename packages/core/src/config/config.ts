@@ -1607,6 +1607,26 @@ export class Config implements McpContext, AgentLoopContext {
       this.contentGeneratorConfig.authType = undefined;
     }
 
+    const compressionAliases = [
+      'chat-compression-default',
+      'chat-compression-2.5-flash-lite',
+      'chat-compression-2.5-flash',
+      'chat-compression-2.5-pro',
+      'chat-compression-3-flash',
+      'chat-compression-3.1-flash-lite',
+      'chat-compression-3-pro',
+    ];
+    const cloudUtilityModels = [
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-3-flash-preview',
+      'gemini-3-pro-preview',
+      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-pro-preview-customtools',
+    ];
+
     if (previousAuthType && isLocalBackendAuthType(previousAuthType)) {
       const currentModel = this.getModel();
       if (
@@ -1615,6 +1635,17 @@ export class Config implements McpContext, AgentLoopContext {
         !currentModel.startsWith('gemma-')
       ) {
         this.setModel(DEFAULT_GEMINI_MODEL_AUTO, true);
+      }
+
+      if (!isLocalBackendAuthType(authMethod)) {
+        this.modelConfigService.clearRuntimeModelOverrides(
+          (override) =>
+            override.match.model !== undefined &&
+            cloudUtilityModels.includes(override.match.model),
+        );
+        this.modelConfigService.clearRuntimeModelConfigs((alias) =>
+          compressionAliases.includes(alias),
+        );
       }
     }
 
@@ -1642,17 +1673,19 @@ export class Config implements McpContext, AgentLoopContext {
       this.setModel(resolvedModel, true);
 
       const localModel = this.getModel();
-      const compressionAliases = [
-        'chat-compression-default',
-        'chat-compression-2.5-flash-lite',
-        'chat-compression-2.5-flash',
-        'chat-compression-2.5-pro',
-        'chat-compression-3-flash',
-        'chat-compression-3.1-flash-lite',
-        'chat-compression-3-pro',
-      ];
       for (const alias of compressionAliases) {
         this.modelConfigService.registerRuntimeModelConfig(alias, {
+          modelConfig: { model: localModel },
+        });
+      }
+
+      // In local mode, override all internal utility model IDs so aliases that
+      // extend them continue to pick up their parameters (temperature, topK,
+      // maxOutputTokens, etc.) but target the local model instead of a cloud
+      // backend.
+      for (const cloudModel of cloudUtilityModels) {
+        this.modelConfigService.registerRuntimeModelOverride({
+          match: { model: cloudModel },
           modelConfig: { model: localModel },
         });
       }

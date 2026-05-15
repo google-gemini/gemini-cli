@@ -11,7 +11,6 @@ import {
   createContentGeneratorConfig,
   getAuthTypeFromEnv,
   type ContentGenerator,
-  getAuthTypeFromEnv,
   resolveLocalBackendBaseUrl,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
@@ -1289,11 +1288,7 @@ describe('createContentGeneratorConfig', () => {
   });
 });
 
-describe('getAuthTypeFromEnv', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
+describe('getAuthTypeFromEnv local backend detection (duplicated describe fix)', () => {
   it('prefers explicit local backend env over GEMINI_API_KEY', () => {
     vi.stubEnv('GEMINI_LOCAL_BACKEND', 'ollama');
     vi.stubEnv('GEMINI_API_KEY', 'test-key');

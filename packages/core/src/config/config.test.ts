@@ -151,7 +151,15 @@ vi.mock('../tools/memoryTool', async (importOriginal) => {
   };
 });
 
-vi.mock('../core/contentGenerator.js');
+vi.mock('../core/contentGenerator.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../core/contentGenerator.js')>();
+  return {
+    ...actual,
+    createContentGenerator: vi.fn(),
+    createContentGeneratorConfig: vi.fn(),
+  };
+});
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
@@ -266,6 +274,11 @@ vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/localLiteRtLmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
+}));
+vi.mock('../services/localModelService.js', () => ({
+  LocalModelService: vi.fn().mockImplementation(() => ({
+    resolveModelId: vi.fn().mockImplementation((_auth, model) => model),
+  })),
 }));
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
@@ -1005,6 +1018,192 @@ describe('Server Config (config.ts)', () => {
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
 
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
+    });
+
+    it('should register runtime model overrides for cloud utility models in local mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
+      );
+
+      const registerSpy = vi.spyOn(
+        config.modelConfigService,
+        'registerRuntimeModelOverride',
+      );
+
+      await config.refreshAuth(AuthType.USE_LOCAL_OLLAMA);
+
+      const calls = registerSpy.mock.calls;
+      const cloudUtilityModels = [
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-3-flash-preview',
+        'gemini-3-pro-preview',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3.1-pro-preview',
+        'gemini-3.1-pro-preview-customtools',
+      ];
+      expect(calls).toHaveLength(cloudUtilityModels.length);
+      for (const cloudModel of cloudUtilityModels) {
+        expect(calls).toContainEqual([
+          {
+            match: { model: cloudModel },
+            modelConfig: { model: config.getModel() },
+          },
+        ]);
+      }
+    });
+
+    it('should register runtime model configs for compression aliases in local mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
+      );
+
+      const registerSpy = vi.spyOn(
+        config.modelConfigService,
+        'registerRuntimeModelConfig',
+      );
+
+      await config.refreshAuth(AuthType.USE_LOCAL_OLLAMA);
+
+      const calls = registerSpy.mock.calls;
+      const compressionAliases = [
+        'chat-compression-default',
+        'chat-compression-2.5-flash-lite',
+        'chat-compression-2.5-flash',
+        'chat-compression-2.5-pro',
+        'chat-compression-3-flash',
+        'chat-compression-3.1-flash-lite',
+        'chat-compression-3-pro',
+      ];
+      expect(calls).toHaveLength(compressionAliases.length);
+      for (const alias of compressionAliases) {
+        expect(calls).toContainEqual([
+          alias,
+          { modelConfig: { model: config.getModel() } },
+        ]);
+      }
+    });
+
+    it('should clear local-mode overrides when switching from local to cloud', async () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_LOCAL_OLLAMA);
+
+      const clearOverridesSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelOverrides',
+      );
+      const clearConfigsSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelConfigs',
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(clearOverridesSpy).toHaveBeenCalledTimes(1);
+      expect(clearConfigsSpy).toHaveBeenCalledTimes(1);
+
+      const overridePredicate = clearOverridesSpy.mock
+        .calls[0][0] as (override: {
+        match: { model?: string; overrideScope?: string };
+      }) => boolean;
+      expect(overridePredicate({ match: { model: 'gemini-2.5-flash' } })).toBe(
+        true,
+      );
+      expect(overridePredicate({ match: { overrideScope: 'my-agent' } })).toBe(
+        false,
+      );
+
+      const configPredicate = clearConfigsSpy.mock.calls[0][0] as (
+        name: string,
+      ) => boolean;
+      expect(configPredicate('chat-compression-default')).toBe(true);
+      expect(configPredicate('agent:my-agent')).toBe(false);
+    });
+
+    it('should not clear overrides when switching between local backends', async () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_LOCAL_OLLAMA);
+
+      const clearOverridesSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelOverrides',
+      );
+      const clearConfigsSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelConfigs',
+      );
+
+      await config.refreshAuth(AuthType.USE_LOCAL_LM_STUDIO);
+
+      expect(clearOverridesSpy).not.toHaveBeenCalled();
+      expect(clearConfigsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not clear overrides when initial auth is cloud', async () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
+      );
+
+      const clearOverridesSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelOverrides',
+      );
+      const clearConfigsSpy = vi.spyOn(
+        config.modelConfigService,
+        'clearRuntimeModelConfigs',
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(clearOverridesSpy).not.toHaveBeenCalled();
+      expect(clearConfigsSpy).not.toHaveBeenCalled();
     });
   });
 

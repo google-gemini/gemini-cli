@@ -349,7 +349,7 @@ export function getDisplayString(
     case GEMMA_4_26B_A4B_IT_MODEL:
       return GEMMA_4_26B_A4B_IT_MODEL;
     case GEMMA_MODEL_ALIAS_4:
-      return 'Gemma 4 (Local)';
+      return 'Auto (Gemma 4 Local)';
     case GEMMA_MODEL_ALIAS_4_26B:
       return 'Gemma 4 26B (Local)';
     case GEMMA_MODEL_ALIAS_4_31B:
