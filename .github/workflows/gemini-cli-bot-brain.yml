@@ -60,9 +60,9 @@ jobs:
       actions: 'read'
       pull-requests: 'read'
     outputs:
-      sha: ${{ steps.get_sha.outputs.sha }}
-      target_sha: ${{ steps.get_target_sha.outputs.sha }}
-      patch_base_sha: ${{ steps.generate_patch.outputs.patch_base_sha }}
+      sha: '${{ steps.get_sha.outputs.sha }}'
+      target_sha: '${{ steps.get_target_sha.outputs.sha }}'
+      patch_base_sha: '${{ steps.generate_patch.outputs.patch_base_sha }}'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
@@ -76,8 +76,8 @@ jobs:
 
       - name: 'Get Current SHA'
         id: 'get_sha'
-        working-directory: agent-code
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        working-directory: 'agent-code'
+        run: 'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
@@ -87,11 +87,11 @@ jobs:
           cache-dependency-path: 'agent-code/package-lock.json'
 
       - name: 'Install dependencies'
-        working-directory: agent-code
+        working-directory: 'agent-code'
         run: 'npm ci'
 
       - name: 'Build Gemini CLI'
-        working-directory: agent-code
+        working-directory: 'agent-code'
         run: 'npm run bundle'
 
       - name: 'Checkout Main (Target Repo)'
@@ -104,8 +104,8 @@ jobs:
 
       - name: 'Get Target SHA'
         id: 'get_target_sha'
-        working-directory: repo-target
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        working-directory: 'repo-target'
+        run: 'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"'
 
       - name: 'Download Previous State'
         env:
@@ -140,7 +140,7 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        working-directory: agent-code
+        working-directory: 'agent-code'
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
       - name: 'Run Brain Phases'
@@ -159,7 +159,7 @@ jobs:
           GEMINI_TELEMETRY_OUTFILE: 'brain-telemetry.json'
           GEMINI_DEBUG_LOG_FILE: 'brain-debug.log'
           GH_PAGER: ''
-        working-directory: repo-target
+        working-directory: 'repo-target'
         run: |
           # Determine intent and prompt
           MANDATE_INPUT="${{ github.event.inputs.mandate || 'auto' }}"
@@ -233,7 +233,7 @@ jobs:
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
-        working-directory: repo-target
+        working-directory: 'repo-target'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -259,7 +259,7 @@ jobs:
       - name: 'Generate Patch'
         id: 'generate_patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
-        working-directory: repo-target
+        working-directory: 'repo-target'
         run: |
           touch bot-changes.patch
           touch pr-description.md
@@ -275,7 +275,7 @@ jobs:
           fi
 
       - name: 'Stage Artifacts'
-        if: always()
+        if: 'always()'
         run: |
           mkdir -p staged-artifacts/tools/gemini-cli-bot/history
           cp repo-target/tools/gemini-cli-bot/lessons-learned.md staged-artifacts/tools/gemini-cli-bot/ 2>/dev/null || true
@@ -291,11 +291,11 @@ jobs:
           cp repo-target/pr-labels.txt staged-artifacts/ 2>/dev/null || true
 
       - name: 'Archive Brain Data'
-        if: always()
+        if: 'always()'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'brain-data'
-          path: staged-artifacts/
+          path: 'staged-artifacts/'
           retention-days: 90
 
   publish:
