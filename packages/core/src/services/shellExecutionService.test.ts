@@ -1240,6 +1240,30 @@ describe('ShellExecutionService', () => {
       // The catch block must call destroy() on spawnedPty to prevent fd leak
       expect(destroySpy).toHaveBeenCalled();
     });
+
+    it('should safely exit if finalize is called after the pty was manually killed', async () => {
+      const abortController = new AbortController();
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      ShellExecutionService.execute(
+        'ls',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+      const pid = mockPtyProcess.pid;
+
+      // Manually kill it, which disposes headlessTerminal and removes from activePtys
+      await ShellExecutionService.kill(pid);
+
+      // Now simulate the process emitting the exit event.
+      // If the !entry guard is missing, this would throw because headlessTerminal was disposed.
+      expect(() => {
+        mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      }).not.toThrow();
+    });
   });
 });
 
