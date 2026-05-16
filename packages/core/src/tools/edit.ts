@@ -60,6 +60,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
+import { withFileLock } from '../utils/fileLocks.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -855,7 +856,16 @@ class EditToolInvocation
    * @param params Parameters for the edit operation
    * @returns Result of the edit operation
    */
-  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    // Serialize concurrent edits to the same file so a parallel call from the
+    // Scheduler doesn't read stale content and clobber another in-flight
+    // edit's write. See issue #26731.
+    return withFileLock(this.resolvedPath, () => this.executeLocked(options));
+  }
+
+  private async executeLocked({
+    abortSignal: signal,
+  }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {

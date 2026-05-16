@@ -52,6 +52,7 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { withFileLock } from '../utils/fileLocks.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -272,7 +273,14 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute({
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    // Serialize concurrent writes to the same file so a parallel call from
+    // the Scheduler doesn't read stale content and clobber another in-flight
+    // write. See issue #26731.
+    return withFileLock(this.resolvedPath, () => this.executeLocked(options));
+  }
+
+  private async executeLocked({
     abortSignal: abortSignal,
   }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);

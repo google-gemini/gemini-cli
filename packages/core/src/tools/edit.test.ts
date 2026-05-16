@@ -1409,4 +1409,40 @@ function doIt() {
       fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
+
+  describe('parallel edits to the same file (issue #26731)', () => {
+    it('does not lose changes when two non-overlapping edits run in parallel', async () => {
+      // Regression: the Scheduler can dispatch multiple `edit` tool calls
+      // via Promise.all. Without per-path serialization both calls read the
+      // same initial content, compute against it, and write — so the later
+      // writer silently clobbers the earlier one.
+      const filePath = path.join(rootDir, 'race-test.txt');
+      const initial = 'alpha beta gamma\n';
+      fs.writeFileSync(filePath, initial, 'utf8');
+
+      const invA = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase alpha',
+        old_string: 'alpha',
+        new_string: 'ALPHA',
+      });
+      const invB = tool.build({
+        file_path: filePath,
+        instruction: 'Uppercase gamma',
+        old_string: 'gamma',
+        new_string: 'GAMMA',
+      });
+
+      const [resultA, resultB] = await Promise.all([
+        invA.execute({ abortSignal: new AbortController().signal }),
+        invB.execute({ abortSignal: new AbortController().signal }),
+      ]);
+
+      expect(resultA.error).toBeUndefined();
+      expect(resultB.error).toBeUndefined();
+      // With the per-path lock both edits land. Without it one is lost and
+      // the file reads as either 'ALPHA beta gamma\n' or 'alpha beta GAMMA\n'.
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('ALPHA beta GAMMA\n');
+    });
+  });
 });
