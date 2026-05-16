@@ -121,10 +121,11 @@ export function isGemma4FamilyModel(model: string): boolean {
     return false;
   }
 
+  const isGemma4Contiguous =
+    normalizedModel.includes('gemma4') || normalizedModel.includes('gemma-4');
   return (
     isLocalGemma4Alias(normalizedModel) ||
-    (normalizedModel.includes('gemma') &&
-      normalizedModel.includes('4') &&
+    (isGemma4Contiguous &&
       !normalizedModel.includes('embed') &&
       !normalizedModel.includes('functiongemma'))
   );

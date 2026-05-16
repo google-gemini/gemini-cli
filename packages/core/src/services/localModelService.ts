@@ -81,10 +81,7 @@ export class LocalModelService {
    * Returns `true` if the backend responds with a non-error status,
    * `false` otherwise (including timeouts).
    */
-  async pingBackend(
-    authType: AuthType,
-    baseUrl?: string,
-  ): Promise<boolean> {
+  async pingBackend(authType: AuthType, baseUrl?: string): Promise<boolean> {
     if (!isLocalBackendAuthType(authType)) {
       return false;
     }
@@ -110,9 +107,10 @@ export class LocalModelService {
   filterGemma4Models(models: LocalModel[]): LocalModel[] {
     return models.filter((model) => {
       const normalizedId = model.id.toLowerCase();
+      const isGemma4Contiguous =
+        normalizedId.includes('gemma4') || normalizedId.includes('gemma-4');
       return (
-        normalizedId.includes('gemma') &&
-        normalizedId.includes('4') &&
+        isGemma4Contiguous &&
         !normalizedId.includes('embed') &&
         !normalizedId.includes('functiongemma')
       );
