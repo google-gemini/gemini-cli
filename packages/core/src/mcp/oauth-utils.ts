@@ -111,9 +111,16 @@ export class OAuthUtils {
     }
 
     const resourcePath = url.pathname.slice(wellKnownPrefix.length) || '/';
-    return this.buildResourceParameter(
-      new URL(resourcePath, `${url.protocol}//${url.host}`).toString(),
-    );
+    if (resourcePath.startsWith('//')) {
+      throw new Error(
+        `Invalid protected resource metadata URL: ${metadataUrl}`,
+      );
+    }
+
+    url.pathname = resourcePath;
+    url.search = '';
+    url.hash = '';
+    return this.buildResourceParameter(url.toString());
   }
 
   /**

@@ -566,6 +566,14 @@ describe('OAuthUtils', () => {
         ),
       ).toThrow(/Invalid protected resource metadata URL/);
     });
+
+    it('should reject protocol-relative resource paths', () => {
+      expect(() =>
+        OAuthUtils.buildResourceParameterFromMetadataUrl(
+          'https://example.com/.well-known/oauth-protected-resource//attacker.com/api',
+        ),
+      ).toThrow(/Invalid protected resource metadata URL/);
+    });
   });
 
   describe('parseTokenExpiry', () => {
