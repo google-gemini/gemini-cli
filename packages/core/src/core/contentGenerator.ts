@@ -13,6 +13,8 @@ import {
   type EmbedContentResponse,
   type EmbedContentParameters,
 } from '@google/genai';
+import { HttpProxyAgent } from 'http-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import * as os from 'node:os';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { isCloudShell } from '../ide/detect-ide.js';
@@ -343,6 +345,13 @@ export async function createContentGenerator(
         httpOptions.baseUrl = baseUrl;
       }
 
+      const proxyUrl = config.proxy?.trim();
+      const proxyAgent = proxyUrl
+        ? baseUrl?.startsWith('http://')
+          ? new HttpProxyAgent(proxyUrl)
+          : new HttpsProxyAgent(proxyUrl)
+        : undefined;
+
       const googleGenAI = new GoogleGenAI({
         apiKey:
           config.authType === AuthType.GATEWAY
@@ -353,6 +362,13 @@ export async function createContentGenerator(
         vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
+        ...(proxyAgent && {
+          googleAuthOptions: {
+            clientOptions: {
+              transporterOptions: { agent: proxyAgent },
+            },
+          },
+        }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
