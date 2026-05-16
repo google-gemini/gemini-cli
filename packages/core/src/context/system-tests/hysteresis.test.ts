@@ -9,6 +9,7 @@ import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
 import { generalistProfile } from '../config/profiles.js';
+import type { Content } from '@google/genai';
 
 describe('Context Manager Hysteresis Tests', () => {
   const mockLlmClient = createMockLlmClient(['<SNAPSHOT>']);
@@ -25,6 +26,12 @@ describe('Context Manager Hysteresis Tests', () => {
     },
   });
 
+  const getProjectionTokens = (proj: Content[], harness: SimulationHarness) =>
+    proj.reduce(
+      (sum, c) => sum + harness.env.tokenCalculator.calculateContentTokens(c),
+      0,
+    );
+
   it('should block consolidation when deficit is below coalescing threshold', async () => {
     const threshold = 1500;
     const harness = await SimulationHarness.create(
@@ -35,14 +42,14 @@ describe('Context Manager Hysteresis Tests', () => {
     // Turn 0: INIT
     await harness.simulateTurn([{ role: 'user', parts: [{ text: 'INIT' }] }]);
 
-    // Turn 1: Add 1500 chars (~500 tokens). Total ~500. Under retained (1000).
+    // Turn 1: Add ~500 tokens
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'A'.repeat(1500) }] },
+      { role: 'user', parts: [{ text: 'A'.repeat(500) }] },
     ]);
 
-    // Turn 2: Add 3000 chars (~1000 tokens). Total ~1500. Deficit ~500 < 1500.
+    // Turn 2: Add ~1000 tokens. Total ~1500. Deficit ~500 < 1500.
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'B'.repeat(3000) }] },
+      { role: 'user', parts: [{ text: 'B'.repeat(1000) }] },
     ]);
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -54,19 +61,19 @@ describe('Context Manager Hysteresis Tests', () => {
       ),
     ).toBe(false);
 
-    // Turn 3: Add 9000 chars (~3000 tokens). Total ~4500.
+    // Turn 3: Add ~3000 tokens. Total ~4500.
     // Deficit ~3500 > 1500. TRIGGER!
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'C'.repeat(9000) }] },
+      { role: 'user', parts: [{ text: 'C'.repeat(3000) }] },
     ]);
 
     // Give it a moment for the async task to finish
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Exceed maxTokens to force a render that shows the snapshot
-    // Add 3000 more tokens (9000 chars). Total ~7500 > 5000.
+    // Add ~3000 tokens. Total ~7500 > 5000.
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'D'.repeat(9000) }] },
+      { role: 'user', parts: [{ text: 'D'.repeat(3000) }] },
     ]);
 
     state = await harness.getGoldenState();
@@ -85,57 +92,51 @@ describe('Context Manager Hysteresis Tests', () => {
     );
 
     // 1. Trigger first consolidation
-    // Add ~9000 chars (~3000 tokens). Total ~3000. Deficit ~2000 > 1000.
+    // Add ~3000 tokens. Total ~3000. Deficit ~2000 > 1000.
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'A'.repeat(9000) }] },
+      { role: 'user', parts: [{ text: 'A'.repeat(3000) }] },
     ]);
     await harness.simulateTurn([{ role: 'user', parts: [{ text: 'B' }] }]); // Make eligible
 
     await new Promise((resolve) => setTimeout(resolve, 500));
     // Exceed maxTokens (5000) to see it
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'X'.repeat(9000) }] },
+      { role: 'user', parts: [{ text: 'X'.repeat(3000) }] },
     ]);
 
-    const state = await harness.getGoldenState();
+    // Get baseline tokens
+    let state = await harness.getGoldenState();
     expect(
       state.finalProjection.some((c) =>
         c.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
       ),
     ).toBe(true);
 
-    // Get baseline tokens
-    const baselineTokens =
-      harness.env.tokenCalculator.calculateConcreteListTokens(
-        harness.contextManager.getNodes(),
-      );
+    const baselineTokens = getProjectionTokens(state.finalProjection, harness);
 
     // 2. Add nodes again, staying below threshold growth
-    // Add 1500 chars (~500 tokens). Growth ~500 < 1000.
+    // Add ~500 tokens. Growth ~500 < 1000.
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'C'.repeat(1500) }] },
+      { role: 'user', parts: [{ text: 'C'.repeat(500) }] },
     ]);
     await harness.simulateTurn([{ role: 'user', parts: [{ text: 'D' }] }]); // Make eligible
 
     await new Promise((resolve) => setTimeout(resolve, 200));
-    const currentTokens =
-      harness.env.tokenCalculator.calculateConcreteListTokens(
-        harness.contextManager.getNodes(),
-      );
+    state = await harness.getGoldenState();
+    const currentTokens = getProjectionTokens(state.finalProjection, harness);
     // Should not have shrunk further (except for D's small addition)
     expect(currentTokens).toBeGreaterThanOrEqual(baselineTokens);
 
     // 3. Exceed threshold growth
-    // Add 6000 chars (~2000 tokens). Growth = ~500 + ~2000 = ~2500 > 1000.
+    // Add ~2000 tokens. Growth = ~500 + ~2000 = ~2500 > 1000.
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'E'.repeat(6000) }] },
+      { role: 'user', parts: [{ text: 'E'.repeat(2000) }] },
     ]);
     await harness.simulateTurn([{ role: 'user', parts: [{ text: 'F' }] }]); // Make eligible
 
     await new Promise((resolve) => setTimeout(resolve, 500));
-    const finalTokens = harness.env.tokenCalculator.calculateConcreteListTokens(
-      harness.contextManager.getNodes(),
-    );
+    state = await harness.getGoldenState();
+    const finalTokens = getProjectionTokens(state.finalProjection, harness);
     // Now it should have consolidated again (E should be replaced by a snapshot eventually)
     expect(finalTokens).toBeLessThan(currentTokens + 2000);
   });
