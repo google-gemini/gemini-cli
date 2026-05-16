@@ -300,6 +300,47 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
       });
     });
+
+    it('should validate against root resource when path metadata falls back to root discovery', async () => {
+      mockFetch
+        // path-based protected resource metadata is unavailable
+        .mockResolvedValueOnce({
+          ok: false,
+        })
+        // root-based protected resource metadata succeeds
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+              bearer_methods_supported: ['header'],
+            }),
+        })
+        // discoverAuthorizationServerMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
+      ).resolves.toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+
+      expect(mockFetch).nthCalledWith(
+        1,
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        2,
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+    });
   });
 
   describe('metadataToOAuthConfig', () => {
@@ -401,6 +442,36 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
       });
     });
+
+    it('should validate against resource_metadata URL instead of MCP server path', async () => {
+      mockFetch
+        // fetchProtectedResourceMetadata(resource_metadata URL)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        // discoverAuthorizationServerMetadata(auth server well-known URL)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+          'https://example.com/mcp',
+        ),
+      ).resolves.toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
   });
 
   describe('extractBaseUrl', () => {
@@ -468,6 +539,32 @@ describe('OAuthUtils', () => {
 
     it('should throw an error for invalid URLs', () => {
       expect(() => OAuthUtils.buildResourceParameter('not-a-url')).toThrow();
+    });
+  });
+
+  describe('buildResourceParameterFromMetadataUrl', () => {
+    it('should infer a root resource from a root protected resource metadata URL', () => {
+      const result = OAuthUtils.buildResourceParameterFromMetadataUrl(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+
+      expect(result).toBe('https://example.com/');
+    });
+
+    it('should infer a path resource from a path-based protected resource metadata URL', () => {
+      const result = OAuthUtils.buildResourceParameterFromMetadataUrl(
+        'https://example.com/.well-known/oauth-protected-resource/mcp/v1',
+      );
+
+      expect(result).toBe('https://example.com/mcp/v1');
+    });
+
+    it('should reject non-protected-resource metadata URLs', () => {
+      expect(() =>
+        OAuthUtils.buildResourceParameterFromMetadataUrl(
+          'https://example.com/.well-known/oauth-authorization-server',
+        ),
+      ).toThrow(/Invalid protected resource metadata URL/);
     });
   });
 

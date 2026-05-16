@@ -88,6 +88,35 @@ export class OAuthUtils {
   }
 
   /**
+   * Extract the resource identifier prefix represented by a protected resource metadata URL.
+   *
+   * RFC 9728 §3.1 constructs metadata URLs by inserting
+   * /.well-known/oauth-protected-resource between the origin and resource path.
+   * RFC 9728 §7.3 then validates the resource metadata against that prefix.
+   *
+   * @param metadataUrl The protected resource metadata URL
+   * @returns The resource identifier prefix represented by the metadata URL
+   */
+  static buildResourceParameterFromMetadataUrl(metadataUrl: string): string {
+    const url = new URL(metadataUrl);
+    const wellKnownPrefix = '/.well-known/oauth-protected-resource';
+
+    if (
+      url.pathname !== wellKnownPrefix &&
+      !url.pathname.startsWith(`${wellKnownPrefix}/`)
+    ) {
+      throw new Error(
+        `Invalid protected resource metadata URL: ${metadataUrl}`,
+      );
+    }
+
+    const resourcePath = url.pathname.slice(wellKnownPrefix.length) || '/';
+    return this.buildResourceParameter(
+      new URL(resourcePath, `${url.protocol}//${url.host}`).toString(),
+    );
+  }
+
+  /**
    * Fetch OAuth protected resource metadata.
    *
    * @param resourceMetadataUrl The protected resource metadata URL
@@ -236,9 +265,9 @@ export class OAuthUtils {
       // RFC 9728 §3.1: Construct well-known URL by inserting /.well-known/oauth-protected-resource
       // between the host and path. This is the RFC-compliant approach.
       const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
-      let resourceMetadata = await this.fetchProtectedResourceMetadata(
-        wellKnownUrls.protectedResource,
-      );
+      let resourceMetadataUrl = wellKnownUrls.protectedResource;
+      let resourceMetadata =
+        await this.fetchProtectedResourceMetadata(resourceMetadataUrl);
 
       // Fallback: If path-based discovery fails and we have a path, try root-based discovery
       // for backwards compatibility with servers that don't implement RFC 9728 path handling
@@ -249,6 +278,9 @@ export class OAuthUtils {
           resourceMetadata = await this.fetchProtectedResourceMetadata(
             rootBasedUrls.protectedResource,
           );
+          if (resourceMetadata) {
+            resourceMetadataUrl = rootBasedUrls.protectedResource;
+          }
         }
       }
 
@@ -256,7 +288,8 @@ export class OAuthUtils {
         // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
         // it is using as the prefix for the metadata request exactly matches the value
         // of the resource metadata parameter in the protected resource metadata document.
-        const expectedResource = this.buildResourceParameter(serverUrl);
+        const expectedResource =
+          this.buildResourceParameterFromMetadataUrl(resourceMetadataUrl);
         if (
           !this.isEquivalentResourceIdentifier(
             resourceMetadata.resource,
@@ -352,7 +385,8 @@ export class OAuthUtils {
 
     if (resourceMetadata && mcpServerUrl) {
       // Validate resource parameter per RFC 9728 Section 7.3
-      const expectedResource = this.buildResourceParameter(mcpServerUrl);
+      const expectedResource =
+        this.buildResourceParameterFromMetadataUrl(resourceMetadataUri);
       if (
         !this.isEquivalentResourceIdentifier(
           resourceMetadata.resource,
