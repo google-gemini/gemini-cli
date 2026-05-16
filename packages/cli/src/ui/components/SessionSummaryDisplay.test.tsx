@@ -12,7 +12,6 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
-  getShellConfiguration,
   isWindows,
   type WorktreeSettings,
 } from '@google/gemini-cli-core';
@@ -22,7 +21,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    getShellConfiguration: vi.fn(),
     isWindows: vi.fn(),
   };
 });
@@ -45,7 +43,6 @@ vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
   };
 });
 
-const getShellConfigurationMock = vi.mocked(getShellConfiguration);
 const isWindowsMock = vi.mocked(isWindows);
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
@@ -104,11 +101,6 @@ describe('<SessionSummaryDisplay />', () => {
   };
 
   beforeEach(() => {
-    getShellConfigurationMock.mockReturnValue({
-      executable: 'bash',
-      argsPrefix: ['-c'],
-      shell: 'bash',
-    });
     isWindowsMock.mockReturnValue(false);
   });
 
@@ -173,11 +165,6 @@ describe('<SessionSummaryDisplay />', () => {
 
     it('renders a standard UUID-formatted session ID in the footer (powershell) on Windows', async () => {
       isWindowsMock.mockReturnValue(true);
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
 
       const uuidSessionId = '1234-abcd-5678-efgh';
       const { lastFrame, unmount } = await renderWithMockedStats(
@@ -192,11 +179,7 @@ describe('<SessionSummaryDisplay />', () => {
     });
 
     it('sanitizes a malicious session ID in the footer (powershell)', async () => {
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
+      isWindowsMock.mockReturnValue(true);
 
       const maliciousSessionId = "'; rm -rf / #";
       const { lastFrame, unmount } = await renderWithMockedStats(
