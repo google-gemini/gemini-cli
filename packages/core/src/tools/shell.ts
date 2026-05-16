@@ -651,11 +651,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          // In Full Access (YOLO) skip the PTY: a real TTY lets `sudo` and
+          // similar prompt for a password indefinitely. The child_process
+          // fallback uses stdio:['ignore', ...] so sudo fails fast with
+          // "a password is required" (matches Codex's Stdio::null() in
+          // codex-rs/utils/pty/src/pipe.rs:144).
+          this.context.config.getEnableInteractiveShell() &&
+            this.context.config.getApprovalMode() !== ApprovalMode.YOLO,
           {
             ...shellExecutionConfig,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
             pager: 'cat',
+            approvalMode: this.context.config.getApprovalMode(),
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.context.config.sanitizationConfig,

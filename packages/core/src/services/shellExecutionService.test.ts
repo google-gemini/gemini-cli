@@ -2192,4 +2192,121 @@ describe('ShellExecutionService environment variables', () => {
 
     vi.unstubAllEnvs();
   });
+
+  it('should inject non-interactive env vars in Full Access (YOLO) mode', async () => {
+    vi.resetModules();
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('npm_config_yes', undefined);
+    vi.stubEnv('DEBIAN_FRONTEND', undefined);
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+    const { ApprovalMode } = await import('../policy/types.js');
+
+    mockGetPty.mockResolvedValue(null); // child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-yolo-env',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true, // interactive UI session — YOLO is the new gate
+      { ...shellExecutionConfig, approvalMode: ApprovalMode.YOLO },
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty('CI', '1');
+    expect(cpEnv).toHaveProperty('npm_config_yes', 'true');
+    expect(cpEnv).toHaveProperty('npm_config_fund', 'false');
+    expect(cpEnv).toHaveProperty('npm_config_audit', 'false');
+    expect(cpEnv).toHaveProperty('YARN_ENABLE_INTERACTIVE', 'false');
+    expect(cpEnv).toHaveProperty('DEBIAN_FRONTEND', 'noninteractive');
+    expect(cpEnv).toHaveProperty('NEEDRESTART_MODE', 'a');
+    expect(cpEnv).toHaveProperty('GIT_TERMINAL_PROMPT', '0');
+    expect(cpEnv).toHaveProperty('GH_PROMPT_DISABLED', '1');
+    expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
+    expect(cpEnv).toHaveProperty('PIP_DISABLE_PIP_VERSION_CHECK', '1');
+
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+    vi.unstubAllEnvs();
+  });
+
+  it('should NOT inject Full Access env vars when approvalMode is DEFAULT', async () => {
+    vi.resetModules();
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('npm_config_yes', undefined);
+    vi.stubEnv('DEBIAN_FRONTEND', undefined);
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+    const { ApprovalMode } = await import('../policy/types.js');
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-default-env',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true, // interactive
+      { ...shellExecutionConfig, approvalMode: ApprovalMode.DEFAULT },
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).not.toHaveProperty('CI');
+    expect(cpEnv).not.toHaveProperty('npm_config_yes');
+    expect(cpEnv).not.toHaveProperty('DEBIAN_FRONTEND');
+    expect(cpEnv).not.toHaveProperty('NEEDRESTART_MODE');
+
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+    vi.unstubAllEnvs();
+  });
+
+  it('should preserve pre-existing user env values in Full Access mode (?? coalesce)', async () => {
+    vi.resetModules();
+    vi.stubEnv('CI', '0');
+    vi.stubEnv('DEBIAN_FRONTEND', 'dialog');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+    const { ApprovalMode } = await import('../policy/types.js');
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-yolo-preserve',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      {
+        ...shellExecutionConfig,
+        approvalMode: ApprovalMode.YOLO,
+        sanitizationConfig: {
+          ...shellExecutionConfig.sanitizationConfig,
+          allowedEnvironmentVariables: ['CI', 'DEBIAN_FRONTEND'],
+        },
+      },
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    // User-set values take precedence over the YOLO defaults
+    expect(cpEnv).toHaveProperty('CI', '0');
+    expect(cpEnv).toHaveProperty('DEBIAN_FRONTEND', 'dialog');
+    // The non-conflicting Full Access defaults still get injected
+    expect(cpEnv).toHaveProperty('npm_config_yes', 'true');
+    expect(cpEnv).toHaveProperty('NEEDRESTART_MODE', 'a');
+
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+    vi.unstubAllEnvs();
+  });
 });
