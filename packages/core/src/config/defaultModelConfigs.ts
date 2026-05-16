@@ -663,6 +663,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-2.5-flash-lite',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -713,6 +714,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-2.5-flash-lite',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',

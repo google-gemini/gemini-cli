@@ -127,6 +127,7 @@ export function getModelPolicyChain(
     definePolicy({
       model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       isLastResort: true,
+      maxAttempts: 10,
     }),
   ];
 }
