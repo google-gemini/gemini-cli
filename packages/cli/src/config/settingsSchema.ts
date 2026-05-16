@@ -339,6 +339,16 @@ const SETTINGS_SCHEMA = {
               'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
             showInDialog: true,
           },
+          trustReadOnlyHint: {
+            type: 'boolean',
+            label: 'Trust MCP readOnlyHint in Plan Mode',
+            category: 'General',
+            requiresRestart: true,
+            default: false,
+            description:
+              'When true, MCP tools declared with `readOnlyHint: true` are allowed silently in Plan Mode instead of prompting on every call. Disabled by default — Plan Mode follows secure-by-default and prompts for tools whose read-only nature is asserted only by external metadata. Enable only for MCP servers you fully trust.',
+            showInDialog: true,
+          },
         },
       },
       retryFetchErrors: {

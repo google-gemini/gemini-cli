@@ -347,6 +347,10 @@ export interface PolicySettings {
   adminPolicyPaths?: string[];
   workspacePoliciesDir?: string;
   disableAlwaysAllow?: boolean;
+  // When true, MCP tools annotated `readOnlyHint = true` are allowed silently
+  // in Plan Mode (overrides plan.toml's default ASK_USER). Maps to
+  // `general.plan.trustReadOnlyHint` in user settings.
+  trustReadOnlyHintInPlanMode?: boolean;
 }
 
 export interface CheckResult {

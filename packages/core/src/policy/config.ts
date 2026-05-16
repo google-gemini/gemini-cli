@@ -73,6 +73,7 @@ export const ADMIN_POLICY_TIER = 5;
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
+export const TRUST_READ_ONLY_HINT_PRIORITY = USER_POLICY_TIER + 0.5;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const CONFIRMATION_REQUIRED_PRIORITY = USER_POLICY_TIER + 0.35;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
@@ -434,6 +435,29 @@ export async function createPolicyEngineConfig(
         source: 'Settings (Tools Excluded)',
       });
     }
+  }
+
+  // Opt-in: trust MCP-declared `readOnlyHint = true` in Plan Mode.
+  // Off by default — Plan Mode follows secure-by-default and prompts on
+  // every MCP read so the user can verify the call. When the user enables
+  // `general.plan.trustReadOnlyHint`, this dynamic rule (priority
+  // TRUST_READ_ONLY_HINT_PRIORITY = 4.5, comfortably above plan.toml's
+  // priority-1.05 ASK_USER rule and below MCP_EXCLUDED_PRIORITY)
+  // overrides ASK_USER → ALLOW for the readOnlyHint annotation.
+  //
+  // Built-in read tools (read_file, glob, grep_search, list_directory,
+  // ...) already run silently in Plan Mode via the explicit allow-list
+  // in read-only.toml and are not affected by this setting.
+  if (settings.trustReadOnlyHintInPlanMode) {
+    rules.push({
+      toolName: '*',
+      mcpName: '*',
+      toolAnnotations: { readOnlyHint: true },
+      decision: PolicyDecision.ALLOW,
+      priority: TRUST_READ_ONLY_HINT_PRIORITY,
+      modes: [ApprovalMode.PLAN],
+      source: 'Settings (general.plan.trustReadOnlyHint)',
+    });
   }
 
   const nonPlanModes = [

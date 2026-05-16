@@ -67,6 +67,7 @@ export async function createPolicyEngineConfig(
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,
+    trustReadOnlyHintInPlanMode: settings.general?.plan?.trustReadOnlyHint,
   };
 
   return createCorePolicyEngineConfig(
