@@ -226,6 +226,10 @@ export class GeminiClient {
     return (content.parts?.length ?? 0) > 0 && isFunctionResponse(content);
   }
 
+  private sanitizeHookContextForPrompt(context: string): string {
+    return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   private async fireAfterAgentHookSafe(
     currentRequest: PartListUnion,
     prompt_id: string,
@@ -947,7 +951,11 @@ export class GeminiClient {
             const requestArray = Array.isArray(request) ? request : [request];
             request = [
               ...requestArray,
-              { text: `<hook_context>${additionalContext}</hook_context>` },
+              {
+                text: `<hook_context>${this.sanitizeHookContextForPrompt(
+                  additionalContext,
+                )}</hook_context>`,
+              },
             ];
           }
         }

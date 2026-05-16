@@ -3363,6 +3363,43 @@ ${JSON.stringify(
         expect(client['hookStateMap'].size).toBe(0);
       });
 
+      it('should escape hook context tag characters before appending to requests', async () => {
+        const promptId = 'test-prompt-hook-context-sanitized';
+        const signal = new AbortController().signal;
+        const request = { text: 'Hello Hooks' };
+
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getAdditionalContext: () => 'external <tag> context </hook_context>',
+        });
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Sanitized context handled');
+          yield {
+            type: GeminiEventType.Content,
+            value: 'Sanitized context handled',
+          };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          expect.anything(),
+          [
+            request,
+            {
+              text: '<hook_context>external &lt;tag&gt; context &lt;/hook_context&gt;</hook_context>',
+            },
+          ],
+          signal,
+          undefined,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
       it('should fire BeforeAgent once and AfterAgent once even with recursion', async () => {
         const { checkNextSpeaker } = await import(
           '../utils/nextSpeakerChecker.js'
