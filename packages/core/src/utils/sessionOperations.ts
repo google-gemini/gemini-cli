@@ -9,7 +9,6 @@ import path from 'node:path';
 import { sanitizeFilenamePart } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 import { isNodeError } from './errors.js';
-import { isStringProperty } from './typeUtils.js';
 import type { Config } from '../config/config.js';
 import { SESSION_FILE_PREFIX } from '../services/chatRecordingTypes.js';
 
@@ -31,7 +30,12 @@ const RESERVED_SESSION_DIR_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 function isSessionIdRecord(record: unknown): record is { sessionId: string } {
-  return isStringProperty(record, 'sessionId');
+  return (
+    record !== null &&
+    typeof record === 'object' &&
+    'sessionId' in record &&
+    typeof (record as { sessionId: unknown }).sessionId === 'string'
+  );
 }
 
 /**

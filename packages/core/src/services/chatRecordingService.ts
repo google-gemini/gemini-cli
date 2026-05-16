@@ -23,11 +23,6 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  hasProperty,
-  isObjectProperty,
-  isStringProperty,
-} from '../utils/typeUtils.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   SESSION_FILE_PREFIX,
@@ -51,6 +46,31 @@ const ENOSPC_WARNING_MESSAGE =
   'Chat recording disabled: No space left on device. ' +
   'The conversation will continue but will not be saved to disk. ' +
   'Free up disk space and restart to enable recording.';
+
+function hasProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: unknown } {
+  return obj !== null && typeof obj === 'object' && prop in obj;
+}
+
+function isStringProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: string } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
+}
+
+function isObjectProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: object } {
+  return (
+    hasProperty(obj, prop) &&
+    obj[prop] !== null &&
+    typeof obj[prop] === 'object'
+  );
+}
 
 function isRewindRecord(record: unknown): record is RewindRecord {
   return isStringProperty(record, '$rewindTo');
