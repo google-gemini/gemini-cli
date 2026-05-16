@@ -399,6 +399,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                     <ApprovalModeIndicator
                       approvalMode={uiState.showApprovalModeIndicator}
                       allowPlanMode={uiState.allowPlanMode}
+                      allowYoloMode={uiState.allowYoloMode}
                     />
                   )}
                 {inputState.shellModeActive && (

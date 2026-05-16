@@ -2296,6 +2296,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
 
+  const allowYoloMode = !config.isYoloModeDisabled();
+
   const showApprovalModeIndicator = useApprovalModeIndicator({
     config,
     addItem: historyManager.addItem,
@@ -2520,6 +2522,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
+      allowYoloMode,
       currentModel,
       contextFileNames,
       errorCount,
@@ -2633,6 +2636,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
+      allowYoloMode,
       contextFileNames,
       errorCount,
       availableTerminalHeight,

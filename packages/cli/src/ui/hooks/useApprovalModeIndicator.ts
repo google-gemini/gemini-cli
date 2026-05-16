@@ -49,12 +49,12 @@ export function useApprovalModeIndicator({
         ) {
           if (addItem) {
             let text =
-              'You cannot enter YOLO mode since it is disabled in your settings.';
+              'You cannot enter Full Access mode since it is disabled in your settings.';
             const adminSettings = config.getRemoteAdminSettings();
             const hasSettings =
               adminSettings && Object.keys(adminSettings).length > 0;
             if (hasSettings && !adminSettings.strictModeDisabled) {
-              text = getAdminErrorMessage('YOLO mode', config);
+              text = getAdminErrorMessage('Full Access mode', config);
             }
 
             addItem(
@@ -72,7 +72,12 @@ export function useApprovalModeIndicator({
             ? ApprovalMode.DEFAULT
             : ApprovalMode.YOLO;
       } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
+        // Linear cycle (Claude Code style):
+        //   DEFAULT → AUTO_EDIT → PLAN? → YOLO? → DEFAULT
+        // PLAN is skipped if !allowPlanMode; YOLO is skipped when it is
+        // disabled by admin/security settings or by untrusted folder.
         const currentMode = config.getApprovalMode();
+        const yoloAvailable = !config.isYoloModeDisabled();
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
@@ -80,13 +85,17 @@ export function useApprovalModeIndicator({
           case ApprovalMode.AUTO_EDIT:
             nextApprovalMode = allowPlanMode
               ? ApprovalMode.PLAN
-              : ApprovalMode.DEFAULT;
+              : yoloAvailable
+                ? ApprovalMode.YOLO
+                : ApprovalMode.DEFAULT;
             break;
           case ApprovalMode.PLAN:
-            nextApprovalMode = ApprovalMode.DEFAULT;
+            nextApprovalMode = yoloAvailable
+              ? ApprovalMode.YOLO
+              : ApprovalMode.DEFAULT;
             break;
           case ApprovalMode.YOLO:
-            nextApprovalMode = ApprovalMode.AUTO_EDIT;
+            nextApprovalMode = ApprovalMode.DEFAULT;
             break;
           default:
         }

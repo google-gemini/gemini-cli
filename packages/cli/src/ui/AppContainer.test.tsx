@@ -3647,6 +3647,36 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Auto Mode (YOLO) Availability', () => {
+    it('should allow auto mode when YOLO is not disabled by settings', async () => {
+      vi.spyOn(mockConfig, 'isYoloModeDisabled').mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      expect(capturedUIState).toBeTruthy();
+      expect(capturedUIState.allowYoloMode).toBe(true);
+      unmount();
+    });
+
+    it('should NOT allow auto mode when YOLO is disabled', async () => {
+      vi.spyOn(mockConfig, 'isYoloModeDisabled').mockReturnValue(true);
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [],
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      expect(capturedUIState).toBeTruthy();
+      expect(capturedUIState.allowYoloMode).toBe(false);
+      unmount();
+    });
+  });
+
   describe('Compression Queuing', () => {
     beforeEach(async () => {
       const { checkPermissions } = await import(
