@@ -40,10 +40,21 @@ export class CompressCommand implements Command {
   ): Promise<CommandExecutionResponse> {
     const promptId = `compress-${Date.now()}`;
     try {
-      const result = await context.agentContext.geminiClient.tryCompressChat(
+      // Optional-chain + null guard mirrors the TUI's compress command
+      // even though `AgentLoopContext.geminiClient` is declared
+      // non-optional today — keeps the ACP path resilient if the
+      // upstream interface ever loosens that contract.
+      const result = await context.agentContext.geminiClient?.tryCompressChat(
         promptId,
         /* force */ true,
       );
+
+      if (!result) {
+        return {
+          name: this.name,
+          data: 'Failed to compress chat history: Gemini client is not available.',
+        };
+      }
 
       switch (result.compressionStatus) {
         case CompressionStatus.COMPRESSED:

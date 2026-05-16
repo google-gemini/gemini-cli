@@ -148,4 +148,17 @@ describe('CompressCommand', () => {
     expect(result.data).toContain('Failed to compress chat history');
     expect(result.data).toContain('Network down');
   });
+
+  it('reports a not-available error when geminiClient is missing', async () => {
+    const command = new CompressCommand();
+    const context: CommandContext = {
+      agentContext: {} as unknown as CommandContext['agentContext'],
+      settings: {} as CommandContext['settings'],
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await command.execute(context, []);
+
+    expect(result.data).toContain('Gemini client is not available');
+  });
 });
