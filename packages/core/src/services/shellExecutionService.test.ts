@@ -2193,11 +2193,18 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should inject non-interactive env vars in Full Access (YOLO) mode', async () => {
+  it('should inject Full Access (YOLO) env vars on top of the !isInteractive block', async () => {
+    // Real production flow: shell.ts forces shouldUseNodePty=false when
+    // approvalMode === YOLO, so execute() runs the child_process path with
+    // isInteractive=false. Both env blocks compose: `!isInteractive`
+    // contributes GIT_TERMINAL_PROMPT / GH_PROMPT_DISABLED / GCM_INTERACTIVE
+    // (and GIT_CONFIG_* shaping); the YOLO block contributes the
+    // package-manager / installer vars on top.
     vi.resetModules();
     vi.stubEnv('CI', undefined);
     vi.stubEnv('npm_config_yes', undefined);
     vi.stubEnv('DEBIAN_FRONTEND', undefined);
+    vi.stubEnv('GIT_CONFIG_COUNT', undefined);
 
     const { ShellExecutionService } = await import(
       './shellExecutionService.js'
@@ -2210,12 +2217,13 @@ describe('ShellExecutionService environment variables', () => {
       '/',
       vi.fn(),
       new AbortController().signal,
-      true, // interactive UI session — YOLO is the new gate
+      false, // YOLO real flow: PTY skipped → isInteractive=false
       { ...shellExecutionConfig, approvalMode: ApprovalMode.YOLO },
     );
 
     expect(mockCpSpawn).toHaveBeenCalled();
     const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    // From the YOLO block (this PR):
     expect(cpEnv).toHaveProperty('CI', '1');
     expect(cpEnv).toHaveProperty('npm_config_yes', 'true');
     expect(cpEnv).toHaveProperty('npm_config_fund', 'false');
@@ -2223,10 +2231,12 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('YARN_ENABLE_INTERACTIVE', 'false');
     expect(cpEnv).toHaveProperty('DEBIAN_FRONTEND', 'noninteractive');
     expect(cpEnv).toHaveProperty('NEEDRESTART_MODE', 'a');
+    expect(cpEnv).toHaveProperty('PIP_DISABLE_PIP_VERSION_CHECK', '1');
+    // From the pre-existing !isInteractive block — included here so a
+    // regression that decouples the two blocks gets caught:
     expect(cpEnv).toHaveProperty('GIT_TERMINAL_PROMPT', '0');
     expect(cpEnv).toHaveProperty('GH_PROMPT_DISABLED', '1');
     expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
-    expect(cpEnv).toHaveProperty('PIP_DISABLE_PIP_VERSION_CHECK', '1');
 
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
