@@ -210,6 +210,58 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should use Config resolved model as the content generator model source', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('pro'),
+      getResolvedModel: vi.fn().mockResolvedValue(PREVIEW_GEMINI_3_1_MODEL),
+      getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
+      getUseCustomToolModel: vi.fn().mockResolvedValue(false),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.GATEWAY,
+        baseUrl: 'https://gateway.test.local',
+      },
+      mockConfig,
+    );
+
+    expect(mockConfig.getResolvedModel).toHaveBeenCalledWith(
+      'pro',
+      AuthType.GATEWAY,
+    );
+    expect(mockConfig.getGemini31Launched).not.toHaveBeenCalled();
+    expect(mockConfig.getGemini31FlashLiteLaunched).not.toHaveBeenCalled();
+    expect(mockConfig.getUseCustomToolModel).not.toHaveBeenCalled();
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringContaining(
+              `/${PREVIEW_GEMINI_3_1_MODEL} (`,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('should resolve Vertex pro alias to custom tools model when enabled', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('pro'),

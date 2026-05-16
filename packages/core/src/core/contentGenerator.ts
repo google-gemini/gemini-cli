@@ -206,20 +206,18 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
-    const useGemini31 =
-      (await gcConfig.getGemini31Launched?.(config.authType)) ?? false;
-    const useGemini31FlashLite =
-      (await gcConfig.getGemini31FlashLiteLaunched?.(config.authType)) ?? false;
-    const useCustomToolModel =
-      (await gcConfig.getUseCustomToolModel?.(config.authType)) ?? false;
-    const model = resolveModel(
-      gcConfig.getModel(),
-      useGemini31,
-      useGemini31FlashLite,
-      useCustomToolModel,
-      gcConfig.getHasAccessToPreviewModel?.() ?? true,
-      gcConfig,
-    );
+    const requestedModel = gcConfig.getModel();
+    const model =
+      (await gcConfig.getResolvedModel?.(requestedModel, config.authType)) ??
+      resolveModel(
+        requestedModel,
+        (await gcConfig.getGemini31Launched?.(config.authType)) ?? false,
+        (await gcConfig.getGemini31FlashLiteLaunched?.(config.authType)) ??
+          false,
+        (await gcConfig.getUseCustomToolModel?.(config.authType)) ?? false,
+        gcConfig.getHasAccessToPreviewModel?.() ?? true,
+        gcConfig,
+      );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const clientName = gcConfig.getClientName();

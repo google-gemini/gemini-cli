@@ -84,6 +84,7 @@ import {
   isAutoModel,
   isPreviewModel,
   isGemini2Model,
+  type ModelResolutionContext,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
 } from './models.js';
@@ -3499,6 +3500,60 @@ export class Config implements McpContext, AgentLoopContext {
   private supportsCustomToolModel(authType?: AuthType): boolean {
     return (
       authType === AuthType.USE_GEMINI || authType === AuthType.USE_VERTEX_AI
+    );
+  }
+
+  private getModelResolutionContextSync(
+    authTypeOverride?: AuthType,
+  ): ModelResolutionContext {
+    return {
+      useGemini3_1: this.getGemini31LaunchedSync(authTypeOverride),
+      useGemini3_1FlashLite:
+        this.getGemini31FlashLiteLaunchedSync(authTypeOverride),
+      useCustomTools: this.getUseCustomToolModelSync(authTypeOverride),
+      hasAccessToPreview: this.getHasAccessToPreviewModel(),
+    };
+  }
+
+  private async getModelResolutionContext(
+    authTypeOverride?: AuthType,
+  ): Promise<ModelResolutionContext> {
+    return {
+      useGemini3_1: await this.getGemini31Launched(authTypeOverride),
+      useGemini3_1FlashLite:
+        await this.getGemini31FlashLiteLaunched(authTypeOverride),
+      useCustomTools: await this.getUseCustomToolModel(authTypeOverride),
+      hasAccessToPreview: this.getHasAccessToPreviewModel(),
+    };
+  }
+
+  getResolvedModelSync(
+    requestedModel: string = this.getModel(),
+    authTypeOverride?: AuthType,
+  ): string {
+    const context = this.getModelResolutionContextSync(authTypeOverride);
+    return resolveModel(
+      requestedModel,
+      context.useGemini3_1,
+      context.useGemini3_1FlashLite,
+      context.useCustomTools,
+      context.hasAccessToPreview,
+      this,
+    );
+  }
+
+  async getResolvedModel(
+    requestedModel: string = this.getModel(),
+    authTypeOverride?: AuthType,
+  ): Promise<string> {
+    const context = await this.getModelResolutionContext(authTypeOverride);
+    return resolveModel(
+      requestedModel,
+      context.useGemini3_1,
+      context.useGemini3_1FlashLite,
+      context.useCustomTools,
+      context.hasAccessToPreview,
+      this,
     );
   }
 
