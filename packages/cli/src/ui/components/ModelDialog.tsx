@@ -367,10 +367,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     if (discoveredBackends.length === 0) return [];
     const BACKEND_DISPLAY: Record<string, string> = {
       ollama: 'Ollama',
-      'lm-studio': 'LM Studio',
-      'llama-cpp': 'Llama.cpp',
-      vllm: 'vLLM',
-      sglang: 'SGLang',
+      'lm-studio': 'LM Studio (draft)',
+      'llama-cpp': 'Llama.cpp (draft)',
+      vllm: 'vLLM (draft)',
+      sglang: 'SGLang (draft)',
     };
     const result: Array<{
       value: string;
@@ -503,10 +503,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }> = [];
       const BACKEND_DISPLAY: Record<string, string> = {
         ollama: 'Ollama',
-        'lm-studio': 'LM Studio',
-        'llama-cpp': 'Llama.cpp',
-        vllm: 'vLLM',
-        sglang: 'SGLang',
+        'lm-studio': 'LM Studio (draft)',
+        'llama-cpp': 'Llama.cpp (draft)',
+        vllm: 'vLLM (draft)',
+        sglang: 'SGLang (draft)',
       };
       for (const backend of discoveredBackends) {
         const label = BACKEND_DISPLAY[backend.backend] || backend.backend;

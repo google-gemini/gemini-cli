@@ -1144,10 +1144,10 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
         options: [
           { value: 'ollama', label: 'Ollama' },
-          { value: 'lm-studio', label: 'LM Studio' },
-          { value: 'llama-cpp', label: 'Llama.cpp' },
-          { value: 'vllm', label: 'vLLM' },
-          { value: 'sglang', label: 'SGLang' },
+          { value: 'lm-studio', label: 'LM Studio (draft)' },
+          { value: 'llama-cpp', label: 'Llama.cpp (draft)' },
+          { value: 'vllm', label: 'vLLM (draft)' },
+          { value: 'sglang', label: 'SGLang (draft)' },
         ],
       },
       baseUrl: {
@@ -1189,7 +1189,7 @@ const SETTINGS_SCHEMA = {
           },
           'lm-studio': {
             type: 'object',
-            label: 'LM Studio',
+            label: 'LM Studio (draft)',
             category: 'Model',
             requiresRestart: true,
             default: {},
@@ -1207,7 +1207,7 @@ const SETTINGS_SCHEMA = {
           },
           'llama-cpp': {
             type: 'object',
-            label: 'Llama.cpp',
+            label: 'Llama.cpp (draft)',
             category: 'Model',
             requiresRestart: true,
             default: {},
@@ -1225,7 +1225,7 @@ const SETTINGS_SCHEMA = {
           },
           vllm: {
             type: 'object',
-            label: 'vLLM',
+            label: 'vLLM (draft)',
             category: 'Model',
             requiresRestart: true,
             default: {},
@@ -1243,7 +1243,7 @@ const SETTINGS_SCHEMA = {
           },
           sglang: {
             type: 'object',
-            label: 'SGLang',
+            label: 'SGLang (draft)',
             category: 'Model',
             requiresRestart: true,
             default: {},

@@ -81,22 +81,22 @@ export function AuthDialog({
       key: AuthType.USE_LOCAL_OLLAMA,
     },
     {
-      label: 'Local LM Studio',
+      label: 'Local LM Studio (draft)',
       value: AuthType.USE_LOCAL_LM_STUDIO,
       key: AuthType.USE_LOCAL_LM_STUDIO,
     },
     {
-      label: 'Local Llama.cpp',
+      label: 'Local Llama.cpp (draft)',
       value: AuthType.USE_LOCAL_LLAMA_CPP,
       key: AuthType.USE_LOCAL_LLAMA_CPP,
     },
     {
-      label: 'Local vLLM',
+      label: 'Local vLLM (draft)',
       value: AuthType.USE_LOCAL_VLLM,
       key: AuthType.USE_LOCAL_VLLM,
     },
     {
-      label: 'Local SGLang',
+      label: 'Local SGLang (draft)',
       value: AuthType.USE_LOCAL_SGLANG,
       key: AuthType.USE_LOCAL_SGLANG,
     },
