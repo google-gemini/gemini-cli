@@ -1461,7 +1461,7 @@ describe('gemini.tsx main function exit codes', () => {
 
     runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
@@ -1470,8 +1470,6 @@ describe('gemini.tsx main function exit codes', () => {
       expect((e as MockProcessExitError).code).toBe(
         ExitCodes.FATAL_AUTHENTICATION_ERROR,
       );
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
