@@ -21,6 +21,7 @@ import {
   startInteractiveUI,
   getNodeMemoryArgs,
   resolveSessionId,
+  applySkipTrustFromArgv,
 } from './gemini.js';
 import {
   loadCliConfig,
@@ -1509,6 +1510,64 @@ describe('validateDnsResolutionOrder', () => {
     expect(debugLoggerWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
+  });
+});
+
+describe('applySkipTrustFromArgv', () => {
+  beforeEach(() => {
+    delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
+  });
+
+  it('sets GEMINI_CLI_TRUST_WORKSPACE when --skip-trust is present', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--skip-trust', '-p', 'hi']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBe('true');
+  });
+
+  it('leaves the env var untouched when --skip-trust is absent', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '-p', 'hi']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBeUndefined();
+  });
+
+  it('does not falsely match similar-looking flags', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--skip-trust-something']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBeUndefined();
+  });
+
+  it('does not match --skip-trust after the -- positional boundary', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--', '--skip-trust']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBeUndefined();
+  });
+
+  it('still matches flags before the -- boundary', () => {
+    applySkipTrustFromArgv([
+      'node',
+      'gemini',
+      '--skip-trust',
+      '--',
+      'rest',
+      'args',
+    ]);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBe('true');
+  });
+
+  it('matches --skip-trust=true (yargs explicit boolean form)', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--skip-trust=true']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBe('true');
+  });
+
+  it('does NOT match --skip-trust=false', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--skip-trust=false']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBeUndefined();
+  });
+
+  it('does NOT match --no-skip-trust (yargs negation form)', () => {
+    applySkipTrustFromArgv(['node', 'gemini', '--no-skip-trust']);
+    expect(process.env['GEMINI_CLI_TRUST_WORKSPACE']).toBeUndefined();
   });
 });
 

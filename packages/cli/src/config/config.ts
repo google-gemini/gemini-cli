@@ -306,7 +306,10 @@ export async function parseArguments(
         })
         .option('skip-trust', {
           type: 'boolean',
-          description: 'Trust the current workspace for this session.',
+          description:
+            'Trust the current workspace for this session. Also lets workspace ' +
+            '`.gemini/settings.json` (including hooks/extensions) and project ' +
+            '`.env` files take effect.',
           default: false,
         })
         .option('worktree', {
@@ -512,6 +515,11 @@ export async function parseArguments(
       throw new Error('Failed to parse arguments');
     }
     result = parsed;
+    // applySkipTrustFromArgv() in gemini.tsx already sets this earlier, before
+    // loadSettings() runs (which is where the workspace-trust gate lives).
+    // This second set is kept as a backstop for code paths that bypass main()
+    // (e.g., direct callers of parseArguments in tests) and is intentionally
+    // idempotent.
     if (result['skip-trust']) {
       process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
     }

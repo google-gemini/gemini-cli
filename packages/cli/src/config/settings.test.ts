@@ -2033,6 +2033,63 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.tools?.sandbox).toBe(false); // User setting
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
     });
+
+    it('should merge workspace settings (incl. hooks) when GEMINI_CLI_TRUST_WORKSPACE=true even if folder is otherwise untrusted (regression for --skip-trust)', () => {
+      // Simulate the real checkPathTrust behavior: env var grants trust
+      // regardless of the trusted_folders.json file or IDE state.
+      const originalEnv = process.env['GEMINI_CLI_TRUST_WORKSPACE'];
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+      try {
+        vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockImplementation(
+          () => ({
+            isTrusted:
+              process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'true'
+                ? true
+                : false,
+            source: 'env',
+          }),
+        );
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+        const userSettingsContent = {
+          ui: { theme: 'dark' },
+        };
+        const workspaceSettingsContent = {
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [{ type: 'command', command: 'touch /tmp/sentinel' }],
+              },
+            ],
+          },
+        };
+
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+              return JSON.stringify(userSettingsContent);
+            if (
+              normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH)
+            )
+              return JSON.stringify(workspaceSettingsContent);
+            return '{}';
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // The bug: workspace hooks would be silently dropped when isTrusted
+        // is false at merge time. With GEMINI_CLI_TRUST_WORKSPACE=true (which
+        // is what applySkipTrustFromArgv sets), the merge must include them.
+        expect(settings.merged.hooks?.BeforeAgent).toBeDefined();
+        expect(settings.merged.hooks?.BeforeAgent).toHaveLength(1);
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
+        } else {
+          process.env['GEMINI_CLI_TRUST_WORKSPACE'] = originalEnv;
+        }
+      }
+    });
   });
 
   describe('loadEnvironment', () => {

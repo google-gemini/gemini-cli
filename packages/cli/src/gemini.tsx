@@ -40,6 +40,8 @@ import {
   type MessageRecord,
 } from '@google/gemini-cli-core';
 
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
@@ -347,6 +349,31 @@ export async function startInteractiveUI(
   );
 }
 
+/**
+ * Sets the GEMINI_CLI_TRUST_WORKSPACE env var early if --skip-trust is
+ * truthy in argv. The CLI flag itself is handled inside parseArguments,
+ * but that runs *after* loadSettings, so without an early hint the
+ * workspace-trust gate inside the settings merge drops workspace settings
+ * (including hooks and extensions). Exported for testing.
+ *
+ * Uses yargs to pre-parse, so all the yargs-supported forms behave
+ * identically to the main parse: `--skip-trust`, `--skip-trust=true`,
+ * `--skip-trust=false`, `--no-skip-trust`, `--` positional boundary, and
+ * SEA/pkg argv layouts (via hideBin).
+ */
+export function applySkipTrustFromArgv(argv: string[]): void {
+  const result = yargs(hideBin(argv))
+    .help(false)
+    .version(false)
+    .option('skip-trust', { type: 'boolean', default: false })
+    .strict(false)
+    .exitProcess(false)
+    .parseSync();
+  if (result['skip-trust'] === true) {
+    process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+  }
+}
+
 export async function main() {
   let config: Config | undefined;
   const cliStartupHandle = startupProfiler.start('cli_startup');
@@ -372,6 +399,14 @@ export async function main() {
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
   registerCleanup(() => slashCommandConflictHandler.stop());
+
+  // Pre-detect --skip-trust before loadSettings. parseArguments would set
+  // this env var, but it runs *after* loadSettings — and the workspace-trust
+  // gate (which drops workspace settings, including hooks, on untrusted
+  // folders) happens during the merge inside loadSettings. Without this
+  // pre-detect, the documented --skip-trust flag silently fails to load
+  // workspace hooks/extensions.
+  applySkipTrustFromArgv(process.argv);
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
