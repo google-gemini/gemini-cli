@@ -233,6 +233,6 @@ export function getSecureSanitizationConfig(
     enableEnvironmentVariableRedaction:
       requestedConfig.enableEnvironmentVariableRedaction ??
       baseConfig?.enableEnvironmentVariableRedaction ??
-      false,
+      true,
   };
 }
