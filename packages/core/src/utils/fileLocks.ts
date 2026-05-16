@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+import { resolveToRealPath } from './paths.js';
 
 /**
  * Per-path mutex used to serialize read-modify-write sequences against the
@@ -57,9 +58,27 @@ export async function withFileLock<T>(
 
 /**
  * Normalises a filesystem path for use as a mutex key. Two paths that
- * resolve to the same file should produce the same key.
+ * resolve to the same file should produce the same key — including paths
+ * that differ only in casing on a case-insensitive filesystem or that
+ * traverse a symbolic link.
  */
 function normalizeKey(absolutePath: string): string {
   const resolved = path.resolve(absolutePath);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  let canonical: string;
+  try {
+    // resolveToRealPath follows symlinks (via robustRealpath) so two
+    // distinct paths that point at the same underlying file share a lock.
+    canonical = resolveToRealPath(resolved);
+  } catch {
+    // resolveToRealPath can throw for malformed paths (e.g. ENAMETOOLONG).
+    // Fall back to the lexical resolve so the lock is best-effort rather
+    // than crashing the caller.
+    canonical = resolved;
+  }
+  // macOS APFS and HFS+ are case-insensitive by default, and Windows is
+  // always case-insensitive, so lowercase on both. Linux is treated as
+  // case-sensitive (most Linux filesystems are).
+  return process.platform === 'win32' || process.platform === 'darwin'
+    ? canonical.toLowerCase()
+    : canonical;
 }

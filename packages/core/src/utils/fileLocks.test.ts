@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { withFileLock } from './fileLocks.js';
 
 describe('withFileLock', () => {
@@ -84,6 +87,69 @@ describe('withFileLock', () => {
     ]);
 
     expect(log).toEqual(['A:start', 'A:end', 'B:start', 'B:end']);
+  });
+
+  describe('symlink and case-sensitivity normalization', () => {
+    let tempDir: string;
+    afterEach(() => {
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('shares the lock between a real path and a symlink pointing to it', async () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-symlink-'));
+      const realPath = path.join(tempDir, 'target.txt');
+      const linkPath = path.join(tempDir, 'alias.txt');
+      fs.writeFileSync(realPath, 'hello');
+      fs.symlinkSync(realPath, linkPath);
+
+      const log: string[] = [];
+      const taskA = async () => {
+        log.push('A:start');
+        await delay(15);
+        log.push('A:end');
+      };
+      const taskB = async () => {
+        log.push('B:start');
+        log.push('B:end');
+      };
+
+      await Promise.all([
+        withFileLock(realPath, taskA),
+        withFileLock(linkPath, taskB),
+      ]);
+
+      // If the symlink had a separate lock, B would start before A ended.
+      expect(log).toEqual(['A:start', 'A:end', 'B:start', 'B:end']);
+    });
+
+    if (process.platform === 'darwin' || process.platform === 'win32') {
+      it('shares the lock between two case-different paths on a case-insensitive filesystem', async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-case-'));
+        const lowerPath = path.join(tempDir, 'mixed.txt');
+        const upperPath = path.join(tempDir, 'MIXED.TXT');
+        fs.writeFileSync(lowerPath, 'hello');
+
+        const log: string[] = [];
+        const taskA = async () => {
+          log.push('A:start');
+          await delay(15);
+          log.push('A:end');
+        };
+        const taskB = async () => {
+          log.push('B:start');
+          log.push('B:end');
+        };
+
+        await Promise.all([
+          withFileLock(lowerPath, taskA),
+          withFileLock(upperPath, taskB),
+        ]);
+
+        expect(log).toEqual(['A:start', 'A:end', 'B:start', 'B:end']);
+      });
+    }
   });
 });
 
