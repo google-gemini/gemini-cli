@@ -31,5 +31,15 @@ describe('CommandHandler', () => {
 
     const help = parse('/help');
     expect(help.commandToExecute?.name).toBe('help');
+
+    const compress = parse('/compress');
+    expect(compress.commandToExecute?.name).toBe('compress');
+
+    // /summarize and /compact are aliases for /compress.
+    const summarize = parse('/summarize');
+    expect(summarize.commandToExecute?.name).toBe('compress');
+
+    const compact = parse('/compact');
+    expect(compact.commandToExecute?.name).toBe('compress');
   });
 });
