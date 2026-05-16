@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
-    "@lydell/node-pty": "1.1.0",
+    "@lydell/node-pty": "1.2.0-beta.12",
     "asciichart": "^1.5.25",
     "strip-ansi": "^7.1.2",
     "vitest": "^3.2.4"
