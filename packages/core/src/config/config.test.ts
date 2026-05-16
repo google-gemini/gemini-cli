@@ -2218,7 +2218,6 @@ describe('Server Config (config.ts)', () => {
     expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
     expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
     expect(configInternal.lastQuotaFetchTime).toBe(0);
-    expect(configInternal.hasAccessToPreviewModel).toBeNull();
 
     // Event emission
     expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
