@@ -142,15 +142,35 @@ function isValidContent(content: Content): boolean {
   if (content.parts === undefined || content.parts.length === 0) {
     return false;
   }
+
+  // A content turn is valid if it contains at least one meaningful part.
+  // Empty text parts (e.g. { text: "" }) are ignored but do not invalidate the entire turn
+  // if other valid parts (like functionCall) are present.
+  let hasValidData = false;
+
   for (const part of content.parts) {
+    // Skip empty part objects rather than invalidating the entire turn.
+    // A single empty {} among otherwise valid parts should not cause the
+    // whole model turn to be dropped, which would create orphaned function responses.
     if (part === undefined || Object.keys(part).length === 0) {
-      return false;
+      continue;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
-      return false;
+
+    if (
+      (part.text !== undefined && part.text !== '') ||
+      part.functionCall ||
+      part.functionResponse ||
+      part.thought ||
+      part.inlineData ||
+      part.fileData ||
+      part.executableCode ||
+      part.codeExecutionResult
+    ) {
+      hasValidData = true;
     }
   }
-  return true;
+
+  return hasValidData;
 }
 
 /**
