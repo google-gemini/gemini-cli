@@ -12,6 +12,8 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
 } from '../config/models.js';
 
 describe('tokenLimit', () => {
@@ -24,6 +26,18 @@ describe('tokenLimit', () => {
   it('should return the correct token limit for preview models', () => {
     expect(tokenLimit(PREVIEW_GEMINI_MODEL)).toBe(1_048_576);
     expect(tokenLimit(PREVIEW_GEMINI_FLASH_MODEL)).toBe(1_048_576);
+  });
+
+  it('should return the correct token limit for Gemma 4 IT models', () => {
+    expect(tokenLimit(GEMMA_4_31B_IT_MODEL)).toBe(256_000);
+    expect(tokenLimit(GEMMA_4_26B_A4B_IT_MODEL)).toBe(256_000);
+  });
+
+  it('should return the correct token limit for local Gemma 4 family models', () => {
+    expect(tokenLimit('gemma4:26b')).toBe(262_144);
+    expect(tokenLimit('gemma4:31b')).toBe(262_144);
+    expect(tokenLimit('gemma4:e4b')).toBe(131_072);
+    expect(tokenLimit('gemma4:e2b')).toBe(131_072);
   });
 
   it('should return the default token limit for an unknown model', () => {

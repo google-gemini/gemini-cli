@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType, loadApiKey } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  isLocalBackendAuthType,
+  getLocalBackendName,
+  LocalModelService,
+  loadApiKey,
+  type LocalBackendAuthType,
+} from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export async function validateAuthMethod(
@@ -15,6 +22,24 @@ export async function validateAuthMethod(
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
   ) {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const typedAuth = authMethod as unknown as AuthType;
+  if (isLocalBackendAuthType(typedAuth)) {
+    const service = new LocalModelService();
+    const reachable = await service.pingBackend(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      authMethod as unknown as LocalBackendAuthType,
+    );
+    if (!reachable) {
+      const backendName = getLocalBackendName(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        authMethod as unknown as LocalBackendAuthType,
+      );
+      return `Local ${backendName} is not reachable. Make sure the server is running and try again.`;
+    }
     return null;
   }
 

@@ -27,7 +27,13 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import {
+  resolveModel,
+  supportsModernFeatures,
+  isGemma4FamilyModel,
+} from '../config/models.js';
+import { ToolFilter, type ToolFilterConfig } from '../services/toolFilter.js';
+import { isLocalBackendAuthType } from './contentGenerator.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
@@ -267,6 +273,7 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
+  private toolFilter?: ToolFilter;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -396,6 +403,9 @@ export class GeminiChat {
     }
 
     this.agentHistory.push(userContent);
+    if (this.isActiveModelLocalGemma4()) {
+      this.stripThoughtBlocksFromHistory();
+    }
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -641,13 +651,19 @@ export class GeminiChat {
         currentGenerateContentConfig = newConfig;
       }
 
+      let effectiveSystemInstruction = this.systemInstruction;
+      if (this.isActiveModelLocalGemma4()) {
+        effectiveSystemInstruction = `<|think|>\n\n${effectiveSystemInstruction}`;
+      }
+
       lastModelToUse = modelToUse;
+      const filteredTools = await this.getFilteredTools(requestContents);
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
-        systemInstruction: this.systemInstruction,
-        tools: this.tools,
+        systemInstruction: effectiveSystemInstruction,
+        tools: filteredTools,
         abortSignal,
       };
 
@@ -879,6 +895,92 @@ export class GeminiChat {
       }
       return newContent;
     });
+  }
+
+  stripThoughtBlocksFromHistory(): void {
+    const thoughtBlockRegex = /<\|channel\|>thought\b[\s\S]*?<\|channel\|>/gi;
+    this.agentHistory.map((content) => {
+      const newContent = { ...content };
+      if (newContent.parts) {
+        newContent.parts = newContent.parts.map((part) => {
+          if (
+            part &&
+            typeof part === 'object' &&
+            'text' in part &&
+            typeof part.text === 'string'
+          ) {
+            const newPart = { ...part };
+            newPart.text = part.text.replace(thoughtBlockRegex, '');
+            return newPart;
+          }
+          return part;
+        });
+      }
+      return newContent;
+    });
+  }
+
+  isActiveModelLocalGemma4(): boolean {
+    const authType = this.context.config.getContentGeneratorConfig()?.authType;
+    if (!isLocalBackendAuthType(authType)) return false;
+    const activeModel = this.context.config.getModel();
+    return isGemma4FamilyModel(activeModel);
+  }
+
+  private async getFilteredTools(
+    requestContents: readonly Content[],
+  ): Promise<Tool[]> {
+    if (!this.isActiveModelLocalGemma4() || this.tools.length === 0) {
+      return this.tools;
+    }
+    const declarations = this.tools[0]?.functionDeclarations;
+    if (!declarations || declarations.length === 0) return this.tools;
+
+    const filterCfg = this.getToolFilterConfig();
+    if (!filterCfg?.enabled) return this.tools;
+
+    if (!this.toolFilter) {
+      const baseUrl =
+        this.context.config.getContentGeneratorConfig?.()?.baseUrl || '';
+      this.toolFilter = new ToolFilter(filterCfg, baseUrl);
+    }
+
+    try {
+      const messages = requestContents
+        .slice(-(filterCfg.maxContextMessages || 3))
+        .map((c) => ({
+          role: c.role || 'user',
+          content:
+            c.parts
+              ?.filter(
+                (p): p is Part & { text: string } =>
+                  typeof p === 'object' && p !== null && 'text' in p,
+              )
+              .map((p) => p.text)
+              .join(' ') || '',
+        }));
+      const filtered = await this.toolFilter.filterTools(
+        declarations,
+        messages,
+        '',
+      );
+      return [{ functionDeclarations: filtered }];
+    } catch {
+      return this.tools;
+    }
+  }
+
+  private getToolFilterConfig(): ToolFilterConfig | undefined {
+    const cfg = this.context.config.getToolFilteringConfig();
+    if (!cfg) return undefined;
+    return {
+      enabled: cfg.enabled ?? false,
+      model: cfg.model ?? 'functiongemma:270m',
+      maxContextMessages: cfg.maxContextMessages ?? 3,
+      fallbackBehavior: cfg.fallbackBehavior ?? 'all-tools',
+      cacheResults: cfg.cacheResults ?? true,
+      cacheTtl: cfg.cacheTtl ?? 30000,
+    };
   }
 
   // To ensure our requests validate, the first function call in every model

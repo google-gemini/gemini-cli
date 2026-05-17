@@ -65,6 +65,21 @@ export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
+export const GEMMA_MODEL_ALIAS_4 = 'gemma4';
+export const GEMMA_MODEL_ALIAS_4_26B = 'gemma4-26b';
+export const GEMMA_MODEL_ALIAS_4_31B = 'gemma4-31b';
+export const GEMMA_MODEL_ALIAS_4_31B_CLOUD = 'gemma4-31b-cloud';
+export const GEMMA_MODEL_ALIAS_4_E4B = 'gemma4-e4b';
+export const GEMMA_MODEL_ALIAS_4_E2B = 'gemma4-e2b';
+
+export const LOCAL_GEMMA_4_ALIASES = new Set([
+  GEMMA_MODEL_ALIAS_4,
+  GEMMA_MODEL_ALIAS_4_26B,
+  GEMMA_MODEL_ALIAS_4_31B,
+  GEMMA_MODEL_ALIAS_4_31B_CLOUD,
+  GEMMA_MODEL_ALIAS_4_E4B,
+  GEMMA_MODEL_ALIAS_4_E2B,
+]);
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -95,6 +110,26 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
+
+export function isLocalGemma4Alias(model: string): boolean {
+  return LOCAL_GEMMA_4_ALIASES.has(model.trim());
+}
+
+export function isGemma4FamilyModel(model: string): boolean {
+  const normalizedModel = model.trim().toLowerCase();
+  if (!normalizedModel) {
+    return false;
+  }
+
+  const isGemma4Contiguous =
+    normalizedModel.includes('gemma4') || normalizedModel.includes('gemma-4');
+  return (
+    isLocalGemma4Alias(normalizedModel) ||
+    (isGemma4Contiguous &&
+      !normalizedModel.includes('embed') &&
+      !normalizedModel.includes('functiongemma'))
+  );
+}
 
 export function getAutoModelDescription(
   releaseChannel: string = 'stable',
@@ -314,6 +349,18 @@ export function getDisplayString(
       return GEMMA_4_31B_IT_MODEL;
     case GEMMA_4_26B_A4B_IT_MODEL:
       return GEMMA_4_26B_A4B_IT_MODEL;
+    case GEMMA_MODEL_ALIAS_4:
+      return 'Auto (Gemma 4 Local)';
+    case GEMMA_MODEL_ALIAS_4_26B:
+      return 'Gemma 4 26B (Local)';
+    case GEMMA_MODEL_ALIAS_4_31B:
+      return 'Gemma 4 31B (Local)';
+    case GEMMA_MODEL_ALIAS_4_31B_CLOUD:
+      return 'Gemma 4 31B Cloud (Local Backend)';
+    case GEMMA_MODEL_ALIAS_4_E4B:
+      return 'Gemma 4 E4B (Local)';
+    case GEMMA_MODEL_ALIAS_4_E2B:
+      return 'Gemma 4 E2B (Local)';
     case GEMINI_MODEL_ALIAS_PRO:
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:

@@ -3,19 +3,22 @@
 exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ ? Get started                                                                                    │
+│ ?Get started                                                                                     │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│  How would you like to connect Gemini CLI for this project?                                      │
 │                                                                                                  │
-│   (selected) Sign in with Google(not selected) Use Gemini API Key(not selected) Vertex AI        │
+│  (selected)  (not selected)(not      (not        (not selecte(not selected(not      (not         │
+│  Sign in withUse Gemini APIselected) selected)   Local LM    Local        selected) selected)    │
+│  Google      Key           Vertex AI Local OllamaStudio      Llama.cpp    Local vLLMLocal SGLang │
 │                                                                                                  │
-│   Something went wrong                                                                           │
 │                                                                                                  │
-│   (Use Enter to select)                                                                          │
+│  Something went wrong                                                                            │
 │                                                                                                  │
-│   Terms of Services and Privacy Notice for Gemini CLI                                            │
+│  (Use Enter to select)                                                                           │
 │                                                                                                  │
-│   https://geminicli.com/docs/resources/tos-privacy/                                              │
+│  Terms of Services and Privacy Notice for Gemini CLI                                             │
+│                                                                                                  │
+│  https://geminicli.com/docs/resources/tos-privacy/                                               │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -24,17 +27,20 @@ exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
 exports[`AuthDialog > Snapshots > renders correctly with default props 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ ? Get started                                                                                    │
+│ ?Get started                                                                                     │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│  How would you like to connect Gemini CLI for this project?                                      │
 │                                                                                                  │
-│   (selected) Sign in with Google(not selected) Use Gemini API Key(not selected) Vertex AI        │
+│  (selected)  (not selected)(not      (not        (not selecte(not selected(not      (not         │
+│  Sign in withUse Gemini APIselected) selected)   Local LM    Local        selected) selected)    │
+│  Google      Key           Vertex AI Local OllamaStudio      Llama.cpp    Local vLLMLocal SGLang │
 │                                                                                                  │
-│   (Use Enter to select)                                                                          │
 │                                                                                                  │
-│   Terms of Services and Privacy Notice for Gemini CLI                                            │
+│  (Use Enter to select)                                                                           │
 │                                                                                                  │
-│   https://geminicli.com/docs/resources/tos-privacy/                                              │
+│  Terms of Services and Privacy Notice for Gemini CLI                                             │
+│                                                                                                  │
+│  https://geminicli.com/docs/resources/tos-privacy/                                               │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -45,7 +51,7 @@ exports[`AuthDialog > Snapshots > renders correctly with enforced auth type 1`] 
 │                                                                                                  │
 │ ? Get started                                                                                    │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│   How would you like to connect Gemini CLI for this project?                                     │
 │                                                                                                  │
 │   (selected) Use Gemini API Key                                                                  │
 │                                                                                                  │

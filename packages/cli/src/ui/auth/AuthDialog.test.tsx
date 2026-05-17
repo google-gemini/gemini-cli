@@ -16,7 +16,11 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  type Config,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
@@ -175,6 +179,22 @@ describe('AuthDialog', () => {
     unmount();
   });
 
+  it('includes local backend auth options', async () => {
+    const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+
+    expect(items.map((item: { value: string }) => item.value)).toEqual(
+      expect.arrayContaining([
+        AuthType.USE_LOCAL_OLLAMA,
+        AuthType.USE_LOCAL_LM_STUDIO,
+        AuthType.USE_LOCAL_LLAMA_CPP,
+        AuthType.USE_LOCAL_VLLM,
+        AuthType.USE_LOCAL_SGLANG,
+      ]),
+    );
+    unmount();
+  });
+
   describe('Initial Auth Type Selection', () => {
     it.each([
       {
@@ -198,6 +218,13 @@ describe('AuthDialog', () => {
         },
         expected: AuthType.USE_GEMINI,
         desc: 'from GEMINI_API_KEY env var',
+      },
+      {
+        setup: () => {
+          vi.stubEnv('GEMINI_LOCAL_BACKEND', 'ollama');
+        },
+        expected: AuthType.USE_LOCAL_OLLAMA,
+        desc: 'from GEMINI_LOCAL_BACKEND env var',
       },
       {
         setup: () => {},

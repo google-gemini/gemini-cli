@@ -15,10 +15,7 @@ import type {
 import { resolveClassifierModel } from '../../config/models.js';
 import { createUserContent, type Content, type Part } from '@google/genai';
 import type { Config } from '../../config/config.js';
-import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../../utils/messageInspectors.js';
+
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
@@ -186,14 +183,8 @@ ${formattedHistory}
     try {
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 
-      // Filter out tool-related turns.
-      // TODO - Consider using function req/res if they help accuracy.
-      const cleanHistory = historySlice.filter(
-        (content) => !isFunctionCall(content) && !isFunctionResponse(content),
-      );
-
-      // Take the last N turns from the *cleaned* history.
-      const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+      // Take the last N turns from the history.
+      const finalHistory = historySlice.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       const history = [...finalHistory, createUserContent(context.request)];
       const singleMessageHistory = this.flattenChatHistory(history);

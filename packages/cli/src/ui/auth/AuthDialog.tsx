@@ -75,6 +75,31 @@ export function AuthDialog({
       value: AuthType.USE_VERTEX_AI,
       key: AuthType.USE_VERTEX_AI,
     },
+    {
+      label: 'Local Ollama',
+      value: AuthType.USE_LOCAL_OLLAMA,
+      key: AuthType.USE_LOCAL_OLLAMA,
+    },
+    {
+      label: 'Local LM Studio (draft)',
+      value: AuthType.USE_LOCAL_LM_STUDIO,
+      key: AuthType.USE_LOCAL_LM_STUDIO,
+    },
+    {
+      label: 'Local Llama.cpp (draft)',
+      value: AuthType.USE_LOCAL_LLAMA_CPP,
+      key: AuthType.USE_LOCAL_LLAMA_CPP,
+    },
+    {
+      label: 'Local vLLM (draft)',
+      value: AuthType.USE_LOCAL_VLLM,
+      key: AuthType.USE_LOCAL_VLLM,
+    },
+    {
+      label: 'Local SGLang (draft)',
+      value: AuthType.USE_LOCAL_SGLANG,
+      key: AuthType.USE_LOCAL_SGLANG,
+    },
   ];
 
   if (settings.merged.security.auth.enforcedType) {
@@ -105,6 +130,11 @@ export function AuthDialog({
 
     if (process.env['GEMINI_API_KEY']) {
       return item.value === AuthType.USE_GEMINI;
+    }
+
+    if (process.env['GEMINI_LOCAL_BACKEND']) {
+      const expectedType = `local-${process.env['GEMINI_LOCAL_BACKEND']}`;
+      return item.value === expectedType;
     }
 
     return item.value === AuthType.LOGIN_WITH_GOOGLE;
@@ -224,7 +254,7 @@ export function AuthDialog({
         </Text>
         <Box marginTop={1}>
           <Text color={theme.text.primary}>
-            How would you like to authenticate for this project?
+            How would you like to connect Gemini CLI for this project?
           </Text>
         </Box>
         <Box marginTop={1}>

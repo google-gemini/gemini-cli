@@ -12,7 +12,9 @@ import {
   PREVIEW_GEMINI_MODEL,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  isGemma4FamilyModel,
 } from '../config/models.js';
+import { resolveGemma4Defaults } from '../services/localModelMetadata.js';
 
 type Model = string;
 type TokenCount = number;
@@ -34,6 +36,17 @@ export function tokenLimit(model: Model): TokenCount {
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
       return 1_048_576;
     default:
-      return DEFAULT_TOKEN_LIMIT;
+      break;
   }
+
+  if (
+    typeof model === 'string' &&
+    model.length > 0 &&
+    isGemma4FamilyModel(model)
+  ) {
+    const defaults = resolveGemma4Defaults(model);
+    return defaults.contextLength || GEMMA_4_TOKEN_LIMIT;
+  }
+
+  return DEFAULT_TOKEN_LIMIT;
 }

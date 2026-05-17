@@ -165,11 +165,13 @@ vi.mock('./extension-manager.js', () => {
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
 const originalGeminiModel = process.env['GEMINI_MODEL'];
+const originalGeminiLocalBackend = process.env['GEMINI_LOCAL_BACKEND'];
 const originalStdoutIsTTY = process.stdout.isTTY;
 const originalStdinIsTTY = process.stdin.isTTY;
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
+  delete process.env['GEMINI_LOCAL_BACKEND'];
   // Restore ExtensionManager mocks by re-assigning them
   ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
   ExtensionManager.prototype.loadExtensions = vi
@@ -195,6 +197,11 @@ afterEach(() => {
     process.env['GEMINI_MODEL'] = originalGeminiModel;
   } else {
     delete process.env['GEMINI_MODEL'];
+  }
+  if (originalGeminiLocalBackend !== undefined) {
+    process.env['GEMINI_LOCAL_BACKEND'] = originalGeminiLocalBackend;
+  } else {
+    delete process.env['GEMINI_LOCAL_BACKEND'];
   }
   Object.defineProperty(process.stdout, 'isTTY', {
     value: originalStdoutIsTTY,
@@ -246,6 +253,15 @@ describe('parseArguments', () => {
 
     const parsedArgs = await parseArguments(createTestMergedSettings());
     expect(parsedArgs.sessionId).toBe('test-uuid-1234');
+  });
+
+  it('should parse --local-backend and export GEMINI_LOCAL_BACKEND for the session', async () => {
+    process.argv = ['node', 'script.js', '--local-backend', 'ollama'];
+
+    const parsedArgs = await parseArguments(createTestMergedSettings());
+
+    expect(parsedArgs.localBackend).toBe('ollama');
+    expect(process.env['GEMINI_LOCAL_BACKEND']).toBe('ollama');
   });
 
   describe('worktree', () => {

@@ -28,7 +28,9 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
-import { getVersion, resolveModel } from '../../index.js';
+import { GeminiToOpenAiContentGenerator } from './geminiToOpenAiContentGenerator.js';
+import { getVersion } from '../utils/version.js';
+import { resolveModel } from '../config/models.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
 /**
@@ -65,6 +67,130 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  USE_LOCAL_OLLAMA = 'local-ollama',
+  USE_LOCAL_LM_STUDIO = 'local-lm-studio',
+  USE_LOCAL_LLAMA_CPP = 'local-llama-cpp',
+  USE_LOCAL_VLLM = 'local-vllm',
+  USE_LOCAL_SGLANG = 'local-sglang',
+}
+
+export type LocalBackendAuthType =
+  | AuthType.USE_LOCAL_OLLAMA
+  | AuthType.USE_LOCAL_LM_STUDIO
+  | AuthType.USE_LOCAL_LLAMA_CPP
+  | AuthType.USE_LOCAL_VLLM
+  | AuthType.USE_LOCAL_SGLANG;
+
+export type LocalBackendName =
+  | 'ollama'
+  | 'lm-studio'
+  | 'llama-cpp'
+  | 'vllm'
+  | 'sglang';
+
+const LOCAL_BACKEND_AUTH_TYPE_MAP: Record<
+  LocalBackendName,
+  LocalBackendAuthType
+> = {
+  ollama: AuthType.USE_LOCAL_OLLAMA,
+  'lm-studio': AuthType.USE_LOCAL_LM_STUDIO,
+  'llama-cpp': AuthType.USE_LOCAL_LLAMA_CPP,
+  vllm: AuthType.USE_LOCAL_VLLM,
+  sglang: AuthType.USE_LOCAL_SGLANG,
+};
+
+const LOCAL_BACKEND_DEFAULT_BASE_URLS: Record<LocalBackendAuthType, string> = {
+  [AuthType.USE_LOCAL_OLLAMA]: 'http://localhost:11434/v1',
+  [AuthType.USE_LOCAL_LM_STUDIO]: 'http://localhost:1234/v1',
+  [AuthType.USE_LOCAL_LLAMA_CPP]: 'http://localhost:8080/v1',
+  [AuthType.USE_LOCAL_VLLM]: 'http://localhost:8000/v1',
+  [AuthType.USE_LOCAL_SGLANG]: 'http://localhost:30000/v1',
+};
+
+const LOCAL_BACKEND_BASE_URL_ENV_VARS: Partial<
+  Record<LocalBackendAuthType, string>
+> = {
+  [AuthType.USE_LOCAL_OLLAMA]: 'OLLAMA_HOST',
+  [AuthType.USE_LOCAL_LM_STUDIO]: 'LM_STUDIO_API_BASE',
+  [AuthType.USE_LOCAL_LLAMA_CPP]: 'LLAMA_CPP_SERVER_BASE',
+  [AuthType.USE_LOCAL_VLLM]: 'VLLM_API_BASE',
+  [AuthType.USE_LOCAL_SGLANG]: 'SGLANG_API_BASE',
+};
+
+export function getLocalBackendBaseUrlEnvVar(
+  authType: LocalBackendAuthType,
+): string | undefined {
+  return LOCAL_BACKEND_BASE_URL_ENV_VARS[authType];
+}
+
+export function isLocalBackendAuthType(
+  authType: AuthType | undefined,
+): authType is LocalBackendAuthType {
+  return (
+    authType === AuthType.USE_LOCAL_OLLAMA ||
+    authType === AuthType.USE_LOCAL_LM_STUDIO ||
+    authType === AuthType.USE_LOCAL_LLAMA_CPP ||
+    authType === AuthType.USE_LOCAL_VLLM ||
+    authType === AuthType.USE_LOCAL_SGLANG
+  );
+}
+
+export function getLocalBackendAuthType(
+  backend: string | undefined,
+): LocalBackendAuthType | undefined {
+  if (!backend) {
+    return undefined;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const normalizedBackend = backend.trim().toLowerCase() as LocalBackendName;
+  return LOCAL_BACKEND_AUTH_TYPE_MAP[normalizedBackend];
+}
+
+export function getLocalBackendName(
+  authType: LocalBackendAuthType,
+): LocalBackendName {
+  // eslint-disable-next-line default-case
+  switch (authType) {
+    case AuthType.USE_LOCAL_OLLAMA:
+      return 'ollama';
+    case AuthType.USE_LOCAL_LM_STUDIO:
+      return 'lm-studio';
+    case AuthType.USE_LOCAL_LLAMA_CPP:
+      return 'llama-cpp';
+    case AuthType.USE_LOCAL_VLLM:
+      return 'vllm';
+    case AuthType.USE_LOCAL_SGLANG:
+      return 'sglang';
+  }
+}
+
+export function resolveLocalBackendBaseUrl(
+  authType: LocalBackendAuthType,
+  explicitBaseUrl?: string,
+  configuredDefaultBaseUrl?: string,
+): string {
+  const envVarName = LOCAL_BACKEND_BASE_URL_ENV_VARS[authType];
+  const rawValue =
+    explicitBaseUrl ||
+    (envVarName ? process.env[envVarName] : undefined) ||
+    configuredDefaultBaseUrl ||
+    LOCAL_BACKEND_DEFAULT_BASE_URLS[authType];
+
+  validateBaseUrl(rawValue);
+  return normalizeLocalBackendBaseUrl(rawValue);
+}
+
+function normalizeLocalBackendBaseUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  const normalizedPath = url.pathname.replace(/\/+$/, '');
+  url.pathname =
+    normalizedPath === '' || normalizedPath === '/'
+      ? '/v1'
+      : normalizedPath.endsWith('/v1')
+        ? normalizedPath
+        : `${normalizedPath}/v1`;
+  return url.toString().replace(/\/$/, '');
 }
 
 /**
@@ -76,6 +202,12 @@ export enum AuthType {
  * 3. GEMINI_API_KEY -> USE_GEMINI
  */
 export function getAuthTypeFromEnv(): AuthType | undefined {
+  const explicitLocalBackend = getLocalBackendAuthType(
+    process.env['GEMINI_LOCAL_BACKEND'],
+  );
+  if (explicitLocalBackend) {
+    return explicitLocalBackend;
+  }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
@@ -93,6 +225,21 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
     process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
   ) {
     return AuthType.COMPUTE_ADC;
+  }
+  if (process.env['OLLAMA_HOST']) {
+    return AuthType.USE_LOCAL_OLLAMA;
+  }
+  if (process.env['LM_STUDIO_API_BASE']) {
+    return AuthType.USE_LOCAL_LM_STUDIO;
+  }
+  if (process.env['LLAMA_CPP_SERVER_BASE']) {
+    return AuthType.USE_LOCAL_LLAMA_CPP;
+  }
+  if (process.env['VLLM_API_BASE']) {
+    return AuthType.USE_LOCAL_VLLM;
+  }
+  if (process.env['SGLANG_API_BASE']) {
+    return AuthType.USE_LOCAL_SGLANG;
   }
   return undefined;
 }
@@ -187,6 +334,15 @@ export async function createContentGeneratorConfig(
       apiKey || process.env['GEMINI_API_KEY'] || '';
     contentGeneratorConfig.vertexai = false;
 
+    return contentGeneratorConfig;
+  }
+
+  if (isLocalBackendAuthType(authType)) {
+    contentGeneratorConfig.vertexai = false;
+    contentGeneratorConfig.baseUrl = resolveLocalBackendBaseUrl(
+      authType,
+      baseUrl,
+    );
     return contentGeneratorConfig;
   }
 
@@ -371,6 +527,41 @@ export async function createContentGenerator(
         }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+    }
+
+    if (isLocalBackendAuthType(config.authType)) {
+      let headers: Record<string, string> = { ...baseHeaders };
+      if (config.customHeaders) {
+        headers = { ...headers, ...config.customHeaders };
+      }
+      if (!config.baseUrl) {
+        throw new Error(
+          `Error creating contentGenerator: Missing baseUrl for local backend ${config.authType}`,
+        );
+      }
+      validateBaseUrl(config.baseUrl);
+
+      if (
+        config.authType === AuthType.USE_LOCAL_VLLM ||
+        config.authType === AuthType.USE_LOCAL_SGLANG
+      ) {
+        const googleGenAI = new GoogleGenAI({
+          apiKey: undefined,
+          vertexai: false,
+          httpOptions: {
+            baseUrl: config.baseUrl,
+            headers,
+          },
+        });
+        return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      }
+
+      const adapter = new GeminiToOpenAiContentGenerator(
+        config.baseUrl,
+        config.apiKey,
+        { ...headers },
+      );
+      return new LoggingContentGenerator(adapter, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

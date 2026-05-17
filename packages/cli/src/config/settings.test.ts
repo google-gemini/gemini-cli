@@ -3458,6 +3458,60 @@ MALICIOUS_VAR=allowed-because-trusted
           'attacker-projectinject',
         );
       });
+
+      it('should export local backend settings into the process environment', () => {
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+        delete process.env['GEMINI_LOCAL_BACKEND'];
+        delete process.env['OLLAMA_HOST'];
+
+        loadEnvironment(
+          createMockSettings({
+            localModel: {
+              backend: 'ollama',
+              baseUrl: 'http://127.0.0.1:11434',
+            },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GEMINI_LOCAL_BACKEND']).toBe('ollama');
+        expect(process.env['OLLAMA_HOST']).toBe('http://127.0.0.1:11434');
+      });
+
+      it('should export provider-specific local backend defaults', () => {
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+        delete process.env['OLLAMA_HOST'];
+        delete process.env['LM_STUDIO_API_BASE'];
+
+        loadEnvironment(
+          createMockSettings({
+            localModel: {
+              providers: {
+                ollama: {
+                  baseUrl: 'http://ollama.internal:21434',
+                },
+                'lm-studio': {
+                  baseUrl: 'http://lmstudio.internal:2234',
+                },
+              },
+            },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['OLLAMA_HOST']).toBe('http://ollama.internal:21434');
+        expect(process.env['LM_STUDIO_API_BASE']).toBe(
+          'http://lmstudio.internal:2234',
+        );
+      });
     });
   });
 });

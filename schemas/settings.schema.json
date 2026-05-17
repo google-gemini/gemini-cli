@@ -713,6 +713,204 @@
       },
       "additionalProperties": false
     },
+    "localModel": {
+      "title": "Local Model",
+      "description": "Settings for local OpenAI-compatible model backends.",
+      "markdownDescription": "Settings for local OpenAI-compatible model backends.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "backend": {
+          "title": "Local Backend",
+          "description": "Local inference backend to use for Gemma 4 aliases.",
+          "markdownDescription": "Local inference backend to use for Gemma 4 aliases.\n\n- Category: `Model`\n- Requires restart: `yes`",
+          "type": "string",
+          "enum": ["ollama", "lm-studio", "llama-cpp", "vllm", "sglang"]
+        },
+        "baseUrl": {
+          "title": "Local Backend Base URL",
+          "description": "Override the local backend API base URL.",
+          "markdownDescription": "Override the local backend API base URL.\n\n- Category: `Model`\n- Requires restart: `yes`",
+          "type": "string"
+        },
+        "providers": {
+          "title": "Local Backend Providers",
+          "description": "Optional per-provider defaults for local backend API endpoints.",
+          "markdownDescription": "Optional per-provider defaults for local backend API endpoints.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "ollama": {
+              "title": "Ollama",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "baseUrl": {
+                  "title": "Ollama Base URL",
+                  "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "lm-studio": {
+              "title": "LM Studio",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "baseUrl": {
+                  "title": "LM Studio Base URL",
+                  "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "llama-cpp": {
+              "title": "Llama.cpp",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "baseUrl": {
+                  "title": "Llama.cpp Base URL",
+                  "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "vllm": {
+              "title": "vLLM",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "baseUrl": {
+                  "title": "vLLM Base URL",
+                  "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "sglang": {
+              "title": "SGLang",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "baseUrl": {
+                  "title": "SGLang Base URL",
+                  "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "discoveryTimeoutMs": {
+          "title": "Discovery Timeout (ms)",
+          "description": "Timeout in milliseconds for probing each local backend during startup discovery.",
+          "markdownDescription": "Timeout in milliseconds for probing each local backend during startup discovery.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `1500`",
+          "default": 1500,
+          "type": "number"
+        },
+        "modelMapping": {
+          "title": "Local Model Mapping",
+          "description": "Optional alias-to-model mappings for discovered local Gemma 4 models.",
+          "markdownDescription": "Optional alias-to-model mappings for discovered local Gemma 4 models.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "gemma4": {
+              "title": "gemma4",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "gemma4-26b": {
+              "title": "gemma4-26b",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "gemma4-31b": {
+              "title": "gemma4-31b",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "gemma4-31b-cloud": {
+              "title": "gemma4-31b-cloud",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "gemma4-e4b": {
+              "title": "gemma4-e4b",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "gemma4-e2b": {
+              "title": "gemma4-e2b",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "toolFiltering": {
+          "title": "Tool Filtering",
+          "description": "Optional FunctionGemma-based tool relevance filtering. Ollama-only.",
+          "markdownDescription": "Optional FunctionGemma-based tool relevance filtering. Ollama-only.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Tool Filtering",
+              "description": "When enabled, FunctionGemma pre-filters tools to reduce context usage.",
+              "markdownDescription": "When enabled, FunctionGemma pre-filters tools to reduce context usage.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "model": {
+              "title": "Filtering Model",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `functiongemma:270m`",
+              "default": "functiongemma:270m",
+              "type": "string"
+            },
+            "maxContextMessages": {
+              "title": "Max Context Messages",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `3`",
+              "default": 3,
+              "type": "number"
+            },
+            "fallbackBehavior": {
+              "title": "Fallback Behavior",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `all-tools`",
+              "default": "all-tools",
+              "type": "string",
+              "enum": ["all-tools", "no-tools", "core-only"]
+            },
+            "cacheResults": {
+              "title": "Cache Results",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "cacheTtl": {
+              "title": "Cache TTL (ms)",
+              "markdownDescription": "Description not provided.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "modelConfigs": {
       "title": "Model Configs",
       "description": "Model configurations.",
@@ -818,6 +1016,42 @@
             "extends": "chat-base-3",
             "modelConfig": {
               "model": "gemma-4-26b-a4b-it"
+            }
+          },
+          "gemma4": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4"
+            }
+          },
+          "gemma4-26b": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4-26b"
+            }
+          },
+          "gemma4-31b": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4-31b"
+            }
+          },
+          "gemma4-31b-cloud": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4-31b-cloud"
+            }
+          },
+          "gemma4-e4b": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4-e4b"
+            }
+          },
+          "gemma4-e2b": {
+            "extends": "chat-base-3",
+            "modelConfig": {
+              "model": "gemma4-e2b"
             }
           },
           "gemini-2.5-flash-base": {
@@ -1115,6 +1349,72 @@
               "multimodalToolUse": false
             }
           },
+          "gemma4": {
+            "displayName": "Gemma 4",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma4-26b": {
+            "displayName": "Gemma 4 26B",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": false,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma4-31b": {
+            "displayName": "Gemma 4 31B",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma4-31b-cloud": {
+            "displayName": "Gemma 4 31B (Cloud)",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma4-e4b": {
+            "displayName": "Gemma 4 E4B",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "gemma4-e2b": {
+            "displayName": "Gemma 4 E2B",
+            "tier": "custom",
+            "family": "gemma-4",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
           "auto": {
             "displayName": "Auto",
             "tier": "auto",
@@ -1170,6 +1470,24 @@
             "default": "gemma-4-31b-it"
           },
           "gemma-4-26b-a4b-it": {
+            "default": "gemma-4-26b-a4b-it"
+          },
+          "gemma4": {
+            "default": "gemma-4-26b-a4b-it"
+          },
+          "gemma4-26b": {
+            "default": "gemma-4-26b-a4b-it"
+          },
+          "gemma4-31b": {
+            "default": "gemma-4-31b-it"
+          },
+          "gemma4-31b-cloud": {
+            "default": "gemma-4-31b-it"
+          },
+          "gemma4-e4b": {
+            "default": "gemma-4-26b-a4b-it"
+          },
+          "gemma4-e2b": {
             "default": "gemma-4-26b-a4b-it"
           },
           "gemini-3.1-pro-preview": {
@@ -1703,6 +2021,42 @@
                 "model": "gemma-4-26b-a4b-it"
               }
             },
+            "gemma4": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4"
+              }
+            },
+            "gemma4-26b": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4-26b"
+              }
+            },
+            "gemma4-31b": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4-31b"
+              }
+            },
+            "gemma4-31b-cloud": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4-31b-cloud"
+              }
+            },
+            "gemma4-e4b": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4-e4b"
+              }
+            },
+            "gemma4-e2b": {
+              "extends": "chat-base-3",
+              "modelConfig": {
+                "model": "gemma4-e2b"
+              }
+            },
             "gemini-2.5-flash-base": {
               "extends": "base",
               "modelConfig": {
@@ -1912,7 +2266,7 @@
         "modelDefinitions": {
           "title": "Model Definitions",
           "description": "Registry of model metadata, including tier, family, and features.",
-          "markdownDescription": "Registry of model metadata, including tier, family, and features.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-flash-lite-preview\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-31b-it\": {\n    \"displayName\": \"gemma-4-31b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"displayName\": \"gemma-4-26b-a4b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto\": {\n    \"displayName\": \"Auto\",\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"pro\": {\n    \"tier\": \"pro\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash\": {\n    \"tier\": \"flash\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-3\": {\n    \"tier\": \"auto\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false\n  },\n  \"auto-gemini-2.5\": {\n    \"tier\": \"auto\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": false\n  }\n}`",
+          "markdownDescription": "Registry of model metadata, including tier, family, and features.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-flash-lite-preview\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-31b-it\": {\n    \"displayName\": \"gemma-4-31b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"displayName\": \"gemma-4-26b-a4b-it\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4\": {\n    \"displayName\": \"Gemma 4\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4-26b\": {\n    \"displayName\": \"Gemma 4 26B\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4-31b\": {\n    \"displayName\": \"Gemma 4 31B\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4-31b-cloud\": {\n    \"displayName\": \"Gemma 4 31B (Cloud)\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4-e4b\": {\n    \"displayName\": \"Gemma 4 E4B\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemma4-e2b\": {\n    \"displayName\": \"Gemma 4 E2B\",\n    \"tier\": \"custom\",\n    \"family\": \"gemma-4\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto\": {\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"pro\": {\n    \"tier\": \"pro\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash\": {\n    \"tier\": \"flash\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-3\": {\n    \"displayName\": \"Auto (Gemini 3)\",\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-2.5\": {\n    \"displayName\": \"Auto (Gemini 2.5)\",\n    \"tier\": \"auto\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  }\n}`",
           "default": {
             "gemini-3.1-flash-lite-preview": {
               "tier": "flash-lite",
@@ -2016,6 +2370,72 @@
                 "multimodalToolUse": false
               }
             },
+            "gemma4": {
+              "displayName": "Gemma 4",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma4-26b": {
+              "displayName": "Gemma 4 26B",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": false,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma4-31b": {
+              "displayName": "Gemma 4 31B",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma4-31b-cloud": {
+              "displayName": "Gemma 4 31B (Cloud)",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma4-e4b": {
+              "displayName": "Gemma 4 E4B",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "gemma4-e2b": {
+              "displayName": "Gemma 4 E2B",
+              "tier": "custom",
+              "family": "gemma-4",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
             "auto": {
               "displayName": "Auto",
               "tier": "auto",
@@ -2074,12 +2494,30 @@
         "modelIdResolutions": {
           "title": "Model ID Resolutions",
           "description": "Rules for resolving requested model names to concrete model IDs based on context.",
-          "markdownDescription": "Rules for resolving requested model names to concrete model IDs based on context.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemma-4-31b-it\": {\n    \"default\": \"gemma-4-31b-it\"\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"default\": \"gemini-3.1-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      }\n    ]\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"default\": \"gemini-3.1-pro-preview-customtools\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      }\n    ]\n  },\n  \"gemini-3-flash-preview\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"gemini-3-pro-preview\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"releaseChannel\": \"stable\"\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"gemini-3.1-flash-lite-preview\": {\n    \"default\": \"gemini-3.1-flash-lite-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": false\n        },\n        \"target\": \"gemini-2.5-flash-lite\"\n      }\n    ]\n  },\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"flash-lite\": {\n    \"default\": \"gemini-2.5-flash-lite\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": true\n        },\n        \"target\": \"gemini-3.1-flash-lite-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-3\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-2.5\": {\n    \"default\": \"gemini-2.5-pro\"\n  }\n}`",
+          "markdownDescription": "Rules for resolving requested model names to concrete model IDs based on context.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemma-4-31b-it\": {\n    \"default\": \"gemma-4-31b-it\"\n  },\n  \"gemma-4-26b-a4b-it\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemma4\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemma4-26b\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemma4-31b\": {\n    \"default\": \"gemma-4-31b-it\"\n  },\n  \"gemma4-31b-cloud\": {\n    \"default\": \"gemma-4-31b-it\"\n  },\n  \"gemma4-e4b\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemma4-e2b\": {\n    \"default\": \"gemma-4-26b-a4b-it\"\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"default\": \"gemini-3.1-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      }\n    ]\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"default\": \"gemini-3.1-pro-preview-customtools\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      }\n    ]\n  },\n  \"gemini-3-flash-preview\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"gemini-3-pro-preview\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-3\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-2.5\": {\n    \"default\": \"gemini-2.5-pro\"\n  },\n  \"gemini-3.1-flash-lite-preview\": {\n    \"default\": \"gemini-3.1-flash-lite-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": false\n        },\n        \"target\": \"gemini-2.5-flash-lite\"\n      }\n    ]\n  },\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"flash-lite\": {\n    \"default\": \"gemini-2.5-flash-lite\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": true\n        },\n        \"target\": \"gemini-3.1-flash-lite-preview\"\n      }\n    ]\n  }\n}`",
           "default": {
             "gemma-4-31b-it": {
               "default": "gemma-4-31b-it"
             },
             "gemma-4-26b-a4b-it": {
+              "default": "gemma-4-26b-a4b-it"
+            },
+            "gemma4": {
+              "default": "gemma-4-26b-a4b-it"
+            },
+            "gemma4-26b": {
+              "default": "gemma-4-26b-a4b-it"
+            },
+            "gemma4-31b": {
+              "default": "gemma-4-31b-it"
+            },
+            "gemma4-31b-cloud": {
+              "default": "gemma-4-31b-it"
+            },
+            "gemma4-e4b": {
+              "default": "gemma-4-26b-a4b-it"
+            },
+            "gemma4-e2b": {
               "default": "gemma-4-26b-a4b-it"
             },
             "gemini-3.1-pro-preview": {

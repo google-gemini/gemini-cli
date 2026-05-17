@@ -138,6 +138,10 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
+export * from './services/localModelDiscoveryService.js';
+export * from './services/localModelService.js';
+export * from './services/localModelMetadata.js';
+export * from './services/toolFilter.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export {

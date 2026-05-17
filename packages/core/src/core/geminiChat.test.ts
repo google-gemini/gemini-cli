@@ -2172,6 +2172,26 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('isActiveModelLocalGemma4', () => {
+    it('recognizes resolved local Gemma 4 model IDs', () => {
+      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+        authType: AuthType.USE_LOCAL_OLLAMA,
+      });
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemma4:26b');
+
+      expect(chat.isActiveModelLocalGemma4()).toBe(true);
+    });
+
+    it('recognizes provider-specific Gemma 4 model IDs', () => {
+      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+        authType: AuthType.USE_LOCAL_LM_STUDIO,
+      });
+      vi.mocked(mockConfig.getModel).mockReturnValue('google/gemma-4-26b-a4b');
+
+      expect(chat.isActiveModelLocalGemma4()).toBe(true);
+    });
+  });
+
   describe('ensureActiveLoopHasThoughtSignatures', () => {
     it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);

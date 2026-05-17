@@ -14,6 +14,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     loadApiKey: vi.fn().mockResolvedValue(null),
+    LocalModelService: vi.fn().mockImplementation(() => ({
+      pingBackend: vi.fn().mockResolvedValue(false),
+    })),
   };
 });
 
@@ -104,5 +107,17 @@ describe('validateAuthMethod', () => {
       vi.stubEnv(key, value as string);
     }
     expect(await validateAuthMethod(authType)).toBe(expected);
+  });
+
+  it('should return error for local Ollama when ping fails', async () => {
+    vi.stubEnv('OLLAMA_HOST', undefined as unknown as string);
+    const result = await validateAuthMethod(AuthType.USE_LOCAL_OLLAMA);
+    expect(result).toContain('not reachable');
+  });
+
+  it('should return error for local LM Studio when ping fails', async () => {
+    vi.stubEnv('LM_STUDIO_API_BASE', undefined as unknown as string);
+    const result = await validateAuthMethod(AuthType.USE_LOCAL_LM_STUDIO);
+    expect(result).toContain('not reachable');
   });
 });

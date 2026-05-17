@@ -120,6 +120,43 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
 
+    gemma4: {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4',
+      },
+    },
+    'gemma4-26b': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4-26b',
+      },
+    },
+    'gemma4-31b': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4-31b',
+      },
+    },
+    'gemma4-31b-cloud': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4-31b-cloud',
+      },
+    },
+    'gemma4-e4b': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4-e4b',
+      },
+    },
+    'gemma4-e2b': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma4-e2b',
+      },
+    },
+
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -377,6 +414,54 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: true, multimodalToolUse: false },
     },
+    gemma4: {
+      displayName: 'Gemma 4',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma4-26b': {
+      displayName: 'Gemma 4 26B',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: false,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma4-31b': {
+      displayName: 'Gemma 4 31B',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma4-31b-cloud': {
+      displayName: 'Gemma 4 31B (Cloud)',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma4-e4b': {
+      displayName: 'Gemma 4 E4B',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma4-e2b': {
+      displayName: 'Gemma 4 E2B',
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
 
     // Aliases
     auto: {
@@ -422,6 +507,24 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemma-4-31b-it',
     },
     'gemma-4-26b-a4b-it': {
+      default: 'gemma-4-26b-a4b-it',
+    },
+    gemma4: {
+      default: 'gemma-4-26b-a4b-it',
+    },
+    'gemma4-26b': {
+      default: 'gemma-4-26b-a4b-it',
+    },
+    'gemma4-31b': {
+      default: 'gemma-4-31b-it',
+    },
+    'gemma4-31b-cloud': {
+      default: 'gemma-4-31b-it',
+    },
+    'gemma4-e4b': {
+      default: 'gemma-4-26b-a4b-it',
+    },
+    'gemma4-e2b': {
       default: 'gemma-4-26b-a4b-it',
     },
 

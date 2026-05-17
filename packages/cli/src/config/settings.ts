@@ -19,6 +19,8 @@ import {
   coreEvents,
   homedir,
   AuthType,
+  getLocalBackendAuthType,
+  getLocalBackendBaseUrlEnvVar,
   type AdminControlsSettings,
   createCache,
 } from '@google/gemini-cli-core';
@@ -682,6 +684,48 @@ export function loadEnvironment(
     } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
+  }
+
+  applyLocalModelEnvironment(settings);
+}
+
+function applyLocalModelEnvironment(settings: Settings): void {
+  const backend = settings.localModel?.backend?.trim();
+  const providers = settings.localModel?.providers;
+
+  if (providers) {
+    for (const [providerName, providerConfig] of Object.entries(providers)) {
+      const authType = getLocalBackendAuthType(providerName);
+      const envVarName = authType
+        ? getLocalBackendBaseUrlEnvVar(authType)
+        : undefined;
+      const baseUrl = providerConfig?.baseUrl?.trim();
+      if (envVarName && baseUrl && !process.env[envVarName]) {
+        process.env[envVarName] = baseUrl;
+      }
+    }
+  }
+
+  if (!backend) {
+    return;
+  }
+
+  if (!process.env['GEMINI_LOCAL_BACKEND']) {
+    process.env['GEMINI_LOCAL_BACKEND'] = backend;
+  }
+
+  const authType = getLocalBackendAuthType(backend);
+  const envVarName = authType
+    ? getLocalBackendBaseUrlEnvVar(authType)
+    : undefined;
+  const providerBaseUrl =
+    providers && backend in providers
+      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        providers[backend as keyof typeof providers]?.baseUrl?.trim()
+      : undefined;
+  const baseUrl = settings.localModel?.baseUrl?.trim() || providerBaseUrl;
+  if (envVarName && baseUrl && !process.env[envVarName]) {
+    process.env[envVarName] = baseUrl;
   }
 }
 

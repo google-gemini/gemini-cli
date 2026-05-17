@@ -9,6 +9,9 @@ import {
   OutputFormat,
   ExitCodes,
   getAuthTypeFromEnv,
+  isLocalBackendAuthType,
+  resolveLocalBackendBaseUrl,
+  getLocalBackendName,
   type Config,
   type AuthType,
 } from '@google/gemini-cli-core';
@@ -35,7 +38,7 @@ export async function validateNonInteractiveAuth(
     }
 
     if (!effectiveAuthType) {
-      const message = `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`;
+      const message = `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_LOCAL_BACKEND, GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`;
       throw new Error(message);
     }
 
@@ -45,6 +48,17 @@ export async function validateNonInteractiveAuth(
       const err = await validateAuthMethod(String(authType));
       if (err != null) {
         throw new Error(err);
+      }
+    }
+
+    if (isLocalBackendAuthType(authType)) {
+      const baseUrl = resolveLocalBackendBaseUrl(authType);
+      const healthError = await checkLocalBackendHealth(baseUrl);
+      if (healthError) {
+        throw new Error(
+          `${getLocalBackendName(authType)} is not running at ${baseUrl}. Please start the backend and try again.\n` +
+            `See: https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/local-gemma-4.md`,
+        );
       }
     }
 
@@ -61,5 +75,33 @@ export async function validateNonInteractiveAuth(
       await runExitCleanup();
       process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     }
+  }
+}
+
+async function checkLocalBackendHealth(
+  baseUrl: string,
+): Promise<string | null> {
+  try {
+    const url = new URL(
+      'models',
+      baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
+    ).toString();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      return `Backend health check failed with status ${response.status}`;
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return 'Backend health check timed out after 2000ms';
+    }
+    return `Backend health check error: ${error instanceof Error ? error.message : String(error)}`;
   }
 }

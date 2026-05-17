@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 import {
   main,
+  autoSelectDiscoveredLocalBackend,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
   startInteractiveUI,
@@ -140,6 +141,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       off: vi.fn(),
       drainBacklogs: vi.fn(),
     },
+    LocalModelDiscoveryService: vi.fn().mockImplementation(() => ({
+      discoverBackends: vi
+        .fn()
+        .mockResolvedValue({ preferredBackend: undefined }),
+    })),
   };
 });
 
@@ -373,6 +379,100 @@ describe('gemini.tsx main function', () => {
 
     // Avoid the process.exit error from being thrown.
     processExitSpy.mockRestore();
+  });
+});
+
+describe('autoSelectDiscoveredLocalBackend', () => {
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_LOCAL_BACKEND', '');
+    vi.stubEnv('OLLAMA_HOST', '');
+    vi.stubEnv('LM_STUDIO_API_BASE', '');
+    vi.stubEnv('LLAMA_CPP_SERVER_BASE', '');
+    vi.stubEnv('VLLM_API_BASE', '');
+    vi.stubEnv('SGLANG_API_BASE', '');
+    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.stubEnv('GOOGLE_GENAI_USE_GCA', '');
+    vi.stubEnv('GOOGLE_GENAI_USE_VERTEXAI', '');
+    vi.stubEnv('CLOUD_SHELL', '');
+    vi.stubEnv('GEMINI_CLI_USE_COMPUTE_ADC', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('selects a discovered local backend when no auth is configured', async () => {
+    const settings = createMockSettings({
+      merged: { security: { auth: { selectedType: undefined } } },
+    });
+    const discoveryService = {
+      discoverBackends: vi.fn().mockResolvedValue({
+        preferredBackend: {
+          authType: AuthType.USE_LOCAL_OLLAMA,
+          backend: 'ollama',
+          baseUrl: 'http://localhost:11434/v1',
+          models: [{ id: 'gemma4:26b' }],
+          gemma4Models: [{ id: 'gemma4:26b' }],
+        },
+      }),
+    };
+
+    await autoSelectDiscoveredLocalBackend(settings, discoveryService as never);
+
+    expect(discoveryService.discoverBackends).toHaveBeenCalled();
+    expect(settings.setValue).toHaveBeenCalledWith(
+      expect.anything(),
+      'security.auth.selectedType',
+      AuthType.USE_LOCAL_OLLAMA,
+    );
+  });
+
+  it('does not override an explicit auth selection', async () => {
+    const settings = createMockSettings({
+      merged: {
+        security: { auth: { selectedType: AuthType.USE_GEMINI } },
+      },
+    });
+    const discoveryService = {
+      discoverBackends: vi.fn(),
+    };
+
+    await autoSelectDiscoveredLocalBackend(settings, discoveryService as never);
+
+    expect(discoveryService.discoverBackends).not.toHaveBeenCalled();
+    expect(settings.setValue).not.toHaveBeenCalled();
+  });
+
+  it('passes configured provider urls into discovery', async () => {
+    const settings = createMockSettings({
+      merged: {
+        security: { auth: { selectedType: undefined } },
+        localModel: {
+          providers: {
+            ollama: { baseUrl: 'http://ollama.internal:21434' },
+          },
+        },
+      },
+    });
+    const discoveryService = {
+      discoverBackends: vi
+        .fn()
+        .mockResolvedValue({ preferredBackend: undefined }),
+    };
+
+    await autoSelectDiscoveredLocalBackend(settings, discoveryService as never);
+
+    expect(discoveryService.discoverBackends).toHaveBeenCalledWith({
+      baseUrls: {
+        ollama: 'http://ollama.internal:21434',
+        'lm-studio': undefined,
+        'llama-cpp': undefined,
+        vllm: undefined,
+        sglang: undefined,
+      },
+      timeoutMs: 1500,
+    });
   });
 });
 

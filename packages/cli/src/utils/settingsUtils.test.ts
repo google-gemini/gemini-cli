@@ -432,6 +432,21 @@ describe('SettingsUtils', () => {
         expect(dialogKeys).not.toContain('ui.theme'); // Hidden
       });
 
+      it('includes localModel endpoint keys using production schema', async () => {
+        const actual = await vi.importActual<
+          typeof import('../config/settingsSchema.js')
+        >('../config/settingsSchema.js');
+        vi.mocked(getSettingsSchema).mockReturnValue(
+          actual.getSettingsSchema(),
+        );
+        TEST_ONLY.clearFlattenedSchema();
+
+        const dialogKeys = getDialogSettingKeys();
+        expect(dialogKeys).toContain('localModel.baseUrl');
+        expect(dialogKeys).toContain('localModel.backend');
+        expect(dialogKeys).toContain('localModel.providers.ollama.baseUrl');
+      });
+
       it('should return fewer keys than getAllSettingKeys', () => {
         const allKeys = getAllSettingKeys();
         const dialogKeys = getDialogSettingKeys();

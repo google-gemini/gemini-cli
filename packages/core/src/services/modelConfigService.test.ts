@@ -670,6 +670,110 @@ describe('ModelConfigService', () => {
     });
   });
 
+  describe('clearRuntimeModelOverrides', () => {
+    it('should remove matching overrides', () => {
+      const service = new ModelConfigService({ aliases: {}, overrides: [] });
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { model: 'local-model' },
+      });
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-flash' },
+        modelConfig: { model: 'local-model' },
+      });
+
+      service.clearRuntimeModelOverrides((o) => o.match.model === 'gemini-pro');
+
+      const resolvedPro = service.getResolvedConfig({ model: 'gemini-pro' });
+      expect(resolvedPro.model).toBe('gemini-pro');
+
+      const resolvedFlash = service.getResolvedConfig({
+        model: 'gemini-flash',
+      });
+      expect(resolvedFlash.model).toBe('local-model');
+    });
+
+    it('should not remove agent-scoped overrides when filtering by model', () => {
+      const service = new ModelConfigService({ aliases: {}, overrides: [] });
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { model: 'local-model' },
+      });
+      service.registerRuntimeModelOverride({
+        match: { overrideScope: 'my-agent' },
+        modelConfig: { model: 'agent-model' },
+      });
+
+      service.clearRuntimeModelOverrides((o) => o.match.model !== undefined);
+
+      const resolvedPro = service.getResolvedConfig({ model: 'gemini-pro' });
+      expect(resolvedPro.model).toBe('gemini-pro');
+
+      const resolvedAgent = service.getResolvedConfig({
+        model: 'gemini-pro',
+        overrideScope: 'my-agent',
+      });
+      expect(resolvedAgent.model).toBe('agent-model');
+    });
+
+    it('should not affect runtime model configs', () => {
+      const service = new ModelConfigService({ aliases: {}, overrides: [] });
+
+      service.registerRuntimeModelConfig('my-alias', {
+        modelConfig: { model: 'custom-model' },
+      });
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { model: 'local-model' },
+      });
+
+      service.clearRuntimeModelOverrides(() => true);
+
+      const resolvedAlias = service.getResolvedConfig({ model: 'my-alias' });
+      expect(resolvedAlias.model).toBe('custom-model');
+    });
+  });
+
+  describe('clearRuntimeModelConfigs', () => {
+    it('should remove matching runtime model configs', () => {
+      const service = new ModelConfigService({ aliases: {}, overrides: [] });
+
+      service.registerRuntimeModelConfig('alias-a', {
+        modelConfig: { model: 'model-a' },
+      });
+      service.registerRuntimeModelConfig('alias-b', {
+        modelConfig: { model: 'model-b' },
+      });
+
+      service.clearRuntimeModelConfigs((name) => name === 'alias-a');
+
+      const resolvedA = service.getResolvedConfig({ model: 'alias-a' });
+      expect(resolvedA.model).toBe('alias-a');
+
+      const resolvedB = service.getResolvedConfig({ model: 'alias-b' });
+      expect(resolvedB.model).toBe('model-b');
+    });
+
+    it('should not affect runtime model overrides', () => {
+      const service = new ModelConfigService({ aliases: {}, overrides: [] });
+
+      service.registerRuntimeModelConfig('my-alias', {
+        modelConfig: { model: 'runtime-model' },
+      });
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { model: 'overridden-model' },
+      });
+
+      service.clearRuntimeModelConfigs(() => true);
+
+      const resolvedPro = service.getResolvedConfig({ model: 'gemini-pro' });
+      expect(resolvedPro.model).toBe('overridden-model');
+    });
+  });
+
   describe('custom aliases', () => {
     it('should resolve a custom alias', () => {
       const config: ModelConfigServiceConfig = {
