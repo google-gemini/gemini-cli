@@ -1503,6 +1503,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 partWidth += charWidth;
                 splitIndex = i + 1;
               }
+              if (splitIndex === 0) {
+                part = wordCP[0] ?? '';
+                splitIndex = 1;
+              }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);
             }

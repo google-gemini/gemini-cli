@@ -5334,6 +5334,35 @@ describe('InputPrompt', () => {
   });
 
   describe('terminal buffer rendering', () => {
+    it('continues rendering ghost text when inputWidth is narrower than the next code point', async () => {
+      props.inputWidth = 1;
+      props.suggestionsWidth = 1;
+      mockBuffer.text = 'a';
+      mockBuffer.lines = ['a'];
+      mockBuffer.allVisualLines = ['a'];
+      mockBuffer.viewportVisualLines = ['a'];
+      mockBuffer.cursor = [0, 1];
+      mockBuffer.visualCursor = [0, 1];
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        promptCompletion: {
+          ...mockCommandCompletion.promptCompletion,
+          text: 'a🙂b',
+          isActive: true,
+        },
+      });
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(clean(lastFrame())).toContain('🙂');
+      });
+      unmount();
+    });
+
     it('does not clip the last char of a visual line whose width equals inputWidth', async () => {
       const fullLine = '1234567890'; // 10 chars, exactly props.inputWidth
       props.inputWidth = 10;
