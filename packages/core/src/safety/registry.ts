@@ -39,7 +39,14 @@ export class CheckerRegistry {
   // Regex to validate checker names (alphanumeric and hyphens only)
   private static readonly VALID_NAME_PATTERN = /^[a-z0-9-]+$/;
 
-  constructor(private readonly checkersPath: string) {}
+  private readonly customCheckers: Map<string, string>;
+
+  constructor(
+    private readonly checkersPath: string,
+    customCheckers?: Map<string, string>,
+  ) {
+    this.customCheckers = customCheckers ?? new Map<string, string>();
+  }
 
   /**
    * Resolves an external checker name to an absolute executable path.
@@ -51,6 +58,7 @@ export class CheckerRegistry {
       );
     }
 
+    // Check built-in external checkers first
     const builtInPath = CheckerRegistry.BUILT_IN_EXTERNAL_CHECKERS.get(name);
     if (builtInPath) {
       const fullPath = path.join(this.checkersPath, builtInPath);
@@ -60,8 +68,28 @@ export class CheckerRegistry {
       return fullPath;
     }
 
-    // TODO: Phase 5 - Add support for custom external checkers
-    throw new Error(`Unknown external checker "${name}".`);
+    // Check custom external checkers
+    const customPath = this.customCheckers.get(name);
+    if (customPath) {
+      if (!fs.existsSync(customPath)) {
+        throw new Error(`Custom checker "${name}" not found at ${customPath}`);
+      }
+      return customPath;
+    }
+
+    throw new Error(
+      `Unknown external checker "${name}". Available: ${this.getAllExternalCheckerNames().join(', ')}`,
+    );
+  }
+
+  /**
+   * Returns all available external checker names (built-in + custom).
+   */
+  getAllExternalCheckerNames(): string[] {
+    return [
+      ...Array.from(CheckerRegistry.BUILT_IN_EXTERNAL_CHECKERS.keys()),
+      ...Array.from(this.customCheckers.keys()),
+    ];
   }
 
   /**
@@ -92,6 +120,16 @@ export class CheckerRegistry {
     return [
       ...Array.from(this.BUILT_IN_EXTERNAL_CHECKERS.keys()),
       ...Array.from(this.getBuiltInInProcessCheckers().keys()),
+    ];
+  }
+
+  /**
+   * Returns all available checker names (built-in + custom).
+   */
+  getAllCheckers(): string[] {
+    return [
+      ...this.getAllExternalCheckerNames(),
+      ...Array.from(CheckerRegistry.getBuiltInInProcessCheckers().keys()),
     ];
   }
 }

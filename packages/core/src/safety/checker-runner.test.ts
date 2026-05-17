@@ -298,5 +298,52 @@ describe('CheckerRunner', () => {
         'Safety checker "python-checker" exited with code 1',
       );
     });
+
+    it('should use custom path when provided instead of resolving through registry', async () => {
+      const customPath = '/custom/path/to/my-checker';
+      const configWithCustomPath = {
+        type: 'external' as const,
+        name: 'custom-checker',
+        path: customPath,
+      };
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockStdout = {
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'data') {
+            callback(
+              Buffer.from(
+                JSON.stringify({ decision: SafetyCheckDecision.ALLOW }),
+              ),
+            );
+          }
+        }),
+      };
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: mockStdout,
+        stderr: { on: vi.fn() },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 0);
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const result = await runner.runChecker(
+        mockToolCall,
+        configWithCustomPath,
+      );
+
+      expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+      // Should use the custom path directly, not call resolveExternal
+      expect(mockRegistry.resolveExternal).not.toHaveBeenCalled();
+      expect(spawn).toHaveBeenCalledWith(customPath, [], expect.anything());
+    });
   });
 });

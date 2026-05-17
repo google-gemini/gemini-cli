@@ -123,7 +123,10 @@ export class CheckerRunner {
   ): Promise<SafetyCheckResult> {
     try {
       // Resolve the checker executable path
-      const checkerPath = this.registry.resolveExternal(checkerConfig.name);
+      // If a custom path is provided, use it directly; otherwise resolve through registry
+      const checkerPath = checkerConfig.path
+        ? checkerConfig.path
+        : this.registry.resolveExternal(checkerConfig.name);
 
       // Build the appropriate context
       const context = checkerConfig.required_context
