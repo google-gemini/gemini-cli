@@ -77,6 +77,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    getHasAccessToPreviewModel: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
 
@@ -234,6 +235,7 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL_AUTO,
       );
+      vi.mocked(policyConfig.getHasAccessToPreviewModel).mockReturnValue(true);
 
       const result = await handleFallback(
         policyConfig,

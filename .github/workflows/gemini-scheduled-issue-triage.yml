@@ -1,10 +1,6 @@
 name: '📋 Gemini Scheduled Issue Triage'
 
 on:
-  issues:
-    types:
-      - 'opened'
-      - 'reopened'
   schedule:
     - cron: '0 * * * *' # Runs every hour
   workflow_dispatch:
@@ -391,6 +387,7 @@ jobs:
         env:
           REPOSITORY: '${{ github.repository }}'
           LABELS_OUTPUT: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
+          SUPPRESS_COMMENT: 'true'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'

@@ -150,6 +150,9 @@ vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
+vi.mock('../config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
 vi.mock('./hooks/useModelCommand.js');
@@ -217,6 +220,7 @@ vi.mock('../utils/cleanup.js');
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
+import { validateAuthMethod } from '../config/auth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
@@ -576,6 +580,36 @@ describe('AppContainer State Management', () => {
   });
 
   describe('State Initialization', () => {
+    it('calls validateAuthMethod and onAuthError if validation fails', async () => {
+      const mockOnAuthError = vi.fn();
+      mockedUseAuthCommand.mockReturnValue({
+        authState: 'authenticated',
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: mockOnAuthError,
+      });
+      vi.mocked(validateAuthMethod).mockResolvedValueOnce('Validation Failed');
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          settings: createMockSettings({
+            merged: {
+              security: {
+                auth: { selectedType: 'oauth-personal', useExternal: false },
+              },
+            },
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(validateAuthMethod).toHaveBeenCalledWith('oauth-personal');
+        expect(mockOnAuthError).toHaveBeenCalledWith('Validation Failed');
+      });
+
+      unmount();
+    });
+
     it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
       mockedUseFocusState.mockReturnValue({
         isFocused: false,
