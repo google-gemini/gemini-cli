@@ -46,6 +46,17 @@ export class CheckerRegistry {
     customCheckers?: Map<string, string>,
   ) {
     this.customCheckers = customCheckers ?? new Map<string, string>();
+    this.validateCustomCheckerPaths();
+  }
+
+  private validateCustomCheckerPaths(): void {
+    for (const [name, checkerPath] of this.customCheckers) {
+      if (!path.isAbsolute(checkerPath)) {
+        throw new Error(
+          `Custom checker "${name}" path must be absolute: ${checkerPath}`,
+        );
+      }
+    }
   }
 
   /**

@@ -85,12 +85,6 @@ export interface AllowedPathConfig {
 export interface ExternalCheckerConfig {
   type: 'external';
   name: string;
-  /**
-   * Optional absolute path to a custom checker executable.
-   * When provided, this path is used directly instead of resolving
-   * the name through the CheckerRegistry.
-   */
-  path?: string;
   config?: unknown;
   required_context?: Array<keyof SafetyCheckInput['context']>;
 }

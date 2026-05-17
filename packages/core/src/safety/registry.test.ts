@@ -135,5 +135,17 @@ describe('CheckerRegistry', () => {
         'Invalid checker name',
       );
     });
+
+    it('should reject relative paths for custom checkers', () => {
+      const customCheckers = new Map([
+        ['relative-checker', './relative/path/to/checker'],
+      ]);
+
+      expect(
+        () => new CheckerRegistry(mockCheckersPath, customCheckers),
+      ).toThrow(
+        'Custom checker "relative-checker" path must be absolute: ./relative/path/to/checker',
+      );
+    });
   });
 });
