@@ -587,8 +587,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
+    const authType = this.context.config.getContentGeneratorConfig()?.authType;
+    const isLocalBackend = authType && isLocalBackendAuthType(authType);
+    const localBackendTimeoutMultiplier = isLocalBackend ? 3 : 1;
     const maxTimeMinutes =
-      this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
+      (this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES) *
+      localBackendTimeoutMultiplier;
     const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
 
     const deadlineTimer = new DeadlineTimer(
