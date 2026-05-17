@@ -1854,6 +1854,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.adk.agentSessionSubagentEnabled`** (boolean):
+  - **Description:** Route subagent invocations through the AgentSession
+    protocol instead of legacy executors.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`
