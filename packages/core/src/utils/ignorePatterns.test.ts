@@ -149,6 +149,7 @@ describe('FileExclusions', () => {
     it('should use config custom excludes when available', () => {
       const mockConfig = {
         getCustomExcludes: vi.fn(() => ['**/config-exclude/**']),
+        getAgentsSettings: vi.fn(() => ({})),
       } as unknown as Config;
 
       const excluder = new FileExclusions(mockConfig);
@@ -159,7 +160,9 @@ describe('FileExclusions', () => {
     });
 
     it('should handle config without getCustomExcludes method', () => {
-      const mockConfig = {} as Config;
+      const mockConfig = {
+        getAgentsSettings: vi.fn(() => ({})),
+      } as unknown as Config;
 
       const excluder = new FileExclusions(mockConfig);
       const patterns = excluder.getDefaultExcludePatterns();
@@ -172,6 +175,7 @@ describe('FileExclusions', () => {
     it('should include config custom excludes in glob patterns', () => {
       const mockConfig = {
         getCustomExcludes: vi.fn(() => ['**/config-glob/**']),
+        getAgentsSettings: vi.fn(() => ({})),
       } as unknown as Config;
 
       const excluder = new FileExclusions(mockConfig);
@@ -180,6 +184,31 @@ describe('FileExclusions', () => {
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
       expect(patterns).toContain('**/config-glob/**');
+    });
+
+    it('should respect agents.searchSessionDirs setting', () => {
+      const mockConfigDisabled = {
+        getAgentsSettings: vi.fn(() => ({ searchSessionDirs: false })),
+      } as unknown as Config;
+      const mockConfigEnabled = {
+        getAgentsSettings: vi.fn(() => ({ searchSessionDirs: true })),
+      } as unknown as Config;
+
+      const excluderDisabled = new FileExclusions(mockConfigDisabled);
+      expect(excluderDisabled.getCoreIgnorePatterns()).toContain(
+        '**/.gemini/tmp/**',
+      );
+      expect(excluderDisabled.getDefaultExcludePatterns()).toContain(
+        '**/.gemini/tmp/**',
+      );
+
+      const excluderEnabled = new FileExclusions(mockConfigEnabled);
+      expect(excluderEnabled.getCoreIgnorePatterns()).not.toContain(
+        '**/.gemini/tmp/**',
+      );
+      expect(excluderEnabled.getDefaultExcludePatterns()).not.toContain(
+        '**/.gemini/tmp/**',
+      );
     });
   });
 

@@ -1237,11 +1237,23 @@ const SETTINGS_SCHEMA = {
     type: 'object',
     label: 'Agents',
     category: 'Advanced',
-    requiresRestart: true,
+    requiresRestart: false,
     default: {},
-    description: 'Settings for subagents.',
+    description: 'Agent behavior settings.',
     showInDialog: false,
     properties: {
+      // Governs whether search tools (grep, glob) are permitted to recurse into internal
+      // session storage, which is blocked by default to prevent self-scraping feedback loops.
+      searchSessionDirs: {
+        type: 'boolean',
+        label: 'Search Session Directories',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Whether to allow agent search tools (grep, glob) to scan internal CLI session directories like .gemini/tmp/.',
+        showInDialog: true,
+      },
       overrides: {
         type: 'object',
         label: 'Agent Overrides',

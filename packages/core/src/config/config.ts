@@ -294,6 +294,7 @@ export interface AgentOverride {
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
   browser?: BrowserAgentCustomConfig;
+  searchSessionDirs?: boolean;
 }
 
 export interface CustomTheme {

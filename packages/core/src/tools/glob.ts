@@ -162,6 +162,21 @@ class GlobToolInvocation extends BaseToolInvocation<
         searchDirectories = workspaceDirectories;
       }
 
+      // Intercept attempts to glob internal session directories.
+      // Recursive loops (finding own output in .jsonl files) cause exponential growth.
+      if (
+        !this.config.getAgentsSettings()?.searchSessionDirs &&
+        ((this.params.dir_path &&
+          this.params.dir_path.includes('.gemini/tmp')) ||
+          this.params.pattern.includes('.gemini/tmp'))
+      ) {
+        return {
+          llmContent:
+            "Access to .gemini/tmp/ is disabled by default to prevent recursive search loops. To search internal session directories, enable 'agents.searchSessionDirs' in settings.",
+          returnDisplay: 'Access to session directories disabled.',
+        };
+      }
+
       // Get centralized file discovery service
       const fileDiscovery = this.config.getFileService();
 

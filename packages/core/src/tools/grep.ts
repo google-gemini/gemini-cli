@@ -197,6 +197,20 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
+      // Check if the agent is attempting to search internal session directories.
+      // This is blocked by default to prevent recursive feedback loops (reading own logs).
+      if (
+        !this.config.getAgentsSettings()?.searchSessionDirs &&
+        ((searchDirAbs && searchDirAbs.includes('.gemini/tmp')) ||
+          this.params.pattern.includes('.gemini/tmp'))
+      ) {
+        return {
+          llmContent:
+            "Access to .gemini/tmp/ is disabled by default to prevent recursive search loops. To search internal session directories, enable 'agents.searchSessionDirs' in settings.",
+          returnDisplay: 'Access to session directories disabled.',
+        };
+      }
+
       const searchDirDisplay = pathParam || '.';
 
       // Determine which directories to search
@@ -434,7 +448,13 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           gitArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include_pattern) {
+
+        if (!this.config.getAgentsSettings()?.searchSessionDirs) {
+          gitArgs.push('--', ':(exclude)**/.gemini/tmp/**');
+          if (include_pattern) {
+            gitArgs.push(include_pattern);
+          }
+        } else if (include_pattern) {
           gitArgs.push('--', include_pattern);
         }
 

@@ -138,7 +138,13 @@ export class FileExclusions {
    * These are the minimal essential patterns that should almost always be excluded.
    */
   getCoreIgnorePatterns(): string[] {
-    return [...COMMON_IGNORE_PATTERNS];
+    const patterns = [...COMMON_IGNORE_PATTERNS];
+    // Prevent the agent from recursively searching its own session/temp files,
+    // which can lead to exponential log growth and memory spikes.
+    if (this.config && !this.config.getAgentsSettings()?.searchSessionDirs) {
+      patterns.push('**/.gemini/tmp/**');
+    }
+    return patterns;
   }
 
   /**
@@ -163,6 +169,11 @@ export class FileExclusions {
     // Add dynamic patterns (like current Gemini MD filename)
     if (includeDynamicPatterns) {
       patterns.push(`**/${getCurrentGeminiMdFilename()}`);
+    }
+
+    // Standard protection against recursive search loops by excluding internal session state.
+    if (this.config && !this.config.getAgentsSettings()?.searchSessionDirs) {
+      patterns.push('**/.gemini/tmp/**');
     }
 
     // Add custom patterns from configuration

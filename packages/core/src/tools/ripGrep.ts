@@ -225,6 +225,19 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
+      // Protection against recursive search loops where the agent reads its own session state.
+      if (
+        !this.config.getAgentsSettings()?.searchSessionDirs &&
+        ((searchDirAbs && searchDirAbs.includes('.gemini/tmp')) ||
+          this.params.pattern.includes('.gemini/tmp'))
+      ) {
+        return {
+          llmContent:
+            "Access to .gemini/tmp/ is disabled by default to prevent recursive search loops. To search internal session directories, enable 'agents.searchSessionDirs' in settings.",
+          returnDisplay: 'Access to session directories disabled.',
+        };
+      }
+
       const totalMaxMatches =
         this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
