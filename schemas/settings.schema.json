@@ -3223,6 +3223,13 @@
               "markdownDescription": "Enable the agent session implementation for the interactive CLI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
+            },
+            "agentSessionSubagentEnabled": {
+              "title": "Agent Session Subagent Enabled",
+              "description": "Route subagent invocations through the AgentSession protocol instead of legacy executors.",
+              "markdownDescription": "Route subagent invocations through the AgentSession protocol instead of legacy executors.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
