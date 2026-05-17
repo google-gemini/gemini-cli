@@ -322,7 +322,7 @@ export async function createApp() {
     expressApp.get('/tasks/metadata', async (req, res) => {
       // This endpoint is only meaningful if the task store is in-memory.
       if (!(taskStoreForExecutor instanceof InMemoryTaskStore)) {
-        res.status(501).send({
+        return res.status(501).send({
           error:
             'Listing all task metadata is only supported when using InMemoryTaskStore.',
         });
