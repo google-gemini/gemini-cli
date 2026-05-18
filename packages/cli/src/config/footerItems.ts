@@ -28,6 +28,11 @@ export const ALL_ITEMS = [
     description: 'Current model identifier',
   },
   {
+    id: 'agent-name',
+    header: '/agent',
+    description: 'Current active agent name',
+  },
+  {
     id: 'context-used',
     header: 'context',
     description: 'Percentage of context window used',
@@ -76,6 +81,7 @@ export const DEFAULT_ORDER = [
   'git-branch',
   'sandbox',
   'model-name',
+  'agent-name',
   'context-used',
   'quota',
   'memory-usage',
@@ -94,6 +100,7 @@ export function deriveItemsFromLegacySettings(
     'git-branch',
     'sandbox',
     'model-name',
+    'agent-name',
     'quota',
   ];
   const items = [...defaults];

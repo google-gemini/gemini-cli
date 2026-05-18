@@ -1043,6 +1043,27 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  agent: {
+    type: 'object',
+    label: 'Agent',
+    category: 'Agent',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings related to the active AI agent.',
+    showInDialog: false,
+    properties: {
+      name: {
+        type: 'string',
+        label: 'Agent Name',
+        category: 'Agent',
+        requiresRestart: false,
+        default: 'gemini-cli',
+        description: 'The active AI agent to use (gemini-cli or gemini-enterprise).',
+        showInDialog: true,
+      },
+    },
+  },
+
   model: {
     type: 'object',
     label: 'Model',

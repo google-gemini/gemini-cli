@@ -198,6 +198,7 @@ export const Footer: React.FC = () => {
 
   const {
     model,
+    activeAgent,
     targetDir,
     debugMode,
     branchName,
@@ -210,6 +211,7 @@ export const Footer: React.FC = () => {
     terminalWidth,
   } = {
     model: uiState.currentModel,
+    activeAgent: uiState.activeAgent,
     targetDir: config.getTargetDir(),
     debugMode: config.getDebugMode(),
     branchName: uiState.branchName,
@@ -329,6 +331,15 @@ export const Footer: React.FC = () => {
           header,
           () => <Text color={itemColor}>{str}</Text>,
           str.length,
+        );
+        break;
+      }
+      case 'agent-name': {
+        addCol(
+          id,
+          header,
+          () => <Text color={itemColor}>{activeAgent}</Text>,
+          activeAgent.length,
         );
         break;
       }

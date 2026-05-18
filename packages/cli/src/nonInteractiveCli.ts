@@ -67,6 +67,7 @@ export async function runNonInteractive(
   params: RunNonInteractiveParams,
 ): Promise<void> {
   const useAgentSession =
+    params.config.getAgent() === 'gemini-enterprise' ||
     params.config.getAgentSessionNoninteractiveEnabled() ||
     process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
   if (useAgentSession) {

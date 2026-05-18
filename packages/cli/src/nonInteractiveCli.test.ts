@@ -193,6 +193,7 @@ describe('runNonInteractive', () => {
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
       getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
+      getAgent: vi.fn().mockReturnValue('gemini-cli'),
     } as unknown as Config;
 
     mockSettings = {

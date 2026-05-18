@@ -114,6 +114,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isAgentDialogOpen: boolean;
   isVoiceModelDialogOpen: boolean;
   isAgentConfigDialogOpen: boolean;
   selectedAgentName?: string;
@@ -162,6 +163,7 @@ export interface UIState {
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
   currentModel: string;
+  activeAgent: string;
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;

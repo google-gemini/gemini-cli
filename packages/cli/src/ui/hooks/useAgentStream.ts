@@ -569,8 +569,31 @@ export const useAgentStream = ({
     [pendingHistoryItem, pendingToolGroupItems],
   );
 
+  const reset = useCallback(() => {
+    setStreamingState(StreamingState.Idle);
+    setThought(null);
+    setPendingHistoryItem(null);
+    setTrackedTools([]);
+    setPushedToolCallIds(new Set());
+    setIsFirstToolInGroup(true);
+    setHasEmittedBoxInTurn(false);
+
+    currentStreamIdRef.current = null;
+    userMessageTimestampRef.current = 0;
+    geminiMessageBufferRef.current = '';
+  }, [
+    setStreamingState,
+    setThought,
+    setPendingHistoryItem,
+    setTrackedTools,
+    setPushedToolCallIds,
+    setIsFirstToolInGroup,
+    setHasEmittedBoxInTurn,
+  ]);
+
   return {
     streamingState,
+    reset,
     submitQuery,
     initError,
     pendingHistoryItems,

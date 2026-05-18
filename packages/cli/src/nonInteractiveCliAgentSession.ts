@@ -296,7 +296,9 @@ export async function runNonInteractive({
         });
       }
 
-      const useEnterprise = process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
+      const useEnterprise =
+        config.getAgent() === 'gemini-enterprise' ||
+        process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
       // Create AgentSession — owns the agentic loop
       const session = useEnterprise
         ? new EnterpriseAgentSession({ config, promptId: prompt_id })

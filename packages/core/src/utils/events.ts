@@ -54,6 +54,16 @@ export interface ModelChangedPayload {
 }
 
 /**
+ * Payload for the 'agent-changed' event.
+ */
+export interface AgentChangedPayload {
+  /**
+   * The new active agent.
+   */
+  agent: string;
+}
+
+/**
  * Payload for the 'approval-mode-changed' event.
  */
 export interface ApprovalModeChangedPayload {
@@ -196,6 +206,7 @@ export interface QuotaChangedPayload {
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
+  AgentChanged = 'agent-changed',
   ApprovalModeChanged = 'approval-mode-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
@@ -231,6 +242,7 @@ export interface EditorSelectedPayload {
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.AgentChanged]: [AgentChangedPayload];
   [CoreEvent.ApprovalModeChanged]: [ApprovalModeChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
@@ -342,6 +354,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that the active agent has changed.
+   */
+  emitAgentChanged(agent: string): void {
+    const payload: AgentChangedPayload = { agent };
+    this.emit(CoreEvent.AgentChanged, payload);
   }
 
   /**

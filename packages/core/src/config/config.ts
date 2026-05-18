@@ -643,6 +643,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  agent?: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   acpMode?: boolean;
@@ -734,6 +735,7 @@ export interface ConfigParameters {
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
+  onAgentChange?: (agent: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
@@ -831,6 +833,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private agent: string;
   private readonly disableLoopDetection: boolean;
   // null = unknown (quota not fetched); true = has access; false = definitively no access
   private hasAccessToPreviewModel: boolean | null = null;
@@ -947,6 +950,7 @@ export class Config implements McpContext, AgentLoopContext {
   private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
+  private readonly onAgentChange: ((agent: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
         disabledSkills?: string[];
@@ -1126,6 +1130,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.agent = params.agent ?? 'gemini-cli';
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? true;
@@ -1390,6 +1395,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
+    this.onAgentChange = params.onAgentChange;
     this.onReload = params.onReload;
 
     this.billing = {
@@ -1911,6 +1917,20 @@ export class Config implements McpContext, AgentLoopContext {
 
   getModel(): string {
     return this.model;
+  }
+
+  getAgent(): string {
+    return this.agent;
+  }
+
+  setAgent(newAgent: string, isTemporary = true): void {
+    if (this.agent !== newAgent) {
+      this.agent = newAgent;
+      coreEvents.emitAgentChanged(newAgent);
+    }
+    if (this.onAgentChange && !isTemporary) {
+      this.onAgentChange(newAgent);
+    }
   }
 
   getDisableLoopDetection(): boolean {

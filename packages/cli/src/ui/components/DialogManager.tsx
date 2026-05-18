@@ -25,6 +25,7 @@ import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
+import { AgentDialog } from './AgentDialog.js';
 import { VoiceModelDialog } from './VoiceModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -239,6 +240,14 @@ export const DialogManager = ({
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (uiState.isAgentDialogOpen) {
+    return (
+      <AgentDialog
+        onClose={uiActions.closeAgentDialog}
+        onSelect={uiActions.handleAgentSelect}
+      />
+    );
   }
   if (uiState.isVoiceModelDialogOpen) {
     return <VoiceModelDialog onClose={uiActions.closeVoiceModelDialog} />;

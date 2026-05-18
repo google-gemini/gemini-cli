@@ -1197,6 +1197,22 @@ export function saveModelChange(
   }
 }
 
+export function saveAgentChange(
+  loadedSettings: LoadedSettings,
+  agent: string,
+): void {
+  try {
+    loadedSettings.setValue(SettingScope.User, 'agent.name', agent);
+  } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
+    coreEvents.emitFeedback(
+      'error',
+      `Failed to save preferred agent: ${detailedErrorMessage}`,
+      error,
+    );
+  }
+}
+
 function migrateExperimentalSettings(
   settings: Settings,
   loadedSettings: LoadedSettings,

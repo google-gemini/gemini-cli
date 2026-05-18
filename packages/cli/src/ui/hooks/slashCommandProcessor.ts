@@ -72,6 +72,7 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openAgentDialog: () => void;
   openVoiceModelDialog: () => void;
   openAgentConfigDialog: (
     name: string,
@@ -505,6 +506,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'model':
                       actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'agent':
+                      actions.openAgentDialog();
                       return { type: 'handled' };
                     case 'voice-model':
                       actions.openVoiceModelDialog();

@@ -103,6 +103,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useAgentCommand } from './hooks/useAgentCommand.js';
 import { useVoiceModelCommand } from './hooks/useVoiceModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
@@ -147,6 +148,7 @@ import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
+import { ConsentPrompt } from './components/ConsentPrompt.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -938,6 +940,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
+  const { isAgentDialogOpen, openAgentDialog, closeAgentDialog } =
+    useAgentCommand();
+  const activeAgent = config?.getAgent() || 'gemini-cli';
 
   const {
     isVoiceModelDialogOpen,
@@ -968,6 +973,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openAgentDialog,
       openVoiceModelDialog,
       openAgentConfigDialog,
       openPermissionsDialog,
@@ -1007,6 +1013,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openAgentDialog,
       openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
@@ -1175,14 +1182,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const streamAgent = useMemo(
     () => {
-      if (process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true') {
+      if (activeAgent === 'gemini-enterprise') {
         return new EnterpriseAgentProtocol({ config });
       }
       return config?.getAgentSessionInteractiveEnabled()
         ? new LegacyAgentProtocol({ config, getPreferredEditor })
         : undefined;
     },
-    [config, getPreferredEditor],
+    [config, getPreferredEditor, activeAgent],
   );
 
   const activeStream = streamAgent
@@ -1237,6 +1244,65 @@ Logging in with Google... Restarting Gemini CLI to continue.
     dismissBackgroundTask,
     retryStatus,
   } = activeStream;
+
+  const handleAgentSelect = useCallback(
+    (agentName: string) => {
+      const doSwap = () => {
+        config.setAgent(agentName, false);
+
+        // 1. Reset UI history
+        historyManager.clearItems();
+        refreshStatic();
+        setBannerVisible(false);
+
+        // 2. Reset streaming loop state
+        if (activeStream && 'reset' in activeStream) {
+          (activeStream as { reset: () => void }).reset();
+        }
+      };
+
+      const isSessionNonEmpty = historyManager.history.some(
+        (item) => item.type === 'user' || item.type === 'gemini',
+      );
+
+      if (isSessionNonEmpty) {
+        setCustomDialog(
+          <ConsentPrompt
+            prompt={`Switching agents will completely clear your active session history. Do you want to proceed to switch to ${agentName}?`}
+            onConfirm={(confirm: boolean) => {
+              setCustomDialog(null);
+              if (confirm) {
+                doSwap();
+              }
+            }}
+            terminalWidth={terminalWidth}
+          />,
+        );
+      } else {
+        doSwap();
+      }
+    },
+    [
+      config,
+      historyManager,
+      refreshStatic,
+      setBannerVisible,
+      activeStream,
+      setCustomDialog,
+      terminalWidth,
+    ],
+  );
+
+  useEffect(() => {
+    const handleAgentChanged = (payload: { agent: string }) => {
+      handleAgentSelect(payload.agent);
+    };
+
+    coreEvents.on(CoreEvent.AgentChanged, handleAgentChanged);
+    return () => {
+      coreEvents.off(CoreEvent.AgentChanged, handleAgentChanged);
+    };
+  }, [handleAgentSelect]);
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -2215,6 +2281,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isAgentDialogOpen ||
     isVoiceModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
@@ -2476,6 +2543,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isAgentDialogOpen,
       isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
@@ -2526,6 +2594,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
+      activeAgent,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2589,6 +2658,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isAgentDialogOpen,
       isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
@@ -2660,6 +2730,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ideTrustRestartReason,
       isRestarting,
       currentModel,
+      activeAgent,
       extensionsUpdateState,
       activePtyId,
       backgroundTaskCount,
@@ -2705,6 +2776,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      closeAgentDialog,
+      handleAgentSelect,
       openVoiceModelDialog,
       closeVoiceModelDialog,
       openAgentConfigDialog,
@@ -2807,6 +2880,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      closeAgentDialog,
+      handleAgentSelect,
       openVoiceModelDialog,
       closeVoiceModelDialog,
       openAgentConfigDialog,

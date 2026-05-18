@@ -51,6 +51,7 @@ import {
   type Settings,
   type MergedSettings,
   saveModelChange,
+  saveAgentChange,
   loadSettings,
   isWorktreeEnabled,
   type LoadedSettings,
@@ -77,6 +78,7 @@ import { runExitCleanup } from '../utils/cleanup.js';
 export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
+  agent?: string;
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
@@ -288,6 +290,12 @@ export async function parseArguments(
           type: 'string',
           nargs: 1,
           description: `Model`,
+        })
+        .option('agent', {
+          alias: 'a',
+          type: 'string',
+          nargs: 1,
+          description: `Agent to use: gemini-cli or gemini-enterprise`,
         })
         .option('prompt', {
           alias: 'p',
@@ -840,6 +848,18 @@ export async function loadCliConfig(
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
       ? defaultModel
       : specifiedModel || defaultModel;
+
+  const defaultAgent = 'gemini-cli';
+  const rawAgent =
+    argv.agent || process.env['GEMINI_CLI_AGENT'] || settings.agent?.name;
+
+  const specifiedAgent = Array.isArray(rawAgent)
+    ? String(rawAgent.at(-1) ?? '').trim() || ''
+    : rawAgent === undefined
+      ? undefined
+      : String(rawAgent ?? '').trim() || '';
+
+  const resolvedAgent = specifiedAgent || defaultAgent;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   if (sandboxConfig) {
     const existingPaths = sandboxConfig.allowedPaths || [];
@@ -1014,6 +1034,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
+    agent: resolvedAgent,
     maxSessionTurns: settings.model?.maxSessionTurns,
 
     listExtensions: argv.listExtensions || false,
@@ -1093,6 +1114,7 @@ export async function loadCliConfig(
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
+    onAgentChange: (agent: string) => saveAgentChange(loadSettings(cwd), agent),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {

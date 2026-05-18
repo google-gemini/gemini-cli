@@ -19,6 +19,7 @@ import {
   type Config,
   type ResumedSessionData,
   coreEvents,
+  CoreEvent,
   createWorkingStdio,
   disableMouseEvents,
   enableMouseEvents,
@@ -101,6 +102,17 @@ export async function startInteractiveUI(
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
+    const [agentKey, setAgentKey] = React.useState(() => config.getAgent());
+
+    React.useEffect(() => {
+      const handleAgentChanged = (payload: { agent: string }) => {
+        setAgentKey(payload.agent);
+      };
+      coreEvents.on(CoreEvent.AgentChanged, handleAgentChanged);
+      return () => {
+        coreEvents.off(CoreEvent.AgentChanged, handleAgentChanged);
+      };
+    }, []);
 
     return (
       <SettingsContext.Provider value={settings}>
@@ -113,6 +125,7 @@ export async function startInteractiveUI(
                     <SessionStatsProvider sessionId={config.getSessionId()}>
                       <VimModeProvider>
                         <AppContainer
+                          key={agentKey}
                           config={config}
                           startupWarnings={startupWarnings}
                           version={version}
