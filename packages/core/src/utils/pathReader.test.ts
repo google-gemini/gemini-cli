@@ -413,6 +413,21 @@ describe('readPathFromWorkspace', () => {
     ).rejects.toThrow('Path not found in workspace: not-found.txt');
   });
 
+  it('should prevent path traversal outside the workspace via relative paths', async () => {
+    mock({
+      [CWD]: {},
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const config = createMockConfig(CWD);
+    // Attempt to traverse out of CWD to OUTSIDE_DIR
+    const relativeTraversal = path.join('..', 'outside', 'secret.txt');
+    await expect(
+      readPathFromWorkspace(relativeTraversal, config),
+    ).rejects.toThrow(`Path not found in workspace: ${relativeTraversal}`);
+  });
+
   // mock-fs permission simulation is unreliable on Windows.
   it.skipIf(process.platform === 'win32')(
     'should return an error string if reading a file with no permissions',

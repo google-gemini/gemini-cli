@@ -40,6 +40,12 @@ export async function readPathFromWorkspace(
     const searchDirs = workspace.getDirectories();
     for (const dir of searchDirs) {
       const potentialPath = path.resolve(dir, pathStr);
+
+      // Security check: ensure the resolved path is actually within the workspace.
+      if (!workspace.isPathWithinWorkspace(potentialPath)) {
+        continue;
+      }
+
       try {
         await fs.access(potentialPath);
         absolutePath = potentialPath;
