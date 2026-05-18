@@ -52,8 +52,11 @@ import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
+import { configureInkStringWidth } from '../ui/utils/configureInkStringWidth.js';
 
 export const persistentStateMock = new FakePersistentState();
+
+configureInkStringWidth();
 
 if (process.env['NODE_ENV'] === 'test') {
   // We mock NODE_ENV to development during tests that use render.tsx

@@ -40,7 +40,7 @@ import {
   cpIndexToOffset,
 } from '../utils/textUtils.js';
 import chalk from 'chalk';
-import stringWidth from 'string-width';
+import { getTerminalStringWidth as stringWidth } from '../utils/terminalStringWidth.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import {

@@ -7,9 +7,9 @@
 import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
-import stringWidth from 'string-width';
 import { LRUCache } from 'mnemonist';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
+import { getTerminalStringWidth as stringWidth } from './terminalStringWidth.js';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
