@@ -49,7 +49,6 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
-  getReleaseChannel?(): string;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -125,7 +124,6 @@ export function resolveModel(
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
-  releaseChannel?: string,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -134,15 +132,12 @@ export function resolveModel(
       ? String(requestedModel ?? '').trim() || ''
       : requestedModel.trim() || '';
 
-  const currentReleaseChannel = releaseChannel ?? config?.getReleaseChannel?.();
-
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
-      releaseChannel: currentReleaseChannel,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {

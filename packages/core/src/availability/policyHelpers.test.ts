@@ -229,9 +229,6 @@ describe('policyHelpers', () => {
         wrapsAround,
         ...rest
       }) => {
-        const releaseChannel = (rest as Record<string, unknown>)[
-          'releaseChannel'
-        ] as string | undefined;
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
@@ -241,7 +238,7 @@ describe('policyHelpers', () => {
               getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
-              getReleaseChannel: () => releaseChannel ?? 'preview',
+              getReleaseChannel: () => 'preview',
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 
