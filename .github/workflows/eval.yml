@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
 
 defaults:
+  env:
+      GH_ACTOR: ${{ github.actor }}
   run:
     shell: 'bash'
 
