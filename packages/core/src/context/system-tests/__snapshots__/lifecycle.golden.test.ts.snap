@@ -2,127 +2,182 @@
 
 exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge Tool Output & Images 1`] = `
 {
-  "baseUnits": 787,
+  "baseUnits": 765,
   "finalProjection": [
     {
-      "parts": [
-        {
-          "text": "System Instructions",
-        },
-      ],
-      "role": "user",
-    },
-    {
-      "parts": [
-        {
-          "text": "Ack.",
-        },
-      ],
-      "role": "model",
-    },
-    {
-      "parts": [
-        {
-          "text": "Hello!",
-        },
-      ],
-      "role": "user",
-    },
-    {
-      "parts": [
-        {
-          "text": "Hi, how can I help?",
-        },
-      ],
-      "role": "model",
-    },
-    {
-      "parts": [
-        {
-          "text": "Read the logs.",
-        },
-      ],
-      "role": "user",
-    },
-    {
-      "parts": [
-        {
-          "functionCall": {
-            "args": {
-              "cmd": "cat server.log",
-            },
-            "name": "run_shell_command",
+      "content": {
+        "parts": [
+          {
+            "text": "System Instructions",
           },
-          "thoughtSignature": "skip_thought_signature_validator",
-        },
-      ],
-      "role": "model",
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "functionResponse": {
-            "name": "run_shell_command",
-            "response": {
-              "output": "<tool_output_masked>
+      "content": {
+        "parts": [
+          {
+            "text": "Ack.",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hello!",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hi, how can I help?",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Read the logs.",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "functionCall": {
+              "args": {
+                "cmd": "cat server.log",
+              },
+              "name": "run_shell_command",
+            },
+            "thoughtSignature": "skip_thought_signature_validator",
+          },
+          {
+            "functionCall": {
+              "args": {},
+              "id": "undefined",
+              "name": "run_shell_command",
+            },
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "functionResponse": {
+              "name": "run_shell_command",
+              "response": {
+                "output": "<tool_output_masked>
 [Tool observation string (0.02MB, 1 lines) masked to preserve context window. Full string saved to: <MOCKED_DIR>]
 </tool_output_masked>",
+              },
             },
           },
-        },
-      ],
-      "role": "user",
+          {
+            "functionResponse": {
+              "id": "undefined",
+              "name": "run_shell_command",
+              "response": {
+                "error": "The tool execution result was lost due to context management truncation.",
+              },
+            },
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "The logs are very long.",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "The logs are very long.",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Look at this architecture diagram:",
-        },
-        {
-          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Look at this architecture diagram:",
+          },
+          {
+            "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Nice diagram.",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Nice diagram.",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Can we refactor?",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Can we refactor?",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Yes we can.",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Yes we can.",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Please continue.",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Please continue.",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
   ],
   "tokenTrajectory": [
@@ -137,18 +192,18 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 497,
+      "tokensAfterBackground": 493,
       "tokensBeforeBackground": 20232,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 750,
-      "tokensBeforeBackground": 3554,
+      "tokensAfterBackground": 728,
+      "tokensBeforeBackground": 3550,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 787,
-      "tokensBeforeBackground": 787,
+      "tokensAfterBackground": 765,
+      "tokensBeforeBackground": 765,
       "turnIndex": 4,
     },
   ],
@@ -160,44 +215,59 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
   "baseUnits": 68,
   "finalProjection": [
     {
-      "parts": [
-        {
-          "text": "System Instructions",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "System Instructions",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Ack.",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Ack.",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Hello!",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Hello!",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Hi, how can I help?",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Hi, how can I help?",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Please continue.",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Please continue.",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
   ],
   "tokenTrajectory": [
@@ -220,60 +290,81 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Node Distillation of Large 
   "baseUnits": 5370,
   "finalProjection": [
     {
-      "parts": [
-        {
-          "text": "Mock response from: utility_compressor, for: {"text":"A...AAAAAAAA"}",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Mock response from: utility_compressor, for: {"text":"A...AAAAAAAA"}",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Mock response from: utility_compressor, for: {"text":"B...BBBBBBBB"}",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Mock response from: utility_compressor, for: {"text":"B...BBBBBBBB"}",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Mock response from: utility_compressor, for: {"text":"C...CCCCCCCC"}",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Mock response from: utility_compressor, for: {"text":"C...CCCCCCCC"}",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Mock response from: utility_compressor, for: {"text":"D...DDDDDDDD"}",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Mock response from: utility_compressor, for: {"text":"D...DDDDDDDD"}",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Mock response from: utility_compressor, for: {"text":"E...EEEEEEEE"}",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Mock response from: utility_compressor, for: {"text":"E...EEEEEEEE"}",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Please continue.",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Please continue.",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
   ],
   "tokenTrajectory": [
@@ -301,31 +392,40 @@ exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC 
   "baseUnits": 505,
   "finalProjection": [
     {
-      "parts": [
-        {
-          "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
-        },
-        {
-          "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
+          },
+          {
+            "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 ..................................................",
-        },
-      ],
-      "role": "model",
+      "content": {
+        "parts": [
+          {
+            "text": "Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 Msg 9 ..................................................",
+          },
+        ],
+        "role": "model",
+      },
+      "id": "<UUID>",
     },
     {
-      "parts": [
-        {
-          "text": "Please continue.",
-        },
-      ],
-      "role": "user",
+      "content": {
+        "parts": [
+          {
+            "text": "Please continue.",
+          },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
     },
   ],
   "tokenTrajectory": [
