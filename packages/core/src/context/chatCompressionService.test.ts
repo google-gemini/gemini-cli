@@ -130,6 +130,25 @@ describe('modelStringToModelConfigAlias', () => {
       'chat-compression-2.5-flash-lite',
     );
   });
+
+  it('should handle auto aliases and other convenient aliases', () => {
+    expect(modelStringToModelConfigAlias('auto')).toBe(
+      'chat-compression-3-pro',
+    );
+    expect(modelStringToModelConfigAlias('auto-gemini-3')).toBe(
+      'chat-compression-3-pro',
+    );
+    expect(modelStringToModelConfigAlias('pro')).toBe('chat-compression-3-pro');
+    expect(modelStringToModelConfigAlias('flash')).toBe(
+      'chat-compression-3-flash',
+    );
+    expect(modelStringToModelConfigAlias('flash-lite')).toBe(
+      'chat-compression-3.1-flash-lite',
+    );
+    expect(modelStringToModelConfigAlias('auto-gemini-2.5')).toBe(
+      'chat-compression-2.5-pro',
+    );
+  });
 });
 
 describe('ChatCompressionService', () => {

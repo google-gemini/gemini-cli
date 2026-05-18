@@ -768,7 +768,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-default": {
         "modelConfig": {
-          "model": "gemini-3-pro-preview"
+          "model": "gemini-3.1-flash-lite-preview"
         }
       },
       "agent-history-provider-summarizer": {

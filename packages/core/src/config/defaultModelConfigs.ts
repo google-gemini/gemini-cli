@@ -284,7 +284,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'chat-compression-default': {
       modelConfig: {
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-flash-lite-preview',
       },
     },
     'agent-history-provider-summarizer': {
