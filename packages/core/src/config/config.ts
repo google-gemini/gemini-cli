@@ -237,6 +237,7 @@ export interface GemmaModelRouterSettings {
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
+  agentSessionSubagentEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -688,6 +689,7 @@ export interface ConfigParameters {
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
+  fakeResponsesNonStrict?: string;
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
@@ -913,12 +915,14 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
+  private readonly agentSessionSubagentEnabled: boolean;
 
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
+  readonly fakeResponsesNonStrict?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
   private readonly disableAlwaysAllow: boolean;
@@ -1299,6 +1303,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
+    this.fakeResponsesNonStrict = params.fakeResponsesNonStrict;
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -1359,6 +1364,8 @@ export class Config implements McpContext, AgentLoopContext {
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.agentSessionInteractiveEnabled =
       params.adk?.agentSessionInteractiveEnabled ?? false;
+    this.agentSessionSubagentEnabled =
+      params.adk?.agentSessionSubagentEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -2571,6 +2578,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isContextManagementEnabled(): boolean {
     return this.contextManagement.enabled;
+  }
+
+  isAgentSessionSubagentEnabled(): boolean {
+    return this.agentSessionSubagentEnabled;
   }
 
   getMemoryBoundaryMarkers(): readonly string[] {

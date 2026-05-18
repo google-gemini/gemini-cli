@@ -47,7 +47,9 @@ describe('ContextManager - Hot Start Calibration', () => {
     const emitGroundTruthSpy = vi.spyOn(env.eventBus, 'emitTokenGroundTruth');
 
     // Add a node to make the buffer non-empty
-    chatHistory.set([{ role: 'user', parts: [{ text: 'Hello' }] }]);
+    chatHistory.set([
+      { id: 'h1', content: { role: 'user', parts: [{ text: 'Hello' }] } },
+    ]);
 
     // First render should trigger calibration
     await contextManager.renderHistory();
@@ -81,7 +83,9 @@ describe('ContextManager - Hot Start Calibration', () => {
     );
 
     // Add a node
-    chatHistory.set([{ role: 'user', parts: [{ text: 'Hello' }] }]);
+    chatHistory.set([
+      { id: 'h1', content: { role: 'user', parts: [{ text: 'Hello' }] } },
+    ]);
 
     // Render should succeed without throwing
     const result = await contextManager.renderHistory();
