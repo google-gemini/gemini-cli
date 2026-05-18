@@ -1309,18 +1309,30 @@ export async function discoverTools(
 
         if (toolDef.inputSchema) {
           try {
-            let schemaStr = JSON.stringify(toolDef.inputSchema);
-            schemaStr = schemaStr
-              .replace(
-                /"type"\s*:\s*\[\s*"([^"]+)"\s*,\s*"null"\s*\]/g,
-                '"type":"$1","nullable":true',
-              )
-              .replace(
-                /"type"\s*:\s*\[\s*"null"\s*,\s*"([^"]+)"\s*\]/g,
-                '"type":"$1","nullable":true',
-              );
+            const transform = (obj: unknown): unknown => {
+              if (obj === null || typeof obj !== 'object') return obj;
+              if (Array.isArray(obj)) return obj.map(transform);
+
+              const res = { ...obj } as Record<string, unknown>;
+
+              if (Array.isArray(res['type']) && res['type'].length === 2) {
+                const nIdx = res['type'].indexOf('null');
+                if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
+                  res['type'] = res['type'][1 - nIdx];
+                  res['nullable'] = true;
+                }
+              }
+
+              for (const k in res) {
+                if (Object.prototype.hasOwnProperty.call(res, k)) {
+                  res[k] = transform(res[k]);
+                }
+              }
+              return res;
+            };
+
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            toolDef.inputSchema = JSON.parse(schemaStr) as {
+            toolDef.inputSchema = transform(toolDef.inputSchema) as {
               type: 'object';
               properties?: Record<string, object>;
               required?: string[];
