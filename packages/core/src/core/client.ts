@@ -335,7 +335,7 @@ export class GeminiClient {
   }
 
   async resumeChat(
-    history: Content[],
+    history: readonly Content[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
@@ -376,7 +376,7 @@ export class GeminiClient {
   }
 
   async startChat(
-    extraHistory?: Content[],
+    extraHistory?: readonly Content[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
