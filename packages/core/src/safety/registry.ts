@@ -56,6 +56,14 @@ export class CheckerRegistry {
           `Custom checker "${name}" path must be absolute: ${checkerPath}`,
         );
       }
+      if (checkerPath.includes('..')) {
+        throw new Error(
+          `Custom checker "${name}" path must not contain '..': ${checkerPath}`,
+        );
+      }
+      if (!fs.existsSync(checkerPath)) {
+        throw new Error(`Custom checker "${name}" not found at ${checkerPath}`);
+      }
     }
   }
 
@@ -76,16 +84,16 @@ export class CheckerRegistry {
       if (!fs.existsSync(fullPath)) {
         throw new Error(`Built-in checker "${name}" not found at ${fullPath}`);
       }
-      return fullPath;
+      // Resolve symlinks to prevent symlink substitution attacks
+      return fs.realpathSync(fullPath);
     }
 
     // Check custom external checkers
     const customPath = this.customCheckers.get(name);
     if (customPath) {
-      if (!fs.existsSync(customPath)) {
-        throw new Error(`Custom checker "${name}" not found at ${customPath}`);
-      }
-      return customPath;
+      // Resolve symlinks to prevent symlink substitution attacks
+      const resolvedPath = fs.realpathSync(customPath);
+      return resolvedPath;
     }
 
     throw new Error(

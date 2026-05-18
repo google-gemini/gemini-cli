@@ -57,6 +57,9 @@ describe('CheckerRegistry', () => {
 
   describe('custom external checkers', () => {
     it('should resolve custom external checkers when provided', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
+
       const customCheckers = new Map([
         ['my-custom-checker', '/path/to/my-checker'],
       ]);
@@ -65,29 +68,27 @@ describe('CheckerRegistry', () => {
         customCheckers,
       );
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-
       const resolvedPath = customRegistry.resolveExternal('my-custom-checker');
       expect(resolvedPath).toBe('/path/to/my-checker');
     });
 
     it('should throw when custom checker executable does not exist', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
       const customCheckers = new Map([
         ['missing-checker', '/path/to/missing-checker'],
       ]);
-      const customRegistry = new CheckerRegistry(
-        mockCheckersPath,
-        customCheckers,
-      );
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-
-      expect(() => customRegistry.resolveExternal('missing-checker')).toThrow(
+      expect(
+        () => new CheckerRegistry(mockCheckersPath, customCheckers),
+      ).toThrow(
         'Custom checker "missing-checker" not found at /path/to/missing-checker',
       );
     });
 
     it('should include custom checkers in getAllExternalCheckerNames', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+
       const customCheckers = new Map([
         ['custom-one', '/path/to/one'],
         ['custom-two', '/path/to/two'],
@@ -103,6 +104,8 @@ describe('CheckerRegistry', () => {
     });
 
     it('should include custom checkers in getAllCheckers', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+
       const customCheckers = new Map([['custom-checker', '/path/to/checker']]);
       const customRegistry = new CheckerRegistry(
         mockCheckersPath,
@@ -125,6 +128,8 @@ describe('CheckerRegistry', () => {
     });
 
     it('should validate checker names for custom checkers', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+
       const customCheckers = new Map([['valid-name', '/path/to/checker']]);
       const customRegistry = new CheckerRegistry(
         mockCheckersPath,
@@ -145,6 +150,18 @@ describe('CheckerRegistry', () => {
         () => new CheckerRegistry(mockCheckersPath, customCheckers),
       ).toThrow(
         'Custom checker "relative-checker" path must be absolute: ./relative/path/to/checker',
+      );
+    });
+
+    it('should reject paths with traversal sequences', () => {
+      const customCheckers = new Map([
+        ['traversal-checker', '/safe/path/../../../etc/malicious'],
+      ]);
+
+      expect(
+        () => new CheckerRegistry(mockCheckersPath, customCheckers),
+      ).toThrow(
+        'Custom checker "traversal-checker" path must not contain \'..\'',
       );
     });
   });
