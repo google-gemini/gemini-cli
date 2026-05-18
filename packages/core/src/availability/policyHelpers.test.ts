@@ -227,7 +227,6 @@ describe('policyHelpers', () => {
         hasAccess,
         authType,
         wrapsAround,
-        ...rest
       }) => {
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
