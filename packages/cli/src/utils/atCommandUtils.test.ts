@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 import { resolveAtCommandPath } from './atCommandUtils.js';
 import { type Config } from '@google/gemini-cli-core';
 
@@ -36,7 +37,7 @@ describe('atCommandUtils', () => {
       isDirectory: () => false,
       isFile: () => true,
     };
-    vi.mocked(fs.stat).mockResolvedValue(mockStats as unknown as fs.Stats);
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
 
     const result = await resolveAtCommandPath(
       'file.ts',
@@ -53,7 +54,7 @@ describe('atCommandUtils', () => {
       isDirectory: () => false,
       isFile: () => true,
     };
-    vi.mocked(fs.stat).mockResolvedValue(mockStats as unknown as fs.Stats);
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
 
     const absolutePath = path.resolve('/mock/root', 'src/index.ts');
     const result = await resolveAtCommandPath(
@@ -67,7 +68,7 @@ describe('atCommandUtils', () => {
   });
 
   it('should handle multiple directories in workspace context', async () => {
-    (mockWorkspaceContext.getDirectories as Mock).mockReturnValue([
+    (mockWorkspaceContext['getDirectories'] as Mock).mockReturnValue([
       '/dir1',
       '/dir2',
     ]);
@@ -76,9 +77,9 @@ describe('atCommandUtils', () => {
       isFile: () => true,
     };
 
-    vi.mocked(fs.stat).mockImplementation(async (p) => {
+    vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
       if (p === path.resolve('/dir2', 'file.txt')) {
-        return mockStats as unknown as fs.Stats;
+        return mockStats as unknown as Stats;
       }
       throw new Error('ENOENT');
     });
@@ -115,7 +116,7 @@ describe('atCommandUtils', () => {
   });
 
   it('should return null if path does not exist in any workspace directory', async () => {
-    vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+    vi.mocked(fsPromises.stat).mockRejectedValue(new Error('ENOENT'));
 
     const result = await resolveAtCommandPath(
       'nonexistent.ts',
@@ -130,7 +131,7 @@ describe('atCommandUtils', () => {
       isDirectory: () => true,
       isFile: () => false,
     };
-    vi.mocked(fs.stat).mockResolvedValue(mockStats as unknown as fs.Stats);
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
 
     const result = await resolveAtCommandPath(
       'src',
@@ -141,11 +142,11 @@ describe('atCommandUtils', () => {
   });
 
   it('should respect validatePathAccess for paths within root', async () => {
-    (mockConfig.validatePathAccess as Mock).mockReturnValue(
+    (mockConfig['validatePathAccess'] as Mock).mockReturnValue(
       'Unauthorized access',
     );
     // Mock getTargetDir to match the resolved path so it's considered "within root"
-    (mockConfig.getTargetDir as Mock).mockReturnValue('/mock/root');
+    (mockConfig['getTargetDir'] as Mock).mockReturnValue('/mock/root');
 
     const result = await resolveAtCommandPath(
       'secret.txt',
@@ -155,16 +156,16 @@ describe('atCommandUtils', () => {
   });
 
   it('should return null for unauthorized paths (letting calling site handle it, e.g. acpSession permission dialog)', async () => {
-    (mockConfig.validatePathAccess as Mock).mockReturnValue(
+    (mockConfig['validatePathAccess'] as Mock).mockReturnValue(
       'Outside workspace',
     );
-    (mockConfig.getTargetDir as Mock).mockReturnValue('/mock/workspace');
+    (mockConfig['getTargetDir'] as Mock).mockReturnValue('/mock/workspace');
 
     const mockStats = {
       isDirectory: () => false,
       isFile: () => true,
     };
-    vi.mocked(fs.stat).mockResolvedValue(mockStats as unknown as fs.Stats);
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
 
     // Path resolve will use /mock/root as base from mockWorkspaceContext
     const result = await resolveAtCommandPath(
