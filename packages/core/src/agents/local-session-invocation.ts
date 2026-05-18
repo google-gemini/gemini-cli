@@ -31,6 +31,7 @@ import {
   sanitizeToolArgs,
   sanitizeErrorMessage,
 } from '../utils/agent-sanitization-utils.js';
+import { checkExhaustive } from '../utils/checks.js';
 import { LocalSubagentSession } from './local-subagent-protocol.js';
 import type { AgentEvent } from '../agent/types.js';
 
@@ -128,13 +129,13 @@ export class LocalSessionInvocation extends BaseToolInvocation<
       switch (activity.type) {
         case 'THOUGHT_CHUNK': {
           const rawText = activity.data['text'];
-          const text = typeof rawText === 'string' ? rawText.trim() : '';
+          const text = typeof rawText === 'string' ? rawText : '';
           const lastItem = recentActivity[recentActivity.length - 1];
 
           if (
             lastItem &&
             lastItem.type === 'thought' &&
-            lastItem.status === 'running'
+            lastItem.status === SubagentState.RUNNING
           ) {
             lastItem.content = sanitizeThoughtContent(text);
           } else {
@@ -267,6 +268,7 @@ export class LocalSessionInvocation extends BaseToolInvocation<
           break;
         }
         default:
+          checkExhaustive(activity.type);
           break;
       }
 
