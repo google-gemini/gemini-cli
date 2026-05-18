@@ -6,11 +6,7 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import {
-  validatePath,
-  isWithinRoot,
-  type Config,
-} from '@google/gemini-cli-core';
+import { validatePath, type Config } from '@google/gemini-cli-core';
 
 export interface ResolvedAtCommandPath {
   absolutePath: string;
@@ -52,16 +48,10 @@ export async function resolveAtCommandPath(
       // Final workspace boundary check using centralized logic
       const validationError = config.validatePathAccess(absolutePath, 'read');
       if (validationError) {
-        // If it's outside root, we might still allow it with explicit user permission in acpSession,
-        // but for now, we follow the general rule.
-        if (!isWithinRoot(absolutePath, config.getTargetDir())) {
-          // Proceed to stat check, calling sites will handle permission dialogs if needed
-        } else {
-          onDebugMessage(
-            `Skipping unauthorized path: ${absolutePath}. Reason: ${validationError}`,
-          );
-          continue;
-        }
+        onDebugMessage(
+          `Skipping unauthorized path: ${absolutePath}. Reason: ${validationError}`,
+        );
+        continue;
       }
 
       const stats = await fs.stat(absolutePath);
