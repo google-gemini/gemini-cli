@@ -743,6 +743,17 @@ export interface ConfigParameters {
    * values are absolute paths to the checker executables.
    */
   customSafetyCheckers?: Map<string, string>;
+  /**
+   * List of trusted directories for custom safety checkers.
+   * Checkers outside these directories require explicit approval.
+   * Defaults to system-wide trusted locations.
+   */
+  trustedCheckerDirectories?: string[];
+  /**
+   * Set of custom checker names that have been explicitly approved
+   * by the user, even if they are outside trusted directories.
+   */
+  approvedUntrustedCheckers?: Set<string>;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -785,6 +796,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
   private readonly customSafetyCheckers: Map<string, string>;
+  private readonly trustedCheckerDirectories: string[];
+  private readonly approvedUntrustedCheckers: Set<string>;
 
   private readonly coreTools: string[] | undefined;
   private readonly mainAgentTools: string[] | undefined;
@@ -1314,13 +1327,18 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableConseca = params.enableConseca ?? false;
     this.customSafetyCheckers =
       params.customSafetyCheckers ?? new Map<string, string>();
+    this.trustedCheckerDirectories = params.trustedCheckerDirectories ?? [];
+    this.approvedUntrustedCheckers =
+      params.approvedUntrustedCheckers ?? new Set<string>();
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
     const checkersPath = this.targetDir;
     const checkerRegistry = new CheckerRegistry(
       checkersPath,
-      params.customSafetyCheckers,
+      this.customSafetyCheckers,
+      this.trustedCheckerDirectories,
+      this.approvedUntrustedCheckers,
     );
     const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
       checkersPath,

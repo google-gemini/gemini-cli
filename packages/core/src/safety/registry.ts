@@ -12,6 +12,16 @@ import { InProcessCheckerType } from '../policy/types.js';
 import { ConsecaSafetyChecker } from './conseca/conseca.js';
 
 /**
+ * Default trusted directories for custom safety checkers.
+ * Paths outside these directories require explicit user approval.
+ */
+const DEFAULT_TRUSTED_CHECKER_DIRECTORIES = [
+  '/usr/local/bin',
+  '/usr/bin',
+  '/opt/gemini-cli/checkers',
+];
+
+/**
  * Registry for managing safety checker resolution.
  */
 export class CheckerRegistry {
@@ -40,12 +50,20 @@ export class CheckerRegistry {
   private static readonly VALID_NAME_PATTERN = /^[a-z0-9-]+$/;
 
   private readonly customCheckers: Map<string, string>;
+  private readonly trustedCheckerDirectories: string[];
+  private readonly approvedUntrustedCheckers: Set<string>;
 
   constructor(
     private readonly checkersPath: string,
     customCheckers?: Map<string, string>,
+    trustedCheckerDirectories?: string[],
+    approvedUntrustedCheckers?: Set<string>,
   ) {
     this.customCheckers = customCheckers ?? new Map<string, string>();
+    this.trustedCheckerDirectories =
+      trustedCheckerDirectories ?? DEFAULT_TRUSTED_CHECKER_DIRECTORIES;
+    this.approvedUntrustedCheckers =
+      approvedUntrustedCheckers ?? new Set<string>();
     this.validateCustomCheckerPaths();
   }
 
@@ -63,6 +81,18 @@ export class CheckerRegistry {
       }
       if (!fs.existsSync(checkerPath)) {
         throw new Error(`Custom checker "${name}" not found at ${checkerPath}`);
+      }
+
+      // Check if path is within a trusted directory or explicitly approved
+      const isInTrustedDir = this.trustedCheckerDirectories.some((dir) =>
+        checkerPath.startsWith(dir + path.sep),
+      );
+
+      if (!isInTrustedDir && !this.approvedUntrustedCheckers.has(name)) {
+        throw new Error(
+          `Custom checker "${name}" at ${checkerPath} is outside trusted directories. ` +
+            `Add to approved list or place in one of: ${this.trustedCheckerDirectories.join(', ')}`,
+        );
       }
     }
   }
