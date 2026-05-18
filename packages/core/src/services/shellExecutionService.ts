@@ -31,7 +31,6 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { getDotEnvKeys } from '../utils/dotEnvTracker.js';
 import {
   NoopSandboxManager,
   type SandboxManager,
@@ -106,6 +105,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  projectEnvKeys?: ReadonlySet<string>;
 }
 
 /**
@@ -444,8 +444,7 @@ export class ShellExecutionService {
 
     // Remove variables that were injected from the project's .env file so they
     // don't override subprocess-level configurations (e.g. phpunit.xml test DB).
-    const dotEnvKeys = getDotEnvKeys();
-    for (const key of dotEnvKeys) {
+    for (const key of shellExecutionConfig.projectEnvKeys ?? []) {
       delete sanitizedEnv[key];
     }
 

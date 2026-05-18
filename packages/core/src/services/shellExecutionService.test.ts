@@ -24,8 +24,7 @@ import {
 } from './shellExecutionService.js';
 import { NoopSandboxManager } from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
-import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
-import { recordDotEnvKeys, clearDotEnvKeys } from '../utils/dotEnvTracker.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -179,7 +178,7 @@ const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
       isUninitialized: false,
       fg: '',
       bg: '',
-    } as AnsiToken,
+    },
   ]);
   return expected;
 };
@@ -209,7 +208,6 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDotEnvKeys();
     ExecutionLifecycleService.resetForTest();
     ShellExecutionService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
@@ -1163,11 +1161,18 @@ describe('ShellExecutionService', () => {
 
     it('should strip project .env keys from the subprocess environment', async () => {
       vi.stubEnv('DB_DATABASE', 'production_db');
-      recordDotEnvKeys(['DB_DATABASE']);
+      const config = {
+        ...shellExecutionConfig,
+        projectEnvKeys: new Set(['DB_DATABASE']),
+      };
 
-      await simulateExecution('php artisan test', (pty) => {
-        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
-      });
+      await simulateExecution(
+        'php artisan test',
+        (pty) => {
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        config,
+      );
 
       const spawnOptions = mockPtySpawn.mock.calls[0][2] as {
         env: Record<string, string>;
@@ -1197,11 +1202,18 @@ describe('ShellExecutionService', () => {
       for (const [key, val] of Object.entries(dotEnvVars)) {
         vi.stubEnv(key, val);
       }
-      recordDotEnvKeys(Object.keys(dotEnvVars));
+      const config = {
+        ...shellExecutionConfig,
+        projectEnvKeys: new Set(Object.keys(dotEnvVars)),
+      };
 
-      await simulateExecution('php artisan test', (pty) => {
-        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
-      });
+      await simulateExecution(
+        'php artisan test',
+        (pty) => {
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        config,
+      );
 
       const spawnOptions = mockPtySpawn.mock.calls[0][2] as {
         env: Record<string, string>;
@@ -1255,7 +1267,7 @@ describe('ShellExecutionService', () => {
 
       // Spy on the actual stored object's destroy
       const storedDestroySpy = vi.spyOn(
-        activePty!.ptyProcess as never as { destroy: () => void },
+        activePty!.ptyProcess as never,
         'destroy',
       );
 
@@ -1555,6 +1567,7 @@ describe('ShellExecutionService child_process fallback', () => {
           expect(result.aborted).toBe(true);
 
           if (platform === 'linux') {
+            // eslint-disable-next-line vitest/no-conditional-expect
             expect(mockProcessKill).toHaveBeenCalledWith(
               -mockChildProcess.pid!,
               expectedSignal,
@@ -1562,6 +1575,7 @@ describe('ShellExecutionService child_process fallback', () => {
           } else {
             // Taskkill is spawned via spawnAsync which is mocked
             const { spawnAsync } = await import('../utils/shell-utils.js');
+            // eslint-disable-next-line vitest/no-conditional-expect
             expect(spawnAsync).toHaveBeenCalledWith(expectedCommand, [
               '/pid',
               String(mockChildProcess.pid),
@@ -1943,9 +1957,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -2003,9 +2016,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -2060,9 +2072,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GITHUB_SHA', '');
     vi.stubEnv('SURFACE', '');
     vi.resetModules();
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -2168,9 +2179,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GIT_CONFIG_KEY_1', 'pull.rebase');
     vi.stubEnv('GIT_CONFIG_VALUE_1', 'true');
 
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     mockGetPty.mockResolvedValue(null); // Force child_process fallback
     await ShellExecutionService.execute(
@@ -2220,9 +2230,8 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GCM_INTERACTIVE', undefined);
     vi.stubEnv('GIT_CONFIG_COUNT', undefined);
 
-    const { ShellExecutionService } = await import(
-      './shellExecutionService.js'
-    );
+    const { ShellExecutionService } =
+      await import('./shellExecutionService.js');
 
     mockGetPty.mockResolvedValue(null); // Force child_process fallback
     await ShellExecutionService.execute(
