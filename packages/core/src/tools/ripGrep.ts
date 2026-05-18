@@ -8,20 +8,26 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  resolveToRealPath,
+  shortenPath,
+  makeRelative,
+  isTrustedSystemPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
-import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -29,7 +35,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -38,73 +44,50 @@ import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
-function getRgCandidateFilenames(): readonly string[] {
-  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
-}
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-async function resolveExistingRgPath(): Promise<string | null> {
-  const binDir = Storage.getGlobalBinDir();
-  for (const fileName of getRgCandidateFilenames()) {
-    const candidatePath = path.join(binDir, fileName);
-    if (await fileExists(candidatePath)) {
-      return candidatePath;
-    }
-  }
-  return null;
-}
-
-let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
 /**
- * Ensures a ripgrep binary is available.
- *
- * NOTE:
- * - The Gemini CLI currently prefers a managed ripgrep binary downloaded
- *   into its global bin directory.
- * - Even if ripgrep is available on the system PATH, it is intentionally
- *   not used at this time.
- *
- * Preference for system-installed ripgrep is blocked on:
- * - checksum verification of external binaries
- * - internalization of the get-ripgrep dependency
- *
- * See:
- * - feat(core): Prefer rg in system path (#11847)
- * - Move get-ripgrep to third_party (#12099)
+ * Resolves the path to the ripgrep binary, either bundled or system-level.
+ * Validates system binaries against trusted directories to prevent RCE.
  */
-async function ensureRipgrepAvailable(): Promise<string | null> {
-  const existingPath = await resolveExistingRgPath();
-  if (existingPath) {
-    return existingPath;
-  }
-  if (!ripgrepAcquisitionPromise) {
-    ripgrepAcquisitionPromise = (async () => {
-      try {
-        await downloadRipGrep(Storage.getGlobalBinDir());
-        return await resolveExistingRgPath();
-      } finally {
-        ripgrepAcquisitionPromise = null;
+export async function resolveRipgrepPath(): Promise<string | null> {
+  try {
+    const platform = os.platform();
+    const arch = os.arch();
+
+    // Map to the correct bundled binary
+    const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+
+    const candidatePaths = [
+      // 1. SEA runtime layout: everything is flattened into the root dir
+      path.resolve(__dirname, 'vendor/ripgrep', binName),
+      // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      path.resolve(__dirname, '../../vendor/ripgrep', binName),
+    ];
+
+    for (const candidate of candidatePaths) {
+      if (await fileExists(candidate)) {
+        return candidate;
       }
-    })();
-  }
-  return ripgrepAcquisitionPromise;
-}
+    }
 
-/**
- * Checks if `rg` exists, if not then attempt to download it.
- */
-export async function canUseRipgrep(): Promise<boolean> {
-  return (await ensureRipgrepAvailable()) !== null;
-}
+    // 3. Fallback: check system PATH
+    const systemRg = resolveExecutable('rg');
+    if (systemRg) {
+      // Security: Validate the system executable to prevent Search Path Interruption.
+      const realPath = resolveToRealPath(systemRg);
 
-/**
- * Ensures `rg` is downloaded, or throws.
- */
-export async function ensureRgPath(): Promise<string> {
-  const downloadedPath = await ensureRipgrepAvailable();
-  if (downloadedPath) {
-    return downloadedPath;
+      if (isTrustedSystemPath(realPath)) {
+        // Return absolute path to prevent re-resolution risk.
+        return realPath;
+      }
+    }
+
+    return null;
+  } catch (error: unknown) {
+    debugLogger.error('Error resolving ripgrep path:', error);
+    return null;
   }
-  throw new Error('Cannot use ripgrep.');
 }
 
 /**
@@ -192,7 +175,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Default to '.' if path is explicitly undefined/null.
       // This forces CWD search instead of 'all workspaces' search by default.
@@ -325,12 +308,24 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
 
-      return await formatGrepResults(
+      const result = await formatGrepResults(
         allMatches,
         this.params,
         searchLocationDescription,
         totalMaxMatches,
       );
+      return {
+        ...result,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary: result.returnDisplay.summary,
+          result: {
+            type: 'text',
+            text: result.llmContent.split('\n---\n').slice(1).join('\n---\n'),
+          },
+        },
+      };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
@@ -487,7 +482,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     const results: GrepMatch[] = [];
     try {
-      const rgPath = await ensureRgPath();
+      const rgPath = await this.config.getRipgrepPath();
+      if (!rgPath) {
+        throw new Error('Cannot find bundled ripgrep binary.');
+      }
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],

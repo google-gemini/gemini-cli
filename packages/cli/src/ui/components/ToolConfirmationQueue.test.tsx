@@ -52,6 +52,7 @@ describe('ToolConfirmationQueue', () => {
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
+    getProjectRoot: () => '/mock/project/root',
     getFileSystemService: () => ({
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),
@@ -140,7 +141,7 @@ describe('ToolConfirmationQueue', () => {
     expect(output).toContain('1 of 3');
     expect(output).toContain('ls'); // Tool name
     expect(output).toContain('list files'); // Tool description
-    expect(output).toContain('Allow execution of [ls]?');
+    expect(output).toContain('Allow execution of [Shell]?');
     expect(output).toMatchSnapshot();
 
     unmount();

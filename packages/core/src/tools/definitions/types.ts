@@ -43,12 +43,13 @@ export interface CoreToolSet {
   google_web_search: FunctionDeclaration;
   web_fetch: FunctionDeclaration;
   read_many_files: FunctionDeclaration;
-  save_memory: FunctionDeclaration;
   write_todos: FunctionDeclaration;
   get_internal_docs: FunctionDeclaration;
   ask_user: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
+  read_mcp_resource: FunctionDeclaration;
+  list_mcp_resources: FunctionDeclaration;
   update_topic?: FunctionDeclaration;
 }

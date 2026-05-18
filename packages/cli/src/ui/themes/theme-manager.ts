@@ -10,6 +10,8 @@ import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
 import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
+import { GitHubDarkColorblind } from './builtin/dark/github-dark-colorblind.js';
+import { GitHubLightColorblind } from './builtin/light/github-light-colorblind.js';
 import { GoogleCode } from './builtin/light/googlecode-light.js';
 import { Holiday } from './builtin/dark/holiday-dark.js';
 import { DefaultLight } from './builtin/light/default-light.js';
@@ -79,6 +81,8 @@ class ThemeManager {
       DefaultDark,
       GitHubDark,
       GitHubLight,
+      GitHubDarkColorblind,
+      GitHubLightColorblind,
       GoogleCode,
       Holiday,
       ShadesOfPurple,
@@ -202,7 +206,6 @@ class ThemeManager {
         try {
           const theme = createCustomTheme(themeWithDefaults);
           this.extensionThemes.set(namespacedName, theme);
-          debugLogger.log(`Registered theme: ${namespacedName}`);
         } catch (error) {
           debugLogger.warn(
             `Failed to load custom theme "${namespacedName}":`,
@@ -233,7 +236,6 @@ class ThemeManager {
     for (const theme of customThemes) {
       const namespacedName = `${theme.name} (${extensionName})`;
       this.extensionThemes.delete(namespacedName);
-      debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
   }
 

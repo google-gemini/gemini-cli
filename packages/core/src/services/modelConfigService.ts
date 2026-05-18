@@ -11,6 +11,7 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   isProModel,
+  getAutoModelDescription,
 } from '../config/models.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
@@ -164,18 +165,24 @@ export class ModelConfigService {
         if (m.tier !== 'auto') return false;
         return true;
       })
-      .map(([id, m]) => ({
-        modelId: id,
-        name: m.displayName ?? getDisplayString(id),
-        description:
-          id === 'auto-gemini-3' && useGemini31
-            ? (m.dialogDescription ?? '').replace(
-                'gemini-3-pro',
-                'gemini-3.1-pro',
-              )
-            : (m.dialogDescription ?? ''),
-        tier: m.tier ?? 'auto',
-      }));
+      .map(([id, m]) => {
+        let description = m.dialogDescription ?? '';
+        if (id === 'auto') {
+          description = getAutoModelDescription(
+            shouldShowPreviewModels,
+            useGemini31,
+          );
+        } else if (id === 'auto-gemini-3' && useGemini31) {
+          description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
+        }
+
+        return {
+          modelId: id,
+          name: m.displayName ?? getDisplayString(id),
+          description,
+          tier: m.tier ?? 'auto',
+        };
+      });
 
     const manualOptions = Object.entries(definitions)
       .filter(([id, m]) => {

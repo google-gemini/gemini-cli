@@ -79,6 +79,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.resetAllMocks();
     // Stub process.platform to 'linux' by default for deterministic snapshots across OSes
     mockPlatform('linux');
+    vi.spyOn(os, 'homedir').mockReturnValue('/tmp/test-home');
 
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
@@ -93,9 +94,13 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
+      getProjectRoot: vi.fn().mockReturnValue('/tmp/project-temp'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectMemoryDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/memory'),
         getProjectTempTrackerDir: vi
           .fn()
           .mockReturnValue('/mock/.gemini/tmp/session/tracker'),
@@ -103,7 +108,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
-      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
@@ -453,11 +457,13 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSandboxEnabled: vi.fn().mockReturnValue(false),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+          getProjectMemoryDir: vi
+            .fn()
+            .mockReturnValue('/tmp/project-temp/memory'),
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
         isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
-        isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),

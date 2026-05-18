@@ -89,11 +89,6 @@ export const READ_MANY_PARAM_EXCLUDE = 'exclude';
 export const READ_MANY_PARAM_RECURSIVE = 'recursive';
 export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 
-// -- save_memory --
-export const MEMORY_TOOL_NAME = 'save_memory';
-export const MEMORY_PARAM_FACT = 'fact';
-export const MEMORY_PARAM_SCOPE = 'scope';
-
 // -- get_internal_docs --
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const DOCS_PARAM_PATH = 'path';
@@ -137,3 +132,7 @@ export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';
 // -- complete_task --
 export const COMPLETE_TASK_TOOL_NAME = 'complete_task';
 export const COMPLETE_TASK_DISPLAY_NAME = 'Complete Task';
+
+// -- MCP Resources --
+export const READ_MCP_RESOURCE_TOOL_NAME = 'read_mcp_resource';
+export const LIST_MCP_RESOURCES_TOOL_NAME = 'list_mcp_resources';

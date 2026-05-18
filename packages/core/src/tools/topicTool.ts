@@ -16,6 +16,7 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -50,7 +51,7 @@ class UpdateTopicInvocation extends BaseToolInvocation<
     return `Update tactical intent: "${intent || '...'}"`;
   }
 
-  async execute(): Promise<ToolResult> {
+  async execute(_options: ExecuteOptions): Promise<ToolResult> {
     const title = this.params[TOPIC_PARAM_TITLE];
     const summary = this.params[TOPIC_PARAM_SUMMARY];
     const strategicIntent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
@@ -92,6 +93,11 @@ class UpdateTopicInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
+      display: {
+        format: 'notice',
+        name: title || UPDATE_TOPIC_DISPLAY_NAME,
+        description: this.getDescription(),
+      },
       returnDisplay,
     };
   }

@@ -17,13 +17,18 @@ import {
   _resetGlobalMemoryMonitorForTests,
 } from './memory-monitor.js';
 import type { Config } from '../config/config.js';
-import { recordMemoryUsage, isPerformanceMonitoringActive } from './metrics.js';
+import {
+  recordMemoryUsage,
+  recordCpuUsage,
+  isPerformanceMonitoringActive,
+} from './metrics.js';
 import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 import { RateLimiter } from './rate-limiter.js';
 
 // Mock dependencies
 vi.mock('./metrics.js', () => ({
   recordMemoryUsage: vi.fn(),
+  recordCpuUsage: vi.fn(),
   isPerformanceMonitoringActive: vi.fn(),
   MemoryMetricType: {
     HEAP_USED: 'heap_used',
@@ -50,6 +55,7 @@ vi.mock('node:process', () => ({
 }));
 
 const mockRecordMemoryUsage = vi.mocked(recordMemoryUsage);
+const mockRecordCpuUsage = vi.mocked(recordCpuUsage);
 const mockIsPerformanceMonitoringActive = vi.mocked(
   isPerformanceMonitoringActive,
 );
@@ -189,6 +195,13 @@ describe('MemoryMonitor', () => {
           mockMemoryUsage.rss,
           {
             memory_type: 'rss',
+            component: 'test_context',
+          },
+        );
+        expect(mockRecordCpuUsage).toHaveBeenCalledWith(
+          mockConfig,
+          expect.any(Number),
+          {
             component: 'test_context',
           },
         );

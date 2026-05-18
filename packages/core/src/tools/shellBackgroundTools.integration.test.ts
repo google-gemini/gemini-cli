@@ -92,9 +92,9 @@ describe('Background Tools Integration', () => {
     (listInvocation as any).context = {
       config: { getSessionId: () => 'default' },
     };
-    const listResult = await listInvocation.execute(
-      new AbortController().signal,
-    );
+    const listResult = await listInvocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(listResult.llmContent).toContain(
       `[PID ${pid}] RUNNING: \`node continuous_log\``,
@@ -109,9 +109,9 @@ describe('Background Tools Integration', () => {
     (readInvocation as any).context = {
       config: { getSessionId: () => 'default' },
     };
-    const readResult = await readInvocation.execute(
-      new AbortController().signal,
-    );
+    const readResult = await readInvocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(readResult.llmContent).toContain('Showing last');
     expect(readResult.llmContent).toContain('Log line');

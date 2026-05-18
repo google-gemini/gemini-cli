@@ -7,7 +7,6 @@
 import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
@@ -22,7 +21,6 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { isTopicTool } from './messages/TopicMessage.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
@@ -82,35 +80,6 @@ export const MainContent = () => {
     return -1;
   }, [uiState.history]);
 
-  const settings = useSettings();
-  const topicUpdateNarrationEnabled =
-    settings.merged.experimental?.topicUpdateNarration === true;
-
-  const suppressNarrationFlags = useMemo(() => {
-    const combinedHistory = [...uiState.history, ...pendingHistoryItems];
-    const flags = new Array<boolean>(combinedHistory.length).fill(false);
-
-    if (topicUpdateNarrationEnabled) {
-      let toolGroupInTurn = false;
-      for (let i = combinedHistory.length - 1; i >= 0; i--) {
-        const item = combinedHistory[i];
-        if (item.type === 'user' || item.type === 'user_shell') {
-          toolGroupInTurn = false;
-        } else if (item.type === 'tool_group') {
-          toolGroupInTurn = item.tools.some((t) => isTopicTool(t.name));
-        } else if (
-          (item.type === 'thinking' ||
-            item.type === 'gemini' ||
-            item.type === 'gemini_content') &&
-          toolGroupInTurn
-        ) {
-          flags[i] = true;
-        }
-      }
-    }
-    return flags;
-  }, [uiState.history, pendingHistoryItems, topicUpdateNarrationEnabled]);
-
   const augmentedHistory = useMemo(
     () =>
       uiState.history.map((item, i) => {
@@ -129,10 +98,9 @@ export const MainContent = () => {
           isFirstThinking,
           isFirstAfterThinking,
           isToolGroupBoundary,
-          suppressNarration: suppressNarrationFlags[i] ?? false,
         };
       }),
-    [uiState.history, lastUserPromptIndex, suppressNarrationFlags],
+    [uiState.history, lastUserPromptIndex],
   );
 
   const historyItems = useMemo(
@@ -144,7 +112,6 @@ export const MainContent = () => {
           isFirstThinking,
           isFirstAfterThinking,
           isToolGroupBoundary,
-          suppressNarration,
         }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
@@ -162,7 +129,6 @@ export const MainContent = () => {
             isFirstThinking={isFirstThinking}
             isFirstAfterThinking={isFirstAfterThinking}
             isToolGroupBoundary={isToolGroupBoundary}
-            suppressNarration={suppressNarration}
           />
         ),
       ),
@@ -201,9 +167,6 @@ export const MainContent = () => {
             (item.type !== 'tool_group' && prevType === 'tool_group') ||
             (item.type === 'tool_group' && prevType !== 'tool_group');
 
-          const suppressNarration =
-            suppressNarrationFlags[uiState.history.length + i] ?? false;
-
           return (
             <HistoryItemDisplay
               key={`pending-${i}`}
@@ -217,7 +180,6 @@ export const MainContent = () => {
               isFirstThinking={isFirstThinking}
               isFirstAfterThinking={isFirstAfterThinking}
               isToolGroupBoundary={isToolGroupBoundary}
-              suppressNarration={suppressNarration}
             />
           );
         })}
@@ -237,7 +199,6 @@ export const MainContent = () => {
       showConfirmationQueue,
       confirmingTool,
       uiState.history,
-      suppressNarrationFlags,
     ],
   );
 

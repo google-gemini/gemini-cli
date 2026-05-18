@@ -64,7 +64,8 @@ Gemini CLI supports three MCP transport types:
 
 Some MCP servers expose contextual “resources” in addition to the tools and
 prompts. Gemini CLI discovers these automatically and gives you the possibility
-to reference them in the chat.
+to reference them in the chat. For more information on the tools used to
+interact with these resources, see [MCP resource tools](mcp-resources.md).
 
 ### Discovery and listing
 
@@ -220,8 +221,10 @@ spawning MCP server processes.
 #### Automatic redaction
 
 By default, the CLI redacts sensitive environment variables from the base
-environment (inherited from the host process) to prevent unintended exposure to
-third-party MCP servers. This includes:
+environment (inherited from the host process). This prevents the accidental
+leakage of sensitive host environment variables (like AWS keys or GitHub tokens)
+to arbitrary third-party MCP servers that might execute malicious code or log
+your environment. This includes:
 
 - Core project keys: `GEMINI_API_KEY`, `GOOGLE_API_KEY`, etc.
 - Variables matching sensitive patterns: `*TOKEN*`, `*SECRET*`, `*PASSWORD*`,
@@ -231,7 +234,8 @@ third-party MCP servers. This includes:
 #### Explicit overrides
 
 If an environment variable must be passed to an MCP server, you must explicitly
-state it in the `env` property of the server configuration in `settings.json`.
+state it in the `env` property of the server configuration in `settings.json`
+(or `mcp_config.json` if configuring standard MCP clients or remote skills).
 Explicitly defined variables (including those from extensions) are trusted and
 are **not** subjected to the automatic redaction process.
 
@@ -245,6 +249,24 @@ specific data with that server.
 > Instead, use environment variable expansion
 > (for example, `"MY_KEY": "$MY_KEY"`) to securely pull the value from your host
 > environment at runtime.
+
+**Example: Passing a GitHub Token securely to the
+[official GitHub MCP server](https://github.com/github/github-mcp-server) via
+`mcp_config.json`**
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@github/github-mcp-server"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      }
+    }
+  }
+}
+```
 
 ### OAuth support for remote MCP servers
 

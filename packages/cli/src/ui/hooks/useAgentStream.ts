@@ -10,6 +10,7 @@ import {
   MessageSenderType,
   debugLogger,
   geminiPartsToContentParts,
+  displayContentToString,
   parseThought,
   CoreToolCallStatus,
   type ApprovalMode,
@@ -25,7 +26,7 @@ import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
   IndividualToolCallDisplay,
-  HistoryItemToolGroup,
+  HistoryItemToolDisplayGroup,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -35,11 +36,15 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
+import { useKeypress } from './useKeypress.js';
 
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
   addItem: UseHistoryManagerReturn['addItem'];
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
 }
@@ -76,6 +81,8 @@ export const useAgentStream = ({
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
+  const [_hasEmittedBoxInTurn, hasEmittedBoxInTurnRef, setHasEmittedBoxInTurn] =
+    useStateAndRef<boolean>(false);
 
   const { startNewPrompt } = useSessionStats();
 
@@ -119,13 +126,16 @@ export const useAgentStream = ({
     }
   }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
 
-  const cancelOngoingRequest = useCallback(async () => {
-    if (agent) {
-      await agent.abort();
-      setStreamingState(StreamingState.Idle);
-      onCancelSubmit(false);
-    }
-  }, [agent, onCancelSubmit]);
+  const cancelOngoingRequest = useCallback(
+    async (clearBuffer: boolean = true) => {
+      if (agent) {
+        await agent.abort();
+        setStreamingState(StreamingState.Idle);
+        onCancelSubmit(false, clearBuffer);
+      }
+    },
+    [agent, onCancelSubmit],
+  );
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
   const handleApprovalModeChange = useCallback(
@@ -197,6 +207,7 @@ export const useAgentStream = ({
             name: displayName,
             originalRequestName: event.name,
             description: desc,
+            display: event.display,
             status: CoreToolCallStatus.Scheduled,
             isClientInitiated: false,
             renderOutputAsMarkdown: isOutputMarkdown,
@@ -222,10 +233,9 @@ export const useAgentStream = ({
               else if (evtStatus === 'success')
                 status = CoreToolCallStatus.Success;
 
+              const display = event.display?.result;
               const liveOutput =
-                event.displayContent?.[0]?.type === 'text'
-                  ? event.displayContent[0].text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
               const progressMessage =
                 legacyState?.progressMessage ?? tc.progressMessage;
               const progress = legacyState?.progress ?? tc.progress;
@@ -237,6 +247,9 @@ export const useAgentStream = ({
               return {
                 ...tc,
                 status,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay: liveOutput,
                 progressMessage,
                 progress,
@@ -255,16 +268,18 @@ export const useAgentStream = ({
 
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
+              const display = event.display?.result;
               const resultDisplay =
-                event.displayContent?.[0]?.type === 'text'
-                  ? event.displayContent[0].text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
 
               return {
                 ...tc,
                 status: event.isError
                   ? CoreToolCallStatus.Error
                   : CoreToolCallStatus.Success,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay,
                 outputFile,
               };
@@ -273,12 +288,17 @@ export const useAgentStream = ({
           break;
         }
 
-        case 'error':
+        case 'error': {
+          const message =
+            event._meta?.['code'] === 'AGENT_EXECUTION_BLOCKED'
+              ? `Agent execution blocked: ${event.message}`
+              : event.message;
           addItem(
-            { type: MessageType.ERROR, text: event.message },
+            { type: MessageType.ERROR, text: message },
             userMessageTimestampRef.current,
           );
           break;
+        }
 
         case 'initialize':
         case 'session_update':
@@ -310,6 +330,21 @@ export const useAgentStream = ({
     const unsubscribe = agent?.subscribe(handleEvent);
     return () => unsubscribe?.();
   }, [agent, handleEvent]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape' && !isShellFocused) {
+        void cancelOngoingRequest(false);
+        return true;
+      }
+      return false;
+    },
+    {
+      isActive:
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation,
+    },
+  );
 
   const submitQuery = useCallback(
     async (
@@ -375,31 +410,26 @@ export const useAgentStream = ({
 
   // Push completed tools to history
   useEffect(() => {
-    const toolsToPush: IndividualToolCallDisplay[] = [];
-    for (let i = 0; i < trackedTools.length; i++) {
-      const tc = trackedTools[i];
-      if (pushedToolCallIdsRef.current.has(tc.callId)) continue;
+    if (trackedTools.length === 0) return;
 
-      if (
+    // We only push to history once all currently known tools in the turn are terminal.
+    // This allows ToolGroupDisplay to correctly hoist ALL notices (topics) for the turn.
+    const allTerminal = trackedTools.every(
+      (tc) =>
         tc.status === 'success' ||
         tc.status === 'error' ||
-        tc.status === 'cancelled'
-      ) {
-        toolsToPush.push(tc);
-      } else {
-        break;
-      }
-    }
+        tc.status === 'cancelled',
+    );
 
-    if (toolsToPush.length > 0) {
+    const toolsToPush = trackedTools.filter(
+      (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
+    );
+
+    if (allTerminal && toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
       for (const tc of toolsToPush) {
         newPushed.add(tc.callId);
       }
-
-      const isLastInBatch =
-        toolsToPush[toolsToPush.length - 1] ===
-        trackedTools[trackedTools.length - 1];
 
       const appearance = getToolGroupBorderAppearance(
         { type: 'tool_group', tools: trackedTools },
@@ -409,24 +439,43 @@ export const useAgentStream = ({
         backgroundTasks,
       );
 
-      const historyItem: HistoryItemToolGroup = {
-        type: 'tool_group',
-        tools: toolsToPush,
-        borderTop: isFirstToolInGroupRef.current,
-        borderBottom: isLastInBatch,
+      const hasBoxInBatch = toolsToPush.some(
+        (tc) => tc.display?.format !== 'notice',
+      );
+      const shouldStartNewBlock =
+        isFirstToolInGroupRef.current ||
+        (!hasEmittedBoxInTurnRef.current && hasBoxInBatch);
+
+      const historyItem: HistoryItemToolDisplayGroup = {
+        type: 'tool_display_group',
+        tools: toolsToPush.map((tc) => ({
+          name: tc.name,
+          description: tc.description,
+          ...tc.display,
+          status: tc.status,
+          originalRequestName: tc.originalRequestName,
+        })),
+        borderTop: shouldStartNewBlock,
+        borderBottom: true,
         ...appearance,
       };
 
       addItem(historyItem);
       setPushedToolCallIds(newPushed);
+
+      if (hasBoxInBatch) {
+        setHasEmittedBoxInTurn(true);
+      }
       setIsFirstToolInGroup(false);
     }
   }, [
     trackedTools,
     pushedToolCallIdsRef,
     isFirstToolInGroupRef,
+    hasEmittedBoxInTurnRef,
     setPushedToolCallIds,
     setIsFirstToolInGroup,
+    setHasEmittedBoxInTurn,
     addItem,
     activePtyId,
     isShellFocused,
@@ -435,7 +484,7 @@ export const useAgentStream = ({
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = trackedTools.filter(
-      (tc) => !pushedToolCallIds.has(tc.callId),
+      (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
     );
 
     const items: HistoryItemWithoutId[] = [];
@@ -449,10 +498,23 @@ export const useAgentStream = ({
     );
 
     if (remainingTools.length > 0) {
+      const hasBoxInPending = remainingTools.some(
+        (tc) => tc.display?.format !== 'notice',
+      );
+      const shouldStartNewBlock =
+        pushedToolCallIds.size === 0 ||
+        (!hasEmittedBoxInTurnRef.current && hasBoxInPending);
+
       items.push({
-        type: 'tool_group',
-        tools: remainingTools,
-        borderTop: pushedToolCallIds.size === 0,
+        type: 'tool_display_group',
+        tools: remainingTools.map((tc) => ({
+          name: tc.name,
+          description: tc.description,
+          ...tc.display,
+          status: tc.status,
+          originalRequestName: tc.originalRequestName,
+        })),
+        borderTop: shouldStartNewBlock,
         borderBottom: false,
         ...appearance,
       });
@@ -480,7 +542,7 @@ export const useAgentStream = ({
       (anyVisibleInHistory || anyVisibleInPending)
     ) {
       items.push({
-        type: 'tool_group' as const,
+        type: 'tool_display_group',
         tools: [],
         borderTop: false,
         borderBottom: true,
@@ -492,6 +554,8 @@ export const useAgentStream = ({
   }, [
     trackedTools,
     pushedToolCallIds,
+    pushedToolCallIdsRef,
+    hasEmittedBoxInTurnRef,
     activePtyId,
     isShellFocused,
     backgroundTasks,
