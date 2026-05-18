@@ -523,6 +523,7 @@ export interface SandboxConfig {
   allowedPaths?: string[];
   includeDirectories?: string[];
   networkAccess?: boolean;
+  setHostname?: boolean;
   command?:
     | 'docker'
     | 'podman'
@@ -540,6 +541,7 @@ export const ConfigSchema = z.object({
       allowedPaths: z.array(z.string()).default([]),
       includeDirectories: z.array(z.string()).default([]),
       networkAccess: z.boolean().default(false),
+      setHostname: z.boolean().default(true),
       command: z
         .enum([
           'docker',

@@ -1552,6 +1552,18 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
       },
+      sandboxSetHostname: {
+        type: 'boolean',
+        label: 'Sandbox Set Hostname',
+        category: 'Tools',
+        requiresRestart: true,
+        default: true,
+        description: oneLine`
+          Whether to set the hostname in the sandbox container.
+          Set to false to avoid Mutating UTS namespace, which is required for some rootless container environments.
+        `,
+        showInDialog: true,
+      },
       sandboxAllowedPaths: {
         type: 'array',
         label: 'Sandbox Allowed Paths',

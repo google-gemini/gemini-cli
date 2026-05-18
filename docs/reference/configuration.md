@@ -1553,6 +1553,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.sandboxSetHostname`** (boolean):
+  - **Description:** Whether to set the hostname in the sandbox container. Set
+    to false to avoid Mutating UTS namespace, which is required for some
+    rootless container environments.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`tools.sandboxAllowedPaths`** (array):
   - **Description:** List of additional paths that the sandbox is allowed to
     access.
