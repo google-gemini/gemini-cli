@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import { debugLogger } from '@google/gemini-cli-core';
 
 const RETRYABLE_DIRECTORY_REMOVAL_ERRORS = new Set([
+  'EACCES',
   'EBUSY',
   'ENOTEMPTY',
   'EPERM',
