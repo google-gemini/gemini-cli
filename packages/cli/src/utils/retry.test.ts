@@ -62,14 +62,17 @@ describe('removeDirectoryWithRetry', () => {
   );
 
   it('throws after exhausting retry attempts', async () => {
-    vi.useRealTimers();
-
     const error = Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
     mockedRm.mockRejectedValue(error);
 
-    await expect(removeDirectoryWithRetry('/test/path')).rejects.toThrow(
-      'EBUSY',
+    const caughtErrorPromise = removeDirectoryWithRetry('/test/path').then(
+      () => undefined,
+      (caughtError: unknown) => caughtError,
     );
+
+    await vi.runAllTimersAsync();
+
+    await expect(caughtErrorPromise).resolves.toBe(error);
     expect(mockedRm).toHaveBeenCalledTimes(5);
   });
 
