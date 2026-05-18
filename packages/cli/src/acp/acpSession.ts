@@ -1056,11 +1056,6 @@ export class Session {
           this.context.config.getTargetDir(),
           pathName,
         );
-
-        validationError = this.context.config.validatePathAccess(
-          absolutePath,
-          'read',
-        );
       }
 
       if (

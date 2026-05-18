@@ -43,6 +43,46 @@ export async function resolveAtCommandPath(
   }
 
   const workspaceDirs = config.getWorkspaceContext().getDirectories();
+
+  // If it's an absolute path, we only need to check it against authorization once.
+  if (path.isAbsolute(pathName)) {
+    const validationError = config.validatePathAccess(pathName, 'read');
+    if (validationError) {
+      onDebugMessage(
+        `Skipping unauthorized absolute path: ${pathName}. Reason: ${validationError}`,
+      );
+      return {
+        status: 'unauthorized',
+        absolutePath: pathName,
+        error: validationError,
+      };
+    }
+
+    try {
+      const stats = await fs.stat(pathName);
+      // Try to find if it's within one of the workspace directories to provide a nice relative path
+      let relativePath = pathName;
+      for (const dir of workspaceDirs) {
+        if (pathName.startsWith(dir)) {
+          relativePath = path.relative(dir, pathName);
+          break;
+        }
+      }
+
+      return {
+        status: 'resolved',
+        resolved: {
+          absolutePath: pathName,
+          relativePath,
+          stats,
+        },
+      };
+    } catch {
+      return { status: 'not_found' };
+    }
+  }
+
+  // For relative paths, try each workspace directory.
   let lastUnauthorized: { absolutePath: string; error: string } | null = null;
 
   for (const dir of workspaceDirs) {
@@ -55,8 +95,6 @@ export async function resolveAtCommandPath(
         `Skipping unauthorized path: ${absolutePath}. Reason: ${validationError}`,
       );
       // We only care about unauthorized paths if we can't find a valid authorized one.
-      // If it's an absolute path, it will be the same absolutePath for all dirs,
-      // but validationError might change if one of the dirs actually contains it (and thus makes it authorized).
       lastUnauthorized = { absolutePath, error: validationError };
       continue;
     }
@@ -67,9 +105,7 @@ export async function resolveAtCommandPath(
         status: 'resolved',
         resolved: {
           absolutePath,
-          relativePath: path.isAbsolute(pathName)
-            ? path.relative(dir, absolutePath)
-            : pathName,
+          relativePath: pathName,
           stats,
         },
       };
