@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,8 +35,6 @@ import { checkExhaustive } from '../utils/checks.js';
 import { LocalSubagentSession } from './local-subagent-protocol.js';
 import type { AgentEvent } from '../agent/types.js';
 
-const INPUT_PREVIEW_MAX_LENGTH = 50;
-const DESCRIPTION_MAX_LENGTH = 200;
 const MAX_RECENT_ACTIVITY = 3;
 
 /** Optional configuration for subagent invocations. */
@@ -90,14 +88,10 @@ export class LocalSessionInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     const inputSummary = Object.entries(this.params)
-      .map(
-        ([key, value]) =>
-          `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`,
-      )
+      .map(([key, value]) => `${key}: ${String(value)}`)
       .join(', ');
 
-    const description = `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }`;
-    return description.slice(0, DESCRIPTION_MAX_LENGTH);
+    return `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }`;
   }
 
   private publishActivity(activity: SubagentActivityItem): void {
@@ -164,9 +158,11 @@ export class LocalSessionInvocation extends BaseToolInvocation<
             ? sanitizeErrorMessage(String(activity.data['description']))
             : undefined;
           const args = JSON.stringify(sanitizeToolArgs(activity.data['args']));
-          // TODO: Use unique callId when available instead of randomUUID to support parallel calls reliably.
+          const callId = activity.data['callId']
+            ? String(activity.data['callId'])
+            : randomUUID();
           recentActivity.push({
-            id: randomUUID(),
+            id: callId,
             type: 'tool_call',
             content: name,
             displayName,
@@ -183,26 +179,28 @@ export class LocalSessionInvocation extends BaseToolInvocation<
           break;
         }
         case 'TOOL_CALL_END': {
-          const rawName = activity.data['name'];
-          const name = typeof rawName === 'string' ? rawName.trim() : '';
           const data = activity.data['data'];
           const isError = isToolActivityError(data);
 
-          // TODO: Matching tool calls by name is unreliable when parallel tool calls are active.
-          // Use unique callId when available to find the correct TOOL_CALL_START item.
-          for (let i = recentActivity.length - 1; i >= 0; i--) {
-            if (
-              recentActivity[i].type === 'tool_call' &&
-              recentActivity[i].content === name &&
-              recentActivity[i].status === SubagentState.RUNNING
-            ) {
-              recentActivity[i].status = isError
-                ? SubagentState.ERROR
-                : SubagentState.COMPLETED;
-              updated = true;
+          const callId = activity.data['id']
+            ? String(activity.data['id'])
+            : undefined;
 
-              this.publishActivity(recentActivity[i]);
-              break;
+          if (callId) {
+            for (let i = recentActivity.length - 1; i >= 0; i--) {
+              if (
+                recentActivity[i].type === 'tool_call' &&
+                recentActivity[i].id === callId &&
+                recentActivity[i].status === SubagentState.RUNNING
+              ) {
+                recentActivity[i].status = isError
+                  ? SubagentState.ERROR
+                  : SubagentState.COMPLETED;
+                updated = true;
+
+                this.publishActivity(recentActivity[i]);
+                break;
+              }
             }
           }
           break;
@@ -219,33 +217,23 @@ export class LocalSessionInvocation extends BaseToolInvocation<
             errorType === SubagentActivityErrorType.REJECTED ||
             error.startsWith(SUBAGENT_REJECTED_ERROR_PREFIX);
 
-          const toolName = activity.data['name']
-            ? String(activity.data['name'])
+          const callId = activity.data['callId']
+            ? String(activity.data['callId'])
             : undefined;
 
-          // TODO: Matching tool calls by name is unreliable when parallel tool calls are active.
-          // Use unique callId when available to find the correct TOOL_CALL_START item.
-          if (toolName && (isCancellation || isRejection)) {
+          if (callId) {
+            const targetStatus =
+              isCancellation || isRejection
+                ? SubagentState.CANCELLED
+                : SubagentState.ERROR;
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
-                recentActivity[i].content === toolName &&
+                recentActivity[i].id === callId &&
                 recentActivity[i].status === SubagentState.RUNNING
               ) {
-                recentActivity[i].status = SubagentState.CANCELLED;
-                updated = true;
-                break;
-              }
-            }
-          } else if (toolName) {
-            // Mark non-rejection/non-cancellation errors as 'error'
-            for (let i = recentActivity.length - 1; i >= 0; i--) {
-              if (
-                recentActivity[i].type === 'tool_call' &&
-                recentActivity[i].content === toolName &&
-                recentActivity[i].status === SubagentState.RUNNING
-              ) {
-                recentActivity[i].status = SubagentState.ERROR;
+                recentActivity[i].status = targetStatus;
                 updated = true;
                 break;
               }

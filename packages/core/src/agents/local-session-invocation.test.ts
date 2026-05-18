@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -103,7 +103,7 @@ describe('LocalSessionInvocation', () => {
   });
 
   describe('getDescription', () => {
-    it('should format the description with inputs and truncate long values and overall length', () => {
+    it('should format the description with inputs', () => {
       setupMockSession({});
       const params = { task: 'Analyze data', priority: 5 };
       const invocation = new LocalSessionInvocation(
@@ -118,7 +118,7 @@ describe('LocalSessionInvocation', () => {
       );
     });
 
-    it('should truncate long input values', () => {
+    it('should not truncate long input values', () => {
       setupMockSession({});
       const longTask = 'A'.repeat(100);
       const params = { task: longTask };
@@ -130,11 +130,11 @@ describe('LocalSessionInvocation', () => {
       );
       const description = invocation.getDescription();
       expect(description).toBe(
-        `Running subagent 'MockAgent' with inputs: { task: ${'A'.repeat(50)} }`,
+        `Running subagent 'MockAgent' with inputs: { task: ${'A'.repeat(100)} }`,
       );
     });
 
-    it('should truncate the overall description if it exceeds the limit', () => {
+    it('should not truncate the overall description', () => {
       setupMockSession({});
       const longNameDef: LocalAgentDefinition = {
         ...testDefinition,
@@ -151,7 +151,7 @@ describe('LocalSessionInvocation', () => {
         mockMessageBus,
       );
       const description = invocation.getDescription();
-      expect(description.length).toBe(200);
+      expect(description.length).toBeGreaterThan(300);
     });
   });
 
@@ -267,13 +267,13 @@ describe('LocalSessionInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_START',
-        data: { name: 'ls', args: {} },
+        data: { name: 'ls', args: {}, callId: 'call-123' },
       });
       capturedActivityCallback!({
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_END',
-        data: { name: 'ls', data: {} },
+        data: { name: 'ls', data: {}, id: 'call-123' },
       });
 
       await executePromise;
@@ -411,7 +411,7 @@ describe('LocalSessionInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_START',
-        data: { name: 'dangerous_tool', args: {} },
+        data: { name: 'dangerous_tool', args: {}, callId: 'call-rej' },
       });
       capturedActivityCallback!({
         isSubagentActivityEvent: true,
@@ -421,6 +421,7 @@ describe('LocalSessionInvocation', () => {
           name: 'dangerous_tool',
           error: `${SUBAGENT_REJECTED_ERROR_PREFIX} Rethink approach.`,
           errorType: SubagentActivityErrorType.REJECTED,
+          callId: 'call-rej',
         },
       });
 
@@ -742,13 +743,13 @@ describe('LocalSessionInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_START',
-        data: { name: 'failing_tool', args: {} },
+        data: { name: 'failing_tool', args: {}, callId: 'call-err' },
       });
       capturedActivityCallback!({
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_END',
-        data: { name: 'failing_tool', data: { isError: true } },
+        data: { name: 'failing_tool', data: { isError: true }, id: 'call-err' },
       });
 
       await executePromise;
