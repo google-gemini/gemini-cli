@@ -94,9 +94,8 @@ export class ExtensionRegistryClient {
       fuzzy: true,
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const results = await fzf.find(query);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return results.map((r: { item: RegistryExtension }) => r.item);
+    const results: Array<{ item: RegistryExtension }> = await fzf.find(query);
+    return results.map((r) => r.item);
   }
 
   async getExtension(id: string): Promise<RegistryExtension | undefined> {

@@ -15,7 +15,6 @@ import {
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
-  type ExtensionLoader,
   debugLogger,
   ApprovalMode,
   type MCPServerConfig,
@@ -112,27 +111,6 @@ vi.mock('@google/gemini-cli-core', async () => {
       }),
     },
     loadEnvironment: vi.fn(),
-    loadServerHierarchicalMemory: vi.fn(
-      (
-        cwd,
-        dirs,
-        fileService,
-        extensionLoader: ExtensionLoader,
-        _folderTrust,
-        _importFormat,
-        _fileFilteringOptions,
-        _maxDirs,
-      ) => {
-        const extensionPaths =
-          extensionLoader?.getExtensions?.()?.flatMap((e) => e.contextFiles) ||
-          [];
-        return Promise.resolve({
-          memoryContent: extensionPaths.join(',') || '',
-          fileCount: extensionPaths?.length || 0,
-          filePaths: extensionPaths,
-        });
-      },
-    ),
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
@@ -1067,151 +1045,6 @@ describe('loadCliConfig', () => {
   });
 });
 
-describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
-    // Restore ExtensionManager mocks that were reset
-    ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
-    ExtensionManager.prototype.loadExtensions = vi
-      .fn()
-      .mockResolvedValue(undefined);
-
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    // Other common mocks would be reset here.
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
-
-  it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-    });
-    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
-      {
-        path: '/path/to/ext1',
-        name: 'ext1',
-        id: 'ext1-id',
-        version: '1.0.0',
-        contextFiles: ['/path/to/ext1/GEMINI.md'],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext2',
-        name: 'ext2',
-        id: 'ext2-id',
-        version: '1.0.0',
-        contextFiles: [],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext3',
-        name: 'ext3',
-        id: 'ext3-id',
-        version: '1.0.0',
-        contextFiles: [
-          '/path/to/ext3/context1.md',
-          '/path/to/ext3/context2.md',
-        ],
-        isActive: true,
-      },
-    ]);
-    const argv = await parseArguments(createTestMergedSettings());
-    await loadCliConfig(settings, 'session-id', argv);
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200, // maxDirs
-      ['.git'], // boundaryMarkers
-    );
-  });
-
-  it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-      context: {
-        includeDirectories: [includeDir],
-        loadMemoryFromIncludeDirectories: true,
-      },
-    });
-
-    const argv = await parseArguments(settings);
-    await loadCliConfig(settings, 'session-id', argv);
-
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [includeDir],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200,
-      ['.git'], // boundaryMarkers
-    );
-  });
-
-  it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-      context: {
-        includeDirectories: ['/path/to/include'],
-        loadMemoryFromIncludeDirectories: false,
-      },
-    });
-
-    const argv = await parseArguments(settings);
-    await loadCliConfig(settings, 'session-id', argv);
-
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200,
-      ['.git'], // boundaryMarkers
-    );
-  });
-
-  it('should NOT call loadServerHierarchicalMemory when skipMemoryLoad is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-    });
-
-    const argv = await parseArguments(settings);
-    await loadCliConfig(settings, 'session-id', argv, {
-      skipMemoryLoad: true,
-    });
-
-    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
-  });
-});
-
 describe('mergeMcpServers', () => {
   it('should not modify the original settings object', async () => {
     const settings = createTestMergedSettings({
@@ -2058,7 +1891,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argv', async () => {
@@ -2102,7 +1935,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 });
 
