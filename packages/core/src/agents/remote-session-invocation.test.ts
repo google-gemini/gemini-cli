@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -354,7 +354,22 @@ describe('RemoteSessionInvocation', () => {
     it('should handle abort gracefully', async () => {
       const controller = new AbortController();
 
-      const { mockSession } = setupMockSession();
+      const partialProgress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: 'Test Agent',
+        state: SubagentState.RUNNING,
+        result: '',
+        recentActivity: [
+          {
+            id: 'a1',
+            type: 'thought',
+            content: 'Thinking...',
+            status: SubagentState.RUNNING,
+          },
+        ],
+      };
+
+      const { mockSession } = setupMockSession({ progress: partialProgress });
 
       // When getResult resolves, the signal will already be aborted
       mockSession.getResult.mockImplementation(async () => {
@@ -378,7 +393,10 @@ describe('RemoteSessionInvocation', () => {
         updateOutput,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({ state: 'cancelled' });
+      expect(
+        (result.returnDisplay as SubagentProgress).recentActivity[0].status,
+      ).toBe(SubagentState.CANCELLED);
       expect(result.llmContent).toEqual([
         { text: 'Operation cancelled by user' },
       ]);
@@ -452,9 +470,10 @@ describe('RemoteSessionInvocation', () => {
       // Should contain both the partial output and the error
       expect(display.result).toContain('Partial work so far');
       expect(display.result).toContain('mid-stream error');
-      // Should preserve partial activity
+      // Should preserve and update partial activity status to ERROR
       expect(display.recentActivity).toHaveLength(1);
       expect(display.recentActivity[0].content).toBe('Thinking...');
+      expect(display.recentActivity[0].status).toBe(SubagentState.ERROR);
     });
 
     it('should clean up listeners in finally', async () => {

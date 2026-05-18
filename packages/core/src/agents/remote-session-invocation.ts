@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  type SubagentActivityItem,
   SubagentState,
   getRemoteAgentTargetUrl,
 } from './types.js';
@@ -116,6 +117,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
   async execute(options: ExecuteOptions): Promise<ToolResult> {
     const { abortSignal: _signal, updateOutput } = options;
     const agentName = this.definition.displayName ?? this.definition.name;
+    const emptyActivity: SubagentActivityItem[] = [];
 
     // Seed session with prior A2A conversation state
     const stateKey = RemoteSessionInvocation.sessionKey(this.definition);
@@ -172,15 +174,19 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
       // rejecting. Detect this and surface proper error state.
       if (_signal?.aborted) {
         const partialProgress = session.getLatestProgress();
+        const recentActivity = this.stopRunningActivities(
+          partialProgress?.recentActivity ?? emptyActivity,
+          SubagentState.CANCELLED,
+        );
         const errorProgress: SubagentProgress = {
           isSubagentProgress: true,
           agentName,
-          state: SubagentState.ERROR,
+          state: SubagentState.CANCELLED,
           result:
             typeof partialProgress?.result === 'string'
               ? partialProgress.result
               : '',
-          recentActivity: partialProgress?.recentActivity ?? [],
+          recentActivity,
         };
         if (updateOutput) updateOutput(errorProgress);
         return {
@@ -207,12 +213,22 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
 
+      const isAbort =
+        (error instanceof Error && error.name === 'AbortError') ||
+        errorMessage.includes('Aborted');
+
+      const status = isAbort ? SubagentState.CANCELLED : SubagentState.ERROR;
+      const recentActivity = this.stopRunningActivities(
+        partialProgress?.recentActivity ?? emptyActivity,
+        status,
+      );
+
       const errorProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: SubagentState.ERROR,
+        state: status,
         result: fullDisplay,
-        recentActivity: partialProgress?.recentActivity ?? [],
+        recentActivity,
       };
 
       if (updateOutput) {
@@ -233,6 +249,19 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
       unsubscribeProgress();
       unsubscribeParent?.();
     }
+  }
+
+  private stopRunningActivities(
+    activity: SubagentActivityItem[],
+    status: SubagentState,
+  ): SubagentActivityItem[] {
+    const result: SubagentActivityItem[] = [];
+    for (const item of activity) {
+      result.push(
+        item.status === SubagentState.RUNNING ? { ...item, status } : item,
+      );
+    }
+    return result;
   }
 
   /**
