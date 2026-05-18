@@ -6,7 +6,7 @@
 
 import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -169,11 +169,14 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
 }
 
 /**
- * Creates an undici ProxyAgent that incorporates safe DNS lookup.
+ * Creates an undici EnvHttpProxyAgent that incorporates safe DNS lookup.
  */
-export function createSafeProxyAgent(proxyUrl: string): ProxyAgent {
-  return new ProxyAgent({
-    uri: proxyUrl,
+export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  return new EnvHttpProxyAgent({
+    httpProxy: proxyUrl,
+    httpsProxy: proxyUrl,
+    noProxy,
   });
 }
 
@@ -221,9 +224,12 @@ export async function fetchWithTimeout(
 
 export function setGlobalProxy(proxy: string) {
   currentProxy = proxy;
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
   setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxy,
+    new EnvHttpProxyAgent({
+      httpProxy: proxy,
+      httpsProxy: proxy,
+      noProxy,
       headersTimeout: defaultHeadersTimeout,
       bodyTimeout: defaultBodyTimeout,
     }),

@@ -10,16 +10,16 @@ import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
-const { setGlobalDispatcher, Agent, ProxyAgent } = vi.hoisted(() => ({
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent } = vi.hoisted(() => ({
   setGlobalDispatcher: vi.fn(),
   Agent: vi.fn(),
-  ProxyAgent: vi.fn(),
+  EnvHttpProxyAgent: vi.fn(),
 }));
 
 vi.mock('undici', () => ({
   setGlobalDispatcher,
   Agent,
-  ProxyAgent,
+  EnvHttpProxyAgent,
 }));
 
 vi.mock('node:dns/promises', () => ({
@@ -54,6 +54,7 @@ describe('fetch utils', () => {
       }
       return [{ address: '93.184.216.34', family: 4 }];
     });
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -237,17 +238,36 @@ describe('fetch utils', () => {
   });
 
   describe('setGlobalProxy', () => {
-    it('should configure ProxyAgent with experiment flag timeout', () => {
+    it('should configure EnvHttpProxyAgent with experiment flag timeout and noProxy', () => {
       const proxyUrl = 'http://proxy.example.com';
+      const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
       updateGlobalFetchTimeouts(45773134);
       setGlobalProxy(proxyUrl);
 
-      expect(ProxyAgent).toHaveBeenCalledWith({
-        uri: proxyUrl,
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: proxyUrl,
+        httpsProxy: proxyUrl,
+        noProxy: noProxyValue,
         headersTimeout: 45773134,
         bodyTimeout: 300000,
       });
       expect(setGlobalDispatcher).toHaveBeenCalled();
+    });
+
+    it('should fall back to no_proxy if NO_PROXY is not set', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('no_proxy', noProxyValue);
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: noProxyValue,
+        }),
+      );
     });
   });
 });
