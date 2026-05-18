@@ -44,7 +44,7 @@ describe('removeDirectoryWithRetry', () => {
     });
   });
 
-  it.each(['EBUSY', 'ENOTEMPTY', 'EPERM'])(
+  it.each(['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM'])(
     'retries when rm fails with %s',
     async (errorCode) => {
       const error = Object.assign(new Error(errorCode), { code: errorCode });
