@@ -65,7 +65,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
                 allowRedirection: true,
               },
             ]
-          : [],
+          : [
+              {
+                toolName: 'read_file',
+                decision: actual.PolicyDecision.ALLOW,
+                priority: 1.05,
+                source: 'Default: read-only.toml',
+              },
+            ],
       checkers: [],
     })),
     coreEvents: {
@@ -400,14 +407,19 @@ describe('loadConfig', () => {
         );
       });
 
-      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+      it('should use default approval mode and load default rules when GEMINI_YOLO_MODE is not true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'false');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             approvalMode: 'default',
             policyEngineConfig: expect.objectContaining({
-              rules: [],
+              rules: expect.arrayContaining([
+                expect.objectContaining({
+                  toolName: 'read_file',
+                  decision: PolicyDecision.ALLOW,
+                }),
+              ]),
             }),
           }),
         );
