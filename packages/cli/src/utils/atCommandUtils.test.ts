@@ -44,9 +44,13 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    expect(result).not.toBeNull();
-    expect(result?.absolutePath).toBe(path.resolve('/mock/root', 'file.ts'));
-    expect(result?.relativePath).toBe('file.ts');
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(
+        path.resolve('/mock/root', 'file.ts'),
+      );
+      expect(result.resolved.relativePath).toBe('file.ts');
+    }
   });
 
   it('should resolve an absolute path', async () => {
@@ -62,9 +66,11 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    expect(result).not.toBeNull();
-    expect(result?.absolutePath).toBe(absolutePath);
-    expect(result?.relativePath).toBe('src/index.ts');
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(absolutePath);
+      expect(result.resolved.relativePath).toBe('src/index.ts');
+    }
   });
 
   it('should handle multiple directories in workspace context', async () => {
@@ -89,33 +95,38 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    expect(result?.absolutePath).toBe(path.resolve('/dir2', 'file.txt'));
-    expect(result?.relativePath).toBe('file.txt');
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(
+        path.resolve('/dir2', 'file.txt'),
+      );
+      expect(result.resolved.relativePath).toBe('file.txt');
+    }
   });
 
-  it('should return null for invalid path (too long)', async () => {
+  it('should return invalid for invalid path (too long)', async () => {
     const longPath = 'a'.repeat(5000);
     const result = await resolveAtCommandPath(
       longPath,
       mockConfig as unknown as Config,
     );
-    expect(result).toBeNull();
+    expect(result.status).toBe('invalid');
   });
 
-  it('should return null for path with log markers', async () => {
+  it('should return invalid for path with log markers', async () => {
     const onDebug = vi.fn();
     const result = await resolveAtCommandPath(
       'FAIL tests/my.test.ts',
       mockConfig as unknown as Config,
       onDebug,
     );
-    expect(result).toBeNull();
+    expect(result.status).toBe('invalid');
     expect(onDebug).toHaveBeenCalledWith(
       expect.stringContaining('Skipping invalid path'),
     );
   });
 
-  it('should return null if path does not exist in any workspace directory', async () => {
+  it('should return not_found if path does not exist in any workspace directory', async () => {
     vi.mocked(fsPromises.stat).mockRejectedValue(new Error('ENOENT'));
 
     const result = await resolveAtCommandPath(
@@ -123,7 +134,7 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    expect(result).toBeNull();
+    expect(result.status).toBe('not_found');
   });
 
   it('should resolve directory paths correctly', async () => {
@@ -138,7 +149,10 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    expect(result?.stats.isDirectory()).toBe(true);
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.stats.isDirectory()).toBe(true);
+    }
   });
 
   it('should respect validatePathAccess for paths within root', async () => {
@@ -152,10 +166,10 @@ describe('atCommandUtils', () => {
       'secret.txt',
       mockConfig as unknown as Config,
     );
-    expect(result).toBeNull();
+    expect(result.status).toBe('unauthorized');
   });
 
-  it('should return null for unauthorized paths (letting calling site handle it, e.g. acpSession permission dialog)', async () => {
+  it('should return unauthorized for paths outside root', async () => {
     (mockConfig['validatePathAccess'] as Mock).mockReturnValue(
       'Outside workspace',
     );
@@ -173,7 +187,11 @@ describe('atCommandUtils', () => {
       mockConfig as unknown as Config,
     );
 
-    // Should now return null so acpSession can trigger its own permission flow
-    expect(result).toBeNull();
+    expect(result.status).toBe('unauthorized');
+    if (result.status === 'unauthorized') {
+      expect(result.absolutePath).toBe(
+        path.resolve('/mock/root', 'outside.txt'),
+      );
+    }
   });
 });
