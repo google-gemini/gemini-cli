@@ -35,6 +35,7 @@ import {
   Scheduler,
   ROOT_SCHEDULER_ID,
   LegacyAgentSession,
+  EnterpriseAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
   displayContentToString,
@@ -295,13 +296,16 @@ export async function runNonInteractive({
         });
       }
 
-      // Create LegacyAgentSession — owns the agentic loop
-      const session = new LegacyAgentSession({
-        client: geminiClient,
-        scheduler,
-        config,
-        promptId: prompt_id,
-      });
+      const useEnterprise = process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
+      // Create AgentSession — owns the agentic loop
+      const session = useEnterprise
+        ? new EnterpriseAgentSession({ config, promptId: prompt_id })
+        : new LegacyAgentSession({
+            client: geminiClient,
+            scheduler,
+            config,
+            promptId: prompt_id,
+          });
 
       // Wire Ctrl+C to session abort
       abortSession = () => {

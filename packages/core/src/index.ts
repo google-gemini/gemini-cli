@@ -196,6 +196,7 @@ export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
 // Export agent session interface
 export * from './agent/agent-session.js';
 export * from './agent/legacy-agent-session.js';
+export * from './agent/enterprise-agent-session.js';
 export * from './agent/event-translator.js';
 export * from './agent/content-utils.js';
 export * from './agent/tool-display-utils.js';

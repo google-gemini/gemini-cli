@@ -507,7 +507,8 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
+  const useEnterprise = process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
+  if (!settings.merged.security.auth.useExternal && !argv.isCommand && !useEnterprise) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -858,13 +859,16 @@ export async function main() {
       ),
     );
 
-    const authType = await validateNonInteractiveAuth(
-      settings.merged.security.auth.selectedType,
-      settings.merged.security.auth.useExternal,
-      config,
-      settings,
-    );
-    await config.refreshAuth(authType);
+    const useEnterprise = process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
+    if (!useEnterprise) {
+      const authType = await validateNonInteractiveAuth(
+        settings.merged.security.auth.selectedType,
+        settings.merged.security.auth.useExternal,
+        config,
+        settings,
+      );
+      await config.refreshAuth(authType);
+    }
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);

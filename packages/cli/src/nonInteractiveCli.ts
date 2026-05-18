@@ -66,7 +66,9 @@ interface RunNonInteractiveParams {
 export async function runNonInteractive(
   params: RunNonInteractiveParams,
 ): Promise<void> {
-  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  const useAgentSession =
+    params.config.getAgentSessionNoninteractiveEnabled() ||
+    process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true';
   if (useAgentSession) {
     debugLogger.debug(
       '[ADK] Running non-interactive mode with ADK agent session',

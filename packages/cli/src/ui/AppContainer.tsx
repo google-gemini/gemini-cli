@@ -90,6 +90,7 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
+  EnterpriseAgentProtocol,
   type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -1173,10 +1174,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [config]);
 
   const streamAgent = useMemo(
-    () =>
-      config?.getAgentSessionInteractiveEnabled()
+    () => {
+      if (process.env['GEMINI_CLI_ENTERPRISE_AGENT'] === 'true') {
+        return new EnterpriseAgentProtocol({ config });
+      }
+      return config?.getAgentSessionInteractiveEnabled()
         ? new LegacyAgentProtocol({ config, getPreferredEditor })
-        : undefined,
+        : undefined;
+    },
     [config, getPreferredEditor],
   );
 

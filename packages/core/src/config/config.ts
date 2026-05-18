@@ -208,6 +208,12 @@ export interface PlanSettings {
   modelRouting?: boolean;
 }
 
+export interface EnterpriseSettings {
+  projectId?: string;
+  engineId?: string;
+  location?: string;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   traces?: boolean;
@@ -742,6 +748,7 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+  enterprise?: EnterpriseSettings;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -978,12 +985,14 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private readonly enterprise?: EnterpriseSettings;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
     this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+    this.enterprise = params.enterprise;
 
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
@@ -1815,6 +1824,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getClientName(): string | undefined {
     return this.clientName;
+  }
+
+  getEnterpriseConfig(): EnterpriseSettings | undefined {
+    return this.enterprise;
   }
 
   setSessionId(sessionId: string): void {
