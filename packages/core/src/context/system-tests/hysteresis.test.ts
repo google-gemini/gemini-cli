@@ -9,7 +9,7 @@ import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
 import { generalistProfile } from '../config/profiles.js';
-import type { Content } from '@google/genai';
+import { type HistoryTurn } from '../../core/agentChatHistory.js';
 
 describe('Context Manager Hysteresis Tests', () => {
   const mockLlmClient = createMockLlmClient(['<SNAPSHOT>']);
@@ -18,6 +18,7 @@ describe('Context Manager Hysteresis Tests', () => {
     ...generalistProfile,
     name: 'Hysteresis Stress Test',
     config: {
+      ...generalistProfile.config,
       budget: {
         maxTokens: 5000,
         retainedTokens: 1000,
@@ -26,9 +27,13 @@ describe('Context Manager Hysteresis Tests', () => {
     },
   });
 
-  const getProjectionTokens = (proj: Content[], harness: SimulationHarness) =>
+  const getProjectionTokens = (
+    proj: HistoryTurn[],
+    harness: SimulationHarness,
+  ) =>
     proj.reduce(
-      (sum, c) => sum + harness.env.tokenCalculator.calculateContentTokens(c),
+      (sum, c) =>
+        sum + harness.env.tokenCalculator.calculateContentTokens(c.content),
       0,
     );
 
@@ -57,7 +62,7 @@ describe('Context Manager Hysteresis Tests', () => {
     // No snapshot because maxTokens (5000) not exceeded, and deficit < threshold.
     expect(
       state.finalProjection.some((c) =>
-        c.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
+        c.content.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
       ),
     ).toBe(false);
 
@@ -79,7 +84,7 @@ describe('Context Manager Hysteresis Tests', () => {
     state = await harness.getGoldenState();
     expect(
       state.finalProjection.some((c) =>
-        c.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
+        c.content.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
       ),
     ).toBe(true);
   });
@@ -108,7 +113,7 @@ describe('Context Manager Hysteresis Tests', () => {
     let state = await harness.getGoldenState();
     expect(
       state.finalProjection.some((c) =>
-        c.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
+        c.content.parts?.some((p) => p.text?.includes('<SNAPSHOT>')),
       ),
     ).toBe(true);
 
