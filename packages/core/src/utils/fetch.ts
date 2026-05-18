@@ -172,11 +172,14 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
  * Creates an undici EnvHttpProxyAgent that incorporates safe DNS lookup.
  */
 export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
-  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const trimmedProxy = proxyUrl.trim();
+  const noProxy = (process.env['NO_PROXY'] || process.env['no_proxy'])?.trim();
   return new EnvHttpProxyAgent({
-    httpProxy: proxyUrl,
-    httpsProxy: proxyUrl,
+    httpProxy: trimmedProxy,
+    httpsProxy: trimmedProxy,
     noProxy,
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
   });
 }
 
@@ -223,12 +226,13 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  currentProxy = proxy;
-  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const trimmedProxy = proxy.trim();
+  currentProxy = trimmedProxy;
+  const noProxy = (process.env['NO_PROXY'] || process.env['no_proxy'])?.trim();
   setGlobalDispatcher(
     new EnvHttpProxyAgent({
-      httpProxy: proxy,
-      httpsProxy: proxy,
+      httpProxy: trimmedProxy,
+      httpsProxy: trimmedProxy,
       noProxy,
       headersTimeout: defaultHeadersTimeout,
       bodyTimeout: defaultBodyTimeout,

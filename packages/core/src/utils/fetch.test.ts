@@ -33,6 +33,7 @@ const {
   isAddressPrivate,
   fetchWithTimeout,
   setGlobalProxy,
+  createSafeProxyAgent,
 } = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
@@ -55,6 +56,7 @@ describe('fetch utils', () => {
       return [{ address: '93.184.216.34', family: 4 }];
     });
     vi.unstubAllEnvs();
+    updateGlobalFetchTimeouts(60000);
   });
 
   afterEach(() => {
@@ -239,17 +241,17 @@ describe('fetch utils', () => {
 
   describe('setGlobalProxy', () => {
     it('should configure EnvHttpProxyAgent with experiment flag timeout and noProxy', () => {
-      const proxyUrl = 'http://proxy.example.com';
-      const noProxyValue = 'localhost,127.0.0.1';
+      const proxyUrl = ' http://proxy.example.com ';
+      const noProxyValue = ' localhost,127.0.0.1 ';
       vi.stubEnv('NO_PROXY', noProxyValue);
 
       updateGlobalFetchTimeouts(45773134);
       setGlobalProxy(proxyUrl);
 
       expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
-        httpProxy: proxyUrl,
-        httpsProxy: proxyUrl,
-        noProxy: noProxyValue,
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: 'localhost,127.0.0.1',
         headersTimeout: 45773134,
         bodyTimeout: 300000,
       });
@@ -268,6 +270,24 @@ describe('fetch utils', () => {
           noProxy: noProxyValue,
         }),
       );
+    });
+  });
+
+  describe('createSafeProxyAgent', () => {
+    it('should create an EnvHttpProxyAgent with trimmed values and default timeouts', () => {
+      const proxyUrl = ' http://proxy.example.com ';
+      const noProxyValue = ' localhost,127.0.0.1 ';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      createSafeProxyAgent(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: 'localhost,127.0.0.1',
+        headersTimeout: 60000,
+        bodyTimeout: 300000,
+      });
     });
   });
 });
