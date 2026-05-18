@@ -25,6 +25,7 @@ import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
+import { resolveAtCommandPath } from '../../utils/atCommandUtils.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
@@ -271,103 +272,109 @@ async function resolveFilePaths(
       continue;
     }
 
-    for (const dir of config.getWorkspaceContext().getDirectories()) {
-      try {
-        const absolutePath = path.resolve(dir, pathName);
-        const stats = await fs.stat(absolutePath);
-
-        const relativePath = path.isAbsolute(pathName)
-          ? path.relative(dir, absolutePath)
-          : pathName;
-
-        if (stats.isDirectory()) {
-          const pathSpec = path.join(relativePath, '**');
-          resolvedFiles.push({
-            part,
-            pathSpec,
-            displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-            absolutePath,
-          });
-          onDebugMessage(
-            `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
-          );
-        } else {
-          resolvedFiles.push({
-            part,
-            pathSpec: relativePath,
-            displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
-            absolutePath,
-          });
-          onDebugMessage(
-            `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
-          );
-        }
-        break;
-      } catch (error) {
-        if (isNodeError(error) && error.code === 'ENOENT') {
-          if (config.getEnableRecursiveFileSearch() && globTool) {
-            onDebugMessage(
-              `Path ${pathName} not found directly, attempting glob search.`,
-            );
-            try {
-              const globResult = await globTool.buildAndExecute(
-                {
-                  pattern: `**/*${pathName}*`,
-                  path: dir,
-                },
-                signal,
+    const resolved = await resolveAtCommandPath(
+      pathName,
+      config,
+      onDebugMessage,
+    );
+    if (resolved) {
+      const absolutePath = resolved.absolutePath;
+      const relativePath = resolved.relativePath;
+      const stats = resolved.stats;
+      if (stats.isDirectory()) {
+        const pathSpec = path.join(relativePath, '**');
+        resolvedFiles.push({
+          part,
+          pathSpec,
+          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
+          absolutePath,
+        });
+        onDebugMessage(
+          `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
+        );
+      } else {
+        resolvedFiles.push({
+          part,
+          pathSpec: relativePath,
+          displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
+          absolutePath,
+        });
+        onDebugMessage(
+          `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
+        );
+      }
+    } else {
+      // If direct resolution fails, we keep the original loop for glob fallback if enabled
+      for (const dir of config.getWorkspaceContext().getDirectories()) {
+        try {
+          const absolutePath = path.resolve(dir, pathName);
+          await fs.stat(absolutePath);
+        } catch (error) {
+          if (isNodeError(error) && error.code === 'ENOENT') {
+            if (config.getEnableRecursiveFileSearch() && globTool) {
+              onDebugMessage(
+                `Path ${pathName} not found directly, attempting glob search.`,
               );
-              if (
-                globResult.llmContent &&
-                typeof globResult.llmContent === 'string' &&
-                !globResult.llmContent.startsWith('No files found') &&
-                !globResult.llmContent.startsWith('Error:')
-              ) {
-                const lines = globResult.llmContent.split('\n');
-                if (lines.length > 1 && lines[1]) {
-                  const firstMatchAbsolute = lines[1].trim();
-                  const pathSpec = path.relative(dir, firstMatchAbsolute);
-                  resolvedFiles.push({
-                    part,
-                    pathSpec,
-                    displayLabel: path.isAbsolute(pathName)
-                      ? pathSpec
-                      : pathName,
-                  });
-                  onDebugMessage(
-                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
-                  );
-                  break;
+              try {
+                const globResult = await globTool.buildAndExecute(
+                  {
+                    pattern: `**/*${pathName}*`,
+                    path: dir,
+                  },
+                  signal,
+                );
+                if (
+                  globResult.llmContent &&
+                  typeof globResult.llmContent === 'string' &&
+                  !globResult.llmContent.startsWith('No files found') &&
+                  !globResult.llmContent.startsWith('Error:')
+                ) {
+                  const lines = globResult.llmContent.split('\n');
+                  if (lines.length > 1 && lines[1]) {
+                    const firstMatchAbsolute = lines[1].trim();
+                    const pathSpec = path.relative(dir, firstMatchAbsolute);
+                    resolvedFiles.push({
+                      part,
+                      pathSpec,
+                      displayLabel: path.isAbsolute(pathName)
+                        ? pathSpec
+                        : pathName,
+                    });
+                    onDebugMessage(
+                      `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
+                    );
+                    break;
+                  } else {
+                    onDebugMessage(
+                      `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                    );
+                  }
                 } else {
                   onDebugMessage(
-                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                    `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
                   );
                 }
-              } else {
+              } catch (globError) {
+                debugLogger.warn(
+                  `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
+                );
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                  `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
                 );
               }
-            } catch (globError) {
-              debugLogger.warn(
-                `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
-              );
+            } else {
               onDebugMessage(
-                `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
+                `Glob tool not found. Path ${pathName} will be skipped.`,
               );
             }
           } else {
+            debugLogger.warn(
+              `Error stating path ${pathName}: ${getErrorMessage(error)}`,
+            );
             onDebugMessage(
-              `Glob tool not found. Path ${pathName} will be skipped.`,
+              `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
             );
           }
-        } else {
-          debugLogger.warn(
-            `Error stating path ${pathName}: ${getErrorMessage(error)}`,
-          );
-          onDebugMessage(
-            `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
-          );
         }
       }
     }

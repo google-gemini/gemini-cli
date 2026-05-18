@@ -177,6 +177,7 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { validatePath } from '../utils/path-validator.js';
 import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
@@ -3299,6 +3300,11 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    const pathValidation = validatePath(absolutePath);
+    if (!pathValidation.isValid) {
+      return `Invalid path: ${pathValidation.error}`;
+    }
+
     if (checkType === 'write' && hasScopedAutoMemoryExtractionWriteAccess()) {
       const resolvedPath = resolveToRealPath(absolutePath);
       if (
