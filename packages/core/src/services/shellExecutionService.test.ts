@@ -25,6 +25,7 @@ import {
 import { NoopSandboxManager } from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
+import { recordDotEnvKeys, clearDotEnvKeys } from '../utils/dotEnvTracker.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -208,6 +209,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearDotEnvKeys();
     ExecutionLifecycleService.resetForTest();
     ShellExecutionService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
@@ -1151,6 +1153,64 @@ describe('ShellExecutionService', () => {
           chunk: expected,
         }),
       );
+    });
+  });
+
+  describe('dotEnv environment isolation', () => {
+    it('should strip project .env keys from the subprocess environment', async () => {
+      process.env['DB_DATABASE'] = 'production_db';
+      recordDotEnvKeys(['DB_DATABASE']);
+
+      await simulateExecution('php artisan test', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      const spawnOptions = mockPtySpawn.mock.calls[0][2] as {
+        env: Record<string, string>;
+      };
+      expect(spawnOptions.env['DB_DATABASE']).toBeUndefined();
+
+      delete process.env['DB_DATABASE'];
+    });
+
+    it('should not strip variables that were in the shell env before .env loading', async () => {
+      // Simulate a var the user set in their shell (not from .env, so not tracked)
+      process.env['EXISTING_VAR'] = 'from_shell';
+
+      await simulateExecution('echo $EXISTING_VAR', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      const spawnOptions = mockPtySpawn.mock.calls[0][2] as {
+        env: Record<string, string>;
+      };
+      expect(spawnOptions.env['EXISTING_VAR']).toBe('from_shell');
+
+      delete process.env['EXISTING_VAR'];
+    });
+
+    it('should strip multiple project .env keys at once', async () => {
+      const dotEnvVars: Record<string, string> = {
+        DB_DATABASE: 'production_db',
+        DB_HOST: '127.0.0.1',
+        APP_ENV: 'local',
+      };
+      for (const [key, val] of Object.entries(dotEnvVars)) {
+        process.env[key] = val;
+      }
+      recordDotEnvKeys(Object.keys(dotEnvVars));
+
+      await simulateExecution('php artisan test', (pty) => {
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      const spawnOptions = mockPtySpawn.mock.calls[0][2] as {
+        env: Record<string, string>;
+      };
+      for (const key of Object.keys(dotEnvVars)) {
+        expect(spawnOptions.env[key]).toBeUndefined();
+        delete process.env[key];
+      }
     });
   });
 
