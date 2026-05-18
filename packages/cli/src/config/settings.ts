@@ -656,7 +656,8 @@ export function loadEnvironment(
       const excludedVars =
         settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile =
-        path.basename(path.dirname(envFilePath)) !== GEMINI_DIR;
+        path.basename(path.dirname(envFilePath)) !== GEMINI_DIR &&
+        envFilePath !== path.join(homedir(), '.env');
 
       const loadedKeys: string[] = [];
 
