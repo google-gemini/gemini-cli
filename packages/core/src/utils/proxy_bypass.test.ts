@@ -72,7 +72,9 @@ describe('Proxy Bypass Integration', () => {
       const response = await fetchWithTimeout(url, 1000);
       expect(await response.text()).toBe('ok');
     } finally {
-      server.close();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve())),
+      );
     }
   });
 
