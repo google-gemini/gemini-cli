@@ -21,6 +21,7 @@ import {
   AuthType,
   type AdminControlsSettings,
   createCache,
+  recordDotEnvKeys,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
@@ -656,6 +657,8 @@ export function loadEnvironment(
         settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
+      const loadedKeys: string[] = [];
+
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
           let value = parsedEnv[key];
@@ -676,8 +679,17 @@ export function loadEnvironment(
           // Load variable only if it's not already set in the environment.
           if (!Object.hasOwn(process.env, key)) {
             process.env[key] = value;
+            // Track keys from project .env files so subprocesses don't inherit
+            // them and override their own configurations (e.g. test DB settings).
+            if (isProjectEnvFile) {
+              loadedKeys.push(key);
+            }
           }
         }
+      }
+
+      if (loadedKeys.length > 0) {
+        recordDotEnvKeys(loadedKeys);
       }
     } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
