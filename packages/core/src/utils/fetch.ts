@@ -173,7 +173,11 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
  */
 export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
   const trimmedProxy = proxyUrl.trim();
-  const noProxy = (process.env['NO_PROXY'] || process.env['no_proxy'])?.trim();
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
   return new EnvHttpProxyAgent({
     httpProxy: trimmedProxy,
     httpsProxy: trimmedProxy,
@@ -228,7 +232,11 @@ export async function fetchWithTimeout(
 export function setGlobalProxy(proxy: string) {
   const trimmedProxy = proxy.trim();
   currentProxy = trimmedProxy;
-  const noProxy = (process.env['NO_PROXY'] || process.env['no_proxy'])?.trim();
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
   setGlobalDispatcher(
     new EnvHttpProxyAgent({
       httpProxy: trimmedProxy,

@@ -271,6 +271,33 @@ describe('fetch utils', () => {
         }),
       );
     });
+
+    it('should handle empty NO_PROXY', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      vi.stubEnv('NO_PROXY', '');
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: '',
+        }),
+      );
+    });
+
+    it('should handle multi-entry NO_PROXY with trimming', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      const noProxyValue = '  google.com, 127.0.0.1 , localhost  ';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: 'google.com, 127.0.0.1 , localhost',
+        }),
+      );
+    });
   });
 
   describe('createSafeProxyAgent', () => {
