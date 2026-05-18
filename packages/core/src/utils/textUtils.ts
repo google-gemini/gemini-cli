@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import ansiRegex from 'ansi-regex';
+import stripAnsi from 'strip-ansi';
 
 /**
  * Safely replaces text with literal strings, avoiding ECMAScript GetSubstitution issues.
@@ -30,11 +30,10 @@ export function safeLiteralReplace(
 /**
  * Strips ANSI/VT escape sequences from a raw byte buffer.
  * Uses latin1 encoding to preserve every byte's value exactly (0-255)
- * while allowing regex-based removal of escape sequences.
+ * while allowing string-based removal of escape sequences.
  */
 export function stripAnsiFromBuffer(data: Buffer): Buffer {
-  const pattern = ansiRegex();
-  const stripped = data.toString('latin1').replace(pattern, '');
+  const stripped = stripAnsi(data.toString('latin1'));
   return Buffer.from(stripped, 'latin1');
 }
 
