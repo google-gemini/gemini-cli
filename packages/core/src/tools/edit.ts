@@ -554,8 +554,12 @@ class EditToolInvocation
       abortSignal,
     );
 
-    // If the self-correction attempt timed out, return the original error.
-    if (fixedEdit === null) {
+    // If the self-correction attempt timed out or failed to return valid JSON, return the original error.
+    if (
+      fixedEdit === null ||
+      fixedEdit.search === undefined ||
+      fixedEdit.replace === undefined
+    ) {
       return {
         currentContent: contentForLlmEditFixer,
         newContent: currentContent,

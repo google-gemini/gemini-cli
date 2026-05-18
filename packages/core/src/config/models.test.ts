@@ -10,6 +10,7 @@ import {
   resolveClassifierModel,
   isGemini3Model,
   isGemini2Model,
+  requiresAggressiveUnescape,
   isCustomModel,
   supportsModernFeatures,
   isAutoModel,
@@ -224,6 +225,31 @@ describe('Dynamic Configuration Parity', () => {
       const dynamic = supportsMultimodalFunctionResponse(model, dynamicConfig);
       expect(dynamic).toBe(legacy);
     }
+  });
+});
+
+describe('requiresAggressiveUnescape', () => {
+  it('should return true for legacy Gemini 1.0 models', () => {
+    expect(requiresAggressiveUnescape('gemini-1.0-pro')).toBe(true);
+  });
+
+  it('should return false for modern Gemini models', () => {
+    expect(requiresAggressiveUnescape('gemini-1.5-pro')).toBe(false);
+    expect(requiresAggressiveUnescape('gemini-1.5-flash')).toBe(false);
+    expect(requiresAggressiveUnescape('gemini-2.5-pro')).toBe(false);
+    expect(requiresAggressiveUnescape('gemini-2.5-flash')).toBe(false);
+    expect(requiresAggressiveUnescape('gemini-3-pro-preview')).toBe(false);
+    expect(requiresAggressiveUnescape('gemini-3.1-pro-preview')).toBe(false);
+  });
+
+  it('should return false for aliases that resolve to modern models', () => {
+    expect(requiresAggressiveUnescape(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
+    expect(requiresAggressiveUnescape(GEMINI_MODEL_ALIAS_PRO)).toBe(false);
+    expect(requiresAggressiveUnescape(GEMINI_MODEL_ALIAS_FLASH)).toBe(false);
+  });
+
+  it('should return false for custom models', () => {
+    expect(requiresAggressiveUnescape('gpt-4')).toBe(false);
   });
 });
 

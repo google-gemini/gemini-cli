@@ -409,6 +409,18 @@ export function isGemini2Model(model: string): boolean {
 }
 
 /**
+ * Checks if the model requires aggressive unescaping of output.
+ * This is a workaround for older models that sometimes double-escaped their output.
+ * Modern models (Gemini 1.5, 2.5, 3.x) do not require this and it can lead to data corruption.
+ */
+export function requiresAggressiveUnescape(model: string): boolean {
+  const resolved = resolveModel(model);
+  // Gemini 1.0 models are known to have needed this.
+  // Gemini 1.5 and later should NOT use aggressive unescape.
+  return /^gemini-1\.0/.test(resolved);
+}
+
+/**
  * Checks if the model is a "custom" model (not Gemini branded).
  *
  * @param model The model name to check.

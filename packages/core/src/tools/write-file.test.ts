@@ -85,7 +85,7 @@ const mockConfigInternal = {
   getIdeMode: vi.fn(() => false),
   getWorkspaceContext: () => new WorkspaceContext(rootDir, [plansDir]),
   getApiKey: () => 'test-key',
-  getModel: () => 'test-model',
+  getModel: () => 'gemini-1.0-pro',
   getSandbox: () => false,
   getDebugMode: () => false,
   getQuestion: () => undefined,
@@ -107,7 +107,7 @@ const mockConfigInternal = {
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
   isPlanMode: vi.fn(() => false),
-  getActiveModel: () => 'test-model',
+  getActiveModel: () => 'gemini-1.0-pro',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
   },
@@ -378,6 +378,35 @@ describe('WriteFileTool', () => {
 
       await getCorrectedFileContent(
         mockGemini3Config,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+        false, // aggressiveUnescape
+      );
+    });
+
+    it('should set aggressiveUnescape to false for modern models (Gemini 1.5)', async () => {
+      const filePath = path.join(rootDir, 'gemini15_file.txt');
+      const proposedContent = 'Proposed new content.';
+      const abortSignal = new AbortController().signal;
+
+      const mockGemini15Config = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...mockConfig,
+        getActiveModel: () => 'gemini-1.5-pro',
+      } as unknown as Config;
+
+      mockEnsureCorrectFileContent.mockResolvedValue('Corrected new content.');
+
+      await getCorrectedFileContent(
+        mockGemini15Config,
         filePath,
         proposedContent,
         abortSignal,

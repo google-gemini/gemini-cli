@@ -28,6 +28,13 @@ const MAX_CACHE_SIZE = 50;
 // Cache for ensureCorrectFileContent results
 const fileContentCorrectionCache = new LRUCache<string, string>(MAX_CACHE_SIZE);
 
+/**
+ * Maximum length of content that we will attempt to correct via LLM.
+ * Strings longer than this (like large objects or B64 images) will almost
+ * certainly trigger truncation in the LLM response, corrupting the file.
+ */
+const MAX_CORRECTION_LENGTH = 4000;
+
 export async function ensureCorrectFileContent(
   content: string,
   baseLlmClient: BaseLlmClient,
@@ -51,6 +58,16 @@ export async function ensureCorrectFileContent(
       fileContentCorrectionCache.set(content, unescapedContent);
       return unescapedContent;
     }
+    fileContentCorrectionCache.set(content, content);
+    return content;
+  }
+
+  // If the content is very long, don't even attempt LLM correction.
+  // The LLM will almost certainly truncate its response, leading to data loss.
+  if (content.length > MAX_CORRECTION_LENGTH) {
+    debugLogger.warn(
+      `Content length (${content.length}) exceeds MAX_CORRECTION_LENGTH. Skipping LLM correction to prevent truncation.`,
+    );
     fileContentCorrectionCache.set(content, content);
     return content;
   }

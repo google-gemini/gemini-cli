@@ -950,6 +950,38 @@ function doIt() {
         expect.any(Object), // abortSignal
       );
     });
+
+    it('should return the original error if self-correction returns truncated or missing fields', async () => {
+      const initialContent = 'Original content.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      // Mock LLM returning truncated JSON (missing search/replace)
+      mockFixLLMEditWithInstruction.mockResolvedValue({
+        explanation: 'Truncated response...',
+      } as any);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Fix something',
+        old_string: 'Original content.',
+        new_string: 'Modified content.',
+      };
+
+      // Force a failure to trigger self-correction
+      vi.spyOn(fileSystemService, 'readTextFile').mockResolvedValueOnce(
+        'Different content.',
+      );
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND); // Initial error preserved
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
   });
 
   describe('Error Scenarios', () => {
