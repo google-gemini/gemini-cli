@@ -7,6 +7,7 @@
 import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
 
 export const INITIAL_HISTORY_LENGTH = 1;
 
@@ -81,8 +82,8 @@ ${environmentMemory}
 
 export async function getInitialChatHistory(
   config: Config,
-  extraHistory?: Content[],
-): Promise<Content[]> {
+  extraHistory?: ReadonlyArray<Content | HistoryTurn>,
+): Promise<Array<Content | HistoryTurn>> {
   const envParts = await getEnvironmentContext(config);
   const envContextString = envParts.map((part) => part.text || '').join('\n\n');
 
