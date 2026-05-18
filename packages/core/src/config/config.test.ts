@@ -3212,6 +3212,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect((pooled?.remaining ?? 0) / (pooled?.limit ?? 1)).toBeCloseTo(0.6);
     });
 
+    it('should not overwrite quota with a zero bucket if a non-zero bucket exists for the same model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-1.5-pro',
+            remainingAmount: '100',
+            remainingFraction: 1.0,
+          },
+          {
+            modelId: 'gemini-1.5-pro',
+            remainingAmount: '0',
+            remainingFraction: 0.0,
+          },
+        ],
+      });
+
+      config.setModel('gemini-1.5-pro');
+      await config.refreshUserQuota();
+
+      // If it overwrites, it will be 0. We want it to be 100.
+      expect(config.getQuotaRemaining()).toBe(100);
+    });
+
     it('should return undefined pooled quota for non-auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [

@@ -2290,11 +2290,17 @@ export class Config implements McpContext, AgentLoopContext {
           }
 
           if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-            this.modelQuotas.set(bucket.modelId, {
-              remaining,
-              limit,
-              resetTime: bucket.resetTime,
-            });
+            const existing = this.modelQuotas.get(bucket.modelId);
+            // If we have multiple buckets for the same model, pick the one with the most
+            // remaining quota. This prevents a restricted or exhausted bucket from
+            // overwriting a valid Pro bucket.
+            if (!existing || remaining > existing.remaining) {
+              this.modelQuotas.set(bucket.modelId, {
+                remaining,
+                limit,
+                resetTime: bucket.resetTime,
+              });
+            }
           }
         }
       }
