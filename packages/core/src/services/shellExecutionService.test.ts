@@ -1157,8 +1157,12 @@ describe('ShellExecutionService', () => {
   });
 
   describe('dotEnv environment isolation', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('should strip project .env keys from the subprocess environment', async () => {
-      process.env['DB_DATABASE'] = 'production_db';
+      vi.stubEnv('DB_DATABASE', 'production_db');
       recordDotEnvKeys(['DB_DATABASE']);
 
       await simulateExecution('php artisan test', (pty) => {
@@ -1169,13 +1173,10 @@ describe('ShellExecutionService', () => {
         env: Record<string, string>;
       };
       expect(spawnOptions.env['DB_DATABASE']).toBeUndefined();
-
-      delete process.env['DB_DATABASE'];
     });
 
     it('should not strip variables that were in the shell env before .env loading', async () => {
-      // Simulate a var the user set in their shell (not from .env, so not tracked)
-      process.env['EXISTING_VAR'] = 'from_shell';
+      vi.stubEnv('EXISTING_VAR', 'from_shell');
 
       await simulateExecution('echo $EXISTING_VAR', (pty) => {
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
@@ -1185,8 +1186,6 @@ describe('ShellExecutionService', () => {
         env: Record<string, string>;
       };
       expect(spawnOptions.env['EXISTING_VAR']).toBe('from_shell');
-
-      delete process.env['EXISTING_VAR'];
     });
 
     it('should strip multiple project .env keys at once', async () => {
@@ -1196,7 +1195,7 @@ describe('ShellExecutionService', () => {
         APP_ENV: 'local',
       };
       for (const [key, val] of Object.entries(dotEnvVars)) {
-        process.env[key] = val;
+        vi.stubEnv(key, val);
       }
       recordDotEnvKeys(Object.keys(dotEnvVars));
 
@@ -1209,7 +1208,6 @@ describe('ShellExecutionService', () => {
       };
       for (const key of Object.keys(dotEnvVars)) {
         expect(spawnOptions.env[key]).toBeUndefined();
-        delete process.env[key];
       }
     });
   });

@@ -9,6 +9,11 @@
  * file so they can be excluded from child process environments, preventing
  * project-level .env values from overriding subprocess configurations (e.g.
  * phpunit.xml test database settings being overridden by a Laravel .env).
+ *
+ * Process-scoped singleton: the CLI runs as a single process with one active
+ * workspace directory at a time, so per-session scoping is not required here.
+ * The set is bounded by the number of keys in a single .env file (typically
+ * tens of entries), so unbounded growth is not a concern.
  */
 
 const dotEnvKeys: Set<string> = new Set();
