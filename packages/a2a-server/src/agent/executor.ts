@@ -93,10 +93,16 @@ export class CoderAgentExecutor implements AgentExecutor {
     taskId: string,
   ): Promise<Config> {
     const workspaceRoot = setTargetDir(agentSettings);
+    const isTrusted = agentSettings.isTrusted ?? false;
     loadEnvironment(); // Will override any global env with workspace envs
-    const settings = loadSettings(workspaceRoot);
+    const settings = loadSettings(workspaceRoot, isTrusted);
     const extensions = loadExtensions(workspaceRoot);
-    return loadConfig(settings, new SimpleExtensionLoader(extensions), taskId);
+    return loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      taskId,
+      isTrusted,
+    );
   }
 
   /**

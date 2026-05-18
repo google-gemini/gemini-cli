@@ -38,6 +38,7 @@ export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  trusted: boolean = false,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
 
@@ -123,7 +124,7 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust,
-    trustedFolder: true,
+    trustedFolder: trusted,
     extensionLoader,
     checkpointing,
     interactive: true,
