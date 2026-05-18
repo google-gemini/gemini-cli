@@ -171,7 +171,10 @@ export class ModelConfigService {
       .map(([id, m]) => {
         let description = m.dialogDescription ?? '';
         if (id === 'auto') {
-          description = getAutoModelDescription(releaseChannel, useGemini31);
+          description = getAutoModelDescription(
+            shouldShowPreviewModels,
+            useGemini31,
+          );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
         }

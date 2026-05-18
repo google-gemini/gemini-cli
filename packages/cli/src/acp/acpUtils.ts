@@ -298,7 +298,10 @@ export function buildAvailableModels(
     {
       value: GEMINI_MODEL_ALIAS_AUTO,
       title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-      description: getAutoModelDescription(releaseChannel, useGemini31),
+      description: getAutoModelDescription(
+        shouldShowPreviewModels,
+        useGemini31,
+      ),
     },
   ];
 
