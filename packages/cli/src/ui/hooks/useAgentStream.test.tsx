@@ -128,6 +128,10 @@ describe('useAgentStream', () => {
     expect(mockAgentProtocol.send).toHaveBeenCalledWith({
       message: { content: [{ type: 'text', text: 'modified prompt' }] },
     });
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: MessageType.USER, text: '/mcp-prompt' }),
+      expect.any(Number),
+    );
   });
 
   it('should update streamingState based on agent_start and agent_end events', async () => {

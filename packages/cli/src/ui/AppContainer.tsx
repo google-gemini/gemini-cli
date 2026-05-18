@@ -1180,40 +1180,38 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [config, getPreferredEditor],
   );
 
-  const agentStream = useAgentStream({
-    agent: streamAgent,
-    addItem: historyManager.addItem,
-    handleSlashCommand,
-    onCancelSubmit,
-    isShellFocused: embeddedShellFocused,
-    logger,
-    isActive: !!streamAgent,
-  });
-
-  const geminiStream = useGeminiStream(
-    config.getGeminiClient(),
-    historyManager.history,
-    historyManager.addItem,
-    config,
-    settings,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-    onCancelSubmit,
-    setEmbeddedShellFocused,
-    terminalWidth,
-    terminalHeight,
-    embeddedShellFocused,
-    consumePendingHints,
-    !streamAgent,
-  );
-
-  const activeStream = streamAgent ? agentStream : geminiStream;
+  const activeStream = streamAgent
+    ? // eslint-disable-next-line react-hooks/rules-of-hooks
+      useAgentStream({
+        agent: streamAgent,
+        addItem: historyManager.addItem,
+        handleSlashCommand,
+        onCancelSubmit,
+        isShellFocused: embeddedShellFocused,
+        logger,
+      })
+    : // eslint-disable-next-line react-hooks/rules-of-hooks
+      useGeminiStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      );
 
   const {
     streamingState,

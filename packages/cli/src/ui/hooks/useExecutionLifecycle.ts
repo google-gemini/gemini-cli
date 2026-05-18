@@ -86,7 +86,6 @@ export const useExecutionLifecycle = (
   terminalHeight?: number,
   activeBackgroundExecutionId?: number,
   isWaitingForConfirmation?: boolean,
-  isActive: boolean = true,
 ) => {
   const [state, dispatch] = useReducer(shellReducer, initialState);
 
@@ -112,7 +111,6 @@ export const useExecutionLifecycle = (
     state.activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
 
   useEffect(() => {
-    if (!isActive) return;
     const isForegroundActive = !!activePtyId || !!isWaitingForConfirmation;
 
     if (isForegroundActive) {
@@ -146,7 +144,6 @@ export const useExecutionLifecycle = (
     state.isBackgroundTaskVisible,
     m,
     dispatch,
-    isActive,
   ]);
 
   useEffect(
@@ -161,7 +158,6 @@ export const useExecutionLifecycle = (
   );
 
   const toggleBackgroundTasks = useCallback(() => {
-    if (!isActive) return;
     if (state.backgroundTasks.size > 0) {
       const willBeVisible = !state.isBackgroundTaskVisible;
       dispatch({ type: 'TOGGLE_VISIBILITY' });
@@ -197,11 +193,9 @@ export const useExecutionLifecycle = (
     isWaitingForConfirmation,
     m,
     dispatch,
-    isActive,
   ]);
 
   const backgroundCurrentExecution = useCallback(() => {
-    if (!isActive) return;
     const pidToBackground =
       state.activeShellPtyId ?? activeBackgroundExecutionId;
     if (pidToBackground) {
@@ -224,11 +218,10 @@ export const useExecutionLifecycle = (
         m.restoreTimeout = null;
       }
     }
-  }, [state.activeShellPtyId, activeBackgroundExecutionId, m, isActive]);
+  }, [state.activeShellPtyId, activeBackgroundExecutionId, m]);
 
   const dismissBackgroundTask = useCallback(
     async (pid: number) => {
-      if (!isActive) return;
       const shell = state.backgroundTasks.get(pid);
       if (shell) {
         if (shell.status === 'running') {
@@ -247,7 +240,7 @@ export const useExecutionLifecycle = (
         }
       }
     },
-    [state.backgroundTasks, dispatch, m, isActive],
+    [state.backgroundTasks, dispatch, m],
   );
 
   const registerBackgroundTask = useCallback(
@@ -257,7 +250,6 @@ export const useExecutionLifecycle = (
       initialOutput: string | AnsiOutput,
       completionBehavior?: CompletionBehavior,
     ) => {
-      if (!isActive) return;
       m.backgroundedPids.add(pid);
       dispatch({
         type: 'REGISTER_TASK',
@@ -321,7 +313,7 @@ export const useExecutionLifecycle = (
         dataUnsubscribe();
       });
     },
-    [dispatch, m, isActive],
+    [dispatch, m],
   );
 
   // Auto-register any execution that gets backgrounded, regardless of type.

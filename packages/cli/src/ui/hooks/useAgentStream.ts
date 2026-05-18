@@ -53,7 +53,6 @@ export interface UseAgentStreamOptions {
   ) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
-  isActive?: boolean;
 }
 
 /**
@@ -67,7 +66,6 @@ export const useAgentStream = ({
   onCancelSubmit,
   isShellFocused,
   logger,
-  isActive = true,
 }: UseAgentStreamOptions) => {
   const [initError] = useState<string | null>(null);
   const [retryStatus] = useState<RetryAttemptPayload | null>(null);
@@ -336,24 +334,22 @@ export const useAgentStream = ({
   );
 
   useEffect(() => {
-    if (!isActive) return;
     const unsubscribe = agent?.subscribe(handleEvent);
     return () => unsubscribe?.();
-  }, [agent, handleEvent, isActive]);
+  }, [agent, handleEvent]);
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape' && !isShellFocused) {
-        void cancelOngoingRequest(false);
+      if (key.ctrl && key.name === 'c') {
+        void cancelOngoingRequest();
         return true;
       }
       return false;
     },
     {
       isActive:
-        isActive &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation),
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation,
     },
   );
 
@@ -403,14 +399,18 @@ export const useAgentStream = ({
         }
 
         if (shouldAddToHistory) {
-          const queryText =
-            typeof localQuery === 'string'
-              ? localQuery
-              : partToString(localQuery);
+          const originalQueryText =
+            typeof query === 'string' ? query : partToString(query);
 
-          addItem({ type: MessageType.USER, text: queryText }, timestamp);
+          addItem(
+            { type: MessageType.USER, text: originalQueryText },
+            timestamp,
+          );
           if (typeof localQuery !== 'string') {
-            void logger?.logMessage(MessageSenderType.USER, queryText);
+            void logger?.logMessage(
+              MessageSenderType.USER,
+              partToString(localQuery),
+            );
           }
         }
         startNewPrompt();
@@ -436,9 +436,7 @@ export const useAgentStream = ({
     },
     [agent, addItem, logger, startNewPrompt, handleSlashCommand],
   );
-
   useEffect(() => {
-    if (!isActive) return;
     if (trackedTools.length > 0) {
       const isNewBatch = !trackedTools.some((tc) =>
         pushedToolCallIdsRef.current.has(tc.callId),
@@ -448,6 +446,7 @@ export const useAgentStream = ({
         setIsFirstToolInGroup(true);
       }
     } else if (streamingState === StreamingState.Idle) {
+      // Clear when idle to be ready for next turn
       setPushedToolCallIds(new Set());
       setIsFirstToolInGroup(true);
     }
@@ -457,12 +456,11 @@ export const useAgentStream = ({
     setPushedToolCallIds,
     setIsFirstToolInGroup,
     streamingState,
-    isActive,
   ]);
 
   // Push completed tools to history
   useEffect(() => {
-    if (!isActive || trackedTools.length === 0) return;
+    if (trackedTools.length === 0) return;
 
     // We only push to history once all currently known tools in the turn are terminal.
     // This allows ToolGroupDisplay to correctly hoist ALL notices (topics) for the turn.
@@ -532,7 +530,6 @@ export const useAgentStream = ({
     activePtyId,
     isShellFocused,
     backgroundTasks,
-    isActive,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
