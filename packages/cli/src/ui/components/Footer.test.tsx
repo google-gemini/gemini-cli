@@ -366,7 +366,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('should display "current process" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
+    it('should display "macOS seatbelt (test-profile)" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
@@ -374,7 +374,7 @@ describe('<Footer />', () => {
         width: 120,
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
-      expect(lastFrame()).toContain('current process');
+      expect(lastFrame()).toContain('macOS seatbelt (test-profile)');
       vi.unstubAllEnvs();
       unmount();
     });
