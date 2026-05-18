@@ -1307,6 +1307,34 @@ export async function discoverTools(
           continue;
         }
 
+        if (toolDef.inputSchema) {
+          try {
+            let schemaStr = JSON.stringify(toolDef.inputSchema);
+            schemaStr = schemaStr
+              .replace(
+                /"type"\s*:\s*\[\s*"([^"]+)"\s*,\s*"null"\s*\]/g,
+                '"type":"$1","nullable":true',
+              )
+              .replace(
+                /"type"\s*:\s*\[\s*"null"\s*,\s*"([^"]+)"\s*\]/g,
+                '"type":"$1","nullable":true',
+              );
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            toolDef.inputSchema = JSON.parse(schemaStr) as {
+              type: 'object';
+              properties?: Record<string, object>;
+              required?: string[];
+            };
+          } catch (error) {
+            cliConfig.emitMcpDiagnostic(
+              'error',
+              `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
+              error,
+              mcpServerName,
+            );
+          }
+        }
+
         const mcpCallableTool = new McpCallableTool(
           mcpClient,
           toolDef,
