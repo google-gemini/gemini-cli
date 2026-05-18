@@ -396,6 +396,7 @@ export const useAgentStream = ({
               } else {
                 // 'handled' or other types that don't need LLM submission
                 shouldAddToHistory = false;
+                return;
               }
             }
           }

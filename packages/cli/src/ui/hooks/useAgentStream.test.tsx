@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import type { AgentProtocol } from '@google/gemini-cli-core';
 import { renderHookWithProviders } from '../../test-utils/render.js';
@@ -38,6 +38,10 @@ describe('useAgentStream', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should initialize on mount', async () => {
