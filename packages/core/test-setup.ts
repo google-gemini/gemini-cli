@@ -10,7 +10,7 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import { setSimulate429 } from './src/utils/testUtils.js';
-import { vi, afterEach } from 'vitest';
+import { vi, afterEach, beforeEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';
 
 // Increase max listeners to avoid warnings in large test suites
@@ -18,6 +18,11 @@ coreEvents.setMaxListeners(100);
 
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
+
+beforeEach(() => {
+  // Ensure a clean home directory state for all tests
+  vi.stubEnv('GEMINI_CLI_HOME', '');
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();

@@ -2809,6 +2809,10 @@ export class Config implements McpContext, AgentLoopContext {
     return getChannelFromVersion(this._clientVersion);
   }
 
+  getAuthType(): string | undefined {
+    return this.contentGeneratorConfig?.authType;
+  }
+
   getPendingIncludeDirectories(): string[] {
     return this.pendingIncludeDirectories;
   }

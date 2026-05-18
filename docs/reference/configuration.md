@@ -976,6 +976,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -993,6 +999,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -1004,6 +1016,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-flash"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
@@ -1013,6 +1031,12 @@ their corresponding top-level category object in your `settings.json` file.
       "gemini-3-pro-preview": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1037,6 +1061,12 @@ their corresponding top-level category object in your `settings.json` file.
       "auto": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "releaseChannel": "stable"
@@ -1069,6 +1099,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -1093,6 +1129,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-flash-lite"
+          },
+          {
+            "condition": {
               "useGemini3_1FlashLite": false
             },
             "target": "gemini-2.5-flash-lite"
@@ -1102,6 +1144,12 @@ their corresponding top-level category object in your `settings.json` file.
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
+          {
+            "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-flash"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1115,7 +1163,15 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_1FlashLite": true
+              "useGemini3_1FlashLite": true,
+              "authType": "gemini-api-key"
+            },
+            "target": "gemini-3.1-flash-lite-preview"
+          },
+          {
+            "condition": {
+              "useGemini3_1FlashLite": true,
+              "authType": "vertex-ai"
             },
             "target": "gemini-3.1-flash-lite-preview"
           }
@@ -1124,6 +1180,12 @@ their corresponding top-level category object in your `settings.json` file.
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1165,6 +1227,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-flash"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
@@ -1180,6 +1248,12 @@ their corresponding top-level category object in your `settings.json` file.
       "pro": {
         "default": "gemini-3-pro-preview",
         "contexts": [
+          {
+            "condition": {
+              "authType": "oauth-personal"
+            },
+            "target": "gemini-2.5-pro"
+          },
           {
             "condition": {
               "hasAccessToPreview": false

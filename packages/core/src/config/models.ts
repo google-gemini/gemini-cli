@@ -11,6 +11,7 @@ export interface ModelResolutionContext {
   hasAccessToPreview?: boolean;
   requestedModel?: string;
   releaseChannel?: string;
+  authType?: string;
 }
 
 /**
@@ -50,6 +51,7 @@ export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
   getReleaseChannel?(): string;
+  getAuthType?(): string | undefined;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -127,6 +129,7 @@ export function resolveModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
   releaseChannel?: string,
+  authType?: string,
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
@@ -136,6 +139,7 @@ export function resolveModel(
       : requestedModel.trim() || '';
 
   const currentReleaseChannel = releaseChannel ?? config?.getReleaseChannel?.();
+  const currentAuthType = authType ?? config?.getAuthType?.();
 
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
@@ -144,6 +148,7 @@ export function resolveModel(
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
       releaseChannel: currentReleaseChannel,
+      authType: currentAuthType,
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -245,6 +250,7 @@ export function resolveClassifierModel(
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
+  authType?: string,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveClassifierModelId(
@@ -255,6 +261,7 @@ export function resolveClassifierModel(
         useGemini3_1FlashLite,
         useCustomTools: useCustomToolModel,
         hasAccessToPreview,
+        authType: authType ?? config?.getAuthType?.(),
       },
     );
   }
@@ -281,6 +288,9 @@ export function resolveClassifierModel(
       false,
       false,
       hasAccessToPreview,
+      config,
+      undefined,
+      authType,
     );
   }
   return resolveModel(
@@ -289,6 +299,9 @@ export function resolveClassifierModel(
     useGemini3_1FlashLite,
     useCustomToolModel,
     hasAccessToPreview,
+    config,
+    undefined,
+    authType,
   );
 }
 

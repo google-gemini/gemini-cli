@@ -428,6 +428,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3.1-pro-preview': {
       default: 'gemini-3.1-pro-preview',
       contexts: [
+        {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-pro',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useCustomTools: true },
@@ -438,12 +442,20 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3.1-pro-preview-customtools': {
       default: 'gemini-3.1-pro-preview-customtools',
       contexts: [
+        {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-pro',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
       ],
     },
     'gemini-3-flash-preview': {
       default: 'gemini-3-flash-preview',
       contexts: [
+        {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-flash',
+        },
         {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
@@ -453,6 +465,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-pro',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -467,6 +483,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        { condition: { authType: 'oauth-personal' }, target: 'gemini-2.5-pro' },
         { condition: { releaseChannel: 'stable' }, target: 'gemini-2.5-pro' },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
@@ -482,6 +499,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     pro: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        { condition: { authType: 'oauth-personal' }, target: 'gemini-2.5-pro' },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -497,6 +515,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3.1-flash-lite-preview',
       contexts: [
         {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-flash-lite',
+        },
+        {
           condition: { useGemini3_1FlashLite: false },
           target: 'gemini-2.5-flash-lite',
         },
@@ -505,6 +527,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     flash: {
       default: 'gemini-3-flash-preview',
       contexts: [
+        {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-flash',
+        },
         {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
@@ -515,7 +541,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-2.5-flash-lite',
       contexts: [
         {
-          condition: { useGemini3_1FlashLite: true },
+          condition: {
+            useGemini3_1FlashLite: true,
+            authType: 'gemini-api-key',
+          },
+          target: 'gemini-3.1-flash-lite-preview',
+        },
+        {
+          condition: { useGemini3_1FlashLite: true, authType: 'vertex-ai' },
           target: 'gemini-3.1-flash-lite-preview',
         },
       ],
@@ -523,6 +556,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'auto-gemini-3': {
       default: 'gemini-3-pro-preview',
       contexts: [
+        { condition: { authType: 'oauth-personal' }, target: 'gemini-2.5-pro' },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -543,6 +577,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-flash-preview',
       contexts: [
         {
+          condition: { authType: 'oauth-personal' },
+          target: 'gemini-2.5-flash',
+        },
+        {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
         },
@@ -555,6 +593,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     pro: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        { condition: { authType: 'oauth-personal' }, target: 'gemini-2.5-pro' },
         {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-pro',

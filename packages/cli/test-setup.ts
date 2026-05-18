@@ -56,6 +56,9 @@ let errorSpy: vi.SpyInstance;
 let debugSpy: vi.SpyInstance;
 
 beforeEach(() => {
+  // Ensure a clean home directory state for all tests
+  vi.stubEnv('GEMINI_CLI_HOME', '');
+
   // Reset themeManager state to ensure test isolation
   themeManager.resetForTesting();
 
