@@ -34,7 +34,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    getAutoModelDescription: (hasAccessToPreview: boolean, useGemini3_1?: boolean) =>
+    getAutoModelDescription: (
+      hasAccessToPreview: boolean,
+      useGemini3_1?: boolean,
+    ) =>
       `Auto Model Description (preview: ${hasAccessToPreview}, 3.1: ${useGemini3_1})`,
     getDisplayString: (val: string) => mockGetDisplayString(val),
     logModelSlashCommand: (config: Config, event: ModelSlashCommandEvent) =>

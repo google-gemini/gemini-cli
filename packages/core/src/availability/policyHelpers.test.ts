@@ -220,14 +220,7 @@ describe('policyHelpers', () => {
     ];
 
     testCases.forEach(
-      ({
-        name,
-        model,
-        useGemini31,
-        hasAccess,
-        authType,
-        wrapsAround,
-      }) => {
+      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({

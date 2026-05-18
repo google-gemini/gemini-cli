@@ -725,4 +725,3 @@ describe('getAutoModelDescription', () => {
     expect(desc).toContain('gemini-3-flash');
   });
 });
-
