@@ -70,7 +70,9 @@ const keepCiEnv =
   process.env.GEMINI_KEEP_CI_ENV === '1' ||
   process.env.GEMINI_KEEP_CI_ENV === 'true';
 if (!keepCiEnv) {
-  const ciKeys = ['CI', 'CONTINUOUS_INTEGRATION'].filter((k) => k in env);
+  const ciKeys = ['CI', 'CONTINUOUS_INTEGRATION', 'GITHUB_ACTIONS'].filter(
+    (k) => k in env,
+  );
   if (ciKeys.length > 0) {
     ciKeys.forEach((k) => delete env[k]);
     process.stderr.write(
