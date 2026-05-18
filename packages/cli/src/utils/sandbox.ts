@@ -314,6 +314,10 @@ export async function start_sandbox(
     // run init binary inside container to forward signals & reap zombies
     const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
 
+    // explicitly clear the entrypoint to prevent the container's default
+    // entrypoint from interfering with the CLI's spawn command.
+    args.push('--entrypoint', '');
+
     // add runsc runtime if using runsc
     if (config.command === 'runsc') {
       args.push('--runtime=runsc');
@@ -728,6 +732,8 @@ export async function start_sandbox(
         'run',
         '--rm',
         '--init',
+        '--entrypoint',
+        '',
         ...(userFlag ? userFlag.split(' ') : []),
         '--name',
         SANDBOX_PROXY_NAME,

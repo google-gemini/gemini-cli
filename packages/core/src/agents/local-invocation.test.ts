@@ -121,7 +121,7 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
-    it('should truncate long input values', () => {
+    it('should not truncate long input values', () => {
       const longTask = 'A'.repeat(100);
       const params = { task: longTask };
       const invocation = new LocalSubagentInvocation(
@@ -131,13 +131,12 @@ describe('LocalSubagentInvocation', () => {
         mockMessageBus,
       );
       const description = invocation.getDescription();
-      // Default INPUT_PREVIEW_MAX_LENGTH is 50
       expect(description).toBe(
-        `Running subagent 'MockAgent' with inputs: { task: ${'A'.repeat(50)} }`,
+        `Running subagent 'MockAgent' with inputs: { task: ${'A'.repeat(100)} }`,
       );
     });
 
-    it('should truncate the overall description if it exceeds the limit', () => {
+    it('should not truncate the overall description', () => {
       // Create a definition and inputs that result in a very long description
       const longNameDef: LocalAgentDefinition = {
         ...testDefinition,
@@ -154,8 +153,7 @@ describe('LocalSubagentInvocation', () => {
         mockMessageBus,
       );
       const description = invocation.getDescription();
-      // Default DESCRIPTION_MAX_LENGTH is 200
-      expect(description.length).toBe(200);
+      expect(description.length).toBeGreaterThan(300);
       expect(
         description.startsWith(
           "Running subagent 'VeryLongAgentNameThatTakesUpSpace'",

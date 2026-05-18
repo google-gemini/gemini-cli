@@ -164,7 +164,7 @@ export function resolveModel(
   switch (normalizedModel) {
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
-      if (currentReleaseChannel === 'stable') {
+      if (!hasAccessToPreview) {
         resolved = DEFAULT_GEMINI_MODEL;
         break;
       }

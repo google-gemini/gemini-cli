@@ -7,6 +7,7 @@
 import { type Part, type PartListUnion } from '@google/genai';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+import { type HistoryTurn } from '../core/agentChatHistory.js';
 
 /**
  * Converts a PartListUnion into a normalized array of Part objects.
@@ -29,8 +30,8 @@ function ensurePartArray(content: PartListUnion): Part[] {
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
-): Array<{ role: 'user' | 'model'; parts: Part[] }> {
-  const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
+): HistoryTurn[] {
+  const clientHistory: HistoryTurn[] = [];
 
   for (const msg of messages) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
@@ -47,8 +48,11 @@ export function convertSessionToClientHistory(
       }
 
       clientHistory.push({
-        role: 'user',
-        parts: ensurePartArray(msg.content),
+        id: msg.id,
+        content: {
+          role: 'user',
+          parts: ensurePartArray(msg.content),
+        },
       });
     } else if (msg.type === 'gemini') {
       const modelParts: Part[] = [];
@@ -85,8 +89,11 @@ export function convertSessionToClientHistory(
         }
 
         clientHistory.push({
-          role: 'model',
-          parts: modelParts,
+          id: msg.id,
+          content: {
+            role: 'model',
+            parts: modelParts,
+          },
         });
 
         const functionResponseParts: Part[] = [];
@@ -117,8 +124,11 @@ export function convertSessionToClientHistory(
 
         if (functionResponseParts.length > 0) {
           clientHistory.push({
-            role: 'user',
-            parts: functionResponseParts,
+            id: `${msg.id}_response`,
+            content: {
+              role: 'user',
+              parts: functionResponseParts,
+            },
           });
         }
       } else {
@@ -128,8 +138,11 @@ export function convertSessionToClientHistory(
 
         if (modelParts.length > 0) {
           clientHistory.push({
-            role: 'model',
-            parts: modelParts,
+            id: msg.id,
+            content: {
+              role: 'model',
+              parts: modelParts,
+            },
           });
         }
       }
