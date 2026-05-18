@@ -10,6 +10,7 @@ import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
+import { LRUCache } from 'mnemonist';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
 import type {
   AgentHistoryProviderConfig,
@@ -843,10 +844,10 @@ export class Config implements McpContext, AgentLoopContext {
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
   private creditsNotificationShown: boolean = false;
-  private modelQuotas: Map<
+  private modelQuotas = new LRUCache<
     string,
     { remaining: number; limit: number; resetTime?: string }
-  > = new Map();
+  >(50);
   private lastRetrievedQuota?: RetrieveUserQuotaResponse;
   private lastQuotaFetchTime = 0;
   private lastEmittedQuotaRemaining: number | undefined;
@@ -2269,6 +2270,11 @@ export class Config implements McpContext, AgentLoopContext {
         this.lastRetrievedQuota = quota;
         this.lastQuotaFetchTime = Date.now();
 
+        const currentResponseQuotas = new Map<
+          string,
+          { remaining: number; limit: number; resetTime?: string }
+        >();
+
         for (const bucket of quota.buckets) {
           if (!bucket.modelId || bucket.remainingFraction == null) {
             continue;
@@ -2282,7 +2288,9 @@ export class Config implements McpContext, AgentLoopContext {
             limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
-                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+                : (currentResponseQuotas.get(bucket.modelId)?.limit ??
+                  this.modelQuotas.get(bucket.modelId)?.limit ??
+                  0);
           } else {
             // Server only sent remainingFraction — use a normalized scale.
             limit = 100;
@@ -2290,18 +2298,22 @@ export class Config implements McpContext, AgentLoopContext {
           }
 
           if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-            const existing = this.modelQuotas.get(bucket.modelId);
-            // If we have multiple buckets for the same model, pick the one with the most
-            // remaining quota. This prevents a restricted or exhausted bucket from
-            // overwriting a valid Pro bucket.
+            const existing = currentResponseQuotas.get(bucket.modelId);
+            // Within the same response, pick the bucket with the most remaining
+            // quota to prevent an exhausted bucket from masking a valid one.
             if (!existing || remaining > existing.remaining) {
-              this.modelQuotas.set(bucket.modelId, {
+              currentResponseQuotas.set(bucket.modelId, {
                 remaining,
                 limit,
                 resetTime: bucket.resetTime,
               });
             }
           }
+        }
+
+        // Commit the condensed response truth to the LRU cache
+        for (const [modelId, quotaData] of currentResponseQuotas.entries()) {
+          this.modelQuotas.set(modelId, quotaData);
         }
       }
 

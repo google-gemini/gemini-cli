@@ -3235,6 +3235,37 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getQuotaRemaining()).toBe(100);
     });
 
+    it('should update cache to a lower value from a new response', async () => {
+      // First response sets quota to 150
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValueOnce({
+        buckets: [
+          {
+            modelId: 'gemini-1.5-pro',
+            remainingAmount: '150',
+            remainingFraction: 1.0,
+          },
+        ],
+      });
+      config.setModel('gemini-1.5-pro');
+      await config.refreshUserQuota();
+      expect(config.getQuotaRemaining()).toBe(150);
+
+      // Second response sets quota to 100
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValueOnce({
+        buckets: [
+          {
+            modelId: 'gemini-1.5-pro',
+            remainingAmount: '100',
+            remainingFraction: 0.66,
+          },
+        ],
+      });
+      await config.refreshUserQuota();
+
+      // If cache isn't properly overwritten by a valid lower value, it would remain 150.
+      expect(config.getQuotaRemaining()).toBe(100);
+    });
+
     it('should return undefined pooled quota for non-auto models', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
         buckets: [
