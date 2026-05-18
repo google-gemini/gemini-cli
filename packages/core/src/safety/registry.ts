@@ -89,8 +89,16 @@ export class CheckerRegistry {
     }
 
     // Check custom external checkers
+    // Note: Paths are validated during registration in validateCustomCheckerPaths().
+    // We perform additional runtime checks here for defense-in-depth.
     const customPath = this.customCheckers.get(name);
     if (customPath) {
+      // Ensure path is still absolute and doesn't contain traversal sequences
+      if (!path.isAbsolute(customPath) || customPath.includes('..')) {
+        throw new Error(
+          `Custom checker "${name}" has an invalid or untrusted path: ${customPath}`,
+        );
+      }
       // Resolve symlinks to prevent symlink substitution attacks
       const resolvedPath = fs.realpathSync(customPath);
       return resolvedPath;
