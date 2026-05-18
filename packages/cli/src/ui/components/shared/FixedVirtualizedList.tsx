@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -172,23 +172,21 @@ function FixedVirtualizedList<T>(
     props.targetScrollIndex,
   );
   const prevDataLength = useRef(data.length);
+  const previousDataLength = prevDataLength.current;
 
   if (
     (props.targetScrollIndex !== undefined &&
       props.targetScrollIndex !== prevTargetScrollIndex &&
       data.length > 0) ||
     (props.targetScrollIndex !== undefined &&
-      prevDataLength.current === 0 &&
+      previousDataLength === 0 &&
       data.length > 0)
   ) {
     if (props.targetScrollIndex !== prevTargetScrollIndex) {
       setPrevTargetScrollIndex(props.targetScrollIndex);
     }
-    prevDataLength.current = data.length;
     setIsStickingToBottom(false);
     setScrollAnchor({ index: props.targetScrollIndex, offset: 0 });
-  } else {
-    prevDataLength.current = data.length;
   }
 
   const rawStateActualScrollTop = (() => {
@@ -236,7 +234,7 @@ function FixedVirtualizedList<T>(
     }
   }
 
-  const listGrew = data.length > prevDataLength.current;
+  const listGrew = data.length > previousDataLength;
   const containerChanged =
     prevContainerHeight.current !== scrollableContainerHeight;
   const shouldAutoScroll = props.targetScrollIndex === undefined;

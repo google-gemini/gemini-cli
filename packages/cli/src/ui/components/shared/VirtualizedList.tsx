@@ -926,6 +926,7 @@ function VirtualizedList<T>(
         containerWidth: number;
         index: number;
         isToggled: boolean;
+        renderItem: typeof renderItem;
       }
     >(),
   );
@@ -965,7 +966,8 @@ function VirtualizedList<T>(
           cached.width === width &&
           cached.containerWidth === containerWidth &&
           cached.index === i &&
-          cached.isToggled === isToggled
+          cached.isToggled === isToggled &&
+          cached.renderItem === renderItem
         ) {
           contentElement = cached.element;
         } else {
@@ -998,6 +1000,7 @@ function VirtualizedList<T>(
             containerWidth,
             index: i,
             isToggled,
+            renderItem,
           });
         }
 

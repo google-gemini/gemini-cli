@@ -12,7 +12,6 @@ import {
   type MouseEvent,
   type MouseEventName,
 } from '../contexts/MouseContext.js';
-import { debugLogger } from '@google/gemini-cli-core';
 
 export const useMouseClick = (
   containerRef: React.RefObject<DOMElement | null>,
@@ -32,9 +31,6 @@ export const useMouseClick = (
       const eventName =
         name ?? (button === 'left' ? 'left-press' : 'right-release');
 
-      debugLogger.log(
-        `[useMouseClick] received event=${event.name} expected=${eventName} hasContainer=${!!containerRef.current}`,
-      );
       if (event.name === eventName && containerRef.current) {
         const { x, y, width, height } = getBoundingBox(containerRef.current);
         // Terminal mouse events are 1-based, Ink layout is 0-based.
@@ -44,17 +40,12 @@ export const useMouseClick = (
         const relativeX = mouseX - x;
         const relativeY = mouseY - y;
 
-        debugLogger.log(
-          `[useMouseClick] bounds x=${x} y=${y} w=${width} h=${height} mouseX=${mouseX} mouseY=${mouseY} relX=${relativeX} relY=${relativeY}`,
-        );
-
         if (
           relativeX >= 0 &&
           relativeX < width &&
           relativeY >= 0 &&
           relativeY < height
         ) {
-          debugLogger.log(`[useMouseClick] Triggering handler!`);
           handlerRef.current(event, relativeX, relativeY);
         }
       }

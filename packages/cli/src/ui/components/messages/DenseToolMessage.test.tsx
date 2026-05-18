@@ -565,6 +565,45 @@ describe('DenseToolMessage', () => {
       expect(lastFrame()).toContain('new line');
     });
 
+    it('shows diff content when globally expanded inside a VirtualizedList context', async () => {
+      const mockListContext = {
+        registerInteractivity: vi.fn(),
+        setItemState: vi.fn(),
+        getItemState: vi.fn(),
+        isItemToggled: vi.fn().mockReturnValue(false),
+        toggleItem: vi.fn(),
+        registerClickCallback: vi.fn(),
+        unregisterClickCallback: vi.fn(),
+      };
+
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <VirtualizedListContext.Provider
+          value={
+            mockListContext as unknown as React.ContextType<
+              typeof VirtualizedListContext
+            >
+          }
+        >
+          <DenseToolMessage
+            {...defaultProps}
+            itemKey="item-1"
+            resultDisplay={diffResult as ToolResultDisplay}
+            status={CoreToolCallStatus.Success}
+          />
+        </VirtualizedListContext.Provider>,
+        {
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          toolActions: {
+            isExpanded: () => true,
+          },
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('new line');
+    });
+
     it('toggles expansion when header is clicked', async () => {
       const toggleExpansion = vi.fn();
       const toggleItem = vi.fn();

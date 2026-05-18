@@ -119,6 +119,41 @@ describe('<VirtualizedList />', () => {
       unmount();
     });
 
+    it('rerenders cached items when renderItem changes', async () => {
+      const data = ['Item 0'];
+      const renderWithLabel = (label: string) => (
+        <Box height={10} width={100}>
+          <VirtualizedList
+            data={data}
+            renderItem={({ item }) => (
+              <Box height={1}>
+                <Text>
+                  {label} {item}
+                </Text>
+              </Box>
+            )}
+            keyExtractor={keyExtractor}
+            estimatedItemHeight={() => itemHeight}
+          />
+        </Box>
+      );
+
+      const { lastFrame, rerender, waitUntilReady, unmount } = await render(
+        renderWithLabel('Initial'),
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('Initial Item 0');
+
+      await act(async () => {
+        rerender(renderWithLabel('Updated'));
+      });
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('Updated Item 0');
+      expect(lastFrame()).not.toContain('Initial Item 0');
+      unmount();
+    });
+
     it('scrolls down to show new items when requested via ref', async () => {
       const ref = createRef<VirtualizedListRef<string>>();
       const { lastFrame, waitUntilReady, unmount } = await render(

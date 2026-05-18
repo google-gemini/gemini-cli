@@ -283,10 +283,15 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   // Determine expansion state based on list context or fallback to tool actions
   const isExpanded = useMemo(() => {
+    const isExpandedGlobally = isExpandedInContext
+      ? isExpandedInContext(callId)
+      : false;
     if (itemKey && virtualizedListContext) {
-      return virtualizedListContext.isItemToggled(itemKey);
+      return (
+        virtualizedListContext.isItemToggled(itemKey) || isExpandedGlobally
+      );
     }
-    return isExpandedInContext ? isExpandedInContext(callId) : false;
+    return isExpandedGlobally;
   }, [itemKey, virtualizedListContext, isExpandedInContext, callId]);
 
   const handleToggle = useCallback(() => {

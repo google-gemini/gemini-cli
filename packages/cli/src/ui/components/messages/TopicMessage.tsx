@@ -24,6 +24,7 @@ interface TopicMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   availableTerminalHeight?: number;
   isExpandable?: boolean;
+  // TopicMessage is only interactive when rendered inside VirtualizedList.
   itemKey?: string;
 }
 
