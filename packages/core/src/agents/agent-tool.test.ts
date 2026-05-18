@@ -148,7 +148,9 @@ describe('AgentTool', () => {
 
   describe('agentSessionSubagentEnabled feature flag', () => {
     it('should use LocalSessionInvocation when flag is enabled for local agent', async () => {
-      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'isAgentSessionSubagentEnabled').mockReturnValue(
+        true,
+      );
       tool = new AgentTool(mockConfig, mockMessageBus);
 
       const params = {
@@ -169,7 +171,9 @@ describe('AgentTool', () => {
     });
 
     it('should use RemoteSessionInvocation when flag is enabled for remote agent', async () => {
-      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'isAgentSessionSubagentEnabled').mockReturnValue(
+        true,
+      );
       tool = new AgentTool(mockConfig, mockMessageBus);
 
       const params = {
@@ -190,7 +194,9 @@ describe('AgentTool', () => {
     });
 
     it('should use legacy invocations when flag is disabled (default)', async () => {
-      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'isAgentSessionSubagentEnabled').mockReturnValue(
+        false,
+      );
       tool = new AgentTool(mockConfig, mockMessageBus);
 
       const localParams = {
@@ -217,7 +223,9 @@ describe('AgentTool', () => {
     });
 
     it('should thread onAgentEvent to session invocations', async () => {
-      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'isAgentSessionSubagentEnabled').mockReturnValue(
+        true,
+      );
       const onEvent = vi.fn();
       tool = new AgentTool(mockConfig, mockMessageBus, onEvent);
 
@@ -238,7 +246,9 @@ describe('AgentTool', () => {
     });
 
     it('should always use BrowserAgentInvocation for browser agent regardless of flag', async () => {
-      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'isAgentSessionSubagentEnabled').mockReturnValue(
+        true,
+      );
       tool = new AgentTool(mockConfig, mockMessageBus);
 
       const params = {
