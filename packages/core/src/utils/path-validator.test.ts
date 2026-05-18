@@ -68,10 +68,25 @@ describe('PathValidator', () => {
     ).toBe(false);
     expect(validatePath('✓ test passed').isValid).toBe(false);
     expect(validatePath('× test failed').isValid).toBe(false);
+    expect(
+      validatePath('TestingLibraryElementError: Unable to find an element')
+        .isValid,
+    ).toBe(false);
   });
 
   it('should allow short paths with quotes (even if unusual)', () => {
     // Some systems might technically allow this, and we only want to block long/obvious log fragments
     expect(validatePath('file"with"quote.txt').isValid).toBe(true);
+  });
+
+  it('should reject long paths with ellipses', () => {
+    expect(
+      validatePath('this/is/a/very/long/path/with/ellipses/.../and/more')
+        .isValid,
+    ).toBe(false);
+  });
+
+  it('should allow short paths with braces', () => {
+    expect(validatePath('{a,b}.ts').isValid).toBe(true);
   });
 });
