@@ -293,12 +293,20 @@ export class ContextManager {
   }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
-    let previewNodes: ConcreteNode[] = [];
+    let previewNodes: readonly ConcreteNode[] = [];
     if (pendingRequest) {
       previewNodes = this.env.graphMapper.applyEvent({
         type: 'PUSH',
         payload: [pendingRequest],
       });
+
+      // Run the ingestion pipeline on the new nodes before they are rendered.
+      const previewNodeIds = new Set(previewNodes.map((n) => n.id));
+      previewNodes = await this.orchestrator.executeTriggerSync(
+        'new_message',
+        previewNodes,
+        previewNodeIds,
+      );
     }
 
     // --- Hot Start Calibration ---
