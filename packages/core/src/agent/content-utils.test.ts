@@ -192,6 +192,7 @@ describe('contentPartsToGeminiParts', () => {
     const content = [
       { type: 'custom_widget', payload: 123 },
     ] as unknown as ContentPart[];
+
     const warnSpy = vi.spyOn(debugLogger, 'warn');
     const result = contentPartsToGeminiParts(content);
 
