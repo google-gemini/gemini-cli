@@ -137,7 +137,7 @@ jobs:
         id: 'analysis'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-            GH_ACTOR: ${{ github.actor }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           # Check for behavioral eval changes
           EVAL_CHANGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^evals/" || true)
