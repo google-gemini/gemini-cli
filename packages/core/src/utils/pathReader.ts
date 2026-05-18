@@ -87,6 +87,11 @@ export async function readPathFromWorkspace(
     );
 
     for (const filePath of finalFiles) {
+      // Defense in depth: validate each file found within the directory.
+      if (!workspace.isPathWithinWorkspace(filePath)) {
+        continue;
+      }
+
       const relativePathForDisplay = path.relative(absolutePath, filePath);
       allParts.push({ text: `--- ${relativePathForDisplay} ---\n` });
       const result = await processSingleFileContent(
