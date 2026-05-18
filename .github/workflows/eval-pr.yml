@@ -137,6 +137,7 @@ jobs:
         id: 'analysis'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+            GH_ACTOR: ${{ github.actor }}
         run: |
           # Check for behavioral eval changes
           EVAL_CHANGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^evals/" || true)
@@ -145,7 +146,7 @@ jobs:
           fi
 
           # Check if user is a maintainer
-          USER_PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
+          USER_PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/$GH_ACTOR/permission --jq '.permission')
           if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
             echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
           fi
