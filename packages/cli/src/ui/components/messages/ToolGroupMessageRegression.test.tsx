@@ -13,6 +13,7 @@ import {
   ApprovalMode,
   WRITE_FILE_DISPLAY_NAME,
   Kind,
+  SubagentState,
 } from '@google/gemini-cli-core';
 import os from 'node:os';
 import { createMockSettings } from '../../../test-utils/settings.js';
@@ -76,7 +77,7 @@ describe('ToolGroupMessage Regression Tests', () => {
         resultDisplay: {
           isSubagentProgress: true,
           agentName: 'TestAgent',
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: [],
         },
       }),
@@ -112,7 +113,7 @@ describe('ToolGroupMessage Regression Tests', () => {
         resultDisplay: {
           isSubagentProgress: true,
           agentName: 'TestAgent',
-          state: 'completed',
+          state: SubagentState.COMPLETED,
           recentActivity: [],
         },
       }),

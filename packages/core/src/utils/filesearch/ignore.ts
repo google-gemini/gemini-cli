@@ -19,8 +19,10 @@ export function loadIgnoreRules(
   const ignoreFiles = service.getAllIgnoreFilePaths();
 
   for (const filePath of ignoreFiles) {
-    if (fs.existsSync(filePath)) {
+    try {
       ignorer.add(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+      // Skip files that can't be read (e.g. directories, permission errors)
     }
   }
 

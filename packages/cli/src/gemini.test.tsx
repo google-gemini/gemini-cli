@@ -44,6 +44,7 @@ import {
   type Config,
   type ResumedSessionData,
   type StartupWarning,
+  type ConversationRecord,
   WarningPriority,
   debugLogger,
   coreEvents,
@@ -272,6 +273,10 @@ vi.mock('./ui/utils/mouse.js', () => ({
 
 vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
+}));
+
+vi.mock('./config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
 }));
 
 describe('gemini.tsx main function', () => {
@@ -828,14 +833,14 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          resolveSession: vi
-            .fn()
-            .mockRejectedValue(new Error('Session not found')),
-        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    );
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(new Error('Session not found')),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -884,14 +889,14 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          resolveSession: vi
-            .fn()
-            .mockRejectedValue(SessionError.noSessionsFound()),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(SessionError.noSessionsFound()),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -1068,13 +1073,88 @@ describe('resolveSessionId', () => {
     expect(resumedSessionData).toBeUndefined();
   });
 
+  it('should import from session file when sessionFile is provided', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
+
+    const coreModule = await import('@google/gemini-cli-core');
+    vi.spyOn(coreModule, 'loadConversationRecord').mockResolvedValueOnce({
+      sessionId: 'old-session-id',
+      projectHash: 'hash',
+      startTime: 'time',
+      lastUpdated: 'time',
+      messages: [
+        { type: 'info', content: 'Old info', id: '1' },
+        { type: 'user', content: 'Hello', id: '2' },
+        { type: 'gemini', content: 'Hi', id: '3' },
+        { type: 'error', content: 'Old error', id: '4' },
+        { type: 'user', id: '5' }, // Missing content
+        null, // Null object
+        { type: 'unknown', content: 'Something', id: '6' }, // Unknown type
+      ],
+    } as unknown as ConversationRecord);
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      const { sessionId, resumedSessionData } = await resolveSessionId(
+        undefined,
+        undefined,
+        'dummy-session.json',
+      );
+
+      expect(sessionId).toBeDefined();
+      expect(sessionId).not.toBe('old-session-id'); // A new session ID should be created
+      expect(resumedSessionData).toBeDefined();
+      expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
+
+      // Verify messages: should have 1 info (the new import confirmation) + 2 valid conversation messages
+      // Invalid messages (missing content, null, unknown type) and transient messages should be filtered out.
+      expect(resumedSessionData?.conversation.messages).toHaveLength(3);
+      expect(resumedSessionData?.conversation.messages![0]).toMatchObject({
+        type: 'info',
+        content: expect.stringContaining('Imported session from'),
+      });
+      expect(resumedSessionData?.conversation.messages![1]).toMatchObject({
+        type: 'user',
+        content: 'Hello',
+      });
+      expect(resumedSessionData?.conversation.messages![2]).toMatchObject({
+        type: 'gemini',
+        content: 'Hi',
+      });
+
+      expect(resumedSessionData?.filePath).toContain(sessionId.slice(0, 8)); // New path
+    } catch (e) {
+      if (e instanceof MockProcessExitError) {
+        throw new Error(
+          'process.exit called with: ' +
+            JSON.stringify(emitFeedbackSpy.mock.calls),
+        );
+      }
+      throw e;
+    } finally {
+      emitFeedbackSpy.mockRestore();
+      processExitSpy.mockRestore();
+    }
+  });
+
   it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          sessionExists: vi.fn().mockResolvedValue(true),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(true),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const processExitSpy = vi
@@ -1100,18 +1180,51 @@ describe('resolveSessionId', () => {
   });
 
   it('should return provided sessionId when it does not exist', async () => {
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          sessionExists: vi.fn().mockResolvedValue(false),
-        }) as unknown as InstanceType<typeof SessionSelector>,
-    );
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
     const { sessionId, resumedSessionData } = await resolveSessionId(
       undefined,
       'new-id',
     );
     expect(sessionId).toBe('new-id');
     expect(resumedSessionData).toBeUndefined();
+  });
+
+  it('should exit with FATAL_INPUT_ERROR when explicit resume session is missing', async () => {
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId('explicit-session-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session:'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
   });
 });
 
@@ -1164,6 +1277,44 @@ describe('gemini.tsx main function exit codes', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
+    }
+  });
+
+  it('should exit with 41 for validateAuthMethod failure during sandbox setup', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockResolvedValue(undefined),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    const authModule = await import('./config/auth.js');
+    vi.mocked(authModule.validateAuthMethod).mockResolvedValueOnce(
+      'Auth method invalid',
+    );
+
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(41);
     }
   });
 

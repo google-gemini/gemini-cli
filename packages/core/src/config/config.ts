@@ -34,7 +34,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { ReadMcpResourceTool } from '../tools/read-mcp-resource.js';
 import { ListMcpResourcesTool } from '../tools/list-mcp-resources.js';
 import { GrepTool } from '../tools/grep.js';
-import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
+import { RipGrepTool, resolveRipgrepPath } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
@@ -42,7 +42,6 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import {
-  MemoryTool,
   setGeminiMdFilename,
   getCurrentGeminiMdFilename,
 } from '../tools/memoryTool.js';
@@ -81,14 +80,11 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -140,7 +136,11 @@ import type { GenerateContentParameters } from '@google/genai';
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { getWorkspaceContextOverride } from './scoped-config.js';
+import {
+  getWorkspaceContextOverride,
+  hasScopedAutoMemoryExtractionWriteAccess,
+  hasScopedMemoryInboxAccess,
+} from './scoped-config.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -171,6 +171,7 @@ import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { ragLogger } from '../utils/ragLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
@@ -236,6 +237,7 @@ export interface GemmaModelRouterSettings {
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
+  agentSessionSubagentEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -441,6 +443,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { getChannelFromVersion } from '../utils/channel.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -707,9 +710,7 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
-  experimentalJitContext?: boolean;
   autoDistillation?: boolean;
-  experimentalMemoryV2?: boolean;
   experimentalAutoMemory?: boolean;
   experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
@@ -740,6 +741,7 @@ export interface ConfigParameters {
     overageStrategy?: OverageStrategy;
   };
   vertexAiRouting?: VertexAiRoutingConfig;
+  logRagSnippets?: boolean;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -758,7 +760,8 @@ export class Config implements McpContext, AgentLoopContext {
   private skillManager!: SkillManager;
   private _sessionId: string;
   private readonly clientName: string | undefined;
-  private clientVersion: string;
+  private _clientVersion: string;
+
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
   readonly topicState = new TopicState();
@@ -769,6 +772,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly sandbox: SandboxConfig | undefined;
   private _sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
+  private _ripgrepPathPromise?: Promise<string | null>;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
@@ -792,6 +796,7 @@ export class Config implements McpContext, AgentLoopContext {
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
+  private readonly logRagSnippets: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
@@ -909,6 +914,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
+  private readonly agentSessionSubagentEnabled: boolean;
 
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -953,8 +959,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
-  private readonly experimentalJitContext: boolean;
-  private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
   private readonly experimentalGemma: boolean;
   private readonly experimentalContextManagementConfig?: string;
@@ -978,8 +982,9 @@ export class Config implements McpContext, AgentLoopContext {
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
-    this.clientVersion = params.clientVersion ?? 'unknown';
+    this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.sandbox = params.sandbox
@@ -1067,6 +1072,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
     this.showMemoryUsage = params.showMemoryUsage ?? false;
+    this.logRagSnippets = params.logRagSnippets ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
@@ -1174,8 +1180,6 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? true;
-    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
     this.experimentalGemma = params.experimentalGemma ?? true;
     this.experimentalContextManagementConfig =
@@ -1357,6 +1361,8 @@ export class Config implements McpContext, AgentLoopContext {
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.agentSessionInteractiveEnabled =
       params.adk?.agentSessionInteractiveEnabled ?? false;
+    this.agentSessionSubagentEnabled =
+      params.adk?.agentSessionSubagentEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1432,6 +1438,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private async _initialize(): Promise<void> {
     await this.storage.initialize();
+    ragLogger.initialize(this.storage.getProjectTempLogsDir());
 
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
@@ -1440,7 +1447,24 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
+      let plansDir: string;
+      try {
+        plansDir = this.storage.getPlansDir();
+      } catch (error) {
+        // Fallback to the default plan dir if any error occurs
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        coreEvents.emitFeedback(
+          'warning',
+          'Invalid custom plans directory: ' +
+            errorMessage +
+            '. Falling back to default project temp directory.',
+          error,
+        );
+        this.storage.setCustomPlansDir(undefined);
+        plansDir = this.storage.getPlansDir();
+      }
+
       try {
         await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
@@ -1521,10 +1545,8 @@ export class Config implements McpContext, AgentLoopContext {
       await this.hookSystem.initialize();
     }
 
-    if (this.experimentalJitContext) {
-      this.memoryContextManager = new MemoryContextManager(this);
-      await this.memoryContextManager.refresh();
-    }
+    this.memoryContextManager = new MemoryContextManager(this);
+    await this.memoryContextManager.refresh();
 
     await this._geminiClient.initialize();
     this.initialized = true;
@@ -1815,7 +1837,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelQuotas.clear();
     this.lastRetrievedQuota = undefined;
     this.lastQuotaFetchTime = 0;
-    this.hasAccessToPreviewModel = null;
 
     // Force an event emission to clear the UI display
     coreEvents.emitQuotaChanged(undefined, undefined, undefined);
@@ -1988,14 +2009,21 @@ export class Config implements McpContext, AgentLoopContext {
     resetTime?: string;
   } {
     const model = this.getModel();
-    if (!isAutoModel(model)) {
+    if (!isAutoModel(model, this)) {
       return {};
     }
 
-    const isPreview =
-      model === PREVIEW_GEMINI_MODEL_AUTO ||
-      isPreviewModel(this.getActiveModel(), this);
-    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const primaryModel = resolveModel(
+      model,
+      this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
+    );
+
+    const isPreview = isPreviewModel(primaryModel, this);
+    const proModel = primaryModel;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
       : DEFAULT_GEMINI_FLASH_MODEL;
@@ -2113,6 +2141,32 @@ export class Config implements McpContext, AgentLoopContext {
     return this.targetDir;
   }
 
+  /**
+   * Returns the path to the ripgrep binary, or null if not found or unsafe.
+   * Uses Promise-based caching to prevent race conditions and redundant I/O.
+   */
+  async getRipgrepPath(): Promise<string | null> {
+    if (!this._ripgrepPathPromise) {
+      this._ripgrepPathPromise = resolveRipgrepPath();
+    }
+    return this._ripgrepPathPromise;
+  }
+
+  /**
+   * Checks if ripgrep is available.
+   */
+  async canUseRipgrep(): Promise<boolean> {
+    return (await this.getRipgrepPath()) !== null;
+  }
+
+  /**
+   * Resets the cached ripgrep path. Used for testing.
+   * @internal
+   */
+  __resetRipgrepPathCache(): void {
+    this._ripgrepPathPromise = undefined;
+  }
+
   getWorkspaceContext(): WorkspaceContext {
     return getWorkspaceContextOverride() ?? this.workspaceContext;
   }
@@ -2181,7 +2235,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getHasAccessToPreviewModel(): boolean {
-    return this.hasAccessToPreviewModel !== false;
+    return this.hasAccessToPreviewModel ?? false;
   }
 
   setHasAccessToPreviewModel(hasAccess: boolean | null): void {
@@ -2243,7 +2297,6 @@ export class Config implements McpContext, AgentLoopContext {
             });
           }
         }
-        this.emitQuotaChangedEvent();
       }
 
       const hasAccess =
@@ -2251,6 +2304,11 @@ export class Config implements McpContext, AgentLoopContext {
           (b) => b.modelId && isPreviewModel(b.modelId, this),
         ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
+
+      if (quota.buckets) {
+        this.emitQuotaChangedEvent();
+      }
+
       return quota;
     } catch (e) {
       debugLogger.debug('Failed to retrieve user quota', e);
@@ -2431,7 +2489,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getUserMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.memoryContextManager) {
+    if (this.memoryContextManager) {
       return {
         global: this.memoryContextManager.getGlobalMemory(),
         extension: this.memoryContextManager.getExtensionMemory(),
@@ -2446,14 +2504,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
-    if (this.experimentalJitContext && this.memoryContextManager) {
-      await this.memoryContextManager.refresh();
-    } else {
-      const { refreshServerHierarchicalMemory } = await import(
-        '../utils/memoryDiscovery.js'
-      );
-      await refreshServerHierarchicalMemory(this);
-    }
+    await this.memoryContextManager?.refresh();
     if (this._geminiClient?.isInitialized()) {
       await this._geminiClient.setTools();
       this._geminiClient.updateSystemInstruction();
@@ -2465,15 +2516,14 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns memory for the system instruction.
-   * When JIT is enabled, global memory and user project memory (Tier 1) go
-   * in the system instruction. Extension and project memory (Tier 2) are
-   * placed in the first user message instead, per the tiered context model.
-   * User project memory is in Tier 1 so mid-session saves are reflected
-   * via system instruction updates.
+   * Returns Tier 1 memory for the system instruction. Global memory and user
+   * project memory go in the system instruction; extension and project memory
+   * are placed in the first user message instead, per the tiered context model.
+   * User project memory is in Tier 1 so mid-session saves are reflected via
+   * system instruction updates.
    */
   getSystemInstructionMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.memoryContextManager) {
+    if (this.memoryContextManager) {
       const global = this.memoryContextManager.getGlobalMemory();
       const userProjectMemory =
         this.memoryContextManager.getUserProjectMemory();
@@ -2487,15 +2537,17 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns Tier 2 memory (extension + project) for injection into the first
-   * user message when JIT is enabled. Returns empty string when JIT is
-   * disabled (Tier 2 memory is already in the system instruction).
+   * user message.
    */
-  getSessionMemory(): string {
-    if (!this.experimentalJitContext || !this.memoryContextManager) {
+  getSessionMemory(options?: { includeExtensionContext?: boolean }): string {
+    if (!this.memoryContextManager) {
       return '';
     }
     const sections: string[] = [];
-    const extension = this.memoryContextManager.getExtensionMemory();
+    const includeExtensionContext = options?.includeExtensionContext ?? true;
+    const extension = includeExtensionContext
+      ? this.memoryContextManager.getExtensionMemory()
+      : '';
     const project = this.memoryContextManager.getEnvironmentMemory();
     if (extension?.trim()) {
       sections.push(
@@ -2521,20 +2573,16 @@ export class Config implements McpContext, AgentLoopContext {
     return this.memoryContextManager;
   }
 
-  isJitContextEnabled(): boolean {
-    return this.experimentalJitContext;
-  }
-
   isContextManagementEnabled(): boolean {
     return this.contextManagement.enabled;
   }
 
-  getMemoryBoundaryMarkers(): readonly string[] {
-    return this.memoryBoundaryMarkers;
+  isAgentSessionSubagentEnabled(): boolean {
+    return this.agentSessionSubagentEnabled;
   }
 
-  isMemoryV2Enabled(): boolean {
-    return this.experimentalMemoryV2;
+  getMemoryBoundaryMarkers(): readonly string[] {
+    return this.memoryBoundaryMarkers;
   }
 
   isAutoMemoryEnabled(): boolean {
@@ -2611,7 +2659,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getGeminiMdFileCount(): number {
-    if (this.experimentalJitContext && this.memoryContextManager) {
+    if (this.memoryContextManager) {
       return this.memoryContextManager.getLoadedPaths().size;
     }
     return this.geminiMdFileCount;
@@ -2622,7 +2670,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getGeminiMdFilePaths(): string[] {
-    if (this.experimentalJitContext && this.memoryContextManager) {
+    if (this.memoryContextManager) {
       return Array.from(this.memoryContextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
@@ -2757,6 +2805,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.dynamicModelConfiguration;
   }
 
+  getReleaseChannel(): string {
+    return getChannelFromVersion(this._clientVersion);
+  }
+
   getPendingIncludeDirectories(): string[] {
     return this.pendingIncludeDirectories;
   }
@@ -2771,6 +2823,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAccessibility(): AccessibilitySettings {
     return this.accessibility;
+  }
+
+  getLogRagSnippets(): boolean {
+    return this.logRagSnippets;
   }
 
   getTelemetryEnabled(): boolean {
@@ -3063,6 +3119,86 @@ export class Config implements McpContext, AgentLoopContext {
     this.ideMode = value;
   }
 
+  private isScopedMemoryInboxPatchPathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+    inboxRoot: string,
+    checkType: 'read' | 'write' = 'write',
+  ): boolean {
+    if (!hasScopedMemoryInboxAccess()) {
+      return false;
+    }
+
+    const normalizedPath = path.resolve(absolutePath);
+    const resolvedMemoryRoot = resolveToRealPath(
+      this.storage.getProjectMemoryTempDir(),
+    );
+
+    // Reads: allow the inbox root and the per-kind subtrees so the extraction
+    // agent can list/inspect prior patches (including non-canonical filenames
+    // left over from older runs) before deciding how to rewrite the canonical
+    // extraction.patch. Writes still flow through the strict canonical-path
+    // check below so the inbox cannot be backdoored with arbitrary files.
+    if (checkType === 'read') {
+      const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+      const normalizedInboxRoot = path.resolve(inboxRoot);
+      if (
+        resolvedPath === resolvedInboxRoot ||
+        normalizedPath === normalizedInboxRoot
+      ) {
+        return isSubpath(resolvedMemoryRoot, resolvedPath);
+      }
+
+      for (const kind of ['private', 'global'] as const) {
+        const kindRoot = path.join(inboxRoot, kind);
+        const resolvedKindRoot = resolveToRealPath(kindRoot);
+        const normalizedKindRoot = path.resolve(kindRoot);
+        if (
+          resolvedPath === resolvedKindRoot ||
+          normalizedPath === normalizedKindRoot ||
+          isSubpath(resolvedKindRoot, resolvedPath) ||
+          isSubpath(normalizedKindRoot, normalizedPath)
+        ) {
+          return isSubpath(resolvedMemoryRoot, resolvedPath);
+        }
+      }
+
+      return false;
+    }
+
+    const isCanonicalPatchPath = (['private', 'global'] as const).some(
+      (kind) =>
+        normalizedPath === path.resolve(inboxRoot, kind, 'extraction.patch'),
+    );
+    if (!isCanonicalPatchPath) {
+      return false;
+    }
+
+    return isSubpath(resolvedMemoryRoot, resolvedPath);
+  }
+
+  private isScopedAutoMemoryExtractionWritePathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+  ): boolean {
+    if (!hasScopedAutoMemoryExtractionWriteAccess()) {
+      return false;
+    }
+
+    const resolvedSkillsMemoryDir = resolveToRealPath(
+      this.storage.getProjectSkillsMemoryDir(),
+    );
+    if (isSubpath(resolvedSkillsMemoryDir, resolvedPath)) {
+      return true;
+    }
+
+    return this.isScopedMemoryInboxPatchPathAllowed(
+      absolutePath,
+      resolvedPath,
+      path.join(this.storage.getProjectMemoryTempDir(), '.inbox'),
+    );
+  }
+
   /**
    * Get the current FileSystemService
    */
@@ -3077,11 +3213,49 @@ export class Config implements McpContext, AgentLoopContext {
    * file (the latter is the only file under `~/.gemini/` that is reachable —
    * settings, credentials, keybindings, etc. remain disallowed).
    *
+   * One subtree is *carved back out*: `<projectMemoryDir>/.inbox/` is owned by
+   * the auto-memory extraction agent and the `/memory inbox` review flow. The
+   * main agent is denied access to it even though it falls inside the project
+   * temp dir; the extraction agent receives a narrow execution-scoped exception
+   * for *writes* to `.inbox/{private,global}/extraction.patch`. Scoped *read*
+   * access to the wider `.inbox/{private,global}/` subtree is granted in
+   * `validatePathAccess` so the extractor can enumerate prior patches.
+   *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
     const resolvedPath = resolveToRealPath(absolutePath);
+
+    // The auto-memory inbox (`<projectMemoryDir>/.inbox/`) is owned by the
+    // background extraction agent and the `/memory inbox` review flow. The
+    // main agent must NOT drop files into it directly (that would let the
+    // model bypass review). Deny first, even if the path also satisfies the
+    // workspace or project-temp allowlists below.
+    const inboxRoot = path.join(
+      this.storage.getProjectMemoryTempDir(),
+      '.inbox',
+    );
+    const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+    const normalizedPath = path.resolve(absolutePath);
+    const normalizedInboxRoot = path.resolve(inboxRoot);
+    if (
+      resolvedPath === resolvedInboxRoot ||
+      isSubpath(resolvedInboxRoot, resolvedPath) ||
+      normalizedPath === normalizedInboxRoot ||
+      isSubpath(normalizedInboxRoot, normalizedPath)
+    ) {
+      if (
+        this.isScopedMemoryInboxPatchPathAllowed(
+          absolutePath,
+          resolvedPath,
+          inboxRoot,
+        )
+      ) {
+        return true;
+      }
+      return false;
+    }
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
@@ -3122,10 +3296,45 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    if (checkType === 'write' && hasScopedAutoMemoryExtractionWriteAccess()) {
+      const resolvedPath = resolveToRealPath(absolutePath);
+      if (
+        this.isScopedAutoMemoryExtractionWritePathAllowed(
+          absolutePath,
+          resolvedPath,
+        )
+      ) {
+        return null;
+      }
+      return `Auto-memory extraction write denied: Attempted path "${absolutePath}" is outside the extraction write allowlist. Extraction may only write extracted skills under ${this.storage.getProjectSkillsMemoryDir()} and canonical inbox patches under ${path.join(this.storage.getProjectMemoryTempDir(), '.inbox', '{private,global}', 'extraction.patch')}.`;
+    }
+
     // For read operations, check read-only paths first
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
         return null;
+      }
+
+      // The memory inbox is carved out of the standard temp-dir allowlist by
+      // `isPathAllowed`. The extraction agent is granted a scoped read
+      // exception so it can enumerate prior patches (including non-canonical
+      // filenames) before consolidating them into the canonical
+      // extraction.patch. Writes remain restricted to canonical paths.
+      if (hasScopedMemoryInboxAccess()) {
+        const inboxRoot = path.join(
+          this.storage.getProjectMemoryTempDir(),
+          '.inbox',
+        );
+        if (
+          this.isScopedMemoryInboxPatchPathAllowed(
+            absolutePath,
+            resolveToRealPath(absolutePath),
+            inboxRoot,
+            'read',
+          )
+        ) {
+          return null;
+        }
       }
     }
 
@@ -3350,6 +3559,13 @@ export class Config implements McpContext, AgentLoopContext {
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
     );
+  }
+
+  /**
+   * Returns the client version.
+   */
+  get clientVersion(): string {
+    return this._clientVersion;
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -3578,11 +3794,17 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {
-    return this.agentSessionNoninteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionNoninteractiveEnabled
+    );
   }
 
   getAgentSessionInteractiveEnabled(): boolean {
-    return this.agentSessionInteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionInteractiveEnabled
+    );
   }
 
   /**
@@ -3683,7 +3905,7 @@ export class Config implements McpContext, AgentLoopContext {
       let useRipgrep = false;
       let errorString: undefined | string = undefined;
       try {
-        useRipgrep = await canUseRipgrep();
+        useRipgrep = await this.canUseRipgrep();
       } catch (error: unknown) {
         errorString = String(error);
       }
@@ -3738,11 +3960,6 @@ export class Config implements McpContext, AgentLoopContext {
         new ReadBackgroundOutputTool(this, this.messageBus),
       ),
     );
-    if (!this.isMemoryV2Enabled()) {
-      maybeRegister(MemoryTool, () =>
-        registry.registerTool(new MemoryTool(this.messageBus, this.storage)),
-      );
-    }
     maybeRegister(WebSearchTool, () =>
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );

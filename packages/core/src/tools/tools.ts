@@ -741,6 +741,10 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
 
 export interface ToolResult {
   /**
+   * Tool-controlled display information.
+   */
+  display?: ToolDisplay;
+  /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.
    */
@@ -1083,6 +1087,9 @@ export type ToolCallConfirmationDetails =
   | ToolInfoConfirmationDetails
   | ToolAskUserConfirmationDetails
   | ToolExitPlanModeConfirmationDetails;
+
+import type { ToolDisplay } from '../agent/types.js';
+export type { ToolDisplay };
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',

@@ -56,40 +56,6 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   }
 
   /**
-   * Appends newly observed pristine nodes (e.g. from a user message) to the working buffer.
-   * Ensures they are tracked in the pristine map and point to themselves in provenance.
-   */
-  appendPristineNodes(
-    newNodes: readonly ConcreteNode[],
-  ): ContextWorkingBufferImpl {
-    if (newNodes.length === 0) return this;
-
-    const newPristineMap = new Map<string, ConcreteNode>(this.pristineNodesMap);
-    const newProvenanceMap = new Map(this.provenanceMap);
-    const existingIds = new Set(this.nodes.map((n) => n.id));
-
-    const nodesToAdd: ConcreteNode[] = [];
-    const batchIds = new Set<string>();
-    for (const node of newNodes) {
-      if (!existingIds.has(node.id) && !batchIds.has(node.id)) {
-        newPristineMap.set(node.id, node);
-        newProvenanceMap.set(node.id, new Set([node.id]));
-        nodesToAdd.push(node);
-        batchIds.add(node.id);
-      }
-    }
-
-    if (nodesToAdd.length === 0) return this;
-
-    return new ContextWorkingBufferImpl(
-      [...this.nodes, ...nodesToAdd],
-      newPristineMap,
-      newProvenanceMap,
-      [...this.history],
-    );
-  }
-
-  /**
    * Generates an entirely new buffer instance by calculating the delta between the processor's input and output.
    */
   applyProcessorResult(
@@ -211,15 +177,129 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
     );
   }
 
-  /** Removes nodes from the working buffer that were completely dropped from the upstream pristine history */
-  prunePristineNodes(
-    retainedIds: ReadonlySet<string>,
+  /**
+   * Rebuilds the working buffer in the exact chronological order of the authoritative pristine history,
+   * while preserving injected/summarized nodes at their relative positions.
+   */
+  syncPristineHistory(
+    authoritativePristineNodes: readonly ConcreteNode[],
   ): ContextWorkingBufferImpl {
-    const newGraph = this.nodes.filter(
-      (n) => retainedIds.has(n.id) || !this.pristineNodesMap.has(n.id),
+    const newPristineMap = new Map<string, ConcreteNode>(this.pristineNodesMap);
+    const newProvenanceMap = new Map(this.provenanceMap);
+
+    const authoritativeIds = new Set(
+      authoritativePristineNodes.map((n) => n.id),
     );
 
-    const newProvenanceMap = new Map(this.provenanceMap);
+    // 1. Register any newly discovered pristine nodes
+    for (const node of authoritativePristineNodes) {
+      if (!newPristineMap.has(node.id)) {
+        newPristineMap.set(node.id, node);
+        newProvenanceMap.set(node.id, new Set([node.id]));
+      }
+    }
+
+    // 2. Identify surviving current nodes
+    // A node survives if it's not a pristine node (e.g. summary)
+    // OR if it IS a pristine node and it's in the authoritative list
+    // OR if it's an injected node (it has no provenance roots).
+    const survivingCurrentNodes = this.nodes
+      .filter((n) => {
+        if (authoritativeIds.has(n.id)) return true;
+        if (!this.pristineNodesMap.has(n.id)) return true;
+
+        // If it's in pristineNodesMap but NOT in authoritativeIds,
+        // it only survives if it has no roots (e.g. it was system-injected).
+        const roots = newProvenanceMap.get(n.id);
+        return !roots || roots.size === 0;
+      })
+      .filter((n) => {
+        // Additional check for non-pristine nodes: they only survive if ALL their pristine roots survive.
+        // E.g., if a mutated node 'm2' roots back to 'p2', and 'p2' is dropped from authoritativeIds, 'm2' must also drop.
+        if (!authoritativeIds.has(n.id) && !this.pristineNodesMap.has(n.id)) {
+          const roots = newProvenanceMap.get(n.id);
+          if (roots && roots.size > 0) {
+            for (const root of roots) {
+              if (!authoritativeIds.has(root)) {
+                return false; // At least one root was dropped
+              }
+            }
+          }
+        }
+        return true;
+      });
+
+    // Build a set of all pristine roots that are explicitly "covered" by the surviving nodes
+    // (so we don't accidentally re-add the original pristine node if it's already been mutated/summarized).
+    const coveredPristineIds = new Set<string>();
+    for (const node of survivingCurrentNodes) {
+      if (!authoritativeIds.has(node.id)) {
+        // This is a mutated/summarized node
+        const roots = newProvenanceMap.get(node.id);
+        if (roots) {
+          for (const root of roots) {
+            coveredPristineIds.add(root);
+          }
+        }
+      }
+    }
+
+    // 3. Weave the authoritative nodes with the surviving current nodes.
+    const pristineIndexMap = new Map(
+      authoritativePristineNodes.map((n, idx) => [n.id, idx]),
+    );
+
+    const getPristineIndex = (nodeId: string): number => {
+      const roots = newProvenanceMap.get(nodeId);
+      if (!roots || roots.size === 0) return -1;
+      // For summaries, position them based on their LATEST pristine root
+      let maxIndex = -1;
+      for (const root of roots) {
+        const idx = pristineIndexMap.get(root);
+        if (idx !== undefined && idx > maxIndex) {
+          maxIndex = idx;
+        }
+      }
+      return maxIndex;
+    };
+
+    const nodeOrder = new Array<{
+      node: ConcreteNode;
+      sortKey: number;
+      originalIndex: number;
+    }>();
+
+    // Add authoritative nodes (if they aren't covered by a mutated version)
+    for (let i = 0; i < authoritativePristineNodes.length; i++) {
+      const node = authoritativePristineNodes[i];
+      if (!coveredPristineIds.has(node.id)) {
+        nodeOrder.push({ node, sortKey: i, originalIndex: -1 }); // Pristine nodes have absolute position
+      }
+    }
+
+    // Add surviving non-pristine nodes and injected nodes
+    for (let i = 0; i < survivingCurrentNodes.length; i++) {
+      const node = survivingCurrentNodes[i];
+      if (!authoritativeIds.has(node.id)) {
+        const baseSortKey = getPristineIndex(node.id);
+        nodeOrder.push({
+          node,
+          sortKey: baseSortKey === -1 ? -1 : baseSortKey + 0.5, // Interleave after pristine roots, or at start if injected
+          originalIndex: i,
+        });
+      }
+    }
+
+    // Sort
+    nodeOrder.sort((a, b) => {
+      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+      // Tiebreak: preserve original order among nodes sharing the same pristine anchor
+      return a.originalIndex - b.originalIndex;
+    });
+
+    const newGraph = nodeOrder.map((item) => item.node);
+
+    // 4. GC caches
     const reachablePristineIds = new Set<string>();
     const reachableCurrentIds = new Set<string>();
 
@@ -228,7 +308,7 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       const roots = newProvenanceMap.get(node.id);
       if (roots) {
         for (const root of roots) {
-          if (retainedIds.has(root) || !this.pristineNodesMap.has(root)) {
+          if (authoritativeIds.has(root) || !this.pristineNodesMap.has(root)) {
             reachablePristineIds.add(root);
           }
         }
@@ -243,7 +323,7 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     const prunedPristineMap = new Map<string, ConcreteNode>();
     for (const id of reachablePristineIds) {
-      const node = this.pristineNodesMap.get(id);
+      const node = newPristineMap.get(id);
       if (node) prunedPristineMap.set(id, node);
     }
 

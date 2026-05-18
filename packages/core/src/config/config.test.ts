@@ -52,7 +52,7 @@ import { ShellTool } from '../tools/shell.js';
 import { AgentTool } from '../agents/agent-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import { RipGrepTool, resolveRipgrepPath } from '../tools/ripGrep.js';
 import {
   logRipgrepFallback,
   logApprovalModeDuration,
@@ -72,6 +72,10 @@ import {
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
+import {
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
+} from './scoped-config.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -84,6 +88,22 @@ vi.mock('fs', async (importOriginal) => {
     realpathSync: vi.fn((path) => path),
   };
 });
+
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    resolveToRealPath: vi.fn((p) => p),
+  };
+});
+
+vi.mock('../utils/fileUtils.js', () => ({
+  fileExists: vi.fn(),
+}));
+
+vi.mock('../utils/shell-utils.js', () => ({
+  resolveExecutable: vi.fn(),
+}));
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -107,16 +127,12 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   })),
 }));
 
-vi.mock('../utils/memoryDiscovery.js', () => ({
-  loadServerHierarchicalMemory: vi.fn(),
-}));
-
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
 vi.mock('../tools/read-file');
 vi.mock('../tools/grep.js');
 vi.mock('../tools/ripGrep.js', () => ({
-  canUseRipgrep: vi.fn(),
+  resolveRipgrepPath: vi.fn(),
   RipGrepTool: class MockRipGrepTool {},
 }));
 vi.mock('../tools/glob');
@@ -125,13 +141,15 @@ vi.mock('../tools/shell');
 vi.mock('../tools/write-file');
 vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
-vi.mock('../tools/memoryTool', () => ({
-  MemoryTool: vi.fn(),
-  setGeminiMdFilename: vi.fn(),
-  getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
-  DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
-  GEMINI_DIR: '.gemini',
-}));
+vi.mock('../tools/memoryTool', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../tools/memoryTool.js')>();
+  return {
+    ...actual,
+    setGeminiMdFilename: vi.fn(),
+    getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'),
+  };
+});
 
 vi.mock('../core/contentGenerator.js');
 
@@ -2001,7 +2019,6 @@ describe('Server Config (config.ts)', () => {
     expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
     expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
     expect(configInternal.lastQuotaFetchTime).toBe(0);
-    expect(configInternal.hasAccessToPreviewModel).toBeNull();
 
     // Event emission
     expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
@@ -2284,7 +2301,7 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
-      vi.mocked(canUseRipgrep).mockResolvedValue(true);
+      vi.mocked(resolveRipgrepPath).mockResolvedValue('/mock/rg');
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2302,7 +2319,7 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
-      vi.mocked(canUseRipgrep).mockResolvedValue(false);
+      vi.mocked(resolveRipgrepPath).mockResolvedValue(null);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2326,7 +2343,7 @@ describe('setApprovalMode with folder trust', () => {
 
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
       const error = new Error('ripGrep check failed');
-      vi.mocked(canUseRipgrep).mockRejectedValue(error);
+      vi.mocked(resolveRipgrepPath).mockRejectedValue(error);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2362,7 +2379,7 @@ describe('setApprovalMode with folder trust', () => {
 
       expect(wasRipGrepRegistered).toBe(false);
       expect(wasGrepRegistered).toBe(true);
-      expect(canUseRipgrep).not.toHaveBeenCalled();
+      expect(resolveRipgrepPath).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
     });
   });
@@ -3233,8 +3250,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -3243,8 +3260,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
     it('should derive quota from remainingFraction when remainingAmount is missing', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
@@ -3483,13 +3500,12 @@ describe('Config JIT Initialization', () => {
     );
   });
 
-  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
       debugMode: false,
       model: 'test-model',
-      experimentalJitContext: true,
       userMemory: 'Initial Memory',
       cwd: '/tmp/test',
     };
@@ -3521,83 +3537,32 @@ describe('Config JIT Initialization', () => {
     expect(sessionMemory).toContain('</project_context>');
     expect(sessionMemory).toContain('</loaded_context>');
 
+    const sessionMemoryWithoutExtension = config.getSessionMemory({
+      includeExtensionContext: false,
+    });
+    expect(sessionMemoryWithoutExtension).toContain('<loaded_context>');
+    expect(sessionMemoryWithoutExtension).not.toContain('<extension_context>');
+    expect(sessionMemoryWithoutExtension).not.toContain('Extension Memory');
+    expect(sessionMemoryWithoutExtension).toContain('<project_context>');
+    expect(sessionMemoryWithoutExtension).toContain('Environment Memory');
+    expect(sessionMemoryWithoutExtension).toContain('</loaded_context>');
+
     // Verify state update (delegated to MemoryContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
-    const params: ConfigParameters = {
-      sessionId: 'test-session',
-      targetDir: '/tmp/test',
-      debugMode: false,
-      model: 'test-model',
-      experimentalJitContext: false,
-      userMemory: 'Initial Memory',
-      cwd: '/tmp/test',
-    };
-
-    config = new Config(params);
-    await config.initialize();
-
-    expect(MemoryContextManager).not.toHaveBeenCalled();
-    expect(config.getUserMemory()).toBe('Initial Memory');
-  });
-
-  describe('isMemoryV2Enabled', () => {
-    it('should default to true', () => {
+  describe('memory path access', () => {
+    it('should NOT add the global ~/.gemini directory to the workspace', async () => {
+      // Memory does not broaden the workspace to include the global ~/.gemini/
+      // directory. Cross-project personal preferences are routed to
+      // ~/.gemini/GEMINI.md via the surgical isPathAllowed allowlist instead.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should return false when experimentalMemoryV2 is explicitly false', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: false,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(false);
-    });
-
-    it('should return true when experimentalMemoryV2 is true', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
-      // The prompt-driven memoryV2 mode does not broaden the workspace
-      // to include the global ~/.gemini/ directory. Cross-project personal
-      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
-      // isPathAllowed allowlist instead — see the next two tests.
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3608,16 +3573,15 @@ describe('Config JIT Initialization', () => {
     });
 
     it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
-      // Surgical allowlist: when memoryV2 is on, the prompt routes
-      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
-      // agent must be able to edit that exact file via edit/write_file.
+      // Surgical allowlist: the prompt routes cross-project personal
+      // preferences to ~/.gemini/GEMINI.md, so the agent must be able to edit
+      // that exact file via edit/write_file.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3639,7 +3603,6 @@ describe('Config JIT Initialization', () => {
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3655,6 +3618,210 @@ describe('Config JIT Initialization', () => {
       expect(
         config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
       ).toBe(false);
+    });
+
+    it('should NOT allow isPathAllowed to write into the auto-memory inbox', () => {
+      // <projectMemoryDir>/.inbox/ is owned by the extraction agent and the
+      // /memory inbox review flow. The main agent must not be able to drop
+      // patches in there directly, even though it falls inside <projectTempDir>.
+      // We bypass Config.initialize() (the GitService init path is independently
+      // flaky in this suite) by spying on the storage methods isPathAllowed
+      // actually consults.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+
+      // The inbox directory itself and any path under it are denied.
+      expect(config.isPathAllowed(inboxRoot)).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(inboxRoot, 'private', 'foo.patch')),
+      ).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(inboxRoot, 'global', 'bar.patch')),
+      ).toBe(false);
+
+      // Sibling files under <projectMemoryDir> stay reachable so the main
+      // agent can edit MEMORY.md and topic notes directly.
+      expect(
+        config.isPathAllowed(path.join(fakeMemoryTempDir, 'MEMORY.md')),
+      ).toBe(true);
+      expect(
+        config.isPathAllowed(path.join(fakeMemoryTempDir, 'some-topic.md')),
+      ).toBe(true);
+    });
+
+    it('should allow scoped extraction access only to canonical inbox patches', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+      const privateExtractionPatch = path.join(
+        inboxRoot,
+        'private',
+        'extraction.patch',
+      );
+      const globalExtractionPatch = path.join(
+        inboxRoot,
+        'global',
+        'extraction.patch',
+      );
+
+      expect(config.isPathAllowed(privateExtractionPatch)).toBe(false);
+
+      runWithScopedMemoryInboxAccess(() => {
+        expect(config.isPathAllowed(privateExtractionPatch)).toBe(true);
+        expect(config.validatePathAccess(privateExtractionPatch)).toBeNull();
+        expect(config.isPathAllowed(globalExtractionPatch)).toBe(true);
+        // Writes (the default checkType for isPathAllowed) remain restricted
+        // to the canonical extraction.patch filenames.
+        expect(
+          config.isPathAllowed(path.join(inboxRoot, 'private', 'other.patch')),
+        ).toBe(false);
+        expect(
+          config.isPathAllowed(
+            path.join(inboxRoot, 'private', 'nested', 'extraction.patch'),
+          ),
+        ).toBe(false);
+
+        // Reads are broadened to the .inbox/{private,global}/ subtree so the
+        // extractor can list and inspect prior patches before consolidating.
+        const privateOtherPatch = path.join(
+          inboxRoot,
+          'private',
+          'other.patch',
+        );
+        const globalLeftover = path.join(inboxRoot, 'global', 'topic-a.patch');
+        const nestedReadPath = path.join(
+          inboxRoot,
+          'private',
+          'nested',
+          'extraction.patch',
+        );
+        expect(config.validatePathAccess(privateOtherPatch, 'read')).toBeNull();
+        expect(config.validatePathAccess(globalLeftover, 'read')).toBeNull();
+        expect(config.validatePathAccess(nestedReadPath, 'read')).toBeNull();
+        expect(config.validatePathAccess(inboxRoot, 'read')).toBeNull();
+        expect(
+          config.validatePathAccess(path.join(inboxRoot, 'private'), 'read'),
+        ).toBeNull();
+        expect(
+          config.validatePathAccess(path.join(inboxRoot, 'global'), 'read'),
+        ).toBeNull();
+
+        // Writes to the same broadened paths are still rejected.
+        expect(config.validatePathAccess(privateOtherPatch)).toContain(
+          'Path not in workspace',
+        );
+        expect(config.validatePathAccess(nestedReadPath)).toContain(
+          'Path not in workspace',
+        );
+      });
+
+      expect(config.isPathAllowed(privateExtractionPatch)).toBe(false);
+      // Outside the scope, reads of inbox files are denied again.
+      expect(
+        config.validatePathAccess(
+          path.join(inboxRoot, 'private', 'other.patch'),
+          'read',
+        ),
+      ).toContain('Path not in workspace');
+    });
+
+    it('should restrict scoped auto-memory extraction writes to generated artifacts', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+
+      const fakeMemoryTempDir = '/tmp/test-fake-temp/memory';
+      const fakeProjectTempDir = '/tmp/test-fake-temp';
+      const fakeSkillsMemoryDir = path.join(fakeMemoryTempDir, 'skills');
+      vi.spyOn(config.storage, 'getProjectMemoryTempDir').mockReturnValue(
+        fakeMemoryTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        fakeProjectTempDir,
+      );
+      vi.spyOn(config.storage, 'getProjectSkillsMemoryDir').mockReturnValue(
+        fakeSkillsMemoryDir,
+      );
+
+      const inboxRoot = path.join(fakeMemoryTempDir, '.inbox');
+      const privateExtractionPatch = path.join(
+        inboxRoot,
+        'private',
+        'extraction.patch',
+      );
+      const skillArtifact = path.join(
+        fakeSkillsMemoryDir,
+        'my-skill',
+        'SKILL.md',
+      );
+      const activeMemoryPath = path.join(fakeMemoryTempDir, 'MEMORY.md');
+      const projectTempPath = path.join(fakeProjectTempDir, 'logs', 'run.log');
+      const workspaceMemoryPath = path.join('/tmp/test', 'GEMINI.md');
+
+      expect(config.validatePathAccess(activeMemoryPath)).toBeNull();
+
+      runWithScopedAutoMemoryExtractionWriteAccess(() => {
+        expect(config.validatePathAccess(skillArtifact)).toBeNull();
+        expect(config.validatePathAccess(activeMemoryPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+        expect(config.validatePathAccess(projectTempPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+        expect(config.validatePathAccess(workspaceMemoryPath)).toContain(
+          'Auto-memory extraction write denied',
+        );
+
+        // Reads still use the normal workspace/temp allowlists.
+        expect(config.validatePathAccess(activeMemoryPath, 'read')).toBeNull();
+      });
+
+      runWithScopedMemoryInboxAccess(() => {
+        runWithScopedAutoMemoryExtractionWriteAccess(() => {
+          expect(config.validatePathAccess(privateExtractionPatch)).toBeNull();
+        });
+      });
     });
   });
 
@@ -3727,18 +3894,16 @@ describe('Config JIT Initialization', () => {
       expect(config.getExperimentalGemma()).toBe(true);
     });
 
-    it('should be independent of experimentalMemoryV2', () => {
+    it('should default to disabled', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
       expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
@@ -3923,6 +4088,36 @@ describe('Plans Directory Initialization', () => {
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).not.toContain(plansDir);
+  });
+
+  it('should gracefully fallback to default plans directory if retrieving custom directory throw an error', async () => {
+    vi.spyOn(coreEvents, 'emitFeedback');
+    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+      planSettings: {
+        directory: '/outside/project/root',
+      },
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    // Should fallback to default project temp plans dir
+    expect(plansDir).toContain('plans');
+    expect(plansDir).not.toContain('/outside/project/root');
+
+    // Should emit a warning feedback
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('Invalid custom plans directory'),
+      expect.any(Error),
+    );
+
+    // Should still add the fallback plans directory to workspace context if it exists
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(plansDir);
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {

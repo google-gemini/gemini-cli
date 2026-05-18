@@ -70,7 +70,6 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
-  refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -497,16 +496,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.fireSessionStartEvent(sessionStartSource);
 
       if (result) {
-        if (result.systemMessage) {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: result.systemMessage,
-            },
-            Date.now(),
-          );
-        }
-
         const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
@@ -549,12 +538,6 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.error('Error during cleanup:', e),
       );
     };
-    // Disable the dependencies check here. historyManager gets flagged
-    // but we don't want to react to changes to it because each new history
-    // item, including the ones from the start session hook will cause a
-    // re-render and an error when we try to reload config.
-    //
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(
@@ -928,12 +911,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        onAuthError(error);
-      }
+      const authMethod = settings.merged.security.auth.selectedType;
+      void (async () => {
+        try {
+          const error = await validateAuthMethod(authMethod);
+          if (
+            error &&
+            authMethod === settings.merged.security.auth.selectedType
+          ) {
+            onAuthError(error);
+          }
+        } catch (e) {
+          if (authMethod === settings.merged.security.auth.selectedType) {
+            onAuthError(getErrorMessage(e));
+          }
+        }
+      })();
     }
   }, [
     settings.merged.security.auth.selectedType,
@@ -1081,19 +1074,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      let flattenedMemory: string;
-      let fileCount: number;
-
-      if (config.isJitContextEnabled()) {
-        await config.getMemoryContextManager()?.refresh();
-        config.updateSystemInstructionIfInitialized();
-        flattenedMemory = flattenMemory(config.getUserMemory());
-        fileCount = config.getGeminiMdFileCount();
-      } else {
-        const result = await refreshServerHierarchicalMemory(config);
-        flattenedMemory = flattenMemory(result.memoryContent);
-        fileCount = result.fileCount;
-      }
+      await config.getMemoryContextManager()?.refresh();
+      config.updateSystemInstructionIfInitialized();
+      const flattenedMemory = flattenMemory(config.getUserMemory());
+      const fileCount = config.getGeminiMdFileCount();
 
       historyManager.addItem(
         {
@@ -1310,6 +1294,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isMcpReady } = useMcpStatus(config);
 
+  const isCompressing = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) =>
+          item.type === MessageType.COMPRESSION && item.compression.isPending,
+      ),
+    [pendingHistoryItems],
+  );
+
   const {
     messageQueue,
     addMessage,
@@ -1321,6 +1314,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
     isMcpReady,
+    isCompressing,
   });
 
   cancelHandlerRef.current = useCallback(
@@ -1415,7 +1409,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+      if (
+        (isSlash && isConfigInitialized) ||
+        (!isCompressing && isIdle && isMcpOrConfigReady)
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1438,7 +1435,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
+        if (
+          isIdle &&
+          !isCompressing &&
+          !isMcpOrConfigReady &&
+          messageQueue.length === 0
+        ) {
           coreEvents.emitFeedback(
             'info',
             !isConfigInitialized
@@ -1458,6 +1460,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       isMcpReady,
       streamingState,
+      isCompressing,
       messageQueue.length,
       pendingHistoryItems,
       config,

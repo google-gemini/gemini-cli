@@ -1962,8 +1962,8 @@ describe('InputPrompt', () => {
       },
       {
         name: 'should NOT trigger completion when cursor is after space following /',
-        text: '/memory add',
-        cursor: [0, 11],
+        text: '/memory list',
+        cursor: [0, 12],
         showSuggestions: false,
       },
       {
@@ -5330,6 +5330,34 @@ describe('InputPrompt', () => {
         );
         unmount();
       });
+    });
+  });
+
+  describe('terminal buffer rendering', () => {
+    it('does not clip the last char of a visual line whose width equals inputWidth', async () => {
+      const fullLine = '1234567890'; // 10 chars, exactly props.inputWidth
+      props.inputWidth = 10;
+      props.suggestionsWidth = 10;
+      vi.spyOn(props.config, 'getUseTerminalBuffer').mockReturnValue(true);
+      mockBuffer.text = fullLine;
+      mockBuffer.lines = [fullLine];
+      mockBuffer.allVisualLines = [fullLine];
+      mockBuffer.viewportVisualLines = [fullLine];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualToTransformedMap = [0];
+      mockBuffer.transformationsByLine = [[]];
+      mockBuffer.cursor = [0, fullLine.length];
+      mockBuffer.visualCursor = [0, fullLine.length];
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(clean(lastFrame())).toContain(fullLine);
+      });
+      unmount();
     });
   });
 });

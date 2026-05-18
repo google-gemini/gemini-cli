@@ -5,7 +5,7 @@
  */
 
 import {
-  addMemory,
+  listInboxMemoryPatches,
   listInboxSkills,
   listInboxPatches,
   listMemoryFiles,
@@ -18,12 +18,6 @@ import type {
   CommandExecutionResponse,
 } from './types.js';
 
-const DEFAULT_SANITIZATION_CONFIG = {
-  allowedEnvironmentVariables: [],
-  blockedEnvironmentVariables: [],
-  enableEnvironmentVariableRedaction: false,
-};
-
 export class MemoryCommand implements Command {
   readonly name = 'memory';
   readonly description = 'Manage memory.';
@@ -31,7 +25,6 @@ export class MemoryCommand implements Command {
     new ShowMemoryCommand(),
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
-    new AddMemoryCommand(),
     new InboxMemoryCommand(),
   ];
   readonly requiresWorkspace = true;
@@ -84,52 +77,10 @@ export class ListMemoryCommand implements Command {
   }
 }
 
-export class AddMemoryCommand implements Command {
-  readonly name = 'memory add';
-  readonly description = 'Add content to the memory.';
-
-  async execute(
-    context: CommandContext,
-    args: string[],
-  ): Promise<CommandExecutionResponse> {
-    const textToAdd = args.join(' ').trim();
-    const result = addMemory(textToAdd);
-    if (result.type === 'message') {
-      return { name: this.name, data: result.content };
-    }
-
-    const toolRegistry = context.agentContext.toolRegistry;
-    const tool = toolRegistry.getTool(result.toolName);
-    if (tool) {
-      const abortController = new AbortController();
-      const signal = abortController.signal;
-
-      await context.sendMessage(`Saving memory via ${result.toolName}...`);
-
-      await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        shellExecutionConfig: {
-          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          sandboxManager: context.agentContext.sandboxManager,
-        },
-      });
-      await refreshMemory(context.agentContext.config);
-      return {
-        name: this.name,
-        data: `Added memory: "${textToAdd}"`,
-      };
-    } else {
-      return {
-        name: this.name,
-        data: `Error: Tool ${result.toolName} not found.`,
-      };
-    }
-  }
-}
-
 export class InboxMemoryCommand implements Command {
   readonly name = 'memory inbox';
   readonly description =
-    'Lists skills extracted from past sessions that are pending review.';
+    'Lists memory items extracted from past sessions that are pending review.';
 
   async execute(
     context: CommandContext,
@@ -142,12 +93,17 @@ export class InboxMemoryCommand implements Command {
       };
     }
 
-    const [skills, patches] = await Promise.all([
+    const [skills, patches, memoryPatches] = await Promise.all([
       listInboxSkills(context.agentContext.config),
       listInboxPatches(context.agentContext.config),
+      listInboxMemoryPatches(context.agentContext.config),
     ]);
 
-    if (skills.length === 0 && patches.length === 0) {
+    if (
+      skills.length === 0 &&
+      patches.length === 0 &&
+      memoryPatches.length === 0
+    ) {
       return { name: this.name, data: 'No items in inbox.' };
     }
 
@@ -165,8 +121,19 @@ export class InboxMemoryCommand implements Command {
         : '';
       lines.push(`- **${p.name}** (update): patches ${targets}${date}`);
     }
+    for (const memoryPatch of memoryPatches) {
+      const targets = memoryPatch.entries.map((e) => e.targetPath).join(', ');
+      const date = memoryPatch.extractedAt
+        ? ` (latest extract: ${new Date(memoryPatch.extractedAt).toLocaleDateString()})`
+        : '';
+      const sourceCount = memoryPatch.sourceFiles.length;
+      const sourceLabel = sourceCount === 1 ? 'patch' : 'patches';
+      lines.push(
+        `- **${memoryPatch.name}** (${sourceCount} source ${sourceLabel}, ${memoryPatch.entries.length} hunks): targets ${targets}${date}`,
+      );
+    }
 
-    const total = skills.length + patches.length;
+    const total = skills.length + patches.length + memoryPatches.length;
     return {
       name: this.name,
       data: `Memory inbox (${total}):\n${lines.join('\n')}`,
