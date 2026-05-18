@@ -34,6 +34,7 @@ export const OVERAGE_ELIGIBLE_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  'auto-gemini-2.5',
 ]);
 
 /**
@@ -41,7 +42,10 @@ export const OVERAGE_ELIGIBLE_MODELS = new Set([
  * @param model The model name to check.
  * @returns true if the model supports credits overage, false otherwise.
  */
-export function isOverageEligibleModel(model: string): boolean {
+export function isOverageEligibleModel(model: string, tier: GeminiUserTier): boolean {
+  if (tier === 'pro') {
+    return true;
+  }
   return OVERAGE_ELIGIBLE_MODELS.has(model);
 }
 

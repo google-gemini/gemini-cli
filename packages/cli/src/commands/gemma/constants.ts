@@ -10,7 +10,7 @@ import { Storage } from '@google/gemini-cli-core';
 export const LITERT_RELEASE_VERSION = 'v0.9.0-alpha03';
 export const LITERT_RELEASE_BASE_URL =
   'https://github.com/google-ai-edge/LiteRT-LM/releases/download';
-export const GEMMA_MODEL_NAME = 'gemma3-1b-gpu-custom';
+export const GEMMA_MODEL_NAME = 'auto-gemini-2.5';
 export const DEFAULT_PORT = 9379;
 export const HEALTH_CHECK_TIMEOUT_MS = 5000;
 export const LITERT_API_VERSION = 'v1beta';
