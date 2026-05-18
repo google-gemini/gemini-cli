@@ -49,6 +49,7 @@ import {
   buildAvailableModes,
   RequestPermissionResponseSchema,
 } from './acpUtils.js';
+import { resolveAtCommandPath } from '../utils/atCommandUtils.js';
 import { z } from 'zod';
 import { getAcpErrorMessage } from './acpErrors.js';
 
@@ -928,13 +929,24 @@ export class Session {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
       let readDirectly = false;
-      try {
-        const absolutePath = path.resolve(
+
+      const resolved = await resolveAtCommandPath(
+        pathName,
+        this.context.config,
+        (msg) => this.debug(msg),
+      );
+
+      let validationError: string | null = null;
+      let absolutePath: string;
+
+      if (!resolved) {
+        // If not resolved, we still check if it's an unauthorized absolute path that we can ask permission for.
+        absolutePath = path.resolve(
           this.context.config.getTargetDir(),
           pathName,
         );
 
-        let validationError = this.context.config.validatePathAccess(
+        validationError = this.context.config.validatePathAccess(
           absolutePath,
           'read',
         );
@@ -1020,7 +1032,11 @@ export class Session {
             });
           }
         }
+      } else {
+        absolutePath = resolved.absolutePath;
+      }
 
+      try {
         if (!validationError) {
           // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
           // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
@@ -1033,7 +1049,9 @@ export class Session {
             !readDirectly
           ) {
             try {
-              const stats = await fs.stat(absolutePath);
+              const stats = resolved
+                ? resolved.stats
+                : await fs.stat(absolutePath);
               if (stats.isFile()) {
                 const fileReadResult = await processSingleFileContent(
                   absolutePath,
@@ -1092,7 +1110,9 @@ export class Session {
           }
 
           if (!readDirectly) {
-            const stats = await fs.stat(absolutePath);
+            const stats = resolved
+              ? resolved.stats
+              : await fs.stat(absolutePath);
             if (stats.isDirectory()) {
               currentPathSpec = pathName.endsWith('/')
                 ? `${pathName}**`
