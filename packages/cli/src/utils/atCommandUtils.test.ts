@@ -347,25 +347,35 @@ describe('atCommandUtils', () => {
       }
     });
 
-    it('should sanitize paths against traversal (..)', async () => {
+    it('should NOT strip traversal (..), but let central validation handle it', async () => {
       const traversalPath = 'src/../../etc/passwd';
+      const absPath = path.resolve('/mock/root', traversalPath);
+
+      (mockConfig['validatePathAccess'] as Mock).mockImplementation((p) => {
+        if (p === absPath) return 'Outside workspace';
+        return null;
+      });
+
       const result = await resolveAtCommandPath(
         `FAIL ${traversalPath}`,
         mockConfig as unknown as Config,
       );
-      // '..' should be stripped, resulting in 'src/etc/passwd' (which doesn't exist in our mock)
-      expect(result.status).toBe('not_found');
+
+      // It should NOT be stripped. It should resolve to the absolute path and fail authorization.
+      expect(result.status).toBe('unauthorized');
+      if (result.status === 'unauthorized') {
+        expect(result.absolutePath).toBe(absPath);
+      }
     });
 
-    it('should sanitize paths against null bytes', async () => {
+    it('should reject paths with null bytes via validatePath', async () => {
       const nullBytePath = 'src/index.ts\0.exe';
       const result = await resolveAtCommandPath(
         `FAIL ${nullBytePath}`,
         mockConfig as unknown as Config,
       );
-      // Null byte and following should be stripped/handled.
-      // Our implementation strips \0, so it becomes 'src/index.ts.exe'
-      expect(result.status).toBe('not_found');
+      // validatePath rejects strings with null bytes
+      expect(result.status).toBe('invalid');
     });
 
     it('should handle paths with slashes and extensions correctly', async () => {

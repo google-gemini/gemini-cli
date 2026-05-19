@@ -173,21 +173,17 @@ function tryExtractPath(noisyString: string): string | null {
     const lineMatch = segmentToClean.match(/^(.+?):(\d+)(?::\d+)?$/);
     const pathOnly = lineMatch ? lineMatch[1] : segmentToClean;
 
-    // 3. Sanitize extracted path to prevent path traversal and null byte injection
-    const cleanSegment = pathOnly.replace(/\0/g, '').replace(/\.\./g, '');
-
-    if (cleanSegment.length === 0) continue;
-
-    // Check if the cleaned segment is considered "valid" by our heuristics
-    // (i.e. no control chars, no markers, etc.)
-    if (validatePath(cleanSegment).isValid) {
+    // 3. Validate the extracted segment using centralized heuristics.
+    // We rely on validatePath and Config.validatePathAccess for robust checking
+    // rather than naive string stripping which can be bypassed or corrupt valid names.
+    if (validatePath(pathOnly).isValid) {
       // Prioritize segments that actually look like paths (have slashes or dots)
       if (
-        cleanSegment.includes('/') ||
-        cleanSegment.includes('\\') ||
-        cleanSegment.includes('.')
+        pathOnly.includes('/') ||
+        pathOnly.includes('\\') ||
+        pathOnly.includes('.')
       ) {
-        return cleanSegment;
+        return pathOnly;
       }
     }
   }
