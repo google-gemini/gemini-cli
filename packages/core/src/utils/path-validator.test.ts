@@ -60,14 +60,17 @@ describe('PathValidator', () => {
     ).toBe(true);
   });
 
-  it('should only reject log markers at the start of the path', () => {
+  it('should only reject log markers at the start of a component', () => {
     // Legitimate paths containing these strings should now be allowed
     expect(validatePath('src/tests/FAIL_CASE.txt').isValid).toBe(true);
     expect(validatePath('FAILURE_LOG.txt').isValid).toBe(true);
     expect(validatePath('docs/AssertionError_details.md').isValid).toBe(true);
 
-    // But they should still be rejected at the start
+    // But they should be rejected if they start a component
     expect(validatePath('FAIL tests/int/my.test.ts').isValid).toBe(false);
+    expect(validatePath('/project/root/FAIL tests/my.test.ts').isValid).toBe(
+      false,
+    );
     expect(
       validatePath('AssertionError: expected true to be false').isValid,
     ).toBe(false);

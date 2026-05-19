@@ -514,7 +514,14 @@ async function readLocalFiles(
     config.getMessageBus(),
   );
 
-  const pathSpecsToRead = resolvedFiles.map((rf) => rf.pathSpec);
+  const pathSpecsToRead = resolvedFiles.map((rf) => {
+    if (rf.absolutePath) {
+      return rf.pathSpec.endsWith('**')
+        ? path.join(rf.absolutePath, '**')
+        : rf.absolutePath;
+    }
+    return rf.pathSpec;
+  });
   const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);
   const respectFileIgnore = config.getFileFilteringOptions();
 
