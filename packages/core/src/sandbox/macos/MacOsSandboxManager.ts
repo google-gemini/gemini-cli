@@ -142,7 +142,7 @@ export class MacOsSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => r !== 'shopt' && r !== 'set' && r !== 'trap',
     );
     const isGitCommand = roots.includes('git');
 

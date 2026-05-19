@@ -16,7 +16,7 @@ import {
 
 /**
  * Extracts the primary command name from a potentially wrapped shell command.
- * Strips shell wrappers and handles shopt/set/etc.
+ * Strips shell wrappers and handles shopt/set/trap/etc.
  *
  * @param command - The full command string.
  * @param args - The arguments for the command.
@@ -30,7 +30,7 @@ export async function getCommandName(
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set',
+    (r) => r !== 'shopt' && r !== 'set' && r !== 'trap',
   );
   if (roots.length > 0) {
     return roots[0];
