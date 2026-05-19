@@ -227,9 +227,9 @@ export class InvalidStreamError extends Error {
     message: string,
     type:
       | 'NO_FINISH_REASON'
-    | 'NO_RESPONSE_TEXT'
-    | 'MALFORMED_FUNCTION_CALL'
-    | 'UNEXPECTED_TOOL_CALL',
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -771,7 +771,7 @@ export class GeminiChat {
           }
 
           throw new AgentExecutionBlockedError(
-            beforeModelResult.reason || 'Model call blocked by hook',
+            beforeModelResult.reason || 'Agent execution blocked by hook',
             syntheticResponse,
           );
         }
