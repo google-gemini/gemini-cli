@@ -418,7 +418,15 @@ export class ShellExecutionService {
       (await resolveExecutable(executable)) ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-    const spawnArgs = [...argsPrefix, guardedCommand];
+    // On Unix bash, prepend a SIGHUP trap so the child process group ignores
+    // hangup signals sent by PTY environments (WSL2, Kitty, Alacritty) when
+    // they detect a detached session. `trap '' HUP` sets SIG_IGN which is
+    // inherited across exec(), matching the behaviour of the `nohup` command.
+    // Windows/PowerShell paths are unaffected by the isWindows guard.
+    const hupGuardedCommand = isWindows
+      ? guardedCommand
+      : `trap '' HUP; ${guardedCommand}`;
+    const spawnArgs = [...argsPrefix, hupGuardedCommand];
 
     // 2. Prepare Environment
     const gitConfigKeys: string[] = [];
@@ -531,18 +539,21 @@ export class ShellExecutionService {
         cwd: finalCwd,
       } = prepared;
 
-      // Do not detach the child process. Using detached:true would call
-      // setsid(), creating a new session with no controlling terminal.
-      // PTY-based environments (WSL2, Kitty, Alacritty) send SIGHUP to
-      // orphaned process groups, immediately killing every spawned command.
-      // killProcessGroup handles cleanup via pgrep tree-walk + per-PID kills
-      // and does not require the child to be a process group leader.
+      // Detach the child into its own process group on Unix. This provides
+      // critical isolation: it prevents TIOCSTI terminal-injection attacks and
+      // stops a rogue `kill -9 0` inside the child from killing the parent
+      // process group. The SIGHUP that PTY environments send to detached
+      // sessions is handled by the `trap '' HUP` guard prepended in
+      // prepareExecution, which sets SIG_IGN (inherited across exec).
+      // Bun's child_process does not call setsid() correctly for detached
+      // processes, so detached mode is disabled there as before.
+      const isBun = 'bun' in process.versions;
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
-        detached: false,
+        detached: !isWindows && !isBun,
         env: finalEnv,
       });
 
