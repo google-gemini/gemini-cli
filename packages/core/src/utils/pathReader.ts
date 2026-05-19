@@ -89,6 +89,10 @@ export async function readPathFromWorkspace(
     for (const filePath of finalFiles) {
       // Defense in depth: validate each file found within the directory.
       if (!workspace.isPathWithinWorkspace(filePath)) {
+        const relativePathForDisplay = path.relative(absolutePath, filePath);
+        allParts.push({
+          text: `--- Skipped ${relativePathForDisplay}: traverses outside workspace ---\n\n`,
+        });
         continue;
       }
 

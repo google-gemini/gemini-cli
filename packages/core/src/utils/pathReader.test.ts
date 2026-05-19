@@ -475,8 +475,11 @@ describe('readPathFromWorkspace', () => {
 
     // Legit content should be there
     expect(resultText).toContain('legit content');
-    // Secret content should NOT be there
+    // Secret content should NOT be there, but a skip message SHOULD be
     expect(resultText).not.toContain('secrets');
+    expect(resultText).toContain(
+      '--- Skipped malicious-link.txt: traverses outside workspace ---',
+    );
   });
 
   // mock-fs permission simulation is unreliable on Windows.
