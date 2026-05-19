@@ -16,9 +16,8 @@ vi.mock('../../utils/skillUtils.js', () => ({
 }));
 
 const { debugLogger } = await vi.hoisted(async () => {
-  const { createMockDebugLogger } = await import(
-    '../../test-utils/mockDebugLogger.js'
-  );
+  const { createMockDebugLogger } =
+    await import('../../test-utils/mockDebugLogger.js');
   return createMockDebugLogger({ stripAnsi: false });
 });
 

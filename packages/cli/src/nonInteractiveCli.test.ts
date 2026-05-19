@@ -215,9 +215,8 @@ describe('runNonInteractive', () => {
       computeMergedSettings: vi.fn(),
     } as unknown as LoadedSettings;
 
-    const { handleAtCommand } = await import(
-      './ui/hooks/atCommandProcessor.js'
-    );
+    const { handleAtCommand } =
+      await import('./ui/hooks/atCommandProcessor.js');
     vi.mocked(handleAtCommand).mockImplementation(async ({ query }) => ({
       processedQuery: [{ text: query }],
     }));
@@ -636,9 +635,8 @@ describe('runNonInteractive', () => {
 
   it('should preprocess @include commands before sending to the model', async () => {
     // 1. Mock the imported atCommandProcessor
-    const { handleAtCommand } = await import(
-      './ui/hooks/atCommandProcessor.js'
-    );
+    const { handleAtCommand } =
+      await import('./ui/hooks/atCommandProcessor.js');
     const mockHandleAtCommand = vi.mocked(handleAtCommand);
 
     // 2. Define the raw input and the expected processed output
@@ -991,9 +989,8 @@ describe('runNonInteractive', () => {
   });
 
   it('should handle slash commands', async () => {
-    const nonInteractiveCliCommands = await import(
-      './nonInteractiveCliCommands.js'
-    );
+    const nonInteractiveCliCommands =
+      await import('./nonInteractiveCliCommands.js');
     const handleSlashCommandSpy = vi.spyOn(
       nonInteractiveCliCommands,
       'handleSlashCommand',
@@ -1271,13 +1268,11 @@ describe('runNonInteractive', () => {
 
   it('should instantiate CommandService with correct loaders for slash commands', async () => {
     // This test indirectly checks that handleSlashCommand is using the right loaders.
-    const { FileCommandLoader } = await import(
-      './services/FileCommandLoader.js'
-    );
+    const { FileCommandLoader } =
+      await import('./services/FileCommandLoader.js');
     const { McpPromptLoader } = await import('./services/McpPromptLoader.js');
-    const { BuiltinCommandLoader } = await import(
-      './services/BuiltinCommandLoader.js'
-    );
+    const { BuiltinCommandLoader } =
+      await import('./services/BuiltinCommandLoader.js');
     mockGetCommands.mockReturnValue([]); // No commands found, so it will fall through
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Acknowledged' },

@@ -1139,9 +1139,8 @@ describe('extensionsCommand', () => {
       const prompts = (await import('prompts')).default;
       vi.mocked(prompts).mockResolvedValue({ overwrite: true });
 
-      const { getScopedEnvContents } = await import(
-        '../../config/extensions/extensionSettings.js'
-      );
+      const { getScopedEnvContents } =
+        await import('../../config/extensions/extensionSettings.js');
       vi.mocked(getScopedEnvContents).mockResolvedValue({});
     });
 

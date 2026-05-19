@@ -988,7 +988,8 @@ describe('WriteFileTool', () => {
         const content = 'test content';
 
         let existsSyncSpy: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ReturnType<typeof vi.spyOn<any, 'existsSync'>> | undefined = undefined;
+          ReturnType<typeof vi.spyOn<any, 'existsSync'>> | undefined =
+          undefined;
 
         try {
           if (mockFsExistsSync) {
