@@ -19,6 +19,7 @@ import { HistoryObserver } from './historyObserver.js';
 import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { deriveStableId } from '../utils/cryptoUtils.js';
 import { hardenHistory } from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
 import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
@@ -151,7 +152,7 @@ export class ContextManager {
       const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
       if (protectedIds.size > 0) {
         debugLogger.log(
-          `[ContextManager] Pinning ${protectedIds.size} nodes (recent_turn or external_active_task) to prevent truncation.`,
+          `[ContextManager] Pinning ${protectedIds.size} nodes (recent_turn, environment_context, or external_active_task) to prevent truncation.`,
         );
       }
 
@@ -216,7 +217,8 @@ export class ContextManager {
    * Identifies 'pinned' nodes that should not be truncated.
    * This includes:
    * 1. The entire last turn (Recent context).
-   * 2. Active tool calls (calls without responses in the graph).
+   * 2. The environment context (Turn 0).
+   * 3. Active tool calls (calls without responses in the graph).
    */
   private getProtectedNodeIds(
     nodes: readonly ConcreteNode[],
@@ -229,13 +231,18 @@ export class ContextManager {
     const lastNode = nodes[nodes.length - 1];
     const lastTurnId = lastNode.turnId;
 
+    // 2. Identify environment context (Turn 0)
+    const envTurnId = `turn_${deriveStableId(['environment-context'])}`;
+
     for (const node of nodes) {
       if (node.turnId === lastTurnId) {
         protectionMap.set(node.id, 'recent_turn');
+      } else if (node.turnId === envTurnId) {
+        protectionMap.set(node.id, 'environment_context');
       }
     }
 
-    // 2. Any externally requested protections
+    // 3. Any externally requested protections
     for (const id of extraProtectedIds) {
       protectionMap.set(id, 'external_active_task');
     }
@@ -394,33 +401,9 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    // We must temporarily append the pendingRequest (if any) before hardening.
-    // Otherwise, the hardener will see dangling functionCalls and inject sentinels
-    // even though the pendingRequest provides the required functionResponses.
-    const fullHistoryToHarden = pendingRequest
-      ? [...renderedHistory, pendingRequest]
-      : renderedHistory;
-
-    const hardenedHistory = hardenHistory(fullHistoryToHarden, {
+    const hardenedHistory = hardenHistory([...renderedHistory], {
       sentinels: this.sidecar.sentinels,
     });
-
-    if (pendingRequest) {
-      const last = hardenedHistory[hardenedHistory.length - 1];
-      if (last && last.content.parts) {
-        const numPartsToRemove = pendingRequest.content.parts?.length || 0;
-        if (
-          numPartsToRemove > 0 &&
-          last.content.parts.length > numPartsToRemove
-        ) {
-          last.content.parts.splice(-numPartsToRemove);
-        } else {
-          hardenedHistory.pop();
-        }
-      } else {
-        hardenedHistory.pop();
-      }
-    }
 
     const apiHistory = hardenedHistory.map((h) => h.content);
     if (header) {
@@ -428,7 +411,7 @@ export class ContextManager {
     }
 
     const result = {
-      history: hardenedHistory,
+      history: renderedHistory,
       apiHistory,
       didApplyManagement,
       baseUnits,

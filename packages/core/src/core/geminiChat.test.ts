@@ -2239,7 +2239,13 @@ describe('GeminiChat', () => {
           role: 'model',
           parts: [
             { text: 'thinking...' },
-            { functionCall: { name: 'test', args: {} } },
+            {
+              functionCall: {
+                name: 'test',
+                args: {},
+                id: expect.stringMatching(/^synth_test_/),
+              },
+            },
           ],
         },
       ]);

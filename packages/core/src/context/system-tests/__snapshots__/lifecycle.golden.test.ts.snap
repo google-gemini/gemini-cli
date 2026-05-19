@@ -2,7 +2,7 @@
 
 exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge Tool Output & Images 1`] = `
 {
-  "baseUnits": 765,
+  "baseUnits": 878,
   "finalProjection": [
     {
       "content": {
@@ -67,16 +67,10 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
               "args": {
                 "cmd": "cat server.log",
               },
+              "id": "synth_<NAME>_<HASH>",
               "name": "run_shell_command",
             },
             "thoughtSignature": "skip_thought_signature_validator",
-          },
-          {
-            "functionCall": {
-              "args": {},
-              "id": "undefined",
-              "name": "run_shell_command",
-            },
           },
         ],
         "role": "model",
@@ -88,20 +82,12 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         "parts": [
           {
             "functionResponse": {
+              "id": "synth_<NAME>_<HASH>",
               "name": "run_shell_command",
               "response": {
                 "output": "<tool_output_masked>
 [Tool observation string (0.02MB, 1 lines) masked to preserve context window. Full string saved to: <MOCKED_DIR>]
 </tool_output_masked>",
-              },
-            },
-          },
-          {
-            "functionResponse": {
-              "id": "undefined",
-              "name": "run_shell_command",
-              "response": {
-                "error": "The tool execution result was lost due to context management truncation.",
               },
             },
           },
@@ -168,17 +154,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       },
       "id": "<UUID>",
     },
-    {
-      "content": {
-        "parts": [
-          {
-            "text": "Please continue.",
-          },
-        ],
-        "role": "user",
-      },
-      "id": "<UUID>",
-    },
   ],
   "tokenTrajectory": [
     {
@@ -192,18 +167,18 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 493,
-      "tokensBeforeBackground": 20232,
+      "tokensAfterBackground": 606,
+      "tokensBeforeBackground": 20296,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 728,
-      "tokensBeforeBackground": 3550,
+      "tokensAfterBackground": 841,
+      "tokensBeforeBackground": 3663,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 765,
-      "tokensBeforeBackground": 765,
+      "tokensAfterBackground": 878,
+      "tokensBeforeBackground": 878,
       "turnIndex": 4,
     },
   ],
@@ -255,17 +230,6 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
           },
         ],
         "role": "model",
-      },
-      "id": "<UUID>",
-    },
-    {
-      "content": {
-        "parts": [
-          {
-            "text": "Please continue.",
-          },
-        ],
-        "role": "user",
       },
       "id": "<UUID>",
     },
@@ -355,17 +319,6 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Node Distillation of Large 
       },
       "id": "<UUID>",
     },
-    {
-      "content": {
-        "parts": [
-          {
-            "text": "Please continue.",
-          },
-        ],
-        "role": "user",
-      },
-      "id": "<UUID>",
-    },
   ],
   "tokenTrajectory": [
     {
@@ -397,6 +350,14 @@ exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC 
           {
             "text": "{"active_tasks":[],"discovered_facts":[],"constraints_and_preferences":[],"recent_arc":[]}",
           },
+        ],
+        "role": "user",
+      },
+      "id": "<UUID>",
+    },
+    {
+      "content": {
+        "parts": [
           {
             "text": "Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 Msg 8 ..................................................",
           },
@@ -413,17 +374,6 @@ exports[`System Lifecycle Golden Tests > Scenario 4: Async-Driven Background GC 
           },
         ],
         "role": "model",
-      },
-      "id": "<UUID>",
-    },
-    {
-      "content": {
-        "parts": [
-          {
-            "text": "Please continue.",
-          },
-        ],
-        "role": "user",
       },
       "id": "<UUID>",
     },

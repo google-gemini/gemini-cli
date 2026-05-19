@@ -44,6 +44,7 @@ describe('render', () => {
         baseUnits: 100,
       }),
       getRawBaseUnits: vi.fn().mockReturnValue(100),
+      calculateConcreteListTokens: vi.fn().mockReturnValue(100),
       getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
     };
 
@@ -131,6 +132,10 @@ describe('render', () => {
         return { tokens, baseUnits: tokens };
       }),
       getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
         if (nodes.length === 1) return tokenMap[nodes[0].id];
         return currentTokens;
       }),
@@ -225,6 +230,10 @@ describe('render', () => {
         return { tokens, baseUnits: tokens };
       }),
       getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
         if (nodes.length === 1) return tokenMap[nodes[0].id];
         return currentTokens;
       }),

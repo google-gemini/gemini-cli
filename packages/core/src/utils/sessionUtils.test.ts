@@ -101,6 +101,7 @@ describe('convertSessionToClientHistory', () => {
     const history = convertSessionToClientHistory(messages);
 
     expect(history.map((h) => h.content)).toEqual([
+      { role: 'user', parts: [{ text: 'System info' }] },
       { role: 'user', parts: [{ text: 'Actual query' }] },
     ]);
   });

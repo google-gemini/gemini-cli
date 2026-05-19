@@ -6,8 +6,77 @@
 
 import { type Part, type PartListUnion } from '@google/genai';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
+export { partListUnionToString } from '../core/geminiRequest.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import { type HistoryTurn } from '../core/agentChatHistory.js';
+import { deriveStableId } from './cryptoUtils.js';
+
+/**
+ * Ensures that all function calls and responses in a chat history have stable IDs.
+ * If IDs are missing (e.g. legacy data or manually constructed tests), it synthesizes
+ * them and MUTATES the underlying Part objects.
+ *
+ * It uses a deterministic pairing heuristic for adjacent turns to link calls and responses.
+ */
+export function ensureStableToolIds(history: HistoryTurn[]): void {
+  for (let i = 0; i < history.length; i++) {
+    const turn = history[i];
+    const parts = turn.content.parts || [];
+
+    for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+      const part = parts[partIdx];
+
+      if (part.functionCall && !part.functionCall.id) {
+        const name = part.functionCall.name;
+        // Search ahead for a matching response in the next turn (common pattern)
+        const nextTurn = history[i + 1];
+        let pairedId: string | undefined;
+
+        if (nextTurn?.content.role === 'user') {
+          const matchingResp = nextTurn.content.parts?.find(
+            (p) =>
+              p.functionResponse &&
+              p.functionResponse.name === name &&
+              !p.functionResponse.id,
+          );
+          if (matchingResp) {
+            pairedId = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+            part.functionCall.id = pairedId;
+            matchingResp.functionResponse!.id = pairedId;
+          }
+        }
+
+        if (!part.functionCall.id) {
+          // If no pairing found, generate a solo synthetic ID
+          part.functionCall.id = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+        }
+      }
+
+      if (part.functionResponse && !part.functionResponse.id) {
+        // Orphaned response handling (search backward)
+        const name = part.functionResponse.name;
+        const prevTurn = history[i - 1];
+        if (prevTurn?.content.role === 'model') {
+          const matchingCall = prevTurn.content.parts?.find(
+            (p) =>
+              p.functionCall &&
+              p.functionCall.name === name &&
+              !p.functionCall.id,
+          );
+          if (matchingCall) {
+            const pairedId = `synth_${name}_${deriveStableId([prevTurn.id, (i - 1).toString(), partIdx.toString()])}`;
+            matchingCall.functionCall!.id = pairedId;
+            part.functionResponse.id = pairedId;
+          }
+        }
+
+        if (!part.functionResponse.id) {
+          part.functionResponse.id = `synth_orph_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+        }
+      }
+    }
+  }
+}
 
 /**
  * Converts a PartListUnion into a normalized array of Part objects.
@@ -34,17 +103,19 @@ export function convertSessionToClientHistory(
   const clientHistory: HistoryTurn[] = [];
 
   for (const msg of messages) {
-    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
+    if (msg.type === 'error' || msg.type === 'warning') {
       continue;
     }
 
-    if (msg.type === 'user') {
-      const contentString = partListUnionToString(msg.content);
-      if (
-        contentString.trim().startsWith('/') ||
-        contentString.trim().startsWith('?')
-      ) {
-        continue;
+    if (msg.type === 'user' || msg.type === 'info') {
+      if (msg.type === 'user') {
+        const contentString = partListUnionToString(msg.content);
+        if (
+          contentString.trim().startsWith('/') ||
+          contentString.trim().startsWith('?')
+        ) {
+          continue;
+        }
       }
 
       clientHistory.push({
@@ -57,7 +128,7 @@ export function convertSessionToClientHistory(
     } else if (msg.type === 'gemini') {
       const modelParts: Part[] = [];
 
-      // Add thoughts if present
+      // 1. Add thoughts from metadata if present
       if (msg.thoughts && msg.thoughts.length > 0) {
         for (const thought of msg.thoughts) {
           const thoughtText = thought.subject
@@ -70,24 +141,25 @@ export function convertSessionToClientHistory(
         }
       }
 
-      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
+      // 2. Add original parts from content (preserving multimodal integrity and synthetic thoughts)
+      if (msg.content) {
+        modelParts.push(...ensurePartArray(msg.content));
+      }
 
-      if (hasToolCalls) {
-        // Preserve original parts to maintain multimodal integrity
-        if (msg.content) {
-          modelParts.push(...ensurePartArray(msg.content));
-        }
-
-        for (const toolCall of msg.toolCalls!) {
+      // 3. Add tool calls if present
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        for (const toolCall of msg.toolCalls) {
           modelParts.push({
             functionCall: {
+              id: toolCall.id,
               name: toolCall.name,
               args: toolCall.args,
-              ...(toolCall.id && { id: toolCall.id }),
             },
           });
         }
+      }
 
+      if (modelParts.length > 0) {
         clientHistory.push({
           id: msg.id,
           content: {
@@ -96,54 +168,43 @@ export function convertSessionToClientHistory(
           },
         });
 
-        const functionResponseParts: Part[] = [];
-        for (const toolCall of msg.toolCalls!) {
-          if (toolCall.result) {
-            let responseData: Part;
+        // 4. Generate tool response turns
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const functionResponseParts: Part[] = [];
+          for (const toolCall of msg.toolCalls) {
+            if (toolCall.result) {
+              let responseData: Part;
 
-            if (typeof toolCall.result === 'string') {
-              responseData = {
-                functionResponse: {
-                  id: toolCall.id,
-                  name: toolCall.name,
-                  response: {
-                    output: toolCall.result,
+              if (typeof toolCall.result === 'string') {
+                responseData = {
+                  functionResponse: {
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    response: {
+                      output: toolCall.result,
+                    },
                   },
-                },
-              };
-            } else if (Array.isArray(toolCall.result)) {
-              functionResponseParts.push(...ensurePartArray(toolCall.result));
-              continue;
-            } else {
-              responseData = toolCall.result;
+                };
+              } else if (Array.isArray(toolCall.result)) {
+                functionResponseParts.push(...ensurePartArray(toolCall.result));
+                continue;
+              } else {
+                responseData = toolCall.result as Part;
+              }
+
+              functionResponseParts.push(responseData);
             }
-
-            functionResponseParts.push(responseData);
           }
-        }
 
-        if (functionResponseParts.length > 0) {
-          clientHistory.push({
-            id: `${msg.id}_response`,
-            content: {
-              role: 'user',
-              parts: functionResponseParts,
-            },
-          });
-        }
-      } else {
-        if (msg.content) {
-          modelParts.push(...ensurePartArray(msg.content));
-        }
-
-        if (modelParts.length > 0) {
-          clientHistory.push({
-            id: msg.id,
-            content: {
-              role: 'model',
-              parts: modelParts,
-            },
-          });
+          if (functionResponseParts.length > 0) {
+            clientHistory.push({
+              id: `${msg.id}_response`,
+              content: {
+                role: 'user',
+                parts: functionResponseParts,
+              },
+            });
+          }
         }
       }
     }

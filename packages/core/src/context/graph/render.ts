@@ -6,6 +6,7 @@
 
 import type { Content } from '@google/genai';
 import type { ConcreteNode } from './types.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
@@ -117,6 +118,9 @@ export async function render(
     `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier.`,
     { targetDelta },
   );
+  debugLogger.log(
+    `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
+  );
 
   // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
   const agedOutNodes = new Set<string>();
@@ -154,9 +158,14 @@ export async function render(
   );
 
   const contents = env.graphMapper.fromGraph(visibleNodes);
+  const finalTokens =
+    advancedTokenCalculator.calculateConcreteListTokens(visibleNodes);
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
+  debugLogger.log(
+    `Context Manager finished. Final actual token count: ${finalTokens}.`,
+  );
   performCalibration(
     env,
     visibleNodes,

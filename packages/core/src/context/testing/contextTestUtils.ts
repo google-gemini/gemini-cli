@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
 import { randomUUID } from 'node:crypto';
+export { deriveStableId } from '../../utils/cryptoUtils.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextEventBus } from '../eventBus.js';

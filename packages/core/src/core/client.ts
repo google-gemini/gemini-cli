@@ -53,7 +53,7 @@ import type {
   DefaultHookOutput,
   AfterAgentHookOutput,
 } from '../hooks/types.js';
-import { NextSpeakerCheckEvent, type LlmRole } from '../telemetry/types.js';
+import { NextSpeakerCheckEvent, LlmRole } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -389,9 +389,7 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history = this.config.getContextManagementConfig().enabled
-      ? (extraHistory ?? [])
-      : await getInitialChatHistory(this.config, extraHistory);
+    const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -640,6 +638,7 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     let currentBaseUnits = 0;
+    let apiHistoryOverride: Content[] | undefined = undefined;
 
     if (this.config.getContextManagementConfig().enabled) {
       if (this.contextManager) {
@@ -654,7 +653,7 @@ export class GeminiClient {
         };
         const {
           history: newHistory,
-          didApplyManagement,
+          apiHistory,
           baseUnits,
         } = await this.contextManager.renderHistory(
           pendingRequest,
@@ -663,13 +662,9 @@ export class GeminiClient {
         );
 
         currentBaseUnits = baseUnits;
+        apiHistoryOverride = apiHistory;
 
-        if (didApplyManagement) {
-          // If the manager pruned history, we update the chat before continuing.
-          // Note: we don't include the pendingRequest in this setHistory,
-          // because Turn.run will add it normally.
-          this.getChat().setHistory(newHistory, { silent: true });
-        }
+        this.getChat().setHistory(newHistory, { silent: true });
       } else {
         const newHistory = await this.agentHistoryProvider.manageHistory(
           this.getHistory(),
@@ -794,12 +789,11 @@ export class GeminiClient {
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
 
-    const resultStream = turn.run(
-      modelConfigKey,
-      request,
-      signal,
+    const resultStream = turn.run(modelConfigKey, request, signal, {
       displayContent,
-    );
+      role: LlmRole.MAIN,
+      apiHistoryOverride,
+    });
     let isError = false;
 
     let loopDetectedAbort = false;
