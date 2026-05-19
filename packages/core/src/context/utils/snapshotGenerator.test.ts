@@ -5,11 +5,131 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SnapshotGenerator, type SnapshotState } from './snapshotGenerator.js';
+import {
+  SnapshotGenerator,
+  type SnapshotState,
+  SnapshotStateHelper,
+} from './snapshotGenerator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { NodeType, type ConcreteNode } from '../graph/types.js';
 
 import type { Mock } from 'vitest';
+
+describe('SnapshotStateHelper', () => {
+  describe('exportState', () => {
+    it('should flatten nested abstractsIds to pristine IDs', () => {
+      // Setup a graph with nested snapshots
+      // S3 abstracts [S2, N5]
+      // S2 abstracts [S1, N3, N4]
+      // S1 abstracts [N1, N2]
+
+      const nodes: ConcreteNode[] = [
+        {
+          id: 'N1',
+          type: NodeType.USER_PROMPT,
+          timestamp: 10,
+          role: 'user',
+          payload: { text: '1' },
+          turnId: 'T1',
+        },
+        {
+          id: 'N2',
+          type: NodeType.AGENT_THOUGHT,
+          timestamp: 20,
+          role: 'model',
+          payload: { text: '2' },
+          turnId: 'T1',
+        },
+        {
+          id: 'S1',
+          type: NodeType.SNAPSHOT,
+          timestamp: 30,
+          role: 'user',
+          payload: { text: 'State 1' },
+          turnId: 'S1',
+          abstractsIds: ['N1', 'N2'],
+        },
+        {
+          id: 'N3',
+          type: NodeType.USER_PROMPT,
+          timestamp: 40,
+          role: 'user',
+          payload: { text: '3' },
+          turnId: 'T2',
+        },
+        {
+          id: 'N4',
+          type: NodeType.AGENT_THOUGHT,
+          timestamp: 50,
+          role: 'model',
+          payload: { text: '4' },
+          turnId: 'T2',
+        },
+        {
+          id: 'S2',
+          type: NodeType.SNAPSHOT,
+          timestamp: 60,
+          role: 'user',
+          payload: { text: 'State 2' },
+          turnId: 'S2',
+          abstractsIds: ['S1', 'N3', 'N4'],
+        },
+        {
+          id: 'N5',
+          type: NodeType.USER_PROMPT,
+          timestamp: 70,
+          role: 'user',
+          payload: { text: '5' },
+          turnId: 'T3',
+        },
+        {
+          id: 'S3',
+          type: NodeType.SNAPSHOT,
+          timestamp: 80,
+          role: 'user',
+          payload: { text: 'State 3' },
+          turnId: 'S3',
+          abstractsIds: ['S2', 'N5'],
+        },
+      ];
+
+      const state = SnapshotStateHelper.exportState(nodes);
+
+      expect(state.snapshot).toBeDefined();
+      expect(state.snapshot?.text).toBe('State 3');
+
+      // Should be flattened to only the "pristine" (non-snapshot) IDs
+      const consumedIds = state.snapshot?.consumedIds;
+      expect(consumedIds).toContain('N1');
+      expect(consumedIds).toContain('N2');
+      expect(consumedIds).toContain('N3');
+      expect(consumedIds).toContain('N4');
+      expect(consumedIds).toContain('N5');
+
+      // Should NOT contain the intermediate snapshot IDs
+      expect(consumedIds).not.toContain('S1');
+      expect(consumedIds).not.toContain('S2');
+
+      expect(consumedIds?.length).toBe(5);
+    });
+
+    it('should return empty state if no snapshot baseline is found', () => {
+      const nodes: ConcreteNode[] = [
+        {
+          id: 'N1',
+          type: NodeType.USER_PROMPT,
+          timestamp: 10,
+          role: 'user',
+          payload: { text: '1' },
+          turnId: 'T1',
+        },
+      ];
+
+      const state = SnapshotStateHelper.exportState(nodes);
+      expect(state).toEqual({});
+    });
+  });
+});
 
 describe('SnapshotGenerator', () => {
   let mockEnv: ContextEnvironment;
