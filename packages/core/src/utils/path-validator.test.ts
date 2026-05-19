@@ -93,4 +93,29 @@ describe('PathValidator', () => {
         .isValid,
     ).toBe(false);
   });
+
+  it('should allow paths with Unicode characters', () => {
+    expect(validatePath('src/文件.ts').isValid).toBe(true);
+    expect(validatePath('docs/🚀_launch.md').isValid).toBe(true);
+  });
+
+  it('should allow paths with multiple consecutive slashes (normalizing is handled by OS layer)', () => {
+    expect(validatePath('src//index.ts').isValid).toBe(true);
+  });
+
+  it('should allow paths with trailing slashes', () => {
+    expect(validatePath('src/utils/').isValid).toBe(true);
+  });
+
+  it('should allow paths with dots as components', () => {
+    expect(validatePath('./src/../index.ts').isValid).toBe(true);
+  });
+
+  it('should reject paths that are only dots if they exceed suspicious length (none currently do)', () => {
+    expect(validatePath('...').isValid).toBe(true); // Short ellipses are allowed as filenames
+  });
+
+  it('should reject paths with mixed invalid characters', () => {
+    expect(validatePath('path\nwith\0invalid').isValid).toBe(false);
+  });
 });

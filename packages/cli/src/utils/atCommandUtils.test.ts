@@ -221,4 +221,45 @@ describe('atCommandUtils', () => {
       expect(result.resolved.relativePath).toBe(otherPath);
     }
   });
+
+  it('should resolve paths in deeply nested workspace directories', async () => {
+    const dir = path.join('/mock', 'root', 'nested', 'project');
+    const relFile = path.join('src', 'index.ts');
+    const absFile = path.join(dir, relFile);
+
+    (mockWorkspaceContext['getDirectories'] as Mock).mockReturnValue([dir]);
+    const mockStats = {
+      isDirectory: () => false,
+      isFile: () => true,
+    };
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
+
+    const result = await resolveAtCommandPath(
+      absFile,
+      mockConfig as unknown as Config,
+    );
+
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(absFile);
+      expect(result.resolved.relativePath).toBe(relFile);
+    }
+  });
+
+  it('should include reason in debug message for unauthorized paths', async () => {
+    const onDebug = vi.fn();
+    (mockConfig['validatePathAccess'] as Mock).mockReturnValue(
+      'FORBIDDEN_ZONE',
+    );
+
+    await resolveAtCommandPath(
+      'secret.txt',
+      mockConfig as unknown as Config,
+      onDebug,
+    );
+
+    expect(onDebug).toHaveBeenCalledWith(
+      expect.stringContaining('Reason: FORBIDDEN_ZONE'),
+    );
+  });
 });
