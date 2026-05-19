@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import stripAnsi from 'strip-ansi';
+
 /**
  * Safely replaces text with literal strings, avoiding ECMAScript GetSubstitution issues.
  * Escapes $ characters to prevent template interpretation.
@@ -26,21 +28,50 @@ export function safeLiteralReplace(
 }
 
 /**
+ * Strips ANSI/VT escape sequences from a raw byte buffer.
+ * Uses latin1 encoding to preserve every byte's value exactly (0-255)
+ * while allowing string-based removal of escape sequences.
+ */
+export function stripAnsiFromBuffer(data: Buffer): Buffer {
+  const stripped = stripAnsi(data.toString('latin1'));
+  return Buffer.from(stripped, 'latin1');
+}
+
+/**
  * Checks if a Buffer is likely binary by testing for the presence of a NULL byte.
  * The presence of a NULL byte is a strong indicator that the data is not plain text.
  * @param data The Buffer to check.
  * @param sampleSize The number of bytes from the start of the buffer to test.
- * @returns True if a NULL byte is found, false otherwise.
+ * @param isPtyOutput When true, ANSI escape sequences are stripped before
+ *   checking and a null-byte ratio threshold is used instead of failing on
+ *   a single null byte.  This prevents false positives caused by node-pty
+ *   on Windows emitting VT control sequences that contain null bytes.
+ * @returns True if the data is likely binary, false otherwise.
  */
 export function isBinary(
   data: Buffer | null | undefined,
   sampleSize = 512,
+  isPtyOutput = false,
 ): boolean {
   if (!data) {
     return false;
   }
 
-  const sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
+  let sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
+
+  if (isPtyOutput) {
+    sample = stripAnsiFromBuffer(sample);
+    if (sample.length === 0) {
+      return false;
+    }
+    let nullCount = 0;
+    for (const byte of sample) {
+      if (byte === 0) {
+        nullCount++;
+      }
+    }
+    return nullCount / sample.length > 0.1;
+  }
 
   for (const byte of sample) {
     // The presence of a NULL byte (0x00) is one of the most reliable

@@ -72,7 +72,7 @@ export async function resolveRipgrepPath(): Promise<string | null> {
     }
 
     // 3. Fallback: check system PATH
-    const systemRg = await resolveExecutable('rg');
+    const systemRg = resolveExecutable('rg');
     if (systemRg) {
       // Security: Validate the system executable to prevent Search Path Interruption.
       const realPath = resolveToRealPath(systemRg);
