@@ -359,7 +359,7 @@ describe('LocalSubagentInvocation', () => {
             isSubagentActivityEvent: true,
             agentName: 'MockAgent',
             type: 'TOOL_CALL_END',
-            data: { name: 'ls', id: 'call1', data: { isError: true } },
+            data: { name: 'ls', callId: 'call1', data: { isError: true } },
           } as SubagentActivityEvent);
         }
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };

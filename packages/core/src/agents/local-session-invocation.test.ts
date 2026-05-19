@@ -273,7 +273,7 @@ describe('LocalSessionInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_END',
-        data: { name: 'ls', data: {}, id: 'call-123' },
+        data: { name: 'ls', data: {}, callId: 'call-123' },
       });
 
       await executePromise;
@@ -749,7 +749,11 @@ describe('LocalSessionInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'MockAgent',
         type: 'TOOL_CALL_END',
-        data: { name: 'failing_tool', data: { isError: true }, id: 'call-err' },
+        data: {
+          name: 'failing_tool',
+          data: { isError: true },
+          callId: 'call-err',
+        },
       });
 
       await executePromise;
