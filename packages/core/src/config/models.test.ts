@@ -34,6 +34,7 @@ import {
   isProModel,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  getAutoModelDescription,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -702,5 +703,25 @@ describe('Gemini 3.1 Config Resolution', () => {
     expect(
       resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
     ).toBeDefined();
+  });
+});
+
+describe('getAutoModelDescription', () => {
+  it('should return Gemini 2.5 description when hasAccessToPreview is false', () => {
+    const desc = getAutoModelDescription(false, false);
+    expect(desc).toContain('gemini-2.5-pro');
+    expect(desc).toContain('gemini-2.5-flash');
+  });
+
+  it('should return Gemini 3.0 description when hasAccessToPreview is true', () => {
+    const desc = getAutoModelDescription(true, false);
+    expect(desc).toContain('gemini-3-pro');
+    expect(desc).toContain('gemini-3-flash');
+  });
+
+  it('should return Gemini 3.1 description when hasAccessToPreview and useGemini3_1 are true', () => {
+    const desc = getAutoModelDescription(true, true);
+    expect(desc).toContain('gemini-3.1-pro');
+    expect(desc).toContain('gemini-3-flash');
   });
 });

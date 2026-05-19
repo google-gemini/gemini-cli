@@ -220,18 +220,7 @@ describe('policyHelpers', () => {
     ];
 
     testCases.forEach(
-      ({
-        name,
-        model,
-        useGemini31,
-        hasAccess,
-        authType,
-        wrapsAround,
-        ...rest
-      }) => {
-        const releaseChannel = (rest as Record<string, unknown>)[
-          'releaseChannel'
-        ] as string | undefined;
+      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
         it(`achieves parity for: ${name}`, () => {
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
@@ -241,7 +230,7 @@ describe('policyHelpers', () => {
               getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
-              getReleaseChannel: () => releaseChannel ?? 'preview',
+              getReleaseChannel: () => 'preview',
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 
