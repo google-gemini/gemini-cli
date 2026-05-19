@@ -54,7 +54,6 @@
     "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
-    "chardet": "^2.1.0",
     "chokidar": "^5.0.0",
     "command-exists": "^1.2.9",
     "diff": "^8.0.3",
