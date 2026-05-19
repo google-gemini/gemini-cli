@@ -188,16 +188,23 @@ export function getEditorCommand(editor: EditorType): string {
 }
 
 /**
- * Given a command name (e.g. "cursor", "code"), returns the EditorType that uses
- * that command, or undefined if no match is found.
+ * Given a command name (e.g. "cursor", "code", "code.cmd"), returns the
+ * EditorType that uses that command, or undefined if no match is found.
+ *
+ * This intentionally checks command names across all platforms (both `default`
+ * and `win32` lists) so that, for example, `$EDITOR=code` is recognized as
+ * vscode on Windows and `$EDITOR=code.cmd` is recognized as vscode on macOS.
  */
 export function resolveEditorTypeFromCommand(
   command: string,
 ): EditorType | undefined {
   const lowerCmd = command.toLowerCase();
   for (const editor of EDITORS) {
-    const commands = getEditorCommands(editor);
-    if (commands.some((c) => c.toLowerCase() === lowerCmd)) {
+    const { win32, default: nonWin32 } = editorCommands[editor];
+    if (
+      win32.some((c) => c.toLowerCase() === lowerCmd) ||
+      nonWin32.some((c) => c.toLowerCase() === lowerCmd)
+    ) {
       return editor;
     }
   }
