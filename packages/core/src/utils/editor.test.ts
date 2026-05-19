@@ -336,6 +336,7 @@ describe('editor utils', () => {
     }
 
     it('should return the correct command for emacs with escaped paths', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
       const command = getDiffCommand(
         'old file "quote".txt',
         'new file \\back\\slash.txt',
