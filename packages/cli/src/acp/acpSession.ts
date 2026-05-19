@@ -104,7 +104,7 @@ export class Session {
       request.toolCall,
       request.serverName,
       request.toolAnnotations,
-      undefined, // subagent
+      request.subagent,
     );
 
     await this.context.config.getMessageBus()?.publish({

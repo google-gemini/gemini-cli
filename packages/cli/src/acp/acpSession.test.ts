@@ -822,5 +822,39 @@ describe('Session', () => {
         }),
       );
     });
+
+    it('should pass subagent to PolicyEngine when present in request', async () => {
+      const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
+        check: Mock<
+          (
+            toolCall: { name: string; args: Record<string, unknown> },
+            serverName?: string,
+            toolAnnotations?: Record<string, unknown>,
+            subagent?: string,
+          ) => Promise<{ decision: PolicyDecision }>
+        >;
+      };
+      mockPolicyEngine.check.mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-subagent',
+        toolCall: { name: 'ls', args: {} },
+        subagent: 'restricted-subagent',
+      });
+
+      expect(mockPolicyEngine.check).toHaveBeenCalledWith(
+        expect.anything(),
+        undefined,
+        undefined,
+        'restricted-subagent',
+      );
+    });
   });
 });
