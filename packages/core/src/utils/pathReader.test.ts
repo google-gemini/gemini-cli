@@ -428,6 +428,57 @@ describe('readPathFromWorkspace', () => {
     ).rejects.toThrow(`Path not found in workspace: ${relativeTraversal}`);
   });
 
+  it('should prevent symlink escape outside the workspace', async () => {
+    mock({
+      [CWD]: {
+        'malicious-link': mock.symlink({
+          path: path.join(OUTSIDE_DIR, 'secret.txt'),
+        }),
+      },
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const config = createMockConfig(CWD);
+    // Even if the link is in the workspace, its target is not.
+    await expect(
+      readPathFromWorkspace('malicious-link', config),
+    ).rejects.toThrow('Path not found in workspace: malicious-link');
+  });
+
+  it('should block symlink escape inside a directory expansion (defense-in-depth)', async () => {
+    mock({
+      [CWD]: {
+        'allowed-dir': {
+          'legit.txt': 'legit content',
+          'malicious-link.txt': mock.symlink({
+            path: path.join(OUTSIDE_DIR, 'secret.txt'),
+          }),
+        },
+      },
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
+    const result = await readPathFromWorkspace('allowed-dir', config);
+    const resultText = result
+      .map((p) => {
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object' && p && 'text' in p) return p.text;
+        return '';
+      })
+      .join('');
+
+    // Legit content should be there
+    expect(resultText).toContain('legit content');
+    // Secret content should NOT be there
+    expect(resultText).not.toContain('secrets');
+  });
+
   // mock-fs permission simulation is unreliable on Windows.
   it.skipIf(process.platform === 'win32')(
     'should return an error string if reading a file with no permissions',
