@@ -21,9 +21,9 @@ export class MessageBus extends EventEmitter {
   constructor(
     private readonly policyEngine: PolicyEngine,
     private readonly debug = false,
+    private readonly isTrusted = true,
   ) {
     super();
-    this.debug = debug;
   }
 
   private isValidMessage(message: Message): boolean {
@@ -47,20 +47,21 @@ export class MessageBus extends EventEmitter {
 
   /**
    * Derives a child message bus scoped to a specific subagent.
+   * Derived buses are untrusted.
    */
   derive(subagentName: string): MessageBus {
-    const bus = new MessageBus(this.policyEngine, this.debug);
+    const bus = new MessageBus(this.policyEngine, this.debug, false);
 
     bus.publish = async (message: Message) => {
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        // Create a sanitized copy to prevent untrusted callers from setting
-        // sensitive fields like forcedDecision or spoofing subagent identity.
+        // Sanitization for untrusted callers:
+        // 1. Remove forcedDecision to prevent policy bypass.
+        // 2. Enforce subagent identity by prepending/setting the scope.
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { forcedDecision, subagent, ...otherFields } = message;
 
         return this.publish({
           ...otherFields,
-          // Enforce identity: nested subagents are prepended
           subagent: message.subagent
             ? `${subagentName}/${message.subagent}`
             : subagentName,
@@ -101,7 +102,10 @@ export class MessageBus extends EventEmitter {
           message.subagent,
         );
 
-        const decision = message.forcedDecision ?? policyDecision;
+        // Only trust forcedDecision if it comes from a trusted bus
+        const decision =
+          (this.isTrusted ? message.forcedDecision : undefined) ??
+          policyDecision;
 
         switch (decision) {
           case PolicyDecision.ALLOW:
