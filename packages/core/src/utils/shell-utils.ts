@@ -15,8 +15,19 @@ import {
 } from 'node:child_process';
 
 /**
+ * Shell built-ins that are treated as administrative preamble and skipped
+ * when identifying the primary command for permission/sandbox checks.
+ * Centralised here so all callers stay in sync automatically.
+ */
+export const SHELL_BUILTINS_TO_IGNORE = new Set(['shopt', 'set', 'trap']);
+
+/**
  * Extracts the primary command name from a potentially wrapped shell command.
  * Strips shell wrappers and handles shopt/set/trap/etc.
+ *
+ * Returns the command name only when there is exactly ONE non-builtin root so
+ * that chained commands (e.g. `git; malicious_cmd`) never silently inherit the
+ * first command's sandbox permissions.
  *
  * @param command - The full command string.
  * @param args - The arguments for the command.
@@ -30,9 +41,9 @@ export async function getCommandName(
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set' && r !== 'trap',
+    (r) => !SHELL_BUILTINS_TO_IGNORE.has(r),
   );
-  if (roots.length > 0) {
+  if (roots.length === 1) {
     return roots[0];
   }
   return path.basename(command);

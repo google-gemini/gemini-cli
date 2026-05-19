@@ -30,6 +30,7 @@ import {
   getCommandName,
   initializeShellParsers,
   getCommandRoots,
+  SHELL_BUILTINS_TO_IGNORE,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 import {
@@ -271,7 +272,7 @@ export class WindowsSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => !SHELL_BUILTINS_TO_IGNORE.has(r),
     );
     const isGitCommand = roots.includes('git');
 

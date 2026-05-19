@@ -42,6 +42,7 @@ import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 import {
   getCommandRoots,
   initializeShellParsers,
+  SHELL_BUILTINS_TO_IGNORE,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 
@@ -226,9 +227,9 @@ export class LinuxSandboxManager implements SandboxManager {
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
     const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
+      (r) => !SHELL_BUILTINS_TO_IGNORE.has(r),
     );
-    const commandName = roots.length > 0 ? roots[0] : join(command);
+    const commandName = roots.length === 1 ? roots[0] : join(command);
     const isGitCommand = roots.includes('git');
 
     const isApproved = allowOverrides

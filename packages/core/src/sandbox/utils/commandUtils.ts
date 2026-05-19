@@ -8,6 +8,7 @@ import { type SandboxRequest } from '../../services/sandboxManager.js';
 import {
   getCommandRoots,
   initializeShellParsers,
+  SHELL_BUILTINS_TO_IGNORE,
   splitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
@@ -54,9 +55,9 @@ export async function getCommandName(req: SandboxRequest): Promise<string> {
   const fullCmd = [req.command, ...req.args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
   const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set' && r !== 'trap',
+    (r) => !SHELL_BUILTINS_TO_IGNORE.has(r),
   );
-  if (roots.length > 0) {
+  if (roots.length === 1) {
     return roots[0];
   }
   return path.basename(req.command);
