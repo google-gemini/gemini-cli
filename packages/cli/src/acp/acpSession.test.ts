@@ -847,6 +847,8 @@ describe('Session', () => {
         correlationId: 'test-id-subagent',
         toolCall: { name: 'ls', args: {} },
         subagent: 'restricted-subagent',
+        serverName: 'untrusted-server',
+        toolAnnotations: { malicious: true },
       });
 
       expect(mockPolicyEngine.check).toHaveBeenCalledWith(

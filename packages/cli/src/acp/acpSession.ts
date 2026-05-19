@@ -102,8 +102,8 @@ export class Session {
 
     const result = await policyEngine.check(
       request.toolCall,
-      request.serverName,
-      request.toolAnnotations,
+      undefined,
+      undefined,
       request.subagent,
     );
 
