@@ -95,24 +95,68 @@ export class Session {
   private handleToolConfirmationRequest = async (
     request: ToolConfirmationRequest,
   ) => {
-    const policyEngine = this.context.config.getPolicyEngine?.();
-    if (!policyEngine) {
-      return;
+    try {
+      const policyEngine = this.context.config.getPolicyEngine?.();
+      const messageBus = this.context.config.getMessageBus();
+
+      if (!policyEngine || !messageBus) {
+        return;
+      }
+
+      if (!request.toolCall.name) {
+        debugLogger.warn(
+          'Tool confirmation request missing tool name. Denying.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const tool = this.context.toolRegistry.getTool(request.toolCall.name);
+      if (!tool) {
+        debugLogger.warn(
+          `Tool confirmation request for unknown tool: ${request.toolCall.name}. Denying.`,
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const serverName =
+        tool instanceof DiscoveredMCPTool ? tool.serverName : undefined;
+      const toolAnnotations = tool.toolAnnotations;
+
+      const result = await policyEngine.check(
+        request.toolCall,
+        serverName,
+        toolAnnotations,
+        request.subagent,
+      );
+
+      await messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: result.decision === PolicyDecision.ALLOW,
+        requiresUserConfirmation: result.decision === PolicyDecision.ASK_USER,
+      });
+    } catch (error) {
+      debugLogger.error('Error handling tool confirmation request:', error);
+      // Fail closed on exception
+      await this.context.config.getMessageBus()?.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: false,
+      });
     }
-
-    const result = await policyEngine.check(
-      request.toolCall,
-      undefined,
-      undefined,
-      request.subagent,
-    );
-
-    await this.context.config.getMessageBus()?.publish({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: request.correlationId,
-      confirmed: result.decision === PolicyDecision.ALLOW,
-      requiresUserConfirmation: result.decision === PolicyDecision.ASK_USER,
-    });
   };
 
   private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {

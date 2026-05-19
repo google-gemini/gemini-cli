@@ -823,7 +823,7 @@ describe('Session', () => {
       );
     });
 
-    it('should pass subagent to PolicyEngine when present in request', async () => {
+    it('should pass subagent and trusted tool info to PolicyEngine', async () => {
       const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
         check: Mock<
           (
@@ -838,24 +838,54 @@ describe('Session', () => {
         decision: PolicyDecision.ALLOW,
       });
 
+      // Mock tool in registry with trusted annotations
+      const trustedAnnotations = { safe: true };
+      (mockToolRegistry.getTool).mockReturnValue({
+        name: 'ls',
+        toolAnnotations: trustedAnnotations,
+      });
+
       const handler = mockMessageBus.subscribe.mock.calls.find(
         (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
       )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
 
       await handler({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        correlationId: 'test-id-subagent',
+        correlationId: 'test-id-trusted',
         toolCall: { name: 'ls', args: {} },
         subagent: 'restricted-subagent',
-        serverName: 'untrusted-server',
-        toolAnnotations: { malicious: true },
+        serverName: 'spoofed-server', // Should be ignored
+        toolAnnotations: { malicious: true }, // Should be ignored
       });
 
       expect(mockPolicyEngine.check).toHaveBeenCalledWith(
         expect.anything(),
-        undefined,
-        undefined,
+        undefined, // serverName for non-MCP tool
+        trustedAnnotations,
         'restricted-subagent',
+      );
+    });
+
+    it('should fail closed and deny unknown tools', async () => {
+      (mockToolRegistry.getTool).mockReturnValue(undefined);
+
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-unknown',
+        toolCall: { name: 'unknown_tool', args: {} },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id-unknown',
+          confirmed: false,
+          requiresUserConfirmation: false,
+        }),
       );
     });
   });
