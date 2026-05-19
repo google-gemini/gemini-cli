@@ -116,7 +116,8 @@ export class Session {
         return;
       }
 
-      if (!request.toolCall.name) {
+      const toolName = request.toolCall.name?.trim();
+      if (!toolName) {
         debugLogger.warn(
           'Tool confirmation request missing tool name. Denying.',
         );
@@ -129,10 +130,10 @@ export class Session {
         return;
       }
 
-      const tool = this.context.toolRegistry.getTool(request.toolCall.name);
+      const tool = this.context.toolRegistry.getTool(toolName);
       if (!tool) {
         debugLogger.warn(
-          `Tool confirmation request for unknown tool: ${request.toolCall.name}. Denying.`,
+          `Tool confirmation request for unknown tool: ${toolName}. Denying.`,
         );
         await messageBus.publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,

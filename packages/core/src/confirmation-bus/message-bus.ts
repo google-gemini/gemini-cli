@@ -56,9 +56,16 @@ export class MessageBus extends EventEmitter {
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
         // Sanitization for untrusted callers:
         // 1. Remove forcedDecision to prevent policy bypass.
-        // 2. Enforce subagent identity by prepending/setting the scope.
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { forcedDecision, subagent, ...otherFields } = message;
+        // 2. Remove metadata (serverName, toolAnnotations, details) to prevent spoofing.
+        // 3. Enforce subagent identity by prepending/setting the scope.
+        const {
+          forcedDecision: _forcedDecision,
+          subagent: _subagent,
+          serverName: _serverName,
+          toolAnnotations: _toolAnnotations,
+          details: _details,
+          ...otherFields
+        } = message;
 
         return this.publish({
           ...otherFields,

@@ -946,6 +946,27 @@ describe('Session', () => {
       );
     });
 
+    it('should trim tool name before lookup and validation', async () => {
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-whitespace',
+        toolCall: { name: '  ', args: {} },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id-whitespace',
+          confirmed: false,
+          requiresUserConfirmation: false,
+        }),
+      );
+    });
+
     it('should pass serverName from DiscoveredMCPTool to PolicyEngine', async () => {
       const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
         check: Mock<
