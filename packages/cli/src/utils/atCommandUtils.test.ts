@@ -69,7 +69,7 @@ describe('atCommandUtils', () => {
     expect(result.status).toBe('resolved');
     if (result.status === 'resolved') {
       expect(result.resolved.absolutePath).toBe(absolutePath);
-      expect(result.resolved.relativePath).toBe('src/index.ts');
+      expect(result.resolved.relativePath).toBe(path.join('src', 'index.ts'));
     }
   });
 
