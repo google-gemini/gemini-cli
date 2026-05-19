@@ -61,7 +61,9 @@ export async function resolveRipgrepPath(): Promise<string | null> {
     const candidatePaths = [
       // 1. SEA runtime layout: everything is flattened into the root dir
       path.resolve(__dirname, 'vendor/ripgrep', binName),
-      // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      // 2. Dev/Dist layout (Actual): dist/src/tools/ripGrep.js -> packages/core/vendor/ripgrep
+      path.resolve(__dirname, '../../../vendor/ripgrep', binName),
+      // 3. Dev/Dist layout (Assumed/Bundled): dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
       path.resolve(__dirname, '../../vendor/ripgrep', binName),
     ];
 

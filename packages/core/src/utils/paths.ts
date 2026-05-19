@@ -555,6 +555,9 @@ export function isTrustedSystemPath(filePath: string): boolean {
       '/usr/local/Cellar',
       '/usr/sbin',
       '/sbin',
+      // 1P internal hermetic execution paths
+      '/google/bin',
+      '/google/src/cloud',
     ].map((p) => normalizePath(p));
 
     return trustedPrefixes.some(
