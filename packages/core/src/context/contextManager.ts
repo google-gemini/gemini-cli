@@ -5,8 +5,11 @@
  */
 
 import type { Content } from '@google/genai';
-import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import { isToolExecution, type ConcreteNode } from './graph/types.js';
+import type {
+  AgentChatHistory,
+  HistoryTurn,
+} from '../core/agentChatHistory.js';
+import type { ConcreteNode } from './graph/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
@@ -38,9 +41,11 @@ export class ContextManager {
   private lastRenderCache?: {
     nodesHash: string;
     result: {
-      history: Content[];
+      history: HistoryTurn[];
+      apiHistory: Content[];
       didApplyManagement: boolean;
       baseUnits: number;
+      processedNodes: readonly ConcreteNode[];
     };
   };
 
@@ -75,6 +80,21 @@ export class ContextManager {
       this.evaluateTriggers(event.newNodes);
     });
     this.eventBus.onProcessorResult((event) => {
+      // Defensive: Verify all targets are still present in the buffer.
+      // If a synchronous render or a previous async task already removed them,
+      // this result is stale and should be dropped.
+      const currentIds = new Set(this.buffer.nodes.map((n) => n.id));
+      const allTargetsPresent = event.targets.every((t) =>
+        currentIds.has(t.id),
+      );
+
+      if (!allTargetsPresent) {
+        debugLogger.log(
+          `[ContextManager] Dropping stale processor result from ${event.processorId}. One or more targets were already removed.`,
+        );
+        return;
+      }
+
       this.buffer = this.buffer.applyProcessorResult(
         event.processorId,
         event.targets,
@@ -127,11 +147,11 @@ export class ContextManager {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
 
-      // Identify active tool calls that must NEVER be truncated
+      // Identify nodes that must NEVER be truncated
       const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
       if (protectedIds.size > 0) {
         debugLogger.log(
-          `[ContextManager] Pinning ${protectedIds.size} active tool call nodes to prevent truncation.`,
+          `[ContextManager] Pinning ${protectedIds.size} nodes (recent_turn or external_active_task) to prevent truncation.`,
         );
       }
 
@@ -215,24 +235,7 @@ export class ContextManager {
       }
     }
 
-    // 2. Identify active tool calls that must NEVER be truncated
-    const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
-    const responses = new Set(
-      nodes
-        .filter((n) => isToolExecution(n) && n.role === 'user')
-        .map((n) => n.payload.functionResponse?.id)
-        .filter((id): id is string => !!id),
-    );
-
-    for (const call of calls) {
-      const id = call.payload.functionCall?.id;
-      // If we have a call but no response in the current graph, it's 'in flight'
-      if (id && !responses.has(id)) {
-        protectionMap.set(call.id, 'in_flight_tool_call');
-      }
-    }
-
-    // 3. Any externally requested protections
+    // 2. Any externally requested protections
     for (const id of extraProtectedIds) {
       protectionMap.set(id, 'external_active_task');
     }
@@ -278,13 +281,15 @@ export class ContextManager {
    * This is the primary method called by the agent framework before sending a request.
    */
   async renderHistory(
-    pendingRequest?: Content,
+    pendingRequest?: HistoryTurn,
     activeTaskIds: Set<string> = new Set(),
     abortSignal?: AbortSignal,
   ): Promise<{
-    history: Content[];
+    history: HistoryTurn[];
+    apiHistory: Content[];
     didApplyManagement: boolean;
     baseUnits: number;
+    processedNodes: readonly ConcreteNode[];
   }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
@@ -302,6 +307,7 @@ export class ContextManager {
     const hotStartPromise = (async () => {
       if (!this.hasPerformedHotStart) {
         this.hasPerformedHotStart = true;
+
         if (this.buffer.nodes.length > 0) {
           const nodesForHotStart = [...this.buffer.nodes, ...previewNodes];
           await this.performHotStartCalibration(nodesForHotStart, abortSignal);
@@ -345,11 +351,7 @@ export class ContextManager {
     const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
-    const {
-      history: renderedHistory,
-      didApplyManagement,
-      baseUnits,
-    } = await render(
+    const renderResult = await render(
       nodes,
       this.orchestrator,
       this.sidecar,
@@ -361,21 +363,68 @@ export class ContextManager {
       previewNodeIds,
     );
 
+    const {
+      history: renderedHistory,
+      didApplyManagement,
+      baseUnits,
+      processedNodes,
+    } = renderResult;
+
+    if (didApplyManagement) {
+      // Commit the GC backstop results back to the master buffer.
+      // We filter out preview nodes because they are ephemeral and will be
+      // added to history naturally by the client after the turn completes.
+      this.buffer = this.buffer.applyProcessorResult(
+        'sync_backstop',
+        this.buffer.nodes,
+        processedNodes.filter((n) => !previewNodeIds.has(n.id)),
+      );
+    }
+
     // Structural validation in debug mode
     checkContextInvariants(this.buffer.nodes, 'RenderHistory');
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    const combinedHistory = header
-      ? [header, ...renderedHistory]
+    // We must temporarily append the pendingRequest (if any) before hardening.
+    // Otherwise, the hardener will see dangling functionCalls and inject sentinels
+    // even though the pendingRequest provides the required functionResponses.
+    const fullHistoryToHarden = pendingRequest
+      ? [...renderedHistory, pendingRequest]
       : renderedHistory;
 
+    const hardenedHistory = hardenHistory(fullHistoryToHarden, {
+      sentinels: this.sidecar.sentinels,
+    });
+
+    if (pendingRequest) {
+      const last = hardenedHistory[hardenedHistory.length - 1];
+      if (last && last.content.parts) {
+        const numPartsToRemove = pendingRequest.content.parts?.length || 0;
+        if (
+          numPartsToRemove > 0 &&
+          last.content.parts.length > numPartsToRemove
+        ) {
+          last.content.parts.splice(-numPartsToRemove);
+        } else {
+          hardenedHistory.pop();
+        }
+      } else {
+        hardenedHistory.pop();
+      }
+    }
+
+    const apiHistory = hardenedHistory.map((h) => h.content);
+    if (header) {
+      apiHistory.unshift(header);
+    }
+
     const result = {
-      history: hardenHistory(combinedHistory, {
-        sentinels: this.sidecar.sentinels,
-      }),
+      history: hardenedHistory,
+      apiHistory,
       didApplyManagement,
       baseUnits,
+      processedNodes,
     };
 
     // Update cache
@@ -394,10 +443,11 @@ export class ContextManager {
       );
 
       const contents = this.env.graphMapper.fromGraph(nodes);
+      const rawContents = contents.map((h) => h.content);
       const header = this.headerProvider
         ? await this.headerProvider()
         : undefined;
-      const combinedHistory = header ? [header, ...contents] : contents;
+      const combinedHistory = header ? [header, ...rawContents] : rawContents;
 
       const baseUnits =
         this.advancedTokenCalculator.getRawBaseUnits(nodes) +

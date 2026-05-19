@@ -12,9 +12,10 @@ import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { performCalibration } from '../utils/tokenCalibration.js';
 import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
+import type { HistoryTurn } from '../../core/agentChatHistory.js';
 
 /**
- * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
+ * Maps the Episodic Context Graph back into a list of HistoryTurns for transmission.
  * It applies synchronous context management (GC backstop) if the budget is exceeded.
  */
 export async function render(
@@ -28,9 +29,10 @@ export async function render(
   header?: Content,
   previewNodeIds: ReadonlySet<string> = new Set(),
 ): Promise<{
-  history: Content[];
+  history: HistoryTurn[];
   didApplyManagement: boolean;
   baseUnits: number;
+  processedNodes: readonly ConcreteNode[];
 }> {
   let headerTokens = 0;
   let headerBaseUnits = 0;
@@ -52,7 +54,12 @@ export async function render(
     const baseUnits =
       advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
 
-    return { history: contents, didApplyManagement: false, baseUnits };
+    return {
+      history: contents,
+      didApplyManagement: false,
+      baseUnits,
+      processedNodes: nodes,
+    };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
@@ -92,11 +99,16 @@ export async function render(
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
-    performCalibration(env, visibleNodes, contents);
+    performCalibration(
+      env,
+      visibleNodes,
+      contents.map((h) => h.content),
+    );
     return {
       history: contents,
       didApplyManagement: false,
       baseUnits: graphBaseUnits + headerBaseUnits,
+      processedNodes: nodes,
     };
   }
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -145,11 +157,16 @@ export async function render(
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
-  performCalibration(env, visibleNodes, contents);
+  performCalibration(
+    env,
+    visibleNodes,
+    contents.map((h) => h.content),
+  );
   return {
     history: contents,
     didApplyManagement: true,
     baseUnits:
       advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerBaseUnits,
+    processedNodes,
   };
 }

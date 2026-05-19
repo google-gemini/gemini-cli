@@ -46,6 +46,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import type { ContextManager } from '../context/contextManager.js';
+import type { HistoryTurn } from './agentChatHistory.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { logNextSpeakerCheck } from '../telemetry/loggers.js';
 import type {
@@ -67,6 +68,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
+import { randomUUID } from 'node:crypto';
 import {
   coreEvents,
   CoreEvent,
@@ -293,7 +295,7 @@ export class GeminiClient {
     this.getChat().stripThoughtsFromHistory();
   }
 
-  setHistory(history: readonly Content[]) {
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>) {
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
@@ -335,7 +337,7 @@ export class GeminiClient {
   }
 
   async resumeChat(
-    history: Content[],
+    history: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
@@ -376,7 +378,7 @@ export class GeminiClient {
   }
 
   async startChat(
-    extraHistory?: Content[],
+    extraHistory?: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
@@ -398,7 +400,7 @@ export class GeminiClient {
         this.config,
         systemInstruction,
         tools,
-        history,
+        [...history],
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
@@ -419,7 +421,7 @@ export class GeminiClient {
       await reportError(
         error,
         'Error initializing Gemini chat session.',
-        history,
+        [...history],
         'startChat',
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
@@ -641,7 +643,15 @@ export class GeminiClient {
 
     if (this.config.getContextManagementConfig().enabled) {
       if (this.contextManager) {
-        const pendingRequest = createUserContent(request);
+        const rawPendingRequest = createUserContent(request);
+        const pendingRequest = {
+          id:
+            this.getChatRecordingService()?.recordSyntheticMessage(
+              'user',
+              rawPendingRequest.parts || [],
+            ) || randomUUID(),
+          content: rawPendingRequest,
+        };
         const {
           history: newHistory,
           didApplyManagement,
