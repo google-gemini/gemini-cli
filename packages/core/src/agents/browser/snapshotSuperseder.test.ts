@@ -9,16 +9,21 @@ import {
   supersedeStaleSnapshots,
   SNAPSHOT_SUPERSEDED_PLACEHOLDER,
 } from './snapshotSuperseder.js';
-import type { GeminiChat } from '../../core/geminiChat.js';
+import type { GeminiChat, HistoryTurn } from '../../core/geminiChat.js';
 import type { Content } from '@google/genai';
+import { randomUUID } from 'node:crypto';
 
 /** Builds a minimal mock GeminiChat around a mutable history array. */
 function createMockChat(history: Content[]): GeminiChat {
+  const getTurns = () => history.map((c) => ({ id: randomUUID(), content: c }));
   return {
     getHistory: vi.fn(() => [...history]),
-    setHistory: vi.fn((newHistory: readonly Content[]) => {
+    getHistoryTurns: vi.fn(() => getTurns()),
+    setHistory: vi.fn((newHistory: ReadonlyArray<Content | HistoryTurn>) => {
       history.length = 0;
-      history.push(...newHistory);
+      for (const item of newHistory) {
+        history.push('content' in item ? item.content : item);
+      }
     }),
   } as unknown as GeminiChat;
 }
