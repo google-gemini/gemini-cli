@@ -21,7 +21,7 @@ evalTest('USUALLY_PASSES', {
 
     expect(createEventCall).toBeDefined();
 
-    const args = JSON.parse(createEventCall?.toolRequest.args);
+    const args = JSON.parse(createEventCall!.toolRequest.args);
 
     expect(args?.start).toHaveProperty('date');
     expect(args?.start).not.toHaveProperty('dateTime');

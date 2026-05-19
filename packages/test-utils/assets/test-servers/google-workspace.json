@@ -905,7 +905,8 @@
                 "type": "string",
                 "description": "The new date, in the format \"yyyy-mm-dd\", for an all-day event."
               }
-            }
+            },
+            "anyOf": [{ "required": ["dateTime"] }, { "required": ["date"] }]
           },
           "attendees": {
             "description": "The new list of attendees for the event.",
