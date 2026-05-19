@@ -28,6 +28,7 @@ import {
   type ServerGeminiStreamEvent,
   PolicyDecision,
   MessageBusType,
+  type ToolConfirmationRequest,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
