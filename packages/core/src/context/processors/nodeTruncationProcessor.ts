@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
@@ -79,9 +79,10 @@ export function createNodeTruncationProcessor(
         if (text) {
           const squashResult = tryApplySquash(text, limitChars);
           if (squashResult) {
+            const newId = deriveStableId([node.id, 'truncated']);
             returnedNodes.push({
               ...node,
-              id: randomUUID(),
+              id: newId,
               payload: { ...payload, text: squashResult.text },
               replacesId: node.id,
               turnId: node.turnId,

@@ -122,4 +122,69 @@ describe('AdaptiveTokenCalculator', () => {
 
     expect(calculator.getLearnedWeight()).toBe(1.0);
   });
+
+  it('should subtract overhead tokens from actual tokens when determining target weight', () => {
+    const eventBus = new ContextEventBus();
+    const getOverheadTokens = () => 40;
+    const calculator = new AdaptiveTokenCalculator(
+      charsPerToken,
+      registry,
+      eventBus,
+      getOverheadTokens,
+    );
+
+    // Initial state: weight = 1.0
+
+    // Simulate an event where the API reported 100 tokens, and our base units were 100
+    // But overhead is 40.
+    // actualGraphTokens = 100 - 40 = 60
+    // rawTargetWeight = 60 / 100 = 0.6
+    // targetWeight = Math.max(0.5, 0.6) = 0.6
+    // newWeight = 1.0 * 0.8 + 0.6 * 0.2 = 0.8 + 0.12 = 0.92
+    eventBus.emitTokenGroundTruth({
+      actualTokens: 100,
+      promptBaseUnits: 100,
+    });
+
+    expect(calculator.getLearnedWeight()).toBeCloseTo(0.92, 5);
+  });
+
+  it('should enforce the maxStep limit to prevent violent oscillation from massive outliers', () => {
+    const eventBus = new ContextEventBus();
+    const maxStep = 0.05; // Tight limit
+    const calculator = new AdaptiveTokenCalculator(
+      charsPerToken,
+      registry,
+      eventBus,
+      undefined,
+      { maxStep },
+    );
+
+    // Initial state: weight = 1.0
+
+    // Simulate a massive outlier where the API reports 10,000 tokens for 100 base units.
+    // rawTargetWeight = 100
+    // targetWeight = Math.min(100, 1.0 * 2.0) = 2.0
+    // emaWeight = 1.0 * 0.8 + 2.0 * 0.2 = 1.2
+    // BUT maxStep is 0.05, so the actual step is clamped.
+    // finalWeight = 1.0 + 0.05 = 1.05
+    eventBus.emitTokenGroundTruth({
+      actualTokens: 10000,
+      promptBaseUnits: 100,
+    });
+
+    expect(calculator.getLearnedWeight()).toBeCloseTo(1.05, 5);
+
+    // Simulate a massive under-estimation
+    // rawTargetWeight = 0
+    // targetWeight = Math.max(0, 1.05 * 0.5) = 0.525
+    // emaWeight = 1.05 * 0.8 + 0.525 * 0.2 = 0.84 + 0.105 = 0.945
+    // BUT maxStep is 0.05, so step is clamped: 1.05 - 0.05 = 1.0
+    eventBus.emitTokenGroundTruth({
+      actualTokens: 0,
+      promptBaseUnits: 100,
+    });
+
+    expect(calculator.getLearnedWeight()).toBeCloseTo(1.0, 5);
+  });
 });

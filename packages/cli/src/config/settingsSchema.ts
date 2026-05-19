@@ -2194,6 +2194,16 @@ const SETTINGS_SCHEMA = {
               'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
+          agentSessionSubagentEnabled: {
+            type: 'boolean',
+            label: 'Agent Session Subagent Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Route subagent invocations through the AgentSession protocol instead of legacy executors.',
+            showInDialog: false,
+          },
         },
       },
       enableAgents: {
