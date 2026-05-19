@@ -550,6 +550,24 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-flash-preview"
         }
       },
+      "gemini-3.1-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview"
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview-customtools"
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -1021,12 +1039,6 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "releaseChannel": "stable"
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -1165,13 +1177,6 @@ their corresponding top-level category object in your `settings.json` file.
           {
             "condition": {
               "hasAccessToPreview": false
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
-              "releaseChannel": "stable",
-              "requestedModels": ["auto"]
             },
             "target": "gemini-2.5-pro"
           },
@@ -1833,6 +1838,12 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
   - **Description:** Enable the agent session implementation for the interactive
     CLI.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.adk.agentSessionSubagentEnabled`** (boolean):
+  - **Description:** Route subagent invocations through the AgentSession
+    protocol instead of legacy executors.
   - **Default:** `false`
   - **Requires restart:** Yes
 

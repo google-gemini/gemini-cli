@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
@@ -120,7 +120,7 @@ export function createToolMaskingProcessor(
           directoryCreated = true;
         }
 
-        const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${randomUUID()}.txt`;
+        const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${deriveStableId([content])}.txt`;
         const filePath = path.join(toolOutputsDir, fileName);
 
         await fs.writeFile(filePath, content);
@@ -214,9 +214,10 @@ export function createToolMaskingProcessor(
                 functionCall: newFC,
               });
 
+              const newId = deriveStableId([node.id, 'masked']);
               returnedNodes.push({
                 ...node,
-                id: randomUUID(),
+                id: newId,
                 payload: maskedPart,
                 replacesId: node.id,
                 turnId: node.turnId,
@@ -242,9 +243,10 @@ export function createToolMaskingProcessor(
                 functionResponse: newFR,
               });
 
+              const newId = deriveStableId([node.id, 'masked']);
               returnedNodes.push({
                 ...node,
-                id: randomUUID(),
+                id: newId,
                 payload: maskedPart,
                 replacesId: node.id,
                 turnId: node.turnId,
