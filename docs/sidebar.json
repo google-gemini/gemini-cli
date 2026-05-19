@@ -262,6 +262,10 @@
         "items": [
           { "label": "FAQ", "slug": "docs/resources/faq" },
           {
+            "label": "Migrating to Antigravity CLI",
+            "slug": "docs/resources/migrating-to-antigravity-cli"
+          },
+          {
             "label": "Quota and pricing",
             "slug": "docs/resources/quota-and-pricing"
           },
