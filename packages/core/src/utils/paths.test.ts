@@ -811,6 +811,24 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath(cwd)).toBe(false);
     });
 
+    it('should not reject paths if the current working directory is the root directory', () => {
+      mockPlatform('linux');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('/');
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      process.cwd = originalCwd;
+    });
+
+    it('should not reject paths if the current working directory is a Windows root directory', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('C:\\');
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      process.cwd = originalCwd;
+      vi.unstubAllEnvs();
+    });
+
     it('should allow trusted paths on Windows', () => {
       mockPlatform('win32');
       vi.stubEnv('SystemRoot', 'C:\\Windows');
