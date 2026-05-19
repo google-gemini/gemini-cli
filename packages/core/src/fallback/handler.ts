@@ -28,13 +28,14 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
+  const failureKind = classifyFailureKind(error);
+
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
     chain,
     failedModel,
   );
 
-  const failureKind = classifyFailureKind(error);
   const availability = config.getModelAvailabilityService();
   const getAvailabilityContext = () => {
     if (!failedPolicy) return undefined;

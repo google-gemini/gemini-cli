@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import { ContextManager } from '../contextManager.js';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import type { Content } from '@google/genai';
@@ -13,6 +14,9 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import { StaticTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 
 export interface TurnSummary {
   turnIndex: number;
@@ -57,6 +61,11 @@ export class SimulationHarness {
       targetDir: mockTempDir,
       sessionId: 'sim-session',
     });
+
+    const behaviorRegistry = new NodeBehaviorRegistry();
+    registerBuiltInBehaviors(behaviorRegistry);
+    const calculator = new StaticTokenCalculator(1, behaviorRegistry);
+
     this.env = new ContextEnvironmentImpl(
       () => mockLlmClient,
       'sim-prompt',
@@ -66,6 +75,8 @@ export class SimulationHarness {
       this.tracer,
       1, // 1 char per token average for estimation (but estimator uses 0.33)
       this.eventBus,
+      calculator,
+      behaviorRegistry,
     );
 
     this.orchestrator = new PipelineOrchestrator(
@@ -81,13 +92,15 @@ export class SimulationHarness {
       this.tracer,
       this.orchestrator,
       this.chatHistory,
+      calculator,
     );
   }
 
   async simulateTurn(messages: Content[]) {
     // 1. Append the new messages
     const currentHistory = this.chatHistory.get();
-    this.chatHistory.set([...currentHistory, ...messages]);
+    const turns = messages.map((m) => ({ id: randomUUID(), content: m }));
+    this.chatHistory.set([...currentHistory, ...turns]);
 
     // 2. Measure tokens immediately after append
     const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
@@ -111,11 +124,12 @@ export class SimulationHarness {
   }
 
   async getGoldenState() {
-    const { history: finalProjection } =
+    const { history: finalProjection, baseUnits } =
       await this.contextManager.renderHistory();
     return {
       tokenTrajectory: this.tokenTrajectory,
       finalProjection,
+      baseUnits,
     };
   }
 }

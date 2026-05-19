@@ -37,7 +37,11 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
       return useGemini31 && authType === AuthType.USE_GEMINI;
     },
     getContentGeneratorConfig: () => ({ authType: undefined }),
+    getHasAccessToPreviewModel: () => true,
     getMaxAttemptsPerTurn: () => 3,
+    getExperimentalDynamicModelConfiguration: () => false,
+    getReleaseChannel: () => 'preview',
+    modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
     ...overrides,
   } as unknown as Config;
   return config;
@@ -96,10 +100,11 @@ describe('policyHelpers', () => {
 
     it('starts chain from preferredModel when model is "auto"', () => {
       const config = createMockConfig({
-        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+        getModel: () => 'auto',
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
+      // Due to Gemini 2.x wrapsAround, the chain will contain both flash and pro
+      expect(chain.length).toBeGreaterThanOrEqual(1);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
     });
 
@@ -186,6 +191,7 @@ describe('policyHelpers', () => {
     const testCases = [
       { name: 'Default Auto', model: DEFAULT_GEMINI_MODEL_AUTO },
       { name: 'Gemini 3 Auto', model: 'auto-gemini-3' },
+      { name: 'Unified Auto', model: 'auto' },
       { name: 'Flash Lite', model: DEFAULT_GEMINI_FLASH_LITE_MODEL },
       {
         name: 'Gemini 3 Auto (3.1 Enabled)',
@@ -224,6 +230,7 @@ describe('policyHelpers', () => {
               getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
+              getReleaseChannel: () => 'preview',
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
             });
 

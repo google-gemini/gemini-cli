@@ -19,6 +19,7 @@ import {
   deduplicateAbsolutePaths,
   toAbsolutePath,
   toPathKey,
+  isTrustedSystemPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -795,6 +796,63 @@ describe('normalizePath', () => {
 
       mockPlatform('linux');
       expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
+    });
+  });
+
+  describe('isTrustedSystemPath', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    });
+
+    it('should reject paths in the current working directory', () => {
+      const cwd = process.cwd();
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      expect(isTrustedSystemPath(cwd)).toBe(false);
+    });
+
+    it('should allow trusted paths on Windows', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+      vi.stubEnv('ProgramFiles(x86)', 'C:\\Program Files (x86)');
+
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      expect(isTrustedSystemPath('C:\\Program Files\\ripgrep\\rg.exe')).toBe(
+        true,
+      );
+      expect(
+        isTrustedSystemPath('C:\\Program Files (x86)\\ripgrep\\rg.exe'),
+      ).toBe(true);
+
+      // Case insensitive
+      expect(isTrustedSystemPath('c:\\windows\\system32\\rg.exe')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('D:\\Downloads\\rg.exe')).toBe(false);
+      expect(isTrustedSystemPath('C:\\Users\\User\\rg.exe')).toBe(false);
+    });
+
+    it('should allow trusted paths on macOS and Linux', () => {
+      mockPlatform('darwin');
+
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/usr/local/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/opt/homebrew/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath('/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath('/usr/local/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(isTrustedSystemPath('/usr/sbin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/sbin/rg')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('/home/user/bin/rg')).toBe(false);
+      expect(isTrustedSystemPath('/tmp/rg')).toBe(false);
+      expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
   });
 });

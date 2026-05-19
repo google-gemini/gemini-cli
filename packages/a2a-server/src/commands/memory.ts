@@ -5,7 +5,6 @@
  */
 
 import {
-  addMemory,
   listMemoryFiles,
   refreshMemory,
   showMemory,
@@ -15,13 +14,6 @@ import type {
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
-import type { AgentLoopContext } from '@google/gemini-cli-core';
-
-const DEFAULT_SANITIZATION_CONFIG = {
-  allowedEnvironmentVariables: [],
-  blockedEnvironmentVariables: [],
-  enableEnvironmentVariableRedaction: false,
-};
 
 export class MemoryCommand implements Command {
   readonly name = 'memory';
@@ -30,7 +22,6 @@ export class MemoryCommand implements Command {
     new ShowMemoryCommand(),
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
-    new AddMemoryCommand(),
   ];
   readonly topLevel = true;
   readonly requiresWorkspace = true;
@@ -79,45 +70,5 @@ export class ListMemoryCommand implements Command {
   ): Promise<CommandExecutionResponse> {
     const result = listMemoryFiles(context.config);
     return { name: this.name, data: result.content };
-  }
-}
-
-export class AddMemoryCommand implements Command {
-  readonly name = 'memory add';
-  readonly description = 'Add content to the memory.';
-
-  async execute(
-    context: CommandContext,
-    args: string[],
-  ): Promise<CommandExecutionResponse> {
-    const textToAdd = args.join(' ').trim();
-    const result = addMemory(textToAdd);
-    if (result.type === 'message') {
-      return { name: this.name, data: result.content };
-    }
-
-    const loopContext: AgentLoopContext = context.config;
-    const toolRegistry = loopContext.toolRegistry;
-    const tool = toolRegistry.getTool(result.toolName);
-    if (tool) {
-      const abortController = new AbortController();
-      const abortSignal = abortController.signal;
-      await tool.buildAndExecute(result.toolArgs, abortSignal, undefined, {
-        shellExecutionConfig: {
-          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          sandboxManager: loopContext.sandboxManager,
-        },
-      });
-      await refreshMemory(context.config);
-      return {
-        name: this.name,
-        data: `Added memory: "${textToAdd}"`,
-      };
-    } else {
-      return {
-        name: this.name,
-        data: `Error: Tool ${result.toolName} not found.`,
-      };
-    }
   }
 }
