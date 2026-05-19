@@ -536,8 +536,8 @@ export function isTrustedSystemPath(filePath: string): boolean {
 
   const normCwd = normalizePath(process.cwd());
   const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
-  if (!isRoot && !isHermeticEnv && isSubpath(normCwd, normPath)) {
-    return false;
+  if (!isRoot && isSubpath(normCwd, normPath)) {
+    return isHermeticEnv;
   }
 
   // 2. Allow standard system directories

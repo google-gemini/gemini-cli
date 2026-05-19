@@ -872,5 +872,53 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/tmp/rg')).toBe(false);
       expect(isTrustedSystemPath('/Library/rg')).toBe(false);
     });
+
+    it('should allow 1P internal hermetic execution paths', () => {
+      mockPlatform('linux');
+
+      expect(isTrustedSystemPath('/google/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/bazel-out/k8-fastbuild/bin/rg',
+        ),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/blaze-out/k8-opt/bin/rg',
+        ),
+      ).toBe(true);
+    });
+
+    it('should bypass CWD rejection in secure hermetic environments', () => {
+      mockPlatform('linux');
+      const originalCwd = process.cwd;
+      const cwd = '/sandbox';
+      process.cwd = vi.fn().mockReturnValue(cwd);
+
+      // Standard CWD rejection
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+
+      // Bypass with TEST_SRCDIR
+      vi.stubEnv('TEST_SRCDIR', '/mock/runfiles');
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      vi.unstubAllEnvs();
+
+      // Bypass with BAZEL_TEST
+      vi.stubEnv('BAZEL_TEST', '1');
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      vi.unstubAllEnvs();
+
+      // Bypass with TEST_WORKSPACE
+      vi.stubEnv('TEST_WORKSPACE', 'my_workspace');
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      vi.unstubAllEnvs();
+
+      // Bypass with RUNFILES_DIR
+      vi.stubEnv('RUNFILES_DIR', '/mock/runfiles');
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      vi.unstubAllEnvs();
+
+      process.cwd = originalCwd;
+    });
   });
 });
