@@ -287,7 +287,6 @@ export class GeminiChat {
     messages?: MessageRecord[],
   ) {
     validateHistory(history);
-<<<<<<< HEAD
 
     let initialHistory: HistoryTurn[];
     // If history is passed, it is the most up-to-date in-memory state and takes precedence.
@@ -316,11 +315,8 @@ export class GeminiChat {
       initialHistory = [];
     }
 
-    this.agentHistory = new AgentChatHistory(initialHistory);
-=======
     this.initialMessages = messages;
-    this.agentHistory = new AgentChatHistory(history);
->>>>>>> a9648de39 (feat: foundation for subagent trajectories (Stage 1))
+    this.agentHistory = new AgentChatHistory(initialHistory);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.content.parts || []),
@@ -338,27 +334,26 @@ export class GeminiChat {
   ) {
     const messagesToUse = messages ?? this.initialMessages;
     await this.chatRecordingService.initialize(resumedSessionData, kind);
-<<<<<<< HEAD
+
+    if (messagesToUse) {
+      this.chatRecordingService.resetMessages(messagesToUse);
+    }
+
     // Sync initial history with the recorder to ensure all turns (even bootstrapped ones)
     // are durable and coordinated.
     this.chatRecordingService.updateMessagesFromHistory(
       this.agentHistory.get(),
     );
-=======
-    if (messagesToUse) {
-      this.chatRecordingService.resetMessages(messagesToUse);
-    }
->>>>>>> a9648de39 (feat: foundation for subagent trajectories (Stage 1))
   }
 
   setSystemInstruction(sysInstr: string) {
     this.systemInstruction = sysInstr;
   }
 
-<<<<<<< HEAD
   getSystemInstruction(): string {
     return this.systemInstruction;
-=======
+  }
+
   getConversation(): ConversationRecord | null {
     return this.chatRecordingService.getConversation();
   }
@@ -369,7 +364,6 @@ export class GeminiChat {
 
   async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
     return this.chatRecordingService.getSubagentTrajectories();
->>>>>>> a9648de39 (feat: foundation for subagent trajectories (Stage 1))
   }
 
   /**
