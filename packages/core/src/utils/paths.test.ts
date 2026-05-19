@@ -889,36 +889,33 @@ describe('normalizePath', () => {
       ).toBe(true);
     });
 
-    it('should bypass CWD rejection in secure hermetic environments', () => {
-      mockPlatform('linux');
+    describe('in secure hermetic environments', () => {
       const originalCwd = process.cwd;
       const cwd = '/sandbox';
-      process.cwd = vi.fn().mockReturnValue(cwd);
 
-      // Standard CWD rejection
-      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      beforeEach(() => {
+        mockPlatform('linux');
+        process.cwd = vi.fn().mockReturnValue(cwd);
+      });
 
-      // Bypass with TEST_SRCDIR
-      vi.stubEnv('TEST_SRCDIR', '/mock/runfiles');
-      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
-      vi.unstubAllEnvs();
+      afterEach(() => {
+        process.cwd = originalCwd;
+        vi.unstubAllEnvs();
+      });
 
-      // Bypass with BAZEL_TEST
-      vi.stubEnv('BAZEL_TEST', '1');
-      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
-      vi.unstubAllEnvs();
+      it('should reject paths in the CWD by default', () => {
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      });
 
-      // Bypass with TEST_WORKSPACE
-      vi.stubEnv('TEST_WORKSPACE', 'my_workspace');
-      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
-      vi.unstubAllEnvs();
-
-      // Bypass with RUNFILES_DIR
-      vi.stubEnv('RUNFILES_DIR', '/mock/runfiles');
-      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
-      vi.unstubAllEnvs();
-
-      process.cwd = originalCwd;
+      it.each([
+        ['TEST_SRCDIR', '/mock/runfiles'],
+        ['BAZEL_TEST', '1'],
+        ['TEST_WORKSPACE', 'my_workspace'],
+        ['RUNFILES_DIR', '/mock/runfiles'],
+      ])('should bypass CWD rejection when %s is set', (envVar, value) => {
+        vi.stubEnv(envVar, value);
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      });
     });
   });
 });
