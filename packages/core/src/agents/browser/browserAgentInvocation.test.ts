@@ -458,7 +458,7 @@ describe('BrowserAgentInvocation', () => {
         isSubagentActivityEvent: true,
         agentName: 'browser_agent',
         type: 'TOOL_CALL_END',
-        data: { name: 'navigate_browser', id: 'call-1' },
+        data: { name: 'navigate_browser', callId: 'call-1' },
       });
 
       await executePromise;

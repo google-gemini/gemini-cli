@@ -217,8 +217,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             break;
           }
           case 'TOOL_CALL_END': {
-            const callId = activity.data['id']
-              ? String(activity.data['id'])
+            const callId = activity.data['callId']
+              ? String(activity.data['callId'])
               : undefined;
             const data = activity.data['data'];
             const isError = isToolActivityError(data);

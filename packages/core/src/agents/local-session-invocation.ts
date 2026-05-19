@@ -182,8 +182,8 @@ export class LocalSessionInvocation extends BaseToolInvocation<
           const data = activity.data['data'];
           const isError = isToolActivityError(data);
 
-          const callId = activity.data['id']
-            ? String(activity.data['id'])
+          const callId = activity.data['callId']
+            ? String(activity.data['callId'])
             : undefined;
 
           if (callId) {
