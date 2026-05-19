@@ -326,12 +326,19 @@ async function resolveFilePaths(
             ) {
               const lines = globResult.llmContent.split('\n');
               if (lines.length > 1 && lines[1]) {
-                const firstMatchAbsolute = lines[1].trim();
+                const rawMatch = lines[1].trim();
+                let firstMatchAbsolute: string;
+                try {
+                  firstMatchAbsolute = resolveToRealPath(rawMatch);
+                } catch {
+                  firstMatchAbsolute = rawMatch;
+                }
                 const pathSpec = path.relative(dir, firstMatchAbsolute);
                 resolvedFiles.push({
                   part,
                   pathSpec,
                   displayLabel: path.isAbsolute(pathName) ? pathSpec : pathName,
+                  absolutePath: firstMatchAbsolute,
                 });
                 onDebugMessage(
                   `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
