@@ -74,6 +74,12 @@ let MOCK_CONTEXT: McpContext = MOCK_CONTEXT_DEFAULT;
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
+vi.mock('undici', () => ({
+  EnvHttpProxyAgent: vi.fn(),
+  fetch: vi.fn(),
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+}));
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
@@ -1779,6 +1785,29 @@ describe('mcp-client', () => {
   });
 
   describe('createTransport', () => {
+    it('should create an HTTP transport that respects NO_PROXY', async () => {
+      const { createTransport } = await import('./mcp-client.js');
+      const { EnvHttpProxyAgent } = await import('undici');
+      const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      await createTransport(
+        'test-server',
+        {
+          url: 'http://test-server',
+          type: 'http',
+        },
+        false,
+        MOCK_CONTEXT,
+      );
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: noProxyValue,
+        }),
+      );
+    });
+
     describe('should connect via httpUrl', () => {
       it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
         const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
