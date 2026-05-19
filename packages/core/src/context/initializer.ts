@@ -24,6 +24,7 @@ import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnap
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { AdaptiveTokenCalculator } from './utils/adaptiveTokenCalculator.js';
+import { estimateContextBreakdown } from '../core/loggingContentGenerator.js';
 import { NodeBehaviorRegistry } from './graph/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from './graph/builtinBehaviors.js';
 
@@ -92,10 +93,26 @@ export async function initializeContextManager(
   const behaviorRegistry = new NodeBehaviorRegistry();
   registerBuiltInBehaviors(behaviorRegistry);
 
+  const getOverheadTokens = () => {
+    const breakdown = estimateContextBreakdown([], {
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: chat.getSystemInstruction() }],
+      },
+      tools: chat.getTools(),
+    });
+    return (
+      breakdown.system_instructions +
+      breakdown.tool_definitions +
+      breakdown.mcp_servers
+    );
+  };
+
   const calculator = new AdaptiveTokenCalculator(
     charsPerToken,
     behaviorRegistry,
     eventBus,
+    getOverheadTokens,
   );
 
   const env = new ContextEnvironmentImpl(
