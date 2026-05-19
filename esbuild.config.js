@@ -63,7 +63,6 @@ const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
   '@github/keytar',
-  '@google/gemini-cli-devtools',
 ];
 
 const baseConfig = {
@@ -109,6 +108,10 @@ const cliConfig = {
     'http-proxy-agent': path.resolve(
       __dirname,
       'packages/cli/src/patches/http-proxy-agent.ts',
+    ),
+    '@google/gemini-cli-devtools': path.resolve(
+      __dirname,
+      'packages/devtools/dist/src/index.js',
     ),
     ...commonAliases,
   },
