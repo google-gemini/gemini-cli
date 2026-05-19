@@ -422,10 +422,12 @@ export class ShellExecutionService {
     // hangup signals sent by PTY environments (WSL2, Kitty, Alacritty) when
     // they detect a detached session. `trap '' HUP` sets SIG_IGN which is
     // inherited across exec(), matching the behaviour of the `nohup` command.
-    // Windows/PowerShell paths are unaffected by the isWindows guard.
-    const hupGuardedCommand = isWindows
-      ? guardedCommand
-      : `trap '' HUP; ${guardedCommand}`;
+    // Explicitly guarded on shell === 'bash' (mirrors ensurePromptvarsDisabled)
+    // so future non-bash Unix shell support is not silently broken.
+    const hupGuardedCommand =
+      !isWindows && shell === 'bash'
+        ? `trap '' HUP; ${guardedCommand}`
+        : guardedCommand;
     const spawnArgs = [...argsPrefix, hupGuardedCommand];
 
     // 2. Prepare Environment
