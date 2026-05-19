@@ -164,7 +164,7 @@ function tryExtractPath(noisyString: string): string | null {
     }
 
     // Also strip trailing common punctuation like comma, semicolon, period if not part of a wrapper
-    segmentToClean = segmentToClean.replace(/[,;!.]$/, '');
+    segmentToClean = segmentToClean.replace(/[,;!.]+$/, '');
 
     if (segmentToClean.length === 0) continue;
 

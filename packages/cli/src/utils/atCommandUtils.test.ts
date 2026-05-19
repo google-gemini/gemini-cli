@@ -336,6 +336,17 @@ describe('atCommandUtils', () => {
       expect(result.status).toBe('resolved');
     });
 
+    it('should handle multiple trailing punctuation marks like file.txt...', async () => {
+      const result = await resolveAtCommandPath(
+        `FAIL ${mockFile}...`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+      }
+    });
+
     it('should handle nested wrappers like ("path/to/file.ts")', async () => {
       const result = await resolveAtCommandPath(
         `FAIL ("${mockFile}")`,
