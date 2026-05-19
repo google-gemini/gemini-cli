@@ -113,10 +113,10 @@ describe('atCommandUtils', () => {
     expect(result.status).toBe('invalid');
   });
 
-  it('should return invalid for path with log markers', async () => {
+  it('should return invalid for path with log markers (and no valid subpath)', async () => {
     const onDebug = vi.fn();
     const result = await resolveAtCommandPath(
-      'FAIL tests/my.test.ts',
+      'FAIL AssertionError: expected true to be false',
       mockConfig as unknown as Config,
       onDebug,
     );
@@ -243,6 +243,35 @@ describe('atCommandUtils', () => {
     if (result.status === 'resolved') {
       expect(result.resolved.absolutePath).toBe(absFile);
       expect(result.resolved.relativePath).toBe(relFile);
+    }
+  });
+
+  it('should extract and resolve a buried path from a log fragment', async () => {
+    const buriedFile = 'src/utils/math.ts';
+    const logFragment = `FAIL ${buriedFile}:42:1 (AssertionError)`;
+
+    const mockStats = {
+      isDirectory: () => false,
+      isFile: () => true,
+    };
+    vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+      if (p === path.resolve('/mock/root', buriedFile)) {
+        return mockStats as unknown as Stats;
+      }
+      throw new Error('ENOENT');
+    });
+
+    const result = await resolveAtCommandPath(
+      logFragment,
+      mockConfig as unknown as Config,
+    );
+
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(
+        path.resolve('/mock/root', buriedFile),
+      );
+      expect(result.resolved.relativePath).toBe(buriedFile);
     }
   });
 
