@@ -1311,7 +1311,7 @@ describe('ShellExecutionService child_process fallback', () => {
           '-c',
           'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
         ],
-        expect.objectContaining({ shell: false, detached: true }),
+        expect.objectContaining({ shell: false, detached: false }),
       );
       expect(result.exitCode).toBe(0);
       expect(result.signal).toBeNull();
@@ -1657,7 +1657,7 @@ describe('ShellExecutionService child_process fallback', () => {
       );
     });
 
-    it('should use bash and detached process group on Linux', async () => {
+    it('should use bash on Linux without detaching (fixes SIGHUP on WSL2/Kitty/Alacritty)', async () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
@@ -1672,7 +1672,7 @@ describe('ShellExecutionService child_process fallback', () => {
         ],
         expect.objectContaining({
           shell: false,
-          detached: true,
+          detached: false,
         }),
       );
     });

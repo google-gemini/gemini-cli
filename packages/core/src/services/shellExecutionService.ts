@@ -531,18 +531,18 @@ export class ShellExecutionService {
         cwd: finalCwd,
       } = prepared;
 
-      // Bun's child_process does not properly call setsid() for detached
-      // processes, leaving children in the parent's session without a
-      // controlling terminal. They receive SIGHUP immediately. Disable
-      // detached mode in Bun; killProcessGroup already falls back to
-      // direct-pid kill when the group kill fails.
-      const isBun = 'bun' in process.versions;
+      // Do not detach the child process. Using detached:true would call
+      // setsid(), creating a new session with no controlling terminal.
+      // PTY-based environments (WSL2, Kitty, Alacritty) send SIGHUP to
+      // orphaned process groups, immediately killing every spawned command.
+      // killProcessGroup handles cleanup via pgrep tree-walk + per-PID kills
+      // and does not require the child to be a process group leader.
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
-        detached: !isWindows && !isBun,
+        detached: false,
         env: finalEnv,
       });
 
