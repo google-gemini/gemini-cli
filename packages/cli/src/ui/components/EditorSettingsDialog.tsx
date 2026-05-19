@@ -126,9 +126,7 @@ export function EditorSettingsDialog({
     isEditorAvailable(settings.merged.general.preferredEditor)
   ) {
     mergedEditorName =
-      EDITOR_DISPLAY_NAMES[
-        settings.merged.general.preferredEditor
-      ];
+      EDITOR_DISPLAY_NAMES[settings.merged.general.preferredEditor];
   }
 
   return (
