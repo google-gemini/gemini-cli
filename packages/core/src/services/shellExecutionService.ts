@@ -13,7 +13,6 @@ import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
-import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
@@ -620,14 +619,8 @@ export class ShellExecutionService {
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
-          const encoding = getCachedEncodingForBuffer(data);
-          try {
-            stdoutDecoder = new TextDecoder(encoding);
-            stderrDecoder = new TextDecoder(encoding);
-          } catch {
-            stdoutDecoder = new TextDecoder('utf-8');
-            stderrDecoder = new TextDecoder('utf-8');
-          }
+          stdoutDecoder = new TextDecoder('utf-8');
+          stderrDecoder = new TextDecoder('utf-8');
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -1115,12 +1108,7 @@ export class ShellExecutionService {
           () =>
             new Promise<void>((resolveChunk) => {
               if (!decoder) {
-                const encoding = getCachedEncodingForBuffer(data);
-                try {
-                  decoder = new TextDecoder(encoding);
-                } catch {
-                  decoder = new TextDecoder('utf-8');
-                }
+                decoder = new TextDecoder('utf-8');
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {

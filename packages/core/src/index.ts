@@ -103,7 +103,6 @@ export {
 export * from './utils/tool-utils.js';
 export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
-export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';

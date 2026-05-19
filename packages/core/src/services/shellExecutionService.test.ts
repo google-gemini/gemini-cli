@@ -120,10 +120,6 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
-vi.mock('../utils/systemEncoding.js', () => ({
-  getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
-}));
-
 const mockProcessKill = vi
   .spyOn(process, 'kill')
   .mockImplementation(() => true);
