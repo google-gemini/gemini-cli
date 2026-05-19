@@ -1208,7 +1208,7 @@ export class GeminiChat {
 
         if (hookResult.blocked) {
           throw new AgentExecutionBlockedError(
-            hookResult.reason || 'Agent execution blocked by hook',
+            hookResult.reason || 'Model call blocked by hook',
             hookResult.response,
           );
         }
