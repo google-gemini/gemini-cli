@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const MAX_TRAVERSAL_DEPTH = 32;
 
@@ -37,9 +38,13 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
     const powershellCommand =
       'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress';
     // Increase maxBuffer to handle large process lists (default is 1MB)
-    const { stdout } = await execAsync(`powershell "${powershellCommand}"`, {
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', powershellCommand],
+      {
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
 
     if (!stdout.trim()) {
       return processMap;

@@ -71,9 +71,15 @@ describe('getIdeProcessInfo', () => {
         command: 'C:\\Program Files\\VSCode\\Code.exe',
       });
       expect(mockedExec).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine',
-        ),
+        'powershell.exe',
+        expect.arrayContaining([
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          expect.stringContaining(
+            'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine',
+          ),
+        ]),
         expect.anything(),
       );
     });
@@ -142,9 +148,37 @@ describe('getIdeProcessInfo', () => {
       const result = await getIdeProcessInfo();
       expect(result).toEqual({ pid: 900, command: 'powershell.exe' });
       expect(mockedExec).toHaveBeenCalledWith(
-        expect.stringContaining('Get-CimInstance Win32_Process'),
+        'powershell.exe',
+        expect.arrayContaining([
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          expect.stringContaining('Get-CimInstance Win32_Process'),
+        ]),
         expect.anything(),
       );
+    });
+
+    it('should invoke powershell.exe with -NoProfile -NonInteractive flags', async () => {
+      (os.platform as Mock).mockReturnValue('win32');
+      const processes = [
+        {
+          ProcessId: 1000,
+          ParentProcessId: 0,
+          Name: 'node.exe',
+          CommandLine: 'node.exe',
+        },
+      ];
+      mockedExec.mockResolvedValueOnce({ stdout: JSON.stringify(processes) });
+
+      await getIdeProcessInfo();
+
+      expect(mockedExec).toHaveBeenCalledTimes(1);
+      const [program, args] = mockedExec.mock.calls[0];
+      expect(program).toBe('powershell.exe');
+      expect(args).toContain('-NoProfile');
+      expect(args).toContain('-NonInteractive');
+      expect(args).toContain('-Command');
     });
 
     it('should handle short process chains', async () => {
