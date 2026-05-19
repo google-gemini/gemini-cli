@@ -10,14 +10,6 @@ import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
 import { wasmLoader } from 'esbuild-plugin-wasm';
 
-let esbuild;
-try {
-  esbuild = (await import('esbuild')).default;
-} catch {
-  console.error('esbuild not available - cannot build bundle');
-  process.exit(1);
-}
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
@@ -145,15 +137,38 @@ const a2aServerConfig = {
   alias: commonAliases,
 };
 
-Promise.allSettled([
-  esbuild.build(cliConfig).then(({ metafile }) => {
-    if (process.env.DEV === 'true') {
-      writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
-    }
-  }),
-  esbuild.build(workerConfig),
-  esbuild.build(a2aServerConfig),
-]).then((results) => {
+export {
+  external,
+  baseConfig,
+  commonAliases,
+  cliConfig,
+  workerConfig,
+  a2aServerConfig,
+  createWasmPlugins,
+};
+
+async function main() {
+  let esbuild;
+  try {
+    esbuild = (await import('esbuild')).default;
+  } catch {
+    console.error('esbuild not available - cannot build bundle');
+    process.exit(1);
+  }
+
+  const results = await Promise.allSettled([
+    esbuild.build(cliConfig).then(({ metafile }) => {
+      if (process.env.DEV === 'true') {
+        writeFileSync(
+          './bundle/esbuild.json',
+          JSON.stringify(metafile, null, 2),
+        );
+      }
+    }),
+    esbuild.build(workerConfig),
+    esbuild.build(a2aServerConfig),
+  ]);
+
   const [cliResult, workerResult, a2aResult] = results;
   if (cliResult.status === 'rejected') {
     console.error('gemini.js build failed:', cliResult.reason);
@@ -167,4 +182,11 @@ Promise.allSettled([
   if (a2aResult.status === 'rejected') {
     console.warn('a2a-server build failed:', a2aResult.reason);
   }
-});
+}
+
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+) {
+  await main();
+}
