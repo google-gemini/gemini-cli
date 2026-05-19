@@ -1657,7 +1657,7 @@ describe('ShellExecutionService child_process fallback', () => {
       );
     });
 
-    it('should use bash on Linux without detaching (fixes SIGHUP on WSL2/Kitty/Alacritty)', async () => {
+    it('should use bash and detached process group on Linux (fixes SIGHUP on WSL2/Kitty/Alacritty)', async () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
