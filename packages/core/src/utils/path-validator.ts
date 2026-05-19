@@ -39,15 +39,15 @@ export function validatePath(pathStr: string): PathValidationResult {
     };
   }
 
-  // Check for common log/error patterns that are definitely not paths
-  // We use anchored regex to ensure we only block if these appear at the start,
-  // which is typical for misinterpreted log lines.
+  // Check for common log/error patterns that are definitely not paths.
+  // We check for these at the start of the string OR at the start of any path component.
+  // This ensures we catch them in both raw model output and resolved absolute paths.
   const logMarkerRegexes = [
-    /^AssertionError:/,
-    /^FAIL /,
-    /^✓ /,
-    /^× /,
-    /^TestingLibraryElementError:/,
+    /(^|[/\\])AssertionError:/,
+    /(^|[/\\])FAIL /,
+    /(^|[/\\])✓ /,
+    /(^|[/\\])× /,
+    /(^|[/\\])TestingLibraryElementError:/,
   ];
   for (const regex of logMarkerRegexes) {
     if (regex.test(pathStr)) {
