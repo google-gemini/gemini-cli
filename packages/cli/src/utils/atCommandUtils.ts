@@ -142,11 +142,39 @@ function tryExtractPath(noisyString: string): string | null {
 
   for (const segment of segments) {
     // 1. Strip leading/trailing punctuation and quotes commonly found in logs
+    // We handle nested wrappers like ("path/to/file.txt")
+    let segmentToClean = segment;
+    const wrapperPairs: Record<string, string> = {
+      '(': ')',
+      '[': ']',
+      '{': '}',
+      '"': '"',
+      "'": "'",
+    };
+
+    let wasStripped = true;
+    while (wasStripped && segmentToClean.length > 1) {
+      wasStripped = false;
+      const firstChar = segmentToClean[0];
+      const lastChar = segmentToClean[segmentToClean.length - 1];
+      if (wrapperPairs[firstChar] === lastChar) {
+        segmentToClean = segmentToClean.slice(1, -1);
+        wasStripped = true;
+      }
+    }
+
+    // Also strip trailing common punctuation like comma, semicolon, period if not part of a wrapper
+    segmentToClean = segmentToClean.replace(/[,;!.]$/, '');
+
+    if (segmentToClean.length === 0) continue;
+
     // 2. Strip trailing line/column numbers (e.g. src/main.ts:10:5)
-    const cleanSegment = segment
-      .replace(/^[(),;[\]"']/, '')
-      .replace(/[(),;[\]"']$/, '')
-      .replace(/:\d+(?::\d+)?$/, '');
+    // We use a non-greedy match for the path part
+    const lineMatch = segmentToClean.match(/^(.+?):(\d+)(?::\d+)?$/);
+    const pathOnly = lineMatch ? lineMatch[1] : segmentToClean;
+
+    // 3. Sanitize extracted path to prevent path traversal and null byte injection
+    const cleanSegment = pathOnly.replace(/\0/g, '').replace(/\.\./g, '');
 
     if (cleanSegment.length === 0) continue;
 

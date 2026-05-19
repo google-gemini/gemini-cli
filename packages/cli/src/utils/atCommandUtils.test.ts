@@ -336,6 +336,38 @@ describe('atCommandUtils', () => {
       expect(result.status).toBe('resolved');
     });
 
+    it('should handle nested wrappers like ("path/to/file.ts")', async () => {
+      const result = await resolveAtCommandPath(
+        `FAIL ("${mockFile}")`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+      }
+    });
+
+    it('should sanitize paths against traversal (..)', async () => {
+      const traversalPath = 'src/../../etc/passwd';
+      const result = await resolveAtCommandPath(
+        `FAIL ${traversalPath}`,
+        mockConfig as unknown as Config,
+      );
+      // '..' should be stripped, resulting in 'src/etc/passwd' (which doesn't exist in our mock)
+      expect(result.status).toBe('not_found');
+    });
+
+    it('should sanitize paths against null bytes', async () => {
+      const nullBytePath = 'src/index.ts\0.exe';
+      const result = await resolveAtCommandPath(
+        `FAIL ${nullBytePath}`,
+        mockConfig as unknown as Config,
+      );
+      // Null byte and following should be stripped/handled.
+      // Our implementation strips \0, so it becomes 'src/index.ts.exe'
+      expect(result.status).toBe('not_found');
+    });
+
     it('should handle paths with slashes and extensions correctly', async () => {
       const complexPath = 'packages/core/src/utils/deep.test.ts';
       const absComplexPath = path.resolve('/mock/root', complexPath);
@@ -364,7 +396,9 @@ describe('atCommandUtils', () => {
 
     it('should return unauthorized if the extracted path is not authorized', async () => {
       const secretFile = '/etc/passwd';
-      (mockConfig['validatePathAccess'] as Mock).mockImplementation((p) => p === secretFile ? 'Unauthorized' : null);
+      (mockConfig['validatePathAccess'] as Mock).mockImplementation((p) =>
+        p === secretFile ? 'Unauthorized' : null,
+      );
       vi.mocked(fsPromises.stat).mockResolvedValue(
         mockStats as unknown as Stats,
       );
