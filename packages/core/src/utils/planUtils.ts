@@ -22,14 +22,6 @@ export const PlanErrorMessages = {
   READ_FAILURE: (detail: string) => `Failed to read plan file: ${detail}`,
 } as const;
 
-/**
- * Resolves a plan file path and strictly validates it against the plans directory boundary.
- * Useful for tools that need to write or read plans.
- * @param planPath The untrusted file path provided by the model.
- * @param plansDir The authorized project plans directory.
- * @returns The safely resolved path string.
- * @throws Error if the path is empty, malicious, or escapes boundaries.
- */
 export function resolveAndValidatePlanPath(
   planPath: string,
   plansDir: string,
@@ -40,38 +32,59 @@ export function resolveAndValidatePlanPath(
     throw new Error('Plan file path must be non-empty.');
   }
 
-  // 1. Handle case where agent provided an absolute path
-  if (path.isAbsolute(trimmedPath)) {
-    if (
-      isSubpath(resolveToRealPath(plansDir), resolveToRealPath(trimmedPath))
-    ) {
-      return trimmedPath;
+  const realPlansDir = resolveToRealPath(plansDir);
+  const plansDirName = path.basename(plansDir);
+
+  let normalizedPlanPath = trimmedPath;
+  if (!path.isAbsolute(trimmedPath)) {
+    const segments = trimmedPath.split(/[\\/]+/);
+    if (segments.length > 1 && segments[0] === plansDirName) {
+      normalizedPlanPath = segments.slice(1).join(path.sep);
     }
   }
 
-  // 2. Handle case where agent provided a path relative to the project root
-  const resolvedFromProjectRoot = path.resolve(projectRoot, trimmedPath);
-  if (
-    isSubpath(
-      resolveToRealPath(plansDir),
-      resolveToRealPath(resolvedFromProjectRoot),
-    )
-  ) {
-    return resolvedFromProjectRoot;
+  // 1. Handle case where agent provided an absolute path
+  if (path.isAbsolute(normalizedPlanPath)) {
+    try {
+      const realResolved = resolveToRealPath(normalizedPlanPath);
+      if (isSubpath(realPlansDir, realResolved)) {
+        return normalizedPlanPath;
+      }
+    } catch {
+      // Fall through if resolveToRealPath fails
+    }
   }
 
-  // 3. Handle default case where agent provided a path relative to the plans directory
-  const resolvedPath = path.resolve(plansDir, trimmedPath);
-  const realPath = resolveToRealPath(resolvedPath);
-  const realPlansDir = resolveToRealPath(plansDir);
-
-  if (!isSubpath(realPlansDir, realPath)) {
-    throw new Error(
-      PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir),
-    );
+  // 2. Try resolving relative to project root
+  const resolvedFromProjectRoot = path.resolve(projectRoot, normalizedPlanPath);
+  try {
+    const realResolved = resolveToRealPath(resolvedFromProjectRoot);
+    if (isSubpath(realPlansDir, realResolved)) {
+      return resolvedFromProjectRoot;
+    }
+  } catch {
+    const directResolved = path.resolve(resolvedFromProjectRoot);
+    if (isSubpath(realPlansDir, directResolved)) {
+      return resolvedFromProjectRoot;
+    }
   }
 
-  return resolvedPath;
+  // 3. Try resolving relative to plansDir
+  const resolvedFromPlansDir = path.resolve(plansDir, normalizedPlanPath);
+  try {
+    const realResolved = resolveToRealPath(resolvedFromPlansDir);
+    if (isSubpath(realPlansDir, realResolved)) {
+      return resolvedFromPlansDir;
+    }
+  } catch {
+    const directResolved = path.resolve(resolvedFromPlansDir);
+    if (isSubpath(realPlansDir, directResolved)) {
+      return resolvedFromPlansDir;
+    }
+  }
+
+  // Fallback boundary check: if still not a subpath, throw PATH_ACCESS_DENIED
+  throw new Error(PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir));
 }
 
 /**

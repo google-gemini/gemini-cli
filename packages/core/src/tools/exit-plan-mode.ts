@@ -227,7 +227,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
       return {
         llmContent: `${exitMessage}
-
+ 
 The approved implementation plan is stored at: ${resolvedPlanPath}
 Read and follow the plan strictly during implementation.`,
         returnDisplay: `Plan approved: ${resolvedPlanPath}`,
@@ -237,7 +237,7 @@ Read and follow the plan strictly during implementation.`,
       if (feedback) {
         return {
           llmContent: `Plan rejected. User feedback: ${feedback}
-
+ 
 The plan is stored at: ${resolvedPlanPath}
 Revise the plan based on the feedback.`,
           returnDisplay: `Feedback: ${feedback}`,
@@ -245,7 +245,7 @@ Revise the plan based on the feedback.`,
       } else {
         return {
           llmContent: `Plan rejected. No feedback provided.
-
+ 
 The plan is stored at: ${resolvedPlanPath}
 Ask the user for specific feedback on how to improve the plan.`,
           returnDisplay: 'Rejected (no feedback)',

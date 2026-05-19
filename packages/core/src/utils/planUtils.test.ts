@@ -8,7 +8,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import os from 'node:os';
-import { validatePlanPath, validatePlanContent } from './planUtils.js';
+import {
+  validatePlanPath,
+  validatePlanContent,
+  resolvePlanPath,
+} from './planUtils.js';
 
 describe('planUtils', () => {
   let tempRootDir: string;
@@ -62,6 +66,55 @@ describe('planUtils', () => {
         tempRootDir,
       );
       expect(result).toContain('Access denied');
+    });
+
+    it('should validate a nested path within the plans directory', async () => {
+      const nestedDir = path.join(plansDir, 'tracks', 'fibsqrt_20260519');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      const planPath = path.join('tracks', 'fibsqrt_20260519', 'spec.md');
+      const fullPath = path.join(plansDir, planPath);
+      fs.writeFileSync(fullPath, '# Nested Spec');
+
+      const result = await validatePlanPath(planPath, plansDir, tempRootDir);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('resolvePlanPath', () => {
+    it('should resolve simple filenames relative to plansDir', () => {
+      const result = resolvePlanPath(
+        'implementation_plan.md',
+        plansDir,
+        tempRootDir,
+      );
+      expect(result).toBe(path.join(plansDir, 'implementation_plan.md'));
+    });
+
+    it('should preserve subdirectories if already inside plansDir', () => {
+      const planPath = path.join(
+        'plans',
+        'tracks',
+        'fibsqrt_20260519',
+        'spec.md',
+      );
+      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
+      expect(result).toBe(
+        path.join(plansDir, 'tracks', 'fibsqrt_20260519', 'spec.md'),
+      );
+    });
+
+    it('should resolve paths relative to plansDir if they contain subdirectories', () => {
+      const planPath = path.join('tracks', 'fibsqrt_20260519', 'spec.md');
+      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
+      expect(result).toBe(
+        path.join(plansDir, 'tracks', 'fibsqrt_20260519', 'spec.md'),
+      );
+    });
+
+    it('should fallback to safe basename when escaping', () => {
+      const planPath = '../../escaped.md';
+      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
+      expect(result).toBe(path.join(plansDir, 'escaped.md'));
     });
   });
 

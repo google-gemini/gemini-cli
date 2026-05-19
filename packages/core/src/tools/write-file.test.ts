@@ -110,6 +110,7 @@ const mockConfigInternal = {
   getActiveModel: () => 'test-model',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
   },
 };
 
@@ -148,6 +149,7 @@ describe('WriteFileTool', () => {
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      getPlansDir: vi.fn().mockReturnValue(plansDir),
     };
 
     mockConfig = {
@@ -1144,6 +1146,36 @@ describe('WriteFileTool', () => {
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
       expect(fs.existsSync(expectedWritePath)).toBe(true);
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
+    });
+  });
+
+  describe('Plan Mode path resolution', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfigInternal.isPlanMode).mockReturnValue(true);
+      vi.mocked(mockConfigInternal.storage.getPlansDir).mockReturnValue(
+        plansDir,
+      );
+    });
+
+    afterEach(() => {
+      vi.mocked(mockConfigInternal.isPlanMode).mockReturnValue(false);
+    });
+
+    it('should preserve nested directory structure within the plans directory', () => {
+      const planFilePath = 'tracks/fibsqrt_20260519/spec.md';
+      const params = { file_path: planFilePath, content: '# Spec' };
+      const invocation = tool.build(params);
+
+      expect(
+        (invocation as unknown as { resolvedPath: string }).resolvedPath,
+      ).toBe(path.resolve(plansDir, 'tracks/fibsqrt_20260519/spec.md'));
+    });
+
+    it('should strip the leading plansDir folder name segment if present in path', () => {
+      const plansDirName = path.basename(plansDir);
+      const planFilePath = `${plansDirName}/tracks/fibsqrt_20260519/spec.md`;
+      const params = { file_path: planFilePath, content: '# Spec' };
+      const invocation = tool.build(params);
     });
   });
 });
