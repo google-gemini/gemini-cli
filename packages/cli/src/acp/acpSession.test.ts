@@ -902,6 +902,29 @@ describe('Session', () => {
       );
     });
 
+    it('should fail closed when PolicyEngine is missing', async () => {
+      (mockConfig.getPolicyEngine as Mock).mockReturnValue(undefined);
+
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-no-engine',
+        toolCall: { name: 'ls', args: {} },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id-no-engine',
+          confirmed: false,
+          requiresUserConfirmation: false,
+        }),
+      );
+    });
+
     it('should handle missing tool name in request by failing closed', async () => {
       const handler = mockMessageBus.subscribe.mock.calls.find(
         (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,

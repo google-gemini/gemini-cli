@@ -53,12 +53,18 @@ export class MessageBus extends EventEmitter {
 
     bus.publish = async (message: Message) => {
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+        // Create a sanitized copy to prevent untrusted callers from setting
+        // sensitive fields like forcedDecision or spoofing subagent identity.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { forcedDecision, subagent, ...otherFields } = message;
+
         return this.publish({
-          ...message,
+          ...otherFields,
+          // Enforce identity: nested subagents are prepended
           subagent: message.subagent
             ? `${subagentName}/${message.subagent}`
             : subagentName,
-        });
+        } as Message);
       }
       return this.publish(message);
     };

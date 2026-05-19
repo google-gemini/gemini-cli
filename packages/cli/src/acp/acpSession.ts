@@ -99,7 +99,20 @@ export class Session {
       const policyEngine = this.context.config.getPolicyEngine?.();
       const messageBus = this.context.config.getMessageBus();
 
-      if (!policyEngine || !messageBus) {
+      if (!messageBus) {
+        return;
+      }
+
+      if (!policyEngine) {
+        debugLogger.warn(
+          'Policy engine missing. Denying tool confirmation request.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
         return;
       }
 
