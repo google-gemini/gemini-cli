@@ -756,12 +756,19 @@ describe('LocalAgentExecutor', () => {
 
       expect(startHistory).toBeDefined();
       expect(startHistory).toHaveLength(2);
+      const history = startHistory!;
 
       // Perform checks on defined objects to satisfy TS
-      const firstPart = startHistory?.[0]?.parts?.[0];
+      const firstPart =
+        'content' in history[0]
+          ? history[0].content.parts?.[0]
+          : history[0].parts?.[0];
       expect(firstPart?.text).toBe('Goal: TestGoal');
 
-      const secondPart = startHistory?.[1]?.parts?.[0];
+      const secondPart =
+        'content' in history[1]
+          ? history[1].content.parts?.[0]
+          : history[1].parts?.[0];
       expect(secondPart?.text).toBe('OK, starting on TestGoal.');
     });
 
@@ -3601,7 +3608,14 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockCompress).toHaveBeenCalledTimes(1);
       expect(mockSetHistory).toHaveBeenCalledTimes(1);
-      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+      // History turns are now wrapped with IDs
+      expect(mockSetHistory).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            content: expect.objectContaining({ role: 'user' }),
+          }),
+        ]),
+      );
     });
 
     it('should pass hasFailedCompressionAttempt=true to compression after a failure', async () => {
@@ -3706,7 +3720,14 @@ describe('LocalAgentExecutor', () => {
       expect(mockCompress.mock.calls[2][5]).toBe(false);
 
       expect(mockSetHistory).toHaveBeenCalledTimes(1);
-      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+      // History turns are now wrapped with IDs
+      expect(mockSetHistory).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            content: expect.objectContaining({ role: 'user' }),
+          }),
+        ]),
+      );
     });
   });
 
