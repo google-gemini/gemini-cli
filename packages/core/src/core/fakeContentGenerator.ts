@@ -36,6 +36,18 @@ export type FakeResponse =
       response: EmbedContentResponse;
     };
 
+/**
+ * Options for the FakeContentGenerator.
+ */
+export interface FakeContentGeneratorOptions {
+  /**
+   * If true, the generator will find the first available response that matches
+   * the requested method, rather than strictly following the input order.
+   * Useful for non-deterministic background tasks.
+   */
+  nonStrict?: boolean;
+}
+
 // A ContentGenerator that responds with canned responses.
 //
 // Typically these would come from a file, provided by the `--fake-responses`
@@ -46,22 +58,45 @@ export class FakeContentGenerator implements ContentGenerator {
   userTierName?: string;
   paidTier?: GeminiUserTier;
 
-  constructor(private readonly responses: FakeResponse[]) {}
+  private readonly responses: FakeResponse[];
 
-  static async fromFile(filePath: string): Promise<FakeContentGenerator> {
+  constructor(
+    responses: FakeResponse[],
+    private readonly options: FakeContentGeneratorOptions = {},
+  ) {
+    this.responses = structuredClone(responses);
+  }
+
+  static async fromFile(
+    filePath: string,
+    options: FakeContentGeneratorOptions = {},
+  ): Promise<FakeContentGenerator> {
     const fileContent = await promises.readFile(filePath, 'utf-8');
     const responses = fileContent
       .split('\n')
       .filter((line) => line.trim() !== '')
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       .map((line) => JSON.parse(line) as FakeResponse);
-    return new FakeContentGenerator(responses);
+    return new FakeContentGenerator(responses, options);
   }
 
   private getNextResponse<
     M extends FakeResponse['method'],
     R = Extract<FakeResponse, { method: M }>['response'],
   >(method: M, request: unknown): R {
+    if (this.options.nonStrict) {
+      const index = this.responses.findIndex((r) => r.method === method);
+      if (index === -1) {
+        throw new Error(
+          `No more mock responses for ${method}, got request:\n` +
+            safeJsonStringify(request),
+        );
+      }
+      const response = this.responses.splice(index, 1)[0];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return response.response as R;
+    }
+
     const response = this.responses[this.callCounter++];
     if (!response) {
       throw new Error(

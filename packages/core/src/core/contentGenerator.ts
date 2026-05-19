@@ -199,6 +199,13 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
+    if (gcConfig.fakeResponsesNonStrict) {
+      const fakeGenerator = await FakeContentGenerator.fromFile(
+        gcConfig.fakeResponsesNonStrict,
+        { nonStrict: true },
+      );
+      return new LoggingContentGenerator(fakeGenerator, gcConfig);
+    }
     if (gcConfig.fakeResponses) {
       const fakeGenerator = await FakeContentGenerator.fromFile(
         gcConfig.fakeResponses,

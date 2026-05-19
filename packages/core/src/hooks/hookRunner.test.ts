@@ -365,7 +365,7 @@ describe('HookRunner', () => {
         );
 
         expect(spawn).toHaveBeenCalledWith(
-          expect.stringMatching(/bash|powershell/),
+          expect.stringMatching(/bash|pwsh|powershell/),
           expect.arrayContaining([
             expect.stringMatching(/['"]?\/test\/project['"]?\/hooks\/test\.sh/),
           ]),
@@ -408,7 +408,7 @@ describe('HookRunner', () => {
         );
 
         expect(spawn).toHaveBeenCalledWith(
-          expect.stringMatching(/bash|powershell/),
+          expect.stringMatching(/bash|pwsh|powershell/),
           expect.arrayContaining([
             expect.stringMatching(
               /ls ['"]\/test\/project\/plans with spaces['"]/,
@@ -447,7 +447,7 @@ describe('HookRunner', () => {
 
         // If secure, spawn will be called with the shell executable and escaped command
         expect(spawn).toHaveBeenCalledWith(
-          expect.stringMatching(/bash|powershell/),
+          expect.stringMatching(/bash|pwsh|powershell/),
           expect.arrayContaining([
             expect.stringMatching(/ls (['"]).*echo.*pwned.*\1/),
           ]),

@@ -22,7 +22,6 @@ import {
   getDisplayString,
   AuthType,
   ToolConfirmationOutcome,
-  getChannelFromVersion,
   getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import type * as acp from '@agentclientprotocol/sdk';
@@ -273,8 +272,6 @@ export function buildAvailableModels(
     config.getUseCustomToolModelSync?.() ??
     (useGemini31 && selectedAuthType === AuthType.USE_GEMINI);
 
-  const releaseChannel = getChannelFromVersion(config.clientVersion);
-
   // --- DYNAMIC PATH ---
   if (
     config.getExperimentalDynamicModelConfiguration?.() === true &&
@@ -285,7 +282,6 @@ export function buildAvailableModels(
       useGemini3_1FlashLite: useGemini31FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview: shouldShowPreviewModels,
-      releaseChannel,
     });
 
     return {
@@ -299,7 +295,10 @@ export function buildAvailableModels(
     {
       value: GEMINI_MODEL_ALIAS_AUTO,
       title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-      description: getAutoModelDescription(releaseChannel, useGemini31),
+      description: getAutoModelDescription(
+        shouldShowPreviewModels,
+        useGemini31,
+      ),
     },
   ];
 

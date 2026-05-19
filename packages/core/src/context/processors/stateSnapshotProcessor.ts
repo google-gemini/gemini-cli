@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
@@ -90,8 +90,11 @@ export function createStateSnapshotProcessor(
           const isValid = consumedIds.every((id) => targetIds.has(id));
 
           if (isValid) {
+            debugLogger.log(
+              `[StateSnapshotProcessor] Successfully spliced PROPOSED_SNAPSHOT from Inbox into Graph. Consumed ${consumedIds.length} nodes.`,
+            );
             // If valid, apply it!
-            const newId = randomUUID();
+            const newId = deriveStableId(consumedIds);
 
             const snapshotNode: Snapshot = {
               id: newId,
@@ -120,6 +123,10 @@ export function createStateSnapshotProcessor(
 
             inbox.consume(proposed.id);
             return returnedNodes;
+          } else {
+            debugLogger.log(
+              `[StateSnapshotProcessor] Rejected PROPOSED_SNAPSHOT from Inbox because one or more target IDs were missing from the current graph window.`,
+            );
           }
         }
       }
@@ -179,11 +186,11 @@ export function createStateSnapshotProcessor(
             maxStateTokens: options.maxStateTokens,
           },
         );
-        const newId = randomUUID();
         const consumedIds = nodesToSummarize.map((n) => n.id);
         if (baselineIdToConsume && !consumedIds.includes(baselineIdToConsume)) {
           consumedIds.push(baselineIdToConsume);
         }
+        const newId = deriveStableId(consumedIds);
 
         const snapshotNode: Snapshot = {
           id: newId,

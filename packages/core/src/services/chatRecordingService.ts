@@ -17,13 +17,12 @@ import {
 import readline from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import type {
-  Content,
-  Part,
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
 import {
   SESSION_FILE_PREFIX,
   type TokensSummary,
@@ -497,9 +496,10 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'],
     content: PartListUnion,
     displayContent?: PartListUnion,
+    id?: string,
   ): MessageRecord {
     return {
-      id: randomUUID(),
+      id: id || randomUUID(),
       timestamp: new Date().toISOString(),
       type,
       content,
@@ -512,14 +512,17 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
     displayContent?: PartListUnion;
-  }): void {
-    if (!this.conversationFile || !this.cachedConversation) return;
+    id?: string;
+  }): string {
+    if (!this.conversationFile || !this.cachedConversation)
+      return message.id || randomUUID();
 
     try {
       const msg = this.newMessage(
         message.type,
         message.content,
         message.displayContent,
+        message.id,
       );
       if (msg.type === 'gemini') {
         msg.thoughts = this.queuedThoughts;
@@ -530,10 +533,28 @@ export class ChatRecordingService {
       }
       this.pushMessage(msg);
       this.updateMetadata({ lastUpdated: new Date().toISOString() });
+      return msg.id;
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
+  }
+
+  /**
+   * Records a synthetic message (e.g. Binary Received, Snapshot/Summary)
+   * and returns its durable ID.
+   */
+  recordSyntheticMessage(
+    type: ConversationRecordExtra['type'],
+    content: PartListUnion,
+    id?: string,
+  ): string {
+    return this.recordMessage({
+      model: undefined,
+      type,
+      content,
+      id,
+    });
   }
 
   recordThought(thought: ThoughtSummary): void {
@@ -869,48 +890,83 @@ export class ChatRecordingService {
     return this.cachedConversation;
   }
 
-  updateMessagesFromHistory(history: readonly Content[]): void {
+  updateMessagesFromHistory(history: readonly HistoryTurn[]): void {
     if (!this.conversationFile || !this.cachedConversation) return;
 
     try {
-      const partsMap = new Map<string, Part[]>();
-      for (const content of history) {
-        if (content.role === 'user' && content.parts) {
-          const callIds = content.parts
-            .map((p) => p.functionResponse?.id)
-            .filter((id): id is string => !!id);
+      let updated = false;
 
-          if (callIds.length === 0) continue;
+      // 1. Sync content and IDs
+      const newMessages: MessageRecord[] = history.map((turn) => {
+        const existing = this.cachedConversation?.messages.find(
+          (m) => m.id === turn.id,
+        );
 
-          let currentCallId = callIds[0];
-          for (const part of content.parts) {
-            if (part.functionResponse?.id) {
-              currentCallId = part.functionResponse.id;
+        if (existing) {
+          // If content parts have changed (e.g. masking), update them
+          if (
+            JSON.stringify(existing.content) !==
+            JSON.stringify(turn.content.parts)
+          ) {
+            updated = true;
+          }
+          return {
+            ...existing,
+            content: turn.content.parts || [],
+          };
+        }
+
+        // It's a new (possibly synthetic) turn like a summary
+        updated = true;
+        return this.newMessage(
+          turn.content.role === 'user' ? 'user' : 'gemini',
+          turn.content.parts || [],
+          undefined,
+          turn.id,
+        );
+      });
+
+      // 2. Specialized 'Masking Sync' for tool call results
+      // If a user turn in history contains a functionResponse, we update the
+      // corresponding ToolCallRecord in the preceding gemini message.
+      for (const turn of history) {
+        if (turn.content.role !== 'user') continue;
+        for (const part of turn.content.parts || []) {
+          if (part.functionResponse) {
+            const callId = part.functionResponse.id;
+            // Find the gemini message that contains this tool call
+            const geminiMsg = newMessages.find(
+              (m) =>
+                m.type === 'gemini' &&
+                m.toolCalls?.some((tc) => tc.id === callId),
+            );
+            if (geminiMsg && geminiMsg.type === 'gemini') {
+              const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
+              if (tc) {
+                // If the history version is different (e.g. masked), sync it into the record
+                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
+                if (
+                  JSON.stringify(tc.result) !==
+                  JSON.stringify(turn.content.parts)
+                ) {
+                  tc.result = turn.content.parts || [];
+                  updated = true;
+                }
+              }
             }
-
-            if (!partsMap.has(currentCallId)) {
-              partsMap.set(currentCallId, []);
-            }
-            partsMap.get(currentCallId)!.push(part);
           }
         }
       }
 
-      for (const message of this.cachedConversation.messages) {
-        let msgChanged = false;
-        if (message.type === 'gemini' && message.toolCalls) {
-          for (const toolCall of message.toolCalls) {
-            const newParts = partsMap.get(toolCall.id);
-            if (newParts !== undefined) {
-              toolCall.result = newParts;
-              msgChanged = true;
-            }
-          }
-        }
-        if (msgChanged) {
-          // Push updated message to log
-          this.pushMessage(message);
-        }
+      if (
+        updated ||
+        newMessages.length !== this.cachedConversation.messages.length
+      ) {
+        this.cachedConversation.messages = newMessages;
+        this.updateMetadata({
+          messages: newMessages,
+          lastUpdated: new Date().toISOString(),
+        });
       }
     } catch (error) {
       debugLogger.error(

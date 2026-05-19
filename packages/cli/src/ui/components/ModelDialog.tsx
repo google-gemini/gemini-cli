@@ -26,7 +26,6 @@ import {
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
-  getChannelFromVersion,
   getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -66,7 +65,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || GEMINI_MODEL_ALIAS_AUTO;
 
-  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
+  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel() ?? false;
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
   const useGemini31FlashLite =
     config?.getGemini31FlashLiteLaunchedSync?.() ?? false;
@@ -123,12 +122,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     },
     { isActive: true },
   );
-
-  const releaseChannel = useMemo(
-    () => getChannelFromVersion(config?.clientVersion ?? ''),
-    [config?.clientVersion],
-  );
-
   const mainOptions = useMemo(() => {
     // --- DYNAMIC PATH ---
     if (
@@ -143,7 +136,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
-          releaseChannel,
         });
 
       const list = allOptions
@@ -171,7 +163,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: GEMINI_MODEL_ALIAS_AUTO,
         title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-        description: getAutoModelDescription(releaseChannel, useGemini31),
+        description: getAutoModelDescription(
+          shouldShowPreviewModels,
+          useGemini31,
+        ),
         key: GEMINI_MODEL_ALIAS_AUTO,
       },
       {
@@ -193,7 +188,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
-    releaseChannel,
   ]);
 
   const manualOptions = useMemo(() => {
@@ -210,7 +204,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
-          releaseChannel,
         });
 
       return allOptions
@@ -303,7 +296,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
-    releaseChannel,
     config,
   ]);
 
