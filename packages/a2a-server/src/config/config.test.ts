@@ -296,7 +296,6 @@ describe('loadConfig', () => {
     expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
   });
 
-<<<<<<< HEAD
   it('should initialize FileDiscoveryService with correct options', async () => {
     const testPath = '/tmp/ignore';
     vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', testPath);
@@ -312,7 +311,9 @@ describe('loadConfig', () => {
       respectGitIgnore: false,
       respectGeminiIgnore: undefined,
       customIgnoreFilePaths: [testPath],
-=======
+    });
+  });
+
   describe('policy engine configuration', () => {
     it('should merge V1 and V2 tool settings into policySettings', async () => {
       const settings: Settings = {
@@ -389,7 +390,6 @@ describe('loadConfig', () => {
         undefined,
         true,
       );
->>>>>>> 85566a73f (fix(a2a-server): Implement default policy loading for parity with CLI (#27073))
     });
   });
 
