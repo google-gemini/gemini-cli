@@ -67,18 +67,18 @@ export class PipelineOrchestrator {
 
   async executeTriggerSync(
     trigger: PipelineTrigger,
-    nodes: readonly ConcreteNode[],
+    buffer: ContextWorkingBufferImpl,
     triggerTargets: ReadonlySet<string>,
     protectedTurnIds: ReadonlySet<string> = new Set(),
-  ): Promise<readonly ConcreteNode[]> {
+  ): Promise<ContextWorkingBufferImpl> {
     this.tracer.logEvent('Orchestrator', 'Strategy Intent', {
       trigger,
-      totalNodes: nodes.length,
+      totalNodes: buffer.nodes.length,
       targetNodes: triggerTargets.size,
     });
 
     // First, run any sync pipelines matching this trigger
-    let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
+    let currentBuffer = buffer;
     const triggerPipelines = this.pipelines.filter((p) =>
       p.triggers.includes(trigger),
     );
@@ -148,7 +148,7 @@ export class PipelineOrchestrator {
     // Success! Drain consumed messages
     this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
 
-    return currentBuffer.nodes;
+    return currentBuffer;
   }
 
   private async executeTriggerAsync(
