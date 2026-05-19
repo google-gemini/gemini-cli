@@ -1308,6 +1308,46 @@ export async function discoverTools(
           continue;
         }
 
+        if (toolDef.inputSchema) {
+          try {
+            const transform = (obj: unknown): unknown => {
+              if (obj === null || typeof obj !== 'object') return obj;
+              if (Array.isArray(obj)) return obj.map(transform);
+
+              const res = { ...obj } as Record<string, unknown>;
+
+              if (Array.isArray(res['type']) && res['type'].length === 2) {
+                const nIdx = res['type'].indexOf('null');
+                if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
+                  res['type'] = res['type'][1 - nIdx];
+                  res['nullable'] = true;
+                }
+              }
+
+              for (const k in res) {
+                if (Object.prototype.hasOwnProperty.call(res, k)) {
+                  res[k] = transform(res[k]);
+                }
+              }
+              return res;
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            toolDef.inputSchema = transform(toolDef.inputSchema) as {
+              type: 'object';
+              properties?: Record<string, object>;
+              required?: string[];
+            };
+          } catch (error) {
+            cliConfig.emitMcpDiagnostic(
+              'error',
+              `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
+              error,
+              mcpServerName,
+            );
+          }
+        }
+
         const mcpCallableTool = new McpCallableTool(
           mcpClient,
           toolDef,

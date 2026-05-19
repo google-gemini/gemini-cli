@@ -54,6 +54,18 @@ for (const file of policyFiles) {
 
 console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 
+// Also copy policies to a2a-server dist directory for bundled execution
+const a2aPolicyDir = join(root, 'packages/a2a-server/dist/policies');
+if (!existsSync(a2aPolicyDir)) {
+  mkdirSync(a2aPolicyDir, { recursive: true });
+}
+for (const file of policyFiles) {
+  copyFileSync(join(root, file), join(a2aPolicyDir, basename(file)));
+}
+console.log(
+  `Copied ${policyFiles.length} policy files to packages/a2a-server/dist/policies/`,
+);
+
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
