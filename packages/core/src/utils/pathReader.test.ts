@@ -482,6 +482,44 @@ describe('readPathFromWorkspace', () => {
     );
   });
 
+  it('should push multiple skip messages if multiple traversals are found in a directory', async () => {
+    mock({
+      [CWD]: {
+        'bad-dir': {
+          'link1.txt': mock.symlink({ path: path.join(OUTSIDE_DIR, 's1.txt') }),
+          'link2.txt': mock.symlink({ path: path.join(OUTSIDE_DIR, 's2.txt') }),
+          'good.txt': 'good content',
+        },
+      },
+      [OUTSIDE_DIR]: {
+        's1.txt': 'secret1',
+        's2.txt': 'secret2',
+      },
+    });
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
+    const result = await readPathFromWorkspace('bad-dir', config);
+    const resultText = result
+      .map((p) => {
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object' && p && 'text' in p) return p.text;
+        return '';
+      })
+      .join('');
+
+    expect(resultText).toContain('good content');
+    expect(resultText).toContain(
+      '--- Skipped link1.txt: traverses outside workspace ---',
+    );
+    expect(resultText).toContain(
+      '--- Skipped link2.txt: traverses outside workspace ---',
+    );
+    expect(resultText).not.toContain('secret1');
+    expect(resultText).not.toContain('secret2');
+  });
+
   // mock-fs permission simulation is unreliable on Windows.
   it.skipIf(process.platform === 'win32')(
     'should return an error string if reading a file with no permissions',
