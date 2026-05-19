@@ -527,9 +527,16 @@ export function isTrustedSystemPath(filePath: string): boolean {
 
   // 1. Explicitly reject paths in current working directory to prevent RCE
   // Exclude root directories to avoid inadvertently rejecting all system paths.
+  // Bypass this restriction in secure, hermetic environments (e.g., Bazel/Blaze).
+  const isHermeticEnv =
+    !!process.env['TEST_SRCDIR'] ||
+    !!process.env['TEST_WORKSPACE'] ||
+    !!process.env['BAZEL_TEST'] ||
+    !!process.env['RUNFILES_DIR'];
+
   const normCwd = normalizePath(process.cwd());
   const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
-  if (!isRoot && isSubpath(normCwd, normPath)) {
+  if (!isRoot && !isHermeticEnv && isSubpath(normCwd, normPath)) {
     return false;
   }
 

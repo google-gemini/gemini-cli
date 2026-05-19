@@ -1813,7 +1813,18 @@ describe('resolveRipgrepPath', () => {
         );
       });
 
-      it('should resolve the SEA (flattened) path first', async () => {
+      it('should resolve the SEA (purely flattened) path first', async () => {
+        vi.mocked(fileExists).mockImplementation(async (checkPath) => {
+          const expectedTarget = path.resolve(__dirname, `rg-linux-x64`);
+          return checkPath.includes(expectedTarget);
+        });
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).not.toBeNull();
+        expect(resolvedPath).toContain('rg-linux-x64');
+      });
+
+      it('should resolve the SEA (vendor subdirectory) path if purely flattened is missing', async () => {
         vi.mocked(fileExists).mockImplementation(async (checkPath) =>
           checkPath.includes(path.normalize('vendor/ripgrep')),
         );
