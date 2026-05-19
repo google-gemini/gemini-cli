@@ -194,4 +194,31 @@ describe('atCommandUtils', () => {
       );
     }
   });
+
+  it('should not treat paths with shared prefixes as subpaths if not actually inside', async () => {
+    // /mock/root-backup/file.txt starts with /mock/root but is not inside it.
+    const dir = '/mock/root';
+    const otherPath = '/mock/root-backup/file.txt';
+
+    (mockWorkspaceContext['getDirectories'] as Mock).mockReturnValue([dir]);
+    const mockStats = {
+      isDirectory: () => false,
+      isFile: () => true,
+    };
+    vi.mocked(fsPromises.stat).mockResolvedValue(mockStats as unknown as Stats);
+
+    const result = await resolveAtCommandPath(
+      otherPath,
+      mockConfig as unknown as Config,
+    );
+
+    expect(result.status).toBe('resolved');
+    if (result.status === 'resolved') {
+      expect(result.resolved.absolutePath).toBe(otherPath);
+      // It should NOT be relative to /mock/root because it's not actually inside it.
+      // path.relative('/mock/root', '/mock/root-backup/file.txt') -> '../root-backup/file.txt'
+      // Our fix should prevent this from being used as a relative path.
+      expect(result.resolved.relativePath).toBe(otherPath);
+    }
+  });
 });

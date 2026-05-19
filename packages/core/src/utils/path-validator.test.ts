@@ -43,7 +43,38 @@ describe('PathValidator', () => {
     );
   });
 
-  it('should reject misinterpreted log fragments with quotes or ellipses', () => {
+  it('should allow paths with single quotes (apostrophes)', () => {
+    // This was previously a false positive
+    expect(validatePath("/Users/john's_files/project/index.ts").isValid).toBe(
+      true,
+    );
+  });
+
+  it('should allow long paths with brackets or parentheses', () => {
+    // These were previously false positives (Next.js dynamic routes, Windows copies)
+    expect(
+      validatePath('packages/web/app/dashboard/[id]/settings/page.tsx').isValid,
+    ).toBe(true);
+    expect(
+      validatePath('/Users/name/Documents/Project (Copy)/index.ts').isValid,
+    ).toBe(true);
+  });
+
+  it('should only reject log markers at the start of the path', () => {
+    // Legitimate paths containing these strings should now be allowed
+    expect(validatePath('src/tests/FAIL_CASE.txt').isValid).toBe(true);
+    expect(validatePath('FAILURE_LOG.txt').isValid).toBe(true);
+    expect(validatePath('docs/AssertionError_details.md').isValid).toBe(true);
+
+    // But they should still be rejected at the start
+    expect(validatePath('FAIL tests/int/my.test.ts').isValid).toBe(false);
+    expect(
+      validatePath('AssertionError: expected true to be false').isValid,
+    ).toBe(false);
+    expect(validatePath('✓ test passed').isValid).toBe(false);
+  });
+
+  it('should reject misinterpreted log fragments with double quotes or ellipses', () => {
     const logFragment =
       'Error: No "formatTimeRange" export is defined on the lib/formatTimeRange mock.';
     const result = validatePath(logFragment);
@@ -51,30 +82,7 @@ describe('PathValidator', () => {
     expect(result.error).toContain('suspicious characters');
   });
 
-  it('should reject code snippets with braces/parens', () => {
-    const codeSnippet =
-      'vi.mock(import("@/lib/formatTimeRange"), async (importOriginal) => { return { ...actual }; })';
-    const result = validatePath(codeSnippet);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain(
-      'misinterpreted log fragment or code snippet',
-    );
-  });
-
-  it('should reject misinterpreted log fragments with log markers', () => {
-    expect(validatePath('FAIL tests/int/my.test.ts').isValid).toBe(false);
-    expect(
-      validatePath('AssertionError: expected true to be false').isValid,
-    ).toBe(false);
-    expect(validatePath('✓ test passed').isValid).toBe(false);
-    expect(validatePath('× test failed').isValid).toBe(false);
-    expect(
-      validatePath('TestingLibraryElementError: Unable to find an element')
-        .isValid,
-    ).toBe(false);
-  });
-
-  it('should allow short paths with quotes (even if unusual)', () => {
+  it('should allow short paths with double quotes (even if unusual)', () => {
     // Some systems might technically allow this, and we only want to block long/obvious log fragments
     expect(validatePath('file"with"quote.txt').isValid).toBe(true);
   });
@@ -84,9 +92,5 @@ describe('PathValidator', () => {
       validatePath('this/is/a/very/long/path/with/ellipses/.../and/more')
         .isValid,
     ).toBe(false);
-  });
-
-  it('should allow short paths with braces', () => {
-    expect(validatePath('{a,b}.ts').isValid).toBe(true);
   });
 });

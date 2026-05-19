@@ -63,8 +63,9 @@ export async function resolveAtCommandPath(
       // Try to find if it's within one of the workspace directories to provide a nice relative path
       let relativePath = pathName;
       for (const dir of workspaceDirs) {
-        if (pathName.startsWith(dir)) {
-          relativePath = path.relative(dir, pathName);
+        const rel = path.relative(dir, pathName);
+        if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+          relativePath = rel;
           break;
         }
       }

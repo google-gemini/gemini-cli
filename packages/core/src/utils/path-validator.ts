@@ -40,15 +40,17 @@ export function validatePath(pathStr: string): PathValidationResult {
   }
 
   // Check for common log/error patterns that are definitely not paths
-  const logMarkers = [
-    'AssertionError',
-    'FAIL',
-    '✓',
-    '×',
-    'TestingLibraryElementError',
+  // We use anchored regex to ensure we only block if these appear at the start,
+  // which is typical for misinterpreted log lines.
+  const logMarkerRegexes = [
+    /^AssertionError:/,
+    /^FAIL /,
+    /^✓ /,
+    /^× /,
+    /^TestingLibraryElementError:/,
   ];
-  for (const marker of logMarkers) {
-    if (pathStr.includes(marker)) {
+  for (const regex of logMarkerRegexes) {
+    if (regex.test(pathStr)) {
       return {
         isValid: false,
         error: 'Path appears to be a misinterpreted log fragment.',
@@ -56,26 +58,14 @@ export function validatePath(pathStr: string): PathValidationResult {
     }
   }
 
-  // If it contains characters like '{', '}', '(', ')', '[', ']' and it's long, it's likely a log
-  if (pathStr.length > 50 && /[{}[\]()]/.test(pathStr)) {
-    return {
-      isValid: false,
-      error:
-        'Path appears to be a misinterpreted log fragment or code snippet.',
-    };
-  }
-
-  // Check for quotes or ellipses in "paths" - almost always a misinterpretation if not a very short name
-  if (
-    pathStr.includes('"') ||
-    pathStr.includes("'") ||
-    pathStr.includes('...')
-  ) {
+  // Check for double quotes or ellipses in "paths" - almost always a misinterpretation if not a very short name.
+  // We removed single quotes from this list to support users with apostrophes in their home directories.
+  if (pathStr.includes('"') || pathStr.includes('...')) {
     if (pathStr.length > 20) {
       return {
         isValid: false,
         error:
-          'Path contains suspicious characters (quotes or ellipses) and is too long to be a simple filename.',
+          'Path contains suspicious characters (double quotes or ellipses) and is too long to be a simple filename.',
       };
     }
   }
