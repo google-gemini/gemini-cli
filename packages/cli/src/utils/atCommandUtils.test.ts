@@ -275,6 +275,109 @@ describe('atCommandUtils', () => {
     }
   });
 
+  describe('Best-Effort Path Extraction (tryExtractPath)', () => {
+    const mockFile = 'src/index.ts';
+    const absMockFile = path.resolve('/mock/root', mockFile);
+    const mockStats = { isDirectory: () => false, isFile: () => true };
+
+    beforeEach(() => {
+      vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+        if (p === absMockFile) return mockStats as unknown as Stats;
+        throw new Error('ENOENT');
+      });
+    });
+
+    it('should extract path from "AssertionError: ..." format', async () => {
+      const result = await resolveAtCommandPath(
+        `AssertionError: expected something but got something else at ${mockFile}:10:5`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+      }
+    });
+
+    it('should extract path wrapped in parentheses', async () => {
+      const result = await resolveAtCommandPath(
+        `FAIL (${mockFile})`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+      }
+    });
+
+    it('should extract path wrapped in square brackets', async () => {
+      const result = await resolveAtCommandPath(
+        `FAIL [${mockFile}]`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+      }
+    });
+
+    it('should extract path from "✓" pass marker', async () => {
+      const result = await resolveAtCommandPath(
+        `✓ ${mockFile}`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+    });
+
+    it('should extract path from "×" fail marker', async () => {
+      const result = await resolveAtCommandPath(
+        `× ${mockFile}`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+    });
+
+    it('should handle paths with slashes and extensions correctly', async () => {
+      const complexPath = 'packages/core/src/utils/deep.test.ts';
+      const absComplexPath = path.resolve('/mock/root', complexPath);
+      vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+        if (p === absComplexPath) return mockStats as unknown as Stats;
+        throw new Error('ENOENT');
+      });
+
+      const result = await resolveAtCommandPath(
+        `FAIL ${complexPath}:123`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe(complexPath);
+      }
+    });
+
+    it('should fail gracefully if no valid path can be extracted', async () => {
+      const result = await resolveAtCommandPath(
+        'FAIL some random text with no slashes or dots',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('invalid');
+    });
+
+    it('should return unauthorized if the extracted path is not authorized', async () => {
+      const secretFile = '/etc/passwd';
+      (mockConfig['validatePathAccess'] as Mock).mockImplementation((p) => p === secretFile ? 'Unauthorized' : null);
+      vi.mocked(fsPromises.stat).mockResolvedValue(
+        mockStats as unknown as Stats,
+      );
+
+      const result = await resolveAtCommandPath(
+        `FAIL ${secretFile}`,
+        mockConfig as unknown as Config,
+      );
+      // It should try to resolve /etc/passwd, identify it as unauthorized, and return that status.
+      expect(result.status).toBe('unauthorized');
+    });
+  });
+
   it('should include reason in debug message for unauthorized paths', async () => {
     const onDebug = vi.fn();
     (mockConfig['validatePathAccess'] as Mock).mockReturnValue(

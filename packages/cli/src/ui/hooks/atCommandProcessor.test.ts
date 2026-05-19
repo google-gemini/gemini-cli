@@ -1553,7 +1553,38 @@ describe('handleAtCommand', () => {
     // Malformed path should be skipped and original query part preserved as text
     expect(result.processedQuery).toEqual([{ text: query }]);
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Skipping invalid path in @-command'),
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
+    );
+  });
+
+  it('should recover a buried path from a malformed fragment during handleAtCommand', async () => {
+    const buriedFile = 'src/recovered.ts';
+    await createTestFile(
+      path.join(testRootDir, buriedFile),
+      'Recovered content',
+    );
+    const malformedFragment = `"FAIL ${buriedFile}:10:5 (AssertionError)"`;
+    const query = `@${malformedFragment}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 703,
+      signal: abortController.signal,
+    });
+
+    // It should extract src/recovered.ts and attach its content
+    expect(result.processedQuery).toContainEqual(
+      expect.objectContaining({ text: 'Recovered content' }),
+    );
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
     );
   });
 });

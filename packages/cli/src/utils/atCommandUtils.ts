@@ -37,20 +37,14 @@ export async function resolveAtCommandPath(
 ): Promise<ResolveAtCommandPathResult> {
   const pathValidation = validatePath(pathName);
   if (!pathValidation.isValid) {
-    // If it's a log fragment, try to extract a real path from it
-    if (
-      pathValidation.error ===
-      'Path appears to be a misinterpreted log fragment.'
-    ) {
-      const extractedPath = tryExtractPath(pathName);
-      if (extractedPath && extractedPath !== pathName) {
-        onDebugMessage(
-          `Identified log fragment, attempting to extract path: "${extractedPath}" from "${pathName}"`,
-        );
-        // Recurse once with the extracted path.
-        // We pass a dummy onDebugMessage to avoid double logging the "invalid" reason if it fails.
-        return resolveAtCommandPath(extractedPath, config);
-      }
+    // Attempt to extract a real path from the invalid fragment
+    const extractedPath = tryExtractPath(pathName);
+    if (extractedPath && extractedPath !== pathName) {
+      onDebugMessage(
+        `Identified invalid path fragment, attempting to extract path: "${extractedPath}" from "${pathName}"`,
+      );
+      // Recurse once with the extracted path.
+      return resolveAtCommandPath(extractedPath, config, onDebugMessage);
     }
 
     onDebugMessage(
@@ -147,11 +141,11 @@ function tryExtractPath(noisyString: string): string | null {
   const segments = noisyString.split(/\s+/);
 
   for (const segment of segments) {
-    // 1. Strip leading/trailing punctuation commonly found in logs (commas, parens, etc.)
+    // 1. Strip leading/trailing punctuation and quotes commonly found in logs
     // 2. Strip trailing line/column numbers (e.g. src/main.ts:10:5)
     const cleanSegment = segment
-      .replace(/^[(),;[\]]/, '')
-      .replace(/[(),;[\]]$/, '')
+      .replace(/^[(),;[\]"']/, '')
+      .replace(/[(),;[\]"']$/, '')
       .replace(/:\d+(?::\d+)?$/, '');
 
     if (cleanSegment.length === 0) continue;
