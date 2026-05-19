@@ -26,6 +26,8 @@ import {
   InvalidStreamError,
   GeminiEventType,
   type ServerGeminiStreamEvent,
+  PolicyDecision,
+  MessageBusType,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
@@ -139,6 +141,9 @@ describe('Session', () => {
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getGitService: vi.fn().mockResolvedValue({} as GitService),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        check: vi.fn(),
+      }),
       validatePathAccess: vi.fn().mockReturnValue(null),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
@@ -706,5 +711,115 @@ describe('Session', () => {
         }),
       }),
     );
+  });
+
+  describe('Policy Handling', () => {
+    it('should auto-approve tool calls when PolicyEngine returns ALLOW', async () => {
+      const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
+        check: Mock<
+          (
+            toolCall: { name: string; args: Record<string, unknown> },
+            serverName?: string,
+            toolAnnotations?: Record<string, unknown>,
+            subagent?: string,
+          ) => Promise<{ decision: PolicyDecision }>
+        >;
+      };
+      mockPolicyEngine.check.mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+
+      // Trigger the subscription handler
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      expect(handler).toBeDefined();
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id',
+        toolCall: { name: 'ls', args: {} },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id',
+          confirmed: true,
+          requiresUserConfirmation: false,
+        }),
+      );
+    });
+
+    it('should request user confirmation when PolicyEngine returns ASK_USER', async () => {
+      const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
+        check: Mock<
+          (
+            toolCall: { name: string; args: Record<string, unknown> },
+            serverName?: string,
+            toolAnnotations?: Record<string, unknown>,
+            subagent?: string,
+          ) => Promise<{ decision: PolicyDecision }>
+        >;
+      };
+      mockPolicyEngine.check.mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-2',
+        toolCall: { name: 'rm', args: { path: '/' } },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id-2',
+          confirmed: false,
+          requiresUserConfirmation: true,
+        }),
+      );
+    });
+
+    it('should deny tool calls when PolicyEngine returns DENY', async () => {
+      const mockPolicyEngine = mockConfig.getPolicyEngine() as unknown as {
+        check: Mock<
+          (
+            toolCall: { name: string; args: Record<string, unknown> },
+            serverName?: string,
+            toolAnnotations?: Record<string, unknown>,
+            subagent?: string,
+          ) => Promise<{ decision: PolicyDecision }>
+        >;
+      };
+      mockPolicyEngine.check.mockResolvedValue({
+        decision: PolicyDecision.DENY,
+      });
+
+      const handler = mockMessageBus.subscribe.mock.calls.find(
+        (call) => call[0] === MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      )?.[1] as (request: ToolConfirmationRequest) => Promise<void>;
+
+      await handler({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-id-3',
+        toolCall: { name: 'forbidden', args: {} },
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: 'test-id-3',
+          confirmed: false,
+          requiresUserConfirmation: false,
+        }),
+      );
+    });
   });
 });

@@ -34,6 +34,9 @@ import {
   isNodeError,
   REFERENCE_CONTENT_START,
   InvalidStreamError,
+  MessageBusType,
+  PolicyDecision,
+  type ToolConfirmationRequest,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -61,6 +64,7 @@ export class Session {
   private pendingPrompt: AbortController | null = null;
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
+  private readonly disposeController = new AbortController();
 
   private generateCallId(name: string): string {
     return `${name}-${Date.now()}-${++this.callIdCounter}`;
@@ -77,7 +81,39 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+
+    // Subscribe to tool confirmation requests to handle policy checks (e.g. auto-allowing safe shell commands)
+    this.context.config
+      .getMessageBus()
+      ?.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.handleToolConfirmationRequest,
+        { signal: this.disposeController.signal },
+      );
   }
+
+  private handleToolConfirmationRequest = async (
+    request: ToolConfirmationRequest,
+  ) => {
+    const policyEngine = this.context.config.getPolicyEngine?.();
+    if (!policyEngine) {
+      return;
+    }
+
+    const result = await policyEngine.check(
+      request.toolCall,
+      request.serverName,
+      request.toolAnnotations,
+      undefined, // subagent
+    );
+
+    await this.context.config.getMessageBus()?.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId: request.correlationId,
+      confirmed: result.decision === PolicyDecision.ALLOW,
+      requiresUserConfirmation: result.decision === PolicyDecision.ASK_USER,
+    });
+  };
 
   private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
     if (payload.sessionId === this.id) {
@@ -96,6 +132,7 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    this.disposeController.abort();
   }
 
   async cancelPendingPrompt(): Promise<void> {
