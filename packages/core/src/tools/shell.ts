@@ -38,6 +38,7 @@ import {
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
+  SHELL_BUILTINS_TO_IGNORE,
   parseCommandDetails,
   hasRedirection,
   detectCommandSubstitution,
@@ -259,7 +260,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const rootCommands = [...new Set(getCommandRoots(command))];
       const allowRedirection = hasRedirection(command) ? true : undefined;
 
-      if (rootCommands.length > 0) {
+      if (rootCommands.length === 1) {
         return { commandPrefix: rootCommands, allowRedirection };
       }
       return { commandPrefix: this.params.command, allowRedirection };
@@ -867,10 +868,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (sandboxDenial) {
           const strippedCommand = stripShellWrapper(this.params.command);
           const rootCommands = getCommandRoots(strippedCommand).filter(
-            (r) => r !== 'shopt',
+            (r) => !SHELL_BUILTINS_TO_IGNORE.has(r),
           );
           const rootCommandDisplay =
-            rootCommands.length > 0 ? rootCommands[0] : 'shell';
+            rootCommands.length === 1 ? rootCommands[0] : 'shell';
 
           const readPaths = new Set(
             this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read || [],
