@@ -34,12 +34,17 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
     !escapedSessionId.startsWith("'")
       ? `"${escapedSessionId}"`
       : escapedSessionId;
-  let footer = `To resume this session: gemini --resume ${footerSessionId}`;
 
-  if (worktreeSettings) {
-    footer =
-      `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n` +
-      `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+  let footer = `No conversation recorded.`;
+
+  if (stats.promptCount > 0) {
+    footer = `To resume this session: gemini --resume ${footerSessionId}`;
+
+    if (worktreeSettings) {
+      footer =
+        `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n` +
+        `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+    }
   }
 
   return (

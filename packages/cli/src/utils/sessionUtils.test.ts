@@ -48,7 +48,7 @@ describe('SessionSelector', () => {
   });
 
   describe('sessionExists', () => {
-    it('should return true if a session file with the exact UUID exists', async () => {
+    it('should return exists: true and isEmpty: true if a session file with the exact UUID exists but has no messages', async () => {
       const sessionId = randomUUID();
       const chatsDir = path.join(tmpDir, 'chats');
       await fs.mkdir(chatsDir, { recursive: true });
@@ -62,7 +62,7 @@ describe('SessionSelector', () => {
 
       const selector = new SessionSelector(storage);
       const exists = await selector.sessionExists(sessionId);
-      expect(exists).toBe(true);
+      expect(exists).toEqual({ exists: true, isEmpty: true });
     });
 
     it('should return false if no session file matches the UUID', async () => {
@@ -76,7 +76,7 @@ describe('SessionSelector', () => {
 
       const selector = new SessionSelector(storage);
       const exists = await selector.sessionExists(sessionId);
-      expect(exists).toBe(false);
+      expect(exists).toEqual({ exists: false, isEmpty: false });
     });
 
     it('should return false if the chats directory does not exist', async () => {
@@ -84,7 +84,7 @@ describe('SessionSelector', () => {
       // Notice we do NOT create chatsDir here.
       const selector = new SessionSelector(storage);
       const exists = await selector.sessionExists(sessionId);
-      expect(exists).toBe(false);
+      expect(exists).toEqual({ exists: false, isEmpty: false });
     });
   });
 
@@ -507,9 +507,16 @@ describe('SessionSelector', () => {
     const sessionSelector = new SessionSelector(storage);
     const sessions = await sessionSelector.listSessions();
 
-    // Should only list the session with user message
-    expect(sessions.length).toBe(1);
-    expect(sessions[0].id).toBe(sessionIdWithUser);
+    // Should list both sessions, but mark the system-only one as empty
+    expect(sessions.length).toBe(2);
+
+    const userSession = sessions.find((s) => s.id === sessionIdWithUser);
+    expect(userSession).toBeDefined();
+    expect(userSession?.isEmpty).toBe(false);
+
+    const systemSession = sessions.find((s) => s.id === sessionIdSystemOnly);
+    expect(systemSession).toBeDefined();
+    expect(systemSession?.isEmpty).toBe(true);
   });
 
   it('should list session with gemini message even without user message', async () => {

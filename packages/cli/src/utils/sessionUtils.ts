@@ -104,6 +104,8 @@ export interface SessionInfo {
   displayName: string;
   /** Cleaned first user message content */
   firstUserMessage: string;
+  /** Whether this session contains only metadata and no messages */
+  isEmpty: boolean;
   /** Whether this is the currently active session */
   isCurrentSession: boolean;
   /** Display index in the list */
@@ -287,16 +289,13 @@ export const getAllSessionFiles = async (
           const lastUpdated =
             content.lastUpdated || content.startTime || fallbackTimestamp;
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
-            return { fileName: file, sessionInfo: null };
-          }
-
           // Skip subagent sessions - these are implementation details of a tool call
           // and shouldn't be surfaced for resumption in the main agent history.
           if (content.kind === 'subagent') {
             return { fileName: file, sessionInfo: null };
           }
+
+          const isEmpty = !content.hasUserOrAssistantMessage;
 
           const firstUserMessage = content.firstUserMessage
             ? cleanMessage(content.firstUserMessage)
@@ -334,6 +333,7 @@ export const getAllSessionFiles = async (
               ? stripUnsafeCharacters(content.summary)
               : firstUserMessage,
             firstUserMessage,
+            isEmpty,
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
             summary: content.summary,
@@ -419,7 +419,9 @@ export class SessionSelector {
   /**
    * Checks if a session with the given ID already exists on disk.
    */
-  async sessionExists(id: string): Promise<boolean> {
+  async sessionExists(
+    id: string,
+  ): Promise<{ exists: boolean; isEmpty: boolean }> {
     const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     const files = await fs.readdir(chatsDir).catch(() => []);
 
@@ -436,14 +438,17 @@ export class SessionSelector {
         const sessionPath = path.join(chatsDir, fileName);
         const sessionData = await loadConversationRecord(sessionPath);
         if (sessionData && sessionData.sessionId === id) {
-          return true;
+          return {
+            exists: true,
+            isEmpty: !sessionData.hasUserOrAssistantMessage,
+          };
         }
       } catch {
         // Ignore unparseable files
       }
     }
 
-    return false;
+    return { exists: false, isEmpty: false };
   }
 
   /**

@@ -1407,4 +1407,125 @@ describe('ChatRecordingService', () => {
       expect(record2!.messages[1].id).toBe('h2');
     });
   });
+
+  describe('Session resume invariant - exit summary vs --list-sessions', () => {
+    it('should have hasUserOrAssistantMessage=true after recording user+gemini messages', async () => {
+      await chatRecordingService.initialize();
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Hi there!',
+        model: 'gemini-pro',
+      });
+
+      const record = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(record).not.toBeNull();
+      expect(record!.sessionId).toBe('test-session-id');
+      expect(record!.hasUserOrAssistantMessage).toBe(true);
+    });
+
+    it('should have hasUserOrAssistantMessage=false when no messages recorded (empty session)', async () => {
+      await chatRecordingService.initialize();
+
+      // No messages recorded — simulates /clear then immediate /quit
+      const record = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(record).not.toBeNull();
+      expect(record!.sessionId).toBe('test-session-id');
+      // BUG: hasUserOrAssistantMessage is false, so --list-sessions and
+      // --resume would filter this out, but the exit summary would still
+      // print "gemini --resume test-session-id"
+      expect(record!.hasUserOrAssistantMessage).toBe(false);
+    });
+
+    it('resume invariant: sessionId in file metadata matches config.getSessionId()', async () => {
+      // This test verifies that the sessionId written to the file
+      // matches what config.getSessionId() returns (used in exit summary)
+      const sessionId = '8bcc846d-9fe9-426e-8d33-66c2858475c0';
+      // @ts-expect-error - overriding readonly property for testing
+      mockConfig.promptId = sessionId;
+      vi.mocked(mockConfig.getSessionId).mockReturnValue(sessionId);
+
+      const service = new ChatRecordingService(mockConfig);
+      await service.initialize();
+
+      service.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+      service.recordMessage({
+        type: 'gemini',
+        content: 'Response',
+        model: 'gemini-pro',
+      });
+
+      const record = await loadConversationRecord(
+        service.getConversationFilePath()!,
+      );
+      expect(record).not.toBeNull();
+      // The key invariant: file sessionId must equal what the exit summary would show
+      expect(record!.sessionId).toBe(mockConfig.getSessionId());
+      expect(record!.sessionId).toBe(sessionId);
+      expect(record!.hasUserOrAssistantMessage).toBe(true);
+    });
+
+    it('resume invariant: resumed session preserves sessionId through re-initialization', async () => {
+      const originalSessionId = '70609f88-8c4f-4a6a-9ecd-e9cbf704b4ed';
+      // @ts-expect-error - overriding readonly property for testing
+      mockConfig.promptId = originalSessionId;
+      vi.mocked(mockConfig.getSessionId).mockReturnValue(originalSessionId);
+
+      // Create original session
+      const service1 = new ChatRecordingService(mockConfig);
+      await service1.initialize();
+      service1.recordMessage({
+        type: 'user',
+        content: 'Original message',
+        model: 'gemini-pro',
+      });
+      service1.recordMessage({
+        type: 'gemini',
+        content: 'Original response',
+        model: 'gemini-pro',
+      });
+
+      const filePath = service1.getConversationFilePath()!;
+
+      // Resume the session (simulate --resume)
+      const resumedRecord = await loadConversationRecord(filePath);
+      const service2 = new ChatRecordingService(mockConfig);
+      await service2.initialize({
+        filePath,
+        conversation: resumedRecord as ConversationRecord,
+      });
+
+      // Send more messages
+      service2.recordMessage({
+        type: 'user',
+        content: 'Follow-up',
+        model: 'gemini-pro',
+      });
+      service2.recordMessage({
+        type: 'gemini',
+        content: 'Follow-up response',
+        model: 'gemini-pro',
+      });
+
+      // Verify sessionId consistency
+      const finalRecord = await loadConversationRecord(filePath);
+      expect(finalRecord).not.toBeNull();
+      expect(finalRecord!.sessionId).toBe(originalSessionId);
+      expect(finalRecord!.sessionId).toBe(mockConfig.getSessionId());
+      expect(finalRecord!.hasUserOrAssistantMessage).toBe(true);
+    });
+  });
 });

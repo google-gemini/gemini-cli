@@ -119,12 +119,17 @@ gemini --list-sessions
 Output example:
 
 ```text
-Available sessions for this project (3):
+Available sessions for this project (4):
 
   1. Fix bug in auth (2 days ago) [a1b2c3d4]
   2. Refactor database schema (5 hours ago) [e5f67890]
   3. Update documentation (Just now) [abcd1234]
+  4. Empty conversation (Empty) (Just now) [1234abcd]
 ```
+
+> [!NOTE] Sessions that contain no user or model messages (e.g., if you start
+> the CLI and immediately quit) will be listed as `(Empty)` but can still be
+> resumed or deleted.
 
 ### Deleting sessions
 

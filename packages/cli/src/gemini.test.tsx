@@ -1152,7 +1152,9 @@ describe('resolveSessionId', () => {
     // eslint-disable-next-line prefer-arrow-callback
     vi.mocked(SessionSelector).mockImplementation(function () {
       return {
-        sessionExists: vi.fn().mockResolvedValue(true),
+        sessionExists: vi
+          .fn()
+          .mockResolvedValue({ exists: true, isEmpty: false }),
       } as unknown as InstanceType<typeof SessionSelector>;
     });
 

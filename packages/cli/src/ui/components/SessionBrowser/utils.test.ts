@@ -18,6 +18,7 @@ describe('SessionBrowser utils', () => {
     messageCount: 1,
     displayName: 'Test Session',
     firstUserMessage: 'Hello',
+    isEmpty: false,
     isCurrentSession: false,
     index: 0,
     ...overrides,

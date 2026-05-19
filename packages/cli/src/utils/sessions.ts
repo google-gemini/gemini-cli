@@ -40,13 +40,14 @@ export async function listSessions(config: Config): Promise<void> {
     )
     .forEach((session, index) => {
       const current = session.isCurrentSession ? ', current' : '';
+      const empty = session.isEmpty ? ' (Empty)' : '';
       const time = formatRelativeTime(session.lastUpdated);
       const title =
         session.displayName.length > 100
           ? session.displayName.slice(0, 97) + '...'
           : session.displayName;
       writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+        `  ${index + 1}. ${title}${empty} (${time}${current}) [${session.id}]\n`,
       );
     });
 }

@@ -292,11 +292,19 @@ export async function resolveSessionId(
   }
 
   if (sessionIdArg) {
-    if (await sessionSelector.sessionExists(sessionIdArg)) {
-      coreEvents.emitFeedback(
-        'error',
-        `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
-      );
+    const sessionStatus = await sessionSelector.sessionExists(sessionIdArg);
+    if (sessionStatus.exists) {
+      if (sessionStatus.isEmpty) {
+        coreEvents.emitFeedback(
+          'error',
+          `Error starting session: Session ID "${sessionIdArg}" already exists but is empty. Please provide a different ID or delete the old session.`,
+        );
+      } else {
+        coreEvents.emitFeedback(
+          'error',
+          `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
+        );
+      }
       await runExitCleanup();
       process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
