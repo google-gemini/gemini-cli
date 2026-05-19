@@ -1026,7 +1026,7 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Platform-Specific Behavior', () => {
-    it('should use powershell.exe on Windows', async () => {
+    it('should use powershell.exe on Windows and prefix the command with chcp 65001 for the PTY session', async () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (pty) =>
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
@@ -1034,7 +1034,7 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        ['-NoProfile', '-Command', 'chcp 65001 >$null;dir "foo bar"'],
         expect.any(Object),
       );
     });
