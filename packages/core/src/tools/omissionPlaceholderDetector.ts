@@ -5,6 +5,7 @@
  */
 
 const OMITTED_PREFIXES = new Set([
+  '',
   'rest of',
   'rest of method',
   'rest of methods',
