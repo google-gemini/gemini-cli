@@ -1,6 +1,6 @@
-# Preview release: v0.43.0-preview.0
+# Preview release: v0.43.0-preview.1
 
-Released: May 12, 2026
+Released: May 19, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -26,6 +26,9 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 85566a7 to release/v0.43.0-preview.0-pr-27073
+  [CONFLICTS] by @gemini-cli-robot in
+  [#27256](https://github.com/google-gemini/gemini-cli/pull/27256)
 - feat(core): steer model to use edit tool for surgical edits, fix a typo in
   [#26480](https://github.com/google-gemini/gemini-cli/pull/26480)
 - docs: clarify Auto Memory proposes memory updates and skills in
@@ -193,4 +196,4 @@ npm install -g @google/gemini-cli@preview
   [#26949](https://github.com/google-gemini/gemini-cli/pull/26949)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.42.0-preview.2...v0.43.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.42.0-preview.2...v0.43.0-preview.1
