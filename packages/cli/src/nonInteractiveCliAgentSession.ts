@@ -42,7 +42,6 @@ import {
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
-import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -50,6 +49,7 @@ import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 import { handleError, handleToolError } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { setupStdinCancellation } from './utils/stdinCancellation.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -112,84 +112,7 @@ export async function runNonInteractive({
         : null;
 
     const abortController = new AbortController();
-
-    // Track cancellation state
-    let isAborting = false;
-    let cancelMessageTimer: NodeJS.Timeout | null = null;
-
-    // Setup stdin listener for Ctrl+C detection
-    let stdinWasRaw = false;
-    let rl: readline.Interface | null = null;
-
-    const setupStdinCancellation = () => {
-      // Only setup if stdin is a TTY (user can interact)
-      if (!process.stdin.isTTY) {
-        return;
-      }
-
-      // Save original raw mode state
-      stdinWasRaw = process.stdin.isRaw || false;
-
-      // Enable raw mode to capture individual keypresses
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-
-      // Setup readline to emit keypress events
-      rl = readline.createInterface({
-        input: process.stdin,
-        escapeCodeTimeout: 0,
-      });
-      readline.emitKeypressEvents(process.stdin, rl);
-
-      // Listen for Ctrl+C
-      const keypressHandler = (
-        str: string,
-        key: { name?: string; ctrl?: boolean },
-      ) => {
-        // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
-        if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
-        }
-      };
-
-      process.stdin.on('keypress', keypressHandler);
-    };
-
-    const cleanupStdinCancellation = () => {
-      // Clear any pending cancel message timer
-      if (cancelMessageTimer) {
-        clearTimeout(cancelMessageTimer);
-        cancelMessageTimer = null;
-      }
-
-      // Cleanup readline and stdin listeners
-      if (rl) {
-        rl.close();
-        rl = null;
-      }
-
-      // Remove keypress listener
-      process.stdin.removeAllListeners('keypress');
-
-      // Restore stdin to original state
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(stdinWasRaw);
-        process.stdin.pause();
-      }
-    };
+    let cleanupStdinCancellation = () => {};
 
     let errorToHandle: unknown | undefined;
     let scheduler: Scheduler | undefined;
@@ -208,7 +131,7 @@ export async function runNonInteractive({
       }
 
       // Setup stdin cancellation listener
-      setupStdinCancellation();
+      cleanupStdinCancellation = setupStdinCancellation({ abortController });
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
