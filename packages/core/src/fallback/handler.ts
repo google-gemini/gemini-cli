@@ -46,10 +46,6 @@ export async function handleFallback(
   let fallbackModel: string;
 
   if (!candidates.length) {
-    if (failedModel !== activeModel) {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', activeModel, failedModel);
-    }
     fallbackModel = failedModel;
   } else {
     const selection = availability.selectFirstAvailable(
@@ -75,11 +71,21 @@ export async function handleFallback(
 
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
-    const activeModel = config.getActiveModel();
 
-    if (action === 'silent' || fallbackModel === activeModel) {
+    if (
+      action === 'silent' ||
+      (fallbackModel === activeModel && failedModel !== activeModel)
+    ) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', fallbackModel, failedModel);
+      // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
+      // For utility bypass, we want a hard runtime override, so pass failedModel.
+      const overrideFailedModel = action === 'silent' ? undefined : failedModel;
+      return processIntent(
+        config,
+        'retry_always',
+        fallbackModel,
+        overrideFailedModel,
+      );
     }
 
     // This will be used in the future when FallbackRecommendation is passed through UI

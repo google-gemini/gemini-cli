@@ -191,7 +191,7 @@ describe('handleFallback', () => {
         expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
         expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
-          MOCK_PRO_MODEL,
+          undefined,
         );
       } finally {
         chainSpy.mockRestore();
