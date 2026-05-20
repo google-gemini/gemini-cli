@@ -252,8 +252,6 @@ module.exports = async ({ github, context, core }) => {
             'connected',
             'reopened',
             'assigned',
-            'labeled',
-            'unlabeled',
           ].includes(e.event)
         ) {
           return true;
