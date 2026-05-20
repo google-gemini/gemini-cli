@@ -17,11 +17,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     homedir: () => mockHomeDir,
-    loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
-      memoryContent: 'mock memory',
-      fileCount: 10,
-      filePaths: ['/a/b/c.md'],
-    }),
   };
 });
 

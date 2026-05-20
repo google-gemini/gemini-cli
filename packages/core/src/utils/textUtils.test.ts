@@ -9,6 +9,8 @@ import {
   safeLiteralReplace,
   truncateString,
   safeTemplateReplace,
+  isBinary,
+  stripAnsiFromBuffer,
 } from './textUtils.js';
 
 describe('safeLiteralReplace', () => {
@@ -196,5 +198,123 @@ describe('safeTemplateReplace', () => {
     const tmpl = 'Value: {{val}}';
     const replacements = { val: '$&' };
     expect(safeTemplateReplace(tmpl, replacements)).toBe('Value: $&');
+  });
+});
+
+describe('stripAnsiFromBuffer', () => {
+  it('returns the buffer unchanged when no escape sequences are present', () => {
+    const input = Buffer.from('hello world');
+    expect(stripAnsiFromBuffer(input).toString()).toBe('hello world');
+  });
+
+  it('strips CSI sequences (ESC [ ... final)', () => {
+    // ESC[31m = red foreground, ESC[0m = reset
+    const input = Buffer.from('\x1b[31mhello\x1b[0m');
+    expect(stripAnsiFromBuffer(input).toString()).toBe('hello');
+  });
+
+  it('strips OSC sequences terminated by BEL', () => {
+    // OSC title set: ESC ] 0 ; title BEL
+    const input = Buffer.from('\x1b]0;My Title\x07some text');
+    expect(stripAnsiFromBuffer(input).toString()).toBe('some text');
+  });
+
+  it('strips OSC sequences terminated by ST (ESC \\)', () => {
+    const input = Buffer.from('\x1b]0;My Title\x1b\\some text');
+    expect(stripAnsiFromBuffer(input).toString()).toBe('some text');
+  });
+
+  it('strips simple two-byte escape sequences', () => {
+    // ESC D = Index (scroll down)
+    const input = Buffer.from('\x1bDhello');
+    expect(stripAnsiFromBuffer(input).toString()).toBe('hello');
+  });
+
+  it('handles multiple mixed escape sequences', () => {
+    const input = Buffer.from(
+      '\x1b[31m\x1b]0;title\x07hello\x1b[0m world\x1bD',
+    );
+    expect(stripAnsiFromBuffer(input).toString()).toBe('hello world');
+  });
+
+  it('returns empty buffer when input is only escape sequences', () => {
+    const input = Buffer.from('\x1b[31m\x1b[0m');
+    expect(stripAnsiFromBuffer(input).length).toBe(0);
+  });
+});
+
+describe('isBinary', () => {
+  describe('default mode (strict, for files/pipes)', () => {
+    it('returns false for null/undefined/empty input', () => {
+      expect(isBinary(null)).toBe(false);
+      expect(isBinary(undefined)).toBe(false);
+      expect(isBinary(Buffer.alloc(0))).toBe(false);
+    });
+
+    it('returns false for plain ASCII text', () => {
+      expect(isBinary(Buffer.from('hello world\n'))).toBe(false);
+    });
+
+    it('returns true when a single null byte is present', () => {
+      expect(isBinary(Buffer.from('hello\x00world'))).toBe(true);
+    });
+
+    it('returns true for binary data', () => {
+      const buf = Buffer.alloc(100, 0);
+      expect(isBinary(buf)).toBe(true);
+    });
+
+    it('only checks the first sampleSize bytes', () => {
+      const buf = Buffer.alloc(600, 0x41); // 'A' x 600
+      buf[550] = 0; // null byte outside default 512 sample
+      expect(isBinary(buf)).toBe(false);
+    });
+
+    it('detects null byte within custom sampleSize', () => {
+      const buf = Buffer.alloc(600, 0x41);
+      buf[550] = 0;
+      expect(isBinary(buf, 600)).toBe(true);
+    });
+  });
+
+  describe('PTY mode (isPtyOutput = true)', () => {
+    it('returns false for PTY output that is pure ANSI escape sequences', () => {
+      const buf = Buffer.from('\x1b[31m\x1b[0m');
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('returns false for text with ANSI sequences containing embedded null bytes', () => {
+      // Simulate Windows PTY: OSC title set with null bytes, followed by text
+      const osc = Buffer.from('\x1b]0;title\x00\x07');
+      const text = Buffer.from('hello world');
+      const buf = Buffer.concat([osc, text]);
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('returns false for a single stray null byte among text', () => {
+      const buf = Buffer.from('hello\x00world, this is a long text output');
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('returns true for actual binary data through PTY (>10% nulls after strip)', () => {
+      // 90 null bytes + 10 text bytes → 90% nulls = binary
+      const nulls = Buffer.alloc(90, 0);
+      const text = Buffer.from('abcdefghij');
+      const buf = Buffer.concat([nulls, text]);
+      expect(isBinary(buf, 512, true)).toBe(true);
+    });
+
+    it('returns false for realistic Windows PTY output with ANSI reset + text', () => {
+      // Simulates: color set, OSC title with a stray null, reset, then real output
+      const buf = Buffer.from(
+        '\x1b[?25l\x1b]0;\x00Window Title\x07\x1b[0mPS C:\\Users> echo hello\r\nhello\r\n',
+      );
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('returns false when the buffer is empty after stripping ANSI', () => {
+      const buf = Buffer.from('\x1b[31m\x1b[42m\x1b[0m');
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
   });
 });

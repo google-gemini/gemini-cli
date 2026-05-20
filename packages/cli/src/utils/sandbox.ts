@@ -55,6 +55,8 @@ export async function start_sandbox(
   });
   patcher.patch();
 
+  let stopProxy: (() => void) | undefined = undefined;
+
   try {
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
@@ -188,17 +190,18 @@ export async function start_sandbox(
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
-        const stopProxy = () => {
+        stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
-            process.kill(-proxyProcess.pid, 'SIGTERM');
+            try {
+              process.kill(-proxyProcess.pid, 'SIGTERM');
+            } catch {
+              // ignore
+            }
           }
         };
-        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -310,6 +313,10 @@ export async function start_sandbox(
     // use interactive mode and auto-remove container on exit
     // run init binary inside container to forward signals & reap zombies
     const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
+
+    // explicitly clear the entrypoint to prevent the container's default
+    // entrypoint from interfering with the CLI's spawn command.
+    args.push('--entrypoint', '');
 
     // add runsc runtime if using runsc
     if (config.command === 'runsc') {
@@ -490,27 +497,18 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus random suffix to avoid conflicts
+    // Use a random suffix instead of probing existing containers so concurrent
+    // CLI starts cannot race on the same sequential name.
     const imageName = parseImageName(image);
     const isIntegrationTest =
       process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
-    let containerName;
-    if (isIntegrationTest) {
-      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
-        'hex',
-      )}`;
-      debugLogger.log(`ContainerName: ${containerName}`);
-    } else {
-      let index = 0;
-      const containerNameCheck = (
-        await execAsync(`${command} ps -a --format "{{.Names}}"`)
-      ).stdout.trim();
-      while (containerNameCheck.includes(`${imageName}-${index}`)) {
-        index++;
-      }
-      containerName = `${imageName}-${index}`;
-      debugLogger.log(`ContainerName (regular): ${containerName}`);
-    }
+    const containerNamePrefix = isIntegrationTest
+      ? 'gemini-cli-integration-test'
+      : imageName;
+    const containerName = `${containerNamePrefix}-${randomBytes(6).toString(
+      'hex',
+    )}`;
+    debugLogger.log(`ContainerName: ${containerName}`);
     args.push('--name', containerName, '--hostname', containerName);
 
     // copy GEMINI_CLI_TEST_VAR for integration tests
@@ -682,22 +680,34 @@ export async function start_sandbox(
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
       const homeDir = getContainerPath(homedir());
-
-      const setupUserCommands = [
-        // Use -f with groupadd to avoid errors if the group already exists.
-        `groupadd -f -g ${gid} ${username}`,
-        // Create user only if it doesn't exist. Use -o for non-unique UID.
-        `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username}`,
-      ].join(' && ');
+      const quotedHomeDir = quote([homeDir]);
 
       const originalCommand = finalEntrypoint[2];
       const escapedOriginalCommand = originalCommand.replace(/'/g, "'\\''");
 
-      // Use `su -p` to preserve the environment.
-      const suCommand = `su -p ${username} -c '${escapedOriginalCommand}'`;
+      // Use defensive entrypoint logic that checks for useradd availability.
+      // This ensures we can support UID/GID mapping on distros that have these
+      // tools. If useradd is missing (e.g. on minimal images), we fail explicitly
+      // to avoid insecurely falling back to root execution with host mounts.
+      const defensiveEntrypoint = [
+        `if command -v useradd >/dev/null 2>&1; then`,
+        `  (groupadd -g ${gid} -o ${username} 2>/dev/null || true) &&`,
+        `  (id ${uid} >/dev/null 2>&1 || useradd -o -u ${uid} -g ${gid} -d ${quotedHomeDir} -s /bin/bash ${username} 2>/dev/null || true) &&`,
+        `  USER_NAME=$(id -nu ${uid} 2>/dev/null);`,
+        `  if [ -n "$USER_NAME" ]; then`,
+        `    su -p "$USER_NAME" -c '${escapedOriginalCommand}';`,
+        `  else`,
+        `    echo "Error: Failed to map host UID ${uid} to a user in the container." >&2;`,
+        `    exit 1;`,
+        `  fi`,
+        `else`,
+        `  echo "Error: 'useradd' not found in container. UID/GID mapping is required for Linux distros like NixOS/Arch to avoid permission issues. Please use a container image that includes standard user management tools (like 'ubuntu' or 'debian')." >&2;`,
+        `  exit 1;`,
+        `fi`,
+      ].join('\n');
 
       // The entrypoint is always `['bash', '-c', '<command>']`, so we modify the command part.
-      finalEntrypoint[2] = `${setupUserCommands} && ${suCommand}`;
+      finalEntrypoint[2] = defensiveEntrypoint;
 
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
@@ -722,6 +732,8 @@ export async function start_sandbox(
         'run',
         '--rm',
         '--init',
+        '--entrypoint',
+        '',
         ...(userFlag ? userFlag.split(' ') : []),
         '--name',
         SANDBOX_PROXY_NAME,
@@ -746,15 +758,18 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      const stopProxy = () => {
+      stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
+            stdio: 'ignore',
+          });
+        } catch {
+          // ignore
+        }
       };
-      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
@@ -806,6 +821,12 @@ export async function start_sandbox(
       });
     });
   } finally {
+    if (stopProxy) {
+      stopProxy();
+      process.off('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
+    }
     patcher.cleanup();
   }
 }

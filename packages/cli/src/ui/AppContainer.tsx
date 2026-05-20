@@ -47,7 +47,6 @@ import { MouseProvider } from './contexts/MouseContext.js';
 import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
-  type EditorType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -68,9 +67,9 @@ import {
   ShellExecutionService,
   saveApiKey,
   debugLogger,
+  isValidEditorType,
   coreEvents,
   CoreEvent,
-  refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -103,6 +102,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useVoiceModelCommand } from './hooks/useVoiceModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
@@ -172,7 +172,6 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   EXPAND_HINT_DURATION_MS,
 } from './constants.js';
-import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { parseSlashCommand } from '../utils/commands.js';
@@ -312,6 +311,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [shellModeActive, setShellModeActive] = useState(false);
+  const [isVoiceModeEnabled, setVoiceModeEnabled] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
@@ -496,16 +496,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.fireSessionStartEvent(sessionStartSource);
 
       if (result) {
-        if (result.systemMessage) {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: result.systemMessage,
-            },
-            Date.now(),
-          );
-        }
-
         const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
@@ -548,12 +538,6 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.error('Error during cleanup:', e),
       );
     };
-    // Disable the dependencies check here. historyManager gets flagged
-    // but we don't want to react to changes to it because each new history
-    // item, including the ones from the start session hook will cause a
-    // re-render and an error when we try to reload config.
-    //
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(
@@ -625,11 +609,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const getPreferredEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    () => settings.merged.general.preferredEditor as EditorType,
-    [settings.merged.general.preferredEditor],
-  );
+  const getPreferredEditor = useCallback(() => {
+    const val = settings.merged.general.preferredEditor;
+    return isValidEditorType(val) ? val : undefined;
+  }, [settings.merged.general.preferredEditor]);
 
   const buffer = useTextBuffer({
     initialText: '',
@@ -754,7 +737,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (authState === AuthState.Authenticated && authContext.requiresRestart) {
-      setAuthState(AuthState.AwaitingGoogleLoginRestart);
+      setAuthState(AuthState.AwaitingLoginRestart);
       setAuthContext({});
     }
   }, [authState, authContext, setAuthState]);
@@ -873,10 +856,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (apiKey: string) => {
       try {
         onAuthError(null);
-        if (!apiKey.trim() && apiKey.length > 1) {
-          onAuthError(
-            'API key cannot be empty string with length greater than 1.',
-          );
+        if (!apiKey.trim()) {
+          onAuthError('API key cannot be empty or whitespace only.');
           return;
         }
 
@@ -929,12 +910,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        onAuthError(error);
-      }
+      const authMethod = settings.merged.security.auth.selectedType;
+      void (async () => {
+        try {
+          const error = await validateAuthMethod(authMethod);
+          if (
+            error &&
+            authMethod === settings.merged.security.auth.selectedType
+          ) {
+            onAuthError(error);
+          }
+        } catch (e) {
+          if (authMethod === settings.merged.security.auth.selectedType) {
+            onAuthError(getErrorMessage(e));
+          }
+        }
+      })();
     }
   }, [
     settings.merged.security.auth.selectedType,
@@ -945,6 +936,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
+
+  const {
+    isVoiceModelDialogOpen,
+    openVoiceModelDialog,
+    closeVoiceModelDialog,
+  } = useVoiceModelCommand();
 
   const { toggleVimEnabled } = useVimMode();
 
@@ -969,6 +966,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
@@ -981,6 +979,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
+      toggleVoiceMode: () => setVoiceModeEnabled((prev) => !prev),
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
@@ -1006,6 +1005,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
       setDebugMessage,
@@ -1073,19 +1073,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      let flattenedMemory: string;
-      let fileCount: number;
-
-      if (config.isJitContextEnabled()) {
-        await config.getMemoryContextManager()?.refresh();
-        config.updateSystemInstructionIfInitialized();
-        flattenedMemory = flattenMemory(config.getUserMemory());
-        fileCount = config.getGeminiMdFileCount();
-      } else {
-        const result = await refreshServerHierarchicalMemory(config);
-        flattenedMemory = flattenMemory(result.memoryContent);
-        fileCount = result.fileCount;
-      }
+      await config.getMemoryContextManager()?.refresh();
+      config.updateSystemInstructionIfInitialized();
+      const flattenedMemory = flattenMemory(config.getUserMemory());
+      const fileCount = config.getGeminiMdFileCount();
 
       historyManager.addItem(
         {
@@ -1119,18 +1110,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [config, historyManager]);
 
-  const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
-    () => {},
-  );
+  const cancelHandlerRef = useRef<
+    (shouldRestorePrompt?: boolean, clearBuffer?: boolean) => void
+  >(() => {});
 
-  const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
-    if (shouldRestorePrompt) {
-      setPendingRestorePrompt(true);
-    } else {
-      setPendingRestorePrompt(false);
-      cancelHandlerRef.current(false);
-    }
-  }, []);
+  const onCancelSubmit = useCallback(
+    (shouldRestorePrompt?: boolean, clearBuffer: boolean = false) => {
+      if (shouldRestorePrompt) {
+        setPendingRestorePrompt(true);
+      } else {
+        setPendingRestorePrompt(false);
+        cancelHandlerRef.current(false, clearBuffer);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (pendingRestorePrompt) {
@@ -1299,6 +1293,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isMcpReady } = useMcpStatus(config);
 
+  const isCompressing = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) =>
+          item.type === MessageType.COMPRESSION && item.compression.isPending,
+      ),
+    [pendingHistoryItems],
+  );
+
   const {
     messageQueue,
     addMessage,
@@ -1310,21 +1313,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
     isMcpReady,
+    isCompressing,
   });
 
   cancelHandlerRef.current = useCallback(
-    (shouldRestorePrompt: boolean = true) => {
-      if (isToolAwaitingConfirmation(pendingHistoryItems)) {
+    (shouldRestorePrompt: boolean = true, clearBuffer: boolean = false) => {
+      if (!clearBuffer && isToolAwaitingConfirmation(pendingHistoryItems)) {
         return; // Don't clear - user may be composing a follow-up message
       }
-      if (isToolExecuting(pendingHistoryItems)) {
-        buffer.setText(''); // Clear for Ctrl+C cancellation
-        return;
-      }
 
-      // If cancelling (shouldRestorePrompt=false), never modify the buffer
-      // User is in control - preserve whatever text they typed, pasted, or restored
+      // If cancelling (shouldRestorePrompt=false):
       if (!shouldRestorePrompt) {
+        // Clear the buffer if explicitly requested (e.g., Ctrl+C)
+        if (clearBuffer) {
+          buffer.setText('');
+        }
+        // Otherwise (e.g., Escape), user is in control - preserve whatever text they typed
         return;
       }
 
@@ -1404,7 +1408,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+      if (
+        (isSlash && isConfigInitialized) ||
+        (!isCompressing && isIdle && isMcpOrConfigReady)
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1427,7 +1434,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
+        if (
+          isIdle &&
+          !isCompressing &&
+          !isMcpOrConfigReady &&
+          messageQueue.length === 0
+        ) {
           coreEvents.emitFeedback(
             'info',
             !isConfigInitialized
@@ -1447,6 +1459,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       isMcpReady,
       streamingState,
+      isCompressing,
       messageQueue.length,
       pendingHistoryItems,
       config,
@@ -2176,8 +2189,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
+  const loginRestartMessage =
+    settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
+
   const dialogsVisible =
-    shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
@@ -2191,6 +2209,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
@@ -2204,6 +2223,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
+    isAwaitingLoginRestart ||
     !!newAgents;
 
   const hasPendingToolConfirmation = useMemo(
@@ -2437,6 +2457,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      isAwaitingLoginRestart,
+      loginRestartMessage,
       apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
@@ -2448,6 +2470,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2468,6 +2491,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -2559,6 +2583,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2579,6 +2604,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
@@ -2638,6 +2664,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       apiKeyDefaultValue,
       authState,
+      isAwaitingLoginRestart,
+      loginRestartMessage,
       transientMessage,
       bannerData,
       bannerVisible,
@@ -2671,6 +2699,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
@@ -2710,6 +2740,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundTaskPid,
       setIsBackgroundTaskListOpen,
       setAuthContext,
+      dismissLoginRestart: () => {
+        setAuthContext({});
+        setAuthState(AuthState.Updating);
+      },
       onHintInput: () => {},
       onHintBackspace: () => {},
       onHintClear: () => {},
@@ -2751,6 +2785,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setAccountSuspensionInfo(null);
         setAuthState(AuthState.Updating);
       },
+      setVoiceModeEnabled: (value: boolean) => {
+        setVoiceModeEnabled(value);
+      },
     }),
     [
       handleThemeSelect,
@@ -2764,6 +2801,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
@@ -2807,20 +2846,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       historyManager,
       getPreferredEditor,
+      setVoiceModeEnabled,
     ],
   );
-
-  if (authState === AuthState.AwaitingGoogleLoginRestart) {
-    return (
-      <LoginWithGoogleRestartDialog
-        onDismiss={() => {
-          setAuthContext({});
-          setAuthState(AuthState.Updating);
-        }}
-        config={config}
-      />
-    );
-  }
 
   return (
     <UIStateContext.Provider value={uiState}>

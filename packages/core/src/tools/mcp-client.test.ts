@@ -40,11 +40,13 @@ import {
   discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
+import { McpComplianceTransport } from './mcp-compliance-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
@@ -70,9 +72,18 @@ const MOCK_CONTEXT_DEFAULT = {
 
 let MOCK_CONTEXT: McpContext = MOCK_CONTEXT_DEFAULT;
 
+const unwrap = (t: any) =>
+  t instanceof McpComplianceTransport ? t.transport : t;
+
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
+vi.mock('undici', () => ({
+  EnvHttpProxyAgent: vi.fn(),
+  fetch: vi.fn(),
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+}));
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
@@ -105,9 +116,11 @@ describe('mcp-client', () => {
     workspaceContext = new WorkspaceContext(testWorkspace);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
     vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
+    vi.restoreAllMocks();
   });
 
   describe('McpClient', () => {
@@ -797,6 +810,102 @@ describe('mcp-client', () => {
             type: 'string',
             description: 'A defined type',
           },
+        },
+      });
+    });
+
+    it('should transform nullable array schemas and preserve properties during discovery', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'nullableTool',
+              description: 'Tool with nullable array',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  tags: {
+                    type: ['array', 'null'],
+                    items: { type: 'string' },
+                  },
+                },
+                $defs: {
+                  SomeType: { type: 'string' },
+                },
+              },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [],
+        }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getToolsByServer: vi.fn().mockReturnValue([]),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        getResourcesByServer: vi.fn().mockReturnValue([]),
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      const registeredTool = vi.mocked(mockedToolRegistry.registerTool).mock
+        .calls[0][0];
+      expect(registeredTool.schema.parametersJsonSchema).toEqual({
+        type: 'object',
+        properties: {
+          tags: {
+            type: 'array',
+            nullable: true,
+            items: { type: 'string' },
+          },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
+        },
+        $defs: {
+          SomeType: { type: 'string' },
         },
       });
     });
@@ -1776,42 +1885,339 @@ describe('mcp-client', () => {
   });
 
   describe('createTransport', () => {
+    it('should create an HTTP transport that respects NO_PROXY', async () => {
+      const { createTransport } = await import('./mcp-client.js');
+      const { EnvHttpProxyAgent } = await import('undici');
+      const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      await createTransport(
+        'test-server',
+        {
+          url: 'http://test-server',
+          type: 'http',
+        },
+        false,
+        MOCK_CONTEXT,
+      );
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: noProxyValue,
+        }),
+      );
+    });
+
     describe('should connect via httpUrl', () => {
-      it('without headers', async () => {
+      it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            token: {
+              accessToken: 'fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
+        } as unknown as MCPOAuthTokenStorage);
+
         const transport = await createTransport(
           'test-server',
           {
-            httpUrl: 'http://test-server',
+            url: 'http://test-server',
+            type: 'http',
+            oauth: { enabled: true },
           },
           false,
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
-          _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('fresh-token');
+      });
+      it('uses storage-backed expiry instead of long fallback cache for dynamic authProvider', async () => {
+        const now = Date.now();
+        const soonExpiry = now + 10 * 60 * 1000; // 10 minutes
+
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: soonExpiry,
         });
+        const mockGetCredentials = vi.fn().mockImplementation(async () => ({
+          clientId: 'cid',
+          token: {
+            accessToken: 'fresh-token',
+            tokenType: 'Bearer',
+            expiresAt: soonExpiry,
+          },
+        }));
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<
+              { access_token: string; expires_in?: number } | undefined
+            >;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('fresh-token');
+        expect(tokens?.expires_in).toBeDefined();
+        expect((tokens?.expires_in ?? 0) <= 10 * 60).toBe(true);
+
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(1);
+        expect(mockGetCredentials).toHaveBeenCalledTimes(1);
+      });
+      it('uses dynamic authProvider when stored OAuth token exists', async () => {
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'stored-fresh-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            token: {
+              accessToken: 'stored-fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('stored-fresh-token');
+      });
+      it('caches OAuth tokens in dynamic authProvider and avoids repeated lookups', async () => {
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'cached-token',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        });
+        const mockGetCredentials = vi.fn().mockResolvedValue({
+          clientId: 'cid',
+          token: {
+            accessToken: 'cached-token',
+            tokenType: 'Bearer',
+            expiresAt: Date.now() + 10 * 60 * 1000,
+          },
+        });
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const t1 = await testableTransport._authProvider!.tokens();
+        const t2 = await testableTransport._authProvider!.tokens();
+
+        expect(t1?.access_token).toBe('cached-token');
+        expect(t2?.access_token).toBe('cached-token');
+
+        // one call from createTransport fallback detection + one call in first tokens();
+        // second tokens() should come from in-memory cache
+        expect(mockGetCredentials).toHaveBeenCalledTimes(1);
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(1);
+      });
+      it('does not long-cache token when metadata has no expiresAt', async () => {
+        const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
+          accessToken: 'no-exp-token',
+          tokenType: 'Bearer',
+          // expiresAt intentionally omitted
+        });
+
+        const mockGetCredentials = vi.fn().mockResolvedValue({
+          clientId: 'cid',
+          token: {
+            accessToken: 'no-exp-token',
+            tokenType: 'Bearer',
+            // expiresAt intentionally omitted
+          },
+        });
+
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidTokenWithMetadata: mockGetValidTokenWithMetadata,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: mockGetCredentials,
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: {
+            tokens: () => Promise<
+              { access_token: string; expires_in?: number } | undefined
+            >;
+          };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+
+        const t1 = await testableTransport._authProvider!.tokens();
+        const t2 = await testableTransport._authProvider!.tokens();
+
+        expect(t1?.access_token).toBe('no-exp-token');
+        expect(t2?.access_token).toBe('no-exp-token');
+        expect(t1?.expires_in).toBeUndefined();
+        expect(t2?.expires_in).toBeUndefined();
+
+        // no-expiry tokens should not be long-cached in memory
+        expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(2);
       });
 
-      it('with headers', async () => {
-        const transport = await createTransport(
-          'test-server',
-          {
-            httpUrl: 'http://test-server',
-            headers: { Authorization: 'derp' },
-          },
-          false,
-          MOCK_CONTEXT,
-        );
+      it('wraps fetch to convert GET 404 to 405 for POST-only servers (e.g. n8n)', async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(
+            new Response(null, { status: 404, statusText: 'Not Found' }),
+          );
+        vi.stubGlobal('fetch', mockFetch);
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
-          _url: new URL('http://test-server'),
-          _requestInit: {
-            headers: { Authorization: 'derp' },
-          },
-        });
+        try {
+          const transport = await createTransport(
+            'test-server',
+            { httpUrl: 'http://test-server' },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          const wrappedFetch = (
+            unwrap(transport) as unknown as {
+              _fetch: (
+                url: URL | string,
+                init?: RequestInit,
+              ) => Promise<Response>;
+            }
+          )._fetch;
+
+          // GET 404 → 405: server doesn't support optional SSE GET stream
+          const getRes = await wrappedFetch('http://test-server', {
+            method: 'GET',
+          });
+          expect(getRes.status).toBe(405);
+          expect(getRes.statusText).toBe('Method Not Allowed');
+
+          // POST 404 → unchanged: real "not found" errors must still propagate
+          const postRes = await wrappedFetch('http://test-server', {
+            method: 'POST',
+          });
+          expect(postRes.status).toBe(404);
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+
+      it('respects NO_PROXY for network transports', async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response('OK', { status: 200 }));
+        vi.stubGlobal('fetch', mockFetch);
+        vi.stubEnv('NO_PROXY', 'localhost');
+
+        try {
+          const transport = await createTransport(
+            'test-server',
+            { url: 'http://localhost/sse', type: 'sse' },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          // For SSEClientTransport, the fetch is private or passed to the SDK.
+          // We can check if it creates the transport successfully.
+          expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        } finally {
+          vi.unstubAllEnvs();
+          vi.unstubAllGlobals();
+        }
       });
     });
 
@@ -1825,8 +2231,8 @@ describe('mcp-client', () => {
           false,
           MOCK_CONTEXT,
         );
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -1843,8 +2249,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { Authorization: 'derp' },
@@ -1863,8 +2269,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -1881,8 +2287,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -1898,8 +2304,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -1917,8 +2323,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { Authorization: 'Bearer token' },
@@ -1938,8 +2344,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { 'X-API-Key': 'key123' },
@@ -1959,8 +2365,8 @@ describe('mcp-client', () => {
         );
 
         // httpUrl should take priority and create HTTP transport
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server-http'),
           _requestInit: { headers: {} },
         });
@@ -2185,8 +2591,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
         const googUserProject =
@@ -2216,9 +2624,11 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(mockGetRequestHeaders).toHaveBeenCalled();
-        const testableTransport = transport as unknown as TestableTransport;
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const headers = testableTransport._requestInit?.headers;
         expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
@@ -2248,8 +2658,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const headers = testableTransport._requestInit?.headers;
         expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
@@ -2269,8 +2681,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
       });
@@ -2410,7 +2824,10 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2437,7 +2854,7 @@ describe('connectToMcpServer with OAuth', () => {
     let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport as unknown as TestableTransport;
+        capturedTransport = unwrap(transport) as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2455,8 +2872,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
-    const authHeader = (capturedTransport as TestableTransport)._requestInit
-      ?.headers?.['Authorization'];
+    const authHeader = (unwrap(capturedTransport) as TestableTransport)
+      ._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token');
   });
 
@@ -2482,7 +2899,7 @@ describe('connectToMcpServer with OAuth', () => {
     let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport as unknown as TestableTransport;
+        capturedTransport = unwrap(transport) as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2501,8 +2918,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
 
-    const authHeader = (capturedTransport as TestableTransport)._requestInit
-      ?.headers?.['Authorization'];
+    const authHeader = (unwrap(capturedTransport) as TestableTransport)
+      ._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
 
@@ -2617,7 +3034,10 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2780,7 +3200,10 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });

@@ -26,6 +26,8 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  SHELL_TOOL_NAME,
+  hasRedirection,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -224,10 +226,13 @@ export const useGeminiStream = (
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: (error: string) => void,
-  performMemoryRefresh: () => Promise<void>,
+  _performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -261,7 +266,6 @@ export const useGeminiStream = (
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
-  const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const logger = useLogger(config);
   const gitService = useMemo(() => {
@@ -803,100 +807,129 @@ export const useGeminiStream = (
     [addItem, config, isLowErrorVerbosity],
   );
 
-  const cancelOngoingRequest = useCallback(() => {
-    if (
-      streamingState !== StreamingState.Responding &&
-      streamingState !== StreamingState.WaitingForConfirmation
-    ) {
-      return;
-    }
-    if (turnCancelledRef.current) {
-      return;
-    }
-    turnCancelledRef.current = true;
-    setRetryStatus(null);
-
-    // A full cancellation means no tools have produced a final result yet.
-    // This determines if we show a generic "Request cancelled" message.
-    const isFullCancellation = !toolCalls.some(
-      (tc) => tc.status === 'success' || tc.status === 'error',
-    );
-
-    // Ensure we have an abort controller, creating one if it doesn't exist.
-    if (!abortControllerRef.current) {
-      abortControllerRef.current = new AbortController();
-    }
-
-    // The order is important here.
-    // 1. Fire the signal to interrupt any active async operations.
-    abortControllerRef.current.abort();
-    // 2. Call the imperative cancel to clear the queue of pending tools.
-    cancelAllToolCalls(abortControllerRef.current.signal);
-
-    if (pendingHistoryItemRef.current) {
-      const isShellCommand =
-        pendingHistoryItemRef.current.type === 'tool_group' &&
-        pendingHistoryItemRef.current.tools.some(
-          (t) => t.name === SHELL_COMMAND_NAME,
-        );
-
-      // If it is a shell command, we update the status to Canceled and clear the output
-      // to avoid artifacts, then add it to history immediately.
-      if (isShellCommand) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
-        const updatedTools = toolGroup.tools.map((tool) => {
-          if (tool.name === SHELL_COMMAND_NAME) {
-            return {
-              ...tool,
-              status: CoreToolCallStatus.Cancelled,
-              resultDisplay: tool.resultDisplay,
-            };
-          }
-          return tool;
-        });
-        addItem({ ...toolGroup, tools: updatedTools } as HistoryItemWithoutId);
-      } else {
-        addItem(pendingHistoryItemRef.current);
+  const cancelOngoingRequest = useCallback(
+    (clearBuffer: boolean = true) => {
+      // If we are already cancelled, do nothing
+      if (turnCancelledRef.current) {
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
-    setPendingHistoryItem(null);
 
-    // If it was a full cancellation, add the info message now.
-    // Otherwise, we let handleCompletedTools figure out the next step,
-    // which might involve sending partial results back to the model.
-    if (isFullCancellation) {
-      // If shell is active, we delay this message to ensure correct ordering
-      // (Shell item first, then Info message).
-      if (!activeShellPtyId) {
-        addItem({
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        });
-        setIsResponding(false);
+      const hasActiveTools = toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          tc.status === CoreToolCallStatus.Scheduled ||
+          tc.status === CoreToolCallStatus.Validating,
+      );
+
+      // If we are not responding, not waiting for confirmation, and have no active tools,
+      // there is nothing to abort.
+      if (
+        streamingState === StreamingState.Idle &&
+        !isRespondingRef.current &&
+        !hasActiveTools
+      ) {
+        // Even if we are "idle", if we are called with clearBuffer=true (Ctrl+C),
+        // we still want to clear the buffer.
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
 
-    onCancelSubmit(false);
-    setShellInputFocused(false);
-  }, [
-    streamingState,
-    addItem,
-    setPendingHistoryItem,
-    onCancelSubmit,
-    pendingHistoryItemRef,
-    setShellInputFocused,
-    cancelAllToolCalls,
-    toolCalls,
-    activeShellPtyId,
-    setIsResponding,
-  ]);
+      turnCancelledRef.current = true;
+      setRetryStatus(null);
+
+      // A full cancellation means no tools have produced a final result yet.
+      // This determines if we show a generic "Request cancelled" message.
+      const isFullCancellation = !toolCalls.some(
+        (tc) => tc.status === 'success' || tc.status === 'error',
+      );
+
+      // Ensure we have an abort controller, creating one if it doesn't exist.
+      if (!abortControllerRef.current) {
+        abortControllerRef.current = new AbortController();
+      }
+
+      // The order is important here.
+      // 1. Fire the signal to interrupt any active async operations.
+      abortControllerRef.current.abort();
+      // 2. Call the imperative cancel to clear the queue of pending tools.
+      cancelAllToolCalls(abortControllerRef.current.signal);
+
+      if (pendingHistoryItemRef.current) {
+        // If it is a shell command, we update the status to Canceled and clear the output
+        // to avoid artifacts, then add it to history immediately.
+        if (
+          pendingHistoryItemRef.current.type === 'tool_group' &&
+          pendingHistoryItemRef.current.tools.some(
+            (t) => t.name === SHELL_COMMAND_NAME,
+          )
+        ) {
+          const toolGroup = pendingHistoryItemRef.current;
+          const updatedTools = toolGroup.tools.map((tool) => {
+            if (tool.name === SHELL_COMMAND_NAME) {
+              return {
+                ...tool,
+                status: CoreToolCallStatus.Cancelled,
+                resultDisplay: tool.resultDisplay,
+              };
+            }
+            return tool;
+          });
+          const newToolGroup: HistoryItemToolGroup = {
+            ...toolGroup,
+            tools: updatedTools,
+          };
+          addItem(newToolGroup);
+        } else {
+          addItem(pendingHistoryItemRef.current);
+        }
+      }
+      setPendingHistoryItem(null);
+
+      // If it was a full cancellation, add the info message now.
+      // Otherwise, we let handleCompletedTools figure out the next step,
+      // which might involve sending partial results back to the model.
+      if (isFullCancellation) {
+        // If shell is active, we delay this message to ensure correct ordering
+        // (Shell item first, then Info message).
+        if (!activeShellPtyId) {
+          addItem({
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          });
+          setIsResponding(false);
+        }
+      }
+
+      onCancelSubmit(false, clearBuffer);
+      setShellInputFocused(false);
+    },
+    [
+      streamingState,
+      addItem,
+      setPendingHistoryItem,
+      onCancelSubmit,
+      pendingHistoryItemRef,
+      isRespondingRef,
+      setShellInputFocused,
+      cancelAllToolCalls,
+      toolCalls,
+      activeShellPtyId,
+      setIsResponding,
+    ],
+  );
 
   useKeypress(
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
-        cancelOngoingRequest();
+        cancelOngoingRequest(false);
+        return true;
       }
+      return false;
     },
     {
       isActive:
@@ -1638,7 +1671,6 @@ export const useGeminiStream = (
                 abortSignal,
                 prompt_id!,
                 undefined,
-                false,
                 query,
               );
               const processingStatus = await processGeminiStreamEvents(
@@ -1789,10 +1821,21 @@ export const useGeminiStream = (
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
+        // or shell commands with redirection (which act as edits).
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) =>
-            EDIT_TOOL_NAMES.has(call.request.name),
-          );
+          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) => {
+            if (EDIT_TOOL_NAMES.has(call.request.name)) {
+              return true;
+            }
+
+            if (call.request.name === SHELL_TOOL_NAME) {
+              const command = (call.request.args as { command?: string })
+                .command;
+              return command && hasRedirection(command);
+            }
+
+            return false;
+          });
         }
 
         // Process pending tool calls sequentially to reduce UI chaos
@@ -1853,8 +1896,8 @@ export const useGeminiStream = (
         if (geminiClient) {
           for (const tool of clientTools) {
             // Only manually record skill activations in the chat history.
-            // Other client-initiated tools (like save_memory) update the system
-            // prompt/context and don't strictly need to be in the history.
+            // Other client-initiated tools update context and don't strictly
+            // need to be in the history.
             if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
               continue;
             }
@@ -1881,14 +1924,6 @@ export const useGeminiStream = (
         }
       }
 
-      // Identify new, successful save_memory calls that we haven't processed yet.
-      const newSuccessfulMemorySaves = completedAndReadyToSubmitTools.filter(
-        (t) =>
-          t.request.name === 'save_memory' &&
-          t.status === 'success' &&
-          !processedMemoryToolsRef.current.has(t.request.callId),
-      );
-
       for (const toolCall of completedAndReadyToSubmitTools) {
         const backgroundedTool = getBackgroundedToolInfo(toolCall);
         if (backgroundedTool) {
@@ -1898,15 +1933,6 @@ export const useGeminiStream = (
             backgroundedTool.initialOutput,
           );
         }
-      }
-
-      if (newSuccessfulMemorySaves.length > 0) {
-        // Perform the refresh only if there are new ones.
-        void performMemoryRefresh();
-        // Mark them as processed so we don't do this again on the next render.
-        newSuccessfulMemorySaves.forEach((t) =>
-          processedMemoryToolsRef.current.add(t.request.callId),
-        );
       }
 
       const geminiTools = completedAndReadyToSubmitTools.filter(
@@ -2032,7 +2058,6 @@ export const useGeminiStream = (
       submitQuery,
       markToolsAsSubmitted,
       geminiClient,
-      performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundTask,

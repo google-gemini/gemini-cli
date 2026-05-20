@@ -138,7 +138,6 @@ These are the only allowed tools:
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
-- **Memory:** [`save_memory`](../tools/memory.md)
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
   instructions and resources in a read-only manner)
 
@@ -470,7 +469,8 @@ associated plan files and task trackers.
 
 - **Default behavior:** Sessions (and their plans) are retained for **30 days**.
 - **Configuration:** You can customize this behavior via the `/settings` command
-  (search for **Session Retention**) or in your `settings.json` file. See
+  (search for **Enable Session Cleanup** or **Keep chat history**) or in your
+  `settings.json` file. See
   [session retention](../cli/session-management.md#session-retention) for more
   details.
 

@@ -19,6 +19,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: 'main'
+          persist-credentials: false
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -28,6 +29,8 @@ jobs:
       - name: 'Run Docs Audit with Gemini'
         id: 'run_gemini'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |

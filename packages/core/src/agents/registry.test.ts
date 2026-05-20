@@ -250,11 +250,11 @@ describe('AgentRegistry', () => {
       };
 
       vi.mocked(tomlLoader.loadAgentsFromDirectory)
-        .mockResolvedValueOnce({ agents: [userAgent], errors: [] }) // User dir
         .mockResolvedValueOnce({
           agents: [projectAgent, uniqueProjectAgent],
           errors: [],
-        }); // Project dir
+        }) // Project dir
+        .mockResolvedValueOnce({ agents: [userAgent], errors: [] }); // User dir
 
       await registry.initialize();
 
@@ -459,7 +459,7 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      // Verify ackService was called with the URL, not the file hash
+      // Verify ackService was called with the raw URL to avoid breaking changes
       expect(ackService.isAcknowledged).toHaveBeenCalledWith(
         expect.anything(),
         'RemoteAgent',
@@ -467,7 +467,6 @@ describe('AgentRegistry', () => {
       );
 
       // Also verify that the agent's metadata was updated to use the URL as hash
-      // Use getDefinition because registerAgent might have been called
       expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
         'https://example.com/card',
       );
@@ -1012,7 +1011,7 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should overwrite an existing agent definition', async () => {
+    it('should NOT overwrite an existing agent definition', async () => {
       await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')?.description).toBe(
         'Mock Description V1',
@@ -1020,36 +1019,22 @@ describe('AgentRegistry', () => {
 
       await registry.testRegisterAgent(MOCK_AGENT_V2);
       expect(registry.getDefinition('MockAgent')?.description).toBe(
-        'Mock Description V2 (Updated)',
+        'Mock Description V1',
       );
       expect(registry.getAllDefinitions()).toHaveLength(1);
     });
 
-    it('should log overwrites when in debug mode', async () => {
-      const debugConfig = makeMockedConfig({ debugMode: true });
-      const debugRegistry = new TestableAgentRegistry(debugConfig);
-      const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
-        .mockImplementation(() => {});
-
-      await debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
-      await debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
-
-      expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
-      );
-    });
-
-    it('should not log overwrites when not in debug mode', async () => {
-      const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+    it('should emit warning on duplicate agent definition', async () => {
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
         .mockImplementation(() => {});
 
       await registry.testRegisterAgent(MOCK_AGENT_V1);
       await registry.testRegisterAgent(MOCK_AGENT_V2);
 
-      expect(debugLogSpy).not.toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining("Duplicate agent name 'MockAgent' detected"),
       );
     });
 

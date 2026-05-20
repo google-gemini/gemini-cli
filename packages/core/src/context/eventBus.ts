@@ -7,6 +7,12 @@
 import { EventEmitter } from 'node:events';
 import type { ConcreteNode } from './graph/types.js';
 
+export interface ProcessorResultEvent {
+  processorId: string;
+  targets: readonly ConcreteNode[];
+  returnedNodes: readonly ConcreteNode[];
+}
+
 export interface PristineHistoryUpdatedEvent {
   nodes: readonly ConcreteNode[];
   newNodes: Set<string>;
@@ -23,7 +29,20 @@ export interface ChunkReceivedEvent {
   targetNodeIds: Set<string>;
 }
 
+export interface TokenGroundTruthEvent {
+  actualTokens: number;
+  promptBaseUnits: number;
+}
+
 export class ContextEventBus extends EventEmitter {
+  emitTokenGroundTruth(event: TokenGroundTruthEvent) {
+    this.emit('TOKEN_GROUND_TRUTH', event);
+  }
+
+  onTokenGroundTruth(listener: (event: TokenGroundTruthEvent) => void) {
+    this.on('TOKEN_GROUND_TRUTH', listener);
+  }
+
   emitPristineHistoryUpdated(event: PristineHistoryUpdatedEvent) {
     this.emit('PRISTINE_HISTORY_UPDATED', event);
   }
@@ -48,5 +67,13 @@ export class ContextEventBus extends EventEmitter {
 
   onConsolidationNeeded(listener: (event: ContextConsolidationEvent) => void) {
     this.on('BUDGET_RETAINED_CROSSED', listener);
+  }
+
+  emitProcessorResult(event: ProcessorResultEvent) {
+    this.emit('PROCESSOR_RESULT', event);
+  }
+
+  onProcessorResult(listener: (event: ProcessorResultEvent) => void) {
+    this.on('PROCESSOR_RESULT', listener);
   }
 }

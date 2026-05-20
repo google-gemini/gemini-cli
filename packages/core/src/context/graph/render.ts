@@ -6,17 +6,17 @@
 
 import type { Content } from '@google/genai';
 import type { ConcreteNode } from './types.js';
-import { debugLogger } from '../../utils/debugLogger.js';
-import type {
-  ContextEnvironment,
-  ContextTracer,
-} from '../pipeline/environment.js';
-import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
+import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
+import { performCalibration } from '../utils/tokenCalibration.js';
+import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
+import type { HistoryTurn } from '../../core/agentChatHistory.js';
 
 /**
- * Orchestrates the final render: takes a working buffer view (The Nodes),
- * applies the Immediate Sanitization pipeline, and enforces token boundaries.
+ * Maps the Episodic Context Graph back into a list of HistoryTurns for transmission.
+ * It applies synchronous context management (GC backstop) if the budget is exceeded.
  */
 export async function render(
   nodes: readonly ConcreteNode[],
@@ -24,47 +24,98 @@ export async function render(
   sidecar: ContextProfile,
   tracer: ContextTracer,
   env: ContextEnvironment,
-  protectedIds: Set<string>,
-): Promise<Content[]> {
+  advancedTokenCalculator: AdvancedTokenCalculator,
+  protectionReasons: Map<string, string> = new Map(),
+  header?: Content,
+  previewNodeIds: ReadonlySet<string> = new Set(),
+): Promise<{
+  history: HistoryTurn[];
+  didApplyManagement: boolean;
+  baseUnits: number;
+  processedNodes: readonly ConcreteNode[];
+}> {
+  let headerTokens = 0;
+  let headerBaseUnits = 0;
+  if (header) {
+    const costs =
+      advancedTokenCalculator.calculateContentTokensAndBaseUnits(header);
+    headerTokens = costs.tokens;
+    headerBaseUnits = costs.baseUnits;
+  }
+
   if (!sidecar.config.budget) {
-    const contents = env.graphMapper.fromGraph(nodes);
+    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
+    const contents = env.graphMapper.fromGraph(visibleNodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
-    return contents;
+
+    // In all cases, retrieve raw base units from the token calculator interface
+    const baseUnits =
+      advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
+
+    return {
+      history: contents,
+      didApplyManagement: false,
+      baseUnits,
+      processedNodes: nodes,
+    };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
-  const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
-  // V0: Always protect the first node (System Prompt) and the last turn
-  if (nodes.length > 0) {
-    protectedIds.add(nodes[0].id);
-    if (nodes[0].logicalParentId) protectedIds.add(nodes[0].logicalParentId);
+  const { tokens: graphTokens, baseUnits: graphBaseUnits } =
+    advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
 
-    const lastNode = nodes[nodes.length - 1];
-    protectedIds.add(lastNode.id);
-    if (lastNode.logicalParentId) protectedIds.add(lastNode.logicalParentId);
-  }
+  const currentTokens = graphTokens + headerTokens;
+
+  const protectedIds = new Set(protectionReasons.keys());
+
+  tracer.logEvent('Render', 'Budget Audit', {
+    maxTokens,
+    retainedTokens: sidecar.config.budget.retainedTokens,
+    graphTokens,
+    headerTokens,
+    currentTokens,
+    pressure: (currentTokens / maxTokens).toFixed(2),
+    isOverBudget: currentTokens > maxTokens,
+  });
+
+  tracer.logEvent('Render', 'Estimation Calibration', {
+    breakdown: env.tokenCalculator.calculateTokenBreakdown(nodes),
+  });
+
+  tracer.logEvent('Render', 'Protection Audit', {
+    reasons: Object.fromEntries(protectionReasons),
+  });
 
   if (currentTokens <= maxTokens) {
     tracer.logEvent(
       'Render',
       `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
     );
-    const contents = env.graphMapper.fromGraph(nodes);
+    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
+    const contents = env.graphMapper.fromGraph(visibleNodes);
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
-    return contents;
+    performCalibration(
+      env,
+      visibleNodes,
+      contents.map((h) => h.content),
+    );
+    return {
+      history: contents,
+      didApplyManagement: false,
+      baseUnits: graphBaseUnits + headerBaseUnits,
+      processedNodes: nodes,
+    };
   }
-
+  const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
   tracer.logEvent(
     'Render',
     `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier.`,
-  );
-  debugLogger.log(
-    `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
+    { targetDelta },
   );
 
   // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
@@ -73,9 +124,12 @@ export async function render(
   // Start from newest and count backwards
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
+    const priorTokens = rollingTokens;
     const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
     rollingTokens += nodeTokens;
-    if (rollingTokens > sidecar.config.budget.retainedTokens) {
+
+    // Loose Boundary Policy: Keep the node that crosses the boundary
+    if (priorTokens > sidecar.config.budget.retainedTokens) {
       agedOutNodes.add(node.id);
     }
   }
@@ -87,16 +141,6 @@ export async function render(
     protectedIds,
   );
 
-  const finalTokens =
-    env.tokenCalculator.calculateConcreteListTokens(processedNodes);
-  tracer.logEvent(
-    'Render',
-    `Finished rendering. Final token count: ${finalTokens}.`,
-  );
-  debugLogger.log(
-    `Context Manager finished. Final actual token count: ${finalTokens}.`,
-  );
-
   // Apply skipList logic to abstract over summarized nodes
   const skipList = new Set<string>();
   for (const node of processedNodes) {
@@ -105,11 +149,24 @@ export async function render(
     }
   }
 
-  const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
+  const visibleNodes = processedNodes.filter(
+    (n) => !skipList.has(n.id) && !previewNodeIds.has(n.id),
+  );
 
   const contents = env.graphMapper.fromGraph(visibleNodes);
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
-  return contents;
+  performCalibration(
+    env,
+    visibleNodes,
+    contents.map((h) => h.content),
+  );
+  return {
+    history: contents,
+    didApplyManagement: true,
+    baseUnits:
+      advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerBaseUnits,
+    processedNodes,
+  };
 }

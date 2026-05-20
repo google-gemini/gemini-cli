@@ -76,29 +76,30 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-export async function resolveExecutable(
-  exe: string,
-): Promise<string | undefined> {
-  if (path.isAbsolute(exe)) {
-    try {
-      await fs.promises.access(exe, fs.constants.X_OK);
-      return exe;
-    } catch {
-      return undefined;
-    }
+function isExecutable(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  const paths = (process.env['PATH'] || '').split(path.delimiter);
+}
+
+export function resolveExecutable(exe: string): string | undefined {
+  if (path.isAbsolute(exe)) {
+    return isExecutable(exe) ? exe : undefined;
+  }
+  const pathEnv = process.env['PATH'];
+  if (!pathEnv) {
+    return undefined;
+  }
   const extensions =
     os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
-
-  for (const p of paths) {
+  for (const dir of pathEnv.split(path.delimiter)) {
     for (const ext of extensions) {
-      const fullPath = path.join(p, exe + ext);
-      try {
-        await fs.promises.access(fullPath, fs.constants.X_OK);
+      const fullPath = path.join(dir, exe + ext);
+      if (isExecutable(fullPath)) {
         return fullPath;
-      } catch {
-        continue;
       }
     }
   }
@@ -240,11 +241,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +365,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -632,6 +645,14 @@ export function parseCommandDetails(
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, PowerShell 7 (pwsh.exe) is preferred over Windows PowerShell 5.1
+ * (powershell.exe) when available on PATH. Windows PowerShell 5.1 silently
+ * strips embedded double quotes from arguments to native executables — see
+ * issue #25859. PowerShell 7 uses standards-compliant argument passing and
+ * does not exhibit this regression. When pwsh.exe is not installed, we fall
+ * back to powershell.exe to preserve the existing behavior and the full
+ * cmdlet surface users depend on.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
@@ -651,7 +672,16 @@ export function getShellConfiguration(): ShellConfiguration {
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
+    const pwshPath = resolveExecutable('pwsh.exe');
+    if (pwshPath) {
+      return {
+        executable: pwshPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
       argsPrefix: ['-NoProfile', '-Command'],
@@ -683,9 +713,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':
@@ -1019,4 +1057,120 @@ export async function* execStreaming(
   } finally {
     prepared.cleanup?.();
   }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

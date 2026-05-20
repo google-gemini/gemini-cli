@@ -12,10 +12,17 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
-import type { ConcreteNode, ToolExecution } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type ToolExecution,
+  NodeType,
+} from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type {
+  BaseLlmClient,
+  GenerateContentOptions,
+} from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../pipeline/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
@@ -23,6 +30,9 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { Mock } from 'vitest';
 import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 import { testTruncateProfile } from './testProfile.js';
+import { StaticTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -37,57 +47,56 @@ export const createMockGenerateContentResponse = (
   }) as GenerateContentResponse;
 
 export function createDummyNode(
-  logicalParentId: string,
-  type: ConcreteNode['type'],
-  tokens = 100,
+  turnId: string,
+  type: NodeType,
+  _tokens = 100,
   overrides?: Partial<ConcreteNode>,
   id?: string,
 ): ConcreteNode {
+  const role =
+    type === NodeType.USER_PROMPT ||
+    type === NodeType.SYSTEM_EVENT ||
+    type === NodeType.SNAPSHOT ||
+    type === NodeType.ROLLING_SUMMARY
+      ? 'user'
+      : 'model';
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
-    logicalParentId,
+    turnId,
     type,
     timestamp: Date.now(),
-    text: `Dummy ${type}`,
-    name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
-    payload: type === 'SYSTEM_EVENT' ? {} : undefined,
-    semanticParts: [],
-    metadata: {
-      originalTokens: tokens,
-      currentTokens: tokens,
-      transformations: [],
-    },
+    role,
+    payload: { text: `Dummy ${type}` },
     ...overrides,
   } as unknown as ConcreteNode;
 }
 
 export function createDummyToolNode(
-  logicalParentId: string,
-  intentTokens = 100,
-  obsTokens = 200,
+  turnId: string,
+  _intentTokens = 100,
+  _obsTokens = 200,
   overrides?: Partial<ToolExecution>,
   id?: string,
 ): ToolExecution {
+  // We don't distinguish between call and response here, but ToolExecution nodes in 1:1 map to ONE part.
+  // Tests using this usually want to simulate a tool interaction.
+  // For simplicity, we'll make this a 'model' tool call by default.
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
-    logicalParentId,
-    type: 'TOOL_EXECUTION',
+    turnId,
+    type: NodeType.TOOL_EXECUTION,
     timestamp: Date.now(),
-    toolName: 'dummy_tool',
-    intent: { action: 'test' },
-    observation: { result: 'ok' },
-    tokens: {
-      intent: intentTokens,
-      observation: obsTokens,
-    },
-    metadata: {
-      originalTokens: intentTokens + obsTokens,
-      currentTokens: intentTokens + obsTokens,
-      transformations: [],
+    role: 'model',
+    payload: {
+      functionCall: {
+        name: 'dummy_tool',
+        args: { action: 'test' },
+        id: id || 'dummy_id',
+      },
     },
     ...overrides,
   } as unknown as ToolExecution;
@@ -95,42 +104,63 @@ export function createDummyToolNode(
 
 export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;
+  countTokens: Mock;
 }
 
 export function createMockLlmClient(
   responses?: Array<string | GenerateContentResponse>,
 ): MockLlmClient {
-  const generateContentMock = vi.fn();
-
-  if (responses && responses.length > 0) {
-    for (const response of responses) {
-      if (typeof response === 'string') {
-        generateContentMock.mockResolvedValueOnce(
-          createMockGenerateContentResponse(response),
+  const generateContentMock = vi
+    .fn()
+    .mockImplementation((options: GenerateContentOptions) => {
+      // Array-based logic for backwards compatibility, if provided
+      if (responses && responses.length > 0) {
+        const callCount = generateContentMock.mock.calls.length - 1;
+        const idx =
+          callCount < responses.length ? callCount : responses.length - 1;
+        const res = responses[idx];
+        return Promise.resolve(
+          typeof res === 'string'
+            ? createMockGenerateContentResponse(res)
+            : res,
         );
-      } else {
-        generateContentMock.mockResolvedValueOnce(response);
+      }
+
+      const lastContent = options.contents[options.contents.length - 1];
+      const lastPart = lastContent?.parts?.[lastContent.parts.length - 1];
+      const lastPartString = JSON.stringify(lastPart ?? {});
+      const contentSample = `${lastPartString.slice(0, 10)}...${lastPartString.slice(-10)}`;
+      return Promise.resolve(
+        createMockGenerateContentResponse(
+          `Mock response from: ${options.role}, for: ${contentSample}`,
+        ),
+      );
+    });
+
+  const generateJsonMock = vi.fn().mockImplementation(async () => {
+    let mockStr = '';
+    if (responses && responses.length > 0) {
+      const callCount = generateJsonMock.mock.calls.length - 1;
+      const idx =
+        callCount < responses.length ? callCount : responses.length - 1;
+      const res = responses[idx];
+      if (typeof res === 'string') {
+        mockStr = res;
       }
     }
-    // Fallback to the last response for any subsequent calls
-    const lastResponse = responses[responses.length - 1];
-    if (typeof lastResponse === 'string') {
-      generateContentMock.mockResolvedValue(
-        createMockGenerateContentResponse(lastResponse),
-      );
-    } else {
-      generateContentMock.mockResolvedValue(lastResponse);
-    }
-  } else {
-    // Default fallback
-    generateContentMock.mockResolvedValue(
-      createMockGenerateContentResponse('Mock LLM response'),
-    );
-  }
+    return {
+      active_tasks: [],
+      discovered_facts: [],
+      constraints_and_preferences: [],
+      chronological_summary: mockStr,
+    };
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     generateContent: generateContentMock,
+    generateJson: generateJsonMock,
+    countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
   } as unknown as MockLlmClient;
 }
 
@@ -144,9 +174,12 @@ export function createMockEnvironment(
     sessionId: 'mock-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
 
-  const env = new ContextEnvironmentImpl(
-    llmClient,
+  let env = new ContextEnvironmentImpl(
+    () => llmClient as BaseLlmClient,
     'mock-session',
     'mock-prompt-id',
     '/tmp/.gemini/trace',
@@ -154,10 +187,27 @@ export function createMockEnvironment(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   if (overrides) {
-    Object.assign(env, overrides);
+    if (overrides.llmClient) {
+      env = new ContextEnvironmentImpl(
+        () => overrides.llmClient!,
+        env.sessionId,
+        env.promptId,
+        env.traceDir,
+        env.projectTempDir,
+        env.tracer,
+        env.charsPerToken,
+        env.eventBus,
+        calculator,
+        behaviorRegistry,
+      );
+    }
+    const { llmClient: _llmClient, ...restOverrides } = overrides;
+    Object.assign(env, restOverrides);
   }
   return env;
 }
@@ -246,8 +296,12 @@ export function setupContextComponentTest(
     sessionId: 'test-session',
   });
   const eventBus = new ContextEventBus();
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+  const calculator = new StaticTokenCalculator(1, behaviorRegistry);
+
   const env = new ContextEnvironmentImpl(
-    config.getBaseLlmClient(),
+    () => config.getBaseLlmClient(),
     'test prompt-id',
     'test-session',
     '/tmp',
@@ -255,6 +309,8 @@ export function setupContextComponentTest(
     tracer,
     1,
     eventBus,
+    calculator,
+    behaviorRegistry,
   );
 
   const orchestrator = new PipelineOrchestrator(
@@ -271,8 +327,8 @@ export function setupContextComponentTest(
     tracer,
     orchestrator,
     chatHistory,
+    calculator,
   );
-
   // The async async pipeline is now internally managed by ContextManager
   return { chatHistory, contextManager };
 }

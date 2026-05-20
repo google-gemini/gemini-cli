@@ -17,7 +17,7 @@ describe('Hierarchical Memory', () => {
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },
@@ -55,7 +55,7 @@ What is my favorite fruit? Tell me just the name of the fruit.`,
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },
@@ -96,7 +96,7 @@ Provide the answer as an XML block like this:
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },

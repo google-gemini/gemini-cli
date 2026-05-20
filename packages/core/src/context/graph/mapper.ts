@@ -3,26 +3,29 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Content } from '@google/genai';
-import type { Episode, ConcreteNode } from './types.js';
-import { toGraph } from './toGraph.js';
+import type { ConcreteNode } from './types.js';
+import { ContextGraphBuilder } from './toGraph.js';
+import type { HistoryEvent, HistoryTurn } from '../../core/agentChatHistory.js';
 import { fromGraph } from './fromGraph.js';
-import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { NodeBehaviorRegistry } from './behaviorRegistry.js';
+import { NodeIdService } from './nodeIdService.js';
 
 export class ContextGraphMapper {
-  private readonly nodeIdentityMap = new WeakMap<object, string>();
+  private readonly idService = new NodeIdService();
+  private readonly builder: ContextGraphBuilder;
 
-  constructor(private readonly registry: NodeBehaviorRegistry) {}
-
-  toGraph(
-    history: readonly Content[],
-    tokenCalculator: ContextTokenCalculator,
-  ): Episode[] {
-    return toGraph(history, tokenCalculator, this.nodeIdentityMap);
+  constructor() {
+    this.builder = new ContextGraphBuilder(this.idService);
   }
 
-  fromGraph(nodes: readonly ConcreteNode[]): Content[] {
-    return fromGraph(nodes, this.registry);
+  applyEvent(event: HistoryEvent): ConcreteNode[] {
+    return this.builder.processHistory(event.payload);
+  }
+
+  fromGraph(nodes: readonly ConcreteNode[]): HistoryTurn[] {
+    return fromGraph(nodes, this.idService);
+  }
+
+  getIdService(): NodeIdService {
+    return this.idService;
   }
 }
