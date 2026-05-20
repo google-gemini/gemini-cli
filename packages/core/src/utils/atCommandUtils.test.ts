@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import { resolveAtCommandPath } from './atCommandUtils.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type Config } from '../config/config.js';
 
 vi.mock('node:fs/promises');
 

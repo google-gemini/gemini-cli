@@ -17,13 +17,13 @@ import {
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
   CoreToolCallStatus,
+  resolveAtCommandPath,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { resolveAtCommandPath } from '../../utils/atCommandUtils.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;

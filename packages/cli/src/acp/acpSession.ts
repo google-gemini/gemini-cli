@@ -37,6 +37,8 @@ import {
   MessageBusType,
   PolicyDecision,
   type ToolConfirmationRequest,
+  resolveAtCommandPath,
+  type ResolvedAtCommandPath,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -52,10 +54,6 @@ import {
   buildAvailableModes,
   RequestPermissionResponseSchema,
 } from './acpUtils.js';
-import {
-  resolveAtCommandPath,
-  type ResolvedAtCommandPath,
-} from '../utils/atCommandUtils.js';
 import { z } from 'zod';
 import { getAcpErrorMessage } from './acpErrors.js';
 

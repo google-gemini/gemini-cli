@@ -6,7 +6,9 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { validatePath, type Config } from '@google/gemini-cli-core';
+import { validatePath } from './path-validator.js';
+import { type Config } from '../config/config.js';
+import { isNodeError, getErrorMessage } from './errors.js';
 
 export interface ResolvedAtCommandPath {
   absolutePath: string;
@@ -89,7 +91,13 @@ export async function resolveAtCommandPath(
           stats,
         },
       };
-    } catch {
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        return { status: 'not_found' };
+      }
+      onDebugMessage(
+        `Unexpected error stating path ${pathName}: ${getErrorMessage(error)}`,
+      );
       return { status: 'not_found' };
     }
   }
@@ -121,8 +129,14 @@ export async function resolveAtCommandPath(
           stats,
         },
       };
-    } catch {
-      // Ignore errors for this specific directory, try next
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        // Expected if path is not in this directory, continue to next
+        continue;
+      }
+      onDebugMessage(
+        `Unexpected error stating path ${absolutePath}: ${getErrorMessage(error)}`,
+      );
     }
   }
 
