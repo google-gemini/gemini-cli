@@ -318,7 +318,6 @@ export function setupContextComponentTest(
     sidecar.buildPipelines(env),
     sidecar.buildAsyncPipelines(env),
     env,
-    eventBus,
     tracer,
   );
 

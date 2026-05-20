@@ -135,7 +135,6 @@ export async function initializeContextManager(
     sidecarProfile.buildPipelines(env),
     sidecarProfile.buildAsyncPipelines(env),
     env,
-    eventBus,
     tracer,
   );
 

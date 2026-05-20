@@ -5,7 +5,7 @@
  */
 import type { ConcreteNode } from './types.js';
 import { ContextGraphBuilder } from './toGraph.js';
-import type { HistoryEvent, HistoryTurn } from '../../core/agentChatHistory.js';
+import type { HistoryTurn } from '../../core/agentChatHistory.js';
 import { fromGraph } from './fromGraph.js';
 import { NodeIdService } from './nodeIdService.js';
 
@@ -17,8 +17,8 @@ export class ContextGraphMapper {
     this.builder = new ContextGraphBuilder(this.idService);
   }
 
-  applyEvent(event: HistoryEvent): ConcreteNode[] {
-    return this.builder.processHistory(event.payload);
+  sync(turns: readonly HistoryTurn[]): ConcreteNode[] {
+    return this.builder.processHistory(turns);
   }
 
   fromGraph(nodes: readonly ConcreteNode[]): HistoryTurn[] {

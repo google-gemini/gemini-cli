@@ -91,11 +91,8 @@ describe('ContextGraphMapper (Round-Trip Fidelity)', () => {
 
     // 3. Translate History -> Graph
     const mapper = new ContextGraphMapper();
-    // Simulate the HistoryObserver capturing the push
-    const nodes = mapper.applyEvent({
-      type: 'SYNC_FULL',
-      payload: originalHistory,
-    });
+    // Simulate the sync
+    const nodes = mapper.sync(originalHistory);
 
     // 4. Translate Graph -> History
     const reconstructedHistory = mapper.fromGraph(nodes);

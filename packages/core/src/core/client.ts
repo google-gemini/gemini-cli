@@ -670,7 +670,7 @@ export class GeminiClient {
         // only for the purpose of the upcoming API call.
         apiHistoryOverride = [...apiHistory, finalPendingContent];
 
-        this.getChat().setHistory(newHistory, { silent: true });
+        this.getChat().setHistory(newHistory);
 
         // Use the original request for display/recording,
         // but the processed one for the API and durable history.

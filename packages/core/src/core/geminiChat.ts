@@ -985,10 +985,7 @@ export class GeminiChat {
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
   }
 
-  setHistory(
-    history: ReadonlyArray<Content | HistoryTurn>,
-    options: { silent?: boolean } = {},
-  ): void {
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
     const wrappedHistory: HistoryTurn[] = history.map((item) => {
       if ('id' in item && 'content' in item) {
         return item;
@@ -1000,7 +997,7 @@ export class GeminiChat {
       return { id, content: item };
     });
     ensureStableToolIds(wrappedHistory);
-    this.agentHistory.set(wrappedHistory, options);
+    this.agentHistory.set(wrappedHistory);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.content.parts || []),
     );
