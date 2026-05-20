@@ -1028,10 +1028,7 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: [
-          ...this.pendingIncludeDirectories,
-          Storage.getGlobalTempDir(),
-        ],
+        includeDirectories: this.getSandboxIncludeDirectories(),
         policyManager: this._sandboxPolicyManager,
       },
       initialApprovalMode,
@@ -1443,9 +1440,12 @@ export class Config implements McpContext, AgentLoopContext {
     await this.storage.initialize();
     ragLogger.initialize(this.storage.getProjectTempLogsDir());
 
-    // Add pending directories to workspace context
-    for (const dir of this.pendingIncludeDirectories) {
-      this.workspaceContext.addDirectory(dir);
+    // Add pending optional include directories to workspace context. Missing or
+    // unreadable directories are reported by WorkspaceContext and skipped
+    // instead of aborting startup.
+    this.workspaceContext.addDirectories(this.pendingIncludeDirectories);
+    if (this.pendingIncludeDirectories.length > 0) {
+      this.refreshSandboxManager();
     }
 
     // Add plans directory to workspace context for plan file storage
@@ -1789,15 +1789,24 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: [
-          ...this.pendingIncludeDirectories,
-          Storage.getGlobalTempDir(),
-        ],
+        includeDirectories: this.getSandboxIncludeDirectories(),
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
     );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+  }
+
+  private getSandboxIncludeDirectories(): string[] {
+    const initialDirectories = new Set(
+      this.workspaceContext.getInitialDirectories(),
+    );
+    return [
+      ...this.workspaceContext
+        .getDirectories()
+        .filter((directory) => !initialDirectories.has(directory)),
+      Storage.getGlobalTempDir(),
+    ];
   }
 
   get sandboxPolicyManager() {
