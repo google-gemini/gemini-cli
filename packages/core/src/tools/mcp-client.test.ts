@@ -2213,7 +2213,7 @@ describe('mcp-client', () => {
 
           // For SSEClientTransport, the fetch is private or passed to the SDK.
           // We can check if it creates the transport successfully.
-          expect(transport).toBeInstanceOf(SSEClientTransport);
+          expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
         } finally {
           vi.unstubAllEnvs();
           vi.unstubAllGlobals();

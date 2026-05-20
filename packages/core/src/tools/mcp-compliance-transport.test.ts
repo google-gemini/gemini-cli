@@ -128,4 +128,70 @@ describe('McpComplianceTransport', () => {
     mockTransport.onmessage!(emptyResponse);
     expect(onMessage.mock.calls[0][0].result.structuredContent).toBeUndefined();
   });
+
+  it('should only parse text content blocks', async () => {
+    const mockTransport = createMockTransport();
+    const complianceTransport = new McpComplianceTransport(mockTransport);
+    const onMessage = vi.fn();
+    complianceTransport.onmessage = onMessage;
+
+    const mediaResponse: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [
+          {
+            type: 'image',
+            data: 'base64data',
+            mimeType: 'image/png',
+          },
+        ],
+      },
+    };
+
+    mockTransport.onmessage!(mediaResponse);
+    expect(onMessage.mock.calls[0][0].result.structuredContent).toBeUndefined();
+  });
+
+  it('should handle responses with multiple content blocks (only fixes the first one if it is text)', async () => {
+    const mockTransport = createMockTransport();
+    const complianceTransport = new McpComplianceTransport(mockTransport);
+    const onMessage = vi.fn();
+    complianceTransport.onmessage = onMessage;
+
+    const multiResponse: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [
+          { type: 'text', text: JSON.stringify({ first: true }) },
+          { type: 'text', text: 'second item' },
+        ],
+      },
+    };
+
+    mockTransport.onmessage!(multiResponse);
+    expect(onMessage.mock.calls[0][0].result.structuredContent).toEqual({
+      first: true,
+    });
+  });
+
+  it('should handle error responses gracefully', async () => {
+    const mockTransport = createMockTransport();
+    const complianceTransport = new McpComplianceTransport(mockTransport);
+    const onMessage = vi.fn();
+    complianceTransport.onmessage = onMessage;
+
+    const errorResponse: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id: 1,
+      error: {
+        code: -32000,
+        message: 'Internal error',
+      },
+    };
+
+    mockTransport.onmessage!(errorResponse);
+    expect(onMessage).toHaveBeenCalledWith(errorResponse);
+  });
 });
