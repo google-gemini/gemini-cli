@@ -88,7 +88,6 @@ module.exports = async ({ github, context, core }) => {
           order: 'asc',
         },
       );
-      items = items.slice(0, 2);
       core.info(`Found ${items.length} items.`);
       for (const item of items) {
         try {
