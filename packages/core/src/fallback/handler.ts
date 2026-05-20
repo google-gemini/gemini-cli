@@ -86,7 +86,8 @@ export async function handleFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
       // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
       // For utility bypass, we want a hard runtime override, so pass failedModel.
-      const overrideFailedModel = action === 'silent' ? undefined : failedModel;
+      const overrideFailedModel =
+        failedModel !== activeModel ? failedModel : undefined;
       return processIntent(
         config,
         'retry_always',
@@ -109,6 +110,7 @@ export async function handleFallback(
 
   const handler = config.getFallbackModelHandler();
   if (typeof handler !== 'function') {
+    throw new Error('STOP 2');
     return null;
   }
 
@@ -123,7 +125,12 @@ export async function handleFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
     }
 
-    return await processIntent(config, intent, fallbackModel, failedModel);
+    return await processIntent(
+      config,
+      intent,
+      fallbackModel,
+      failedModel !== activeModel ? failedModel : undefined,
+    );
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
