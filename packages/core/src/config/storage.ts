@@ -28,6 +28,10 @@ const AGENTS_DIR_NAME = '.agents';
 export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
+  private static homePathComparisonCache:
+    | { homeDir: string; candidates: Set<string> }
+    | undefined;
+
   private readonly targetDir: string;
   private sessionId: string | undefined;
   private projectIdentifier: string | undefined;
@@ -168,10 +172,45 @@ export class Storage {
    * This handles symlinks and platform-specific path normalization.
    */
   isWorkspaceHomeDir(): boolean {
-    return (
-      normalizePath(resolveToRealPath(this.targetDir)) ===
-      normalizePath(resolveToRealPath(homedir()))
+    const homeDir = homedir();
+    if (!homeDir) {
+      return false;
+    }
+
+    const targetCandidates = Storage.getPathComparisonCandidates(
+      this.targetDir,
     );
+    const homeCandidates = Storage.getHomePathComparisonCandidates(homeDir);
+
+    for (const candidate of targetCandidates) {
+      if (homeCandidates.has(candidate)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static getHomePathComparisonCandidates(homeDir: string): Set<string> {
+    if (Storage.homePathComparisonCache?.homeDir !== homeDir) {
+      Storage.homePathComparisonCache = {
+        homeDir,
+        candidates: Storage.getPathComparisonCandidates(homeDir),
+      };
+    }
+
+    return Storage.homePathComparisonCache.candidates;
+  }
+
+  private static getPathComparisonCandidates(pathStr: string): Set<string> {
+    const candidates = [pathStr, resolveToRealPath(pathStr)];
+
+    try {
+      candidates.push(fs.realpathSync.native(path.resolve(pathStr)));
+    } catch {
+      // Fall back to the existing path and robust realpath candidates.
+    }
+
+    return new Set(candidates.map((candidate) => normalizePath(candidate)));
   }
 
   getAgentsDir(): string {

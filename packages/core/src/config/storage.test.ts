@@ -16,10 +16,16 @@ import * as fs from 'node:fs';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
+  const realpathSync = vi.fn(
+    actual.realpathSync,
+  ) as unknown as typeof actual.realpathSync;
+  realpathSync.native = vi.fn(
+    actual.realpathSync.native,
+  ) as unknown as typeof actual.realpathSync.native;
   return {
     ...actual,
     mkdirSync: vi.fn(),
-    realpathSync: vi.fn(actual.realpathSync),
+    realpathSync,
   };
 });
 
@@ -125,6 +131,35 @@ describe('Storage – additional helpers', () => {
   it('getProjectCommandsDir returns project/.gemini/commands', () => {
     const expected = path.join(projectRoot, GEMINI_DIR, 'commands');
     expect(storage.getProjectCommandsDir()).toBe(expected);
+  });
+
+  it('recognizes home when native and generic realpath use different Windows spellings', () => {
+    const originalHomeDir = os.homedir();
+    vi.mocked(homedir).mockReturnValue('C:\\Users\\TestUser');
+    vi.mocked(fs.realpathSync).mockImplementation((pathLike) => {
+      const pathStr = String(pathLike);
+      if (pathStr.endsWith('C:\\Users\\TESTUS~1')) {
+        return 'C:\\Users\\TESTUS~1';
+      }
+      return pathStr;
+    });
+    vi.mocked(fs.realpathSync.native).mockImplementation((pathLike) => {
+      const pathStr = String(pathLike);
+      if (pathStr.endsWith('C:\\Users\\TESTUS~1')) {
+        return 'C:\\Users\\TestUser';
+      }
+      return pathStr;
+    });
+
+    try {
+      expect(new Storage('C:\\Users\\TESTUS~1').isWorkspaceHomeDir()).toBe(
+        true,
+      );
+    } finally {
+      vi.mocked(homedir).mockReturnValue(originalHomeDir);
+      vi.mocked(fs.realpathSync).mockRestore();
+      vi.mocked(fs.realpathSync.native).mockRestore();
+    }
   });
 
   it('getUserSkillsDir returns ~/.gemini/skills', () => {
