@@ -691,6 +691,11 @@ export function parseCommandDetails(
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // -NonInteractive prevents PSReadLine from intercepting console input
+    // events inside the ConPTY session, which otherwise causes interactive
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
+    // and exit when arrow keys are pressed.
+    const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
@@ -700,7 +705,7 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: powershellArgsPrefix,
           shell: 'powershell',
         };
       }
@@ -718,7 +723,7 @@ export function getShellConfiguration(): ShellConfiguration {
     // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: powershellArgsPrefix,
       shell: 'powershell',
     };
   }
