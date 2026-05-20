@@ -266,6 +266,7 @@ export const getAllSessionFiles = async (
         try {
           const content = await loadConversationRecord(filePath, {
             metadataOnly: !options.includeFullContent,
+            baseDir: chatsDir,
           });
           if (!content) {
             return { fileName: file, sessionInfo: null };

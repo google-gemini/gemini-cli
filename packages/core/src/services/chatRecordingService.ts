@@ -5,7 +5,7 @@
  */
 
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { getProjectHash, resolveToRealPath } from '../utils/paths.js';
+import { getProjectHash, resolveToRealPath, isSubpath } from '../utils/paths.js';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
@@ -117,6 +117,14 @@ export async function loadConversationRecord(
 > {
   try {
     const realPath = resolveToRealPath(filePath);
+
+    if (options?.baseDir && !isSubpath(options.baseDir, realPath)) {
+      debugLogger.warn(
+        `loadConversationRecord: blocked traversal attempt. ${realPath} is not within ${options.baseDir}`,
+      );
+      return null;
+    }
+
     const stats = await fs.promises.stat(realPath);
     if (!stats.isFile()) {
       return null;

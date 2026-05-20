@@ -19,6 +19,7 @@ import {
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
   resolveToRealPath,
+  isSubpath,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -51,6 +52,9 @@ export const getSavedChatTags = async (
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         try {
           const filePath = resolveToRealPath(path.join(geminiDir, file));
+          if (!isSubpath(geminiDir, filePath)) {
+            return null;
+          }
           const stats = await fsPromises.stat(filePath);
           if (stats.isFile()) {
             const tagName = file.slice(file_head.length, -file_tail.length);
