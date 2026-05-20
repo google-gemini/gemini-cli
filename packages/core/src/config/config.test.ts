@@ -863,6 +863,16 @@ describe('Server Config (config.ts)', () => {
       expect(GeminiClient).toHaveBeenCalledWith(config);
     });
 
+    it('should clear fallback overrides when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+    });
+
     it('should pass Vertex AI routing settings when refreshing auth', async () => {
       const vertexAiRouting = {
         requestType: 'shared' as const,
@@ -1902,6 +1912,21 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  it('clears fallback overrides when session changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    await config.initialize();
+
+    config.activateFallbackMode('fallback-model', 'failed-model');
+    expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+    config.setSessionId('session-two');
+
+    expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+  });
+
   it('does not throw when changing sessions before the previous plans dir exists', async () => {
     const config = new Config({
       ...baseParams,
@@ -2713,6 +2738,16 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('should preserve fallback overrides when setting a new model', () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      config.setModel('new-model');
+
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
     });
 
     it('should allow setting auto model from auto model and reset availability', () => {
