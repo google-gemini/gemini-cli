@@ -52,7 +52,14 @@ import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 
-vi.mock('../utils/paths.js');
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    getProjectHash: vi.fn(),
+    resolveToRealPath: vi.fn((p) => p),
+  };
+});
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>();
   let count = 0;
@@ -1421,6 +1428,22 @@ describe('ChatRecordingService', () => {
       const nonExistentPath = path.join(testTempDir, 'non-existent.json');
       const result = await loadConversationRecord(nonExistentPath);
       expect(result).toBeNull();
+    });
+
+    it('should resolve symbolic links via resolveToRealPath', async () => {
+      const sessionId = 'real-session';
+      const realPath = path.join(testTempDir, 'real-session.json');
+      await fs.promises.writeFile(
+        realPath,
+        JSON.stringify({ sessionId, messages: [] }),
+      );
+
+      const symlinkPath = path.join(testTempDir, 'symlink-session.json');
+      await fs.promises.symlink(realPath, symlinkPath);
+
+      const result = await loadConversationRecord(symlinkPath);
+      expect(result).not.toBeNull();
+      expect(result!.sessionId).toBe(sessionId);
     });
   });
 });

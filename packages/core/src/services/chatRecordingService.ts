@@ -5,7 +5,7 @@
  */
 
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { getProjectHash } from '../utils/paths.js';
+import { getProjectHash, resolveToRealPath } from '../utils/paths.js';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
@@ -115,8 +115,9 @@ export async function loadConversationRecord(
     })
   | null
 > {
+  const realPath = resolveToRealPath(filePath);
   try {
-    const stats = await fs.promises.stat(filePath);
+    const stats = await fs.promises.stat(realPath);
     if (!stats.isFile()) {
       return null;
     }
@@ -128,7 +129,7 @@ export async function loadConversationRecord(
   }
 
   try {
-    const fileStream = fs.createReadStream(filePath);
+    const fileStream = fs.createReadStream(realPath);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,

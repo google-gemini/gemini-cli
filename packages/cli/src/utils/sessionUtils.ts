@@ -253,7 +253,7 @@ export const getAllSessionFiles = async (
     const sessionFiles = entries
       .filter(
         (e) =>
-          e.isFile() &&
+          (e.isFile() || e.isSymbolicLink()) &&
           e.name.startsWith(SESSION_FILE_PREFIX) &&
           (e.name.endsWith('.json') || e.name.endsWith('.jsonl')),
       )

@@ -1181,4 +1181,28 @@ describe('getAllSessionFiles', () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].fileName).toBe(sessionFile);
   });
+
+  it('should include symbolic links to files', async () => {
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Create a valid session file
+    const sessionId = randomUUID();
+    const sessionFile = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`;
+    const sessionPath = path.join(chatsDir, sessionFile);
+    await fs.writeFile(
+      sessionPath,
+      JSON.stringify({ sessionId, projectHash: 'abc', messages: [] }),
+    );
+
+    // Create a symlink to it
+    const symlinkFile = `${SESSION_FILE_PREFIX}2024-01-01T12-00-symlink.json`;
+    const symlinkPath = path.join(chatsDir, symlinkFile);
+    await fs.symlink(sessionPath, symlinkPath);
+
+    const sessions = await getAllSessionFiles(chatsDir);
+
+    expect(sessions).toHaveLength(2);
+    expect(sessions.map((s) => s.fileName)).toContain(symlinkFile);
+  });
 });
