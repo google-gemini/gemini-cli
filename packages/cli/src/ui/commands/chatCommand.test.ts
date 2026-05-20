@@ -124,9 +124,9 @@ describe('chatCommand', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
         if (path.endsWith('test1.json')) {
-          return { mtime: date1 } as Stats;
+          return { mtime: date1, isFile: () => true } as Stats;
         }
-        return { mtime: date2 } as Stats;
+        return { mtime: date2, isFile: () => true } as Stats;
       });
 
       await listCommand?.action?.(mockContext, '');
@@ -141,6 +141,37 @@ describe('chatCommand', () => {
           {
             name: 'test2',
             mtime: date2.toISOString(),
+          },
+        ],
+      });
+    });
+
+    it('should ignore directories matching the checkpoint pattern', async () => {
+      const fakeFiles = ['checkpoint-file.json', 'checkpoint-directory.json'];
+      const date = new Date();
+
+      mockFs.readdir.mockResolvedValue(fakeFiles as any);
+      mockFs.stat.mockImplementation(async (filePath: any): Promise<Stats> => {
+        if (filePath.endsWith('file.json')) {
+          return {
+            mtime: date,
+            isFile: () => true,
+          } as Stats;
+        }
+        return {
+          mtime: date,
+          isFile: () => false,
+        } as Stats;
+      });
+
+      await listCommand?.action?.(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: 'chat_list',
+        chats: [
+          {
+            name: 'file',
+            mtime: date.toISOString(),
           },
         ],
       });
@@ -347,6 +378,7 @@ describe('chatCommand', () => {
           (async (_: string): Promise<Stats> =>
             ({
               mtime: new Date(),
+              isFile: () => true,
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
 
@@ -366,9 +398,12 @@ describe('chatCommand', () => {
           path: string,
         ): Promise<Stats> => {
           if (path.endsWith('test1.json')) {
-            return { mtime: date } as Stats;
+            return { mtime: date, isFile: () => true } as Stats;
           }
-          return { mtime: new Date(date.getTime() + 1000) } as Stats;
+          return {
+            mtime: new Date(date.getTime() + 1000),
+            isFile: () => true,
+          } as Stats;
         }) as unknown as typeof fsPromises.stat);
 
         const result = await resumeCommand?.completion?.(mockContext, '');
@@ -427,6 +462,7 @@ describe('chatCommand', () => {
           (async (_: string): Promise<Stats> =>
             ({
               mtime: new Date(),
+              isFile: () => true,
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
 

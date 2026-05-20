@@ -249,13 +249,15 @@ export const getAllSessionFiles = async (
   options: GetSessionOptions = {},
 ): Promise<SessionFileEntry[]> => {
   try {
-    const files = await fs.readdir(chatsDir);
-    const sessionFiles = files
+    const entries = await fs.readdir(chatsDir, { withFileTypes: true });
+    const sessionFiles = entries
       .filter(
-        (f) =>
-          f.startsWith(SESSION_FILE_PREFIX) &&
-          (f.endsWith('.json') || f.endsWith('.jsonl')),
+        (e) =>
+          e.isFile() &&
+          e.name.startsWith(SESSION_FILE_PREFIX) &&
+          (e.name.endsWith('.json') || e.name.endsWith('.jsonl')),
       )
+      .map((e) => e.name)
       .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(

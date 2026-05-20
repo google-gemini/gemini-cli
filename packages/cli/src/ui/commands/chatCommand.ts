@@ -31,7 +31,7 @@ import { convertToRestPayload } from '@google/gemini-cli-core';
 
 const CHECKPOINT_MENU_GROUP = 'checkpoints';
 
-const getSavedChatTags = async (
+export const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
@@ -50,11 +50,13 @@ const getSavedChatTags = async (
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         const filePath = path.join(geminiDir, file);
         const stats = await fsPromises.stat(filePath);
-        const tagName = file.slice(file_head.length, -file_tail.length);
-        chatDetails.push({
-          name: decodeTagName(tagName),
-          mtime: stats.mtime.toISOString(),
-        });
+        if (stats.isFile()) {
+          const tagName = file.slice(file_head.length, -file_tail.length);
+          chatDetails.push({
+            name: decodeTagName(tagName),
+            mtime: stats.mtime.toISOString(),
+          });
+        }
       }
     }
 

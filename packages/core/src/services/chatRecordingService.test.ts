@@ -1407,4 +1407,20 @@ describe('ChatRecordingService', () => {
       expect(record2!.messages[1].id).toBe('h2');
     });
   });
+
+  describe('loadConversationRecord', () => {
+    it('should return null for a directory to avoid EISDIR errors', async () => {
+      const dirPath = path.join(testTempDir, 'session-directory.json');
+      await fs.promises.mkdir(dirPath, { recursive: true });
+
+      const result = await loadConversationRecord(dirPath);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for non-existent files', async () => {
+      const nonExistentPath = path.join(testTempDir, 'non-existent.json');
+      const result = await loadConversationRecord(nonExistentPath);
+      expect(result).toBeNull();
+    });
+  });
 });

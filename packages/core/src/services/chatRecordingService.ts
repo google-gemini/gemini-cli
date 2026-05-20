@@ -115,8 +115,16 @@ export async function loadConversationRecord(
     })
   | null
 > {
-  if (!fs.existsSync(filePath)) {
-    return null;
+  try {
+    const stats = await fs.promises.stat(filePath);
+    if (!stats.isFile()) {
+      return null;
+    }
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
   }
 
   try {
