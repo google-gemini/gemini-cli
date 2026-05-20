@@ -73,5 +73,23 @@ describe('Flash Model Fallback Configuration', () => {
         expect.any(FlashFallbackEvent),
       );
     });
+
+    it('should set fallback override when failedModel is provided and register runtime override', () => {
+      config.activateFallbackMode(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getFallbackOverride(DEFAULT_GEMINI_MODEL)).toBe(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+
+      // Verify it registers the runtime model override with ModelConfigService
+      expect(
+        config
+          .getModelConfigService()
+          .getResolvedConfig({ model: DEFAULT_GEMINI_MODEL }).model,
+      ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
   });
 });

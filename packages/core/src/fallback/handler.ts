@@ -42,8 +42,14 @@ export async function handleFallback(
     return { service: availability, policy: failedPolicy };
   };
 
+  const activeModel = config.getActiveModel();
   let fallbackModel: string;
+
   if (!candidates.length) {
+    if (failedModel !== activeModel) {
+      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      return processIntent(config, 'retry_always', activeModel, failedModel);
+    }
     fallbackModel = failedModel;
   } else {
     const selection = availability.selectFirstAvailable(
@@ -69,10 +75,11 @@ export async function handleFallback(
 
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
+    const activeModel = config.getActiveModel();
 
-    if (action === 'silent') {
+    if (action === 'silent' || fallbackModel === activeModel) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', fallbackModel);
+      return processIntent(config, 'retry_always', fallbackModel, failedModel);
     }
 
     // This will be used in the future when FallbackRecommendation is passed through UI
@@ -103,7 +110,7 @@ export async function handleFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
     }
 
-    return await processIntent(config, intent, fallbackModel);
+    return await processIntent(config, intent, fallbackModel, failedModel);
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
@@ -131,12 +138,13 @@ async function processIntent(
   config: Config,
   intent: FallbackIntent | null,
   fallbackModel: string,
+  failedModel?: string,
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
-      config.activateFallbackMode(fallbackModel);
+      config.activateFallbackMode(fallbackModel, failedModel);
       return true;
 
     case 'retry_once':

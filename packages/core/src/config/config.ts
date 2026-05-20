@@ -833,6 +833,7 @@ export class Config implements McpContext, AgentLoopContext {
   private ideMode: boolean;
 
   private _activeModel: string;
+  private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
@@ -1923,12 +1924,23 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelAvailabilityService.reset();
   }
 
-  activateFallbackMode(model: string): void {
+  activateFallbackMode(model: string, failedModel?: string): void {
     this.setModel(model, true);
+    if (failedModel) {
+      this.fallbackOverrides.set(failedModel, model);
+      this.modelConfigService.registerRuntimeModelOverride({
+        match: { model: failedModel },
+        modelConfig: { model },
+      });
+    }
     const authType = this.getContentGeneratorConfig()?.authType;
     if (authType) {
       logFlashFallback(this, new FlashFallbackEvent(authType));
     }
+  }
+
+  getFallbackOverride(model: string): string | undefined {
+    return this.fallbackOverrides.get(model);
   }
 
   getActiveModel(): string {
