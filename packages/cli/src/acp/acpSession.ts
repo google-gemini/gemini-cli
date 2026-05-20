@@ -34,6 +34,9 @@ import {
   isNodeError,
   REFERENCE_CONTENT_START,
   InvalidStreamError,
+  MessageBusType,
+  PolicyDecision,
+  type ToolConfirmationRequest,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -61,6 +64,7 @@ export class Session {
   private pendingPrompt: AbortController | null = null;
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
+  private readonly disposeController = new AbortController();
 
   private generateCallId(name: string): string {
     return `${name}-${Date.now()}-${++this.callIdCounter}`;
@@ -77,7 +81,97 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+
+    // Subscribe to tool confirmation requests to handle policy checks (e.g. auto-allowing safe shell commands)
+    this.context.config
+      .getMessageBus()
+      ?.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.handleToolConfirmationRequest,
+        { signal: this.disposeController.signal },
+      );
   }
+
+  private handleToolConfirmationRequest = async (
+    request: ToolConfirmationRequest,
+  ) => {
+    try {
+      const policyEngine = this.context.config.getPolicyEngine?.();
+      const messageBus = this.context.config.getMessageBus();
+
+      if (!messageBus) {
+        return;
+      }
+
+      if (!policyEngine) {
+        debugLogger.warn(
+          'Policy engine missing. Denying tool confirmation request.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const toolName = request.toolCall.name?.trim();
+      if (!toolName) {
+        debugLogger.warn(
+          'Tool confirmation request missing tool name. Denying.',
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const tool = this.context.toolRegistry.getTool(toolName);
+      if (!tool) {
+        debugLogger.warn(
+          `Tool confirmation request for unknown tool: ${toolName}. Denying.`,
+        );
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: false,
+        });
+        return;
+      }
+
+      const serverName =
+        tool instanceof DiscoveredMCPTool ? tool.serverName : undefined;
+      const toolAnnotations = tool.toolAnnotations;
+
+      const result = await policyEngine.check(
+        request.toolCall,
+        serverName,
+        toolAnnotations,
+        request.subagent,
+      );
+
+      await messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: result.decision === PolicyDecision.ALLOW,
+        requiresUserConfirmation: result.decision === PolicyDecision.ASK_USER,
+      });
+    } catch (error) {
+      debugLogger.error('Error handling tool confirmation request:', error);
+      // Fail closed on exception
+      await this.context.config.getMessageBus()?.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: false,
+      });
+    }
+  };
 
   private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
     if (payload.sessionId === this.id) {
@@ -96,6 +190,7 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    this.disposeController.abort();
   }
 
   async cancelPendingPrompt(): Promise<void> {
