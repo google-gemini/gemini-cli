@@ -28,7 +28,7 @@ export class PrivateIpError extends Error {
   }
 }
 
-let defaultHeadersTimeout = 60000; // 60 seconds
+let defaultHeadersTimeout = 300000; // 5 minutes
 const defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
 
