@@ -411,12 +411,23 @@ export class ContextManager {
       sentinels: this.sidecar.sentinels,
     });
 
+    const firstPendingId = pendingHistory[0]?.id;
+    let splitIndex = renderedHistory.length;
+    if (firstPendingId) {
+      const foundIndex = hardenedAllHistory.findIndex(
+        (h) => h.id === firstPendingId,
+      );
+      if (foundIndex !== -1) {
+        splitIndex = foundIndex;
+      }
+    }
+
     const apiHistory = hardenedAllHistory
-      .slice(0, renderedHistory.length)
+      .slice(0, splitIndex)
       .map((h) => h.content);
 
     const pendingApiHistory = hardenedAllHistory
-      .slice(renderedHistory.length)
+      .slice(splitIndex)
       .map((h) => h.content);
 
     if (header) {

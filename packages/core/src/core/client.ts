@@ -644,11 +644,7 @@ export class GeminiClient {
       if (this.contextManager) {
         const rawPendingRequest = createUserContent(request);
         const pendingRequest = {
-          id:
-            this.getChatRecordingService()?.recordSyntheticMessage(
-              'user',
-              rawPendingRequest.parts || [],
-            ) || randomUUID(),
+          id: randomUUID(),
           content: rawPendingRequest,
         };
         const {
@@ -676,8 +672,9 @@ export class GeminiClient {
 
         this.getChat().setHistory(newHistory, { silent: true });
 
-        // Update the request for turn.run so that the final history record
-        // matches the processed/cleaned content sent to the API.
+        // Use the original request for display/recording,
+        // but the processed one for the API and durable history.
+        displayContent = rawPendingRequest.parts || [];
         request = finalPendingContent.parts || [];
       } else {
         const newHistory = await this.agentHistoryProvider.manageHistory(

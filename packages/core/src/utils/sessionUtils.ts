@@ -126,34 +126,42 @@ export function convertSessionToClientHistory(
     } else if (msg.type === 'gemini') {
       const modelParts: Part[] = [];
 
-      // 1. Add thoughts from metadata if present
-      if (msg.thoughts && msg.thoughts.length > 0) {
-        for (const thought of msg.thoughts) {
-          const thoughtText = thought.subject
-            ? `**${thought.subject}** ${thought.description}`
-            : thought.description;
-          modelParts.push({
-            text: thoughtText,
-            thought: true,
-          } as Part);
+      const contentParts = msg.content ? ensurePartArray(msg.content) : [];
+      const hasCallsInContent = contentParts.some((p) => !!p.functionCall);
+      const hasThoughtsInContent = contentParts.some((p) => p.thought);
+
+      if (hasCallsInContent || hasThoughtsInContent) {
+        // Modern session: content is the source of truth for all parts
+        modelParts.push(...contentParts);
+      } else {
+        // Legacy session: rebuild from components
+        // 1. Add thoughts from metadata if present
+        if (msg.thoughts && msg.thoughts.length > 0) {
+          for (const thought of msg.thoughts) {
+            const thoughtText = thought.subject
+              ? `**${thought.subject}** ${thought.description}`
+              : thought.description;
+            modelParts.push({
+              text: thoughtText,
+              thought: true,
+            } as Part);
+          }
         }
-      }
 
-      // 2. Add original parts from content (preserving multimodal integrity and synthetic thoughts)
-      if (msg.content) {
-        modelParts.push(...ensurePartArray(msg.content));
-      }
+        // 2. Add content (usually just text in legacy)
+        modelParts.push(...contentParts);
 
-      // 3. Add tool calls if present
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        for (const toolCall of msg.toolCalls) {
-          modelParts.push({
-            functionCall: {
-              id: toolCall.id,
-              name: toolCall.name,
-              args: toolCall.args,
-            },
-          });
+        // 3. Add tool calls from metadata
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          for (const toolCall of msg.toolCalls) {
+            modelParts.push({
+              functionCall: {
+                id: toolCall.id,
+                name: toolCall.name,
+                args: toolCall.args,
+              },
+            });
+          }
         }
       }
 
