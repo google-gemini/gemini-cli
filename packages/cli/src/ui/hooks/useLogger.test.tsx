@@ -5,12 +5,18 @@
  */
 
 import { act } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useLogger } from './useLogger.js';
-import { Logger, type Storage, type Config } from '@google/gemini-cli-core';
+import {
+  Logger,
+  uiTelemetryService,
+  type Storage,
+  type Config,
+} from '@google/gemini-cli-core';
 
-let deferredInit: { resolve: (val?: unknown) => void };
+const deferredInits: Array<{ resolve: (val?: unknown) => void }> = [];
+let unmounts: Array<() => void> = [];
 
 // Mock Logger
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -22,7 +28,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       initialize: vi.fn().mockImplementation(
         () =>
           new Promise((resolve) => {
-            deferredInit = { resolve };
+            deferredInits.push({ resolve });
           }),
       ),
       sessionId: id,
@@ -39,18 +45,52 @@ describe('useLogger', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    deferredInits.length = 0;
+  });
+
+  afterEach(() => {
+    for (const unmount of unmounts) {
+      unmount();
+    }
+    unmounts = [];
   });
 
   it('should initialize with the sessionId from config', async () => {
-    const { result } = await renderHook(() => useLogger(mockConfig));
+    const { result, unmount } = await renderHook(() => useLogger(mockConfig));
+    unmounts.push(unmount);
 
     expect(result.current).toBeNull();
 
     await act(async () => {
-      deferredInit.resolve();
+      deferredInits[0].resolve();
     });
 
     expect(result.current).not.toBeNull();
     expect(Logger).toHaveBeenCalledWith('active-session-id', mockStorage);
+  });
+
+  it('should reinitialize when the session is cleared', async () => {
+    const { result, unmount } = await renderHook(() => useLogger(mockConfig));
+    unmounts.push(unmount);
+
+    await act(async () => {
+      deferredInits[0].resolve();
+    });
+
+    const activeLogger = result.current;
+    expect(activeLogger).not.toBeNull();
+
+    await act(async () => {
+      uiTelemetryService.clear('new-session-id');
+    });
+
+    expect(Logger).toHaveBeenCalledWith('new-session-id', mockStorage);
+    expect(result.current).toBe(activeLogger);
+
+    await act(async () => {
+      deferredInits[1].resolve();
+    });
+
+    expect(result.current).not.toBe(activeLogger);
   });
 });
