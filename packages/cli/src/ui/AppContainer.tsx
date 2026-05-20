@@ -47,7 +47,6 @@ import { MouseProvider } from './contexts/MouseContext.js';
 import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
-  type EditorType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -68,9 +67,9 @@ import {
   ShellExecutionService,
   saveApiKey,
   debugLogger,
+  isValidEditorType,
   coreEvents,
   CoreEvent,
-  refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -610,11 +609,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const getPreferredEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    () => settings.merged.general.preferredEditor as EditorType,
-    [settings.merged.general.preferredEditor],
-  );
+  const getPreferredEditor = useCallback(() => {
+    const val = settings.merged.general.preferredEditor;
+    return isValidEditorType(val) ? val : undefined;
+  }, [settings.merged.general.preferredEditor]);
 
   const buffer = useTextBuffer({
     initialText: '',
@@ -912,12 +910,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        onAuthError(error);
-      }
+      const authMethod = settings.merged.security.auth.selectedType;
+      void (async () => {
+        try {
+          const error = await validateAuthMethod(authMethod);
+          if (
+            error &&
+            authMethod === settings.merged.security.auth.selectedType
+          ) {
+            onAuthError(error);
+          }
+        } catch (e) {
+          if (authMethod === settings.merged.security.auth.selectedType) {
+            onAuthError(getErrorMessage(e));
+          }
+        }
+      })();
     }
   }, [
     settings.merged.security.auth.selectedType,
@@ -1065,19 +1073,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      let flattenedMemory: string;
-      let fileCount: number;
-
-      if (config.isJitContextEnabled()) {
-        await config.getMemoryContextManager()?.refresh();
-        config.updateSystemInstructionIfInitialized();
-        flattenedMemory = flattenMemory(config.getUserMemory());
-        fileCount = config.getGeminiMdFileCount();
-      } else {
-        const result = await refreshServerHierarchicalMemory(config);
-        flattenedMemory = flattenMemory(result.memoryContent);
-        fileCount = result.fileCount;
-      }
+      await config.getMemoryContextManager()?.refresh();
+      config.updateSystemInstructionIfInitialized();
+      const flattenedMemory = flattenMemory(config.getUserMemory());
+      const fileCount = config.getGeminiMdFileCount();
 
       historyManager.addItem(
         {

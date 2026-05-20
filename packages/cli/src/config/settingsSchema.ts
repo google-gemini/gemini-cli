@@ -12,6 +12,7 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  EDITOR_OPTIONS,
   AuthProviderType,
   type MCPServerConfig,
   type RequiredMcpServerConfig,
@@ -192,12 +193,27 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       preferredEditor: {
-        type: 'string',
+        type: 'enum',
         label: 'Preferred Editor',
         category: 'General',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The preferred editor to open files in.',
+        description: oneLine`
+          The preferred editor to open files in. Must be one of the built-in
+          supported identifiers. Use /editor in the CLI to pick interactively,
+          or leave unset to use $VISUAL/$EDITOR.
+        `,
+        showInDialog: false,
+        options: EDITOR_OPTIONS,
+      },
+      openEditorInNewWindow: {
+        type: 'boolean',
+        label: 'Open Editor in New Window',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Open VS Code-family editors in a new window when editing files.',
         showInDialog: false,
       },
       vimMode: {
@@ -427,6 +443,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
+      logRagSnippets: {
+        type: 'boolean',
+        label: 'Log RAG Snippets',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Log full Code Customization (RAG) retrieved snippets to a local file for debugging.',
         showInDialog: true,
       },
     },
@@ -2184,6 +2210,16 @@ const SETTINGS_SCHEMA = {
               'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
+          agentSessionSubagentEnabled: {
+            type: 'boolean',
+            label: 'Agent Session Subagent Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Route subagent invocations through the AgentSession protocol instead of legacy executors.',
+            showInDialog: false,
+          },
         },
       },
       enableAgents: {
@@ -2250,16 +2286,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enables extension loading/unloading within the CLI session.',
-        showInDialog: false,
-      },
-      jitContext: {
-        type: 'boolean',
-        label: 'JIT Context Loading',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.',
         showInDialog: false,
       },
       useOSC52Paste: {
@@ -2391,16 +2417,6 @@ const SETTINGS_SCHEMA = {
             },
           },
         },
-      },
-      memoryV2: {
-        type: 'boolean',
-        label: 'Memory v2',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
-        showInDialog: true,
       },
       stressTestProfile: {
         type: 'boolean',
@@ -3471,7 +3487,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       family: { type: 'string' },
       isPreview: { type: 'boolean' },
       isVisible: { type: 'boolean' },
-      dialogDescription: { type: 'string' },
+      dialogDescription: {
+        type: 'string',
+        description:
+          "A description of the model to display in the model selection dialog. For the 'auto' alias, this value is dynamically generated and any value provided here will be ignored.",
+      },
       features: {
         type: 'object',
         properties: {

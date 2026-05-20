@@ -104,6 +104,51 @@ module.exports = async ({ github, context, core }) => {
     labelsToAdd = [...new Set(labelsToAdd)];
     labelsToRemove = [...new Set(labelsToRemove)];
 
+    // Fetch existing labels to auto-resolve conflicts
+    try {
+      const { data: issueData } = await github.rest.issues.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: issueNumber,
+      });
+      const existingLabels = issueData.labels.map((l) =>
+        typeof l === 'string' ? l : l.name,
+      );
+
+      const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
+      if (hasNewArea) {
+        const existingAreas = existingLabels.filter((l) =>
+          l.startsWith('area/'),
+        );
+        labelsToRemove.push(...existingAreas);
+      }
+
+      const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
+      if (hasNewPriority) {
+        const existingPriorities = existingLabels.filter((l) =>
+          l.startsWith('priority/'),
+        );
+        labelsToRemove.push(...existingPriorities);
+      }
+
+      const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
+      if (hasNewKind) {
+        const existingKinds = existingLabels.filter((l) =>
+          l.startsWith('kind/'),
+        );
+        labelsToRemove.push(...existingKinds);
+      }
+
+      // Re-deduplicate and filter out labels we are trying to add
+      labelsToRemove = [...new Set(labelsToRemove)].filter(
+        (l) => !labelsToAdd.includes(l),
+      );
+    } catch (e) {
+      core.warning(
+        `Failed to fetch existing labels for #${issueNumber}: ${e.message}`,
+      );
+    }
+
     // Enforce mutually exclusive area labels
     const areaLabelsToAdd = labelsToAdd.filter((l) => l.startsWith('area/'));
     if (areaLabelsToAdd.length > 1) {
@@ -166,9 +211,12 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
-    if (entry.explanation || entry.effort_analysis) {
+    if (
+      (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') ||
+      entry.effort_analysis
+    ) {
       let commentBody = '';
-      if (entry.explanation) {
+      if (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') {
         commentBody += entry.explanation;
       }
       if (entry.effort_analysis) {

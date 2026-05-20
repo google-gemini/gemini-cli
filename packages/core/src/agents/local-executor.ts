@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -315,7 +316,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.parentCallId = parentCallId;
     this.cache = new LRUCache<string, string>(10);
 
-    this.agentId = Math.random().toString(36).slice(2, 8);
+    this.agentId = randomUUID();
   }
 
   /**
@@ -642,17 +643,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // Inject loaded memory files. Some background agents opt out of
         // extension memory while still retaining project session context.
-        let environmentMemory: string;
-        if (this.context.config.isJitContextEnabled?.()) {
-          environmentMemory =
-            this.definition.includeExtensionContext === false
-              ? this.context.config.getSessionMemory({
-                  includeExtensionContext: false,
-                })
-              : this.context.config.getSessionMemory();
-        } else {
-          environmentMemory = this.context.config.getEnvironmentMemory();
-        }
+        const environmentMemory =
+          this.definition.includeExtensionContext === false
+            ? this.context.config.getSessionMemory({
+                includeExtensionContext: false,
+              })
+            : this.context.config.getSessionMemory();
 
         const initialParts: Part[] = [];
         if (environmentMemory) {
@@ -923,12 +919,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.hasFailedCompressionAttempt = true;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         this.hasFailedCompressionAttempt = false;
       }
     } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         // Do NOT reset hasFailedCompressionAttempt.
         // We only truncated content because summarization previously failed.
         // We want to keep avoiding expensive summarization calls.

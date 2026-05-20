@@ -1962,8 +1962,8 @@ describe('InputPrompt', () => {
       },
       {
         name: 'should NOT trigger completion when cursor is after space following /',
-        text: '/memory add',
-        cursor: [0, 11],
+        text: '/memory list',
+        cursor: [0, 12],
         showSuggestions: false,
       },
       {
@@ -4895,6 +4895,60 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(setShortcutsHelpVisible).toHaveBeenCalledWith(true);
       });
+      unmount();
+    });
+
+    it('should NOT open shortcuts help with ? in vim NORMAL mode', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const vimHandleInput = vi.fn().mockReturnValue(true);
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt
+          {...props}
+          vimEnabled={true}
+          vimMode="NORMAL"
+          vimHandleInput={vimHandleInput}
+        />,
+        {
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      expect(setShortcutsHelpVisible).not.toHaveBeenCalled();
+      expect(vimHandleInput).toHaveBeenCalled();
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should open shortcuts help with ? in vim INSERT mode', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const vimHandleInput = vi.fn().mockReturnValue(false);
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt
+          {...props}
+          vimEnabled={true}
+          vimMode="INSERT"
+          vimHandleInput={vimHandleInput}
+        />,
+        {
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(true);
+      });
+
       unmount();
     });
 

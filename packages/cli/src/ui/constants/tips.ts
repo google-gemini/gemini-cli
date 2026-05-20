@@ -144,7 +144,6 @@ export const INFORMATIVE_TIPS = [
   'Authenticate with an OAuth-enabled MCP server with /mcp auth',
   'Reload MCP servers with /mcp reload',
   'See the current instructional context with /memory show',
-  'Add content to the instructional memory with /memory add',
   'Reload instructional context from GEMINI.md files with /memory reload',
   'List the paths of the GEMINI.md files in use with /memory list',
   'Choose your Gemini model with /model',

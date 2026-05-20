@@ -5,6 +5,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type {
   jsonSchemaValidator,
@@ -20,6 +21,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -54,9 +56,11 @@ import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
-import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
+import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
+
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   getErrorMessage,
@@ -82,6 +86,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
+
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -1025,6 +1030,16 @@ function createAuthProvider(
   }
   return undefined;
 }
+/**
+ * Creates an OAuth token provider for transports so token lookup/refresh happens
+ * at request/auth time instead of freezing a single token at transport creation.
+ */
+function createDynamicOAuthTokenProvider(
+  mcpServerName: string,
+  mcpServerConfig: MCPServerConfig,
+): McpAuthProvider {
+  return new DynamicStoredOAuthProvider(mcpServerName, mcpServerConfig);
+}
 
 /**
  * Create a transport with OAuth token for the given server configuration.
@@ -1291,6 +1306,46 @@ export async function discoverTools(
       try {
         if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
+        }
+
+        if (toolDef.inputSchema) {
+          try {
+            const transform = (obj: unknown): unknown => {
+              if (obj === null || typeof obj !== 'object') return obj;
+              if (Array.isArray(obj)) return obj.map(transform);
+
+              const res = { ...obj } as Record<string, unknown>;
+
+              if (Array.isArray(res['type']) && res['type'].length === 2) {
+                const nIdx = res['type'].indexOf('null');
+                if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
+                  res['type'] = res['type'][1 - nIdx];
+                  res['nullable'] = true;
+                }
+              }
+
+              for (const k in res) {
+                if (Object.prototype.hasOwnProperty.call(res, k)) {
+                  res[k] = transform(res[k]);
+                }
+              }
+              return res;
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            toolDef.inputSchema = transform(toolDef.inputSchema) as {
+              type: 'object';
+              properties?: Record<string, object>;
+              required?: string[];
+            };
+          } catch (error) {
+            cliConfig.emitMcpDiagnostic(
+              'error',
+              `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
+              error,
+              mcpServerName,
+            );
+          }
         }
 
         const mcpCallableTool = new McpCallableTool(
@@ -2123,16 +2178,34 @@ function createUrlTransport(
     | StreamableHTTPClientTransportOptions
     | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
-  // Wrap fetch to treat GET 404 as 405 so servers that do not support the
-  // optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
+  // Create a proxy-aware fetcher that respects NO_PROXY for this MCP server
+  // This is especially important for local MCP servers (localhost, 127.0.0.1)
+  // when a company proxy is globally configured.
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const agent = new EnvHttpProxyAgent({ noProxy });
+
+  // Wrap fetch to:
+  // 1. Use the proxy-aware agent (respecting NO_PROXY)
+  // 2. Treat GET 404 as 405 so servers that do not support the
+  //    optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
   // The SDK already silently ignores 405; 404 is semantically equivalent here.
   const baseFetch =
     (transportOptions as StreamableHTTPClientTransportOptions).fetch ??
     globalThis.fetch;
+
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      const res = await baseFetch(url, init);
+      // If we have an explicit NO_PROXY, we use a proxy-aware dispatcher.
+      // We use the global fetch but pass a custom dispatcher in the init options.
+      // This avoids manual response reconstruction and dangerous type casts.
+      const res = noProxy
+        ? await globalThis.fetch(url, {
+            ...init,
+            dispatcher: agent,
+          } as RequestInit)
+        : await baseFetch(url, init);
+
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
         : res;
@@ -2205,41 +2278,32 @@ export async function createTransport(
     }
   }
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
-    const authProvider = createAuthProvider(mcpServerConfig);
+    let authProvider = createAuthProvider(mcpServerConfig);
     const headers: Record<string, string> =
       (await authProvider?.getRequestHeaders?.()) ?? {};
 
     if (authProvider === undefined) {
-      // Check if we have OAuth configuration or stored tokens
-      let accessToken: string | null = null;
-      if (mcpServerConfig.oauth?.enabled && mcpServerConfig.oauth) {
-        const tokenStorage = new MCPOAuthTokenStorage();
-        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-        accessToken = await mcpAuthProvider.getValidToken(
-          mcpServerName,
-          mcpServerConfig.oauth,
-        );
+      const tokenStorage = new MCPOAuthTokenStorage();
+      const credentials = await tokenStorage.getCredentials(mcpServerName);
+      const shouldUseDynamicOAuthProvider = !!credentials;
 
-        if (!accessToken) {
-          // Emit info message (not error) since this is expected behavior
-          cliConfig.emitMcpDiagnostic(
-            'info',
-            `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
-            undefined,
-            mcpServerName,
-          );
-        }
-      } else {
-        // Check if we have stored OAuth tokens for this server (from previous authentication)
-        accessToken = await getStoredOAuthToken(mcpServerName);
-        if (accessToken) {
-          debugLogger.log(
-            `Found stored OAuth token for server '${mcpServerName}'`,
-          );
-        }
+      if (!shouldUseDynamicOAuthProvider && mcpServerConfig.oauth?.enabled) {
+        cliConfig.emitMcpDiagnostic(
+          'info',
+          `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
+          undefined,
+          mcpServerName,
+        );
       }
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
+
+      if (shouldUseDynamicOAuthProvider) {
+        debugLogger.log(
+          `Found stored OAuth token for server '${mcpServerName}'`,
+        );
+        authProvider = createDynamicOAuthTokenProvider(
+          mcpServerName,
+          mcpServerConfig,
+        );
       }
     }
 
@@ -2339,7 +2403,6 @@ export async function createTransport(
     `Invalid configuration: missing httpUrl (for Streamable HTTP), url (for SSE), and command (for stdio).`,
   );
 }
-
 interface NamedTool {
   name?: string;
 }

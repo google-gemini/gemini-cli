@@ -275,6 +275,10 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
 }));
 
+vi.mock('./config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
+
 describe('gemini.tsx main function', () => {
   let originalIsTTY: boolean | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
@@ -1273,6 +1277,44 @@ describe('gemini.tsx main function exit codes', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
+    }
+  });
+
+  it('should exit with 41 for validateAuthMethod failure during sandbox setup', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockResolvedValue(undefined),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    const authModule = await import('./config/auth.js');
+    vi.mocked(authModule.validateAuthMethod).mockResolvedValueOnce(
+      'Auth method invalid',
+    );
+
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(41);
     }
   });
 

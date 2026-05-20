@@ -36,6 +36,7 @@ export * from './commands/types.js';
 export * from './core/baseLlmClient.js';
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/fakeContentGenerator.js';
 export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
@@ -102,7 +103,6 @@ export {
 export * from './utils/tool-utils.js';
 export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
-export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
