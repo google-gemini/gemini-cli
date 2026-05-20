@@ -244,7 +244,7 @@ export async function loadConversationRecord(
     }
 
     if (!metadata.sessionId || !metadata.projectHash) {
-      return await parseLegacyRecordFallback(filePath, options);
+      return await parseLegacyRecordFallback(realPath, options);
     }
 
     const metadataMessages = Array.isArray(metadata.messages)
