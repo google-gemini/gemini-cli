@@ -1926,8 +1926,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
-    this.fallbackOverrides.clear();
-    this.modelConfigService.clearRuntimeOverrides();
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {

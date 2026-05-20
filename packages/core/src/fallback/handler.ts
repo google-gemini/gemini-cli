@@ -46,6 +46,13 @@ export async function handleFallback(
   let fallbackModel: string;
 
   if (!candidates.length) {
+    if (
+      failedModel !== activeModel &&
+      availability.snapshot(activeModel).available
+    ) {
+      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      return processIntent(config, 'retry_always', activeModel, failedModel);
+    }
     fallbackModel = failedModel;
   } else {
     const selection = availability.selectFirstAvailable(

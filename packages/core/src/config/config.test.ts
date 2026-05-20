@@ -2740,14 +2740,14 @@ describe('Config getHooks', () => {
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should clear fallback overrides when setting a model', () => {
+    it('should preserve fallback overrides when setting a new model', () => {
       const config = new Config(baseParams);
       config.activateFallbackMode('fallback-model', 'failed-model');
       expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
 
       config.setModel('new-model');
 
-      expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
     });
 
     it('should allow setting auto model from auto model and reset availability', () => {
