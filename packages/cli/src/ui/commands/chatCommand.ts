@@ -20,6 +20,7 @@ import {
   INITIAL_HISTORY_LENGTH,
   resolveToRealPath,
   isSubpath,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -63,8 +64,8 @@ export const getSavedChatTags = async (
               mtime: stats.mtime.toISOString(),
             };
           }
-        } catch {
-          // Ignore individual file errors
+        } catch (e) {
+          debugLogger.debug(`Failed to stat checkpoint file ${file}:`, e);
         }
       }
       return null;

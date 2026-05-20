@@ -15,7 +15,8 @@ import * as fsPromises from 'node:fs/promises';
 // ... (rest of imports)
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     resolveToRealPath: vi.fn((p: string) => p),
@@ -71,6 +72,7 @@ describe('chatCommand', () => {
   };
 
   beforeEach(() => {
+    mockExport.mockClear();
     mockGetHistory = vi.fn().mockReturnValue([]);
     mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
@@ -131,12 +133,14 @@ describe('chatCommand', () => {
       const date2 = new Date(date1.getTime() + 1000);
 
       (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
-      (mockFs.stat as unknown as vi.Mock).mockImplementation(async (path: string): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
-          return { mtime: date1, isFile: () => true } as unknown as Stats;
-        }
-        return { mtime: date2, isFile: () => true } as unknown as Stats;
-      });
+      (mockFs.stat as unknown as vi.Mock).mockImplementation(
+        async (path: string): Promise<Stats> => {
+          if (path.endsWith('test1.json')) {
+            return { mtime: date1, isFile: () => true } as unknown as Stats;
+          }
+          return { mtime: date2, isFile: () => true } as unknown as Stats;
+        },
+      );
 
       await listCommand?.action?.(mockContext, '');
 
@@ -160,18 +164,20 @@ describe('chatCommand', () => {
       const date = new Date();
 
       (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
-      (mockFs.stat as unknown as vi.Mock).mockImplementation(async (filePath: string): Promise<Stats> => {
-        if (filePath.endsWith('file.json')) {
+      (mockFs.stat as unknown as vi.Mock).mockImplementation(
+        async (filePath: string): Promise<Stats> => {
+          if (filePath.endsWith('file.json')) {
+            return {
+              mtime: date,
+              isFile: () => true,
+            } as unknown as Stats;
+          }
           return {
             mtime: date,
-            isFile: () => true,
+            isFile: () => false,
           } as unknown as Stats;
-        }
-        return {
-          mtime: date,
-          isFile: () => false,
-        } as unknown as Stats;
-      });
+        },
+      );
 
       await listCommand?.action?.(mockContext, '');
 

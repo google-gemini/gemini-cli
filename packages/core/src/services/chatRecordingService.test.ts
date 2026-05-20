@@ -83,6 +83,8 @@ describe('ChatRecordingService', () => {
     vi.restoreAllMocks();
   });
   beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(fs.appendFileSync).mockRestore();
     testTempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'chat-recording-test-'),
     );
