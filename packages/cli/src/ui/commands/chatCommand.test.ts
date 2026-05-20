@@ -15,7 +15,7 @@ import * as fsPromises from 'node:fs/promises';
 // ... (rest of imports)
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal<any>();
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     resolveToRealPath: vi.fn((p: string) => p),
@@ -130,14 +130,12 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.readdir as any).mockResolvedValue(fakeFiles as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.stat as any).mockImplementation(async (path: any): Promise<any> => {
+      (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as vi.Mock).mockImplementation(async (path: string): Promise<Stats> => {
         if (path.endsWith('test1.json')) {
-          return { mtime: date1, isFile: () => true } as any;
+          return { mtime: date1, isFile: () => true } as unknown as Stats;
         }
-        return { mtime: date2, isFile: () => true } as any;
+        return { mtime: date2, isFile: () => true } as unknown as Stats;
       });
 
       await listCommand?.action?.(mockContext, '');
@@ -161,20 +159,18 @@ describe('chatCommand', () => {
       const fakeFiles = ['checkpoint-file.json', 'checkpoint-directory.json'];
       const date = new Date();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.readdir as any).mockResolvedValue(fakeFiles as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.stat as any).mockImplementation(async (filePath: any): Promise<any> => {
+      (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as vi.Mock).mockImplementation(async (filePath: string): Promise<Stats> => {
         if (filePath.endsWith('file.json')) {
           return {
             mtime: date,
             isFile: () => true,
-          } as any;
+          } as unknown as Stats;
         }
         return {
           mtime: date,
           isFile: () => false,
-        } as any;
+        } as unknown as Stats;
       });
 
       await listCommand?.action?.(mockContext, '');
@@ -748,10 +744,6 @@ Hi there!`;
 
       beforeEach(() => {
         mockGetLatestApiRequest = vi.fn();
-        if (!mockContext.services.agentContext!.config) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mockContext.services.agentContext!.config as any) = {};
-        }
         mockContext.services.agentContext!.config.getLatestApiRequest =
           mockGetLatestApiRequest;
         vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
