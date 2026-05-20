@@ -1929,8 +1929,23 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {
-    this.setModel(model, true);
+    if (this.getActiveModel() !== model) {
+      this.setModel(model, true);
+    }
     if (failedModel) {
+      // Chained fallback mitigation: If we already have overrides that point to the model
+      // that just failed, we need to update them to point to the new fallback model.
+      // e.g. A -> B, then B fails and we fallback to C. We must update A to point to C.
+      for (const [source, target] of this.fallbackOverrides.entries()) {
+        if (target === failedModel) {
+          this.fallbackOverrides.set(source, model);
+          this.modelConfigService.registerRuntimeModelOverride({
+            match: { model: source },
+            modelConfig: { model },
+          });
+        }
+      }
+
       this.fallbackOverrides.set(failedModel, model);
       this.modelConfigService.registerRuntimeModelOverride({
         match: { model: failedModel },
