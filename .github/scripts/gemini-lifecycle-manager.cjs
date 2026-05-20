@@ -242,7 +242,9 @@ module.exports = async ({ github, context, core }) => {
         const isBot =
           actor.includes('[bot]') || actor.includes('github-actions');
 
-        // Explicit whitelist of meaningful events
+        if (isBot) return false;
+
+        // Explicit whitelist of meaningful events for humans
         if (
           [
             'commented',
@@ -250,15 +252,10 @@ module.exports = async ({ github, context, core }) => {
             'connected',
             'reopened',
             'assigned',
+            'labeled',
+            'unlabeled',
           ].includes(e.event)
         ) {
-          // If a human commented, or ANYONE (even a bot) linked a PR, it's meaningful
-          if (e.event === 'commented' && isBot) return false;
-          return true;
-        }
-
-        // If a human explicitly added or removed a label, it's meaningful
-        if (['labeled', 'unlabeled'].includes(e.event) && !isBot) {
           return true;
         }
 
