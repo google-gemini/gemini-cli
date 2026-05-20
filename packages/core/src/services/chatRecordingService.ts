@@ -253,7 +253,7 @@ export async function loadConversationRecord(
                 ) {
                   if (Array.isArray(msg.content)) {
                     firstUserMessageStr = msg.content
-                      .map((p: any) => (isTextPart(p) ? p.text : ''))
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
                       .join('');
                   } else {
                     firstUserMessageStr = msg.content;
@@ -297,7 +297,7 @@ export async function loadConversationRecord(
                 ) {
                   if (Array.isArray(msg.content)) {
                     firstUserMessageStr = msg.content
-                      .map((p: any) => (isTextPart(p) ? p.text : ''))
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
                       .join('');
                   } else {
                     firstUserMessageStr = msg.content;

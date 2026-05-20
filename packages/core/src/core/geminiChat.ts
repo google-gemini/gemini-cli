@@ -314,6 +314,7 @@ export class GeminiChat {
     }
 
     this.agentHistory = new AgentChatHistory(initialHistory);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
@@ -980,6 +981,7 @@ export class GeminiChat {
       );
       this.agentHistory.push({ id, content });
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
   }
 

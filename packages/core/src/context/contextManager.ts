@@ -375,7 +375,6 @@ export class ContextManager {
       this.advancedTokenCalculator,
       protectionReasons,
       header,
-      previewNodeIds,
     );
 
     const {

@@ -16,7 +16,7 @@ import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { Part } from '@google/genai';
 
 describe('render', () => {
-  it('should filter out previewNodeIds', async () => {
+  it('should render all provided nodes', async () => {
     const mockNodes: ConcreteNode[] = [
       {
         id: '1',
@@ -34,7 +34,6 @@ describe('render', () => {
         payload: {} as Part,
       } as unknown as ConcreteNode,
     ];
-    const previewNodeIds = new Set(['preview-1']);
 
     const orchestrator = {} as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
@@ -72,10 +71,13 @@ describe('render', () => {
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
       undefined,
-      previewNodeIds,
     );
 
-    expect(result.history).toEqual([{ text: '1' }, { text: '2' }]);
+    expect(result.history).toEqual([
+      { text: '1' },
+      { text: '2' },
+      { text: 'preview-1' },
+    ]);
     expect(result.baseUnits).toBe(100);
   });
 
@@ -172,7 +174,6 @@ describe('render', () => {
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
       undefined,
-      new Set(),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -270,7 +271,6 @@ describe('render', () => {
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
       new Map(),
       undefined,
-      new Set(),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

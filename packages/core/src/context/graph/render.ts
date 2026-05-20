@@ -28,7 +28,6 @@ export async function render(
   advancedTokenCalculator: AdvancedTokenCalculator,
   protectionReasons: Map<string, string> = new Map(),
   header?: Content,
-  previewNodeIds: ReadonlySet<string> = new Set(),
 ): Promise<{
   history: HistoryTurn[];
   didApplyManagement: boolean;
@@ -45,8 +44,7 @@ export async function render(
   }
 
   if (!sidecar.config.budget) {
-    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
-    const contents = env.graphMapper.fromGraph(visibleNodes);
+    const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
@@ -95,14 +93,13 @@ export async function render(
       'Render',
       `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
     );
-    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
-    const contents = env.graphMapper.fromGraph(visibleNodes);
+    const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
     performCalibration(
       env,
-      visibleNodes,
+      nodes,
       contents.map((h) => h.content),
     );
     return {
@@ -153,9 +150,7 @@ export async function render(
     }
   }
 
-  const visibleNodes = processedNodes.filter(
-    (n) => !skipList.has(n.id) && !previewNodeIds.has(n.id),
-  );
+  const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
 
   const contents = env.graphMapper.fromGraph(visibleNodes);
   const finalTokens =

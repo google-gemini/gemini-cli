@@ -103,19 +103,17 @@ export function convertSessionToClientHistory(
   const clientHistory: HistoryTurn[] = [];
 
   for (const msg of messages) {
-    if (msg.type === 'error' || msg.type === 'warning') {
+    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }
 
-    if (msg.type === 'user' || msg.type === 'info') {
-      if (msg.type === 'user') {
-        const contentString = partListUnionToString(msg.content);
-        if (
-          contentString.trim().startsWith('/') ||
-          contentString.trim().startsWith('?')
-        ) {
-          continue;
-        }
+    if (msg.type === 'user') {
+      const contentString = partListUnionToString(msg.content);
+      if (
+        contentString.trim().startsWith('/') ||
+        contentString.trim().startsWith('?')
+      ) {
+        continue;
       }
 
       clientHistory.push({
@@ -189,7 +187,7 @@ export function convertSessionToClientHistory(
                 functionResponseParts.push(...ensurePartArray(toolCall.result));
                 continue;
               } else {
-                responseData = toolCall.result as Part;
+                responseData = toolCall.result;
               }
 
               functionResponseParts.push(responseData);

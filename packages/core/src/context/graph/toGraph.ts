@@ -43,9 +43,9 @@ function isFileDataPart(
   );
 }
 
-function isFunctionCallPart(
-  part: Part,
-): part is Part & { functionCall: { id?: string; name: string; args: any } } {
+function isFunctionCallPart(part: Part): part is Part & {
+  functionCall: { id?: string; name: string; args: Record<string, unknown> };
+} {
   return (
     typeof part.functionCall === 'object' &&
     part.functionCall !== null &&
@@ -53,10 +53,12 @@ function isFunctionCallPart(
   );
 }
 
-function isFunctionResponsePart(
-  part: Part,
-): part is Part & {
-  functionResponse: { id?: string; name: string; response: any };
+function isFunctionResponsePart(part: Part): part is Part & {
+  functionResponse: {
+    id?: string;
+    name: string;
+    response: Record<string, unknown>;
+  };
 } {
   return (
     typeof part.functionResponse === 'object' &&
@@ -186,6 +188,7 @@ export class ContextGraphBuilder {
   constructor(private readonly idService: NodeIdService) {}
 
   processHistory(history: readonly HistoryTurn[]): ConcreteNode[] {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     ensureStableToolIds(history as HistoryTurn[]);
     const nodes: ConcreteNode[] = [];
 
