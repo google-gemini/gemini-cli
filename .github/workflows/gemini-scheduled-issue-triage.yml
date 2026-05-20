@@ -16,7 +16,6 @@ defaults:
 permissions:
   id-token: 'write'
   issues: 'write'
-  pull-requests: 'write'
 
 jobs:
   triage-issues:
@@ -37,7 +36,6 @@ jobs:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
-          permission-pull-requests: 'write'
 
       - name: 'Get issue from event'
         if: |-
@@ -71,7 +69,7 @@ jobs:
           set -euo pipefail
           echo '🔍 Fetching open issues to find conflicts...'
           # Fetch up to 2000 open issues in one quick GraphQL-backed query
-          gh issue list --repo "${GITHUB_REPOSITORY}" --state open --limit 2000 --json number,title,body,labels > all_open_issues.json
+          gh issue list --repo "${GITHUB_REPOSITORY}" --search "is:issue is:open" --limit 2000 --json number,title,body,labels > all_open_issues.json
 
           echo '🧹 Filtering issues with multiple area/ or priority/ labels...'
           jq -c '[ .[] | select( (.labels | map(select(.name | startswith("area/"))) | length) > 1 or (.labels | map(select(.name | startswith("priority/"))) | length) > 1 ) ] | .[0:50]' all_open_issues.json > conflicting_labels_issues.json
