@@ -142,35 +142,44 @@ function tryExtractPath(noisyString: string): string | null {
 
   for (const segment of segments) {
     // 1. Strip leading/trailing punctuation and quotes commonly found in logs
-    // We handle nested wrappers like ("path/to/file.txt")
+    // We handle nested wrappers like ("path/to/file.txt") or (at src/index.ts)
     let segmentToClean = segment;
-    const wrapperPairs: Record<string, string> = {
-      '(': ')',
-      '[': ']',
-      '{': '}',
-      '"': '"',
-      "'": "'",
-    };
+    const wrappers = [
+      '(',
+      ')',
+      '[',
+      ']',
+      '{',
+      '}',
+      '"',
+      "'",
+      ',',
+      ';',
+      '!',
+      '.',
+    ];
 
     let wasStripped = true;
-    while (wasStripped && segmentToClean.length > 1) {
+    while (wasStripped && segmentToClean.length > 0) {
       wasStripped = false;
       const firstChar = segmentToClean[0];
       const lastChar = segmentToClean[segmentToClean.length - 1];
-      if (wrapperPairs[firstChar] === lastChar) {
-        segmentToClean = segmentToClean.slice(1, -1);
+
+      // Strip known punctuation from the start or end
+      if (wrappers.includes(firstChar)) {
+        segmentToClean = segmentToClean.slice(1);
+        wasStripped = true;
+      } else if (wrappers.includes(lastChar)) {
+        segmentToClean = segmentToClean.slice(0, -1);
         wasStripped = true;
       }
     }
 
-    // Also strip trailing common punctuation like comma, semicolon, period if not part of a wrapper
-    segmentToClean = segmentToClean.replace(/[,;!.]+$/, '');
-
     if (segmentToClean.length === 0) continue;
 
     // 2. Strip trailing line/column numbers (e.g. src/main.ts:10:5)
-    // We use a non-greedy match for the path part
-    const lineMatch = segmentToClean.match(/^(.+?):(\d+)(?::\d+)?$/);
+    // We handle the case where it might be wrapped in more text, e.g. at (src/index.ts:123)
+    const lineMatch = segmentToClean.match(/^(.+?):(\d+)(?::\d+)?/);
     const pathOnly = lineMatch ? lineMatch[1] : segmentToClean;
 
     // 3. Validate the extracted segment using centralized heuristics.
