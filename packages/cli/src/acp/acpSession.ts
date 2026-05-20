@@ -37,6 +37,8 @@ import {
   MessageBusType,
   PolicyDecision,
   type ToolConfirmationRequest,
+  resolveAtCommandPath,
+  type ResolvedAtCommandPath,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -1023,99 +1025,120 @@ export class Session {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
       let readDirectly = false;
-      try {
-        const absolutePath = path.resolve(
+
+      const result = await resolveAtCommandPath(
+        pathName,
+        this.context.config,
+        (msg) => this.debug(msg),
+      );
+
+      let validationError: string | null = null;
+      let absolutePath: string;
+      let resolved: ResolvedAtCommandPath | undefined;
+
+      if (result.status === 'resolved') {
+        resolved = result.resolved;
+        absolutePath = resolved.absolutePath;
+      } else if (result.status === 'unauthorized') {
+        absolutePath = result.absolutePath;
+        validationError = result.error;
+      } else if (result.status === 'invalid') {
+        // Already logged in resolveAtCommandPath
+        continue;
+      } else {
+        // Result is not_found.
+        // We still check if it's an unauthorized absolute path that we can ask permission for,
+        // specifically for paths that are completely outside the root and not even in any workspace directory.
+        // For relative paths not found anywhere, we resolve relative to targetDir for permission check.
+        absolutePath = path.resolve(
           this.context.config.getTargetDir(),
           pathName,
         );
+      }
 
-        let validationError = this.context.config.validatePathAccess(
-          absolutePath,
-          'read',
-        );
-
-        // We ask the user for explicit permission to read them if outside sandboxed workspace boundaries (and not already authorized).
-        if (
-          validationError &&
-          !isWithinRoot(absolutePath, this.context.config.getTargetDir())
-        ) {
-          try {
-            const stats = await fs.stat(absolutePath);
-            if (stats.isFile()) {
-              const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
-              const params = {
-                sessionId: this.id,
-                options: [
-                  {
-                    optionId: ToolConfirmationOutcome.ProceedOnce,
-                    name: 'Allow once',
-                    kind: 'allow_once',
-                  },
-                  {
-                    optionId: ToolConfirmationOutcome.Cancel,
-                    name: 'Deny',
-                    kind: 'reject_once',
-                  },
-                ] as acp.PermissionOption[],
-                toolCall: {
-                  toolCallId: syntheticCallId,
-                  status: 'pending',
-                  title: `Allow access to absolute path: ${pathName}`,
-                  content: [
-                    {
-                      type: 'content',
-                      content: {
-                        type: 'text',
-                        text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
-                      },
-                    },
-                  ],
-                  locations: [],
-                  kind: 'read',
+      if (
+        !resolved &&
+        validationError &&
+        !isWithinRoot(absolutePath, this.context.config.getTargetDir())
+      ) {
+        try {
+          const stats = await fs.stat(absolutePath);
+          if (stats.isFile()) {
+            const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
+            const params = {
+              sessionId: this.id,
+              options: [
+                {
+                  optionId: ToolConfirmationOutcome.ProceedOnce,
+                  name: 'Allow once',
+                  kind: 'allow_once',
                 },
-              };
-
-              const output = RequestPermissionResponseSchema.parse(
-                await this.connection.requestPermission(params),
-              );
-
-              const outcome =
-                output.outcome.outcome === 'cancelled'
-                  ? ToolConfirmationOutcome.Cancel
-                  : z
-                      .nativeEnum(ToolConfirmationOutcome)
-                      .parse(output.outcome.optionId);
-
-              if (outcome === ToolConfirmationOutcome.ProceedOnce) {
-                this.context.config
-                  .getWorkspaceContext()
-                  .addReadOnlyPath(absolutePath);
-                validationError = null;
-              } else {
-                this.debug(
-                  `Direct read authorization denied for absolute path ${pathName}`,
-                );
-                directContents.push({
-                  spec: pathName,
-                  content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
-                });
-                continue;
-              }
-            }
-          } catch (error) {
-            this.debug(
-              `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
-            );
-            await this.sendUpdate({
-              sessionUpdate: 'agent_thought_chunk',
-              content: {
-                type: 'text',
-                text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+                {
+                  optionId: ToolConfirmationOutcome.Cancel,
+                  name: 'Deny',
+                  kind: 'reject_once',
+                },
+              ] as acp.PermissionOption[],
+              toolCall: {
+                toolCallId: syntheticCallId,
+                status: 'pending',
+                title: `Allow access to absolute path: ${pathName}`,
+                content: [
+                  {
+                    type: 'content',
+                    content: {
+                      type: 'text',
+                      text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
+                    },
+                  },
+                ],
+                locations: [],
+                kind: 'read',
               },
-            });
-          }
-        }
+            };
 
+            const output = RequestPermissionResponseSchema.parse(
+              await this.connection.requestPermission(params),
+            );
+
+            const outcome =
+              output.outcome.outcome === 'cancelled'
+                ? ToolConfirmationOutcome.Cancel
+                : z
+                    .nativeEnum(ToolConfirmationOutcome)
+                    .parse(output.outcome.optionId);
+
+            if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+              this.context.config
+                .getWorkspaceContext()
+                .addReadOnlyPath(absolutePath);
+              validationError = null;
+            } else {
+              this.debug(
+                `Direct read authorization denied for absolute path ${pathName}`,
+              );
+              directContents.push({
+                spec: pathName,
+                content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
+              });
+              continue;
+            }
+          }
+        } catch (error) {
+          this.debug(
+            `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
+          );
+          await this.sendUpdate({
+            sessionUpdate: 'agent_thought_chunk',
+            content: {
+              type: 'text',
+              text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+            },
+          });
+        }
+      }
+
+      try {
         if (!validationError) {
           // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
           // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
@@ -1128,7 +1151,9 @@ export class Session {
             !readDirectly
           ) {
             try {
-              const stats = await fs.stat(absolutePath);
+              const stats = resolved
+                ? resolved.stats
+                : await fs.stat(absolutePath);
               if (stats.isFile()) {
                 const fileReadResult = await processSingleFileContent(
                   absolutePath,
@@ -1187,7 +1212,9 @@ export class Session {
           }
 
           if (!readDirectly) {
-            const stats = await fs.stat(absolutePath);
+            const stats = resolved
+              ? resolved.stats
+              : await fs.stat(absolutePath);
             if (stats.isDirectory()) {
               currentPathSpec = pathName.endsWith('/')
                 ? `${pathName}**`

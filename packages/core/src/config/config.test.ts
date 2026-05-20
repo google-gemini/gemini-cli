@@ -3477,6 +3477,53 @@ describe('Config Quota & Preview Model Access', () => {
       expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });
   });
+
+  describe('validatePathAccess (PathValidator integration)', () => {
+    it('should reject pathologically long paths', () => {
+      const config = new Config(baseParams);
+      const longPath = path.join(baseParams.targetDir, 'a'.repeat(5000));
+      const result = config.validatePathAccess(longPath, 'read');
+      expect(result).toContain('Invalid path: Path is too long');
+    });
+
+    it('should reject paths with log markers', () => {
+      const config = new Config(baseParams);
+      const logPath = path.join(
+        baseParams.targetDir,
+        'AssertionError: expected true to be false',
+      );
+      const result = config.validatePathAccess(logPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path appears to be a misinterpreted log fragment',
+      );
+    });
+
+    it('should reject paths with control characters', () => {
+      const config = new Config(baseParams);
+      const malformedPath = path.join(
+        baseParams.targetDir,
+        'file\nwith\nnewline.txt',
+      );
+      const result = config.validatePathAccess(malformedPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path contains invalid characters',
+      );
+    });
+
+    it('should allow normal paths', () => {
+      const config = new Config(baseParams);
+      const normalPath = path.resolve(baseParams.targetDir, 'src/index.ts');
+      const result = config.validatePathAccess(normalPath, 'read');
+
+      // It might return "Path not in workspace" or similar if not authorized,
+      // but it should NOT return the "Invalid path" prefix from PathValidator.
+      if (result) {
+        expect(result).not.toContain('Invalid path:');
+      } else {
+        expect(result).toBeNull();
+      }
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
