@@ -52,6 +52,7 @@ import {
 } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
@@ -896,6 +897,58 @@ EOF`;
         );
 
         await promise;
+      });
+    });
+
+    describe('PTY routing vs Full Access (YOLO)', () => {
+      it('should enable PTY when interactive shell is on and approvalMode is not YOLO', async () => {
+        vi.mocked(mockConfig.getEnableInteractiveShell).mockReturnValue(true);
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.DEFAULT,
+        );
+
+        const invocation = shellTool.build({ command: 'echo hi' });
+        const promise = invocation.execute({ abortSignal: mockAbortSignal });
+        resolveShellExecution();
+        await promise;
+
+        const call = mockShellExecutionService.mock.calls.at(-1);
+        // 5th positional arg (index 4) is shouldUseNodePty.
+        expect(call?.[4]).toBe(true);
+      });
+
+      it('should skip PTY in Full Access (YOLO) so sudo cannot prompt for a password', async () => {
+        // PTY would give sudo a real TTY and let it hang forever waiting for
+        // a password. The child_process fallback uses stdio:['ignore', ...]
+        // so sudo fails fast with "a password is required" (matches Codex's
+        // Stdio::null() in codex-rs/utils/pty/src/pipe.rs:144).
+        vi.mocked(mockConfig.getEnableInteractiveShell).mockReturnValue(true);
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.YOLO,
+        );
+
+        const invocation = shellTool.build({ command: 'sudo apt update' });
+        const promise = invocation.execute({ abortSignal: mockAbortSignal });
+        resolveShellExecution();
+        await promise;
+
+        const call = mockShellExecutionService.mock.calls.at(-1);
+        expect(call?.[4]).toBe(false);
+      });
+
+      it('should still skip PTY when interactive shell is disabled, regardless of approvalMode', async () => {
+        vi.mocked(mockConfig.getEnableInteractiveShell).mockReturnValue(false);
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.DEFAULT,
+        );
+
+        const invocation = shellTool.build({ command: 'echo hi' });
+        const promise = invocation.execute({ abortSignal: mockAbortSignal });
+        resolveShellExecution();
+        await promise;
+
+        const call = mockShellExecutionService.mock.calls.at(-1);
+        expect(call?.[4]).toBe(false);
       });
     });
   });

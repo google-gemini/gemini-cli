@@ -36,6 +36,7 @@ import {
   type SandboxPermissions,
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -138,6 +139,10 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  // When set to YOLO, prepareExecution injects non-interactive env vars
+  // (CI=1, npm_config_yes=true, DEBIAN_FRONTEND=noninteractive, etc.) so
+  // package managers and installers auto-confirm instead of hanging on stdin.
+  approvalMode?: ApprovalMode;
 }
 
 /**
@@ -517,6 +522,36 @@ export class ShellExecutionService {
         GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
         [newKey]: 'credential.helper',
         [newValue]: '',
+      });
+    }
+
+    // Full Access mode opts the user into "auto-everything". Make common
+    // installers / package managers run non-interactively so they don't hang
+    // on prompts like `npx`'s "Ok to proceed? [y]" or `apt`'s "Do you want
+    // to continue?". Pre-existing user values pass through (?? coalesce).
+    //
+    // GIT_TERMINAL_PROMPT, GH_PROMPT_DISABLED, GCM_INTERACTIVE are NOT set
+    // here: the `!isInteractive` block above already does (in YOLO we force
+    // shouldUseNodePty=false in shell.ts → isInteractive=false → that block
+    // runs and overwrites them unconditionally). Listing them here would be
+    // redundant and the `??` would be misleading — user values for those
+    // three are not preserved by either path.
+    //
+    // Codex CLI does the always-on equivalent at exec (codex-rs
+    // `UNIFIED_EXEC_ENV`); Claude Code propagates these vars from the user's
+    // env. We gate on YOLO because outside Full Access the user has not
+    // opted in to skipping prompts.
+    if (shellExecutionConfig.approvalMode === ApprovalMode.YOLO) {
+      Object.assign(baseEnv, {
+        CI: baseEnv['CI'] ?? '1',
+        npm_config_yes: baseEnv['npm_config_yes'] ?? 'true',
+        npm_config_fund: baseEnv['npm_config_fund'] ?? 'false',
+        npm_config_audit: baseEnv['npm_config_audit'] ?? 'false',
+        YARN_ENABLE_INTERACTIVE: baseEnv['YARN_ENABLE_INTERACTIVE'] ?? 'false',
+        DEBIAN_FRONTEND: baseEnv['DEBIAN_FRONTEND'] ?? 'noninteractive',
+        NEEDRESTART_MODE: baseEnv['NEEDRESTART_MODE'] ?? 'a',
+        PIP_DISABLE_PIP_VERSION_CHECK:
+          baseEnv['PIP_DISABLE_PIP_VERSION_CHECK'] ?? '1',
       });
     }
 
