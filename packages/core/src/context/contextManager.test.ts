@@ -125,4 +125,27 @@ describe('ContextManager', () => {
     );
     expect(passedNodeIds.has(passedNodes[0].id)).toBe(true);
   });
+
+  it('renderHistory should exclude pendingRequest from the result (late binding)', async () => {
+    const contextManager = new ContextManager(
+      mockSidecar,
+      mockEnv,
+      mockTracer,
+      mockOrchestrator,
+      mockChatHistory,
+      mockAdvancedTokenCalculator,
+    );
+
+    const pendingRequest: HistoryTurn = {
+      id: 'pending-turn-1',
+      content: { role: 'user', parts: [{ text: 'Active prompt' }] },
+    };
+
+    const { history, apiHistory } =
+      await contextManager.renderHistory(pendingRequest);
+
+    // Should be empty because mockChatHistory has no historical turns
+    expect(history).toHaveLength(0);
+    expect(apiHistory).toHaveLength(0);
+  });
 });

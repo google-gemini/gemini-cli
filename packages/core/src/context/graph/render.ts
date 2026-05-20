@@ -15,6 +15,17 @@ import { performCalibration } from '../utils/tokenCalibration.js';
 import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { HistoryTurn } from '../../core/agentChatHistory.js';
 
+export interface RenderOptions {
+  protectionReasons?: Map<string, string>;
+  header?: Content;
+  /**
+   * If true, the most recent turn in the graph will not be considered for
+   * consolidation (snapshots) or included in the returned history.
+   * This is used for "late-binding" the prompt.
+   */
+  lateBindPrompt?: boolean;
+}
+
 /**
  * Maps the Episodic Context Graph back into a list of HistoryTurns for transmission.
  * It applies synchronous context management (GC backstop) if the budget is exceeded.
@@ -26,14 +37,15 @@ export async function render(
   tracer: ContextTracer,
   env: ContextEnvironment,
   advancedTokenCalculator: AdvancedTokenCalculator,
-  protectionReasons: Map<string, string> = new Map(),
-  header?: Content,
+  options: RenderOptions = {},
 ): Promise<{
   history: HistoryTurn[];
+  pendingHistory: HistoryTurn[];
   didApplyManagement: boolean;
   baseUnits: number;
   processedNodes: readonly ConcreteNode[];
 }> {
+  const { protectionReasons = new Map(), header, lateBindPrompt } = options;
   let headerTokens = 0;
   let headerBaseUnits = 0;
   if (header) {
@@ -43,18 +55,36 @@ export async function render(
     headerBaseUnits = costs.baseUnits;
   }
 
+  const lastTurnId = nodes[nodes.length - 1]?.turnId;
+
   if (!sidecar.config.budget) {
-    const contents = env.graphMapper.fromGraph(nodes);
+    const allVisibleNodes = nodes;
+
+    const managedNodes =
+      lateBindPrompt && lastTurnId
+        ? allVisibleNodes.filter((n) => n.turnId !== lastTurnId)
+        : allVisibleNodes;
+
+    const pendingNodes =
+      lateBindPrompt && lastTurnId
+        ? allVisibleNodes.filter((n) => n.turnId === lastTurnId)
+        : [];
+
+    const history = env.graphMapper.fromGraph(managedNodes);
+    const pendingHistory = env.graphMapper.fromGraph(pendingNodes);
+
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
-      renderedContext: contents,
+      renderedContext: history,
+      pendingContext: pendingHistory,
     });
 
-    // In all cases, retrieve raw base units from the token calculator interface
     const baseUnits =
-      advancedTokenCalculator.getRawBaseUnits(nodes) + headerBaseUnits;
+      advancedTokenCalculator.getRawBaseUnits(allVisibleNodes) +
+      headerBaseUnits;
 
     return {
-      history: contents,
+      history,
+      pendingHistory,
       didApplyManagement: false,
       baseUnits,
       processedNodes: nodes,
@@ -63,7 +93,7 @@ export async function render(
 
   const maxTokens = sidecar.config.budget.maxTokens;
 
-  const { tokens: graphTokens, baseUnits: graphBaseUnits } =
+  const { tokens: graphTokens } =
     advancedTokenCalculator.calculateTokensAndBaseUnits(nodes);
 
   const currentTokens = graphTokens + headerTokens;
@@ -93,19 +123,39 @@ export async function render(
       'Render',
       `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
     );
-    const contents = env.graphMapper.fromGraph(nodes);
+
+    const allVisibleNodes = nodes;
+
+    const managedNodes =
+      lateBindPrompt && lastTurnId
+        ? allVisibleNodes.filter((n) => n.turnId !== lastTurnId)
+        : allVisibleNodes;
+
+    const pendingNodes =
+      lateBindPrompt && lastTurnId
+        ? allVisibleNodes.filter((n) => n.turnId === lastTurnId)
+        : [];
+
+    const history = env.graphMapper.fromGraph(managedNodes);
+    const pendingHistory = env.graphMapper.fromGraph(pendingNodes);
+
     tracer.logEvent('Render', 'Render Context for LLM', {
-      renderedContext: contents,
+      renderedContext: history,
+      pendingContext: pendingHistory,
     });
-    performCalibration(
-      env,
-      nodes,
-      contents.map((h) => h.content),
-    );
+
+    performCalibration(env, allVisibleNodes, [
+      ...history.map((h) => h.content),
+      ...pendingHistory.map((h) => h.content),
+    ]);
+
     return {
-      history: contents,
+      history,
+      pendingHistory,
       didApplyManagement: false,
-      baseUnits: graphBaseUnits + headerBaseUnits,
+      baseUnits:
+        advancedTokenCalculator.getRawBaseUnits(allVisibleNodes) +
+        headerBaseUnits,
       processedNodes: nodes,
     };
   }
@@ -119,19 +169,24 @@ export async function render(
     `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
   );
 
-  // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
   const agedOutNodes = new Set<string>();
   let rollingTokens = 0;
-  // Start from newest and count backwards
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
     const priorTokens = rollingTokens;
     const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
     rollingTokens += nodeTokens;
 
-    // Loose Boundary Policy: Keep the node that crosses the boundary
     if (priorTokens > sidecar.config.budget.retainedTokens) {
       agedOutNodes.add(node.id);
+    }
+  }
+
+  if (lateBindPrompt && lastTurnId) {
+    for (const node of nodes) {
+      if (node.turnId === lastTurnId) {
+        agedOutNodes.delete(node.id);
+      }
     }
   }
 
@@ -142,7 +197,6 @@ export async function render(
     protectedIds,
   );
 
-  // Apply skipList logic to abstract over summarized nodes
   const skipList = new Set<string>();
   for (const node of processedNodes) {
     if (node.abstractsIds) {
@@ -150,27 +204,43 @@ export async function render(
     }
   }
 
-  const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
+  const allVisibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
 
-  const contents = env.graphMapper.fromGraph(visibleNodes);
+  const managedNodes =
+    lateBindPrompt && lastTurnId
+      ? allVisibleNodes.filter((n) => n.turnId !== lastTurnId)
+      : allVisibleNodes;
+
+  const pendingNodes =
+    lateBindPrompt && lastTurnId
+      ? allVisibleNodes.filter((n) => n.turnId === lastTurnId)
+      : [];
+
+  const history = env.graphMapper.fromGraph(managedNodes);
+  const pendingHistory = env.graphMapper.fromGraph(pendingNodes);
+
   const finalTokens =
-    advancedTokenCalculator.calculateConcreteListTokens(visibleNodes);
+    advancedTokenCalculator.calculateConcreteListTokens(allVisibleNodes);
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
-    renderedContextSanitized: contents,
+    renderedContextSanitized: history,
+    pendingContextSanitized: pendingHistory,
   });
   debugLogger.log(
     `Context Manager finished. Final actual token count: ${finalTokens}.`,
   );
-  performCalibration(
-    env,
-    visibleNodes,
-    contents.map((h) => h.content),
-  );
+
+  performCalibration(env, allVisibleNodes, [
+    ...history.map((h) => h.content),
+    ...pendingHistory.map((h) => h.content),
+  ]);
+
   return {
-    history: contents,
+    history,
+    pendingHistory,
     didApplyManagement: true,
     baseUnits:
-      advancedTokenCalculator.getRawBaseUnits(visibleNodes) + headerBaseUnits,
+      advancedTokenCalculator.getRawBaseUnits(allVisibleNodes) +
+      headerBaseUnits,
     processedNodes,
   };
 }

@@ -44,6 +44,7 @@ export class ContextManager {
     result: {
       history: HistoryTurn[];
       apiHistory: Content[];
+      pendingApiHistory: Content[];
       didApplyManagement: boolean;
       baseUnits: number;
       processedNodes: readonly ConcreteNode[];
@@ -294,6 +295,7 @@ export class ContextManager {
   ): Promise<{
     history: HistoryTurn[];
     apiHistory: Content[];
+    pendingApiHistory: Content[];
     didApplyManagement: boolean;
     baseUnits: number;
     processedNodes: readonly ConcreteNode[];
@@ -373,12 +375,16 @@ export class ContextManager {
       this.tracer,
       this.env,
       this.advancedTokenCalculator,
-      protectionReasons,
-      header,
+      {
+        protectionReasons,
+        header,
+        lateBindPrompt: !!pendingRequest,
+      },
     );
 
     const {
       history: renderedHistory,
+      pendingHistory,
       didApplyManagement,
       baseUnits,
       processedNodes,
@@ -400,11 +406,19 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    const hardenedHistory = hardenHistory([...renderedHistory], {
+    const allHistory = [...renderedHistory, ...pendingHistory];
+    const hardenedAllHistory = hardenHistory(allHistory, {
       sentinels: this.sidecar.sentinels,
     });
 
-    const apiHistory = hardenedHistory.map((h) => h.content);
+    const apiHistory = hardenedAllHistory
+      .slice(0, renderedHistory.length)
+      .map((h) => h.content);
+
+    const pendingApiHistory = hardenedAllHistory
+      .slice(renderedHistory.length)
+      .map((h) => h.content);
+
     if (header) {
       apiHistory.unshift(header);
     }
@@ -412,6 +426,7 @@ export class ContextManager {
     const result = {
       history: renderedHistory,
       apiHistory,
+      pendingApiHistory,
       didApplyManagement,
       baseUnits,
       processedNodes,

@@ -654,6 +654,7 @@ export class GeminiClient {
         const {
           history: newHistory,
           apiHistory,
+          pendingApiHistory,
           baseUnits,
         } = await this.contextManager.renderHistory(
           pendingRequest,
@@ -662,9 +663,22 @@ export class GeminiClient {
         );
 
         currentBaseUnits = baseUnits;
-        apiHistoryOverride = apiHistory;
+
+        // Use the PROCESSED pending content if available (e.g. if cleaned or distilled)
+        const finalPendingContent =
+          pendingApiHistory.length > 0
+            ? pendingApiHistory[0]
+            : rawPendingRequest;
+
+        // Late-bind the prompt: Append the active request to the managed history
+        // only for the purpose of the upcoming API call.
+        apiHistoryOverride = [...apiHistory, finalPendingContent];
 
         this.getChat().setHistory(newHistory, { silent: true });
+
+        // Update the request for turn.run so that the final history record
+        // matches the processed/cleaned content sent to the API.
+        request = finalPendingContent.parts || [];
       } else {
         const newHistory = await this.agentHistoryProvider.manageHistory(
           this.getHistory(),
