@@ -16,6 +16,8 @@ module.exports = async ({ github, context, core }) => {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
 
+  core.info(`Running in ${dryRun ? 'DRY RUN' : 'PRODUCTION'} mode.`);
+
   const STALE_LABEL = 'stale';
   const NEED_INFO_LABEL = 'status/need-information';
   const EXEMPT_LABELS = [
@@ -123,10 +125,14 @@ module.exports = async ({ github, context, core }) => {
         lastComment.user?.type !== 'Bot' &&
         !(await isMaintainer(lastComment.user, lastComment.author_association))
       ) {
-        core.info(
-          `Removing ${NEED_INFO_LABEL} from #${item.number} due to contributor response.`,
-        );
-        if (!dryRun) {
+        if (dryRun) {
+          core.info(
+            `[DRY RUN] Would remove ${NEED_INFO_LABEL} from #${item.number} due to contributor response.`,
+          );
+        } else {
+          core.info(
+            `Removing ${NEED_INFO_LABEL} from #${item.number} due to contributor response.`,
+          );
           await github.rest.issues
             .removeLabel({
               owner,
@@ -144,10 +150,14 @@ module.exports = async ({ github, context, core }) => {
   await processItems(
     `repo:${owner}/${repo} is:open label:"${NEED_INFO_LABEL}" updated:<${noResponseThreshold.toISOString()}`,
     async (item) => {
-      core.info(
-        `Closing #${item.number} due to no response for ${NO_RESPONSE_DAYS} days.`,
-      );
-      if (!dryRun) {
+      if (dryRun) {
+        core.info(
+          `[DRY RUN] Would close #${item.number} due to no response for ${NO_RESPONSE_DAYS} days.`,
+        );
+      } else {
+        core.info(
+          `Closing #${item.number} due to no response for ${NO_RESPONSE_DAYS} days.`,
+        );
         await github.rest.issues.createComment({
           owner,
           repo,
@@ -171,7 +181,6 @@ module.exports = async ({ github, context, core }) => {
   await processItems(
     `repo:${owner}/${repo} is:open -label:"${STALE_LABEL}" ${exemptQuery} updated:<${staleThreshold.toISOString()}`,
     async (item) => {
-      core.info(`Marking #${item.number} as stale.`);
       const isBug = item.labels.some((l) =>
         (typeof l === 'string' ? l : l.name).toLowerCase().includes('bug'),
       );
@@ -179,7 +188,10 @@ module.exports = async ({ github, context, core }) => {
         ? `This bug report has been automatically marked as stale due to ${STALE_DAYS} days of inactivity. Many issues are resolved in newer releases. Please verify if the issue persists in the latest Gemini CLI version. If it does, please leave a comment to keep this open. It will be closed in ${CLOSE_DAYS} days if no further activity occurs. Thank you!`
         : `This item has been automatically marked as stale due to ${STALE_DAYS} days of inactivity. It will be closed in ${CLOSE_DAYS} days if no further activity occurs. Thank you!`;
 
-      if (!dryRun) {
+      if (dryRun) {
+        core.info(`[DRY RUN] Would mark #${item.number} as stale.`);
+      } else {
+        core.info(`Marking #${item.number} as stale.`);
         await github.rest.issues.addLabels({
           owner,
           repo,
@@ -255,10 +267,14 @@ module.exports = async ({ github, context, core }) => {
 
       if (meaningfulEvents.length > 0) {
         // Activity detected, remove Stale label
-        core.info(
-          `Removing ${STALE_LABEL} from #${item.number} due to meaningful activity (e.g., comment or PR).`,
-        );
-        if (!dryRun) {
+        if (dryRun) {
+          core.info(
+            `[DRY RUN] Would remove ${STALE_LABEL} from #${item.number} due to meaningful activity (e.g., comment or PR).`,
+          );
+        } else {
+          core.info(
+            `Removing ${STALE_LABEL} from #${item.number} due to meaningful activity (e.g., comment or PR).`,
+          );
           await github.rest.issues
             .removeLabel({
               owner,
@@ -278,8 +294,10 @@ module.exports = async ({ github, context, core }) => {
         return;
       }
 
-      core.info(`Closing stale item #${item.number}.`);
-      if (!dryRun) {
+      if (dryRun) {
+        core.info(`[DRY RUN] Would close stale item #${item.number}.`);
+      } else {
+        core.info(`Closing stale item #${item.number}.`);
         await github.rest.issues.createComment({
           owner,
           repo,
@@ -313,8 +331,12 @@ module.exports = async ({ github, context, core }) => {
     async (pr) => {
       if (await isMaintainer(pr.user, pr.author_association)) return;
 
-      core.info(`Nudging PR #${pr.number} for contribution policy.`);
-      if (!dryRun) {
+      if (dryRun) {
+        core.info(
+          `[DRY RUN] Would nudge PR #${pr.number} for contribution policy.`,
+        );
+      } else {
+        core.info(`Nudging PR #${pr.number} for contribution policy.`);
         await github.rest.issues.addLabels({
           owner,
           repo,
@@ -337,10 +359,14 @@ module.exports = async ({ github, context, core }) => {
     async (pr) => {
       if (await isMaintainer(pr.user, pr.author_association)) return;
 
-      core.info(
-        `Closing PR #${pr.number} per contribution policy (no 'help wanted').`,
-      );
-      if (!dryRun) {
+      if (dryRun) {
+        core.info(
+          `[DRY RUN] Would close PR #${pr.number} per contribution policy (no 'help wanted').`,
+        );
+      } else {
+        core.info(
+          `Closing PR #${pr.number} per contribution policy (no 'help wanted').`,
+        );
         await github.rest.issues.createComment({
           owner,
           repo,
