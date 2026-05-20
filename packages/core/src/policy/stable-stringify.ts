@@ -63,8 +63,8 @@ export function stableStringify(obj: unknown): string {
     isTopLevel = false,
   ): string => {
     // Handle primitives and null
-    if (currentObj === undefined) {
-      return 'null'; // undefined in arrays becomes null in JSON
+    if (currentObj === undefined || typeof currentObj === 'symbol') {
+      return 'null'; // undefined and symbols in arrays become null in JSON
     }
     if (currentObj === null) {
       return 'null';
@@ -104,8 +104,12 @@ export function stableStringify(obj: unknown): string {
 
       if (Array.isArray(currentObj)) {
         const items = currentObj.map((item) => {
-          // undefined and functions in arrays become null
-          if (item === undefined || typeof item === 'function') {
+          // undefined, functions and symbols in arrays become null
+          if (
+            item === undefined ||
+            typeof item === 'function' ||
+            typeof item === 'symbol'
+          ) {
             return 'null';
           }
           return stringify(item, ancestors, false);
@@ -120,8 +124,12 @@ export function stableStringify(obj: unknown): string {
       for (const key of sortedKeys) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const value = (currentObj as Record<string, unknown>)[key];
-        // Skip undefined and function values in objects (per JSON spec)
-        if (value !== undefined && typeof value !== 'function') {
+        // Skip undefined, function and symbol values in objects (per JSON spec)
+        if (
+          value !== undefined &&
+          typeof value !== 'function' &&
+          typeof value !== 'symbol'
+        ) {
           let pairStr =
             JSON.stringify(key) + ':' + stringify(value, ancestors, false);
 

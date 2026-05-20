@@ -48,10 +48,39 @@ export interface SnapshotState {
   recent_arc: string[];
 }
 
+import { debugLogger } from '../../utils/debugLogger.js';
+
+export function isSnapshotState(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return false;
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!isRecord(parsed)) return false;
+    const isSnap =
+      Array.isArray(parsed['active_tasks']) &&
+      Array.isArray(parsed['discovered_facts']) &&
+      Array.isArray(parsed['constraints_and_preferences']) &&
+      Array.isArray(parsed['recent_arc']);
+    if (!isSnap) {
+      debugLogger.log(
+        '[isSnapshotState] FAILED FOR JSON:',
+        JSON.stringify(parsed),
+      );
+    }
+    return isSnap;
+  } catch {
+    debugLogger.log('[isSnapshotState] PARSE FAILED FOR:', trimmed);
+    return false;
+  }
+}
+
 export interface BaselineSnapshotInfo {
   text: string;
   abstractsIds: string[];
   id: string;
+  timestamp: number;
 }
 
 /**
@@ -61,6 +90,20 @@ export interface BaselineSnapshotInfo {
 export function findLatestSnapshotBaseline(
   targets: readonly ConcreteNode[],
 ): BaselineSnapshotInfo | undefined {
+  debugLogger.log(
+    '[findLatestSnapshotBaseline] Targets:',
+    targets.map((t) => ({
+      id: t.id,
+      type: t.type,
+      text:
+        t.payload &&
+        typeof t.payload === 'object' &&
+        'text' in t.payload &&
+        typeof t.payload.text === 'string'
+          ? t.payload.text.substring(0, 20)
+          : '',
+    })),
+  );
   const lastSnapshotNode = [...targets]
     .reverse()
     .find((n) => n.type === NodeType.SNAPSHOT && n.payload.text);
@@ -72,8 +115,10 @@ export function findLatestSnapshotBaseline(
         ? [...lastSnapshotNode.abstractsIds]
         : [],
       id: lastSnapshotNode.id,
+      timestamp: lastSnapshotNode.timestamp,
     };
   }
+
   return undefined;
 }
 
@@ -324,5 +369,63 @@ ${formatNodesForLlm(nodes)}`;
     }
 
     return JSON.stringify(newState);
+  }
+}
+
+/**
+ * Shared logic for working with Snapshot node state.
+ */
+export class SnapshotStateHelper {
+  /**
+   * Flatten nested abstract IDs to only the "pristine" (non-snapshot) IDs.
+   */
+  static flattenAbstracts(
+    nodes: ConcreteNode[],
+    abstractsIds: readonly string[],
+  ): string[] {
+    const pristineIds: string[] = [];
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+    const walk = (ids: readonly string[]) => {
+      for (const id of ids) {
+        const node = nodeMap.get(id);
+        if (!node) {
+          // Fallback: if node not in map, treat as pristine ID
+          pristineIds.push(id);
+          continue;
+        }
+
+        if (node.type === NodeType.SNAPSHOT && node.abstractsIds) {
+          walk(node.abstractsIds);
+        } else {
+          pristineIds.push(id);
+        }
+      }
+    };
+
+    walk(abstractsIds);
+    return Array.from(new Set(pristineIds)); // Dedupe
+  }
+
+  /**
+   * Helper to extract state from the most recent snapshot in a list of nodes.
+   */
+  static exportState(nodes: ConcreteNode[]): {
+    snapshot?: { text: string; consumedIds: string[] };
+  } {
+    const baseline = findLatestSnapshotBaseline(nodes);
+    if (!baseline) return {};
+
+    const node = nodes.find((n) => n.id === baseline.id);
+    if (!node || node.type !== NodeType.SNAPSHOT) return {};
+
+    const consumedIds = this.flattenAbstracts(nodes, node.abstractsIds || []);
+
+    return {
+      snapshot: {
+        text: baseline.text,
+        consumedIds,
+      },
+    };
   }
 }

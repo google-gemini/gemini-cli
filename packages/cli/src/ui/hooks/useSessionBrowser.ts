@@ -12,22 +12,28 @@ import {
   convertSessionToClientHistory,
   uiTelemetryService,
   loadConversationRecord,
-  type Config,
-  type ResumedSessionData,
+} from '@google/gemini-cli-core';
+import type {
+  HistoryTurn,
+  Config,
+  ResumedSessionData,
 } from '@google/gemini-cli-core';
 import {
   convertSessionToHistoryFormats,
   type SessionInfo,
 } from '../../utils/sessionUtils.js';
-import type { Part } from '@google/genai';
 
 export { convertSessionToHistoryFormats };
+
+import type { Part } from '@google/genai';
 
 export const useSessionBrowser = (
   config: Config,
   onLoadHistory: (
     uiHistory: HistoryItemWithoutId[],
-    clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+    clientHistory: Array<
+      { role: 'user' | 'model'; parts: Part[] } | HistoryTurn
+    >,
     resumedSessionData: ResumedSessionData,
   ) => Promise<void>,
 ) => {

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import { ContextManager } from '../contextManager.js';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import type { Content } from '@google/genai';
@@ -98,7 +99,8 @@ export class SimulationHarness {
   async simulateTurn(messages: Content[]) {
     // 1. Append the new messages
     const currentHistory = this.chatHistory.get();
-    this.chatHistory.set([...currentHistory, ...messages]);
+    const turns = messages.map((m) => ({ id: randomUUID(), content: m }));
+    this.chatHistory.set([...currentHistory, ...turns]);
 
     // 2. Measure tokens immediately after append
     const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
