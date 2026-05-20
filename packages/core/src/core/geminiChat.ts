@@ -42,6 +42,8 @@ import {
 import {
   ChatRecordingService,
   type ResumedSessionData,
+  type MessageRecord,
+  type ConversationRecord,
 } from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
@@ -272,6 +274,7 @@ export class GeminiChat {
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
   private callCounter = 0;
+  private initialMessages?: MessageRecord[];
   agentHistory: AgentChatHistory;
 
   constructor(
@@ -281,6 +284,7 @@ export class GeminiChat {
     history: Array<Content | HistoryTurn> = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
+    messages?: MessageRecord[],
   ) {
     validateHistory(history);
 
@@ -311,6 +315,7 @@ export class GeminiChat {
       initialHistory = [];
     }
 
+    this.initialMessages = messages;
     this.agentHistory = new AgentChatHistory(initialHistory);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
@@ -325,8 +330,15 @@ export class GeminiChat {
   async initialize(
     resumedSessionData?: ResumedSessionData,
     kind: 'main' | 'subagent' = 'main',
+    messages?: MessageRecord[],
   ) {
+    const messagesToUse = messages ?? this.initialMessages;
     await this.chatRecordingService.initialize(resumedSessionData, kind);
+
+    if (messagesToUse) {
+      this.chatRecordingService.resetMessages(messagesToUse);
+    }
+
     // Sync initial history with the recorder to ensure all turns (even bootstrapped ones)
     // are durable and coordinated.
     this.chatRecordingService.updateMessagesFromHistory(
@@ -340,6 +352,18 @@ export class GeminiChat {
 
   getSystemInstruction(): string {
     return this.systemInstruction;
+  }
+
+  getConversation(): ConversationRecord | null {
+    return this.chatRecordingService.getConversation();
+  }
+
+  getChatRecordingService(): ChatRecordingService {
+    return this.chatRecordingService;
+  }
+
+  async getSubagentTrajectories(): Promise<Record<string, ConversationRecord>> {
+    return this.chatRecordingService.getSubagentTrajectories();
   }
 
   /**
@@ -747,7 +771,7 @@ export class GeminiChat {
           }
 
           throw new AgentExecutionBlockedError(
-            beforeModelResult.reason || 'Model call blocked by hook',
+            beforeModelResult.reason || 'Agent execution blocked by hook',
             syntheticResponse,
           );
         }
@@ -1323,13 +1347,6 @@ export class GeminiChat {
 
   getLastPromptTokenCount(): number {
     return this.lastPromptTokenCount;
-  }
-
-  /**
-   * Gets the chat recording service instance.
-   */
-  getChatRecordingService(): ChatRecordingService {
-    return this.chatRecordingService;
   }
 
   /**

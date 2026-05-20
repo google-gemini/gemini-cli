@@ -63,6 +63,8 @@ describe('chatCommand', () => {
     mockGetHistory = vi.fn().mockReturnValue([]);
     mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
+      getSubagentTrajectories: vi.fn().mockResolvedValue({}),
+      getConversation: vi.fn().mockReturnValue({ messages: [] }),
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
     mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
@@ -191,6 +193,15 @@ describe('chatCommand', () => {
         { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
       ]);
       result = await saveCommand?.action?.(mockContext, tag);
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        {
+          history: expect.any(Array),
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          trajectories: {},
+          messages: [],
+        },
+        tag,
+      );
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -230,7 +241,12 @@ describe('chatCommand', () => {
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
-        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        {
+          history,
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+          trajectories: {},
+          messages: [],
+        },
         tag,
       );
       expect(result).toEqual({
@@ -292,6 +308,8 @@ describe('chatCommand', () => {
           { type: 'gemini', text: 'hello world' },
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
+        messages: undefined,
+        version: undefined,
       });
     });
 
@@ -332,6 +350,8 @@ describe('chatCommand', () => {
           { type: 'gemini', text: 'hello world' },
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
+        messages: undefined,
+        version: undefined,
       });
     });
 
@@ -463,8 +483,10 @@ describe('chatCommand', () => {
         'gemini-conversation-1234567890.json',
       );
       expect(mockExport).toHaveBeenCalledWith({
-        history: mockHistory,
+        messages: [],
         filePath: expectedPath,
+        trajectories: {},
+        history: mockHistory,
       });
       expect(result).toEqual({
         type: 'message',
@@ -478,8 +500,10 @@ describe('chatCommand', () => {
       const result = await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
-        history: mockHistory,
+        messages: [],
         filePath: expectedPath,
+        trajectories: {},
+        history: mockHistory,
       });
       expect(result).toEqual({
         type: 'message',
@@ -493,8 +517,10 @@ describe('chatCommand', () => {
       const result = await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
-        history: mockHistory,
+        messages: [],
         filePath: expectedPath,
+        trajectories: {},
+        history: mockHistory,
       });
       expect(result).toEqual({
         type: 'message',
@@ -543,8 +569,10 @@ describe('chatCommand', () => {
       await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
-        history: mockHistory,
+        messages: [],
         filePath: expectedPath,
+        trajectories: {},
+        history: mockHistory,
       });
     });
 
@@ -553,8 +581,10 @@ describe('chatCommand', () => {
       await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
-        history: mockHistory,
+        messages: [],
         filePath: expectedPath,
+        trajectories: {},
+        history: mockHistory,
       });
     });
   });

@@ -7,6 +7,11 @@
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { Content } from '@google/genai';
+import {
+  type ConversationRecord,
+  type MessageRecord,
+  reconstructHistory,
+} from '@google/gemini-cli-core';
 
 /**
  * Serializes chat history to a Markdown string.
@@ -51,8 +56,20 @@ export function serializeHistoryToMarkdown(
  * Options for exporting chat history.
  */
 export interface ExportHistoryOptions {
-  history: readonly Content[];
+  /**
+   * Optional full message records which contain metadata like agentId for tool calls,
+   * providing the link between history and trajectories.
+   */
+  messages?: MessageRecord[];
+  /** The file path to export to. */
   filePath: string;
+  /** Optional subagent trajectories to include. */
+  trajectories?: Record<string, ConversationRecord>;
+  /**
+   * Optional standard history array used for model requests.
+   * If provided, it is used for Markdown export to avoid reconstruction.
+   */
+  history?: readonly Content[];
 }
 
 /**
@@ -61,13 +78,21 @@ export interface ExportHistoryOptions {
 export async function exportHistoryToFile(
   options: ExportHistoryOptions,
 ): Promise<void> {
-  const { history, filePath } = options;
+  const {
+    messages,
+    filePath,
+    trajectories: _trajectories, // Collected but not yet included in Stage 1 JSON output
+    history: providedHistory,
+  } = options;
   const extension = path.extname(filePath).toLowerCase();
 
   let content: string;
   if (extension === '.json') {
-    content = JSON.stringify(history, null, 2);
+    // Stage 1 & 2: Maintain legacy behavior - only export the raw history array.
+    // Trajectories and messages are collected but not yet included in Stage 2 JSON output.
+    content = JSON.stringify(providedHistory ?? [], null, 2);
   } else if (extension === '.md') {
+    const history = providedHistory ?? reconstructHistory(messages ?? []);
     content = serializeHistoryToMarkdown(history);
   } else {
     throw new Error(

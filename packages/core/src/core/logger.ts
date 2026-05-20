@@ -12,6 +12,11 @@ import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 
+import {
+  type ConversationRecord,
+  type MessageRecord,
+} from '../services/chatRecordingService.js';
+
 const LOG_FILE_NAME = 'logs.json';
 
 export enum MessageSenderType {
@@ -29,6 +34,17 @@ export interface LogEntry {
 export interface Checkpoint {
   history: readonly Content[];
   authType?: AuthType;
+  /**
+   * The rich message records which are the source of truth for the session.
+   * Optional in Stage 1 to maintain backward compatibility.
+   */
+  messages?: MessageRecord[];
+  /**
+   * The version of the checkpoint format.
+   */
+  version?: '2.0';
+  /** Optional subagent trajectories to include. */
+  trajectories?: Record<string, ConversationRecord>;
 }
 
 // This regex matches any character that is NOT a letter (a-z, A-Z),
@@ -347,7 +363,7 @@ export class Logger {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
-      return { history: [] };
+      return { history: [], messages: [] };
     }
 
     const path = await this._getCheckpointPath(tag);
@@ -359,7 +375,7 @@ export class Logger {
       // Handle legacy format (just an array of Content)
       if (Array.isArray(parsedContent)) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return { history: parsedContent as Content[] };
+        return { history: parsedContent as Content[], messages: [] };
       }
 
       if (
@@ -368,25 +384,29 @@ export class Logger {
         'history' in parsedContent
       ) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return parsedContent as Checkpoint;
+        const checkpoint = parsedContent as Checkpoint;
+        return {
+          ...checkpoint,
+          messages: checkpoint.messages ?? [],
+        };
       }
 
       debugLogger.warn(
         `Checkpoint file at ${path} has an unknown format. Returning empty checkpoint.`,
       );
-      return { history: [] };
+      return { history: [], messages: [] };
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         // This is okay, it just means the checkpoint doesn't exist in either format.
-        return { history: [] };
+        return { history: [], messages: [] };
       }
       debugLogger.error(
         `Failed to read or parse checkpoint file ${path}:`,
         error,
       );
-      return { history: [] };
+      return { history: [], messages: [] };
     }
   }
 
