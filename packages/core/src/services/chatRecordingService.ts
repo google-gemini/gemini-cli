@@ -719,16 +719,26 @@ export class ChatRecordingService {
     const chatsDir = path.join(tempDir, 'chats');
 
     for (const agentId of agentIds) {
-      const subagentFilePath = path.join(chatsDir, `${agentId}.json`);
+      const safeAgentId = sanitizeFilenamePart(agentId);
+      const safeParentId = sanitizeFilenamePart(this.sessionId || '');
+      if (!safeAgentId || !safeParentId) continue;
+
+      // Subagents are stored in a subdirectory named after their parent session ID
+      const subagentFilePath = path.join(
+        chatsDir,
+        safeParentId,
+        `${safeAgentId}.jsonl`,
+      );
       try {
-        const content = await fs.promises.readFile(subagentFilePath, 'utf-8');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const subagentRecord = JSON.parse(content) as ConversationRecord;
+        const subagentRecord = await loadConversationRecord(subagentFilePath);
+        if (!subagentRecord) continue;
+
         trajectories[agentId] = subagentRecord;
 
         // Recursive discovery: Create a temporary service to find nested trajectories
         const subService = new ChatRecordingService(this.context);
         // Manual override of cached state for discovery
+        subService.sessionId = agentId;
         subService.cachedConversation = subagentRecord;
         subService.conversationFile = subagentFilePath;
         const nested = await subService.getSubagentTrajectories();

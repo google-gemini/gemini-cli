@@ -28,8 +28,13 @@ export function reconstructHistory(messages: MessageRecord[]): Content[] {
           parts.push(p);
         }
       }
-    } else if (typeof msg.content === 'string' && msg.content.length > 0) {
-      parts.push({ text: msg.content });
+    } else if (typeof msg.content === 'string') {
+      if (msg.content.length > 0) {
+        parts.push({ text: msg.content });
+      }
+    } else if (msg.content) {
+      // Handle single Part object
+      parts.push(msg.content);
     }
 
     if (msg.type === 'user') {
