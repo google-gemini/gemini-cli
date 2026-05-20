@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, type Mock } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -15,8 +15,7 @@ import * as fsPromises from 'node:fs/promises';
 // ... (rest of imports)
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     resolveToRealPath: vi.fn((p: string) => p),
@@ -132,8 +131,8 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
-      (mockFs.stat as unknown as vi.Mock).mockImplementation(
+      (mockFs.readdir as unknown as Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as Mock).mockImplementation(
         async (path: string): Promise<Stats> => {
           if (path.endsWith('test1.json')) {
             return { mtime: date1, isFile: () => true } as unknown as Stats;
@@ -163,8 +162,8 @@ describe('chatCommand', () => {
       const fakeFiles = ['checkpoint-file.json', 'checkpoint-directory.json'];
       const date = new Date();
 
-      (mockFs.readdir as unknown as vi.Mock).mockResolvedValue(fakeFiles);
-      (mockFs.stat as unknown as vi.Mock).mockImplementation(
+      (mockFs.readdir as unknown as Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as Mock).mockImplementation(
         async (filePath: string): Promise<Stats> => {
           if (filePath.endsWith('file.json')) {
             return {
