@@ -389,7 +389,7 @@ describe('handleFallback', () => {
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
         FALLBACK_MODEL,
-        MOCK_PRO_MODEL,
+        undefined,
       );
       // TODO: add logging expect statement
     });

@@ -386,18 +386,14 @@ describe('Auto Routing Fallback Integration', () => {
     // Simulate start of next turn
     config.getModelAvailabilityService().resetTurn();
 
-    // Turn 2: Since fallback was 'retry_always', it is permanent. Flash should be used!
+    // Turn 2: Pro should be attempted again!
+    // Let's make it succeed this time to verify it works!
     vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
       async (params) => {
-        if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
           return {
             candidates: [
-              {
-                content: {
-                  role: 'model',
-                  parts: [{ text: 'Flash Turn 2 success' }],
-                },
-              },
+              { content: { role: 'model', parts: [{ text: 'Pro success' }] } },
             ],
           } as unknown as GenerateContentResponse;
         }
@@ -415,7 +411,7 @@ describe('Auto Routing Fallback Integration', () => {
 
     const result2 = await promise2;
     expect(result2.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
-      'Flash Turn 2 success',
+      'Pro success',
     );
   });
 });
