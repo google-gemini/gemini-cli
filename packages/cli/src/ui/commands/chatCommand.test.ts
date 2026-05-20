@@ -131,13 +131,13 @@ describe('chatCommand', () => {
       const date2 = new Date(date1.getTime() + 1000);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.readdir as any).mockResolvedValue(fakeFiles);
+      (mockFs.readdir as any).mockResolvedValue(fakeFiles as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.stat as any).mockImplementation(async (path: any): Promise<Stats> => {
+      (mockFs.stat as any).mockImplementation(async (path: any): Promise<any> => {
         if (path.endsWith('test1.json')) {
-          return { mtime: date1, isFile: () => true } as Stats;
+          return { mtime: date1, isFile: () => true } as any;
         }
-        return { mtime: date2, isFile: () => true } as Stats;
+        return { mtime: date2, isFile: () => true } as any;
       });
 
       await listCommand?.action?.(mockContext, '');
@@ -162,19 +162,19 @@ describe('chatCommand', () => {
       const date = new Date();
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.readdir as any).mockResolvedValue(fakeFiles);
+      (mockFs.readdir as any).mockResolvedValue(fakeFiles as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockFs.stat as any).mockImplementation(async (filePath: any): Promise<Stats> => {
+      (mockFs.stat as any).mockImplementation(async (filePath: any): Promise<any> => {
         if (filePath.endsWith('file.json')) {
           return {
             mtime: date,
             isFile: () => true,
-          } as Stats;
+          } as any;
         }
         return {
           mtime: date,
           isFile: () => false,
-        } as Stats;
+        } as any;
       });
 
       await listCommand?.action?.(mockContext, '');
