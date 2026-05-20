@@ -120,9 +120,9 @@ describe('chatCommand', () => {
       const date2 = new Date(date1.getTime() + 1000);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.readdir.mockResolvedValue(fakeFiles as any);
+      mockFs.readdir.mockResolvedValue(fakeFiles as string[]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
+      mockFs.stat.mockImplementation(async (path: string): Promise<Stats> => {
         if (path.endsWith('test1.json')) {
           return { mtime: date1, isFile: () => true } as Stats;
         }
@@ -150,8 +150,8 @@ describe('chatCommand', () => {
       const fakeFiles = ['checkpoint-file.json', 'checkpoint-directory.json'];
       const date = new Date();
 
-      mockFs.readdir.mockResolvedValue(fakeFiles as any);
-      mockFs.stat.mockImplementation(async (filePath: any): Promise<Stats> => {
+      mockFs.readdir.mockResolvedValue(fakeFiles as string[]);
+      mockFs.stat.mockImplementation(async (filePath: string): Promise<Stats> => {
         if (filePath.endsWith('file.json')) {
           return {
             mtime: date,
