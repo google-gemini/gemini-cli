@@ -13,7 +13,6 @@ import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
-import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
@@ -79,6 +78,40 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   }
 
   return `${BASH_SHOPT_GUARD} ${command}`;
+}
+
+// On Windows, a new ConPTY session inherits its codepage from the system
+// OEMCP (microsoft/terminal `src/host/settings.cpp:41` defaults
+// `_uCodePage` to `Globals.uiOEMCP`, set from `GetOEMCP()` in
+// `srvinit.cpp:44`). On locales without "Beta: Use Unicode UTF-8 for
+// worldwide language support" the OEMCP is a legacy codepage (e.g. 850,
+// 866, 936, 932), and conhost converts every byte from the child via
+// `MultiByteToWideChar(gci.OutputCP, ...)` in `_stream.cpp:341-343`,
+// turning UTF-8 output from child processes (perl, python, node, ...)
+// into mojibake.
+//
+// `CreatePseudoConsole` does not accept a codepage argument
+// (microsoft/terminal#9174 — open as a feature request). The only way
+// to set the ConPTY codepage is from inside the new session via
+// `SetConsoleOutputCP` (intercepted by conhost in `getset.cpp:1144`).
+// Prefix the command with `chcp 65001` so the first thing the new
+// session does is switch its codepage to UTF-8.
+function injectUtf8CodepageForPty(
+  command: string,
+  shell: ShellType,
+  isWindows: boolean,
+  usingPty: boolean,
+): string {
+  if (!isWindows || !usingPty) {
+    return command;
+  }
+  if (shell === 'powershell') {
+    return `chcp 65001 >$null;${command}`;
+  }
+  if (shell === 'cmd') {
+    return `chcp 65001>nul&${command}`;
+  }
+  return command;
 }
 
 /** A structured result from a shell command execution. */
@@ -389,6 +422,7 @@ export class ShellExecutionService {
     cwd: string,
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
+    usingPty: boolean,
   ): Promise<{
     program: string;
     args: string[];
@@ -417,7 +451,13 @@ export class ShellExecutionService {
     const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-    const spawnArgs = [...argsPrefix, guardedCommand];
+    const finalCommand = injectUtf8CodepageForPty(
+      guardedCommand,
+      shell,
+      isWindows,
+      usingPty,
+    );
+    const spawnArgs = [...argsPrefix, finalCommand];
 
     // 2. Prepare Environment
     const gitConfigKeys: string[] = [];
@@ -520,6 +560,7 @@ export class ShellExecutionService {
         cwd,
         shellExecutionConfig,
         isInteractive,
+        false,
       );
       cmdCleanup = prepared.cleanup;
 
@@ -620,14 +661,8 @@ export class ShellExecutionService {
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
-          const encoding = getCachedEncodingForBuffer(data);
-          try {
-            stdoutDecoder = new TextDecoder(encoding);
-            stderrDecoder = new TextDecoder(encoding);
-          } catch {
-            stdoutDecoder = new TextDecoder('utf-8');
-            stderrDecoder = new TextDecoder('utf-8');
-          }
+          stdoutDecoder = new TextDecoder('utf-8');
+          stderrDecoder = new TextDecoder('utf-8');
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -900,6 +935,7 @@ export class ShellExecutionService {
         cwd,
         shellExecutionConfig,
         true,
+        true,
       );
       cmdCleanup = prepared.cleanup;
 
@@ -1115,12 +1151,7 @@ export class ShellExecutionService {
           () =>
             new Promise<void>((resolveChunk) => {
               if (!decoder) {
-                const encoding = getCachedEncodingForBuffer(data);
-                try {
-                  decoder = new TextDecoder(encoding);
-                } catch {
-                  decoder = new TextDecoder('utf-8');
-                }
+                decoder = new TextDecoder('utf-8');
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
