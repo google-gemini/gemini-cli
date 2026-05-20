@@ -115,20 +115,12 @@ export async function loadConversationRecord(
     })
   | null
 > {
-  const realPath = resolveToRealPath(filePath);
   try {
+    const realPath = resolveToRealPath(filePath);
     const stats = await fs.promises.stat(realPath);
     if (!stats.isFile()) {
       return null;
     }
-  } catch (error) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-
-  try {
     const fileStream = fs.createReadStream(realPath);
     const rl = readline.createInterface({
       input: fileStream,

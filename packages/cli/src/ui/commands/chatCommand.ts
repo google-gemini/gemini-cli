@@ -18,6 +18,7 @@ import {
   decodeTagName,
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -46,17 +47,29 @@ export const getSavedChatTags = async (
     const files = await fsPromises.readdir(geminiDir);
     const chatDetails: ChatDetail[] = [];
 
-    for (const file of files) {
+    const statPromises = files.map(async (file) => {
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
-        const filePath = path.join(geminiDir, file);
-        const stats = await fsPromises.stat(filePath);
-        if (stats.isFile()) {
-          const tagName = file.slice(file_head.length, -file_tail.length);
-          chatDetails.push({
-            name: decodeTagName(tagName),
-            mtime: stats.mtime.toISOString(),
-          });
+        try {
+          const filePath = resolveToRealPath(path.join(geminiDir, file));
+          const stats = await fsPromises.stat(filePath);
+          if (stats.isFile()) {
+            const tagName = file.slice(file_head.length, -file_tail.length);
+            return {
+              name: decodeTagName(tagName),
+              mtime: stats.mtime.toISOString(),
+            };
+          }
+        } catch {
+          // Ignore individual file errors
         }
+      }
+      return null;
+    });
+
+    const results = await Promise.all(statPromises);
+    for (const result of results) {
+      if (result) {
+        chatDetails.push(result);
       }
     }
 
