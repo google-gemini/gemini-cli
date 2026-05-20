@@ -110,7 +110,6 @@ export async function handleFallback(
 
   const handler = config.getFallbackModelHandler();
   if (typeof handler !== 'function') {
-    throw new Error('STOP 2');
     return null;
   }
 
