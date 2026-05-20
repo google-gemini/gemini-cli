@@ -21,12 +21,14 @@ export function reconstructHistory(messages: MessageRecord[]): Content[] {
       // Map PartUnion to Part
       for (const p of msg.content) {
         if (typeof p === 'string') {
-          parts.push({ text: p });
+          if (p.length > 0) {
+            parts.push({ text: p });
+          }
         } else {
           parts.push(p);
         }
       }
-    } else if (typeof msg.content === 'string') {
+    } else if (typeof msg.content === 'string' && msg.content.length > 0) {
       parts.push({ text: msg.content });
     }
 
