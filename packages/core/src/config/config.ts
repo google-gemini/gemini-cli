@@ -1568,6 +1568,8 @@ export class Config implements McpContext, AgentLoopContext {
   ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
+    this.fallbackOverrides.clear();
+    this.modelConfigService.clearRuntimeOverrides();
 
     // Vertex and Genai have incompatible encryption and sending history with
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
@@ -1829,6 +1831,8 @@ export class Config implements McpContext, AgentLoopContext {
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
+    this.fallbackOverrides.clear();
+    this.modelConfigService.clearRuntimeOverrides();
     this.approvedPlanPath = undefined;
     this.topicState.reset();
     this.skillManager.reset();
@@ -1922,6 +1926,8 @@ export class Config implements McpContext, AgentLoopContext {
       this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
+    this.fallbackOverrides.clear();
+    this.modelConfigService.clearRuntimeOverrides();
   }
 
   activateFallbackMode(model: string, failedModel?: string): void {
