@@ -11,6 +11,7 @@ import {
   createSyntheticHistory,
   createMockContextConfig,
   setupContextComponentTest,
+  deriveStableId,
 } from './testing/contextTestUtils.js';
 
 describe('ContextManager Sync Pressure Barrier Tests', () => {
@@ -32,10 +33,14 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // 2. Add System Prompt (Episode 0 - Protected)
+    const envId = deriveStableId(['environment-context']);
     chatHistory.set([
       {
-        id: 'h1',
-        content: { role: 'user', parts: [{ text: 'System prompt' }] },
+        id: envId,
+        content: {
+          role: 'user',
+          parts: [{ text: '<session_context>\nSystem prompt' }],
+        },
       },
       {
         id: 'h2',
@@ -74,8 +79,10 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
 
     expect(projection.length).toBeLessThan(rawHistoryLength);
 
-    // Verify Episode 0 (System) was pruned, so we now start with a sentinel due to role alternation
+    // Verify Episode 0 (System) was PRESERVED because it is pinned Turn 0.
+    expect(projection[0].id).toBe(envId);
     expect(projection[0].content.role).toBe('user');
+
     const projectionString = JSON.stringify(projection);
     expect(projectionString).toContain('User turn 17');
     // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
@@ -86,19 +93,13 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // Verify the latest turn is perfectly preserved at the back
-    // Note: The HistoryHardener appends a "Please continue." user turn if we end on model,
-    // so we look at the turns before the sentinel.
-    const lastSentinel = contentNodes[contentNodes.length - 1].content;
-    const lastModel = contentNodes[contentNodes.length - 2].content;
-    const lastUser = contentNodes[contentNodes.length - 3].content;
-
-    expect(lastSentinel.role).toBe('user');
-    expect(lastSentinel.parts![0].text).toBe('Please continue.');
-
-    expect(lastUser.role).toBe('user');
-    expect(lastUser.parts![0].text).toBe('Final question.');
+    const lastModel = contentNodes[contentNodes.length - 1].content;
+    const lastUser = contentNodes[contentNodes.length - 2].content;
 
     expect(lastModel.role).toBe('model');
     expect(lastModel.parts![0].text).toBe('Final answer.');
+
+    expect(lastUser.role).toBe('user');
+    expect(lastUser.parts![0].text).toBe('Final question.');
   });
 });
