@@ -108,15 +108,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   /**
-   * Wraps a command in a subshell `()` to capture background process IDs (PIDs) using pgrep.
-   * Uses newlines to prevent breaking heredocs or trailing comments.
+   * Wraps a command in a subshell to capture background process IDs (PIDs)
+   * using an EXIT trap. Uses newlines to prevent breaking heredocs or trailing
+   * comments.
    *
    * @param command The raw command string to execute.
    * @param tempFilePath Path to the temporary file where PIDs will be written.
    * @param isWindows Whether the current platform is Windows (if true, the command is returned as-is).
    * @returns The wrapped command string.
    */
-  private wrapCommandForPgrep(
+  private wrapCommandForBackgroundPIDs(
     command: string,
     tempFilePath: string,
     isWindows: boolean,
@@ -132,7 +133,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       trimmed += ' ';
     }
     const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
-    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
+    return `_bgpids_file=${escapedTempFilePath}\n(\n  trap 'jobs -p > "$_bgpids_file"' EXIT\n${trimmed}\n)\n__code=$?\nexit $__code`;
   }
 
   private getContextualDetails(): string {
@@ -497,10 +498,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const onAbort = () => combinedController.abort();
     try {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
-      tempFilePath = path.join(tempDir, 'pgrep.tmp');
+      tempFilePath = path.join(tempDir, 'bgpids.tmp');
 
-      // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = this.wrapCommandForPgrep(
+      // Windows shells do not support the POSIX jobs output used here.
+      const commandToExecute = this.wrapCommandForBackgroundPIDs(
         strippedCommand,
         tempFilePath,
         isWindows,
@@ -651,7 +652,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          this.context.config.isInteractiveShellEnabled(),
           {
             ...shellExecutionConfig,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
@@ -736,12 +737,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
 
         if (tempFileExists) {
-          const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent
+          const backgroundPIDContent = await fsPromises.readFile(
+            tempFilePath,
+            'utf8',
+          );
+          const backgroundPIDLines = backgroundPIDContent
             .split('\n')
             .map((line) => line.trim())
             .filter(Boolean);
-          for (const line of pgrepLines) {
+          for (const line of backgroundPIDLines) {
             if (!/^\d+$/.test(line)) {
               if (
                 line.includes('sysmond service not found') ||
@@ -750,7 +754,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
               ) {
                 continue;
               }
-              debugLogger.error(`pgrep: ${line}`);
+              debugLogger.error(`background pid output: ${line}`);
             }
             const pid = Number(line);
             if (pid !== result.pid) {
@@ -759,7 +763,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         } else {
           if (!signal.aborted && !result.backgrounded) {
-            debugLogger.error('missing pgrep output');
+            debugLogger.error('missing background pid output');
           }
         }
       }
@@ -1089,7 +1093,7 @@ export class ShellTool extends BaseDeclarativeTool<
       // Errors are surfaced when parsing commands.
     });
     const definition = getShellDefinition(
-      context.config.getEnableInteractiveShell(),
+      context.config.isInteractiveShellEnabled(),
       context.config.getEnableShellOutputEfficiency(),
       context.config.getSandboxEnabled(),
     );
@@ -1139,7 +1143,7 @@ export class ShellTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const definition = getShellDefinition(
-      this.context.config.getEnableInteractiveShell(),
+      this.context.config.isInteractiveShellEnabled(),
       this.context.config.getEnableShellOutputEfficiency(),
       this.context.config.getSandboxEnabled(),
     );

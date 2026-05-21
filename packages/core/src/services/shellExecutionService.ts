@@ -17,6 +17,7 @@ import {
   getShellConfiguration,
   resolveExecutable,
   type ShellType,
+  BASH_HUP_GUARD,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -112,6 +113,32 @@ function injectUtf8CodepageForPty(
     return `chcp 65001>nul&${command}`;
   }
   return command;
+}
+
+/**
+ * Prepends a POSIX SIGHUP-ignore guard to bash commands on non-Windows platforms.
+ *
+ * PTY environments such as WSL2, Kitty, and Alacritty aggressively send SIGHUP
+ * to process groups that lose their controlling terminal. By prepending
+ * `trap '' HUP;` we apply the same mechanism as the POSIX `nohup` utility:
+ * SIG_IGN is inherited across exec(), so every child spawned by the command
+ * also ignores SIGHUP — making the guard genuinely effective even in subshells.
+ *
+ * The guard is bash-only and idempotent (won't be doubled if already present).
+ * It is stripped back out by stripShellWrapper() / stripHupGuard() before any
+ * sandbox or permission-check logic sees the command, so there is no
+ * privilege-escalation surface from the preamble itself.
+ */
+function ensureHupIgnored(command: string, shell: ShellType): string {
+  if (shell !== 'bash') {
+    return command;
+  }
+  const trimmed = command.trimStart();
+  const prefix = `${BASH_HUP_GUARD} `;
+  if (trimmed.startsWith(prefix) || trimmed === BASH_HUP_GUARD) {
+    return command; // Already guarded — idempotent
+  }
+  return `${BASH_HUP_GUARD} ${command}`;
 }
 
 /** A structured result from a shell command execution. */
@@ -448,9 +475,16 @@ export class ShellExecutionService {
 
     const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
-    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+    const promptGuarded = ensurePromptvarsDisabled(commandToExecute, shell);
+    // Prepend the SIGHUP-ignore guard for bash on non-Windows. This uses the
+    // same mechanism as POSIX `nohup`: SIG_IGN is inherited across exec(), so
+    // child processes spawned by the command also ignore SIGHUP. The guard is
+    // stripped by stripShellWrapper() before any sandbox permission checks.
+    const hupGuarded = !isWindows
+      ? ensureHupIgnored(promptGuarded, shell)
+      : promptGuarded;
     const finalCommand = injectUtf8CodepageForPty(
-      guardedCommand,
+      hupGuarded,
       shell,
       isWindows,
       usingPty,
@@ -944,6 +978,7 @@ export class ShellExecutionService {
         cwd: finalCwd,
       } = prepared;
 
+      const isWindowsPlatform = os.platform() === 'win32';
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -951,7 +986,16 @@ export class ShellExecutionService {
         cols,
         rows,
         env: finalEnv,
-        handleFlowControl: true,
+        // handleFlowControl intercepts XON/XOFF (Ctrl+S/Q) and prevents them
+        // from reaching the child.  On Windows, the flag can interfere with
+        // ConPTY's internal input routing and cause interactive TUI tools to
+        // miss key events, so we disable it there.
+        handleFlowControl: !isWindowsPlatform,
+        // On Windows, explicitly request ConPTY (introduced in Windows 10 1809).
+        // Without this, @lydell/node-pty may silently fall back to WinPTY, which
+        // has known incompatibilities with interactive Node.js TUI applications
+        // that rely on VT-sequence-based arrow-key navigation.
+        ...(isWindowsPlatform ? { useConpty: true } : {}),
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -991,6 +1035,13 @@ export class ShellExecutionService {
           }).catch(() => {});
         },
         isActive: () => {
+          // On Windows, process.kill(pid, 0) can return false negatives
+          // for ConPTY-managed shell wrappers (powershell.exe), causing
+          // writeToPty to silently discard input (including arrow keys).
+          // Check the internal activePtys map first for reliable status.
+          if (ShellExecutionService.activePtys.has(ptyPid)) {
+            return true;
+          }
           try {
             return process.kill(ptyPid, 0);
           } catch {
