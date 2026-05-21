@@ -17,16 +17,18 @@ expect.addSnapshotSerializer({
     (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
       val,
     ) ||
-      /^[0-9a-f]{32}$/i.test(val) ||
+      /\b[0-9a-f]{32}\b/i.test(val) ||
+      /\bsynth_[a-zA-Z0-9_]+_[0-9a-f]{32}\b/.test(val) ||
       /[\\/]tmp[\\/]sim/.test(val)),
   print: (val) => {
     if (typeof val !== 'string') return `"${val}"`;
     let scrubbed = val
       .replace(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+        /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
         '<UUID>',
       )
       .replace(/\b[0-9a-f]{32}\b/gi, '<UUID>')
+      .replace(/\bsynth_[a-zA-Z0-9_]+_[0-9a-f]{32}\b/g, 'synth_<NAME>_<HASH>')
       .replace(/[\\/]tmp[\\/]sim[^\s"'\]]*/g, '<MOCKED_DIR>');
 
     // Also scrub timestamps in filenames like blob_1234567890_...

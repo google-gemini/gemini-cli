@@ -18,7 +18,6 @@ import type {
   ProcessArgs,
 } from '../pipeline.js';
 import type { PipelineDef, AsyncPipelineDef } from '../config/types.js';
-import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 
 // A realistic mock processor that modifies the text of the first target node
@@ -77,11 +76,10 @@ function createMockAsyncProcessor(
 
 describe('PipelineOrchestrator (Component)', () => {
   let env: ContextEnvironment;
-  let eventBus: ContextEventBus;
+  let orchestrator: PipelineOrchestrator;
 
   beforeEach(() => {
     env = createMockEnvironment();
-    eventBus = env.eventBus;
   });
 
   afterEach(() => {
@@ -92,13 +90,13 @@ describe('PipelineOrchestrator (Component)', () => {
     pipelines: PipelineDef[],
     asyncPipelines: AsyncPipelineDef[] = [],
   ) => {
-    const orchestrator = new PipelineOrchestrator(
+    orchestrator = new PipelineOrchestrator(
       pipelines,
       asyncPipelines,
       env,
-      eventBus,
       env.tracer,
     );
+
     return orchestrator;
   };
 
@@ -207,13 +205,14 @@ describe('PipelineOrchestrator (Component)', () => {
       const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10);
       const node2 = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 20);
 
-      eventBus.emitChunkReceived({
-        nodes: [node1, node2],
-        targetNodeIds: new Set([node2.id]),
-      });
+      await orchestrator.executeTriggerSync(
+        'nodes_added',
+        [node1, node2],
+        new Set([node2.id]),
+      );
 
       // Yield event loop
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executeSpy).toHaveBeenCalledTimes(1);
       const callArgs = executeSpy.mock.calls[0][0];
