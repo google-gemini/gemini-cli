@@ -435,4 +435,20 @@ describe('ProjectRegistry', () => {
     expect(data.projects[normalizePath(projectPath)]).toBe('my-project');
     expect(Object.values(data.projects)).not.toContain('../../etc/passwd');
   });
+
+  it('resolves symlinks to the same short ID', async () => {
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    const realDir = path.join(tempDir, 'real-project');
+    fs.mkdirSync(realDir);
+
+    const symlinkDir = path.join(tempDir, 'symlink-project');
+    fs.symlinkSync(realDir, symlinkDir, 'dir');
+
+    const id1 = await registry.getShortId(realDir);
+    const id2 = await registry.getShortId(symlinkDir);
+
+    expect(id1).toBe(id2);
+  });
 });

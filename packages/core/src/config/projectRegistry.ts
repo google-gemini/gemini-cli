@@ -12,6 +12,7 @@ import { lock } from 'proper-lockfile';
 import { z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -93,7 +94,7 @@ export class ProjectRegistry {
   }
 
   private normalizePath(projectPath: string): string {
-    let resolved = path.resolve(projectPath);
+    let resolved = resolveToRealPath(projectPath);
     if (os.platform() === 'win32') {
       resolved = resolved.toLowerCase();
     }
