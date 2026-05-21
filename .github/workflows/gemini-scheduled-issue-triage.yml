@@ -29,6 +29,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: 'Install Utilities'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
       - name: 'Get Current Version'
         id: 'get_version'
         run: |
@@ -307,7 +312,7 @@ jobs:
           use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
           settings: |-
             {
-              "maxSessionTurns": 25,
+              "maxSessionTurns": 100,
               "coreTools": [
                 "run_shell_command(echo)",
                 "grep_search",
