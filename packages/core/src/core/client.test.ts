@@ -1001,7 +1001,7 @@ ${JSON.stringify(
         { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
-        undefined,
+        expect.objectContaining({ displayContent: undefined }),
       );
     });
 
@@ -1872,7 +1872,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1890,7 +1890,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // Second turn
@@ -1908,7 +1908,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1926,7 +1926,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // New prompt
@@ -1948,7 +1948,7 @@ ${JSON.stringify(
           { model: 'new-routed-model', isChatModel: true },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1976,7 +1976,7 @@ ${JSON.stringify(
           { model: 'original-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -1999,7 +1999,7 @@ ${JSON.stringify(
           { model: 'fallback-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
     });
@@ -2428,7 +2428,7 @@ ${JSON.stringify(
           expect.objectContaining({ model: 'model-a' }),
           expect.anything(),
           expect.anything(),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -3469,7 +3469,7 @@ ${JSON.stringify(
           expect.anything(),
           [{ text: 'Please explain' }],
           expect.anything(),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // First call should have stopHookActive=false, retry should have stopHookActive=true

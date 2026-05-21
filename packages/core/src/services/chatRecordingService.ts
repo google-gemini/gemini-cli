@@ -216,14 +216,92 @@ export async function loadConversationRecord(
             );
             memoryScratchpadIsStale = false;
           }
+          if (
+            hasProperty(record.$set, 'messages') &&
+            Array.isArray(record.$set.messages)
+          ) {
+            // Checkpoint: clear and rebuild from the provided messages array
+            messagesMap.clear();
+            if (options?.metadataOnly) {
+              messageIds.length = 0;
+              messageKinds.clear();
+            }
+            for (const msg of record.$set.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isUserOrAssistant =
+                  msg.type === 'user' || msg.type === 'gemini';
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, { isUser, isUserOrAssistant });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
           // Metadata update
           metadata = {
             ...metadata,
             ...record.$set,
           };
         } else if (isPartialMetadataRecord(record)) {
-          // Initial metadata line
+          // Initial metadata line (or entire legacy record if on one line)
           metadata = { ...metadata, ...record };
+          if (
+            hasProperty(record, 'messages') &&
+            Array.isArray(record.messages)
+          ) {
+            for (const msg of record.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isUserOrAssistant =
+                  msg.type === 'user' || msg.type === 'gemini';
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, { isUser, isUserOrAssistant });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
         }
       } catch {
         // ignore parse errors on individual lines
@@ -234,15 +312,9 @@ export async function loadConversationRecord(
       return await parseLegacyRecordFallback(filePath, options);
     }
 
-    const metadataMessages = Array.isArray(metadata.messages)
-      ? metadata.messages
-      : [];
-    const loadedMessages =
-      metadataMessages.length > 0
-        ? metadataMessages
-        : Array.from(messagesMap.values());
+    const loadedMessages = Array.from(messagesMap.values());
     const metadataFirstUserMessage =
-      metadataMessages.find((message) => message.type === 'user') ?? null;
+      loadedMessages.find((message) => message.type === 'user') ?? null;
     let fallbackFirstUserMessage = firstUserMessageStr;
     if (!fallbackFirstUserMessage && metadataFirstUserMessage) {
       const rawContent = metadataFirstUserMessage.content;
@@ -272,22 +344,14 @@ export async function loadConversationRecord(
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
       messageCount: options?.metadataOnly
-        ? metadataMessages.length || messageIds.length
+        ? loadedMessages.length || messageIds.length
         : loadedMessages.length,
-      userMessageCount:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.filter((m) => m.type === 'user').length
-          : userMessageCount,
+      userMessageCount,
       memoryScratchpadIsStale: isTrackingMemoryScratchpadFreshness
         ? memoryScratchpadIsStale
         : undefined,
       firstUserMessage: fallbackFirstUserMessage,
-      hasUserOrAssistantMessage:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.some(
-              (m) => m.type === 'user' || m.type === 'gemini',
-            )
-          : hasUserOrAssistant,
+      hasUserOrAssistantMessage: hasUserOrAssistant,
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);

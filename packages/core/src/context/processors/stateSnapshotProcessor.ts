@@ -90,6 +90,13 @@ export function createStateSnapshotProcessor(
           const isValid = consumedIds.every((id) => targetIds.has(id));
 
           if (isValid) {
+            env.tracer.logEvent(
+              'StateSnapshotProcessor',
+              'Snapshot Spliced from Inbox',
+              {
+                snapshotText: newText,
+              },
+            );
             debugLogger.log(
               `[StateSnapshotProcessor] Successfully spliced PROPOSED_SNAPSHOT from Inbox into Graph. Consumed ${consumedIds.length} nodes.`,
             );
@@ -186,6 +193,11 @@ export function createStateSnapshotProcessor(
             maxStateTokens: options.maxStateTokens,
           },
         );
+
+        env.tracer.logEvent('StateSnapshotProcessor', 'Snapshot Synthesized', {
+          snapshotText,
+        });
+
         const consumedIds = nodesToSummarize.map((n) => n.id);
         if (baselineIdToConsume && !consumedIds.includes(baselineIdToConsume)) {
           consumedIds.push(baselineIdToConsume);
