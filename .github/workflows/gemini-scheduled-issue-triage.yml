@@ -190,7 +190,7 @@ jobs:
           use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
           settings: |-
             {
-              "maxSessionTurns": 30,
+              "maxSessionTurns": 25,
               "coreTools": [
                 "run_shell_command(echo)",
                 "read_file"
