@@ -344,6 +344,10 @@ export class ModelConfigService {
     this.runtimeOverrides.push(override);
   }
 
+  clearRuntimeOverrides(): void {
+    this.runtimeOverrides.length = 0;
+  }
+
   /**
    * Resolves a model configuration by merging settings from aliases and applying overrides.
    *

@@ -12,9 +12,10 @@ import { hardenHistory } from '../../utils/historyHardening.js';
 describe('ContextGraphMapper (Round-Trip Fidelity)', () => {
   it('should flawlessly round-trip a complex history containing parallel tool calls and responses', () => {
     // 1. Define a complex, worst-case scenario history
+    const envId = 'd04923d38bb0f6017037e74183378ef4';
     const originalHistory: HistoryTurn[] = [
       {
-        id: 'system_prompt_id',
+        id: envId,
         content: {
           role: 'user',
           parts: [{ text: '<session_context>\nSystem Prompt here' }],
@@ -90,11 +91,8 @@ describe('ContextGraphMapper (Round-Trip Fidelity)', () => {
 
     // 3. Translate History -> Graph
     const mapper = new ContextGraphMapper();
-    // Simulate the HistoryObserver capturing the push
-    const nodes = mapper.applyEvent({
-      type: 'SYNC_FULL',
-      payload: originalHistory,
-    });
+    // Simulate the sync
+    const nodes = mapper.sync(originalHistory);
 
     // 4. Translate Graph -> History
     const reconstructedHistory = mapper.fromGraph(nodes);

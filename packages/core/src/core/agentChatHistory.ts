@@ -16,39 +16,15 @@ export interface HistoryTurn {
   readonly content: Content;
 }
 
-export type HistoryEventType = 'PUSH' | 'SYNC_FULL' | 'CLEAR' | 'SILENT_SYNC';
-
-export interface HistoryEvent {
-  type: HistoryEventType;
-  payload: readonly HistoryTurn[];
-}
-
-export type HistoryListener = (event: HistoryEvent) => void;
-
 /**
  * The 'Strong Owner' of chat history turns.
  * It ensures that every turn in the session is associated with a durable ID.
  */
 export class AgentChatHistory {
   private history: HistoryTurn[] = [];
-  private listeners: Set<HistoryListener> = new Set();
 
   constructor(initialTurns: HistoryTurn[] = []) {
     this.history = [...initialTurns];
-  }
-
-  subscribe(listener: HistoryListener): () => void {
-    this.listeners.add(listener);
-    // Emit initial state to new subscriber
-    listener({ type: 'SYNC_FULL', payload: this.history });
-    return () => this.listeners.delete(listener);
-  }
-
-  private notify(type: HistoryEventType, payload: readonly HistoryTurn[]) {
-    const event: HistoryEvent = { type, payload };
-    for (const listener of this.listeners) {
-      listener(event);
-    }
   }
 
   /**
@@ -57,20 +33,17 @@ export class AgentChatHistory {
    */
   push(turn: HistoryTurn) {
     this.history.push(turn);
-    this.notify('PUSH', [turn]);
   }
 
   /**
    * Overwrites the entire history with a new list of turns.
    */
-  set(turns: readonly HistoryTurn[], options: { silent?: boolean } = {}) {
+  set(turns: readonly HistoryTurn[]) {
     this.history = [...turns];
-    this.notify(options.silent ? 'SILENT_SYNC' : 'SYNC_FULL', this.history);
   }
 
   clear() {
     this.history = [];
-    this.notify('CLEAR', []);
   }
 
   get(): readonly HistoryTurn[] {

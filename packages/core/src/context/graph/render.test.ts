@@ -16,7 +16,7 @@ import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { Part } from '@google/genai';
 
 describe('render', () => {
-  it('should filter out previewNodeIds', async () => {
+  it('should render all provided nodes', async () => {
     const mockNodes: ConcreteNode[] = [
       {
         id: '1',
@@ -34,7 +34,6 @@ describe('render', () => {
         payload: {} as Part,
       } as unknown as ConcreteNode,
     ];
-    const previewNodeIds = new Set(['preview-1']);
 
     const orchestrator = {} as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
@@ -44,6 +43,7 @@ describe('render', () => {
         baseUnits: 100,
       }),
       getRawBaseUnits: vi.fn().mockReturnValue(100),
+      calculateConcreteListTokens: vi.fn().mockReturnValue(100),
       getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
     };
 
@@ -69,12 +69,17 @@ describe('render', () => {
       tracer,
       env,
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
-      new Map(),
-      undefined,
-      previewNodeIds,
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
-    expect(result.history).toEqual([{ text: '1' }, { text: '2' }]);
+    expect(result.history).toEqual([
+      { text: '1' },
+      { text: '2' },
+      { text: 'preview-1' },
+    ]);
     expect(result.baseUnits).toBe(100);
   });
 
@@ -134,6 +139,10 @@ describe('render', () => {
         if (nodes.length === 1) return tokenMap[nodes[0].id];
         return currentTokens;
       }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
     };
 
     const env = {
@@ -165,9 +174,10 @@ describe('render', () => {
       tracer,
       env,
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
-      new Map(),
-      undefined,
-      new Set(),
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,6 +238,10 @@ describe('render', () => {
         if (nodes.length === 1) return tokenMap[nodes[0].id];
         return currentTokens;
       }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
     };
 
     const env = {
@@ -259,9 +273,10 @@ describe('render', () => {
       tracer,
       env,
       mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
-      new Map(),
-      undefined,
-      new Set(),
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -269,5 +284,67 @@ describe('render', () => {
     // C(40k), B(40k). Adding B pushes total to 80k. B is the boundary node and survives. A drops.
     expect(surviving).toEqual(['B', 'C']); // A is dropped
     expect(result.baseUnits).toBe(160000);
+  });
+
+  it('should exclude the last turn when lateBindPrompt is true', async () => {
+    const mockNodes: ConcreteNode[] = [
+      {
+        id: '1',
+        type: NodeType.USER_PROMPT,
+        turnId: 'turn-1',
+        payload: {} as Part,
+      } as unknown as ConcreteNode,
+      {
+        id: '2',
+        type: NodeType.AGENT_THOUGHT,
+        turnId: 'turn-2',
+        payload: {} as Part,
+      } as unknown as ConcreteNode,
+    ];
+
+    const orchestrator = {
+      executeTriggerSync: vi.fn(async (trigger, nodes) => nodes),
+    } as unknown as PipelineOrchestrator;
+    const sidecar = { config: {} } as ContextProfile; // No budget
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn().mockReturnValue({
+        tokens: 100,
+        baseUnits: 100,
+      }),
+      getRawBaseUnits: vi.fn().mockReturnValue(50),
+      calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+      getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
+    };
+
+    const env = {
+      tokenCalculator: {
+        calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+        calculateTokenBreakdown: vi.fn().mockReturnValue({}),
+      },
+      graphMapper: {
+        fromGraph: vi.fn((nodes: readonly ConcreteNode[]) =>
+          nodes.map((n) => ({ text: n.id })),
+        ),
+      },
+    } as unknown as ContextEnvironment;
+    const tracer = {
+      logEvent: vi.fn(),
+    } as unknown as ContextTracer;
+
+    const result = await render(
+      mockNodes,
+      orchestrator,
+      sidecar,
+      tracer,
+      env,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
+      {
+        lateBindPrompt: true,
+      },
+    );
+
+    expect(result.history).toEqual([{ text: '1' }]); // Turn 2 (node 2) is excluded
+    expect(result.pendingHistory).toEqual([{ text: '2' }]); // Turn 2 is included here
+    expect(result.baseUnits).toBe(50);
   });
 });
