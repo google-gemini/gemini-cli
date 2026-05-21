@@ -1689,6 +1689,7 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
         items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
       },
       exclude: {
         type: 'array',
@@ -1784,6 +1785,7 @@ const SETTINGS_SCHEMA = {
         description: 'A list of MCP servers to allow.',
         showInDialog: false,
         items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
       },
       excluded: {
         type: 'array',
@@ -1794,6 +1796,7 @@ const SETTINGS_SCHEMA = {
         description: 'A list of MCP servers to exclude.',
         showInDialog: false,
         items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
       },
     },
   },
@@ -1886,6 +1889,7 @@ const SETTINGS_SCHEMA = {
           'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
         showInDialog: true,
         items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
       },
       folderTrust: {
         type: 'object',
@@ -1926,6 +1930,7 @@ const SETTINGS_SCHEMA = {
               'Environment variables to always allow (bypass redaction).',
             showInDialog: false,
             items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
           },
           blocked: {
             type: 'array',
@@ -1936,6 +1941,7 @@ const SETTINGS_SCHEMA = {
             description: 'Environment variables to always redact.',
             showInDialog: false,
             items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
           },
           enabled: {
             type: 'boolean',
