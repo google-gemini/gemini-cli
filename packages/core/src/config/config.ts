@@ -1445,10 +1445,10 @@ export class Config implements McpContext, AgentLoopContext {
     await this.storage.initialize();
     ragLogger.initialize(this.storage.getProjectTempLogsDir());
 
-    // Add pending directories to workspace context
-    for (const dir of this.pendingIncludeDirectories) {
-      this.workspaceContext.addDirectory(dir);
-    }
+    // Add pending directories to workspace context.
+    // Use the batch method so missing or invalid entries are warned and
+    // skipped rather than aborting startup (see #27311).
+    this.workspaceContext.addDirectories(this.pendingIncludeDirectories);
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
