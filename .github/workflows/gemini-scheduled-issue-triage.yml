@@ -408,7 +408,7 @@ jobs:
 
       - name: 'Apply Triaged Labels'
         if: |-
-          always() && 
+          always() &&
           ( (steps.gemini_standard_issue_analysis.outcome == 'success' && steps.gemini_standard_issue_analysis.outputs.summary != '[]' && steps.gemini_standard_issue_analysis.outputs.summary != '') ||
             (steps.gemini_effort_issue_analysis.outcome == 'success' && steps.gemini_effort_issue_analysis.outputs.summary != '[]' && steps.gemini_effort_issue_analysis.outputs.summary != '') )
         env:
