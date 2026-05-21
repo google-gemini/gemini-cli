@@ -175,6 +175,7 @@ describe('Scheduler Parallel Execution', () => {
 
   const mockInvocation = {
     shouldConfirmExecute: vi.fn().mockResolvedValue(false),
+    toolLocations: vi.fn().mockReturnValue([]),
   };
 
   beforeEach(() => {
@@ -318,20 +319,50 @@ describe('Scheduler Parallel Execution', () => {
       schedulerId: 'root',
     });
 
-    vi.mocked(readTool1.build).mockReturnValue(
-      mockInvocation as unknown as AnyToolInvocation,
+    vi.mocked(readTool1.build).mockImplementation(
+      (args) =>
+        ({
+          ...mockInvocation,
+          toolLocations: () => [
+            { path: (args as { path?: string })?.path || 'a.txt' },
+          ],
+        }) as unknown as AnyToolInvocation,
     );
-    vi.mocked(readTool2.build).mockReturnValue(
-      mockInvocation as unknown as AnyToolInvocation,
+    vi.mocked(readTool2.build).mockImplementation(
+      (args) =>
+        ({
+          ...mockInvocation,
+          toolLocations: () => [
+            { path: (args as { path?: string })?.path || 'b.txt' },
+          ],
+        }) as unknown as AnyToolInvocation,
     );
-    vi.mocked(writeTool.build).mockReturnValue(
-      mockInvocation as unknown as AnyToolInvocation,
+    vi.mocked(writeTool.build).mockImplementation(
+      (args) =>
+        ({
+          ...mockInvocation,
+          toolLocations: () => [
+            { path: (args as { path?: string })?.path || 'c.txt' },
+          ],
+        }) as unknown as AnyToolInvocation,
     );
-    vi.mocked(agentTool1.build).mockReturnValue(
-      mockInvocation as unknown as AnyToolInvocation,
+    vi.mocked(agentTool1.build).mockImplementation(
+      (args) =>
+        ({
+          ...mockInvocation,
+          toolLocations: () => [
+            { path: (args as { path?: string })?.path || 'agent1.txt' },
+          ],
+        }) as unknown as AnyToolInvocation,
     );
-    vi.mocked(agentTool2.build).mockReturnValue(
-      mockInvocation as unknown as AnyToolInvocation,
+    vi.mocked(agentTool2.build).mockImplementation(
+      (args) =>
+        ({
+          ...mockInvocation,
+          toolLocations: () => [
+            { path: (args as { path?: string })?.path || 'agent2.txt' },
+          ],
+        }) as unknown as AnyToolInvocation,
     );
   });
 
@@ -510,7 +541,7 @@ describe('Scheduler Parallel Execution', () => {
     expect(start1).toBeGreaterThan(end3);
   });
 
-  it('should execute non-read-only tools in parallel if wait_for_previous is false', async () => {
+  it('should execute non-read-only tools in parallel if wait_for_previous is false and paths differ', async () => {
     const executionLog: string[] = [];
     mockExecutor.execute.mockImplementation(async ({ call }) => {
       const id = call.request.callId;
@@ -523,13 +554,53 @@ describe('Scheduler Parallel Execution', () => {
       } as unknown as SuccessfulToolCall;
     });
 
-    const w1 = { ...req3, callId: 'w1', args: { wait_for_previous: false } };
-    const w2 = { ...req3, callId: 'w2', args: { wait_for_previous: false } };
+    const w1 = {
+      ...req3,
+      callId: 'w1',
+      args: { path: 'w1.txt', wait_for_previous: false },
+    };
+    const w2 = {
+      ...req3,
+      callId: 'w2',
+      args: { path: 'w2.txt', wait_for_previous: false },
+    };
 
     await scheduler.schedule([w1, w2], signal);
 
     expect(executionLog.slice(0, 2)).toContain('start-w1');
     expect(executionLog.slice(0, 2)).toContain('start-w2');
+  });
+
+  it('should execute non-read-only tools sequentially if they target the same file even if wait_for_previous is false', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const w1 = {
+      ...req3,
+      callId: 'w1',
+      args: { path: 'same.txt', wait_for_previous: false },
+    };
+    const w2 = {
+      ...req3,
+      callId: 'w2',
+      args: { path: 'same.txt', wait_for_previous: false },
+    };
+
+    await scheduler.schedule([w1, w2], signal);
+
+    expect(executionLog[0]).toBe('start-w1');
+    expect(executionLog[1]).toBe('end-w1');
+    expect(executionLog[2]).toBe('start-w2');
+    expect(executionLog[3]).toBe('end-w2');
   });
 
   it('should execute read-only tools sequentially if wait_for_previous is true', async () => {
