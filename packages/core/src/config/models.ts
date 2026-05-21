@@ -57,10 +57,11 @@ export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
-export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
+/** @deprecated Gemini 3.1 Flash Lite is now GA. Use DEFAULT_GEMINI_FLASH_LITE_MODEL. */
+export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
@@ -198,13 +199,15 @@ export function resolveModel(
     }
   }
 
+  if (resolved === 'none') {
+    return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+  }
+
   if (!hasAccessToPreview && isPreviewModel(resolved)) {
     // Downgrade to stable models if user lacks preview access.
     switch (resolved) {
       case PREVIEW_GEMINI_FLASH_MODEL:
         return DEFAULT_GEMINI_FLASH_MODEL;
-      case PREVIEW_GEMINI_FLASH_LITE_MODEL:
-        return DEFAULT_GEMINI_FLASH_LITE_MODEL;
       case PREVIEW_GEMINI_MODEL:
       case PREVIEW_GEMINI_3_1_MODEL:
       case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
@@ -348,7 +351,7 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
     model === GEMINI_MODEL_ALIAS_AUTO ||
-    model === PREVIEW_GEMINI_FLASH_LITE_MODEL
+    (model === PREVIEW_GEMINI_FLASH_LITE_MODEL && model !== 'none')
   );
 }
 
@@ -494,7 +497,7 @@ export function isActiveModel(
   useCustomToolModel: boolean = false,
   experimentalGemma: boolean = true,
 ): boolean {
-  if (!VALID_GEMINI_MODELS.has(model)) {
+  if (!VALID_GEMINI_MODELS.has(model) || model === 'none') {
     return false;
   }
   if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
