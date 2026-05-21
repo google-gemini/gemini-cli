@@ -14,7 +14,8 @@ import type {
 } from '@a2a-js/sdk/server';
 import { EventEmitter } from 'node:events';
 import { requestStorage } from '../http/requestStorage.js';
-import { loadConfig } from '../config/config.js';
+import { loadConfig, loadEnvironment } from '../config/config.js';
+import { loadExtensions } from '../config/extension.js';
 import { checkPathTrust } from '@google/gemini-cli-core';
 import { CoderAgentEvent } from '../types.js';
 
@@ -152,12 +153,40 @@ describe('CoderAgentExecutor', () => {
       'test-task',
       false,
     );
+    expect(loadEnvironment).not.toHaveBeenCalled();
+    expect(loadExtensions).toHaveBeenLastCalledWith('/tmp', false);
     expect(Task.create).toHaveBeenLastCalledWith(
       'test-task',
       'test-context',
       expect.anything(),
       mockEventBus,
       undefined,
+    );
+  });
+
+  it('loads workspace environment and extensions after server-side trust succeeds', async () => {
+    vi.mocked(checkPathTrust).mockReturnValueOnce({
+      isTrusted: true,
+      source: 'file',
+    });
+
+    await executor.createTask(
+      'test-task',
+      'test-context',
+      {
+        kind: CoderAgentEvent.StateAgentSettingsEvent,
+        workspacePath: '/tmp',
+      },
+      mockEventBus,
+    );
+
+    expect(loadEnvironment).toHaveBeenCalledOnce();
+    expect(loadExtensions).toHaveBeenLastCalledWith('/tmp', true);
+    expect(loadConfig).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'test-task',
+      true,
     );
   });
 

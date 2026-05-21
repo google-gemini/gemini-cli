@@ -36,9 +36,12 @@ interface ExtensionConfig {
   excludeTools?: string[];
 }
 
-export function loadExtensions(workspaceDir: string): GeminiCLIExtension[] {
+export function loadExtensions(
+  workspaceDir: string,
+  includeWorkspaceExtensions = true,
+): GeminiCLIExtension[] {
   const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
+    ...(includeWorkspaceExtensions ? loadExtensionsFromDir(workspaceDir) : []),
     ...loadExtensionsFromDir(homedir()),
   ];
 

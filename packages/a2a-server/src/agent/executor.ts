@@ -106,9 +106,11 @@ export class CoderAgentExecutor implements AgentExecutor {
       isHeadless: isHeadlessMode(),
     });
     const isTrusted = trustResult ?? false;
-    loadEnvironment(); // Will override any global env with workspace envs
+    if (isTrusted) {
+      loadEnvironment(); // Will override any global env with workspace envs
+    }
     const settings = loadSettings(workspaceRoot, isTrusted);
-    const extensions = loadExtensions(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot, isTrusted);
     return loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),

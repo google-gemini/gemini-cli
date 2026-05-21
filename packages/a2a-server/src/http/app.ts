@@ -198,7 +198,6 @@ export async function createApp() {
   try {
     // Load the server configuration once on startup.
     const workspaceRoot = setTargetDir(undefined);
-    loadEnvironment();
 
     // Use a temporary settings load to check if folder trust is enabled.
     // This is similar to how the CLI handles the initial trust check.
@@ -209,13 +208,17 @@ export async function createApp() {
       isHeadless: isHeadlessMode(),
     });
 
-    const settings = loadSettings(workspaceRoot, isTrusted ?? false);
-    const extensions = loadExtensions(workspaceRoot);
+    const trustedWorkspace = isTrusted ?? false;
+    if (trustedWorkspace) {
+      loadEnvironment();
+    }
+    const settings = loadSettings(workspaceRoot, trustedWorkspace);
+    const extensions = loadExtensions(workspaceRoot, trustedWorkspace);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
-      isTrusted ?? false,
+      trustedWorkspace,
     );
 
     let git: GitService | undefined;
