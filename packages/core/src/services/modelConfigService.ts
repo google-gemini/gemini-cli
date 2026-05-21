@@ -103,7 +103,6 @@ export interface ResolutionContext {
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
   requestedModel?: string;
-  releaseChannel?: string;
 }
 
 /** The requirements defined in the registry. */
@@ -114,7 +113,6 @@ export interface ResolutionCondition {
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
   requestedModels?: string[];
-  releaseChannel?: string;
 }
 
 export interface ModelConfigServiceConfig {
@@ -160,7 +158,6 @@ export class ModelConfigService {
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
     const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
-    const releaseChannel = context.releaseChannel ?? 'stable';
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -172,7 +169,10 @@ export class ModelConfigService {
       .map(([id, m]) => {
         let description = m.dialogDescription ?? '';
         if (id === 'auto') {
-          description = getAutoModelDescription(releaseChannel, useGemini31);
+          description = getAutoModelDescription(
+            shouldShowPreviewModels,
+            useGemini31,
+          );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
         }
@@ -270,8 +270,6 @@ export class ModelConfigService {
             !!context.requestedModel &&
             value.includes(context.requestedModel)
           );
-        case 'releaseChannel':
-          return value === context.releaseChannel;
         default:
           return false;
       }
@@ -349,6 +347,10 @@ export class ModelConfigService {
 
   registerRuntimeModelOverride(override: ModelConfigOverride): void {
     this.runtimeOverrides.push(override);
+  }
+
+  clearRuntimeOverrides(): void {
+    this.runtimeOverrides.length = 0;
   }
 
   /**
