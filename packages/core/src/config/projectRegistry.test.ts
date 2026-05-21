@@ -13,6 +13,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ProjectRegistry } from './projectRegistry.js';
 import { lock } from 'proper-lockfile';
+import {
+  normalizePath as normalizePathUtil,
+  resolveToRealPath,
+} from '../utils/paths.js';
 
 vi.mock('proper-lockfile');
 
@@ -23,11 +27,7 @@ describe('ProjectRegistry', () => {
   let baseDir2: string;
 
   function normalizePath(p: string): string {
-    let resolved = path.resolve(p);
-    if (os.platform() === 'win32') {
-      resolved = resolved.toLowerCase();
-    }
-    return resolved;
+    return normalizePathUtil(resolveToRealPath(p));
   }
 
   beforeEach(() => {

@@ -7,12 +7,14 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import {
+  normalizePath as normalizePathUtil,
+  resolveToRealPath,
+} from '../utils/paths.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -94,11 +96,7 @@ export class ProjectRegistry {
   }
 
   private normalizePath(projectPath: string): string {
-    let resolved = resolveToRealPath(projectPath);
-    if (os.platform() === 'win32') {
-      resolved = resolved.toLowerCase();
-    }
-    return resolved;
+    return normalizePathUtil(resolveToRealPath(projectPath));
   }
 
   private async save(data: RegistryData): Promise<void> {
