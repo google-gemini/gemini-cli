@@ -7,11 +7,60 @@
 import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
 import { coreEvents } from '@google/gemini-cli-core';
+import { isLikelyShellCommand } from './shellCommandValidator.js';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.
  */
 type CommentedRecord = Record<string | symbol, unknown>;
+
+/**
+ * Recursively walks the updates object and warns about any object with
+ * `type: "command"` whose `command` value looks like natural language
+ * rather than a valid shell command.
+ */
+function warnAboutNaturalLanguageCommandValues(
+  updates: Record<string, unknown>,
+  path: string,
+): void {
+  for (const [key, value] of Object.entries(updates)) {
+    const currentPath = path ? `${path}.${key}` : key;
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      const objValue = value as Record<string, unknown>;
+      if (
+        objValue['type'] === 'command' &&
+        typeof objValue['command'] === 'string'
+      ) {
+        if (!isLikelyShellCommand(objValue['command'] as string)) {
+          coreEvents.emitFeedback(
+            'warn',
+            `Setting "${currentPath}.command" contains text that does not look like a valid shell command. ` +
+              'The value will be saved, but it may fail when executed.',
+          );
+        }
+      }
+      warnAboutNaturalLanguageCommandValues(objValue, currentPath);
+    } else if (Array.isArray(value)) {
+      (value as unknown[]).forEach((item, index) => {
+        if (
+          typeof item === 'object' &&
+          item !== null &&
+          !Array.isArray(item)
+        ) {
+          warnAboutNaturalLanguageCommandValues(
+            item as Record<string, unknown>,
+            `${currentPath}[${index}]`,
+          );
+        }
+      });
+    }
+  }
+}
 
 /**
  * Updates a JSON file while preserving comments and formatting.
@@ -20,6 +69,8 @@ export function updateSettingsFilePreservingFormat(
   filePath: string,
   updates: Record<string, unknown>,
 ): void {
+  warnAboutNaturalLanguageCommandValues(updates, '');
+
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
     return;
