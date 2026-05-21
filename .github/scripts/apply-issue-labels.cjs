@@ -5,86 +5,98 @@
  */
 
 module.exports = async ({ github, context, core }) => {
-  const rawLabels = process.env.LABELS_OUTPUT;
-  core.info(`Raw labels JSON: ${rawLabels}`);
-  let parsedLabels;
-  try {
-    // First, try to parse the raw output as JSON.
-    parsedLabels = JSON.parse(rawLabels);
-  } catch (jsonError) {
-    // If that fails, check for a markdown code block.
-    core.warning(
-      `Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`,
-    );
-    const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        parsedLabels = JSON.parse(jsonMatch[1].trim());
-      } catch (markdownError) {
-        core.setFailed(
-          `Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`,
-        );
-        return;
+  const extractJson = (raw) => {
+    if (!raw || raw === '[]' || raw === '') return [];
+    try {
+      // First, try to parse the raw output as JSON.
+      return JSON.parse(raw);
+    } catch (jsonError) {
+      // If that fails, check for a markdown code block.
+      core.info('Direct JSON parsing failed. Trying to extract from a markdown block.');
+      const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          return JSON.parse(jsonMatch[1].trim());
+        } catch (markdownError) {
+          core.warning(`Failed to parse extracted JSON from markdown block: ${markdownError.message}`);
+        }
       }
-    } else {
-      // If no markdown block, try to find a raw JSON array in the output.
-      // The CLI may include debug/log lines (e.g. telemetry init, YOLO mode)
-      // before the actual JSON response.
-      const jsonArrayMatch = rawLabels.match(
-        /\[\s*\{\s*"issue_number"[\s\S]*\}\s*\]/,
-      );
+
+      // Try to find a raw JSON array in the output.
+      const jsonArrayMatch = raw.match(/\[\s*\{\s*"issue_number"[\s\S]*\}\s*\]/);
       if (jsonArrayMatch) {
         try {
-          parsedLabels = JSON.parse(jsonArrayMatch[0]);
+          return JSON.parse(jsonArrayMatch[0]);
         } catch (extractError) {
-          // It's possible the regex matched from a `[STARTUP]` log all the way to the end
-          // of the JSON array. We need to be more aggressive and find the FIRST `[ { "issue_number"`
-          core.warning(
-            `Strict array match failed: ${extractError.message}. Attempting to clean leading noisy brackets.`,
-          );
-          const fallbackMatch = rawLabels.match(
-            /(\[\s*\{\s*"issue_number"[\s\S]*)/,
-          );
+          const fallbackMatch = raw.match(/(\[\s*\{\s*"issue_number"[\s\S]*)/);
           if (fallbackMatch) {
             try {
-              // We might have grabbed trailing noise too, so we find the last closing bracket
-              const cleaned = fallbackMatch[0].substring(
-                0,
-                fallbackMatch[0].lastIndexOf(']') + 1,
-              );
-              parsedLabels = JSON.parse(cleaned);
+              const cleaned = fallbackMatch[0].substring(0, fallbackMatch[0].lastIndexOf(']') + 1);
+              return JSON.parse(cleaned);
             } catch (fallbackError) {
-              core.setFailed(
-                `Found JSON-like content but failed to parse: ${fallbackError.message}\nRaw output: ${rawLabels}`,
-              );
-              return;
+              core.warning(`Failed to parse extracted JSON using fallback regex: ${fallbackError.message}`);
             }
-          } else {
-            core.setFailed(
-              `Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawLabels}`,
-            );
-            return;
           }
         }
-      } else {
-        core.setFailed(
-          `Output is not valid JSON and does not contain extractable JSON.\nRaw output: ${rawLabels}`,
-        );
-        return;
       }
     }
-  }
-  core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+    core.warning('No valid JSON could be extracted from input.');
+    return [];
+  };
 
-  for (const entry of parsedLabels) {
-    const issueNumber = entry.issue_number;
-    if (!issueNumber) {
-      core.info(
-        `Skipping entry with no issue number: ${JSON.stringify(entry)}`,
-      );
-      continue;
+  // Collect all outputs from environment variables
+  // Prioritize EFFORT results over STANDARD results by processing Effort FIRST
+  // so that its labels appear first in the merged arrays (and thus win in mutually exclusive logic)
+  const effortRaw = process.env.LABELS_OUTPUT_EFFORT;
+  const standardRaw = process.env.LABELS_OUTPUT_STANDARD;
+  const genericRaw = process.env.LABELS_OUTPUT;
+
+  const resultsByIssue = new Map();
+
+  const processResults = (results, sourceName) => {
+    for (const entry of results) {
+      const issueNumber = entry.issue_number;
+      if (!issueNumber) continue;
+
+      if (!resultsByIssue.has(issueNumber)) {
+        resultsByIssue.set(issueNumber, {
+          issue_number: issueNumber,
+          labels_to_add: [...(entry.labels_to_add || [])],
+          labels_to_remove: [...(entry.labels_to_remove || [])],
+          explanation: entry.explanation || '',
+          effort_analysis: entry.effort_analysis || '',
+        });
+      } else {
+        const existing = resultsByIssue.get(issueNumber);
+        // Combine labels
+        existing.labels_to_add = [...new Set([...existing.labels_to_add, ...(entry.labels_to_add || [])])];
+        existing.labels_to_remove = [...new Set([...existing.labels_to_remove, ...(entry.labels_to_remove || [])])];
+        
+        // Combine explanations (if different)
+        if (entry.explanation && !existing.explanation.includes(entry.explanation)) {
+          existing.explanation = existing.explanation 
+            ? `${existing.explanation}\n\n${entry.explanation}`
+            : entry.explanation;
+        }
+        
+        // Take effort analysis if present
+        if (entry.effort_analysis && !existing.effort_analysis) {
+          existing.effort_analysis = entry.effort_analysis;
+        }
+      }
     }
+  };
 
+  // Order matters: Effort first so its labels win in conflict resolution
+  processResults(extractJson(effortRaw), 'EFFORT');
+  processResults(extractJson(standardRaw), 'STANDARD');
+  processResults(extractJson(genericRaw), 'GENERIC');
+
+  const finalResults = Array.from(resultsByIssue.values());
+  core.info(`Aggregated triage results for ${finalResults.length} issues.`);
+
+  for (const entry of finalResults) {
+    const issueNumber = entry.issue_number;
     let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
     let existingLabels = [];
@@ -110,15 +122,11 @@ module.exports = async ({ github, context, core }) => {
       const targetPriority = labelsToAdd.find((l) => l.startsWith('priority/'));
       if (targetPriority) {
         let downgradedPriority = null;
-        if (targetPriority === 'priority/p0')
-          downgradedPriority = 'priority/p1';
-        if (targetPriority === 'priority/p1')
-          downgradedPriority = 'priority/p2';
+        if (targetPriority === 'priority/p0') downgradedPriority = 'priority/p1';
+        if (targetPriority === 'priority/p1') downgradedPriority = 'priority/p2';
 
         if (downgradedPriority) {
-          core.info(
-            `Programmatically downgrading ${targetPriority} to ${downgradedPriority} due to status/need-information`,
-          );
+          core.info(`Programmatically downgrading ${targetPriority} to ${downgradedPriority} due to status/need-information`);
           labelsToAdd = labelsToAdd.filter((l) => l !== targetPriority);
           labelsToAdd.push(downgradedPriority);
         }
@@ -131,73 +139,44 @@ module.exports = async ({ github, context, core }) => {
       labelsToAdd.includes('status/manual-triage') ||
       existingLabels.includes('status/manual-triage')
     ) {
-      // If the AI flagged it for manual triage, remove bot-triaged if it exists
       labelsToRemove.push('status/bot-triaged');
-      // Ensure we don't accidentally try to add bot-triaged if the AI returned it
       labelsToAdd = labelsToAdd.filter((l) => l !== 'status/bot-triaged');
     } else {
-      // Standard successful bot triage
       labelsToAdd.push('status/bot-triaged');
     }
 
-    // Deduplicate arrays
-    labelsToAdd = [...new Set(labelsToAdd)];
-    labelsToRemove = [...new Set(labelsToRemove)];
-
-    // Fetch existing labels to auto-resolve conflicts
-    const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
-    if (hasNewArea) {
-      const existingAreas = existingLabels.filter((l) => l.startsWith('area/'));
-      labelsToRemove.push(...existingAreas);
+    // Resolve internal conflicts (e.g., adding P1 and P2)
+    // We already resolved these by putting Effort first in the combined list
+    
+    // Resolve external conflicts with existing labels
+    if (labelsToAdd.some((l) => l.startsWith('area/'))) {
+      labelsToRemove.push(...existingLabels.filter((l) => l.startsWith('area/')));
+    }
+    if (labelsToAdd.some((l) => l.startsWith('priority/'))) {
+      labelsToRemove.push(...existingLabels.filter((l) => l.startsWith('priority/')));
+    }
+    if (labelsToAdd.some((l) => l.startsWith('kind/'))) {
+      labelsToRemove.push(...existingLabels.filter((l) => l.startsWith('kind/')));
     }
 
-    const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
-    if (hasNewPriority) {
-      const existingPriorities = existingLabels.filter((l) =>
-        l.startsWith('priority/'),
-      );
-      labelsToRemove.push(...existingPriorities);
+    // Enforce mutual exclusivity in the TO-ADD list (Architect wins)
+    const exclusivePrefixes = ['area/', 'priority/', 'kind/'];
+    for (const prefix of exclusivePrefixes) {
+      const filtered = labelsToAdd.filter(l => l.startsWith(prefix));
+      if (filtered.length > 1) {
+        const winner = filtered[0]; // First one wins
+        core.info(`Issue #${issueNumber} has multiple ${prefix} labels suggested. Keeping "${winner}" and discarding others.`);
+        labelsToAdd = labelsToAdd.filter(l => !l.startsWith(prefix) || l === winner);
+      }
     }
 
-    const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
-    if (hasNewKind) {
-      const existingKinds = existingLabels.filter((l) => l.startsWith('kind/'));
-      labelsToRemove.push(...existingKinds);
-    }
-
-    // Enforce mutually exclusive area labels
-    const areaLabelsToAdd = labelsToAdd.filter((l) => l.startsWith('area/'));
-    if (areaLabelsToAdd.length > 1) {
-      core.warning(
-        `Issue #${issueNumber} has multiple area labels to add: ${areaLabelsToAdd.join(', ')}. Keeping only the first one.`,
-      );
-      const firstArea = areaLabelsToAdd[0];
-      labelsToAdd = labelsToAdd.filter(
-        (l) => !l.startsWith('area/') || l === firstArea,
-      );
-    }
-
-    // Enforce mutually exclusive priority labels
-    const priorityLabelsToAdd = labelsToAdd.filter((l) =>
-      l.startsWith('priority/'),
-    );
-    if (priorityLabelsToAdd.length > 1) {
-      core.warning(
-        `Issue #${issueNumber} has multiple priority labels to add: ${priorityLabelsToAdd.join(', ')}. Keeping only the first one.`,
-      );
-      const firstPriority = priorityLabelsToAdd[0];
-      labelsToAdd = labelsToAdd.filter(
-        (l) => !l.startsWith('priority/') || l === firstPriority,
-      );
-    }
-
-    // Re-deduplicate and filter out labels we are trying to add,
-    // and filter out labels that are already present or absent to avoid unnecessary API calls
+    // Final deduplication and cleanup
     labelsToRemove = [...new Set(labelsToRemove)].filter(
       (l) => !labelsToAdd.includes(l) && existingLabels.includes(l),
     );
-    labelsToAdd = labelsToAdd.filter((l) => !existingLabels.includes(l));
+    labelsToAdd = [...new Set(labelsToAdd)].filter((l) => !existingLabels.includes(l));
 
+    // Batch label operations
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
         owner: context.repo.owner,
@@ -205,11 +184,7 @@ module.exports = async ({ github, context, core }) => {
         issue_number: issueNumber,
         labels: labelsToAdd,
       });
-
-      const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-      core.info(
-        `Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`,
-      );
+      core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
     }
 
     if (labelsToRemove.length > 0) {
@@ -222,32 +197,19 @@ module.exports = async ({ github, context, core }) => {
             name: label,
           });
         } catch (e) {
-          if (e.status !== 404) {
-            core.warning(
-              `Failed to remove label ${label} from #${issueNumber}: ${e.message}`,
-            );
-          }
+          if (e.status !== 404) core.warning(`Failed to remove label ${label} from #${issueNumber}: ${e.message}`);
         }
       }
-      core.info(
-        `Successfully removed labels for #${issueNumber}: ${labelsToRemove.join(', ')}`,
-      );
+      core.info(`Successfully removed labels for #${issueNumber}: ${labelsToRemove.join(', ')}`);
     }
 
-    // Restrictive Commenting Policy:
-    // - Silence standard triage (Area/Kind/Priority) to avoid spam.
-    // - Only comment if status/need-information is added (to explain what is missing).
-    // - Only comment if effort_analysis is present (deep technical dive).
-    const needsInfoAdded =
-      labelsToAdd.includes('status/need-information') &&
-      !existingLabels.includes('status/need-information');
+    // Post comment if needed
+    const needsInfoAdded = labelsToAdd.includes('status/need-information') && !existingLabels.includes('status/need-information');
     const hasEffortAnalysis = !!entry.effort_analysis;
 
     if (needsInfoAdded || hasEffortAnalysis) {
       let commentBody = '';
-      if (needsInfoAdded && entry.explanation) {
-        commentBody += entry.explanation;
-      }
+      if (needsInfoAdded && entry.explanation) commentBody += entry.explanation;
       if (hasEffortAnalysis) {
         if (commentBody) commentBody += '\n\n';
         commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
@@ -260,19 +222,8 @@ module.exports = async ({ github, context, core }) => {
           issue_number: issueNumber,
           body: commentBody,
         });
-        core.info(
-          `Posted required comment (need-info or effort) for #${issueNumber}`,
-        );
+        core.info(`Posted required comment for #${issueNumber}`);
       }
-    }
-
-    if (
-      (!entry.labels_to_add || entry.labels_to_add.length === 0) &&
-      (!entry.labels_to_remove || entry.labels_to_remove.length === 0)
-    ) {
-      core.info(
-        `No labels to add or remove for #${issueNumber}, leaving as is`,
-      );
     }
   }
 };

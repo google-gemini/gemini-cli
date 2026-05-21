@@ -392,30 +392,14 @@ jobs:
             - This product is designed to use different models eg.. using pro, downgrading to flash etc.
             - When users report that they dont expect the model to change those would be categorized as feature requests.
 
-      - name: 'Apply Standard Labels to Issues'
+      - name: 'Apply Triaged Labels'
         if: |-
-          ${{ steps.gemini_standard_issue_analysis.outcome == 'success' &&
-              steps.gemini_standard_issue_analysis.outputs.summary != '[]' &&
-              steps.gemini_standard_issue_analysis.outputs.summary != '' }}
+          always() && 
+          ( (steps.gemini_standard_issue_analysis.outcome == 'success' && steps.gemini_standard_issue_analysis.outputs.summary != '[]' && steps.gemini_standard_issue_analysis.outputs.summary != '') ||
+            (steps.gemini_effort_issue_analysis.outcome == 'success' && steps.gemini_effort_issue_analysis.outputs.summary != '[]' && steps.gemini_effort_issue_analysis.outputs.summary != '') )
         env:
-          REPOSITORY: '${{ github.repository }}'
-          LABELS_OUTPUT: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
-          SUPPRESS_COMMENT: 'true'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
-        with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
-          script: |-
-            const applyLabels = require('./.github/scripts/apply-issue-labels.cjs');
-            await applyLabels({ github, context, core });
-
-      - name: 'Apply Effort Labels to Issues'
-        if: |-
-          ${{ steps.gemini_effort_issue_analysis.outcome == 'success' &&
-              steps.gemini_effort_issue_analysis.outputs.summary != '[]' &&
-              steps.gemini_effort_issue_analysis.outputs.summary != '' }}
-        env:
-          REPOSITORY: '${{ github.repository }}'
-          LABELS_OUTPUT: '${{ steps.gemini_effort_issue_analysis.outputs.summary }}'
+          LABELS_OUTPUT_STANDARD: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
+          LABELS_OUTPUT_EFFORT: '${{ steps.gemini_effort_issue_analysis.outputs.summary }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
