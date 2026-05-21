@@ -18,6 +18,8 @@ import {
   resolveExecutable,
   type ShellType,
   BASH_HUP_GUARD,
+  getCommandRoots,
+  initializeShellParsers,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -409,8 +411,12 @@ export class ShellExecutionService {
           }
         })();
 
-      if (isWSL && /\.exe\b/i.test(commandToExecute)) {
-        finalShouldUseNodePty = false;
+      if (isWSL) {
+        await initializeShellParsers();
+        const commands = getCommandRoots(commandToExecute);
+        if (commands.some((cmd) => cmd.toLowerCase().endsWith('.exe'))) {
+          finalShouldUseNodePty = false;
+        }
       }
     }
 

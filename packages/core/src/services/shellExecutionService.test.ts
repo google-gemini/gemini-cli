@@ -1880,6 +1880,35 @@ describe('ShellExecutionService execution method selection', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should use node-pty on WSL when executing a command with .exe only in arguments', async () => {
+    mockPlatform.mockReturnValue('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+    mockSerializeTerminalToObject.mockReturnValue([]);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'vim app.exe',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+      shellExecutionConfig,
+    );
+
+    if (!mockPtyProcess.onExit.mock.calls[0]) {
+      const res = await handle.result;
+      throw new Error(`Failed early in executeWithPty: ${res.error}`);
+    }
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    const result = await handle.result;
+
+    expect(mockPtySpawn).toHaveBeenCalled();
+    expect(mockCpSpawn).not.toHaveBeenCalled();
+    expect(result.executionMethod).toBe('mock-pty');
+
+    vi.unstubAllEnvs();
+  });
+
   it('should use node-pty on standard Linux when executing a command with .exe', async () => {
     mockPlatform.mockReturnValue('linux');
     vi.stubEnv('WSL_DISTRO_NAME', ''); // No WSL
