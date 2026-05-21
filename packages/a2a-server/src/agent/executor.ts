@@ -15,6 +15,8 @@ import type {
 import {
   GeminiEventType,
   SimpleExtensionLoader,
+  checkPathTrust,
+  isHeadlessMode,
   type ToolCallRequestInfo,
   type Config,
 } from '@google/gemini-cli-core';
@@ -37,6 +39,10 @@ import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
+
+type ExecuteOptions = {
+  allowAutoExecute?: boolean;
+};
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -93,7 +99,13 @@ export class CoderAgentExecutor implements AgentExecutor {
     taskId: string,
   ): Promise<Config> {
     const workspaceRoot = setTargetDir(agentSettings);
-    const isTrusted = agentSettings.isTrusted ?? false;
+    const initialSettings = loadSettings(workspaceRoot, false);
+    const { isTrusted: trustResult } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isHeadless: isHeadlessMode(),
+    });
+    const isTrusted = trustResult ?? false;
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot, isTrusted);
     const extensions = loadExtensions(workspaceRoot);
@@ -103,6 +115,22 @@ export class CoderAgentExecutor implements AgentExecutor {
       taskId,
       isTrusted,
     );
+  }
+
+  private normalizeAgentSettings(
+    agentSettings: AgentSettings,
+    options: ExecuteOptions = {},
+  ): AgentSettings {
+    const normalized: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: agentSettings.workspacePath,
+    };
+
+    if (options.allowAutoExecute && agentSettings.autoExecute === true) {
+      normalized.autoExecute = true;
+    }
+
+    return normalized;
   }
 
   /**
@@ -121,7 +149,12 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
     }
 
-    const agentSettings = persistedState._agentSettings;
+    const agentSettings = this.normalizeAgentSettings(
+      persistedState._agentSettings,
+      {
+        allowAutoExecute: true,
+      },
+    );
     const config = await this.getConfig(agentSettings, sdkTask.id);
     const contextId: string =
       getContextIdFromMetadata(metadata) || sdkTask.contextId;
@@ -146,11 +179,15 @@ export class CoderAgentExecutor implements AgentExecutor {
     contextId: string,
     agentSettingsInput?: AgentSettings,
     eventBus?: ExecutionEventBus,
+    options: ExecuteOptions = {},
   ): Promise<TaskWrapper> {
-    const agentSettings: AgentSettings = agentSettingsInput || {
-      kind: CoderAgentEvent.StateAgentSettingsEvent,
-      workspacePath: process.cwd(),
-    };
+    const agentSettings = this.normalizeAgentSettings(
+      agentSettingsInput || {
+        kind: CoderAgentEvent.StateAgentSettingsEvent,
+        workspacePath: process.cwd(),
+      },
+      options,
+    );
     const config = await this.getConfig(agentSettings, taskId);
     const runtimeTask = await Task.create(
       taskId,
@@ -296,6 +333,7 @@ export class CoderAgentExecutor implements AgentExecutor {
   async execute(
     requestContext: RequestContext,
     eventBus: ExecutionEventBus,
+    options: ExecuteOptions = {},
   ): Promise<void> {
     const userMessage = requestContext.userMessage;
     const sdkTask = requestContext.task;
@@ -409,6 +447,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           contextId,
           agentSettings,
           eventBus,
+          options,
         );
       } catch (error) {
         logger.error(

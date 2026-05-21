@@ -117,7 +117,9 @@ export class InitCommand implements Command {
 
     // The executor will handle the entire agentic loop, including
     // creating the task, streaming responses, and handling tools.
-    await agentExecutor.execute(requestContext, eventBus);
+    await agentExecutor.execute(requestContext, eventBus, {
+      allowAutoExecute: true,
+    });
     return {
       name: this.name,
       data: geminiMdPath,

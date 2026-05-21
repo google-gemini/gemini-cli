@@ -182,6 +182,7 @@ describe('InitCommand', () => {
             }),
           }),
           eventBus,
+          { allowAutoExecute: true },
         );
       });
     });
