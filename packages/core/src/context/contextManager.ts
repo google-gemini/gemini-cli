@@ -36,6 +36,7 @@ export class ContextManager {
 
   // Hysteresis tracking to prevent utility call churn
   private lastTriggeredDeficit = 0;
+  private lastTriggeredNormalizeDeficit = 0;
 
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
@@ -221,7 +222,9 @@ export class ContextManager {
 
     const fullHistoryToHarden = [...renderedHistory, ...pendingHistory];
 
-    const hardenedFullHistory = hardenHistory(fullHistoryToHarden);
+    const hardenedFullHistory = hardenHistory(fullHistoryToHarden, {
+      sentinels: this.sidecar.sentinels,
+    });
 
     const envContextId = deriveStableId(['environment-context']);
     const pendingIds = new Set(pendingHistory.map((t) => t.id));
@@ -314,26 +317,34 @@ export class ContextManager {
       );
     }
 
+    // Identify ephemeral preview nodes that are NOT in the master buffer.
+    const bufferIds = new Set(this.buffer.nodes.map((n) => n.id));
+    const previewNodes = nodes.filter((n) => !bufferIds.has(n.id));
+    const currentNodes = [...this.buffer.nodes, ...previewNodes];
+
     const currentTokens =
-      this.env.tokenCalculator.calculateConcreteListTokens(nodes);
+      this.env.tokenCalculator.calculateConcreteListTokens(currentNodes);
 
     if (currentTokens > this.sidecar.config.budget.retainedTokens) {
       const agedOutRetainedNodes = new Set<string>();
       const agedOutNormalizedNodes = new Set<string>();
 
-      const protectionMap = this.getProtectedNodeIds(nodes, activeTaskIds);
+      const protectionMap = this.getProtectedNodeIds(
+        currentNodes,
+        activeTaskIds,
+      );
       const protectedIds = new Set(protectionMap.keys());
 
       // Also pin Turn 0 (Environment Context)
       const envTurnId = `turn_${deriveStableId(['environment-context'])}`;
-      const turn0Nodes = nodes.filter((n) => n.turnId === envTurnId);
+      const turn0Nodes = currentNodes.filter((n) => n.turnId === envTurnId);
       for (const n of turn0Nodes) {
         protectedIds.add(n.id);
       }
 
       let rollingTokens = 0;
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const node = nodes[i];
+      for (let i = currentNodes.length - 1; i >= 0; i--) {
+        const node = currentNodes[i];
         const priorTokens = rollingTokens;
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
@@ -365,6 +376,10 @@ export class ContextManager {
         const threshold =
           this.sidecar.config.budget.coalescingThresholdTokens || 0;
 
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
         if (targetDeficit > this.lastTriggeredDeficit + threshold) {
           this.lastTriggeredDeficit = targetDeficit;
 
@@ -392,19 +407,31 @@ export class ContextManager {
       if (agedOutNormalizedNodes.size > 0) {
         const targetDeficit =
           currentTokens - this.sidecar.config.budget.normalizedTokens!;
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
 
-        this.eventBus.emitNormalizeNeeded({
-          nodes: this.buffer.nodes,
-          targetDeficit,
-          targetNodeIds: agedOutNormalizedNodes,
-        });
+        if (targetDeficit < this.lastTriggeredNormalizeDeficit) {
+          this.lastTriggeredNormalizeDeficit = targetDeficit;
+        }
 
-        this.buffer = await this.orchestrator.executeTriggerSync(
-          'normalized_exceeded',
-          this.buffer,
-          agedOutNormalizedNodes,
-          protectedIds,
-        );
+        if (targetDeficit > this.lastTriggeredNormalizeDeficit + threshold) {
+          this.lastTriggeredNormalizeDeficit = targetDeficit;
+
+          this.eventBus.emitNormalizeNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNormalizedNodes,
+          });
+
+          this.buffer = await this.orchestrator.executeTriggerSync(
+            'normalized_exceeded',
+            this.buffer,
+            agedOutNormalizedNodes,
+            protectedIds,
+          );
+        }
+      } else {
+        this.lastTriggeredNormalizeDeficit = 0;
       }
     }
   }
