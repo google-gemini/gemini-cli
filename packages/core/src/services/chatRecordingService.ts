@@ -118,11 +118,14 @@ export async function loadConversationRecord(
   try {
     const realPath = resolveToRealPath(filePath);
 
-    if (options?.baseDir && !isSubpath(options.baseDir, realPath)) {
-      debugLogger.warn(
-        `loadConversationRecord: blocked traversal attempt. ${realPath} is not within ${options.baseDir}`,
-      );
-      return null;
+    if (options?.baseDir) {
+      const realBaseDir = resolveToRealPath(options.baseDir);
+      if (!isSubpath(realBaseDir, realPath)) {
+        debugLogger.warn(
+          `loadConversationRecord: blocked traversal attempt. ${realPath} is not within ${realBaseDir} (original baseDir: ${options.baseDir})`,
+        );
+        return null;
+      }
     }
 
     const stats = await fs.promises.stat(realPath);

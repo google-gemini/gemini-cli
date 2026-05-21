@@ -48,12 +48,13 @@ export const getSavedChatTags = async (
     const file_tail = '.json';
     const files = await fsPromises.readdir(geminiDir);
     const chatDetails: ChatDetail[] = [];
+    const realGeminiDir = resolveToRealPath(geminiDir);
 
     const statPromises = files.map(async (file) => {
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         try {
           const filePath = resolveToRealPath(path.join(geminiDir, file));
-          if (!isSubpath(geminiDir, filePath)) {
+          if (!isSubpath(realGeminiDir, filePath)) {
             return null;
           }
           const stats = await fsPromises.stat(filePath);
