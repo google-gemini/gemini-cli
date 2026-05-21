@@ -512,6 +512,29 @@ describe('Server Config (config.ts)', () => {
       expect(mcpStarted).toBe(true);
     });
 
+    it('should not throw when an includeDirectories entry is missing', async () => {
+      const missingDir = '/path/to/missing/.kilocode/rules';
+      const presentDir = '/path/to/present';
+
+      const realExistsSync = vi.mocked(fs.existsSync).getMockImplementation();
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        if (p === missingDir) return false;
+        return realExistsSync ? !!realExistsSync(p) : true;
+      });
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        includeDirectories: [missingDir, presentDir],
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+
+      const directories = config.getWorkspaceContext().getDirectories();
+      expect(directories).toContain(presentDir);
+      expect(directories).not.toContain(missingDir);
+    });
+
     describe('getCompressionThreshold', () => {
       it('should return the local compression threshold if it is set', async () => {
         const config = new Config({
