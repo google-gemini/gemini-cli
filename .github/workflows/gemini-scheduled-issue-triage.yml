@@ -62,12 +62,20 @@ jobs:
       - name: 'Find Issues with Conflicting Labels'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
-        with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
-          script: |-
-            const findConflictingLabels = require('./.github/scripts/find-conflicting-labels.cjs');
-            await findConflictingLabels({ github, context, core });
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+        run: |-
+          set -euo pipefail
+          echo '🔍 Fetching open issues to find conflicts...'
+          # Fetch up to 2000 open issues in one quick GraphQL-backed query
+          gh issue list --repo "${GITHUB_REPOSITORY}" --search "is:issue is:open" --limit 2000 --json number,title,body,labels > all_open_issues.json
+
+          echo '🧹 Filtering issues with multiple area/ or priority/ labels...'
+          jq -c '[ .[] | select( (.labels | map(select(.name | startswith("area/"))) | length) > 1 or (.labels | map(select(.name | startswith("priority/"))) | length) > 1 ) ] | .[0:50]' all_open_issues.json > conflicting_labels_issues.json
+
+          CONFLICT_COUNT=$(jq 'length' conflicting_labels_issues.json)
+          echo "Found ${CONFLICT_COUNT} issues with conflicting labels (capped at 50 for processing)."
 
       - name: 'Find untriaged issues'
         if: |-
@@ -81,19 +89,19 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 50 --json number,title,body > no_area_issues.json
+            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 50 --json number,title,body,labels > no_area_issues.json
 
           echo '🔍 Finding issues missing kind labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:status/bot-triaged -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 50 --json number,title,body > no_kind_issues.json
+            --search 'is:open is:issue -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 50 --json number,title,body,labels > no_kind_issues.json
 
           echo '🏷️ Finding issues missing priority labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body > no_priority_issues.json
+            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 50 --json number,title,body,labels > no_priority_issues.json
 
           echo '📏 Finding issues missing effort labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 5 --json number,title,body > no_effort_issues.json
+            --search 'is:open is:issue -label:effort/small -label:effort/medium -label:effort/large label:area/core,area/extensions,area/site,area/non-interactive' --limit 20 --json number,title,body,labels > no_effort_issues.json
 
           echo '🔄 Merging and deduplicating standard triage issues...'
           if [ ! -f conflicting_labels_issues.json ]; then echo "[]" > conflicting_labels_issues.json; fi
@@ -158,6 +166,7 @@ jobs:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GEMINI_EXP: 'gemini_exp.json'
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
+          GEMINI_MODEL: 'gemini-3-flash-preview'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -174,7 +183,7 @@ jobs:
                 "read_file"
               ],
               "telemetry": {
-                "enabled": true,
+                "enabled": false,
                 "target": "gcp"
               }
             }
@@ -188,12 +197,12 @@ jobs:
             ## Steps
 
             1. You are only able to use the echo and read_file commands. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
-            2. Use the read_file tool to read the file "standard_issues_to_triage.json" which contains the JSON array of issues to triage.
-            3. Review the issue title, body and any comments provided in the JSON file.
+            2. Use the read_file tool to read the file "standard_issues_to_triage.json" which contains the JSON array of issues to triage (including their current labels).
+            3. Review the issue title, body, current labels, and any comments provided in the JSON file.
             4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/*, and priority/*.
             5. Label Policy:
                - If the issue already has a kind/ label, do not change it.
-               - If the issue has exactly ONE priority/ label, do not change it.
+               - If the issue has exactly ONE priority/ label, do not change it (unless you are explicitly re-evaluating an ambiguous priority).
                - If the issue is missing a priority/ label, OR if the issue currently has MULTIPLE priority/ labels, you must evaluate the issue's impact to determine exactly ONE priority level (priority/p0, priority/p1, priority/p2, priority/p3, or priority/unknown) based the guidelines. If you are fixing an issue with multiple priority/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
                - If the issue has exactly ONE area/ label, do not change it.
                - If the issue is missing an area/ label, OR if the issue currently has MULTIPLE area/ labels, select exactly ONE area/ label that best fits the issue. Issues MUST NOT have multiple area/ labels. If you are fixing an issue with multiple area/ labels, put the correct one in `labels_to_add` and put all the incorrect ones in `labels_to_remove`.
@@ -213,11 +222,12 @@ jobs:
                ]
                ```
               If an issue cannot be classified, do not include it in the output array.
-            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
-              - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            10. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
-            11. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
-            12. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
+            9. For each issue, carefully check if the CLI version is present. It is usually found under the "### Client information" header, as a bullet point (e.g., "• CLI Version: 0.33.1"), or in the output of the `/about` command.
+              - If the version is provided but is more than 6 minor versions older than the most recent release, apply the status/need-information label and leave a comment politely asking the user to verify if the issue persists in the latest version.
+            10. If the issue does not have sufficient information, recommend the status/need-information label and leave a comment politely requesting the missing details. For example, if repro steps are missing, ask for them; if the CLI version is completely missing, ask for the version information in the explanation section below. Do not ask for version info if it is already in the issue body.
+            11. If you think an issue is a Priority/P0, you MUST apply the priority/p1 label AND the status/manual-triage label, and include a note in your explanation that it likely requires P0 escalation.
+            12. If the issue is highly ambiguous, completely lacks a description, or you are torn between two lower priorities (like P2 vs P3), you MUST retain the existing priority label if one is already present. Do not toggle the priority if you do not have enough information to make a definitive change.
+            13. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
 
             ## Guidelines
 
@@ -230,12 +240,14 @@ jobs:
               - Identify exactly ONE area/ label. Do NOT assign multiple area/ labels to a single issue.
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
               - Identify exactly ONE priority/ label. Do NOT assign multiple priority/ labels to a single issue.
-              - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
+              - **Do not manually downgrade the priority.** Always assign the true priority based on the guidelines. The system will handle downgrades programmatically if information is missing.
+              - **NEVER mention label names, label removals, or label additions in your `explanation`.** The explanation must be purely written for the user (e.g., "Please provide your CLI version.") without exposing internal triage mechanics (e.g., do NOT say "Removing area/unknown to leave only area/core").
 
             Categorization Guidelines (Priority):
             P0 - Urgent Blocking Issues:
+              - DO NOT APPLY THE priority/p0 LABEL AUTOMATICALLY. Instead apply priority/p1 and status/manual-triage.
               - Definition: Critical failures breaking core functionality for a large portion of users. Examples: CLI fails to launch globally, core commands (gemini run) crash on valid input, unhandled promise rejections on boot, critical security vulnerability.
-              - Note: You must apply status/manual-triage instead of priority/p0.
+              - Note: You must apply priority/p1 and status/manual-triage instead of priority/p0.
             P1 - Critical but Workable:
               - Definition: Severe issues without a reasonable workaround, significantly degrading the developer experience but not globally blocking. Examples: Specific tools failing consistently (e.g., `web_search` returns 500s), persistent PTY streaming hangs, memory leaks leading to OOM after short use.
             P2 - Significant Issues:
@@ -275,6 +287,7 @@ jobs:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GEMINI_EXP: 'gemini_exp.json'
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
+          GEMINI_MODEL: 'gemini-3-flash-preview'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -293,7 +306,7 @@ jobs:
                 "read_file"
               ],
               "telemetry": {
-                "enabled": true,
+                "enabled": false,
                 "target": "gcp"
               }
             }
@@ -428,9 +441,12 @@ jobs:
           GITHUB_REPOSITORY: '${{ github.repository }}'
         run: |-
           set -euo pipefail
-          echo '🧹 Finding issues that have both bot-triaged and need-triage labels...'
+          echo '🧹 Finding issues that have conflicting status labels...'
           gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue label:status/bot-triaged label:status/need-triage' --limit 50 --json number > issues_to_cleanup.json
+            --search 'is:open is:issue label:status/bot-triaged label:status/need-triage' --limit 50 --json number > cleanup_1.json
+          gh issue list --repo "${GITHUB_REPOSITORY}" \
+            --search 'is:open is:issue label:status/bot-triaged label:status/manual-triage' --limit 50 --json number > cleanup_2.json
+          jq -c -s 'add | unique_by(.number)' cleanup_1.json cleanup_2.json > issues_to_cleanup.json
 
       - name: 'Clean Up Triage Labels'
         if: |-

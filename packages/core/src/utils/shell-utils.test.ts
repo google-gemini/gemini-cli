@@ -21,6 +21,8 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  stripHupGuard,
+  BASH_HUP_GUARD,
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
@@ -486,7 +488,11 @@ describe('getShellConfiguration', () => {
     it('should return PowerShell configuration by default', () => {
       const config = getShellConfiguration();
       expect(config.executable).toBe('powershell.exe');
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.argsPrefix).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+      ]);
       expect(config.shell).toBe('powershell');
     });
 
@@ -511,7 +517,11 @@ describe('getShellConfiguration', () => {
       vi.stubEnv('ComSpec', 'C:\\WINDOWS\\system32\\cmd.exe');
       const config = getShellConfiguration();
       expect(config.executable).toBe('powershell.exe');
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.argsPrefix).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+      ]);
       expect(config.shell).toBe('powershell');
     });
 
@@ -521,7 +531,11 @@ describe('getShellConfiguration', () => {
       vi.stubEnv('ComSpec', psPath);
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.argsPrefix).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+      ]);
       expect(config.shell).toBe('powershell');
     });
 
@@ -530,7 +544,11 @@ describe('getShellConfiguration', () => {
       vi.stubEnv('ComSpec', pwshPath);
       const config = getShellConfiguration();
       expect(config.executable).toBe(pwshPath);
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.argsPrefix).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+      ]);
       expect(config.shell).toBe('powershell');
     });
 
@@ -538,7 +556,11 @@ describe('getShellConfiguration', () => {
       vi.stubEnv('ComSpec', 'C:\\Path\\To\\POWERSHELL.EXE');
       const config = getShellConfiguration();
       expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.argsPrefix).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+      ]);
       expect(config.shell).toBe('powershell');
     });
   });
@@ -644,5 +666,60 @@ describe('resolveExecutable', () => {
     mockPlatform.mockReturnValue('linux');
 
     expect(resolveExecutable('anything')).toBeUndefined();
+  });
+});
+
+describe('stripHupGuard', () => {
+  it('should remove our own HUP guard prefix from the start of a command', () => {
+    expect(stripHupGuard(`${BASH_HUP_GUARD} git status`)).toBe('git status');
+  });
+
+  it('should be idempotent: if no guard present, return command unchanged', () => {
+    expect(stripHupGuard('git status')).toBe('git status');
+  });
+
+  it('should return empty string when command is exactly the guard itself', () => {
+    expect(stripHupGuard(BASH_HUP_GUARD)).toBe('');
+  });
+
+  it('should handle leading whitespace before the guard', () => {
+    expect(stripHupGuard(`   ${BASH_HUP_GUARD} git status`)).toBe('git status');
+  });
+
+  // Security regression: must NOT strip user-supplied trap commands
+  it('should NOT strip a user-supplied trap command (only strips our exact preamble)', () => {
+    // A user attempting to use trap as a sandbox bypass
+    const maliciousCmd = `trap 'rm -rf /' EXIT; git status`;
+    // stripHupGuard looks for the exact BASH_HUP_GUARD prefix (trap '' HUP;), not 'trap'
+    expect(stripHupGuard(maliciousCmd)).toBe(maliciousCmd);
+  });
+
+  it('should NOT strip a trap command with different arguments', () => {
+    const cmd = `trap '' TERM; git status`;
+    expect(stripHupGuard(cmd)).toBe(cmd);
+  });
+});
+
+describe('stripShellWrapper (with HUP guard integration)', () => {
+  it('should strip bash -c wrapper AND then the HUP guard preamble', () => {
+    const wrapped = `bash -c "${BASH_HUP_GUARD} git status"`;
+    expect(stripShellWrapper(wrapped)).toBe('git status');
+  });
+
+  it('should strip the HUP guard alone when no shell wrapper', () => {
+    expect(stripShellWrapper(`${BASH_HUP_GUARD} git status`)).toBe(
+      'git status',
+    );
+  });
+
+  it('should leave user-supplied trap commands intact (security check)', () => {
+    // This ensures that a user command starting with a different trap
+    // is not incorrectly stripped by the HUP guard removal logic
+    const maliciousCmd = `trap 'rm -rf /' EXIT; git status`;
+    expect(stripShellWrapper(maliciousCmd)).toBe(maliciousCmd);
+  });
+
+  it('should still strip a plain shell wrapper without HUP guard', () => {
+    expect(stripShellWrapper('sh -c "ls -l"')).toEqual('ls -l');
   });
 });
