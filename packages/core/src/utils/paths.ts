@@ -418,8 +418,6 @@ export function resolveToRealPath(pathStr: string): string {
     if (resolvedPath.startsWith('file://')) {
       resolvedPath = fileURLToPath(resolvedPath);
     }
-
-    resolvedPath = decodeURIComponent(resolvedPath);
   } catch {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }

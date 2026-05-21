@@ -520,9 +520,9 @@ describe('resolveToRealPath', () => {
       expected: path.resolve('path', 'to', 'file'),
     },
     {
-      description: 'should decode URI components',
+      description: 'should NOT decode URI components if no file:// protocol',
       input: path.resolve('path', 'to', 'some folder').replace(/ /g, '%20'),
-      expected: path.resolve('path', 'to', 'some folder'),
+      expected: path.resolve('path', 'to', 'some folder').replace(/ /g, '%20'),
     },
     {
       description: 'should handle both file protocol and encoding',
