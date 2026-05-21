@@ -10,7 +10,7 @@ module.exports = async ({ github, context, core }) => {
     try {
       // First, try to parse the raw output as JSON.
       return JSON.parse(raw);
-    } catch (_jsonError) {
+    } catch {
       // If that fails, check for a markdown code block.
       core.info('Direct JSON parsing failed. Trying to extract from a markdown block.');
       const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
@@ -27,7 +27,7 @@ module.exports = async ({ github, context, core }) => {
       if (jsonArrayMatch) {
         try {
           return JSON.parse(jsonArrayMatch[0]);
-        } catch (_extractError) {
+        } catch {
           const fallbackMatch = raw.match(/(\[\s*\{\s*"issue_number"[\s\S]*)/);
           if (fallbackMatch) {
             try {
