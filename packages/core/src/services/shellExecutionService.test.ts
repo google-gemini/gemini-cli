@@ -33,6 +33,7 @@ const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 const mockMkdirSync = vi.hoisted(() => vi.fn());
+const mockReadFileSync = vi.hoisted(() => vi.fn());
 const mockCreateWriteStream = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
@@ -42,6 +43,10 @@ const mockDebugLogger = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
+}));
+
+const mockReadFileSyncObj = vi.hoisted(() => ({
+  original: null as typeof import('node:fs').readFileSync | null,
 }));
 
 // Top-level Mocks
@@ -58,15 +63,19 @@ vi.mock('@lydell/node-pty', () => ({
 }));
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
+  mockReadFileSyncObj.original = actual.readFileSync;
+  mockReadFileSync.mockImplementation(actual.readFileSync);
   return {
     ...actual,
     default: {
       ...actual,
       mkdirSync: mockMkdirSync,
       createWriteStream: mockCreateWriteStream,
+      readFileSync: mockReadFileSync,
     },
     mkdirSync: mockMkdirSync,
     createWriteStream: mockCreateWriteStream,
+    readFileSync: mockReadFileSync,
   };
 });
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
@@ -1813,6 +1822,102 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockPtySpawn).not.toHaveBeenCalled();
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
+  });
+
+  it('should bypass node-pty and use child_process on WSL when executing a command with .exe', async () => {
+    mockPlatform.mockReturnValue('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+    mockSerializeTerminalToObject.mockReturnValue([]);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'adb.exe devices',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+      shellExecutionConfig,
+    );
+
+    // Simulate exit of child_process fallback
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    const result = await handle.result;
+
+    expect(mockPtySpawn).not.toHaveBeenCalled();
+    expect(mockCpSpawn).toHaveBeenCalled();
+    expect(result.executionMethod).toBe('child_process');
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should use node-pty on WSL when executing a non-.exe command', async () => {
+    mockPlatform.mockReturnValue('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+    mockSerializeTerminalToObject.mockReturnValue([]);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'ls -la',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+      shellExecutionConfig,
+    );
+
+    if (!mockPtyProcess.onExit.mock.calls[0]) {
+      const res = await handle.result;
+      throw new Error(`Failed early in executeWithPty: ${res.error}`);
+    }
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    const result = await handle.result;
+
+    expect(mockPtySpawn).toHaveBeenCalled();
+    expect(mockCpSpawn).not.toHaveBeenCalled();
+    expect(result.executionMethod).toBe('mock-pty');
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should use node-pty on standard Linux when executing a command with .exe', async () => {
+    mockPlatform.mockReturnValue('linux');
+    vi.stubEnv('WSL_DISTRO_NAME', ''); // No WSL
+    vi.stubEnv('WSLENV', '');
+    vi.stubEnv('WSL_INTEROP', '');
+    mockSerializeTerminalToObject.mockReturnValue([]);
+
+    // Mock readFileSync to simulate a standard (non-microsoft/WSL) kernel version
+    mockReadFileSync.mockImplementation((path, options) => {
+      if (typeof path === 'string' && path.includes('/proc/version')) {
+        return 'Linux version 5.4.0-generic (buildd@lgw01-amd64-060)';
+      }
+      return mockReadFileSyncObj.original!(path, options);
+    });
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'some_program.exe --version',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true, // shouldUseNodePty
+      shellExecutionConfig,
+    );
+
+    if (!mockPtyProcess.onExit.mock.calls[0]) {
+      const res = await handle.result;
+      throw new Error(`Failed early in executeWithPty: ${res.error}`);
+    }
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    const result = await handle.result;
+
+    expect(mockPtySpawn).toHaveBeenCalled();
+    expect(mockCpSpawn).not.toHaveBeenCalled();
+    expect(result.executionMethod).toBe('mock-pty');
+
+    mockReadFileSync.mockImplementation(mockReadFileSyncObj.original!);
+    vi.unstubAllEnvs();
   });
 });
 

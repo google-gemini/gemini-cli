@@ -386,7 +386,35 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
-    if (shouldUseNodePty) {
+    let finalShouldUseNodePty = shouldUseNodePty;
+
+    // Detect if we are on WSL and running a Windows executable (.exe).
+    // WSL has known terminal/PTY interop issues when running Windows binaries within a Linux PTY (like node-pty),
+    // which can lead to hangs, lost/missing output, or indefinite waiting for process exit.
+    if (finalShouldUseNodePty && os.platform() === 'linux') {
+      const isWSL =
+        Boolean(
+          process.env['WSL_DISTRO_NAME'] ||
+            process.env['WSLENV'] ||
+            process.env['WSL_INTEROP'],
+        ) ||
+        (() => {
+          try {
+            return fs
+              .readFileSync('/proc/version', 'utf8')
+              .toLowerCase()
+              .includes('microsoft');
+          } catch {
+            return false;
+          }
+        })();
+
+      if (isWSL && /\.exe\b/i.test(commandToExecute)) {
+        finalShouldUseNodePty = false;
+      }
+    }
+
+    if (finalShouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
@@ -410,7 +438,7 @@ export class ShellExecutionService {
       onOutputEvent,
       abortSignal,
       shellExecutionConfig,
-      shouldUseNodePty,
+      finalShouldUseNodePty,
     );
   }
 
