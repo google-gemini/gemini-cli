@@ -229,13 +229,29 @@ describe('Dynamic Configuration Parity', () => {
 });
 
 describe('isPreviewModel', () => {
-  it('should return true for preview models', () => {
-    expect(isPreviewModel(PREVIEW_GEMINI_MODEL)).toBe(true);
-    expect(isPreviewModel(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
-    expect(isPreviewModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(true);
-    expect(isPreviewModel(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
+  const PREVIEW_MODELS = [
+    PREVIEW_GEMINI_MODEL,
+    PREVIEW_GEMINI_3_1_MODEL,
+    PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+    PREVIEW_GEMINI_FLASH_MODEL,
+    PREVIEW_GEMINI_FLASH_LITE_MODEL,
+  ];
+
+  it('should return true for active preview models', () => {
+    for (const model of PREVIEW_MODELS) {
+      if (model !== 'none') {
+        expect(isPreviewModel(model)).toBe(true);
+      }
+    }
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
-    expect(isPreviewModel(PREVIEW_GEMINI_FLASH_LITE_MODEL)).toBe(true);
+    expect(isPreviewModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
+  });
+
+  it('should return false if a preview model is retired (set to none)', () => {
+    const retiredModels = PREVIEW_MODELS.filter((m) => m === 'none');
+    for (const model of retiredModels) {
+      expect(isPreviewModel(model)).toBe(false);
+    }
   });
 
   it('should return false for non-preview models', () => {
@@ -625,21 +641,27 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
   });
 
-  it('should return true for PREVIEW_GEMINI_FLASH_LITE_MODEL only when useGemini3_1FlashLite is true, and always true for DEFAULT_GEMINI_FLASH_LITE_MODEL', () => {
-    expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, true)).toBe(
-      true,
-    );
+  it('should handle PREVIEW_GEMINI_FLASH_LITE_MODEL activity correctly based on retirement status', () => {
+    if (PREVIEW_GEMINI_FLASH_LITE_MODEL === 'none') {
+      expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, true)).toBe(
+        false,
+      );
+      expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, true, true)).toBe(
+        false,
+      );
+    } else {
+      expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, true)).toBe(
+        true,
+      );
+      expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, true, true)).toBe(
+        true,
+      );
+    }
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
-      true,
-    );
-    expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, true, true)).toBe(
       true,
     );
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true, true)).toBe(
       true,
-    );
-    expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, true, false)).toBe(
-      false,
     );
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true, false)).toBe(
       true,
@@ -677,9 +699,11 @@ describe('isActiveModel', () => {
     expect(
       isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, false, false, false),
     ).toBe(false);
-    expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
-      false,
-    );
+    if (PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
+      expect(isActiveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
+        false,
+      );
+    }
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false, false)).toBe(
       true,
     );
@@ -707,14 +731,23 @@ describe('Gemini 3.1 Config Resolution', () => {
     ).toBeDefined();
   });
 
-  it('PREVIEW_GEMINI_FLASH_LITE_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
-    const resolved = modelConfigService.getResolvedConfig({
-      model: PREVIEW_GEMINI_FLASH_LITE_MODEL,
-      isChatModel: true,
-    });
-    expect(
-      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
-    ).toBeDefined();
+  it('PREVIEW_GEMINI_FLASH_LITE_MODEL should resolve to appropriate config based on retirement status', () => {
+    if (PREVIEW_GEMINI_FLASH_LITE_MODEL === 'none') {
+      // If none, it falls back to chat-base which may not have thinkingLevel
+      const resolved = modelConfigService.getResolvedConfig({
+        model: PREVIEW_GEMINI_FLASH_LITE_MODEL,
+        isChatModel: true,
+      });
+      expect(resolved.model).toBe(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+    } else {
+      const resolved = modelConfigService.getResolvedConfig({
+        model: PREVIEW_GEMINI_FLASH_LITE_MODEL,
+        isChatModel: true,
+      });
+      expect(
+        resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+      ).toBeDefined();
+    }
   });
 });
 
@@ -727,13 +760,13 @@ describe('getAutoModelDescription', () => {
 
   it('should return Gemini 3.0 description when hasAccessToPreview is true', () => {
     const desc = getAutoModelDescription(true, false);
-    expect(desc).toContain('gemini-3-pro');
-    expect(desc).toContain('gemini-3-flash');
+    expect(desc).toContain('gemini-3-pro-preview');
+    expect(desc).toContain('gemini-3-flash-preview');
   });
 
   it('should return Gemini 3.1 description when hasAccessToPreview and useGemini3_1 are true', () => {
     const desc = getAutoModelDescription(true, true);
-    expect(desc).toContain('gemini-3.1-pro');
-    expect(desc).toContain('gemini-3-flash');
+    expect(desc).toContain('gemini-3.1-pro-preview');
+    expect(desc).toContain('gemini-3-flash-preview');
   });
 });

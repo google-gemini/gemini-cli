@@ -101,10 +101,12 @@ export function getAutoModelDescription(
 ) {
   const proModel = hasAccessToPreview
     ? useGemini3_1
-      ? 'gemini-3.1-pro'
-      : 'gemini-3-pro'
-    : 'gemini-2.5-pro';
-  const flashModel = hasAccessToPreview ? 'gemini-3-flash' : 'gemini-2.5-flash';
+      ? PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL
+    : DEFAULT_GEMINI_MODEL;
+  const flashModel = hasAccessToPreview
+    ? PREVIEW_GEMINI_FLASH_MODEL
+    : DEFAULT_GEMINI_FLASH_MODEL;
   return `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
 }
 
@@ -332,6 +334,9 @@ export function isPreviewModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  if (model === 'none') {
+    return false;
+  }
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
       config.modelConfigService.getModelDefinition(model)?.isPreview === true
@@ -345,7 +350,7 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
     model === GEMINI_MODEL_ALIAS_AUTO ||
-    (model === PREVIEW_GEMINI_FLASH_LITE_MODEL && model !== 'none')
+    model === PREVIEW_GEMINI_FLASH_LITE_MODEL
   );
 }
 

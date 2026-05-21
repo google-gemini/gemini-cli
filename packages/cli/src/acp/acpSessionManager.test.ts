@@ -243,6 +243,27 @@ describe('AcpSessionManager', () => {
     );
   });
 
+  it('should NOT include retired preview models (none) in available models', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31FlashLiteLaunchedSync = vi.fn().mockReturnValue(true);
+
+    const response = await manager.newSession(
+      {
+        cwd: '/tmp',
+        mcpServers: [],
+      },
+      {},
+    );
+
+    const modelIds =
+      response.models?.availableModels?.map((m) => m.modelId) ?? [];
+    expect(modelIds).not.toContain('none');
+  });
+
   it('should return modes with plan mode when plan is enabled', async () => {
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',

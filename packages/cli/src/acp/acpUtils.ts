@@ -336,7 +336,7 @@ export function buildAvailableModels(
       },
     ];
 
-    if (useGemini31FlashLite) {
+    if (useGemini31FlashLite && PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
       previewOptions.push({
         value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
         title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),

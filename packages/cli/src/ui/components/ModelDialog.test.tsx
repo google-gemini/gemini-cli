@@ -47,7 +47,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         mockModelSlashCommandEvent(model);
       }
     },
-    PREVIEW_GEMINI_FLASH_LITE_MODEL: 'gemini-3.1-flash-lite',
+    PREVIEW_GEMINI_FLASH_LITE_MODEL: 'none',
   };
 });
 
@@ -159,7 +159,7 @@ describe('<ModelDialog />', () => {
 
     // Verify order: Flash Preview -> Flash Lite (Preview/Default) -> Flash
     const flashPreviewIdx = output.indexOf(PREVIEW_GEMINI_FLASH_MODEL);
-    const flashLiteIdx = output.indexOf(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+    const flashLiteIdx = output.indexOf(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     const flashIdx = output.indexOf(DEFAULT_GEMINI_FLASH_MODEL);
 
     expect(flashPreviewIdx).toBeLessThan(flashLiteIdx);
@@ -449,7 +449,7 @@ describe('<ModelDialog />', () => {
       unmount();
     });
 
-    it('shows Flash Lite Preview model regardless of tier when flag is enabled', async () => {
+    it('does not show Flash Lite Preview model when it is retired (none) even if flag is enabled', async () => {
       mockGetProModelNoAccessSync.mockReturnValue(false);
       mockGetProModelNoAccess.mockResolvedValue(false);
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
@@ -468,7 +468,8 @@ describe('<ModelDialog />', () => {
       await waitUntilReady();
 
       const output = lastFrame();
-      expect(output).toContain(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+      expect(output).not.toContain(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+      expect(output).toContain(DEFAULT_GEMINI_FLASH_LITE_MODEL);
       unmount();
     });
   });

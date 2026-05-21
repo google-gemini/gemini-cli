@@ -96,7 +96,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
       PREVIEW_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
-    ];
+    ].filter((m) => m !== 'none');
     if (manualModels.includes(preferredModel)) {
       return preferredModel;
     }
@@ -224,14 +224,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_MODEL,
       },
       {
-        value: DEFAULT_GEMINI_FLASH_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
-        key: DEFAULT_GEMINI_FLASH_MODEL,
-      },
-      {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+        key: DEFAULT_GEMINI_FLASH_MODEL,
       },
     ];
 
@@ -272,7 +272,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (useGemini31FlashLite) {
+      if (useGemini31FlashLite && PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
         previewOptions.push({
           value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
           title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
