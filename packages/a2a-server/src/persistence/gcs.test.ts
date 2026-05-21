@@ -199,7 +199,10 @@ describe('GCSTaskStore', () => {
     mockUuidv4.mockReturnValue('test-uuid');
     mockSetTargetDir.mockReturnValue('/tmp/workdir');
     mockGetPersistedState.mockReturnValue({
-      _agentSettings: {},
+      _agentSettings: {
+        kind: 'agent-settings',
+        workspacePath: '/tmp/workdir',
+      },
       _taskState: 'submitted',
     });
     (fse.pathExists as Mock).mockResolvedValue(true);
@@ -269,6 +272,25 @@ describe('GCSTaskStore', () => {
       );
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('workspace saved to GCS'),
+      );
+    });
+
+    it('should archive the task workspace from persisted agent settings', async () => {
+      const workspacePath = '/tmp/task-workspace';
+      mockGetPersistedState.mockReturnValueOnce({
+        _agentSettings: {
+          kind: 'agent-settings',
+          workspacePath,
+        },
+        _taskState: 'working',
+      });
+
+      const store = new GCSTaskStore(bucketName);
+      await store.save(mockTask);
+
+      expect(mockTar.c).toHaveBeenCalledWith(
+        expect.objectContaining({ cwd: workspacePath }),
+        ['file1.txt'],
       );
     });
 

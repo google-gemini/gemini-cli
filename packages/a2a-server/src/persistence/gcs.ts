@@ -10,12 +10,16 @@ import * as tar from 'tar';
 import * as fse from 'fs-extra';
 import { promises as fsPromises, createReadStream } from 'node:fs';
 import { tmpdir } from '@google/gemini-cli-core';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import { logger } from '../utils/logger.js';
 import { setTargetDir } from '../config/config.js';
-import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
+import {
+  getPersistedState,
+  type PersistedStateMetadata,
+  type PersistedTaskMetadata,
+} from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 type ObjectType = 'metadata' | 'workspace';
@@ -29,6 +33,14 @@ const isTaskIdValid = (taskId: string): boolean => {
   const validTaskIdRegex = /^[a-zA-Z0-9_-]+$/;
   return validTaskIdRegex.test(taskId);
 };
+
+const getPersistedWorkspacePath = (
+  persistedState: PersistedStateMetadata,
+): string =>
+  resolve(
+    process.env['CODER_AGENT_WORKSPACE_PATH'] ??
+      persistedState._agentSettings.workspacePath,
+  );
 
 export class GCSTaskStore implements TaskStore {
   private storage: Storage;
@@ -94,6 +106,8 @@ export class GCSTaskStore implements TaskStore {
   async save(task: SDKTask): Promise<void> {
     await this.ensureBucketInitialized();
     const taskId = task.id;
+    const metadataObjectPath = this.getObjectPath(taskId, 'metadata');
+    const workspaceObjectPath = this.getObjectPath(taskId, 'workspace');
     const persistedState = getPersistedState(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       task.metadata as PersistedTaskMetadata,
@@ -102,10 +116,7 @@ export class GCSTaskStore implements TaskStore {
     if (!persistedState) {
       throw new Error(`Task ${taskId} is missing persisted state in metadata.`);
     }
-    const workDir = process.cwd();
-
-    const metadataObjectPath = this.getObjectPath(taskId, 'metadata');
-    const workspaceObjectPath = this.getObjectPath(taskId, 'workspace');
+    const workDir = getPersistedWorkspacePath(persistedState);
 
     const dataToStore = task.metadata;
 
