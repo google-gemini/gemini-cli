@@ -10,7 +10,7 @@ module.exports = async ({ github, context, core }) => {
     try {
       // First, try to parse the raw output as JSON.
       return JSON.parse(raw);
-    } catch (jsonError) {
+    } catch (_jsonError) {
       // If that fails, check for a markdown code block.
       core.info('Direct JSON parsing failed. Trying to extract from a markdown block.');
       const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
@@ -27,7 +27,7 @@ module.exports = async ({ github, context, core }) => {
       if (jsonArrayMatch) {
         try {
           return JSON.parse(jsonArrayMatch[0]);
-        } catch (extractError) {
+        } catch (_extractError) {
           const fallbackMatch = raw.match(/(\[\s*\{\s*"issue_number"[\s\S]*)/);
           if (fallbackMatch) {
             try {
@@ -53,7 +53,7 @@ module.exports = async ({ github, context, core }) => {
 
   const resultsByIssue = new Map();
 
-  const processResults = (results, sourceName) => {
+  const processResults = (results, _sourceName) => {
     for (const entry of results) {
       const issueNumber = entry.issue_number;
       if (!issueNumber) continue;
