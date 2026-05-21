@@ -14,6 +14,18 @@ import type { FakeResponse, HistoryTurn } from '@google/gemini-cli-core';
 describe('Context Management Fidelity E2E', () => {
   let rig: TestRig;
 
+  function generateRandomString(length: number): string {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(
+        Math.floor(Math.random() * characters.length),
+      );
+    }
+    return result;
+  }
+
   beforeEach(() => {
     rig = new TestRig();
   });
@@ -52,7 +64,7 @@ describe('Context Management Fidelity E2E', () => {
 
     const countTokensResponse: FakeResponse = {
       method: 'countTokens',
-      response: { totalTokens: 50000 },
+      response: { totalTokens: 1000 },
     };
 
     const streamResponse = (text: string): FakeResponse => ({
@@ -87,7 +99,6 @@ describe('Context Management Fidelity E2E', () => {
       },
     });
 
-    const massivePayload = 'X'.repeat(50000);
     const traceDir = path.join(rig.testDir!, 'traces');
     fs.mkdirSync(traceDir, { recursive: true });
     const traceLog = path.join(traceDir, 'trace.log');
@@ -105,24 +116,35 @@ describe('Context Management Fidelity E2E', () => {
       streamResponse('Ack 3'),
       streamResponse('Ack 4'),
       streamResponse('Ack 5'),
+      streamResponse('Ack 6'),
+      streamResponse('Ack 7'),
+      streamResponse('Ack 8'),
+      streamResponse('Ack 9'),
+      streamResponse('Ack 10'),
+      streamResponse('Ack 11'),
+      streamResponse('Ack 12'),
     ];
     for (let i = 0; i < 50; i++) {
       runMocks.push(snapshotResponse);
       runMocks.push(countTokensResponse);
     }
 
-    // Turn 1: Initial massive payload to put pressure
-    await rig.run({
-      args: [
-        '--debug',
-        '--fake-responses-non-strict',
-        setupResponses('resp1.json', runMocks),
-      ],
-      stdin: 'Turn 1: ' + massivePayload,
-      env: commonEnv,
-    });
+    // Turns 1-10: Build up history
+    for (let i = 1; i <= 10; i++) {
+      await rig.run({
+        args: [
+          '--debug',
+          i === 1 ? '' : '--resume',
+          i === 1 ? '' : 'latest',
+          '--fake-responses-non-strict',
+          setupResponses(`resp_init_${i}.json`, runMocks),
+        ].filter(Boolean),
+        stdin: `Turn ${i}: ` + generateRandomString(900),
+        env: commonEnv,
+      });
+    }
 
-    // Turn 2: Another turn, resuming Turn 1
+    // Turn 11: Penultimate turn
     await rig.run({
       args: [
         '--debug',
@@ -131,11 +153,11 @@ describe('Context Management Fidelity E2E', () => {
         '--fake-responses-non-strict',
         setupResponses('resp2.json', runMocks),
       ],
-      stdin: 'Turn 2: ' + massivePayload,
+      stdin: 'Turn 11: ' + generateRandomString(900),
       env: commonEnv,
     });
 
-    // Turn 3: Third turn to force GC, resuming Turn 2
+    // Turn 12: Breach threshold and force GC
     await rig.run({
       args: [
         '--debug',
@@ -144,7 +166,7 @@ describe('Context Management Fidelity E2E', () => {
         '--fake-responses-non-strict',
         setupResponses('resp3.json', runMocks),
       ],
-      stdin: 'Turn 3: ' + massivePayload,
+      stdin: 'Turn 12: ' + generateRandomString(900),
       env: commonEnv,
     });
 
@@ -214,12 +236,16 @@ describe('Context Management Fidelity E2E', () => {
 
     // Most importantly, synthetic IDs (like summaries) must be stable.
     const syntheticTurns = contextBeforeExit!.filter(
-      (t: HistoryTurn) => t.id && t.id.length === 32,
-    ); // deriveStableId produces 32-char hex
+      (t: HistoryTurn) =>
+        t.content.parts?.some((p) => p.text?.includes('active_tasks')) ||
+        (t.id && t.id.length === 32),
+    );
     expect(syntheticTurns.length).toBeGreaterThan(0);
 
     const syntheticTurnsAfter = contextAfterResume!.filter(
-      (t: HistoryTurn) => t.id && t.id.length === 32,
+      (t: HistoryTurn) =>
+        t.content.parts?.some((p) => p.text?.includes('active_tasks')) ||
+        (t.id && t.id.length === 32),
     );
     expect(syntheticTurnsAfter.length).toBeGreaterThanOrEqual(
       syntheticTurns.length,

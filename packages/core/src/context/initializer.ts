@@ -22,7 +22,6 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
-import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { AdaptiveTokenCalculator } from './utils/adaptiveTokenCalculator.js';
 import { estimateContextBreakdown } from '../core/loggingContentGenerator.js';
 import { NodeBehaviorRegistry } from './graph/behaviorRegistry.js';
@@ -136,7 +135,6 @@ export async function initializeContextManager(
     sidecarProfile.buildPipelines(env),
     sidecarProfile.buildAsyncPipelines(env),
     env,
-    eventBus,
     tracer,
   );
 
@@ -147,9 +145,5 @@ export async function initializeContextManager(
     orchestrator,
     chat.agentHistory,
     calculator,
-    async () => {
-      const parts = await getEnvironmentContext(config);
-      return { role: 'user', parts };
-    },
   );
 }
