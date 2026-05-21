@@ -79,6 +79,7 @@ describe('AcpSessionManager', () => {
       validatePathAccess: vi.fn().mockReturnValue(null),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
+        getDirectories: vi.fn().mockReturnValue(['/tmp']),
       }),
       getPolicyEngine: vi.fn().mockReturnValue({
         addRule: vi.fn(),

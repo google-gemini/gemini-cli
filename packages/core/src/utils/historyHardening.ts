@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Part } from '@google/genai';
+import { type Part, type Content } from '@google/genai';
 import { debugLogger } from './debugLogger.js';
 import { type HistoryTurn } from '../core/agentChatHistory.js';
 import { deriveStableId } from './cryptoUtils.js';
@@ -124,7 +124,7 @@ function pairToolsAndEnforceSignatures(
         const missing: Array<{ id: string; name: string }> = [];
 
         for (const call of callParts) {
-          const id = call.functionCall!.id || 'undefined';
+          const id = call.functionCall!.id;
           const name = call.functionCall!.name || 'unknown';
 
           const hasResponse =
@@ -139,7 +139,7 @@ function pairToolsAndEnforceSignatures(
             debugLogger.log(
               `[HistoryHardener] Call id='${id}' (name='${name}') has no matching response in next turn.`,
             );
-            missing.push({ id, name });
+            missing.push({ id: id || '', name });
           }
         }
 
@@ -164,7 +164,7 @@ function pairToolsAndEnforceSignatures(
             targetUserTurn.content.parts.push({
               functionResponse: {
                 name: m.name,
-                id: m.id,
+                id: m.id || undefined,
                 response: {
                   error: sentinels.lostToolResponse,
                 },
@@ -346,10 +346,17 @@ function enforceRoleConstraints(
 export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
   return history.map((turn) => ({
     id: turn.id,
-    content: {
-      role: turn.content.role,
-      parts: (turn.content.parts || []).map((p) => scrubPart(p)),
-    },
+    content: scrubContents([turn.content])[0],
+  }));
+}
+
+/**
+ * Deep-scrubs an array of Content objects to remove non-standard properties.
+ */
+export function scrubContents(contents: Content[]): Content[] {
+  return contents.map((content) => ({
+    role: content.role,
+    parts: (content.parts || []).map((p) => scrubPart(p)),
   }));
 }
 
@@ -361,7 +368,7 @@ function isThoughtPart(part: Part): part is ThoughtPart {
   return 'thoughtSignature' in part;
 }
 
-function scrubPart(part: Part): Part {
+export function scrubPart(part: Part): Part {
   const scrubbed: Record<string, unknown> = {};
 
   if ('text' in part && typeof part.text === 'string') {

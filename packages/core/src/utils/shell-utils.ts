@@ -15,8 +15,39 @@ import {
 } from 'node:child_process';
 
 /**
+ * The exact HUP-signal guard preamble injected by ensureHupIgnored().
+ * Exported so shellExecutionService and stripShellWrapper stay in sync.
+ */
+export const BASH_HUP_GUARD = `trap '' HUP;`;
+
+/**
+ * Strips the SIGHUP guard prepended by ensureHupIgnored() from a command.
+ *
+ * This is intentionally narrow: it only removes the exact literal string
+ * `trap '' HUP; ` from the very start of a command. It does NOT
+ * skip or ignore arbitrary user-supplied `trap` commands, which would be a
+ * sandbox-bypass vector (e.g., `trap 'rm -rf /' EXIT; git status`).
+ */
+export function stripHupGuard(command: string): string {
+  const trimmed = command.trimStart();
+  const prefix = `${BASH_HUP_GUARD} `;
+  if (trimmed.startsWith(prefix)) {
+    return trimmed.slice(prefix.length);
+  }
+  // Handle case where there's no trailing space (e.g., guard is the whole command)
+  if (trimmed === BASH_HUP_GUARD) {
+    return '';
+  }
+  return command;
+}
+
+/**
  * Extracts the primary command name from a potentially wrapped shell command.
- * Strips shell wrappers and handles shopt/set/etc.
+ * Strips shell wrappers (including our own HUP guard) and handles shopt/set/etc.
+ *
+ * Returns the command name only when there is exactly ONE non-builtin root so
+ * that chained commands (e.g. `git; malicious_cmd`) never silently inherit the
+ * first command's sandbox permissions.
  *
  * @param command - The full command string.
  * @param args - The arguments for the command.
@@ -32,7 +63,10 @@ export async function getCommandName(
   const roots = getCommandRoots(stripped).filter(
     (r) => r !== 'shopt' && r !== 'set',
   );
-  if (roots.length > 0) {
+  // Single-root enforcement: only grant named-command permissions when the
+  // command is unambiguous. Multi-root chains fall back to basename so that
+  // `git; malicious_cmd` never inherits `git`'s sandbox policy.
+  if (roots.length === 1) {
     return roots[0];
   }
   return path.basename(command);
@@ -657,6 +691,11 @@ export function parseCommandDetails(
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // -NonInteractive prevents PSReadLine from intercepting console input
+    // events inside the ConPTY session, which otherwise causes interactive
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
+    // and exit when arrow keys are pressed.
+    const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
@@ -666,7 +705,7 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: powershellArgsPrefix,
           shell: 'powershell',
         };
       }
@@ -684,7 +723,7 @@ export function getShellConfiguration(): ShellConfiguration {
     // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: powershellArgsPrefix,
       shell: 'powershell',
     };
   }
@@ -838,6 +877,7 @@ export function stripShellWrapper(command: string): string {
   const pattern =
     /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
+  let result: string;
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
     if (
@@ -846,9 +886,13 @@ export function stripShellWrapper(command: string): string {
     ) {
       newCommand = newCommand.substring(1, newCommand.length - 1);
     }
-    return newCommand;
+    result = newCommand;
+  } else {
+    result = command.trim();
   }
-  return command.trim();
+  // Peel off the SIGHUP guard that ensureHupIgnored() prepends so that
+  // sandbox managers see the actual user command, not our preamble.
+  return stripHupGuard(result);
 }
 
 /**

@@ -18,7 +18,6 @@ import {
   StreamEventType,
   type GeminiChat,
 } from './geminiChat.js';
-import { LlmRole } from '../telemetry/types.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -123,7 +122,8 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
-        LlmRole.MAIN,
+        'main',
+        undefined,
         undefined,
       );
 
