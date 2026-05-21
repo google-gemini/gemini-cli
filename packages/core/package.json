@@ -23,6 +23,7 @@
     "dist"
   ],
   "dependencies": {
+    "@google/adk": "file:../../../adk-js/core",
     "@a2a-js/sdk": "0.3.11",
     "@bufbuild/protobuf": "^2.11.0",
     "@google-cloud/logging": "^11.2.1",

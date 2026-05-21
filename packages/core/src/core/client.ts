@@ -30,6 +30,8 @@ import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
+import { GcliAdkModel } from './gcliAdkModel.js';
+import type { LlmRequest } from '@google/adk';
 import {
   retryWithBackoff,
   type RetryAvailabilityContext,
@@ -1101,15 +1103,35 @@ export class GeminiClient {
           systemInstruction,
         };
 
-        return this.getContentGeneratorOrFail().generateContent(
-          {
-            model: currentAttemptModel,
-            config: requestConfig,
-            contents,
-          },
+        const adkModel = new GcliAdkModel(
+          this.getContentGeneratorOrFail(),
           this.lastPromptId,
           role,
+          currentAttemptModel,
         );
+
+        const adkRequest: LlmRequest = {
+          contents,
+          config: requestConfig,
+          liveConnectConfig: {},
+          toolsDict: {},
+        };
+
+        const adkStream = adkModel.generateContentAsync(
+          adkRequest,
+          false,
+          abortSignal,
+        );
+
+        const processResponse = async () => {
+          const nextVal = await adkStream.next();
+          if (nextVal.done || !nextVal.value) {
+            throw new Error('No response from ADK model.');
+          }
+          return nextVal.value.rawResponse;
+        };
+
+        return processResponse();
       };
       const onPersistent429Callback = async (
         authType?: string,

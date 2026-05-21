@@ -60,6 +60,13 @@ import {
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  createSession,
+  createEvent,
+  type Session,
+  type LlmRequest,
+} from '@google/adk';
+import { GcliAdkModel } from './gcliAdkModel.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -267,6 +274,7 @@ export class GeminiChat {
   private lastPromptTokenCount: number;
   private callCounter = 0;
   agentHistory: AgentChatHistory;
+  private readonly adkSession: Session;
 
   constructor(
     readonly context: AgentLoopContext,
@@ -282,6 +290,18 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.parts || []),
     );
+    this.adkSession = createSession({
+      id: context.config.getSessionId() || 'default-adk-session',
+      appName: 'Gemini CLI',
+      userId: 'gemini-user',
+      events: history.map((content) =>
+        createEvent({
+          invocationId: context.config.getSessionId() || 'session-init',
+          author: content.role,
+          content,
+        }),
+      ),
+    });
   }
 
   get loopContext(): AgentLoopContext {
@@ -375,9 +395,16 @@ export class GeminiChat {
     if (binaryInjections) {
       // Turn 1: The original tool response (now cleaned)
       this.agentHistory.push(userContent);
+      this.adkSession.events.push(
+        createEvent({
+          invocationId: prompt_id,
+          author: userContent.role,
+          content: userContent,
+        }),
+      );
 
       // Turn 2: Synthetic Model Acknowledgment
-      this.agentHistory.push({
+      const ackContent: Content = {
         role: 'model',
         parts: [
           {
@@ -386,7 +413,15 @@ export class GeminiChat {
             thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
           },
         ],
-      });
+      };
+      this.agentHistory.push(ackContent);
+      this.adkSession.events.push(
+        createEvent({
+          invocationId: prompt_id,
+          author: 'model',
+          content: ackContent,
+        }),
+      );
 
       // Turn 3: The actual binary data (becomes the current request message)
       userContent = {
@@ -396,6 +431,13 @@ export class GeminiChat {
     }
 
     this.agentHistory.push(userContent);
+    this.adkSession.events.push(
+      createEvent({
+        invocationId: prompt_id,
+        author: userContent.role,
+        content: userContent,
+      }),
+    );
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -740,15 +782,33 @@ export class GeminiChat {
 
       const finalContents = stripToolCallIdPrefixes(contentsToUse);
 
-      return this.context.config.getContentGenerator().generateContentStream(
-        {
-          model: modelToUse,
-          contents: finalContents,
-          config,
-        },
+      const adkModel = new GcliAdkModel(
+        this.context.config.getContentGenerator(),
         prompt_id,
         role,
+        modelToUse,
       );
+
+      const adkRequest: LlmRequest = {
+        contents: finalContents,
+        config,
+        liveConnectConfig: {},
+        toolsDict: {},
+      };
+
+      const adkStream = adkModel.generateContentAsync(
+        adkRequest,
+        true,
+        abortSignal,
+      );
+
+      const responseGenerator = async function* () {
+        for await (const adkResponse of adkStream) {
+          yield adkResponse.rawResponse;
+        }
+      };
+
+      return responseGenerator();
     };
 
     const onPersistent429Callback = async (
@@ -803,6 +863,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      prompt_id,
     );
   }
 
@@ -844,6 +905,7 @@ export class GeminiChat {
    */
   clearHistory(): void {
     this.agentHistory.clear();
+    this.adkSession.events = [];
   }
 
   /**
@@ -851,6 +913,13 @@ export class GeminiChat {
    */
   addHistory(content: Content): void {
     this.agentHistory.push(content);
+    this.adkSession.events.push(
+      createEvent({
+        invocationId: this.context.config.getSessionId() || 'history-add',
+        author: content.role,
+        content,
+      }),
+    );
   }
 
   setHistory(
@@ -862,6 +931,13 @@ export class GeminiChat {
       this.agentHistory.flatMap((c) => c.parts || []),
     );
     this.chatRecordingService.updateMessagesFromHistory(history);
+    this.adkSession.events = history.map((content) =>
+      createEvent({
+        invocationId: this.context.config.getSessionId() || 'history-sync',
+        author: content.role,
+        content,
+      }),
+    );
   }
 
   stripThoughtsFromHistory(): void {
@@ -968,6 +1044,7 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    prompt_id: string,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -1208,7 +1285,18 @@ export class GeminiChat {
       }
     }
 
-    this.agentHistory.push({ role: 'model', parts: consolidatedParts });
+    const consolidatedContent: Content = {
+      role: 'model',
+      parts: consolidatedParts,
+    };
+    this.agentHistory.push(consolidatedContent);
+    this.adkSession.events.push(
+      createEvent({
+        invocationId: prompt_id,
+        author: 'model',
+        content: consolidatedContent,
+      }),
+    );
   }
 
   getLastPromptTokenCount(): number {
