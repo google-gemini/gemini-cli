@@ -100,6 +100,11 @@ describe('GeminiAgent Session Resume', () => {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
       },
+      getMessageBus: vi.fn().mockReturnValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       isPlanEnabled: vi.fn().mockReturnValue(true),

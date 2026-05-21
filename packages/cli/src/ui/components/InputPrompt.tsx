@@ -93,6 +93,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import type { VimMode } from '../contexts/VimModeContext.js';
 
 const SCROLLBAR_GUTTER_WIDTH = 1;
 
@@ -127,6 +128,8 @@ export interface InputPromptProps {
   onEscapePromptChange?: (showPrompt: boolean) => void;
   onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  vimEnabled?: boolean;
+  vimMode?: VimMode;
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
@@ -215,6 +218,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onEscapePromptChange,
   onSuggestionsVisibilityChange,
   vimHandleInput,
+  vimEnabled,
+  vimMode,
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
@@ -907,7 +912,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (shortcutsHelpVisible) {
-        if (key.sequence === '?' && key.insertable) {
+        if (
+          key.sequence === '?' &&
+          key.insertable &&
+          (!vimEnabled || vimMode === 'INSERT')
+        ) {
           setShortcutsHelpVisible(false);
           buffer.handleInput(key);
           return true;
@@ -927,7 +936,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         key.sequence === '?' &&
         key.insertable &&
         !shortcutsHelpVisible &&
-        buffer.text.length === 0
+        buffer.text.length === 0 &&
+        (!vimEnabled || vimMode === 'INSERT')
       ) {
         setShortcutsHelpVisible(true);
         return true;
@@ -1423,6 +1433,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetCompletionState,
       resetEscapeState,
       vimHandleInput,
+      vimEnabled,
+      vimMode,
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,

@@ -12,6 +12,7 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  EDITOR_OPTIONS,
   AuthProviderType,
   type MCPServerConfig,
   type RequiredMcpServerConfig,
@@ -192,12 +193,27 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       preferredEditor: {
-        type: 'string',
+        type: 'enum',
         label: 'Preferred Editor',
         category: 'General',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The preferred editor to open files in.',
+        description: oneLine`
+          The preferred editor to open files in. Must be one of the built-in
+          supported identifiers. Use /editor in the CLI to pick interactively,
+          or leave unset to use $VISUAL/$EDITOR.
+        `,
+        showInDialog: false,
+        options: EDITOR_OPTIONS,
+      },
+      openEditorInNewWindow: {
+        type: 'boolean',
+        label: 'Open Editor in New Window',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Open VS Code-family editors in a new window when editing files.',
         showInDialog: false,
       },
       vimMode: {
@@ -2192,6 +2208,16 @@ const SETTINGS_SCHEMA = {
             default: false,
             description:
               'Enable the agent session implementation for the interactive CLI.',
+            showInDialog: false,
+          },
+          agentSessionSubagentEnabled: {
+            type: 'boolean',
+            label: 'Agent Session Subagent Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Route subagent invocations through the AgentSession protocol instead of legacy executors.',
             showInDialog: false,
           },
         },

@@ -668,6 +668,31 @@ describe('ModelConfigService', () => {
       // Specificity should win over order
       expect(resolved.generateContentConfig.temperature).toBe(0.1);
     });
+
+    it('should clear runtime overrides', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { generateContentConfig: { temperature: 0.99 } },
+      });
+
+      expect(
+        service.getResolvedConfig({ model: 'gemini-pro' }).generateContentConfig
+          .temperature,
+      ).toBe(0.99);
+
+      service.clearRuntimeOverrides();
+
+      expect(
+        service.getResolvedConfig({ model: 'gemini-pro' }).generateContentConfig
+          .temperature,
+      ).toBeUndefined();
+    });
   });
 
   describe('custom aliases', () => {
