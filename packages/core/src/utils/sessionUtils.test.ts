@@ -27,7 +27,7 @@ describe('convertSessionToClientHistory', () => {
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history.map((h) => h.content)).toEqual([
       { role: 'user', parts: [{ text: 'Hello' }] },
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ]);
@@ -58,7 +58,7 @@ describe('convertSessionToClientHistory', () => {
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history.map((h) => h.content)).toEqual([
       { role: 'user', parts: [{ text: 'Hello' }] },
       {
         role: 'model',
@@ -100,7 +100,7 @@ describe('convertSessionToClientHistory', () => {
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history.map((h) => h.content)).toEqual([
       { role: 'user', parts: [{ text: 'Actual query' }] },
     ]);
   });
@@ -133,7 +133,7 @@ describe('convertSessionToClientHistory', () => {
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history.map((h) => h.content)).toEqual([
       { role: 'user', parts: [{ text: 'List files' }] },
       {
         role: 'model',
@@ -172,7 +172,7 @@ describe('convertSessionToClientHistory', () => {
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history.map((h) => h.content)).toEqual([
       {
         role: 'user',
         parts: [

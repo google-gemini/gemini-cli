@@ -87,10 +87,50 @@ module.exports = async ({ github, context, core }) => {
 
     let labelsToAdd = entry.labels_to_add || [];
     let labelsToRemove = entry.labels_to_remove || [];
+    let existingLabels = [];
+
+    // Fetch existing labels early
+    try {
+      const { data: issueData } = await github.rest.issues.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: issueNumber,
+      });
+      existingLabels = issueData.labels.map((l) =>
+        typeof l === 'string' ? l : l.name,
+      );
+    } catch (e) {
+      core.warning(
+        `Failed to fetch existing labels for #${issueNumber}: ${e.message}`,
+      );
+    }
+
+    // Programmatic Priority Downgrade Logic
+    if (labelsToAdd.includes('status/need-information')) {
+      const targetPriority = labelsToAdd.find((l) => l.startsWith('priority/'));
+      if (targetPriority) {
+        let downgradedPriority = null;
+        if (targetPriority === 'priority/p0')
+          downgradedPriority = 'priority/p1';
+        if (targetPriority === 'priority/p1')
+          downgradedPriority = 'priority/p2';
+
+        if (downgradedPriority) {
+          core.info(
+            `Programmatically downgrading ${targetPriority} to ${downgradedPriority} due to status/need-information`,
+          );
+          labelsToAdd = labelsToAdd.filter((l) => l !== targetPriority);
+          labelsToAdd.push(downgradedPriority);
+        }
+      }
+    }
 
     labelsToRemove.push('status/need-triage');
 
-    if (labelsToAdd.includes('status/manual-triage')) {
+    if (
+      labelsToAdd.includes('status/manual-triage') ||
+      existingLabels.includes('status/manual-triage')
+    ) {
       // If the AI flagged it for manual triage, remove bot-triaged if it exists
       labelsToRemove.push('status/bot-triaged');
       // Ensure we don't accidentally try to add bot-triaged if the AI returned it
@@ -105,48 +145,24 @@ module.exports = async ({ github, context, core }) => {
     labelsToRemove = [...new Set(labelsToRemove)];
 
     // Fetch existing labels to auto-resolve conflicts
-    try {
-      const { data: issueData } = await github.rest.issues.get({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: issueNumber,
-      });
-      const existingLabels = issueData.labels.map((l) =>
-        typeof l === 'string' ? l : l.name,
+    const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
+    if (hasNewArea) {
+      const existingAreas = existingLabels.filter((l) => l.startsWith('area/'));
+      labelsToRemove.push(...existingAreas);
+    }
+
+    const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
+    if (hasNewPriority) {
+      const existingPriorities = existingLabels.filter((l) =>
+        l.startsWith('priority/'),
       );
+      labelsToRemove.push(...existingPriorities);
+    }
 
-      const hasNewArea = labelsToAdd.some((l) => l.startsWith('area/'));
-      if (hasNewArea) {
-        const existingAreas = existingLabels.filter((l) =>
-          l.startsWith('area/'),
-        );
-        labelsToRemove.push(...existingAreas);
-      }
-
-      const hasNewPriority = labelsToAdd.some((l) => l.startsWith('priority/'));
-      if (hasNewPriority) {
-        const existingPriorities = existingLabels.filter((l) =>
-          l.startsWith('priority/'),
-        );
-        labelsToRemove.push(...existingPriorities);
-      }
-
-      const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
-      if (hasNewKind) {
-        const existingKinds = existingLabels.filter((l) =>
-          l.startsWith('kind/'),
-        );
-        labelsToRemove.push(...existingKinds);
-      }
-
-      // Re-deduplicate and filter out labels we are trying to add
-      labelsToRemove = [...new Set(labelsToRemove)].filter(
-        (l) => !labelsToAdd.includes(l),
-      );
-    } catch (e) {
-      core.warning(
-        `Failed to fetch existing labels for #${issueNumber}: ${e.message}`,
-      );
+    const hasNewKind = labelsToAdd.some((l) => l.startsWith('kind/'));
+    if (hasNewKind) {
+      const existingKinds = existingLabels.filter((l) => l.startsWith('kind/'));
+      labelsToRemove.push(...existingKinds);
     }
 
     // Enforce mutually exclusive area labels
@@ -174,6 +190,13 @@ module.exports = async ({ github, context, core }) => {
         (l) => !l.startsWith('priority/') || l === firstPriority,
       );
     }
+
+    // Re-deduplicate and filter out labels we are trying to add,
+    // and filter out labels that are already present or absent to avoid unnecessary API calls
+    labelsToRemove = [...new Set(labelsToRemove)].filter(
+      (l) => !labelsToAdd.includes(l) && existingLabels.includes(l),
+    );
+    labelsToAdd = labelsToAdd.filter((l) => !existingLabels.includes(l));
 
     if (labelsToAdd.length > 0) {
       await github.rest.issues.addLabels({
@@ -211,25 +234,36 @@ module.exports = async ({ github, context, core }) => {
       );
     }
 
-    if (
-      (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') ||
-      entry.effort_analysis
-    ) {
+    // Restrictive Commenting Policy:
+    // - Silence standard triage (Area/Kind/Priority) to avoid spam.
+    // - Only comment if status/need-information is added (to explain what is missing).
+    // - Only comment if effort_analysis is present (deep technical dive).
+    const needsInfoAdded =
+      labelsToAdd.includes('status/need-information') &&
+      !existingLabels.includes('status/need-information');
+    const hasEffortAnalysis = !!entry.effort_analysis;
+
+    if (needsInfoAdded || hasEffortAnalysis) {
       let commentBody = '';
-      if (entry.explanation && process.env.SUPPRESS_COMMENT !== 'true') {
+      if (needsInfoAdded && entry.explanation) {
         commentBody += entry.explanation;
       }
-      if (entry.effort_analysis) {
+      if (hasEffortAnalysis) {
         if (commentBody) commentBody += '\n\n';
         commentBody += `**Effort Analysis:**\n${entry.effort_analysis}`;
       }
 
-      await github.rest.issues.createComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: issueNumber,
-        body: commentBody,
-      });
+      if (commentBody) {
+        await github.rest.issues.createComment({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issueNumber,
+          body: commentBody,
+        });
+        core.info(
+          `Posted required comment (need-info or effort) for #${issueNumber}`,
+        );
+      }
     }
 
     if (
