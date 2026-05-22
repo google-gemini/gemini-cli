@@ -322,6 +322,13 @@ export function getDisplayString(
 }
 
 /**
+ * Extracts the base model name from a potentially full resource path.
+ */
+function getBaseModelName(modelId: string): string {
+  return modelId.split('/').pop() ?? '';
+}
+
+/**
  * Checks if the model is a preview model.
  *
  * @param model The model name to check.
@@ -332,20 +339,22 @@ export function isPreviewModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const baseModel = getBaseModelName(model);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
-      config.modelConfigService.getModelDefinition(model)?.isPreview === true
+      config.modelConfigService.getModelDefinition(baseModel)?.isPreview ===
+      true
     );
   }
 
   return (
-    model === PREVIEW_GEMINI_MODEL ||
-    model === PREVIEW_GEMINI_3_1_MODEL ||
-    model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
-    model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === GEMINI_MODEL_ALIAS_AUTO ||
-    model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
+    baseModel === PREVIEW_GEMINI_MODEL ||
+    baseModel === PREVIEW_GEMINI_3_1_MODEL ||
+    baseModel === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
+    baseModel === PREVIEW_GEMINI_FLASH_MODEL ||
+    baseModel === PREVIEW_GEMINI_MODEL_AUTO ||
+    baseModel === GEMINI_MODEL_ALIAS_AUTO ||
+    baseModel === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
   );
 }
 
@@ -360,10 +369,13 @@ export function isProModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const baseModel = getBaseModelName(model);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return config.modelConfigService.getModelDefinition(model)?.tier === 'pro';
+    return (
+      config.modelConfigService.getModelDefinition(baseModel)?.tier === 'pro'
+    );
   }
-  return model.toLowerCase().includes('pro');
+  return baseModel.toLowerCase().includes('pro');
 }
 
 /**
@@ -380,15 +392,16 @@ export function isGemini3Model(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
     const resolved = resolveModel(model, false, false, false, true, config);
-    const parsedModel = resolved.split('/').pop() ?? '';
+    const baseModel = getBaseModelName(resolved);
     return (
-      config.modelConfigService.getModelDefinition(parsedModel)?.family ===
+      config.modelConfigService.getModelDefinition(baseModel)?.family ===
       'gemini-3'
     );
   }
 
   const resolved = resolveModel(model);
-  return /^gemini-3(\.|-|$)/.test(resolved.split('/').pop() ?? '');
+  const baseModel = getBaseModelName(resolved);
+  return /^gemini-3(\.|-|$)/.test(baseModel);
 }
 
 /**
@@ -400,7 +413,8 @@ export function isGemini3Model(
 export function isGemini2Model(model: string): boolean {
   // This is legacy behavior, will remove this when gemini 2 models are no
   // longer needed.
-  return /^gemini-2(\.|$)/.test(model);
+  const baseModel = getBaseModelName(model);
+  return /^gemini-2(\.|$)/.test(baseModel);
 }
 
 /**
@@ -416,13 +430,15 @@ export function isCustomModel(
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = resolveModel(model, false, false, false, true, config);
+    const baseModel = getBaseModelName(resolved);
     return (
-      config.modelConfigService.getModelDefinition(resolved)?.tier ===
-        'custom' || !resolved.startsWith('gemini-')
+      config.modelConfigService.getModelDefinition(baseModel)?.tier ===
+        'custom' || !baseModel.startsWith('gemini-')
     );
   }
   const resolved = resolveModel(model);
-  return !resolved.startsWith('gemini-');
+  const baseModel = getBaseModelName(resolved);
+  return !baseModel.startsWith('gemini-');
 }
 
 /**
@@ -448,13 +464,16 @@ export function isAutoModel(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const baseModel = getBaseModelName(model);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return config.modelConfigService.getModelDefinition(model)?.tier === 'auto';
+    return (
+      config.modelConfigService.getModelDefinition(baseModel)?.tier === 'auto'
+    );
   }
   return (
-    model === GEMINI_MODEL_ALIAS_AUTO ||
-    model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === DEFAULT_GEMINI_MODEL_AUTO
+    baseModel === GEMINI_MODEL_ALIAS_AUTO ||
+    baseModel === PREVIEW_GEMINI_MODEL_AUTO ||
+    baseModel === DEFAULT_GEMINI_MODEL_AUTO
   );
 }
 
@@ -469,13 +488,14 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const baseModel = getBaseModelName(model);
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
-      config.modelConfigService.getModelDefinition(model)?.features
+      config.modelConfigService.getModelDefinition(baseModel)?.features
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  return baseModel.startsWith('gemini-3-');
 }
 
 /**

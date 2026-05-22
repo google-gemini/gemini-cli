@@ -386,6 +386,30 @@ describe('isGemini3Model', () => {
     ).toBe(true);
   });
 
+  it('should handle Vertex AI model resource paths consistently across all functions', () => {
+    const vertexPath =
+      'projects/test/locations/us-central1/publishers/google/models/gemini-3.1-pro-preview';
+
+    expect(isPreviewModel(vertexPath)).toBe(true);
+    expect(isProModel(vertexPath)).toBe(true);
+    expect(isGemini3Model(vertexPath)).toBe(true);
+    expect(isGemini2Model(vertexPath)).toBe(false);
+    expect(isCustomModel(vertexPath)).toBe(false);
+    expect(isAutoModel(vertexPath)).toBe(false);
+    expect(supportsMultimodalFunctionResponse(vertexPath)).toBe(false); // starts with gemini-3.1, not gemini-3-
+
+    const vertexGemini2 =
+      'projects/test/locations/us-central1/publishers/google/models/gemini-2.5-flash';
+    expect(isGemini2Model(vertexGemini2)).toBe(true);
+    expect(isGemini3Model(vertexGemini2)).toBe(false);
+    expect(isCustomModel(vertexGemini2)).toBe(false);
+
+    const vertexCustom =
+      'projects/test/locations/us-central1/publishers/google/models/my-custom-model';
+    expect(isCustomModel(vertexCustom)).toBe(true);
+    expect(isGemini3Model(vertexCustom)).toBe(false);
+  });
+
   it('should return false for arbitrary strings', () => {
     expect(isGemini3Model('gpt-4')).toBe(false);
   });
