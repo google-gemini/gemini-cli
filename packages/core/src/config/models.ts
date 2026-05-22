@@ -495,7 +495,7 @@ export function supportsMultimodalFunctionResponse(
         ?.multimodalToolUse === true
     );
   }
-  return baseModel.startsWith('gemini-3-');
+  return /^gemini-3(\.|-|$)/.test(baseModel);
 }
 
 /**

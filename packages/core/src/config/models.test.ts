@@ -396,7 +396,7 @@ describe('isGemini3Model', () => {
     expect(isGemini2Model(vertexPath)).toBe(false);
     expect(isCustomModel(vertexPath)).toBe(false);
     expect(isAutoModel(vertexPath)).toBe(false);
-    expect(supportsMultimodalFunctionResponse(vertexPath)).toBe(false); // starts with gemini-3.1, not gemini-3-
+    expect(supportsMultimodalFunctionResponse(vertexPath)).toBe(true);
 
     const vertexGemini2 =
       'projects/test/locations/us-central1/publishers/google/models/gemini-2.5-flash';
