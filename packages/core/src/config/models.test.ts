@@ -326,12 +326,41 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model(DEFAULT_GEMINI_MODEL_AUTO)).toBe(false);
   });
 
-  it('should return true for Vertex AI model resource paths', () => {
+  it('should correctly classify an exhaustive list of models as requested', () => {
+    // Expected true
+    expect(isGemini3Model('models/gemini-3.5-flash')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.1-pro-preview')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.1-flash-lite')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.1-flash-lite-preview')).toBe(true);
+    expect(isGemini3Model('models/gemini-3-flash-preview')).toBe(true);
+
+    // Expected false
+    expect(isGemini3Model('models/gemini-2.5-pro')).toBe(false);
+    expect(isGemini3Model('models/gemini-2.5-flash')).toBe(false);
+    expect(isGemini3Model('models/gemini-2.5-flash-lite')).toBe(false);
+  });
+
+  it('should return true for Vertex AI model resource paths and handle false positives', () => {
     expect(
       isGemini3Model(
         'projects/test/locations/us-central1/publishers/google/models/gemini-3.1-pro-preview',
       ),
     ).toBe(true);
+    expect(
+      isGemini3Model(
+        'projects/test/locations/us-central1/publishers/google/models/gemini-3-flash-preview',
+      ),
+    ).toBe(true);
+    expect(
+      isGemini3Model(
+        'projects/test/locations/us-central1/publishers/google/models/gemini-3.5-flash',
+      ),
+    ).toBe(true);
+    expect(
+      isGemini3Model(
+        'projects/gemini-3-project/locations/us-central1/publishers/google/models/gemini-2.5-pro',
+      ),
+    ).toBe(false);
   });
 
   it('should return false for arbitrary strings', () => {
