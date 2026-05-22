@@ -512,6 +512,7 @@ const baseMockUiState = {
   terminalBackgroundColor: 'black' as const,
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
+  allowYoloMode: true,
   activePtyId: undefined,
   backgroundTasks: new Map(),
   backgroundTaskHeight: 0,

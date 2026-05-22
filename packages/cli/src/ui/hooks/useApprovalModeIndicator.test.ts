@@ -196,6 +196,32 @@ describe('useApprovalModeIndicator', () => {
     );
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
 
+    // From AUTO_EDIT, without plan mode, Shift+Tab advances to YOLO
+    // (the Claude Code style linear cycle).
+    act(() => {
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: true,
+      } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    expect(result.current).toBe(ApprovalMode.YOLO);
+
+    // Shift+Tab from YOLO returns to DEFAULT (linear cycle end)
+    act(() => {
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: true,
+      } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
+    );
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
+
+    // Ctrl+Y still works as a fast toggle to YOLO
     act(() => {
       capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
@@ -204,38 +230,70 @@ describe('useApprovalModeIndicator', () => {
     );
     expect(result.current).toBe(ApprovalMode.YOLO);
 
-    // Shift+Tab cycles back to AUTO_EDIT (from YOLO)
-    act(() => {
-      capturedUseKeypressHandler({
-        name: 'tab',
-        shift: true,
-      } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.AUTO_EDIT,
-    );
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
-
-    // Ctrl+Y toggles YOLO
+    // Ctrl+Y toggles back to DEFAULT
     act(() => {
       capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.YOLO,
+      ApprovalMode.DEFAULT,
     );
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should follow full linear cycle DEFAULT → AUTO_EDIT → PLAN → YOLO → DEFAULT when plan mode is allowed', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    const { result } = await renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: true,
+      }),
+    );
+
+    const press = () =>
+      act(() => {
+        capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+      });
+
+    press();
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+
+    press();
+    expect(result.current).toBe(ApprovalMode.PLAN);
+
+    press();
     expect(result.current).toBe(ApprovalMode.YOLO);
 
-    // Shift+Tab from YOLO jumps to AUTO_EDIT
-    act(() => {
-      capturedUseKeypressHandler({
-        name: 'tab',
-        shift: true,
-      } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.AUTO_EDIT,
+    press();
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should skip YOLO in the cycle when YOLO is disabled by settings', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+    mockConfigInstance.isYoloModeDisabled.mockReturnValue(true);
+
+    const { result } = await renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: true,
+      }),
     );
+
+    const press = () =>
+      act(() => {
+        capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+      });
+
+    press();
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+
+    press();
+    expect(result.current).toBe(ApprovalMode.PLAN);
+
+    // PLAN should skip YOLO and go straight back to DEFAULT
+    press();
+    expect(result.current).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should not toggle if only one key or other keys combinations are pressed', async () => {
@@ -324,15 +382,13 @@ describe('useApprovalModeIndicator', () => {
   describe('in untrusted folders', () => {
     beforeEach(() => {
       mockConfigInstance.isTrustedFolder.mockReturnValue(false);
+      // Match the real Config.isYoloModeDisabled() behavior: untrusted folders
+      // implicitly disable YOLO, so the cycle skips it.
+      mockConfigInstance.isYoloModeDisabled.mockReturnValue(true);
     });
 
     it('should not enable YOLO mode when Ctrl+Y is pressed', async () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
-      mockConfigInstance.setApprovalMode.mockImplementation(() => {
-        throw new Error(
-          'Cannot enable privileged approval modes in an untrusted folder.',
-        );
-      });
       const mockAddItem = vi.fn();
       const { result } = await renderHook(() =>
         useApprovalModeIndicator({
@@ -347,12 +403,11 @@ describe('useApprovalModeIndicator', () => {
         capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
       });
 
-      // We expect setApprovalMode to be called, and the error to be caught.
-      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.YOLO,
-      );
+      // Ctrl+Y short-circuits when YOLO is disabled (untrusted folder is one
+      // such case): setApprovalMode is never called, but the user gets a
+      // warning message explaining why.
+      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
       expect(mockAddItem).toHaveBeenCalled();
-      // Verify the underlying config value was not changed
       expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
@@ -435,7 +490,7 @@ describe('useApprovalModeIndicator', () => {
     });
 
     it('should show a warning when trying to enable privileged modes', async () => {
-      // Mock the error thrown by setApprovalMode
+      // Mock the error thrown by setApprovalMode (Shift+Tab path).
       const errorMessage =
         'Cannot enable privileged approval modes in an untrusted folder.';
       mockConfigInstance.setApprovalMode.mockImplementation(() => {
@@ -450,20 +505,20 @@ describe('useApprovalModeIndicator', () => {
         }),
       );
 
-      // Try to enable YOLO mode
+      // Ctrl+Y short-circuits to a WARNING message (YOLO is disabled).
       act(() => {
         capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(
         {
-          type: MessageType.INFO,
-          text: errorMessage,
+          type: MessageType.WARNING,
+          text: expect.stringMatching(/Full Access mode/),
         },
         expect.any(Number),
       );
 
-      // Try to enable AUTO_EDIT mode
+      // Shift+Tab still triggers the setApprovalMode error path → INFO message.
       act(() => {
         capturedUseKeypressHandler({
           name: 'tab',
@@ -491,7 +546,7 @@ describe('useApprovalModeIndicator', () => {
       }
     });
 
-    it('should not enable YOLO mode when Ctrl+Y is pressed and add an info message', async () => {
+    it('should not enable Full Access mode when Ctrl+Y is pressed and add an info message', async () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
       mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
         strictModeDisabled: true,
@@ -516,7 +571,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+          text: 'You cannot enter Full Access mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );
@@ -524,7 +579,7 @@ describe('useApprovalModeIndicator', () => {
       expect(result.current).toBe(ApprovalMode.DEFAULT);
     });
 
-    it('should show admin error message when YOLO mode is disabled by admin', async () => {
+    it('should show admin error message when Full Access mode is disabled by admin', async () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
       mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
         mcpEnabled: true,
@@ -545,7 +600,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: '[Mock] YOLO mode is disabled',
+          text: '[Mock] Full Access mode is disabled',
         },
         expect.any(Number),
       );
@@ -570,7 +625,7 @@ describe('useApprovalModeIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.WARNING,
-          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+          text: 'You cannot enter Full Access mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );
@@ -681,7 +736,7 @@ describe('useApprovalModeIndicator', () => {
       capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
 
-    // Switch to AUTO_EDIT
+    // Linear cycle: YOLO -> DEFAULT
     act(() => {
       capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
     });
@@ -693,7 +748,7 @@ describe('useApprovalModeIndicator', () => {
     );
     expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(
       2,
-      ApprovalMode.AUTO_EDIT,
+      ApprovalMode.DEFAULT,
     );
   });
 
@@ -717,7 +772,7 @@ describe('useApprovalModeIndicator', () => {
     );
   });
 
-  it('should cycle to DEFAULT when allowPlanMode is false', async () => {
+  it('should cycle from AUTO_EDIT to YOLO when allowPlanMode is false and YOLO is allowed', async () => {
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
 
     await renderHook(() =>
@@ -728,7 +783,27 @@ describe('useApprovalModeIndicator', () => {
       }),
     );
 
-    // AUTO_EDIT -> DEFAULT
+    // AUTO_EDIT -> YOLO (plan is skipped, YOLO is the next in the linear cycle)
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+  });
+
+  it('should cycle from AUTO_EDIT directly to DEFAULT when both PLAN and YOLO are disabled', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
+    mockConfigInstance.isYoloModeDisabled.mockReturnValue(true);
+
+    await renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: false,
+      }),
+    );
+
     act(() => {
       capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
     });

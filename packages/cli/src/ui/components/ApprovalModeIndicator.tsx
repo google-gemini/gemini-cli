@@ -14,36 +14,43 @@ import { Command } from '../key/keyBindings.js';
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
   allowPlanMode?: boolean;
+  allowYoloMode?: boolean;
 }
+
+const AUTO_GLYPH = '⏵⏵';
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
-  allowPlanMode,
+  allowPlanMode = false,
+  allowYoloMode = true,
 }) => {
+  const cycleHint = formatCommand(Command.CYCLE_APPROVAL_MODE);
+
   let textColor = '';
   let textContent = '';
   let subText = '';
 
-  const cycleHint = formatCommand(Command.CYCLE_APPROVAL_MODE);
-  const yoloHint = formatCommand(Command.TOGGLE_YOLO);
-
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = 'auto-accept edits';
+      textContent = `${AUTO_GLYPH} accept edits on`;
       subText = allowPlanMode
         ? `${cycleHint} to plan`
-        : `${cycleHint} to manual`;
+        : allowYoloMode
+          ? `${cycleHint} to auto mode`
+          : `${cycleHint} to manual`;
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
-      textContent = 'plan';
-      subText = `${cycleHint} to manual`;
+      textContent = 'plan mode on';
+      subText = allowYoloMode
+        ? `${cycleHint} to auto mode`
+        : `${cycleHint} to manual`;
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
-      textContent = 'YOLO';
-      subText = yoloHint;
+      textContent = `${AUTO_GLYPH} auto mode on`;
+      subText = `${cycleHint} to manual`;
       break;
     case ApprovalMode.DEFAULT:
     default:

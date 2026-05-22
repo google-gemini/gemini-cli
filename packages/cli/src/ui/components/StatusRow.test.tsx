@@ -34,6 +34,7 @@ describe('<StatusRow />', () => {
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     allowPlanMode: false,
+    allowYoloMode: true,
     renderMarkdown: true,
     currentModel: 'gemini-3',
   };
