@@ -381,6 +381,13 @@ export class ChatRecordingService {
   ): Promise<void> {
     try {
       this.kind = kind;
+      if (this.context.config.isEphemeralMode()) {
+        this.conversationFile = null;
+        this.cachedConversation = null;
+        this.queuedThoughts = [];
+        this.queuedTokens = null;
+        return;
+      }
       if (resumedSessionData) {
         this.conversationFile = resumedSessionData.filePath;
         this.sessionId = resumedSessionData.conversation.sessionId;

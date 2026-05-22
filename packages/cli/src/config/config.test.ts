@@ -248,6 +248,25 @@ describe('parseArguments', () => {
     expect(parsedArgs.sessionId).toBe('test-uuid-1234');
   });
 
+  it('should parse --ephemeral option correctly', async () => {
+    process.argv = ['node', 'script.js', '--ephemeral'];
+
+    const parsedArgs = await parseArguments(createTestMergedSettings());
+    expect(parsedArgs.ephemeral).toBe(true);
+  });
+
+  it('should enable ephemeral mode and disable checkpointing', async () => {
+    process.argv = ['node', 'script.js', '--ephemeral'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    settings.general.checkpointing.enabled = true;
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.isEphemeralMode()).toBe(true);
+    expect(config.getCheckpointingEnabled()).toBe(false);
+  });
+
   describe('worktree', () => {
     it('should parse --worktree flag when provided with a name', async () => {
       process.argv = ['node', 'script.js', '--worktree', 'my-feature'];

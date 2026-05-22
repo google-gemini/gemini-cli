@@ -89,6 +89,7 @@ describe('ChatRecordingService', () => {
       },
       promptId: 'test-session-id',
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      isEphemeralMode: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
@@ -139,6 +140,20 @@ describe('ChatRecordingService', () => {
       const files = fs.readdirSync(chatsDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/^session-.*-test-ses\.jsonl$/);
+    });
+
+    it('should not create a session file in ephemeral mode', async () => {
+      vi.mocked(mockConfig.isEphemeralMode).mockReturnValue(true);
+
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+      expect(fs.existsSync(path.join(testTempDir, 'chats'))).toBe(false);
     });
 
     it('should include the conversation kind when specified', async () => {

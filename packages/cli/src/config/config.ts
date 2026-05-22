@@ -108,6 +108,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  ephemeral?: boolean | undefined;
   skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
@@ -396,6 +397,12 @@ export async function parseArguments(
           alias: 'l',
           type: 'boolean',
           description: 'List all available extensions and exit.',
+        })
+        .option('ephemeral', {
+          type: 'boolean',
+          description:
+            'Run without saving chat history or checkpoint data to disk.',
+          default: false,
         })
         .option('resume', {
           alias: 'r',
@@ -1010,7 +1017,10 @@ export async function loadCliConfig(
     telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
     fileFiltering,
-    checkpointing: settings.general?.checkpointing?.enabled,
+    checkpointing: argv.ephemeral
+      ? false
+      : settings.general?.checkpointing?.enabled,
+    ephemeral: argv.ephemeral,
     proxy:
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
