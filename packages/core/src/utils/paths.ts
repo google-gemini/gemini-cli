@@ -319,6 +319,64 @@ export function getProjectHash(projectRoot: string): string {
   return crypto.createHash('sha256').update(projectRoot).digest('hex');
 }
 
+let isWslCache: boolean | undefined;
+
+export function resetWslCache(): void {
+  isWslCache = undefined;
+}
+
+export function isWSL(): boolean {
+  if (isWslCache !== undefined) {
+    return isWslCache;
+  }
+
+  if (process.platform !== 'linux') {
+    isWslCache = false;
+    return isWslCache;
+  }
+
+  if (
+    process.env['WSL_DISTRO_NAME'] ||
+    process.env['WSL_INTEROP'] ||
+    process.env['WSLENV']
+  ) {
+    isWslCache = true;
+    return isWslCache;
+  }
+
+  try {
+    const kernelVersion = fs.readFileSync('/proc/version', 'utf8');
+    isWslCache = /microsoft|wsl/i.test(kernelVersion);
+  } catch {
+    isWslCache = false;
+  }
+
+  return isWslCache;
+}
+
+function isWindowsNetworkPath(p: string): boolean {
+  return p.startsWith('\\\\') || p.startsWith('//');
+}
+
+/**
+ * Translates Windows drive paths to WSL mount paths when running under WSL.
+ * UNC/network paths are left untouched because they do not map to /mnt drives.
+ */
+export function translateWindowsPath(p: string): string {
+  if (!p || !isWSL() || isWindowsNetworkPath(p)) {
+    return p;
+  }
+
+  const match = /^([a-zA-Z]):(?:[\\/](.*))?$/.exec(p);
+  if (!match) {
+    return p;
+  }
+
+  const drive = match[1].toLowerCase();
+  const rest = match[2]?.replace(/\\/g, '/') ?? '';
+  return rest ? `/mnt/${drive}/${rest}` : `/mnt/${drive}/`;
+}
+
 /**
  * Resolves a path to an absolute path with forward slashes, preserving the
  * original case of every segment.
@@ -329,9 +387,10 @@ export function getProjectHash(projectRoot: string): string {
  * filesystems use `normalizePath` instead.
  */
 export function toAbsolutePath(p: string): string {
+  const translatedPath = translateWindowsPath(p);
   const isWindows = process.platform === 'win32';
   const pathModule = isWindows ? path.win32 : path;
-  return pathModule.resolve(p).replace(/\\/g, '/');
+  return pathModule.resolve(translatedPath).replace(/\\/g, '/');
 }
 
 /**
@@ -358,6 +417,8 @@ export function normalizePath(p: string): string {
  * @returns True if childPath is a subpath of parentPath, false otherwise.
  */
 export function isSubpath(parentPath: string, childPath: string): boolean {
+  const translatedParentPath = translateWindowsPath(parentPath);
+  const translatedChildPath = translateWindowsPath(childPath);
   const platform = process.platform;
   const isWindows = platform === 'win32';
   const isDarwin = platform === 'darwin';
@@ -365,8 +426,8 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
 
   // Resolve both paths to absolute to ensure consistent comparison,
   // especially when mixing relative and absolute paths or when casing differs.
-  let p = pathModule.resolve(parentPath);
-  let c = pathModule.resolve(childPath);
+  let p = pathModule.resolve(translatedParentPath);
+  let c = pathModule.resolve(translatedChildPath);
 
   // On Windows, path.relative is case-insensitive.
   // On POSIX (including Darwin), path.relative is case-sensitive.
@@ -412,7 +473,7 @@ export function assertValidPathString(p: unknown): asserts p is string {
  */
 export function resolveToRealPath(pathStr: string): string {
   assertValidPathString(pathStr);
-  let resolvedPath = pathStr;
+  let resolvedPath = translateWindowsPath(pathStr);
 
   try {
     if (resolvedPath.startsWith('file://')) {
