@@ -546,11 +546,11 @@ export class LoadedSettings {
     }
 
     return definedAllowlists.reduce((acc, current) => {
-      const normalizedCurrent = current.map((item) =>
-        item.toLowerCase().trim(),
+      const normalizedCurrent = new Set(
+        current.map((item) => item.toLowerCase().trim()),
       );
       return acc.filter((item) =>
-        normalizedCurrent.includes(item.toLowerCase().trim()),
+        normalizedCurrent.has(item.toLowerCase().trim()),
       );
     });
   }
