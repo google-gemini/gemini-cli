@@ -35,6 +35,7 @@ import {
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   getAutoModelDescription,
+  type ModelCapabilityContext,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -361,6 +362,28 @@ describe('isGemini3Model', () => {
         'projects/gemini-3-project/locations/us-central1/publishers/google/models/gemini-2.5-pro',
       ),
     ).toBe(false);
+  });
+
+  it('should return true for Vertex AI model resource paths with dynamic configuration', () => {
+    // We use a mock config object directly as per the bot's suggestion
+    // to use hardcoded literals rather than imported constants for self-contained tests.
+    expect(
+      isGemini3Model(
+        'projects/test/locations/us-central1/publishers/google/models/gemini-3.1-pro-preview',
+        {
+          getExperimentalDynamicModelConfiguration: () => true,
+          modelConfigService: {
+            resolveModelId: (modelId: string) => modelId,
+            getModelDefinition: (modelId: string) => {
+              if (modelId === 'gemini-3.1-pro-preview') {
+                return { family: 'gemini-3' };
+              }
+              return undefined;
+            },
+          },
+        } as unknown as ModelCapabilityContext,
+      ),
+    ).toBe(true);
   });
 
   it('should return false for arbitrary strings', () => {

@@ -380,8 +380,9 @@ export function isGemini3Model(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
     const resolved = resolveModel(model, false, false, false, true, config);
+    const parsedModel = resolved.split('/').pop() ?? '';
     return (
-      config.modelConfigService.getModelDefinition(resolved)?.family ===
+      config.modelConfigService.getModelDefinition(parsedModel)?.family ===
       'gemini-3'
     );
   }
