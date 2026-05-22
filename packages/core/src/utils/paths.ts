@@ -320,20 +320,35 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Resolves a path to an absolute path with forward slashes, preserving the
+ * original case of every segment.
+ *
+ * Use this for paths that will be surfaced to the user (e.g. `/memory list`,
+ * `--- Context from: ... ---` headers) or used as the storage form passed
+ * through to file I/O. For comparison/dedup keys on case-insensitive
+ * filesystems use `normalizePath` instead.
+ */
+export function toAbsolutePath(p: string): string {
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+  return pathModule.resolve(p).replace(/\\/g, '/');
+}
+
+/**
  * Normalizes a path for reliable comparison across platforms.
  * - Resolves to an absolute path.
  * - Converts all path separators to forward slashes.
- * - On Windows, converts to lowercase for case-insensitivity.
+ * - On case-insensitive platforms (Windows, macOS), converts to lowercase.
+ *
+ * Use this for comparison keys (Set/Map lookups, equality checks). For paths
+ * that will be displayed to the user or persisted as identifiers, use
+ * `toAbsolutePath` instead so the original casing is preserved.
  */
 export function normalizePath(p: string): string {
+  const absolute = toAbsolutePath(p);
   const platform = process.platform;
-  const isWindows = platform === 'win32';
-  const pathModule = isWindows ? path.win32 : path;
-
-  const resolved = pathModule.resolve(p);
-  const normalized = resolved.replace(/\\/g, '/');
-  const isCaseInsensitive = isWindows || platform === 'darwin';
-  return isCaseInsensitive ? normalized.toLowerCase() : normalized;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? absolute.toLowerCase() : absolute;
 }
 
 /**
@@ -425,7 +440,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       e &&
       typeof e === 'object' &&
       'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
+      (e.code === 'ENOENT' ||
+        e.code === 'EISDIR' ||
+        e.code === 'ENAMETOOLONG' ||
+        e.code === 'ENOTDIR')
     ) {
       try {
         const stat = fs.lstatSync(p);
@@ -442,7 +460,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+            (lstatError.code === 'ENOENT' ||
+              lstatError.code === 'EISDIR' ||
+              lstatError.code === 'ENAMETOOLONG' ||
+              lstatError.code === 'ENOTDIR')
           )
         ) {
           throw lstatError;
@@ -496,4 +517,58 @@ export function toPathKey(p: string): string {
   const platform = process.platform;
   const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
   return isCaseInsensitive ? norm.toLowerCase() : norm;
+}
+
+/**
+ * Verifies if a path is a trusted system directory.
+ */
+export function isTrustedSystemPath(filePath: string): boolean {
+  const normPath = normalizePath(filePath);
+
+  // 1. Explicitly reject paths in current working directory to prevent RCE
+  // Exclude root directories to avoid inadvertently rejecting all system paths.
+  // Bypass this restriction in secure, hermetic environments (e.g., Bazel/Blaze).
+  const isHermeticEnv =
+    !!process.env['TEST_SRCDIR'] ||
+    !!process.env['TEST_WORKSPACE'] ||
+    !!process.env['BAZEL_TEST'] ||
+    !!process.env['RUNFILES_DIR'];
+
+  const normCwd = normalizePath(process.cwd());
+  const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
+  if (!isRoot && isSubpath(normCwd, normPath)) {
+    return isHermeticEnv;
+  }
+
+  // 2. Allow standard system directories
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const trustedPrefixes = [
+      process.env['SystemRoot'] || 'C:\\Windows',
+      process.env['ProgramFiles'] || 'C:\\Program Files',
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  } else {
+    const trustedPrefixes = [
+      '/usr/bin',
+      '/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/Cellar',
+      '/usr/local/Cellar',
+      '/usr/sbin',
+      '/sbin',
+      // 1P internal hermetic execution paths
+      '/google/bin',
+      '/google/src/cloud',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  }
 }

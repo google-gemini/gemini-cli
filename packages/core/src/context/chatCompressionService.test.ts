@@ -196,7 +196,7 @@ describe('ChatCompressionService', () => {
     } as unknown as Config;
 
     vi.mocked(getInitialChatHistory).mockImplementation(
-      async (_config, extraHistory) => extraHistory || [],
+      async (_config, extraHistory) => (extraHistory ? [...extraHistory] : []),
     );
   });
 

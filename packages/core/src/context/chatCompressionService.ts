@@ -442,7 +442,9 @@ export class ChatCompressionService {
     const fullNewHistory = await getInitialChatHistory(config, extraHistory);
 
     const newTokenCount = await calculateRequestTokenCount(
-      fullNewHistory.flatMap((c) => c.parts || []),
+      fullNewHistory.flatMap(
+        (c) => ('content' in c ? c.content.parts : c.parts) || [],
+      ),
       config.getContentGenerator(),
       model,
     );

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import { describe, it, expect } from 'vitest';
 import { createNodeDistillationProcessor } from './nodeDistillationProcessor.js';
 import {
@@ -14,6 +13,7 @@ import {
   createDummyToolNode,
   createMockLlmClient,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 import type {
   UserPrompt,
   AgentThought,
@@ -41,20 +41,20 @@ describe('NodeDistillationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       50,
       {
-        semanticParts: [{ type: 'text', text: longText }],
+        payload: { text: longText },
       },
       'prompt-id',
     ) as UserPrompt;
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       50,
       {
-        text: longText,
+        payload: { text: longText },
       },
       'thought-id',
     ) as AgentThought;
@@ -64,7 +64,13 @@ describe('NodeDistillationProcessor', () => {
       5,
       500,
       {
-        observation: { result: 'A'.repeat(500) },
+        role: 'user',
+        payload: {
+          functionResponse: {
+            name: 'dummy_tool',
+            response: { result: 'A'.repeat(500) },
+          },
+        },
       },
       'tool-id',
     );
@@ -78,19 +84,19 @@ describe('NodeDistillationProcessor', () => {
     // 1. User Prompt
     const compressedPrompt = result[0] as UserPrompt;
     expect(compressedPrompt.id).not.toBe(prompt.id);
-    expect(compressedPrompt.semanticParts[0].type).toBe('text');
-    assert(compressedPrompt.semanticParts[0].type === 'text');
-    expect(compressedPrompt.semanticParts[0].text).toBe('Mocked Summary!');
+    expect(compressedPrompt.payload.text).toBe('Mocked Summary!');
 
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
     expect(compressedThought.id).not.toBe(thought.id);
-    expect(compressedThought.text).toBe('Mocked Summary!');
+    expect(compressedThought.payload.text).toBe('Mocked Summary!');
 
     // 3. Tool Execution
     const compressedTool = result[2] as ToolExecution;
     expect(compressedTool.id).not.toBe(tool.id);
-    expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
+    expect(compressedTool.payload.functionResponse?.response).toEqual({
+      summary: 'Mocked Summary!',
+    });
 
     expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(3);
   });
@@ -114,20 +120,20 @@ describe('NodeDistillationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       {
-        semanticParts: [{ type: 'text', text: shortText }],
+        payload: { text: shortText },
       },
       'prompt-id',
     ) as UserPrompt;
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       13,
       {
-        text: 'Short thought',
+        payload: { text: 'Short thought' },
       },
       'thought-id',
     ) as AgentThought;

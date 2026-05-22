@@ -13,6 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
+  type CoreEvents,
   createSessionId,
   logUserPrompt,
   AuthType,
@@ -34,6 +35,9 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  getProjectHash,
+  loadConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -43,6 +47,8 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
+import * as path from 'node:path';
+import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   loadSettings,
@@ -76,10 +82,14 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runAcpClient } from './acp/acpClient.js';
+import { runAcpClient } from './acp/acpStdioTransport.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionError, SessionSelector } from './utils/sessionUtils.js';
+import {
+  RESUME_LATEST,
+  SessionError,
+  SessionSelector,
+} from './utils/sessionUtils.js';
 
 import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
@@ -193,11 +203,12 @@ ${reason.stack}`
 export async function resolveSessionId(
   resumeArg: string | undefined,
   sessionIdArg?: string | undefined,
+  sessionFileArg?: string | undefined,
 ): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg && !sessionIdArg) {
+  if (!resumeArg && !sessionIdArg && !sessionFileArg) {
     return { sessionId: createSessionId() };
   }
 
@@ -205,6 +216,80 @@ export async function resolveSessionId(
   await storage.initialize();
 
   const sessionSelector = new SessionSelector(storage);
+
+  if (sessionFileArg) {
+    try {
+      const sessionData = await loadConversationRecord(sessionFileArg);
+      if (!sessionData) {
+        throw new Error(`File not found or invalid format: ${sessionFileArg}`);
+      }
+
+      const now = Date.now();
+      const isoNow = new Date(now).toISOString();
+
+      // Filter out old system/info messages that are specific to the previous run
+      // and only keep actual conversation messages (user/gemini).
+      // Best effort parse: ensure message is an object and has required fields.
+      sessionData.messages = (sessionData.messages || []).filter(
+        (m) =>
+          typeof m === 'object' &&
+          m !== null &&
+          (m.type === 'user' || m.type === 'gemini') &&
+          m.content !== undefined,
+      );
+
+      // Add a single info message to the history to confirm the import
+      sessionData.messages.unshift({
+        id: `import-${now}`,
+        type: 'info',
+        content: `Imported session from ${sessionFileArg}`,
+        timestamp: isoNow,
+      } as MessageRecord);
+
+      const newSessionId = createSessionId();
+      sessionData.sessionId = newSessionId;
+      sessionData.projectHash = getProjectHash(storage.getProjectRoot());
+      sessionData.startTime = isoNow;
+      sessionData.lastUpdated = isoNow;
+
+      const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+      const newSessionPath = path.join(
+        chatsDir,
+        `session-${now}-${newSessionId.slice(0, 8)}.jsonl`,
+      );
+
+      const { messages: _messages, ...initialMetadata } = sessionData;
+
+      const lines = [JSON.stringify(initialMetadata)];
+      if (sessionData.messages) {
+        for (const msg of sessionData.messages) {
+          lines.push(JSON.stringify(msg));
+        }
+      }
+
+      await fsPromises.mkdir(chatsDir, { recursive: true });
+      await fsPromises.writeFile(
+        newSessionPath,
+        lines.join('\n') + '\n',
+        'utf-8',
+      );
+
+      return {
+        sessionId: newSessionId,
+        resumedSessionData: {
+          conversation: sessionData,
+          filePath: newSessionPath,
+        },
+      };
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error importing session from file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
 
   if (sessionIdArg) {
     if (await sessionSelector.sessionExists(sessionIdArg)) {
@@ -228,8 +313,10 @@ export async function resolveSessionId(
     };
   } catch (error) {
     if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
-      coreEvents.emitFeedback('warning', error.message);
-      return { sessionId: createSessionId() };
+      if (resumeArg === RESUME_LATEST) {
+        coreEvents.emitFeedback('warning', error.message);
+        return { sessionId: createSessionId() };
+      }
     }
     coreEvents.emitFeedback(
       'error',
@@ -261,6 +348,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  let config: Config | undefined;
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -273,7 +361,7 @@ export async function main() {
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
     cleanupStdio();
   });
 
@@ -338,6 +426,7 @@ export async function main() {
   const { sessionId, resumedSessionData } = await resolveSessionId(
     argv.resume,
     argv.sessionId,
+    argv.sessionFile,
   );
 
   if (
@@ -409,6 +498,7 @@ export async function main() {
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
+    skipExtensions: true,
   });
 
   adminControlsListner.setConfig(partialConfig);
@@ -423,7 +513,7 @@ export async function main() {
         partialConfig.isInteractive() &&
         settings.merged.security.auth.selectedType
       ) {
-        const err = validateAuthMethod(
+        const err = await validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
         if (err) {
@@ -534,7 +624,7 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+    config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
       worktreeSettings: worktreeInfo,
     });
@@ -780,7 +870,7 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
 
     await runNonInteractive({
       config,
@@ -795,7 +885,7 @@ export async function main() {
   }
 }
 
-export function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush(config?: Config) {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
@@ -807,24 +897,43 @@ export function initializeOutputListenersAndFlush() {
         writeToStdout(payload.chunk, payload.encoding);
       }
     });
-
-    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
-      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-        if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content + '\n');
-        } else {
-          writeToStderr(payload.content + '\n');
-        }
-      });
-    }
-
-    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
-      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        writeToStderr(payload.message + '\n');
-      });
-    }
   }
-  coreEvents.drainBacklogs();
+
+  if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content + '\n');
+      } else {
+        writeToStderr(payload.content + '\n');
+      }
+    });
+  }
+
+  if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+    coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+      writeToStderr(payload.message + '\n');
+    });
+  }
+
+  const outputFormat = config?.getOutputFormat();
+  const forceToStderr = outputFormat === 'json';
+
+  coreEvents.drainBacklogs(
+    <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
+      if (forceToStderr && event === (CoreEvent.Output as string)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const payload = args[0] as OutputPayload;
+        if (!payload.isStderr) {
+          return {
+            event,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            args: [{ ...payload, isStderr: true }] as unknown as CoreEvents[K],
+          };
+        }
+      }
+      return { event, args };
+    },
+  );
 }
 
 function setupAdminControlsListener() {

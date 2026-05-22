@@ -15,7 +15,6 @@ import {
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
-  type ExtensionLoader,
   debugLogger,
   ApprovalMode,
   type MCPServerConfig,
@@ -112,27 +111,6 @@ vi.mock('@google/gemini-cli-core', async () => {
       }),
     },
     loadEnvironment: vi.fn(),
-    loadServerHierarchicalMemory: vi.fn(
-      (
-        cwd,
-        dirs,
-        fileService,
-        extensionLoader: ExtensionLoader,
-        _folderTrust,
-        _importFormat,
-        _fileFilteringOptions,
-        _maxDirs,
-      ) => {
-        const extensionPaths =
-          extensionLoader?.getExtensions?.()?.flatMap((e) => e.contextFiles) ||
-          [];
-        return Promise.resolve({
-          memoryContent: extensionPaths.join(',') || '',
-          fileCount: extensionPaths?.length || 0,
-          filePaths: extensionPaths,
-        });
-      },
-    ),
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
@@ -234,7 +212,7 @@ describe('parseArguments', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it('should fail if both --resume and --session-id are provided', async () => {
+  it('should fail if multiple session flags are provided', async () => {
     process.argv = [
       'node',
       'script.js',
@@ -255,7 +233,7 @@ describe('parseArguments', () => {
 
     expect(mockConsoleError).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Cannot use both --resume (-r) and --session-id together',
+        'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.',
       ),
     );
   });
@@ -1043,136 +1021,27 @@ describe('loadCliConfig', () => {
 
     expect(config.isInteractive()).toBe(false);
   });
-});
 
-describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
-    // Restore ExtensionManager mocks that were reset
-    ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
-    ExtensionManager.prototype.loadExtensions = vi
-      .fn()
-      .mockResolvedValue(undefined);
-
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    // Other common mocks would be reset here.
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
-
-  it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-    });
-    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
-      {
-        path: '/path/to/ext1',
-        name: 'ext1',
-        id: 'ext1-id',
-        version: '1.0.0',
-        contextFiles: ['/path/to/ext1/GEMINI.md'],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext2',
-        name: 'ext2',
-        id: 'ext2-id',
-        version: '1.0.0',
-        contextFiles: [],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext3',
-        name: 'ext3',
-        id: 'ext3-id',
-        version: '1.0.0',
-        contextFiles: [
-          '/path/to/ext3/context1.md',
-          '/path/to/ext3/context2.md',
-        ],
-        isActive: true,
-      },
-    ]);
-    const argv = await parseArguments(createTestMergedSettings());
-    await loadCliConfig(settings, 'session-id', argv);
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200, // maxDirs
-      ['.git'], // boundaryMarkers
-    );
-  });
-
-  it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-      context: {
-        includeDirectories: [includeDir],
-        loadMemoryFromIncludeDirectories: true,
-      },
+  describe('isAcpMode', () => {
+    it('should force skipNextSpeakerCheck to true when in ACP mode', async () => {
+      process.argv = ['node', 'script.js', '--acp'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(true);
     });
 
-    const argv = await parseArguments(settings);
-    await loadCliConfig(settings, 'session-id', argv);
-
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [includeDir],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200,
-      ['.git'], // boundaryMarkers
-    );
-  });
-
-  it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings({
-      experimental: { jitContext: false },
-      context: {
-        includeDirectories: ['/path/to/include'],
-        loadMemoryFromIncludeDirectories: false,
-      },
+    it('should respect settings.model.skipNextSpeakerCheck when not in ACP mode', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        model: { skipNextSpeakerCheck: false },
+      });
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getSkipNextSpeakerCheck()).toBe(false);
     });
-
-    const argv = await parseArguments(settings);
-    await loadCliConfig(settings, 'session-id', argv);
-
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.any(Object),
-      expect.any(ExtensionManager),
-      true,
-      'tree',
-      expect.objectContaining({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
-      200,
-      ['.git'], // boundaryMarkers
-    );
   });
 });
 
@@ -2022,7 +1891,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argv', async () => {
@@ -2066,7 +1935,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto-gemini-3');
+    expect(config.getModel()).toBe('auto');
   });
 });
 
@@ -3988,7 +3857,7 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('acp-vscode');
   });
 
-  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+  it('should set acpMode to true and set clientName to acp for generic terminals', async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
     vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
@@ -4000,10 +3869,10 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(true);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('acp');
   });
 
-  it('should set acpMode to false and clientName to undefined by default', async () => {
+  it('should set acpMode to false and clientName to tui by default', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
@@ -4012,6 +3881,6 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(false);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('tui');
   });
 });

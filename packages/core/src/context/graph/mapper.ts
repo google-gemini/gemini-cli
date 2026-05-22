@@ -5,44 +5,27 @@
  */
 import type { ConcreteNode } from './types.js';
 import { ContextGraphBuilder } from './toGraph.js';
-import type { Content } from '@google/genai';
-import type { HistoryEvent } from '../../core/agentChatHistory.js';
+import type { HistoryTurn } from '../../core/agentChatHistory.js';
 import { fromGraph } from './fromGraph.js';
-import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { NodeBehaviorRegistry } from './behaviorRegistry.js';
+import { NodeIdService } from './nodeIdService.js';
 
 export class ContextGraphMapper {
-  private readonly nodeIdentityMap = new WeakMap<object, string>();
+  private readonly idService = new NodeIdService();
+  private readonly builder: ContextGraphBuilder;
 
-  constructor(private readonly registry: NodeBehaviorRegistry) {}
-
-  private builder?: ContextGraphBuilder;
-
-  applyEvent(
-    event: HistoryEvent,
-    tokenCalculator: ContextTokenCalculator,
-  ): ConcreteNode[] {
-    if (!this.builder) {
-      this.builder = new ContextGraphBuilder(
-        tokenCalculator,
-        this.nodeIdentityMap,
-      );
-    }
-
-    if (event.type === 'CLEAR') {
-      this.builder.clear();
-      return [];
-    }
-
-    if (event.type === 'SYNC_FULL') {
-      this.builder.clear();
-    }
-
-    this.builder.processHistory(event.payload);
-    return this.builder.getNodes();
+  constructor() {
+    this.builder = new ContextGraphBuilder(this.idService);
   }
 
-  fromGraph(nodes: readonly ConcreteNode[]): Content[] {
-    return fromGraph(nodes, this.registry);
+  sync(turns: readonly HistoryTurn[]): ConcreteNode[] {
+    return this.builder.processHistory(turns);
+  }
+
+  fromGraph(nodes: readonly ConcreteNode[]): HistoryTurn[] {
+    return fromGraph(nodes, this.idService);
+  }
+
+  getIdService(): NodeIdService {
+    return this.idService;
   }
 }

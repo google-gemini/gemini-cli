@@ -93,7 +93,38 @@ export class AskUserTool extends BaseDeclarativeTool<
     toolName: string,
     toolDisplayName: string,
   ): AskUserInvocation {
-    return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
+    const unescape = (str: string): string =>
+      str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+
+    const normalizedParams: AskUserParams = {
+      questions: params.questions.map((q) => {
+        const normalizedQ: Question = {
+          ...q,
+          type: q.type,
+          question: unescape(q.question),
+        };
+        if (q.header) normalizedQ.header = unescape(q.header);
+        if (q.placeholder) normalizedQ.placeholder = unescape(q.placeholder);
+
+        if (q.options) {
+          normalizedQ.options = q.options.map((opt) => ({
+            ...opt,
+            label: unescape(opt.label),
+            description: opt.description?.trim()
+              ? unescape(opt.description.trim())
+              : '',
+          }));
+        }
+        return normalizedQ;
+      }),
+    };
+
+    return new AskUserInvocation(
+      normalizedParams,
+      messageBus,
+      toolName,
+      toolDisplayName,
+    );
   }
 
   override async validateBuildAndExecute(

@@ -13,7 +13,7 @@ import { ContextEventBus } from './eventBus.js';
 import { ContextEnvironmentImpl } from './pipeline/environmentImpl.js';
 import { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { ContextManager } from './contextManager.js';
-import { debugLogger } from '../utils/debugLogger.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 import { NodeTruncationProcessorOptionsSchema } from './processors/nodeTruncationProcessor.js';
 import { ToolMaskingProcessorOptionsSchema } from './processors/toolMaskingProcessor.js';
 import { HistoryTruncationProcessorOptionsSchema } from './processors/historyTruncationProcessor.js';
@@ -22,6 +22,10 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
+import { AdaptiveTokenCalculator } from './utils/adaptiveTokenCalculator.js';
+import { estimateContextBreakdown } from '../core/loggingContentGenerator.js';
+import { NodeBehaviorRegistry } from './graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from './graph/builtinBehaviors.js';
 
 export async function initializeContextManager(
   config: Config,
@@ -29,10 +33,6 @@ export async function initializeContextManager(
   lastPromptId: string,
 ): Promise<ContextManager | undefined> {
   const isV1Enabled = config.getContextManagementConfig().enabled;
-  debugLogger.log(
-    `[initializer] called with enabled=${isV1Enabled}, GEMINI_CONTEXT_TRACE_DIR=${process.env['GEMINI_CONTEXT_TRACE_DIR']}`,
-  );
-
   if (!isV1Enabled) {
     return undefined;
   }
@@ -88,6 +88,32 @@ export async function initializeContextManager(
 
   const eventBus = new ContextEventBus();
 
+  const charsPerToken = 3;
+  const behaviorRegistry = new NodeBehaviorRegistry();
+  registerBuiltInBehaviors(behaviorRegistry);
+
+  const getOverheadTokens = () => {
+    const breakdown = estimateContextBreakdown([], {
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: chat.getSystemInstruction() }],
+      },
+      tools: chat.getTools(),
+    });
+    return (
+      breakdown.system_instructions +
+      breakdown.tool_definitions +
+      breakdown.mcp_servers
+    );
+  };
+
+  const calculator = new AdaptiveTokenCalculator(
+    charsPerToken,
+    behaviorRegistry,
+    eventBus,
+    getOverheadTokens,
+  );
+
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
     config.getSessionId(),
@@ -95,15 +121,20 @@ export async function initializeContextManager(
     logDir,
     projectTempDir,
     tracer,
-    4,
+    charsPerToken,
     eventBus,
+    calculator,
+    behaviorRegistry,
+    {
+      calibrateTokenCalculation:
+        !!process.env['GEMINI_CONTEXT_CALIBRATE_TOKEN_CALCULATIONS'],
+    },
   );
 
   const orchestrator = new PipelineOrchestrator(
     sidecarProfile.buildPipelines(env),
     sidecarProfile.buildAsyncPipelines(env),
     env,
-    eventBus,
     tracer,
   );
 
@@ -113,5 +144,6 @@ export async function initializeContextManager(
     tracer,
     orchestrator,
     chat.agentHistory,
+    calculator,
   );
 }

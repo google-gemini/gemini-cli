@@ -36,6 +36,7 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
+import { populateToolDisplay } from '../agent/tool-display-utils.js';
 import type { EditorType } from '../utils/editor.js';
 import {
   MessageBusType,
@@ -381,6 +382,16 @@ export class Scheduler {
       () => {
         try {
           const invocation = tool.build(request.args);
+          if (!request.display) {
+            request.display = populateToolDisplay({
+              name: tool.name,
+              invocation,
+              displayName: tool.displayName,
+            });
+            if (!request.display.description) {
+              request.display.description = tool.description;
+            }
+          }
           return {
             status: CoreToolCallStatus.Validating,
             request,

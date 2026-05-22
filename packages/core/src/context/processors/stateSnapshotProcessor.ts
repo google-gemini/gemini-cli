@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
@@ -11,13 +11,18 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, Snapshot } from '../graph/types.js';
-import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
+import { type ConcreteNode, type Snapshot, NodeType } from '../graph/types.js';
+import {
+  SnapshotGenerator,
+  findLatestSnapshotBaseline,
+} from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   model?: string;
   systemInstruction?: string;
+  maxSummaryTurns?: number;
+  maxStateTokens?: number;
 }
 
 export const StateSnapshotProcessorOptionsSchema: JSONSchemaType<StateSnapshotProcessorOptions> =
@@ -32,6 +37,8 @@ export const StateSnapshotProcessorOptionsSchema: JSONSchemaType<StateSnapshotPr
       freeTokensTarget: { type: 'number', nullable: true },
       model: { type: 'string', nullable: true },
       systemInstruction: { type: 'string', nullable: true },
+      maxSummaryTurns: { type: 'number', nullable: true },
+      maxStateTokens: { type: 'number', nullable: true },
     },
     required: [],
   };
@@ -61,6 +68,7 @@ export function createStateSnapshotProcessor(
         newText: string;
         consumedIds: string[];
         type: string;
+        timestamp: number;
       }>('PROPOSED_SNAPSHOT');
 
       if (proposedSnapshots.length > 0) {
@@ -75,22 +83,33 @@ export function createStateSnapshotProcessor(
         );
 
         for (const proposed of sorted) {
-          const { consumedIds, newText } = proposed.payload;
+          const { consumedIds, newText, timestamp } = proposed.payload;
 
           // Verify all consumed IDs still exist sequentially in targets
           const targetIds = new Set(targets.map((t) => t.id));
           const isValid = consumedIds.every((id) => targetIds.has(id));
 
           if (isValid) {
+            env.tracer.logEvent(
+              'StateSnapshotProcessor',
+              'Snapshot Spliced from Inbox',
+              {
+                snapshotText: newText,
+              },
+            );
+            debugLogger.log(
+              `[StateSnapshotProcessor] Successfully spliced PROPOSED_SNAPSHOT from Inbox into Graph. Consumed ${consumedIds.length} nodes.`,
+            );
             // If valid, apply it!
-            const newId = randomUUID();
+            const newId = deriveStableId(consumedIds);
 
             const snapshotNode: Snapshot = {
               id: newId,
-              logicalParentId: newId,
-              type: 'SNAPSHOT',
-              timestamp: Date.now(),
-              text: newText,
+              turnId: newId,
+              type: NodeType.SNAPSHOT,
+              timestamp: timestamp ?? Date.now(),
+              role: 'user',
+              payload: { text: newText },
               abstractsIds: consumedIds,
             };
 
@@ -111,6 +130,10 @@ export function createStateSnapshotProcessor(
 
             inbox.consume(proposed.id);
             return returnedNodes;
+          } else {
+            debugLogger.log(
+              `[StateSnapshotProcessor] Rejected PROPOSED_SNAPSHOT from Inbox because one or more target IDs were missing from the current graph window.`,
+            );
           }
         }
       }
@@ -131,12 +154,6 @@ export function createStateSnapshotProcessor(
 
       // Scan oldest to newest
       for (const node of targets) {
-        if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          // In a real system, system prompt is protected, but we double check
-          continue;
-        }
-
         nodesToSummarize.push(node);
         deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
@@ -145,22 +162,58 @@ export function createStateSnapshotProcessor(
 
       if (nodesToSummarize.length < 2) return targets; // Not enough context
 
+      let previousStateJson: string | undefined = undefined;
+      let baselineIdToConsume: string | undefined = undefined;
+
+      // Global Lookback: Find the absolute most recent snapshot anywhere in the active context
+      const baseline = findLatestSnapshotBaseline(targets);
+
+      if (baseline) {
+        previousStateJson = baseline.text;
+        // If the snapshot happens to be inside our summary window, remove it so the LLM doesn't read it as raw transcript
+        const summaryIdx = nodesToSummarize.findIndex(
+          (n) => n.id === baseline.id,
+        );
+        if (summaryIdx !== -1) {
+          baselineIdToConsume = baseline.id;
+          nodesToSummarize.splice(summaryIdx, 1);
+        }
+      } else {
+        debugLogger.log(
+          '[StateSnapshotProcessor] No previous snapshot found in context graph. Initializing new Master State baseline.',
+        );
+      }
+
       try {
         const snapshotText = await generator.synthesizeSnapshot(
           nodesToSummarize,
-          options.systemInstruction,
+          previousStateJson,
+          {
+            maxSummaryTurns: options.maxSummaryTurns,
+            maxStateTokens: options.maxStateTokens,
+          },
         );
-        const newId = randomUUID();
-        const snapshotNode: Snapshot = {
-          id: newId,
-          logicalParentId: newId,
-          type: 'SNAPSHOT',
-          timestamp: Date.now(),
-          text: snapshotText,
-          abstractsIds: nodesToSummarize.map((n) => n.id),
-        };
+
+        env.tracer.logEvent('StateSnapshotProcessor', 'Snapshot Synthesized', {
+          snapshotText,
+        });
 
         const consumedIds = nodesToSummarize.map((n) => n.id);
+        if (baselineIdToConsume && !consumedIds.includes(baselineIdToConsume)) {
+          consumedIds.push(baselineIdToConsume);
+        }
+        const newId = deriveStableId(consumedIds);
+
+        const snapshotNode: Snapshot = {
+          id: newId,
+          turnId: newId,
+          type: NodeType.SNAPSHOT,
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
+          role: 'user',
+          payload: { text: snapshotText },
+          abstractsIds: [...consumedIds],
+        };
+
         const returnedNodes = targets.filter(
           (t) => !consumedIds.includes(t.id),
         );

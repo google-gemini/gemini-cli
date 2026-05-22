@@ -12,18 +12,17 @@ import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import { isNodeError } from '../utils/errors.js';
 import {
   deleteSessionArtifactsAsync,
-  deleteSubagentSessionDirAndArtifactsAsync,
+  deleteStoredSession,
 } from '../utils/sessionOperations.js';
 import readline from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import type {
-  Content,
-  Part,
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
 import {
   SESSION_FILE_PREFIX,
   type TokensSummary,
@@ -97,10 +96,6 @@ function isPartialMetadataRecord(
 
 function isTextPart(part: unknown): part is { text: string } {
   return isStringProperty(part, 'text');
-}
-
-function isSessionIdRecord(record: unknown): record is { sessionId: string } {
-  return isStringProperty(record, 'sessionId');
 }
 
 export async function loadConversationRecord(
@@ -221,14 +216,92 @@ export async function loadConversationRecord(
             );
             memoryScratchpadIsStale = false;
           }
+          if (
+            hasProperty(record.$set, 'messages') &&
+            Array.isArray(record.$set.messages)
+          ) {
+            // Checkpoint: clear and rebuild from the provided messages array
+            messagesMap.clear();
+            if (options?.metadataOnly) {
+              messageIds.length = 0;
+              messageKinds.clear();
+            }
+            for (const msg of record.$set.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isUserOrAssistant =
+                  msg.type === 'user' || msg.type === 'gemini';
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, { isUser, isUserOrAssistant });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
           // Metadata update
           metadata = {
             ...metadata,
             ...record.$set,
           };
         } else if (isPartialMetadataRecord(record)) {
-          // Initial metadata line
+          // Initial metadata line (or entire legacy record if on one line)
           metadata = { ...metadata, ...record };
+          if (
+            hasProperty(record, 'messages') &&
+            Array.isArray(record.messages)
+          ) {
+            for (const msg of record.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isUserOrAssistant =
+                  msg.type === 'user' || msg.type === 'gemini';
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, { isUser, isUserOrAssistant });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
         }
       } catch {
         // ignore parse errors on individual lines
@@ -239,15 +312,9 @@ export async function loadConversationRecord(
       return await parseLegacyRecordFallback(filePath, options);
     }
 
-    const metadataMessages = Array.isArray(metadata.messages)
-      ? metadata.messages
-      : [];
-    const loadedMessages =
-      metadataMessages.length > 0
-        ? metadataMessages
-        : Array.from(messagesMap.values());
+    const loadedMessages = Array.from(messagesMap.values());
     const metadataFirstUserMessage =
-      metadataMessages.find((message) => message.type === 'user') ?? null;
+      loadedMessages.find((message) => message.type === 'user') ?? null;
     let fallbackFirstUserMessage = firstUserMessageStr;
     if (!fallbackFirstUserMessage && metadataFirstUserMessage) {
       const rawContent = metadataFirstUserMessage.content;
@@ -277,22 +344,14 @@ export async function loadConversationRecord(
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
       messageCount: options?.metadataOnly
-        ? metadataMessages.length || messageIds.length
+        ? loadedMessages.length || messageIds.length
         : loadedMessages.length,
-      userMessageCount:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.filter((m) => m.type === 'user').length
-          : userMessageCount,
+      userMessageCount,
       memoryScratchpadIsStale: isTrackingMemoryScratchpadFreshness
         ? memoryScratchpadIsStale
         : undefined,
       firstUserMessage: fallbackFirstUserMessage,
-      hasUserOrAssistantMessage:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.some(
-              (m) => m.type === 'user' || m.type === 'gemini',
-            )
-          : hasUserOrAssistant,
+      hasUserOrAssistantMessage: hasUserOrAssistant,
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);
@@ -497,9 +556,10 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'],
     content: PartListUnion,
     displayContent?: PartListUnion,
+    id?: string,
   ): MessageRecord {
     return {
-      id: randomUUID(),
+      id: id || randomUUID(),
       timestamp: new Date().toISOString(),
       type,
       content,
@@ -512,14 +572,17 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
     displayContent?: PartListUnion;
-  }): void {
-    if (!this.conversationFile || !this.cachedConversation) return;
+    id?: string;
+  }): string {
+    if (!this.conversationFile || !this.cachedConversation)
+      return message.id || randomUUID();
 
     try {
       const msg = this.newMessage(
         message.type,
         message.content,
         message.displayContent,
+        message.id,
       );
       if (msg.type === 'gemini') {
         msg.thoughts = this.queuedThoughts;
@@ -530,10 +593,28 @@ export class ChatRecordingService {
       }
       this.pushMessage(msg);
       this.updateMetadata({ lastUpdated: new Date().toISOString() });
+      return msg.id;
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
+  }
+
+  /**
+   * Records a synthetic message (e.g. Binary Received, Snapshot/Summary)
+   * and returns its durable ID.
+   */
+  recordSyntheticMessage(
+    type: ConversationRecordExtra['type'],
+    content: PartListUnion,
+    id?: string,
+  ): string {
+    return this.recordMessage({
+      model: undefined,
+      type,
+      content,
+      id,
+    });
   }
 
   recordThought(thought: ThoughtSummary): void {
@@ -681,114 +762,32 @@ export class ChatRecordingService {
    * @throws {Error} If shortId validation fails.
    */
   async deleteSession(sessionIdOrBasename: string): Promise<void> {
-    try {
-      const tempDir = this.context.config.storage.getProjectTempDir();
-      const chatsDir = path.join(tempDir, 'chats');
-      const shortId = this.deriveShortId(sessionIdOrBasename);
-
-      // Using stat instead of existsSync for async sanity
-      if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
-        return; // Nothing to delete
-      }
-
-      const matchingFiles = await this.getMatchingSessionFiles(
-        chatsDir,
-        shortId,
-      );
-      for (const file of matchingFiles) {
-        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
-      }
-    } catch (error) {
-      debugLogger.error('Error deleting session file.', error);
-      throw error;
-    }
-  }
-
-  private deriveShortId(sessionIdOrBasename: string): string {
-    let shortId = sessionIdOrBasename;
-    if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
-      const withoutExt = sessionIdOrBasename.replace(/\.jsonl?$/, '');
-      const parts = withoutExt.split('-');
-      shortId = parts[parts.length - 1];
-    } else if (sessionIdOrBasename.length >= 8) {
-      shortId = sessionIdOrBasename.slice(0, 8);
-    } else {
-      throw new Error('Invalid sessionId or basename provided for deletion');
-    }
-
-    if (shortId.length !== 8) {
-      throw new Error('Derived shortId must be exactly 8 characters');
-    }
-
-    return shortId;
-  }
-
-  private async getMatchingSessionFiles(
-    chatsDir: string,
-    shortId: string,
-  ): Promise<string[]> {
-    const files = await fs.promises.readdir(chatsDir);
-    return files.filter(
-      (f) =>
-        f.startsWith(SESSION_FILE_PREFIX) &&
-        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
-    );
+    return deleteStoredSession(this.context.config, sessionIdOrBasename);
   }
 
   /**
-   * Deletes a single session file and its associated logs, tool-outputs, and directory.
+   * Asynchronously deletes the current session's chat file and tool outputs.
+   * This encapsulates the session ID logic and uses non-blocking I/O to avoid
+   * blocking the event loop on exit.
    */
-  private async deleteSessionAndArtifacts(
-    chatsDir: string,
-    file: string,
-    tempDir: string,
-  ): Promise<void> {
-    const filePath = path.join(chatsDir, file);
+  async deleteCurrentSessionAsync(): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
     try {
-      const CHUNK_SIZE = 4096;
-      const buffer = Buffer.alloc(CHUNK_SIZE);
-      let firstLine: string;
-      let fd: fs.promises.FileHandle | undefined;
-      try {
-        fd = await fs.promises.open(filePath, 'r');
-        const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-        if (bytesRead === 0) {
-          await fd.close();
-          await fs.promises.unlink(filePath);
-          return;
-        }
-        const contentChunk = buffer.toString('utf8', 0, bytesRead);
-        const newlineIndex = contentChunk.indexOf('\n');
-        firstLine =
-          newlineIndex !== -1
-            ? contentChunk.substring(0, newlineIndex)
-            : contentChunk;
-      } finally {
-        if (fd !== undefined) {
-          await fd.close();
-        }
-      }
-      const content = JSON.parse(firstLine) as unknown;
+      const tempDir = this.context.config.storage.getProjectTempDir();
 
-      let fullSessionId: string | undefined;
-      if (isSessionIdRecord(content)) {
-        fullSessionId = content['sessionId'];
-      }
+      // Delete the conversation file directly using the tracked path.
+      await fs.promises.unlink(this.conversationFile).catch(() => {
+        // File may not exist; ignore.
+      });
 
-      // Delete the session file
-      await fs.promises.unlink(filePath);
-
-      if (fullSessionId) {
-        // Delegate to shared utility!
-        await deleteSessionArtifactsAsync(fullSessionId, tempDir);
-        await deleteSubagentSessionDirAndArtifactsAsync(
-          fullSessionId,
-          chatsDir,
-          tempDir,
-        );
-      }
+      // Delegate tool-output and log cleanup to the shared utility.
+      await deleteSessionArtifactsAsync(this.sessionId, tempDir);
     } catch (error) {
-      debugLogger.error(`Error deleting associated file ${file}:`, error);
+      debugLogger.error('Error deleting current session.', error);
+      throw error;
     }
   }
 
@@ -818,48 +817,83 @@ export class ChatRecordingService {
     return this.cachedConversation;
   }
 
-  updateMessagesFromHistory(history: readonly Content[]): void {
+  updateMessagesFromHistory(history: readonly HistoryTurn[]): void {
     if (!this.conversationFile || !this.cachedConversation) return;
 
     try {
-      const partsMap = new Map<string, Part[]>();
-      for (const content of history) {
-        if (content.role === 'user' && content.parts) {
-          const callIds = content.parts
-            .map((p) => p.functionResponse?.id)
-            .filter((id): id is string => !!id);
+      let updated = false;
 
-          if (callIds.length === 0) continue;
+      // 1. Sync content and IDs
+      const newMessages: MessageRecord[] = history.map((turn) => {
+        const existing = this.cachedConversation?.messages.find(
+          (m) => m.id === turn.id,
+        );
 
-          let currentCallId = callIds[0];
-          for (const part of content.parts) {
-            if (part.functionResponse?.id) {
-              currentCallId = part.functionResponse.id;
+        if (existing) {
+          // If content parts have changed (e.g. masking), update them
+          if (
+            JSON.stringify(existing.content) !==
+            JSON.stringify(turn.content.parts)
+          ) {
+            updated = true;
+          }
+          return {
+            ...existing,
+            content: turn.content.parts || [],
+          };
+        }
+
+        // It's a new (possibly synthetic) turn like a summary
+        updated = true;
+        return this.newMessage(
+          turn.content.role === 'user' ? 'user' : 'gemini',
+          turn.content.parts || [],
+          undefined,
+          turn.id,
+        );
+      });
+
+      // 2. Specialized 'Masking Sync' for tool call results
+      // If a user turn in history contains a functionResponse, we update the
+      // corresponding ToolCallRecord in the preceding gemini message.
+      for (const turn of history) {
+        if (turn.content.role !== 'user') continue;
+        for (const part of turn.content.parts || []) {
+          if (part.functionResponse) {
+            const callId = part.functionResponse.id;
+            // Find the gemini message that contains this tool call
+            const geminiMsg = newMessages.find(
+              (m) =>
+                m.type === 'gemini' &&
+                m.toolCalls?.some((tc) => tc.id === callId),
+            );
+            if (geminiMsg && geminiMsg.type === 'gemini') {
+              const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
+              if (tc) {
+                // If the history version is different (e.g. masked), sync it into the record
+                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
+                if (
+                  JSON.stringify(tc.result) !==
+                  JSON.stringify(turn.content.parts)
+                ) {
+                  tc.result = turn.content.parts || [];
+                  updated = true;
+                }
+              }
             }
-
-            if (!partsMap.has(currentCallId)) {
-              partsMap.set(currentCallId, []);
-            }
-            partsMap.get(currentCallId)!.push(part);
           }
         }
       }
 
-      for (const message of this.cachedConversation.messages) {
-        let msgChanged = false;
-        if (message.type === 'gemini' && message.toolCalls) {
-          for (const toolCall of message.toolCalls) {
-            const newParts = partsMap.get(toolCall.id);
-            if (newParts !== undefined) {
-              toolCall.result = newParts;
-              msgChanged = true;
-            }
-          }
-        }
-        if (msgChanged) {
-          // Push updated message to log
-          this.pushMessage(message);
-        }
+      if (
+        updated ||
+        newMessages.length !== this.cachedConversation.messages.length
+      ) {
+        this.cachedConversation.messages = newMessages;
+        this.updateMetadata({
+          messages: newMessages,
+          lastUpdated: new Date().toISOString(),
+        });
       }
     } catch (error) {
       debugLogger.error(

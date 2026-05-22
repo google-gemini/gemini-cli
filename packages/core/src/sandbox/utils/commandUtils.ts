@@ -56,7 +56,11 @@ export async function getCommandName(req: SandboxRequest): Promise<string> {
   const roots = getCommandRoots(stripped).filter(
     (r) => r !== 'shopt' && r !== 'set',
   );
-  if (roots.length > 0) {
+  // Single-root enforcement: only grant named-command permissions when the
+  // command is unambiguous. Multi-root chains fall back to basename so that
+  // a chained command like `git; malicious_cmd` never inherits `git`'s
+  // sandbox policy for the entire chain.
+  if (roots.length === 1) {
     return roots[0];
   }
   return path.basename(req.command);

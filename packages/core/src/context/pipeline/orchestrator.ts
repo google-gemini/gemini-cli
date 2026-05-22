@@ -10,113 +10,74 @@ import type {
   PipelineDef,
   PipelineTrigger,
 } from '../config/types.js';
-import type {
-  ContextEnvironment,
-  ContextEventBus,
-  ContextTracer,
-} from './environment.js';
+import type { ContextEnvironment, ContextTracer } from './environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { InboxSnapshotImpl } from './inbox.js';
 import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
+  private readonly pendingPipelines = new Map<string, Promise<void>>();
+  private readonly pipelineMutex = new Map<string, Promise<void>>();
+  private readonly pipelineScheduled = new Set<string>();
+  private nodeProvider: (() => readonly ConcreteNode[]) | undefined;
 
   constructor(
     private readonly pipelines: PipelineDef[],
     private readonly asyncPipelines: AsyncPipelineDef[],
     private readonly env: ContextEnvironment,
-    private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
   ) {
-    this.setupTriggers();
+    // Background timers not fully implemented in V1 yet
+  }
+
+  /**
+   * Sets the provider for the latest live nodes.
+   * This is used by sequential pipeline runs to ensure they operate on current state.
+   */
+  setNodeProvider(provider: () => readonly ConcreteNode[]) {
+    this.nodeProvider = provider;
+  }
+
+  /**
+   * Returns a promise that resolves when all currently executing async pipelines have finished.
+   * This acts as a 'Pressure Barrier' for the ContextManager.
+   */
+  async waitForPipelines(): Promise<void> {
+    const pending = Array.from(this.pendingPipelines.values());
+    if (pending.length > 0) {
+      debugLogger.log(
+        `[PipelineOrchestrator] Waiting for ${pending.length} pending async pipelines to complete...`,
+      );
+      await Promise.allSettled(pending);
+    }
   }
 
   private isNodeAllowed(
     node: ConcreteNode,
     triggerTargets: ReadonlySet<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    protectedTurnIds: ReadonlySet<string> = new Set(),
   ): boolean {
     return (
       triggerTargets.has(node.id) &&
-      !protectedLogicalIds.has(node.id) &&
-      (!node.logicalParentId || !protectedLogicalIds.has(node.logicalParentId))
+      !protectedTurnIds.has(node.id) &&
+      !protectedTurnIds.has(node.turnId)
     );
-  }
-
-  private setupTriggers() {
-    const bindTriggers = <P extends PipelineDef | AsyncPipelineDef>(
-      pipelines: P[],
-      executeFn: (
-        pipeline: P,
-        nodes: readonly ConcreteNode[],
-        targets: ReadonlySet<string>,
-        protectedIds: ReadonlySet<string>,
-      ) => void,
-    ) => {
-      for (const pipeline of pipelines) {
-        for (const trigger of pipeline.triggers) {
-          if (typeof trigger === 'object' && trigger.type === 'timer') {
-            const timer = setInterval(() => {
-              // Background timers not fully implemented in V1 yet
-            }, trigger.intervalMs);
-            this.activeTimers.push(timer);
-          } else if (
-            trigger === 'retained_exceeded' ||
-            trigger === 'nodes_aged_out'
-          ) {
-            this.eventBus.onConsolidationNeeded((event) => {
-              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
-            });
-          } else if (trigger === 'new_message' || trigger === 'nodes_added') {
-            this.eventBus.onChunkReceived((event) => {
-              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
-            });
-          }
-        }
-      }
-    };
-
-    bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
-      void this.executePipelineAsync(
-        pipeline,
-        nodes,
-        new Set(targets),
-        new Set(protectedIds),
-      );
-    });
-
-    bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {
-      const inboxSnapshot = new InboxSnapshotImpl(
-        this.env.inbox.getMessages() || [],
-      );
-      const targets = nodes.filter((n) => targetIds.has(n.id));
-      for (const processor of pipeline.processors) {
-        processor
-          .process({
-            targets,
-            inbox: inboxSnapshot,
-            buffer: ContextWorkingBufferImpl.initialize(nodes),
-          })
-          .catch((e: unknown) =>
-            debugLogger.error(`AsyncProcessor ${processor.name} failed:`, e),
-          );
-      }
-    });
-  }
-
-  shutdown() {
-    for (const timer of this.activeTimers) {
-      clearInterval(timer);
-    }
   }
 
   async executeTriggerSync(
     trigger: PipelineTrigger,
     nodes: readonly ConcreteNode[],
     triggerTargets: ReadonlySet<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    protectedTurnIds: ReadonlySet<string> = new Set(),
   ): Promise<readonly ConcreteNode[]> {
+    this.tracer.logEvent('Orchestrator', 'Strategy Intent', {
+      trigger,
+      totalNodes: nodes.length,
+      targetNodes: triggerTargets.size,
+    });
+
+    // First, run any sync pipelines matching this trigger
     let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
     const triggerPipelines = this.pipelines.filter((p) =>
       p.triggers.includes(trigger),
@@ -133,10 +94,11 @@ export class PipelineOrchestrator {
           this.tracer.logEvent(
             'Orchestrator',
             `Executing processor synchronously: ${processor.id}`,
+            { nodeCountBefore: currentBuffer.nodes.length },
           );
 
           const allowedTargets = currentBuffer.nodes.filter((n) =>
-            this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
+            this.isNodeAllowed(n, triggerTargets, protectedTurnIds),
           );
 
           const returnedNodes = await processor.process({
@@ -150,6 +112,27 @@ export class PipelineOrchestrator {
             allowedTargets,
             returnedNodes,
           );
+
+          const addedNodes = returnedNodes.filter(
+            (n) => !allowedTargets.some((at) => at.id === n.id),
+          );
+          const removedNodes = allowedTargets.filter(
+            (at) => !returnedNodes.some((n) => n.id === at.id),
+          );
+
+          this.tracer.logEvent('Orchestrator', 'Transformation Lineage', {
+            processorId: processor.id,
+            inputNodeCount: allowedTargets.length,
+            outputNodeCount: returnedNodes.length,
+            removedNodeIds: removedNodes.map((n) => n.id),
+            addedNodes: addedNodes.map((n) => ({
+              id: n.id,
+              replacesId: n.replacesId,
+              abstractsIds: n.abstractsIds,
+              approxTokens:
+                this.env.tokenCalculator.calculateConcreteListTokens([n]),
+            })),
+          });
         } catch (error) {
           debugLogger.error(
             `Synchronous processor ${processor.id} failed:`,
@@ -159,65 +142,86 @@ export class PipelineOrchestrator {
       }
     }
 
+    // After sync pipelines finish, trigger any matching async pipelines in the background
+    void this.executeTriggerAsync(trigger, currentBuffer.nodes, triggerTargets);
+
     // Success! Drain consumed messages
     this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
 
     return currentBuffer.nodes;
   }
 
-  private async executePipelineAsync(
-    pipeline: PipelineDef,
+  private async executeTriggerAsync(
+    trigger: PipelineTrigger,
     nodes: readonly ConcreteNode[],
-    triggerTargets: Set<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    triggerTargets: ReadonlySet<string>,
   ) {
-    this.tracer.logEvent(
-      'Orchestrator',
-      `Triggering async pipeline: ${pipeline.name}`,
-    );
-    if (!nodes || nodes.length === 0) return;
-
-    let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
-    const inboxSnapshot = new InboxSnapshotImpl(
-      this.env.inbox.getMessages() || [],
+    const asyncPipelines = this.asyncPipelines.filter((p) =>
+      p.triggers.includes(trigger),
     );
 
-    for (const processor of pipeline.processors) {
-      try {
-        this.tracer.logEvent(
-          'Orchestrator',
-          `Executing processor: ${processor.id} (async)`,
-        );
-
-        const allowedTargets = currentBuffer.nodes.filter((n) =>
-          this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
-        );
-
-        const returnedNodes = await processor.process({
-          buffer: currentBuffer,
-          targets: allowedTargets,
-          inbox: inboxSnapshot,
-        });
-
-        currentBuffer = currentBuffer.applyProcessorResult(
-          processor.id,
-          allowedTargets,
-          returnedNodes,
-        );
-        this.eventBus.emitProcessorResult({
-          processorId: processor.id,
-          targets: allowedTargets,
-          returnedNodes,
-        });
-      } catch (error) {
-        debugLogger.error(
-          `Pipeline ${pipeline.name} failed async at ${processor.id}:`,
-          error,
-        );
-        return;
-      }
+    for (const pipeline of asyncPipelines) {
+      void this.handleAsyncExecution(pipeline, nodes, triggerTargets);
     }
+  }
 
-    this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
+  private async handleAsyncExecution(
+    pipeline: AsyncPipelineDef,
+    nodes: readonly ConcreteNode[],
+    targets: ReadonlySet<string>,
+  ) {
+    if (this.pipelineScheduled.has(pipeline.name)) {
+      return;
+    }
+    this.pipelineScheduled.add(pipeline.name);
+
+    const existing = this.pipelineMutex.get(pipeline.name) || Promise.resolve();
+
+    const nextPromise = (async () => {
+      try {
+        await existing;
+        this.pipelineScheduled.delete(pipeline.name);
+
+        const latestNodes = this.nodeProvider ? this.nodeProvider() : nodes;
+        const latestTargets = latestNodes.filter((n) => targets.has(n.id));
+
+        if (latestTargets.length === 0) return;
+
+        debugLogger.log(
+          `[Orchestrator] Executing async pipeline ${pipeline.name}`,
+        );
+
+        const inboxSnapshot = new InboxSnapshotImpl(
+          this.env.inbox.getMessages() || [],
+        );
+
+        for (const processor of pipeline.processors) {
+          await processor.process({
+            targets: latestTargets,
+            inbox: inboxSnapshot,
+            buffer: ContextWorkingBufferImpl.initialize(latestNodes),
+          });
+        }
+        this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
+      } catch (e) {
+        debugLogger.error(`Async pipeline chain ${pipeline.name} failed:`, e);
+      }
+    })();
+
+    this.pipelineMutex.set(pipeline.name, nextPromise);
+    const pipelineId = `${pipeline.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.pendingPipelines.set(pipelineId, nextPromise);
+    void nextPromise.finally(() => {
+      this.pendingPipelines.delete(pipelineId);
+      if (this.pipelineMutex.get(pipeline.name) === nextPromise) {
+        this.pipelineMutex.delete(pipeline.name);
+      }
+    });
+  }
+
+  shutdown() {
+    for (const timer of this.activeTimers) {
+      clearInterval(timer);
+    }
   }
 }

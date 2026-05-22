@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PipelineOrchestrator } from './orchestrator.js';
 import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 import type { ContextEnvironment } from './environment.js';
 import type {
   ContextProcessor,
@@ -18,7 +18,6 @@ import type {
   ProcessArgs,
 } from '../pipeline.js';
 import type { PipelineDef, AsyncPipelineDef } from '../config/types.js';
-import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 
 // A realistic mock processor that modifies the text of the first target node
@@ -28,21 +27,22 @@ function createModifyingProcessor(id: string): ContextProcessor {
     name: 'ModifyingProcessor',
     process: async (args: ProcessArgs) => {
       const newTargets = [...args.targets];
-      if (newTargets.length > 0 && newTargets[0].type === 'USER_PROMPT') {
+      if (
+        newTargets.length > 0 &&
+        newTargets[0].type === NodeType.USER_PROMPT
+      ) {
         const prompt = newTargets[0];
-        const newParts = [...prompt.semanticParts];
-        if (newParts.length > 0 && newParts[0].type === 'text') {
-          newParts[0] = {
-            ...newParts[0],
-            text: newParts[0].text + ' [modified]',
+        if (prompt.payload.text) {
+          newTargets[0] = {
+            ...prompt,
+            id: prompt.id + '-modified',
+            replacesId: prompt.id,
+            payload: {
+              ...prompt.payload,
+              text: prompt.payload.text + ' [modified]',
+            },
           };
         }
-        newTargets[0] = {
-          ...prompt,
-          id: prompt.id + '-modified',
-          replacesId: prompt.id,
-          semanticParts: newParts,
-        };
       }
       return newTargets;
     },
@@ -76,11 +76,10 @@ function createMockAsyncProcessor(
 
 describe('PipelineOrchestrator (Component)', () => {
   let env: ContextEnvironment;
-  let eventBus: ContextEventBus;
+  let orchestrator: PipelineOrchestrator;
 
   beforeEach(() => {
     env = createMockEnvironment();
-    eventBus = env.eventBus;
   });
 
   afterEach(() => {
@@ -91,13 +90,13 @@ describe('PipelineOrchestrator (Component)', () => {
     pipelines: PipelineDef[],
     asyncPipelines: AsyncPipelineDef[] = [],
   ) => {
-    const orchestrator = new PipelineOrchestrator(
+    orchestrator = new PipelineOrchestrator(
       pipelines,
       asyncPipelines,
       env,
-      eventBus,
       env.tracer,
     );
+
     return orchestrator;
   };
 
@@ -112,8 +111,8 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
-        semanticParts: [{ type: 'text', text: 'Original' }],
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
+        payload: { text: 'Original' },
       });
 
       const processed = await orchestrator.executeTriggerSync(
@@ -125,8 +124,7 @@ describe('PipelineOrchestrator (Component)', () => {
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
-      assert(resultingNode.semanticParts[0].type === 'text');
-      expect(resultingNode.semanticParts[0].text).toBe('Original [modified]');
+      expect(resultingNode.payload.text).toBe('Original [modified]');
       expect(resultingNode.replacesId).toBe(originalNode.id);
     });
 
@@ -140,8 +138,8 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
-        semanticParts: [{ type: 'text', text: 'Original' }],
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
+        payload: { text: 'Original' },
       });
 
       const processed = await orchestrator.executeTriggerSync(
@@ -167,8 +165,8 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
-        semanticParts: [{ type: 'text', text: 'Original' }],
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
+        payload: { text: 'Original' },
       });
 
       // The throwing processor should be caught and logged, allowing Mod to still run.
@@ -181,8 +179,7 @@ describe('PipelineOrchestrator (Component)', () => {
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
-      assert(resultingNode.semanticParts[0].type === 'text');
-      expect(resultingNode.semanticParts[0].text).toBe('Original [modified]');
+      expect(resultingNode.payload.text).toBe('Original [modified]');
     });
   });
 
@@ -205,16 +202,17 @@ describe('PipelineOrchestrator (Component)', () => {
         ],
       );
 
-      const node1 = createDummyNode('ep1', 'USER_PROMPT', 10);
-      const node2 = createDummyNode('ep1', 'AGENT_THOUGHT', 20);
+      const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10);
+      const node2 = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 20);
 
-      eventBus.emitChunkReceived({
-        nodes: [node1, node2],
-        targetNodeIds: new Set([node2.id]),
-      });
+      await orchestrator.executeTriggerSync(
+        'nodes_added',
+        [node1, node2],
+        new Set([node2.id]),
+      );
 
       // Yield event loop
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executeSpy).toHaveBeenCalledTimes(1);
       const callArgs = executeSpy.mock.calls[0][0];
