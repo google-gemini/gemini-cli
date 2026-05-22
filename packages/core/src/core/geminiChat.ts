@@ -850,7 +850,7 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
-      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+      const finalContents = stripToolCallIds(contentsToUse);
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
@@ -1441,31 +1441,27 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
 }
 
-export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
+export function stripToolCallIds(contents: Content[]): Content[] {
   return contents.map((content) => ({
     ...content,
     parts: (content.parts || []).map((part) => {
       const newPart = { ...part };
       if (newPart.functionCall) {
         const fc = newPart.functionCall;
-        const name = fc.name?.trim() || 'generic_tool';
-        if (fc.id && fc.id.startsWith(`${name}__`)) {
-          newPart.functionCall = {
-            name: fc.name,
-            args: fc.args,
-            id: fc.id.substring(name.length + 2),
-          };
+        if ('id' in fc) {
+          // Gemini API does not accept `id` in functionCall.
+          // Always strip it before sending to the API.
+          const { id: _id, ...rest } = fc;
+          newPart.functionCall = rest;
         }
       }
       if (newPart.functionResponse) {
         const fr = newPart.functionResponse;
-        const name = fr.name?.trim() || 'generic_tool';
-        if (fr.id && fr.id.startsWith(`${name}__`)) {
-          newPart.functionResponse = {
-            name: fr.name,
-            response: fr.response,
-            id: fr.id.substring(name.length + 2),
-          };
+        if ('id' in fr) {
+          // Gemini API does not accept `id` in functionResponse.
+          // Always strip it before sending to the API.
+          const { id: _id, ...rest } = fr;
+          newPart.functionResponse = rest;
         }
       }
       return newPart;

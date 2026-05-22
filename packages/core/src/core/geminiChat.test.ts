@@ -18,7 +18,7 @@ import {
   StreamEventType,
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
-  stripToolCallIdPrefixes,
+  stripToolCallIds,
   type HistoryTurn,
 } from './geminiChat.js';
 import {
@@ -2985,21 +2985,48 @@ describe('GeminiChat', () => {
     });
   });
 
-  describe('stripToolCallIdPrefixes', () => {
-    it('should strip tool name prefix matching the tool name', () => {
+  describe('stripToolCallIds', () => {
+    it.each<{ desc: string; id: string; name: string }>([
+      {
+        desc: 'prefixed id matching tool name',
+        id: 'my_tool__call_123',
+        name: 'my_tool',
+      },
+      {
+        desc: 'non-matching prefix',
+        id: 'other_tool__call_123',
+        name: 'my_tool',
+      },
+      {
+        desc: 'whitespace tool name',
+        id: 'generic_tool__call_123',
+        name: '  ',
+      },
+      {
+        desc: 'empty string id',
+        id: '',
+        name: 'my_tool',
+      },
+    ])(
+      'should strip functionCall id and preserve other fields ($desc)',
+      ({ id, name }) => {
+        const contents: Content[] = [
+          {
+            role: 'model',
+            parts: [{ functionCall: { id, name, args: { key: 'value' } } }],
+          },
+        ];
+        const stripped = stripToolCallIds(contents);
+        expect(stripped[0].parts![0].functionCall!.id).toBeUndefined();
+        expect(stripped[0].parts![0].functionCall!.name).toBe(name);
+        expect(stripped[0].parts![0].functionCall!.args).toEqual({
+          key: 'value',
+        });
+      },
+    );
+
+    it('should strip functionResponse id and preserve other fields', () => {
       const contents: Content[] = [
-        {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                id: 'my_tool__call_123',
-                name: 'my_tool',
-                args: {},
-              },
-            },
-          ],
-        },
         {
           role: 'user',
           parts: [
@@ -3013,24 +3040,20 @@ describe('GeminiChat', () => {
           ],
         },
       ];
-
-      const stripped = stripToolCallIdPrefixes(contents);
-      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
-      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+      const stripped = stripToolCallIds(contents);
+      expect(stripped[0].parts![0].functionResponse!.id).toBeUndefined();
+      expect(stripped[0].parts![0].functionResponse!.name).toBe('my_tool');
+      expect(stripped[0].parts![0].functionResponse!.response).toEqual({
+        result: 'success',
+      });
     });
 
-    it('should correctly handle tool names that contain double underscores', () => {
+    it('should be a no-op when neither functionCall nor functionResponse has an id', () => {
       const contents: Content[] = [
         {
           role: 'model',
           parts: [
-            {
-              functionCall: {
-                id: 'my__custom__tool__call_abc',
-                name: 'my__custom__tool',
-                args: {},
-              },
-            },
+            { functionCall: { name: 'my_tool', args: { key: 'value' } } },
           ],
         },
         {
@@ -3038,73 +3061,22 @@ describe('GeminiChat', () => {
           parts: [
             {
               functionResponse: {
-                id: 'my__custom__tool__call_abc',
-                name: 'my__custom__tool',
-                response: { result: 'success' },
-              },
-            },
-          ],
-        },
-      ];
-
-      const stripped = stripToolCallIdPrefixes(contents);
-      expect(stripped[0].parts![0].functionCall!.id).toBe('call_abc');
-      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_abc');
-    });
-
-    it('should not strip if prefix does not match the tool name', () => {
-      const contents: Content[] = [
-        {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                id: 'other_tool__call_123',
                 name: 'my_tool',
-                args: {},
+                response: { result: 'ok' },
               },
             },
           ],
         },
       ];
-
-      const stripped = stripToolCallIdPrefixes(contents);
-      expect(stripped[0].parts![0].functionCall!.id).toBe(
-        'other_tool__call_123',
-      );
-    });
-
-    it('should correctly handle fallback to generic_tool when name is missing or has whitespace', () => {
-      const contents: Content[] = [
-        {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                id: 'generic_tool__call_123',
-                name: '  ',
-                args: {},
-              },
-            },
-          ],
-        },
-        {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                id: 'generic_tool__call_123',
-                name: undefined as unknown as string,
-                response: { result: 'success' },
-              },
-            },
-          ],
-        },
-      ];
-
-      const stripped = stripToolCallIdPrefixes(contents);
-      expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
-      expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+      const stripped = stripToolCallIds(contents);
+      expect(stripped[0].parts![0].functionCall).toEqual({
+        name: 'my_tool',
+        args: { key: 'value' },
+      });
+      expect(stripped[1].parts![0].functionResponse).toEqual({
+        name: 'my_tool',
+        response: { result: 'ok' },
+      });
     });
   });
 });
