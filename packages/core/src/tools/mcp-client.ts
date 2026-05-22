@@ -288,11 +288,6 @@ export class McpClient implements McpProgressReporter {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
-    for (const registries of this.registeredRegistries) {
-      registries.toolRegistry.removeMcpToolsByServer(this.serverName);
-      registries.promptRegistry.removePromptsByServer(this.serverName);
-      registries.resourceRegistry.removeResourcesByServer(this.serverName);
-    }
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -759,12 +754,14 @@ export class McpClient implements McpProgressReporter {
               );
             }
 
-            registries.toolRegistry.removeMcpToolsByServer(this.serverName);
+            if (newTools.length > 0) {
+              registries.toolRegistry.removeMcpToolsByServer(this.serverName);
 
-            for (const tool of newTools) {
-              registries.toolRegistry.registerTool(tool);
+              for (const tool of newTools) {
+                registries.toolRegistry.registerTool(tool);
+              }
+              registries.toolRegistry.sortTools();
             }
-            registries.toolRegistry.sortTools();
           }
         } catch (err) {
           debugLogger.error(
