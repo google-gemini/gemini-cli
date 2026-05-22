@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
@@ -1305,6 +1306,17 @@ export class Config implements McpContext, AgentLoopContext {
     this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
+    if (this.ephemeral) {
+      const uniqueSuffix = `${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+      const ephemeralRoot = path.join(
+        os.tmpdir(),
+        'gemini-cli-ephemeral',
+        uniqueSuffix,
+      );
+      this.storage.setEphemeralTempDir(ephemeralRoot);
+    }
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;

@@ -249,6 +249,10 @@ export async function parseArguments(
         return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
       }
 
+      if (argv['ephemeral'] && sessionFlags > 0) {
+        return '--ephemeral cannot be combined with --resume, --session-id, or --session-file. Ephemeral runs are not persisted, so there is nothing to resume.';
+      }
+
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
       }
@@ -401,7 +405,7 @@ export async function parseArguments(
         .option('ephemeral', {
           type: 'boolean',
           description:
-            'Run without saving chat history or checkpoint data to disk.',
+            'Redirect per-run writes (chat history, checkpoints, tool outputs, RAG logs, shell history) out of the user home for the current process.',
           default: false,
         })
         .option('resume', {

@@ -33,10 +33,26 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
+  private ephemeralTempDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+  }
+
+  /**
+   * Redirects `getProjectTempDir()` (and everything derived from it, such as
+   * `chats/`, `tool-outputs/`, `logs/`, `plans/`, `tracker/`, `checkpoints/`,
+   * `memory/`, and `shell_history`) to a process-local directory outside of
+   * `~/.gemini/`. Set by the CLI when `--ephemeral` is used so that nothing the
+   * agent produces during the current run is persisted under the user's home
+   * directory.
+   *
+   * When set, `initialize()` becomes a no-op (the project registry is not
+   * consulted) and `getProjectTempDir()` returns this path directly.
+   */
+  setEphemeralTempDir(dir: string): void {
+    this.ephemeralTempDir = dir;
   }
 
   setCustomPlansDir(dir: string | undefined): void {
@@ -179,6 +195,9 @@ export class Storage {
   }
 
   getProjectTempDir(): string {
+    if (this.ephemeralTempDir) {
+      return this.ephemeralTempDir;
+    }
     const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
     return path.join(tempDir, identifier);
@@ -230,6 +249,13 @@ export class Storage {
       return this.initPromise;
     }
 
+    if (this.ephemeralTempDir) {
+      this.initPromise = (async () => {
+        this.projectIdentifier = 'ephemeral';
+      })();
+      return this.initPromise;
+    }
+
     this.initPromise = (async () => {
       if (this.projectIdentifier) {
         return;
@@ -273,6 +299,9 @@ export class Storage {
   }
 
   getHistoryDir(): string {
+    if (this.ephemeralTempDir) {
+      return path.join(this.ephemeralTempDir, 'history');
+    }
     const identifier = this.getProjectIdentifier();
     const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
     return path.join(historyDir, identifier);

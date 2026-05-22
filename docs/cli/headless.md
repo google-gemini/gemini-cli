@@ -18,8 +18,22 @@ the current conversation should not be persisted to disk:
 gemini --ephemeral -p "summarize this repository"
 ```
 
-Ephemeral mode disables chat-history recording and automatic checkpointing for
-the current process. Existing settings and credentials are still read normally.
+Ephemeral mode redirects every per-run write that would normally land under
+`~/.gemini/tmp/<project_hash>/` to a process-local directory under the system
+temp dir, and disables automatic checkpointing for the current process.
+Concretely, this means the following are not persisted to your home directory
+for the run:
+
+- Chat history (the `chats/` JSONL).
+- Conversation checkpoints used by `/restore`.
+- Truncated tool outputs and tool-output masking dumps (`tool-outputs/`).
+- RAG snippet trace logs (`logs/rag-trace.log`).
+- Shell command history (`shell_history`).
+- Plans, tracker, and tasks scratch directories created for the session.
+
+Settings, authentication credentials, and the global project registry are still
+read normally; only the per-run writes above are redirected. `--ephemeral`
+cannot be combined with `--resume`, `--session-id`, or `--session-file`.
 
 ### Output formats
 

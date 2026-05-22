@@ -267,6 +267,32 @@ describe('parseArguments', () => {
     expect(config.getCheckpointingEnabled()).toBe(false);
   });
 
+  it('should redirect project temp dir out of the user home in ephemeral mode', async () => {
+    process.argv = ['node', 'script.js', '--ephemeral'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    await config.storage.initialize();
+
+    const tempDir = config.storage.getProjectTempDir();
+    const historyDir = config.storage.getHistoryDir();
+    expect(tempDir.startsWith(os.tmpdir())).toBe(true);
+    expect(tempDir.includes('.gemini')).toBe(false);
+    expect(historyDir.startsWith(tempDir)).toBe(true);
+  });
+
+  it('should reject --ephemeral combined with --resume', async () => {
+    process.argv = ['node', 'script.js', '--ephemeral', '--resume', 'latest'];
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+  });
+
   describe('worktree', () => {
     it('should parse --worktree flag when provided with a name', async () => {
       process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
