@@ -9,9 +9,45 @@ import path from 'node:path';
 
 import { describe, expect } from 'vitest';
 
-import { evalTest, TEST_AGENTS } from './test-helper.js';
+import { AGENT_TOOL_NAME } from '@google/gemini-cli-core';
+import { evalTest, TEST_AGENTS, TestRig } from './test-helper.js';
 
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
+
+/**
+ * Helper to verify that a specific subagent was successfully invoked via the unified tool.
+ */
+async function expectSubagentCall(rig: TestRig, agentName: string) {
+  await rig.expectToolCallSuccess(
+    [AGENT_TOOL_NAME],
+    undefined,
+    (args: string) => {
+      try {
+        const parsed = JSON.parse(args);
+        return parsed.agent_name === agentName;
+      } catch {
+        return false;
+      }
+    },
+  );
+}
+
+/**
+ * Helper to check if a subagent (either via unified tool or direct name) was called.
+ */
+function isSubagentCalled(toolLogs: any[], agentName: string): boolean {
+  return toolLogs.some((l) => {
+    if (l.toolRequest.name === AGENT_TOOL_NAME) {
+      try {
+        const args = JSON.parse(l.toolRequest.args);
+        return args.agent_name === agentName;
+      } catch {
+        return false;
+      }
+    }
+    return l.toolRequest.name === agentName;
+  });
+}
 
 // A minimal package.json is used to provide a realistic workspace anchor.
 // This prevents the agent from making incorrect assumptions about the environment
@@ -62,7 +98,7 @@ describe('subagent eval test cases', () => {
       'README.md': 'TODO: update the README.\n',
     },
     assert: async (rig, _result) => {
-      await rig.expectToolCallSuccess([TEST_AGENTS.DOCS_AGENT.name]);
+      await expectSubagentCall(rig, TEST_AGENTS.DOCS_AGENT.name);
     },
   });
 
@@ -99,14 +135,10 @@ describe('subagent eval test cases', () => {
       }>;
 
       expect(updatedIndex).toContain('export const sum =');
-      expect(
-        toolLogs.some(
-          (l) => l.toolRequest.name === TEST_AGENTS.DOCS_AGENT.name,
-        ),
-      ).toBe(false);
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+      expect(isSubagentCalled(toolLogs, TEST_AGENTS.DOCS_AGENT.name)).toBe(
         false,
       );
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -140,13 +172,11 @@ describe('subagent eval test cases', () => {
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
+        toolRequest: { name: string; args: string };
       }>;
 
-      await rig.expectToolCallSuccess([TEST_AGENTS.TESTING_AGENT.name]);
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
-        false,
-      );
+      await expectSubagentCall(rig, TEST_AGENTS.TESTING_AGENT.name);
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -181,18 +211,15 @@ describe('subagent eval test cases', () => {
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
+        toolRequest: { name: string; args: string };
       }>;
       const readme = readProjectFile(rig, 'README.md');
 
-      await rig.expectToolCallSuccess([
-        TEST_AGENTS.DOCS_AGENT.name,
-        TEST_AGENTS.TESTING_AGENT.name,
-      ]);
+      await expectSubagentCall(rig, TEST_AGENTS.DOCS_AGENT.name);
+      await expectSubagentCall(rig, TEST_AGENTS.TESTING_AGENT.name);
+
       expect(readme).not.toContain('TODO: update the README.');
-      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
-        false,
-      );
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -219,14 +246,11 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
-      const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
-      }>;
-      await rig.expectToolCallSuccess(['database-agent']);
+      const toolLogs = rig.readToolLogs();
+      await expectSubagentCall(rig, TEST_AGENTS.DATABASE_AGENT.name);
 
       // Ensure the generalist and other irrelevant specialists were not invoked
       const uncalledAgents = [
-        'generalist',
         TEST_AGENTS.DOCS_AGENT.name,
         TEST_AGENTS.TESTING_AGENT.name,
         TEST_AGENTS.CSS_AGENT.name,
@@ -239,10 +263,9 @@ describe('subagent eval test cases', () => {
       ];
 
       for (const agentName of uncalledAgents) {
-        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
-          false,
-        );
+        expect(isSubagentCalled(toolLogs, agentName)).toBe(false);
       }
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 
@@ -274,14 +297,11 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
-      const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
-      }>;
-      await rig.expectToolCallSuccess(['database-agent']);
+      const toolLogs = rig.readToolLogs();
+      await expectSubagentCall(rig, TEST_AGENTS.DATABASE_AGENT.name);
 
       // Ensure the generalist and other irrelevant specialists were not invoked
       const uncalledAgents = [
-        'generalist',
         TEST_AGENTS.DOCS_AGENT.name,
         TEST_AGENTS.TESTING_AGENT.name,
         TEST_AGENTS.CSS_AGENT.name,
@@ -294,10 +314,9 @@ describe('subagent eval test cases', () => {
       ];
 
       for (const agentName of uncalledAgents) {
-        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
-          false,
-        );
+        expect(isSubagentCalled(toolLogs, agentName)).toBe(false);
       }
+      expect(isSubagentCalled(toolLogs, 'generalist')).toBe(false);
     },
   });
 });

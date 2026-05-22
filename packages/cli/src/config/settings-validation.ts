@@ -25,10 +25,10 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   if (def.type === 'string') {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if (def.enum) return z.enum(def.enum as [string, ...string[]]);
-    return z.string();
+    return buildPrimitiveSchema('string');
   }
-  if (def.type === 'number') return z.number();
-  if (def.type === 'boolean') return z.boolean();
+  if (def.type === 'number') return buildPrimitiveSchema('number');
+  if (def.type === 'boolean') return buildPrimitiveSchema('boolean');
 
   if (def.type === 'array') {
     if (def.items) {
@@ -133,9 +133,22 @@ function buildPrimitiveSchema(
     case 'string':
       return z.string();
     case 'number':
-      return z.number();
+      return z.preprocess((val) => {
+        if (typeof val === 'string' && val.trim() !== '') {
+          const num = Number(val);
+          if (!isNaN(num)) return num;
+        }
+        return val;
+      }, z.number());
     case 'boolean':
-      return z.boolean();
+      return z.preprocess((val) => {
+        if (typeof val === 'string') {
+          const lower = val.toLowerCase();
+          if (lower === 'true') return true;
+          if (lower === 'false') return false;
+        }
+        return val;
+      }, z.boolean());
     default:
       return z.unknown();
   }
@@ -160,7 +173,9 @@ function buildZodSchemaFromDefinition(
   if (definition.ref === 'TelemetrySettings') {
     const objectSchema = REF_SCHEMAS['TelemetrySettings'];
     if (objectSchema) {
-      return z.union([z.boolean(), objectSchema]).optional();
+      return z
+        .union([buildPrimitiveSchema('boolean'), objectSchema])
+        .optional();
     }
   }
 

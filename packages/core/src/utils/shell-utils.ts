@@ -15,8 +15,39 @@ import {
 } from 'node:child_process';
 
 /**
+ * The exact HUP-signal guard preamble injected by ensureHupIgnored().
+ * Exported so shellExecutionService and stripShellWrapper stay in sync.
+ */
+export const BASH_HUP_GUARD = `trap '' HUP;`;
+
+/**
+ * Strips the SIGHUP guard prepended by ensureHupIgnored() from a command.
+ *
+ * This is intentionally narrow: it only removes the exact literal string
+ * `trap '' HUP; ` from the very start of a command. It does NOT
+ * skip or ignore arbitrary user-supplied `trap` commands, which would be a
+ * sandbox-bypass vector (e.g., `trap 'rm -rf /' EXIT; git status`).
+ */
+export function stripHupGuard(command: string): string {
+  const trimmed = command.trimStart();
+  const prefix = `${BASH_HUP_GUARD} `;
+  if (trimmed.startsWith(prefix)) {
+    return trimmed.slice(prefix.length);
+  }
+  // Handle case where there's no trailing space (e.g., guard is the whole command)
+  if (trimmed === BASH_HUP_GUARD) {
+    return '';
+  }
+  return command;
+}
+
+/**
  * Extracts the primary command name from a potentially wrapped shell command.
- * Strips shell wrappers and handles shopt/set/etc.
+ * Strips shell wrappers (including our own HUP guard) and handles shopt/set/etc.
+ *
+ * Returns the command name only when there is exactly ONE non-builtin root so
+ * that chained commands (e.g. `git; malicious_cmd`) never silently inherit the
+ * first command's sandbox permissions.
  *
  * @param command - The full command string.
  * @param args - The arguments for the command.
@@ -32,7 +63,10 @@ export async function getCommandName(
   const roots = getCommandRoots(stripped).filter(
     (r) => r !== 'shopt' && r !== 'set',
   );
-  if (roots.length > 0) {
+  // Single-root enforcement: only grant named-command permissions when the
+  // command is unambiguous. Multi-root chains fall back to basename so that
+  // `git; malicious_cmd` never inherits `git`'s sandbox policy.
+  if (roots.length === 1) {
     return roots[0];
   }
   return path.basename(command);
@@ -76,29 +110,30 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-export async function resolveExecutable(
-  exe: string,
-): Promise<string | undefined> {
-  if (path.isAbsolute(exe)) {
-    try {
-      await fs.promises.access(exe, fs.constants.X_OK);
-      return exe;
-    } catch {
-      return undefined;
-    }
+function isExecutable(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  const paths = (process.env['PATH'] || '').split(path.delimiter);
+}
+
+export function resolveExecutable(exe: string): string | undefined {
+  if (path.isAbsolute(exe)) {
+    return isExecutable(exe) ? exe : undefined;
+  }
+  const pathEnv = process.env['PATH'];
+  if (!pathEnv) {
+    return undefined;
+  }
   const extensions =
     os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
-
-  for (const p of paths) {
+  for (const dir of pathEnv.split(path.delimiter)) {
     for (const ext of extensions) {
-      const fullPath = path.join(p, exe + ext);
-      try {
-        await fs.promises.access(fullPath, fs.constants.X_OK);
+      const fullPath = path.join(dir, exe + ext);
+      if (isExecutable(fullPath)) {
         return fullPath;
-      } catch {
-        continue;
       }
     }
   }
@@ -240,11 +275,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +399,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -632,10 +679,23 @@ export function parseCommandDetails(
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, PowerShell 7 (pwsh.exe) is preferred over Windows PowerShell 5.1
+ * (powershell.exe) when available on PATH. Windows PowerShell 5.1 silently
+ * strips embedded double quotes from arguments to native executables — see
+ * issue #25859. PowerShell 7 uses standards-compliant argument passing and
+ * does not exhibit this regression. When pwsh.exe is not installed, we fall
+ * back to powershell.exe to preserve the existing behavior and the full
+ * cmdlet surface users depend on.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // -NonInteractive prevents PSReadLine from intercepting console input
+    // events inside the ConPTY session, which otherwise causes interactive
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
+    // and exit when arrow keys are pressed.
+    const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
@@ -645,16 +705,25 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: powershellArgsPrefix,
           shell: 'powershell',
         };
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
+    const pwshPath = resolveExecutable('pwsh.exe');
+    if (pwshPath) {
+      return {
+        executable: pwshPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: powershellArgsPrefix,
       shell: 'powershell',
     };
   }
@@ -683,9 +752,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':
@@ -800,6 +877,7 @@ export function stripShellWrapper(command: string): string {
   const pattern =
     /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
+  let result: string;
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
     if (
@@ -808,9 +886,13 @@ export function stripShellWrapper(command: string): string {
     ) {
       newCommand = newCommand.substring(1, newCommand.length - 1);
     }
-    return newCommand;
+    result = newCommand;
+  } else {
+    result = command.trim();
   }
-  return command.trim();
+  // Peel off the SIGHUP guard that ensureHupIgnored() prepends so that
+  // sandbox managers see the actual user command, not our preamble.
+  return stripHupGuard(result);
 }
 
 /**
@@ -1019,4 +1101,120 @@ export async function* execStreaming(
   } finally {
     prepared.cleanup?.();
   }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

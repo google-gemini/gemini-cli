@@ -8,18 +8,21 @@ import {
   buildSeatbeltProfile,
   escapeSchemeString,
 } from './seatbeltArgsBuilder.js';
-import * as fsUtils from '../utils/fsUtils.js';
+import type { ResolvedSandboxPaths } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 import os from 'node:os';
 
-vi.mock('../utils/fsUtils.js', async () => {
-  const actual = await vi.importActual('../utils/fsUtils.js');
-  return {
-    ...actual,
-    tryRealpath: vi.fn((p) => p),
-    resolveGitWorktreePaths: vi.fn(() => ({})),
-  };
-});
+const defaultResolvedPaths: ResolvedSandboxPaths = {
+  workspace: {
+    resolved: '/Users/test/workspace',
+    original: '/Users/test/raw-workspace',
+  },
+  forbidden: [],
+  globalIncludes: [],
+  policyAllowed: [],
+  policyRead: [],
+  policyWrite: [],
+};
 
 describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
   afterEach(() => {
@@ -35,12 +38,8 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
 
   describe('buildSeatbeltProfile', () => {
     it('should build a strict allowlist profile allowing the workspace', () => {
-      vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
-
       const profile = buildSeatbeltProfile({
-        workspace: '/Users/test/workspace',
-        allowedPaths: [],
-        forbiddenPaths: [],
+        resolvedPaths: defaultResolvedPaths,
       });
 
       expect(profile).toContain('(version 1)');
@@ -51,11 +50,11 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
     });
 
     it('should allow network when networkAccess is true', () => {
-      vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
       const profile = buildSeatbeltProfile({
-        workspace: '/test',
-        allowedPaths: [],
-        forbiddenPaths: [],
+        resolvedPaths: {
+          ...defaultResolvedPaths,
+          workspace: { resolved: '/test', original: '/test' },
+        },
         networkAccess: true,
       });
       expect(profile).toContain('(allow network-outbound)');
@@ -63,7 +62,6 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
 
     describe('governance files', () => {
       it('should inject explicit deny rules for governance files', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p.toString());
         vi.spyOn(fs, 'existsSync').mockReturnValue(true);
         vi.spyOn(fs, 'lstatSync').mockImplementation(
           (p) =>
@@ -74,9 +72,13 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
         );
 
         const profile = buildSeatbeltProfile({
-          workspace: '/test/workspace',
-          allowedPaths: [],
-          forbiddenPaths: [],
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            workspace: {
+              resolved: '/test/workspace',
+              original: '/test/workspace',
+            },
+          },
         });
 
         expect(profile).toContain(
@@ -87,48 +89,16 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
           `(deny file-write* (subpath "/test/workspace/.git"))`,
         );
       });
-
-      it('should protect both the symlink and the real path if they differ', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => {
-          if (p === '/test/workspace/.gitignore')
-            return '/test/real/.gitignore';
-          return p.toString();
-        });
-        vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-        vi.spyOn(fs, 'lstatSync').mockImplementation(
-          () =>
-            ({
-              isDirectory: () => false,
-              isFile: () => true,
-            }) as unknown as fs.Stats,
-        );
-
-        const profile = buildSeatbeltProfile({
-          workspace: '/test/workspace',
-          allowedPaths: [],
-          forbiddenPaths: [],
-        });
-
-        expect(profile).toContain(
-          `(deny file-write* (literal "/test/workspace/.gitignore"))`,
-        );
-        expect(profile).toContain(
-          `(deny file-write* (literal "/test/real/.gitignore"))`,
-        );
-      });
     });
 
     describe('allowedPaths', () => {
-      it('should embed allowed paths and normalize them', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => {
-          if (p === '/test/symlink') return '/test/real_path';
-          return p;
-        });
-
+      it('should embed allowed paths', () => {
         const profile = buildSeatbeltProfile({
-          workspace: '/test',
-          allowedPaths: ['/custom/path1', '/test/symlink'],
-          forbiddenPaths: [],
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            workspace: { resolved: '/test', original: '/test' },
+            policyAllowed: ['/custom/path1', '/test/real_path'],
+          },
         });
 
         expect(profile).toContain(`(subpath "/custom/path1")`);
@@ -138,12 +108,12 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
 
     describe('forbiddenPaths', () => {
       it('should explicitly deny forbidden paths', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
-
         const profile = buildSeatbeltProfile({
-          workspace: '/test',
-          allowedPaths: [],
-          forbiddenPaths: ['/secret/path'],
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            workspace: { resolved: '/test', original: '/test' },
+            forbidden: ['/secret/path'],
+          },
         });
 
         expect(profile).toContain(
@@ -151,50 +121,75 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
         );
       });
 
-      it('resolves forbidden symlink paths to their real paths', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => {
-          if (p === '/test/symlink' || p === '/test/missing-dir') {
-            return '/test/real_path';
-          }
-          return p;
-        });
-
-        const profile = buildSeatbeltProfile({
-          workspace: '/test',
-          allowedPaths: [],
-          forbiddenPaths: ['/test/symlink'],
-        });
-
-        expect(profile).toContain(
-          `(deny file-read* file-write* (subpath "/test/real_path"))`,
-        );
-      });
-
-      it('explicitly denies non-existent forbidden paths to prevent creation', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
-
-        const profile = buildSeatbeltProfile({
-          workspace: '/test',
-          allowedPaths: [],
-          forbiddenPaths: ['/test/missing-dir/missing-file.txt'],
-        });
-
-        expect(profile).toContain(
-          `(deny file-read* file-write* (subpath "/test/missing-dir/missing-file.txt"))`,
-        );
-      });
-
       it('should override allowed paths if a path is also in forbidden paths', () => {
-        vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
-
         const profile = buildSeatbeltProfile({
-          workspace: '/test',
-          allowedPaths: ['/custom/path1'],
-          forbiddenPaths: ['/custom/path1'],
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            workspace: { resolved: '/test', original: '/test' },
+            policyAllowed: ['/custom/path1'],
+            forbidden: ['/custom/path1'],
+          },
         });
 
         const allowString = `(allow file-read* file-write* (subpath "/custom/path1"))`;
         const denyString = `(deny file-read* file-write* (subpath "/custom/path1"))`;
+
+        expect(profile).toContain(allowString);
+        expect(profile).toContain(denyString);
+
+        const allowIndex = profile.indexOf(allowString);
+        const denyIndex = profile.indexOf(denyString);
+        expect(denyIndex).toBeGreaterThan(allowIndex);
+      });
+    });
+
+    describe('git worktree paths', () => {
+      it('enforces read-only binding for git worktrees even if workspaceWrite is true', () => {
+        const worktreeGitDir = '/path/to/worktree/.git';
+        const mainGitDir = '/path/to/main/.git';
+
+        const profile = buildSeatbeltProfile({
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            gitWorktree: {
+              worktreeGitDir,
+              mainGitDir,
+            },
+          },
+          workspaceWrite: true,
+        });
+
+        // Should grant read access
+        expect(profile).toContain(
+          `(allow file-read* (subpath "${worktreeGitDir}"))`,
+        );
+        expect(profile).toContain(
+          `(allow file-read* (subpath "${mainGitDir}"))`,
+        );
+
+        // Should NOT grant write access
+        expect(profile).not.toContain(
+          `(allow file-read* file-write* (subpath "${worktreeGitDir}"))`,
+        );
+        expect(profile).not.toContain(
+          `(allow file-read* file-write* (subpath "${mainGitDir}"))`,
+        );
+      });
+
+      it('git worktree read-only rules should override previous policyAllowed write paths', () => {
+        const worktreeGitDir = '/custom/worktree/.git';
+        const profile = buildSeatbeltProfile({
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            policyAllowed: ['/custom/worktree'],
+            gitWorktree: {
+              worktreeGitDir,
+            },
+          },
+        });
+
+        const allowString = `(allow file-read* file-write* (subpath "/custom/worktree"))`;
+        const denyString = `(deny file-write* (subpath "${worktreeGitDir}"))`;
 
         expect(profile).toContain(allowString);
         expect(profile).toContain(denyString);

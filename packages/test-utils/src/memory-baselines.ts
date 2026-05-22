@@ -10,9 +10,10 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
  * Baseline entry for a single memory test scenario.
  */
 export interface MemoryBaseline {
-  heapUsedBytes: number;
-  heapTotalBytes: number;
-  rssBytes: number;
+  heapUsedMB: number;
+  heapTotalMB: number;
+  rssMB: number;
+  externalMB: number;
   timestamp: string;
 }
 
@@ -60,16 +61,18 @@ export function updateBaseline(
   path: string,
   scenarioName: string,
   measured: {
-    heapUsedBytes: number;
-    heapTotalBytes: number;
-    rssBytes: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+    rssMB: number;
+    externalMB: number;
   },
 ): void {
   const baselines = loadBaselines(path);
   baselines.scenarios[scenarioName] = {
-    heapUsedBytes: measured.heapUsedBytes,
-    heapTotalBytes: measured.heapTotalBytes,
-    rssBytes: measured.rssBytes,
+    heapUsedMB: measured.heapUsedMB,
+    heapTotalMB: measured.heapTotalMB,
+    rssMB: measured.rssMB,
+    externalMB: measured.externalMB,
     timestamp: new Date().toISOString(),
   };
   saveBaselines(path, baselines);

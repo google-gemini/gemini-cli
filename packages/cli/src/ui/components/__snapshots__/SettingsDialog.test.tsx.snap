@@ -19,8 +19,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -31,9 +34,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -41,6 +41,24 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`SettingsDialog > Initial Rendering > should render the bottom border correctly when height is constrained 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ ╰─Search to filter─────────────────────────────────────────────────────────────────────────────╯ │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│  ▼ Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
@@ -65,8 +83,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -76,9 +97,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -111,8 +129,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Auto Update                                                                     true*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -122,9 +143,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -157,8 +175,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -168,9 +189,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -203,8 +221,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -214,9 +235,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -249,8 +267,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -260,9 +281,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -295,8 +313,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -306,9 +327,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -341,8 +359,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -352,9 +373,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -387,8 +405,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion.            │
+│    Enable Terminal Notifications                                                          false  │
+│    Enable terminal run-event notifications for action-required prompts and session com…          │
+│                                                                                                  │
+│    Terminal Notification Method                                                            Auto  │
+│    How to send terminal notifications.                                                           │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
 │    Enable Plan Mode for read-only safety during planning.                                        │
@@ -398,9 +419,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
-│                                                                                                  │
-│    Retry Fetch Errors                                                                      true  │
-│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

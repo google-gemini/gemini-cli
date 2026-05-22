@@ -9,6 +9,7 @@ import {
   type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import {
   DEFAULT_QUERY_STRING,
@@ -16,6 +17,7 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  SubagentState,
   getAgentCardLoadOptions,
   getRemoteAgentTargetUrl,
 } from './types.js';
@@ -28,7 +30,6 @@ import type {
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import { A2AAgentError } from './a2a-errors.js';
 
@@ -126,10 +127,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(
-    _signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput | SubagentProgress) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: _signal, updateOutput } = options;
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
@@ -140,13 +139,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         updateOutput({
           isSubagentProgress: true,
           agentName,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: [
             {
               id: 'pending',
               type: 'thought',
               content: 'Working...',
-              status: 'running',
+              status: SubagentState.RUNNING,
             },
           ],
         });
@@ -195,7 +194,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           updateOutput({
             isSubagentProgress: true,
             agentName,
-            state: 'running',
+            state: SubagentState.RUNNING,
             recentActivity: reassembler.toActivityItems(),
             result: reassembler.toString(),
           });
@@ -227,7 +226,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const finalProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: finalOutput,
         recentActivity: reassembler.toActivityItems(),
       };
@@ -251,7 +250,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const errorProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: 'error',
+        state: SubagentState.ERROR,
         result: fullDisplay,
         recentActivity: reassembler.toActivityItems(),
       };

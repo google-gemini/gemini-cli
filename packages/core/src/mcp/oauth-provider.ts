@@ -616,4 +616,74 @@ ${authUrl}
 
     return null;
   }
+  async getValidTokenWithMetadata(
+    serverName: string,
+    config: MCPOAuthConfig,
+  ): Promise<{
+    accessToken: string;
+    tokenType: string;
+    expiresAt?: number;
+    scope?: string;
+    refreshToken?: string;
+  } | null> {
+    const credentials = await this.tokenStorage.getCredentials(serverName);
+    if (!credentials) return null;
+
+    let current = credentials.token;
+
+    if (this.tokenStorage.isTokenExpired(current)) {
+      const clientId = config.clientId ?? credentials.clientId;
+      if (current.refreshToken && clientId && credentials.tokenUrl) {
+        try {
+          const newTokenResponse = await this.refreshAccessToken(
+            config,
+            current.refreshToken,
+            credentials.tokenUrl,
+            credentials.mcpServerUrl,
+          );
+
+          const refreshed: OAuthToken = {
+            accessToken: newTokenResponse.access_token,
+            tokenType: newTokenResponse.token_type,
+            refreshToken:
+              newTokenResponse.refresh_token || current.refreshToken,
+            scope: newTokenResponse.scope || current.scope,
+          };
+
+          if (newTokenResponse.expires_in) {
+            refreshed.expiresAt =
+              Date.now() + newTokenResponse.expires_in * 1000;
+          }
+
+          await this.tokenStorage.saveToken(
+            serverName,
+            refreshed,
+            clientId,
+            credentials.tokenUrl,
+            credentials.mcpServerUrl,
+          );
+
+          current = refreshed;
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            'Failed to refresh auth token.',
+            error,
+          );
+          await this.tokenStorage.deleteCredentials(serverName);
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+
+    return {
+      accessToken: current.accessToken,
+      tokenType: current.tokenType || 'Bearer',
+      expiresAt: current.expiresAt,
+      scope: current.scope,
+      refreshToken: current.refreshToken,
+    };
+  }
 }

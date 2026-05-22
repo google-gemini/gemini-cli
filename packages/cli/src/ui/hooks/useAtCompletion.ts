@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import * as path from 'node:path';
 import {
@@ -170,13 +170,13 @@ async function searchResourceCandidates(
     selector: (candidate: ResourceSuggestionCandidate) => candidate.searchKey,
   });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const results = await fzf.find(normalizedPattern, {
-    limit: MAX_SUGGESTIONS_TO_SHOW * 3,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return results.map(
-    (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
+  const results: Array<{ item: ResourceSuggestionCandidate }> = await fzf.find(
+    normalizedPattern,
+    {
+      limit: MAX_SUGGESTIONS_TO_SHOW * 3,
+    },
   );
+  return results.map((result) => result.item.suggestion);
 }
 
 async function searchAgentCandidates(
@@ -194,11 +194,13 @@ async function searchAgentCandidates(
     selector: (s: Suggestion) => s.label,
   });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const results = await fzf.find(normalizedPattern, {
-    limit: MAX_SUGGESTIONS_TO_SHOW,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return results.map((r: { item: Suggestion }) => r.item);
+  const results: Array<{ item: Suggestion }> = await fzf.find(
+    normalizedPattern,
+    {
+      limit: MAX_SUGGESTIONS_TO_SHOW,
+    },
+  );
+  return results.map((r) => r.item);
 }
 
 export function useAtCompletion(props: UseAtCompletionProps): void {
@@ -224,15 +226,28 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions(state.isLoading);
   }, [state.isLoading, setIsLoadingSuggestions]);
 
-  const resetFileSearchState = () => {
+  const disposeFileSearchers = useCallback(async () => {
+    const searchers = [...fileSearchMap.current.values()];
     fileSearchMap.current.clear();
     initEpoch.current += 1;
+
+    const closePromises: Array<Promise<void>> = [];
+    for (const searcher of searchers) {
+      if (searcher.close) {
+        closePromises.push(searcher.close());
+      }
+    }
+    await Promise.all(closePromises);
+  }, []);
+
+  const resetFileSearchState = useCallback(() => {
+    void disposeFileSearchers();
     dispatch({ type: 'RESET' });
-  };
+  }, [disposeFileSearchers]);
 
   useEffect(() => {
     resetFileSearchState();
-  }, [cwd, config]);
+  }, [cwd, config, resetFileSearchState]);
 
   useEffect(() => {
     const workspaceContext = config?.getWorkspaceContext?.();
@@ -242,7 +257,18 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       workspaceContext.onDirectoriesChanged(resetFileSearchState);
 
     return unsubscribe;
-  }, [config]);
+  }, [config, resetFileSearchState]);
+
+  useEffect(
+    () => () => {
+      void disposeFileSearchers();
+      searchAbortController.current?.abort();
+      if (slowSearchTimer.current) {
+        clearTimeout(slowSearchTimer.current);
+      }
+    },
+    [disposeFileSearchers],
+  );
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
@@ -295,6 +321,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             ),
             cache: true,
             cacheTtl: 30,
+            enableFileWatcher:
+              config?.getFileFilteringOptions()?.enableFileWatcher ?? false,
             enableRecursiveFileSearch:
               config?.getEnableRecursiveFileSearch() ?? true,
             enableFuzzySearch:

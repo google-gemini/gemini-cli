@@ -451,6 +451,25 @@ describe('retryWithBackoff', () => {
       });
       await vi.runAllTimersAsync();
       await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on undici timeout error codes (UND_ERR_HEADERS_TIMEOUT)', async () => {
+      const error = new Error('Headers timeout error');
+      (error as any).code = 'UND_ERR_HEADERS_TIMEOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
     it('should retry on SSL error code (ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)', async () => {
@@ -497,6 +516,40 @@ describe('retryWithBackoff', () => {
     it('should retry on EPROTO error (generic protocol/SSL error)', async () => {
       const error = new Error('Protocol error');
       (error as any).code = 'EPROTO';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on OpenSSL 3.x SSL error code (ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC)', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on unknown SSL BAD_RECORD_MAC variant via substring fallback', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SOME_FUTURE_BAD_RECORD_MAC';
       const mockFn = vi
         .fn()
         .mockRejectedValueOnce(error)

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import { GeminiAgent } from './acpClient.js';
+import { GeminiAgent } from './acpRpcDispatcher.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
   ApprovalMode,
@@ -28,6 +28,7 @@ import {
 } from '../utils/sessionUtils.js';
 import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
+import { waitFor } from '../test-utils/async.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -99,12 +100,21 @@ describe('GeminiAgent Session Resume', () => {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
       },
+      getMessageBus: vi.fn().mockReturnValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
+      isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      toolRegistry: {
+        getTool: vi.fn().mockReturnValue({ kind: 'read' }),
+      },
       get config() {
         return this;
       },
@@ -167,11 +177,6 @@ describe('GeminiAgent Session Resume', () => {
           ],
         },
       ],
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockConfig as any).toolRegistry = {
-      getTool: vi.fn().mockReturnValue({ kind: 'read' }),
     };
 
     (SessionSelector as unknown as Mock).mockImplementation(() => ({
@@ -239,7 +244,7 @@ describe('GeminiAgent Session Resume', () => {
       }),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       // User message
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({

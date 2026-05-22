@@ -67,6 +67,11 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
+
+      // invoke_agent should be allowed by default (via agents.toml)
+      expect(
+        (await engine.check({ name: 'invoke_agent' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
     });
 
     it('should handle MCP server wildcard patterns correctly', async () => {
@@ -350,8 +355,36 @@ describe('Policy Engine Integration Tests', () => {
         (await engine.check({ name: 'get_internal_docs' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'cli_help' }, undefined)).decision,
+        (
+          await engine.check(
+            { name: 'invoke_agent', args: { agent_name: 'cli_help' } },
+            undefined,
+          )
+        ).decision,
       ).toBe(PolicyDecision.ALLOW);
+
+      // codebase_investigator should be allowed in Plan mode
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'invoke_agent',
+              args: { agent_name: 'codebase_investigator' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Unknown agents should be denied in Plan mode (via catch-all)
+      expect(
+        (
+          await engine.check(
+            { name: 'invoke_agent', args: { agent_name: 'unknown_agent' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
 
       // Other tools should be denied via catch all
       expect(

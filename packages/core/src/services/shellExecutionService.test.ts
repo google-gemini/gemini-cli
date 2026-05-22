@@ -75,6 +75,7 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveExecutable: mockResolveExecutable,
+    spawnAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   };
 });
 vi.mock('node:child_process', async (importOriginal) => {
@@ -119,10 +120,6 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
-vi.mock('../utils/systemEncoding.js', () => ({
-  getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
-}));
-
 const mockProcessKill = vi
   .spyOn(process, 'kill')
   .mockImplementation(() => true);
@@ -208,10 +205,11 @@ describe('ShellExecutionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
-    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
+    mockResolveExecutable.mockImplementation((exe: string) => exe);
     process.env['PATH'] = '/test/path';
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },
@@ -291,7 +289,7 @@ describe('ShellExecutionService', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+          "trap '' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l",
         ],
         expect.any(Object),
       );
@@ -694,7 +692,7 @@ describe('ShellExecutionService', () => {
       );
 
       expect(sigtermCallIndex).toBe(0);
-      expect(sigkillCallIndex).toBe(1);
+      expect(sigkillCallIndex).toBeGreaterThan(0);
       expect(sigtermCallIndex).toBeLessThan(sigkillCallIndex);
 
       expect(result.signal).toBe(9);
@@ -1028,7 +1026,7 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Platform-Specific Behavior', () => {
-    it('should use powershell.exe on Windows', async () => {
+    it('should use powershell.exe on Windows and prefix the command with chcp 65001 for the PTY session', async () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (pty) =>
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
@@ -1036,8 +1034,16 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
-        expect.any(Object),
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'chcp 65001 >$null;dir "foo bar"',
+        ],
+        expect.objectContaining({
+          handleFlowControl: false,
+          useConpty: true,
+        }),
       );
     });
 
@@ -1051,9 +1057,11 @@ describe('ShellExecutionService', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+          'trap \'\' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
-        expect.any(Object),
+        expect.objectContaining({
+          handleFlowControl: true,
+        }),
       );
     });
   });
@@ -1247,6 +1255,8 @@ describe('ShellExecutionService child_process fallback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
 
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -1305,7 +1315,7 @@ describe('ShellExecutionService child_process fallback', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+          "trap '' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l",
         ],
         expect.objectContaining({ shell: false, detached: true }),
       );
@@ -1386,6 +1396,7 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.stdout?.emit('data', Buffer.from(chunk2));
         cp.stdout?.emit('data', Buffer.from(chunk3));
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       const truncationMessage =
@@ -1473,8 +1484,11 @@ describe('ShellExecutionService child_process fallback', () => {
 
           const { result } = await simulateExecution(
             'sleep 10',
-            (cp, abortController) => {
+            async (cp, abortController) => {
               abortController.abort();
+              await new Promise(process.nextTick);
+              await new Promise(process.nextTick);
+              await new Promise(process.nextTick);
               if (expectedExit.signal) {
                 cp.emit('exit', null, expectedExit.signal);
                 cp.emit('close', null, expectedExit.signal);
@@ -1494,11 +1508,14 @@ describe('ShellExecutionService child_process fallback', () => {
               expectedSignal,
             );
           } else {
-            expect(mockCpSpawn).toHaveBeenCalledWith(
-              expectedCommand,
-              ['/pid', String(mockChildProcess.pid), '/f', '/t'],
-              expect.anything(),
-            );
+            // Taskkill is spawned via spawnAsync which is mocked
+            const { spawnAsync } = await import('../utils/shell-utils.js');
+            expect(spawnAsync).toHaveBeenCalledWith(expectedCommand, [
+              '/pid',
+              String(mockChildProcess.pid),
+              '/f',
+              '/t',
+            ]);
           }
         });
       },
@@ -1528,6 +1545,7 @@ describe('ShellExecutionService child_process fallback', () => {
       );
 
       abortController.abort();
+      await vi.advanceTimersByTimeAsync(0);
 
       // Check the first kill signal
       expect(mockProcessKill).toHaveBeenCalledWith(
@@ -1566,6 +1584,7 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.stdout?.emit('data', binaryChunk1);
         cp.stdout?.emit('data', binaryChunk2);
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
@@ -1607,6 +1626,22 @@ describe('ShellExecutionService child_process fallback', () => {
         'exit',
       ]);
     });
+
+    it('should correctly measure sniffedBytes with >20 small chunks to prevent OOM (regression #22170)', async () => {
+      mockIsBinary.mockReturnValue(false);
+
+      await simulateExecution('cat lots_of_chunks', (cp) => {
+        for (let i = 0; i < 25; i++) {
+          cp.stdout?.emit('data', Buffer.alloc(10, 'a'));
+        }
+        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
+      });
+
+      const lastCallBuffer =
+        mockIsBinary.mock.calls[mockIsBinary.mock.calls.length - 1][0];
+      expect(lastCallBuffer.length).toBe(250);
+    });
   });
 
   describe('Platform-Specific Behavior', () => {
@@ -1614,11 +1649,12 @@ describe('ShellExecutionService child_process fallback', () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        ['-NoProfile', '-NonInteractive', '-Command', 'dir "foo bar"'],
         expect.objectContaining({
           shell: false,
           detached: false,
@@ -1631,13 +1667,14 @@ describe('ShellExecutionService child_process fallback', () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+          'trap \'\' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
         expect.objectContaining({
           shell: false,
@@ -1662,6 +1699,8 @@ describe('ShellExecutionService execution method selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     onOutputEventMock = vi.fn();
 
     // Mock for pty
@@ -1712,10 +1751,12 @@ describe('ShellExecutionService execution method selection', () => {
     );
 
     // Simulate exit to allow promise to resolve
+    if (!mockPtyProcess.onExit.mock.calls[0]) {
+      const res = await handle.result;
+      throw new Error(`Failed early in executeWithPty: ${res.error}`);
+    }
     mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
     const result = await handle.result;
-
-    expect(mockGetPty).toHaveBeenCalled();
     expect(mockPtySpawn).toHaveBeenCalled();
     expect(mockCpSpawn).not.toHaveBeenCalled();
     expect(result.executionMethod).toBe('mock-pty');
@@ -1741,6 +1782,7 @@ describe('ShellExecutionService execution method selection', () => {
 
     // Simulate exit to allow promise to resolve
     mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).not.toHaveBeenCalled();
@@ -1764,6 +1806,7 @@ describe('ShellExecutionService execution method selection', () => {
 
     // Simulate exit to allow promise to resolve
     mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).toHaveBeenCalled();
@@ -1786,6 +1829,8 @@ describe('ShellExecutionService environment variables', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     vi.resetModules(); // Reset modules to ensure process.env changes are fresh
 
     // Mock for pty
@@ -2025,7 +2070,7 @@ describe('ShellExecutionService environment variables', () => {
       sandboxManager: mockSandboxManager,
     };
 
-    mockResolveExecutable.mockResolvedValue('/bin/bash/resolved');
+    mockResolveExecutable.mockReturnValue('/bin/bash/resolved');
     const mockChild = new EventEmitter() as unknown as ChildProcess;
     mockChild.stdout = new EventEmitter() as unknown as Readable;
     mockChild.stderr = new EventEmitter() as unknown as Readable;

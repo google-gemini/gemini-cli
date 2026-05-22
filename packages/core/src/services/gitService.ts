@@ -8,9 +8,56 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { spawnAsync } from '../utils/shell-utils.js';
-import { simpleGit, CheckRepoActions, type SimpleGit } from 'simple-git';
+import {
+  simpleGit,
+  CheckRepoActions,
+  type SimpleGit,
+  type SimpleGitOptions,
+} from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  sanitizeEnvironment,
+  getSecureSanitizationConfig,
+} from './environmentSanitization.js';
+
+export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
+export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
+
+const SHADOW_REPO_UNSAFE_OPTIONS = {
+  allowUnsafeAlias: true,
+  allowUnsafeAskPass: true,
+  allowUnsafeConfigEnvCount: true,
+  allowUnsafeConfigPaths: true,
+  allowUnsafeCredentialHelper: true,
+  allowUnsafeCustomBinary: true,
+  allowUnsafeDiffExternal: true,
+  allowUnsafeDiffTextConv: true,
+  allowUnsafeEditor: true,
+  allowUnsafeFilter: true,
+  allowUnsafeFsMonitor: true,
+  allowUnsafeGitProxy: true,
+  allowUnsafeGpgProgram: true,
+  allowUnsafeHooksPath: true,
+  allowUnsafeMergeDriver: true,
+  allowUnsafePack: true,
+  allowUnsafePager: true,
+  allowUnsafeProtocolOverride: true,
+  allowUnsafeSshCommand: true,
+  allowUnsafeTemplateDir: true,
+} satisfies NonNullable<SimpleGitOptions['unsafe']> &
+  Record<`allowUnsafe${string}`, boolean>;
+
+/**
+ * Common configuration for the shadow Git repository used for checkpointing.
+ *
+ * We enable all "unsafe" options because the shadow repository is an internal,
+ * isolated state management tool, and we want to ensure it works reliably
+ * regardless of the user's local environment (e.g., PAGER, EDITOR, or SSH settings).
+ */
+const SHADOW_REPO_GIT_OPTIONS: Partial<SimpleGitOptions> = {
+  unsafe: SHADOW_REPO_UNSAFE_OPTIONS,
+};
 
 export class GitService {
   private projectRoot: string;
@@ -55,9 +102,25 @@ export class GitService {
     const gitConfigPath = path.join(repoDir, '.gitconfig');
     const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return {
+      ...sanitizeEnvironment(
+        process.env,
+        getSecureSanitizationConfig({
+          enableEnvironmentVariableRedaction: true,
+        }),
+      ),
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
       GIT_CONFIG_SYSTEM: systemConfigPath,
+      // Ensure we don't inherit isolation-breaking variables from the user environment.
+      GIT_DIR: undefined,
+      GIT_WORK_TREE: undefined,
+      // Explicitly provide identity to prevent "Author identity unknown" errors
+      // inside sandboxed environments like Docker where the gitconfig might not
+      // be picked up properly.
+      GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+      GIT_AUTHOR_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
+      GIT_COMMITTER_NAME: SHADOW_REPO_AUTHOR_NAME,
+      GIT_COMMITTER_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
     };
   }
 
@@ -73,13 +136,12 @@ export class GitService {
 
     // We don't want to inherit the user's name, email, or gpg signing
     // preferences for the shadow repository, so we create a dedicated gitconfig.
-    const gitConfigContent =
-      '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
+    const gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
     await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
-    const repo = simpleGit(repoDir).env(shadowRepoEnv);
+    const repo = simpleGit(repoDir, SHADOW_REPO_GIT_OPTIONS).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {
       isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
@@ -116,10 +178,10 @@ export class GitService {
 
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
-    return simpleGit(this.projectRoot).env({
+    return simpleGit(this.projectRoot, SHADOW_REPO_GIT_OPTIONS).env({
+      ...this.getShadowRepoEnv(repoDir),
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
-      ...this.getShadowRepoEnv(repoDir),
     });
   }
 

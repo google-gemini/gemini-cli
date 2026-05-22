@@ -10,8 +10,8 @@ Model routing is managed by the `ModelAvailabilityService`, which monitors model
 health and automatically routes requests to available models based on defined
 policies.
 
-1.  **Model failure:** If the currently selected model fails (e.g., due to quota
-    or server errors), the CLI will initiate the fallback process.
+1.  **Model failure:** If the currently selected model fails (for example, due
+    to quota or server errors), the CLI will initiate the fallback process.
 
 2.  **User consent:** Depending on the failure and the model's policy, the CLI
     may prompt you to switch to a fallback model (by default always prompts
@@ -34,11 +34,11 @@ Gemini CLI will use a locally-running **Gemma** model to make routing decisions
 reduce costs associated with hosted model usage while offering similar routing
 decision latency and quality.
 
-In order to use this feature, the local Gemma model **must** be served behind a
-Gemini API and accessible via HTTP at an endpoint configured in `settings.json`.
+The easiest way to set this up is using the automated `gemini gemma setup`
+command.
 
 For more details on how to configure local model routing, see
-[Local Model Routing](../core/local-model-routing.md).
+[`gemini gemma` — Local Model Routing Setup](../core/gemma-setup.md).
 
 ### Model selection precedence
 

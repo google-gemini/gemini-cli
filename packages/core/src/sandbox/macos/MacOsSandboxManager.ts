@@ -22,7 +22,11 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
-import { initializeShellParsers } from '../../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  getCommandRoots,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -133,28 +137,42 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
+    // If the workspace is writable and we're running a git command,
+    // automatically allow write access to the .git directory.
+    const fullCmd = [command, ...args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
+    const isGitCommand = roots.includes('git');
+
+    if (workspaceWrite && isGitCommand) {
+      const gitDir = path.join(this.options.workspace, '.git');
+      if (!mergedAdditional.fileSystem!.write!.includes(gitDir)) {
+        mergedAdditional.fileSystem!.write!.push(gitDir);
+      }
+    }
+
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
+    );
+
     const resolvedPaths = await resolveSandboxPaths(
       this.options,
       req,
       mergedAdditional,
     );
-    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
-      req,
-      mergedAdditional,
-      this.options.workspace,
-      req.policy?.allowedPaths,
-    );
 
     const sandboxArgs = buildSeatbeltProfile({
-      workspace: this.options.workspace,
-      allowedPaths: [
-        ...resolvedPaths.policyAllowed,
-        ...(this.options.includeDirectories || []),
-      ],
-      forbiddenPaths: resolvedPaths.forbidden,
+      resolvedPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
-      additionalPermissions: mergedAdditional,
     });
 
     const tempFile = this.writeProfileToTempFile(sandboxArgs);

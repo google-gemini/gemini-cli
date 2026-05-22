@@ -66,12 +66,16 @@ export class OAuthCredentialStorage {
       throw new Error('Attempted to save credentials without an access token.');
     }
 
+    const existing = await this.storage.getCredentials(MAIN_ACCOUNT_KEY);
+    const mergedRefreshToken =
+      credentials.refresh_token || existing?.token.refreshToken;
+
     // Convert Google Credentials to OAuthCredentials format
     const mcpCredentials: OAuthCredentials = {
       serverName: MAIN_ACCOUNT_KEY,
       token: {
         accessToken: credentials.access_token,
-        refreshToken: credentials.refresh_token || undefined,
+        refreshToken: mergedRefreshToken || undefined,
         tokenType: credentials.token_type || 'Bearer',
         scope: credentials.scope || undefined,
         expiresAt: credentials.expiry_date || undefined,
@@ -125,8 +129,17 @@ export class OAuthCredentialStorage {
       throw error;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const credentials: Credentials = JSON.parse(credsJson);
+    let credentials: Credentials;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      credentials = JSON.parse(credsJson);
+    } catch {
+      coreEvents.emitFeedback(
+        'warning',
+        `Corrupted OAuth credential file at ${oldFilePath}, skipping migration`,
+      );
+      return null;
+    }
 
     // Save to new storage
     await this.saveCredentials(credentials);

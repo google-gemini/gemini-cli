@@ -53,6 +53,7 @@ const mocks = vi.hoisted(() => ({
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
   isNotificationsEnabled: vi.fn(() => true),
+  getNotificationMethod: vi.fn(() => 'auto'),
   buildRunEventNotificationContent: vi.fn((event) => ({
     title: 'Mock Notification',
     subtitle: 'Mock Subtitle',
@@ -99,7 +100,7 @@ import { type LoadedSettings } from '../config/settings.js';
 import { createMockSettings } from '../test-utils/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
-import { StreamingState } from './types.js';
+import { StreamingState, MessageType } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -123,16 +124,19 @@ vi.mock('ink', async (importOriginal) => {
 });
 
 import { InputContext, type InputState } from './contexts/InputContext.js';
+import { QuotaContext, type QuotaState } from './contexts/QuotaContext.js';
 
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
 let capturedInputState: InputState;
+let capturedQuotaState: QuotaState;
 let capturedUIActions: UIActions;
 let capturedOverflowActions: OverflowActions;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
   capturedInputState = useContext(InputContext)!;
+  capturedQuotaState = useContext(QuotaContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
   capturedOverflowActions = useOverflowActions()!;
   return null;
@@ -146,6 +150,9 @@ vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
+vi.mock('../config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
 vi.mock('./hooks/useModelCommand.js');
@@ -191,6 +198,7 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
 vi.mock('../utils/terminalNotifications.js', () => ({
   notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
   isNotificationsEnabled: terminalNotificationsMocks.isNotificationsEnabled,
+  getNotificationMethod: terminalNotificationsMocks.getNotificationMethod,
   buildRunEventNotificationContent:
     terminalNotificationsMocks.buildRunEventNotificationContent,
 }));
@@ -212,6 +220,7 @@ vi.mock('../utils/cleanup.js');
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
+import { validateAuthMethod } from '../config/auth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
@@ -571,6 +580,36 @@ describe('AppContainer State Management', () => {
   });
 
   describe('State Initialization', () => {
+    it('calls validateAuthMethod and onAuthError if validation fails', async () => {
+      const mockOnAuthError = vi.fn();
+      mockedUseAuthCommand.mockReturnValue({
+        authState: 'authenticated',
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: mockOnAuthError,
+      });
+      vi.mocked(validateAuthMethod).mockResolvedValueOnce('Validation Failed');
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({
+          settings: createMockSettings({
+            merged: {
+              security: {
+                auth: { selectedType: 'oauth-personal', useExternal: false },
+              },
+            },
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(validateAuthMethod).toHaveBeenCalledWith('oauth-personal');
+        expect(mockOnAuthError).toHaveBeenCalledWith('Validation Failed');
+      });
+
+      unmount();
+    });
+
     it('sends a macOS notification when confirmation is pending and terminal is unfocused', async () => {
       mockedUseFocusState.mockReturnValue({
         isFocused: false,
@@ -1262,6 +1301,42 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('SessionStart Hook Rendering', () => {
+    it('does not render systemMessage directly (avoids duplicate with HookSystemMessage event)', async () => {
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const fireSessionStartEvent = vi.fn().mockResolvedValue({
+        systemMessage: 'Hello from SessionStart hook',
+        getAdditionalContext: vi.fn(() => undefined),
+      });
+      vi.spyOn(mockConfig, 'getHookSystem').mockReturnValue({
+        fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+        fireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(fireSessionStartEvent).toHaveBeenCalled());
+
+      // The direct-render path (the bug) would call addItem with the
+      // systemMessage text and no `source` field. The HookSystemMessage
+      // event-listener path (the correct one) always sets `source`.
+      const directRenderCall = mockAddItem.mock.calls.find(
+        ([item]) =>
+          item?.text === 'Hello from SessionStart hook' && !item?.source,
+      );
+      expect(directRenderCall).toBeUndefined();
+
+      unmount();
+    });
+  });
+
   describe('Token Counting from Session Stats', () => {
     it('tracks token counts from session messages', async () => {
       // Session stats are provided through the SessionStatsProvider context
@@ -1309,15 +1384,15 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Quota and Fallback Integration', () => {
-    it('passes a null proQuotaRequest to UIStateContext by default', async () => {
+    it('passes a null proQuotaRequest to QuotaContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
       const { unmount } = await act(async () => renderAppContainer());
       // Assert that the context value is as expected
-      expect(capturedUIState.quota.proQuotaRequest).toBeNull();
+      expect(capturedQuotaState.proQuotaRequest).toBeNull();
       unmount();
     });
 
-    it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
+    it('passes a valid proQuotaRequest to QuotaContext when provided by the hook', async () => {
       // Arrange: Create a mock request object that a UI dialog would receive
       const mockRequest = {
         failedModel: 'gemini-pro',
@@ -1332,7 +1407,7 @@ describe('AppContainer State Management', () => {
       // Act: Render the container
       const { unmount } = await act(async () => renderAppContainer());
       // Assert: The mock request is correctly passed through the context
-      expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
+      expect(capturedQuotaState.proQuotaRequest).toEqual(mockRequest);
       unmount();
     });
 
@@ -3568,6 +3643,67 @@ describe('AppContainer State Management', () => {
 
       expect(capturedUIState).toBeTruthy();
       expect(capturedUIState.allowPlanMode).toBe(false);
+      unmount();
+    });
+  });
+
+  describe('Compression Queuing', () => {
+    beforeEach(async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      vi.spyOn(mockConfig, 'isModelSteeringEnabled').mockReturnValue(true);
+
+      const actual = await vi.importActual('./hooks/useMessageQueue.js');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { useMessageQueue: realUseMessageQueue } = actual as any;
+      mockedUseMessageQueue.mockImplementation(realUseMessageQueue);
+
+      // Start compression by mocking pendingHistoryItems to include a pending compression
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        pendingHistoryItems: [
+          {
+            type: MessageType.COMPRESSION,
+            compression: {
+              isPending: true,
+              originalTokenCount: null,
+              newTokenCount: null,
+              compressionStatus: null,
+            },
+          },
+        ],
+      }));
+    });
+
+    it('queues messages during compression instead of handling as steering hints', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+
+      // Verify state isolation
+      expect(capturedUIState.streamingState).toBe(StreamingState.Idle);
+
+      // Submit a message
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('follow up message'),
+      );
+
+      // Verify it was queued, not submitted as steering hint
+      expect(capturedUIState.messageQueue).toContain('follow up message');
+
+      unmount();
+    });
+
+    it('executes slash commands immediately during compression', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+
+      // Submit a slash command
+      await act(async () => capturedUIActions.handleFinalSubmit('/help'));
+
+      // Verify it was NOT queued
+      expect(capturedUIState.messageQueue).not.toContain('/help');
+
       unmount();
     });
   });

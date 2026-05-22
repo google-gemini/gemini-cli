@@ -24,7 +24,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
-  BACKSPACE = '\x7f',
+  BACKSPACE = '\u0008',
   CTRL_L = '\u000C',
 }
 

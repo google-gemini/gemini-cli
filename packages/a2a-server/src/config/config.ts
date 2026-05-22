@@ -11,9 +11,7 @@ import * as dotenv from 'dotenv';
 import {
   AuthType,
   Config,
-  FileDiscoveryService,
   ApprovalMode,
-  loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   startupProfiler,
@@ -25,8 +23,8 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
-  PolicyDecision,
-  PRIORITY_YOLO_ALLOW_ALL,
+  createPolicyEngineConfig,
+  type PolicySettings,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -40,6 +38,7 @@ export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  trusted: boolean = false,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
 
@@ -65,6 +64,24 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  const policySettings: PolicySettings = {
+    mcpServers: settings.mcpServers,
+    tools: {
+      core: settings.coreTools || settings.tools?.core,
+      exclude: settings.excludeTools || settings.tools?.exclude,
+      allowed: settings.allowedTools || settings.tools?.allowed,
+    },
+    policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    true,
+  );
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -80,20 +97,7 @@ export async function loadConfig(
     allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
-    policyEngineConfig: {
-      rules:
-        approvalMode === ApprovalMode.YOLO
-          ? [
-              {
-                toolName: '*',
-                decision: PolicyDecision.ALLOW,
-                priority: PRIORITY_YOLO_ALLOW_ALL,
-                modes: [ApprovalMode.YOLO],
-                allowRedirection: true,
-              },
-            ]
-          : [],
-    },
+    policyEngineConfig,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
@@ -120,7 +124,7 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust,
-    trustedFolder: true,
+    trustedFolder: trusted,
     extensionLoader,
     checkpointing,
     interactive: true,
@@ -128,23 +132,6 @@ export async function loadConfig(
     ptyInfo: 'auto',
     enableAgents: settings.experimental?.enableAgents ?? true,
   };
-
-  const fileService = new FileDiscoveryService(workspaceDir, {
-    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
-    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
-    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
-  });
-  const { memoryContent, fileCount, filePaths } =
-    await loadServerHierarchicalMemory(
-      workspaceDir,
-      [workspaceDir],
-      fileService,
-      extensionLoader,
-      folderTrust,
-    );
-  configParams.userMemory = memoryContent;
-  configParams.geminiMdFileCount = fileCount;
-  configParams.geminiMdFilePaths = filePaths;
 
   // Set an initial config to use to get a code assist server.
   // This is needed to fetch admin controls.

@@ -88,6 +88,7 @@ const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
 const STARTUP_TIME = 'gemini_cli.startup.duration';
 const MEMORY_USAGE = 'gemini_cli.memory.usage';
 const CPU_USAGE = 'gemini_cli.cpu.usage';
+const EVENT_LOOP_DELAY = 'gemini_cli.event_loop.delay';
 const TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
 const TOOL_EXECUTION_BREAKDOWN = 'gemini_cli.tool.execution.breakdown';
 const TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
@@ -608,6 +609,17 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
       component?: string;
     },
   },
+  [EVENT_LOOP_DELAY]: {
+    description: 'Event loop delay in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.DOUBLE,
+    assign: (h: Histogram) => (eventLoopDelayHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      percentile: string;
+      component?: string;
+    },
+  },
   [TOOL_QUEUE_DEPTH]: {
     description: 'Number of tools in execution queue.',
     unit: 'count',
@@ -806,6 +818,7 @@ let genAiClientOperationDurationHistogram: Histogram | undefined;
 let startupTimeHistogram: Histogram | undefined;
 let memoryUsageGauge: Histogram | undefined; // Using Histogram until ObservableGauge is available
 let cpuUsageGauge: Histogram | undefined;
+let eventLoopDelayHistogram: Histogram | undefined;
 let toolQueueDepthGauge: Histogram | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
 let tokenEfficiencyHistogram: Histogram | undefined;
@@ -1116,7 +1129,14 @@ export function recordModelRoutingMetrics(
   };
 
   if (event.reasoning) {
-    attributes['routing.reasoning'] = event.reasoning;
+    // GCP metric labels have a maximum string size of 1024 characters.
+    // Apply strict truncation only in CI workflows to avoid masking data for normal users.
+    const isStrictTelemetry =
+      process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
+    attributes['routing.reasoning'] =
+      isStrictTelemetry && event.reasoning.length > 1000
+        ? event.reasoning.substring(0, 1000) + '...'
+        : event.reasoning;
   }
   if (event.enable_numerical_routing !== undefined) {
     attributes['routing.enable_numerical_routing'] =
@@ -1129,9 +1149,16 @@ export function recordModelRoutingMetrics(
   modelRoutingLatencyHistogram.record(event.routing_latency_ms, attributes);
 
   if (event.failed) {
+    const isStrictTelemetry =
+      process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
     modelRoutingFailureCounter.add(1, {
       ...attributes,
-      'routing.error_message': event.error_message,
+      'routing.error_message':
+        isStrictTelemetry &&
+        event.error_message &&
+        event.error_message.length > 1000
+          ? event.error_message.substring(0, 1000) + '...'
+          : event.error_message,
     });
   }
 }
@@ -1337,6 +1364,21 @@ export function recordCpuUsage(
   };
 
   cpuUsageGauge.record(percentage, metricAttributes);
+}
+
+export function recordEventLoopDelay(
+  config: Config,
+  delayMs: number,
+  attributes: MetricDefinitions[typeof EVENT_LOOP_DELAY]['attributes'],
+): void {
+  if (!eventLoopDelayHistogram || !isPerformanceMonitoringEnabled) return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  };
+
+  eventLoopDelayHistogram.record(delayMs, metricAttributes);
 }
 
 export function recordToolQueueDepth(config: Config, queueDepth: number): void {

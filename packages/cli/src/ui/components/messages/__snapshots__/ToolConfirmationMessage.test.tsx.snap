@@ -94,7 +94,7 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 │ echo "Line 49"                                                               │
 │ echo "Line 50"                                                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo]?
+Allow execution of [Shell]?
 
 ● 1. Allow once               
   2. Allow for this session
@@ -110,7 +110,7 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 │                                                                              │
 │ whoami                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo, ls, whoami]?
+Allow execution of [Shell]?
 
 ● 1. Allow once               
   2. Allow for this session
@@ -148,7 +148,7 @@ exports[`ToolConfirmationMessage > should render multiline shell scripts with co
 │   echo $i                                                                    │
 │ done                                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo]?
+Allow execution of [Shell]?
 
 ● 1. Allow once               
   2. Allow for this session
@@ -200,7 +200,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ echo "hello"                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo]?
+Allow execution of [Shell]?
 
 ● 1. Allow once               
   2. No, suggest changes (esc)
@@ -211,7 +211,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ echo "hello"                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Allow execution of [echo]?
+Allow execution of [Shell]?
 
 ● 1. Allow once               
   2. Allow for this session

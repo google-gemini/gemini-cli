@@ -357,9 +357,8 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('→ Found 2 matches');
-    // Matches are rendered in a secondary list for high-signal summaries
-    expect(output).toContain('file1.ts:10: match 1');
-    expect(output).toContain('file2.ts:20: match 2');
+    // Matches should no longer be rendered in dense mode to keep it compact
+    expect(output).not.toContain('file1.ts:10: match 1');
     expect(output).toMatchSnapshot();
   });
 
@@ -400,9 +399,8 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('Attempting to read files from **/*.ts');
     expect(output).toContain('→ Read 3 file(s) (1 ignored)');
-    expect(output).toContain('file1.ts');
-    expect(output).toContain('file2.ts');
-    expect(output).toContain('file3.ts');
+    // File lists should no longer be rendered in dense mode
+    expect(output).not.toContain('file1.ts');
     expect(output).toMatchSnapshot();
   });
 
@@ -474,6 +472,28 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).not.toContain('→');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('truncates long description but preserves tool name (< 25 chars)', async () => {
+    const longDescription =
+      'This is a very long description that should definitely be truncated because it exceeds the available terminal width and we want to see how it behaves.';
+    const toolName = 'tool-name-is-24-chars-!!'; // Exactly 24 chars
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <DenseToolMessage
+        {...defaultProps}
+        name={toolName}
+        description={longDescription}
+        terminalWidth={50} // Narrow width to force truncation
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+
+    // Tool name should be fully present (it plus one space is exactly 25, fitting the maxWidth)
+    expect(output).toContain(toolName);
+    // Description should be present but truncated
+    expect(output).toContain('This is a');
     expect(output).toMatchSnapshot();
   });
 

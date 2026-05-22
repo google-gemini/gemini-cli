@@ -14,17 +14,19 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
+  getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -61,9 +63,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [config]);
 
   // Determine the Preferred Model (read once when the dialog opens).
-  const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const preferredModel = config?.getModel() || GEMINI_MODEL_ALIAS_AUTO;
 
-  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
+  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel() ?? false;
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
   const useGemini31FlashLite =
     config?.getGemini31FlashLiteLaunchedSync?.() ?? false;
@@ -119,7 +121,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     },
     { isActive: true },
   );
-
   const mainOptions = useMemo(() => {
     // --- DYNAMIC PATH ---
     if (
@@ -159,11 +160,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     // --- LEGACY PATH ---
     const list = [
       {
-        value: DEFAULT_GEMINI_MODEL_AUTO,
-        title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
-        key: DEFAULT_GEMINI_MODEL_AUTO,
+        value: GEMINI_MODEL_ALIAS_AUTO,
+        title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
+        description: getAutoModelDescription(
+          shouldShowPreviewModels,
+          useGemini31,
+        ),
+        key: GEMINI_MODEL_ALIAS_AUTO,
       },
       {
         value: 'Manual',
@@ -175,16 +178,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       },
     ];
 
-    if (shouldShowPreviewModels) {
-      list.unshift({
-        value: PREVIEW_GEMINI_MODEL_AUTO,
-        title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-        description: useGemini31
-          ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
-          : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-        key: PREVIEW_GEMINI_MODEL_AUTO,
-      });
-    }
     return list;
   }, [
     config,
@@ -222,7 +215,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     // --- LEGACY PATH ---
-    const list = [
+    const showGemmaModels = config?.getExperimentalGemma() ?? false;
+
+    const options = [
       {
         value: DEFAULT_GEMINI_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_MODEL),
@@ -239,6 +234,21 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       },
     ];
+
+    if (showGemmaModels) {
+      options.push(
+        {
+          value: GEMMA_4_31B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_31B_IT_MODEL),
+          key: GEMMA_4_31B_IT_MODEL,
+        },
+        {
+          value: GEMMA_4_26B_A4B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_26B_A4B_IT_MODEL),
+          key: GEMMA_4_26B_A4B_IT_MODEL,
+        },
+      );
+    }
 
     if (shouldShowPreviewModels) {
       const previewProModel = useGemini31
@@ -270,15 +280,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         });
       }
 
-      list.unshift(...previewOptions);
+      options.unshift(...previewOptions);
     }
 
     if (!hasAccessToProModel) {
       // Filter out all Pro models for free tier
-      return list.filter((option) => !isProModel(option.value));
+      return options.filter((option) => !isProModel(option.value));
     }
 
-    return list;
+    return options;
   }, [
     shouldShowPreviewModels,
     useGemini31,
