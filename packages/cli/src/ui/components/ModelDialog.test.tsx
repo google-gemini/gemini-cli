@@ -67,7 +67,6 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
-    getGemini31FlashLiteLaunchedSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
     getExperimentalGemma: () => boolean;
@@ -88,7 +87,6 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
-    getGemini31FlashLiteLaunchedSync: mockGetGemini31FlashLiteLaunchedSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
     getExperimentalGemma: () => false,
@@ -101,7 +99,6 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
-    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(false);
     mockGetProModelNoAccess.mockResolvedValue(false);
     mockGetProModelNoAccessSync.mockReturnValue(false);
 
