@@ -235,12 +235,38 @@ export async function fetchWithTimeout(
 const MAX_SAFE_REDIRECTS = 10;
 
 /**
+ * Resolves the hostname of `url` to a non-private IP address.
+ *
+ * Returns the IP string on success, or null if all resolved addresses are
+ * private or the hostname cannot be resolved. Used to pin DNS results before
+ * the actual fetch so that a DNS rebinding attack cannot swap a public IP for
+ * a private one between the isBlockedHost check and the connection.
+ */
+async function resolveToSafeIp(url: string): Promise<string | null> {
+  try {
+    const { hostname } = new URL(url);
+    if (ipaddr.isValid(hostname)) {
+      return hostname; // already a literal IP, validated by caller
+    }
+    const addresses = await lookup(hostname, { all: true });
+    const safe = addresses.find((a) => !isAddressPrivate(a.address));
+    return safe?.address ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetches a URL while re-validating each redirect destination for SSRF risk.
  *
  * fetchWithTimeout follows redirects automatically (WHATWG default), which
  * means the initial isBlockedHost check is bypassed for redirect destinations.
  * This function opts-out of automatic redirect following and re-validates each
  * Location header value before following it, preventing open-redirect SSRF.
+ *
+ * DNS pinning: to prevent DNS rebinding attacks, the hostname is resolved once
+ * and the connection is made to the pinned IP address. The original hostname is
+ * preserved in the Host header for virtual-hosting compatibility.
  *
  * @param isBlockedHost Predicate returning true for URLs that must not be fetched.
  * @param url The URL to fetch.
@@ -255,8 +281,29 @@ export async function fetchWithSafeRedirects(
   options?: Omit<RequestInit, 'redirect'>,
   hopsLeft = MAX_SAFE_REDIRECTS,
 ): Promise<Response> {
-  const response = await fetchWithTimeout(url, timeout, {
-    ...(options as RequestInit),
+  // Pin the resolved IP to prevent DNS rebinding between the caller's
+  // isBlockedHost check and the actual TCP connection.
+  const parsed = new URL(url);
+  const originalHostname = parsed.hostname;
+  let fetchUrl = url;
+  let fetchOptions = options;
+  if (!ipaddr.isValid(originalHostname)) {
+    const resolvedIp = await resolveToSafeIp(url);
+    if (resolvedIp) {
+      parsed.hostname = resolvedIp;
+      fetchUrl = parsed.href;
+      fetchOptions = {
+        ...options,
+        headers: {
+          ...(options?.headers as Record<string, string>),
+          Host: originalHostname,
+        },
+      };
+    }
+  }
+
+  const response = await fetchWithTimeout(fetchUrl, timeout, {
+    ...(fetchOptions as RequestInit),
     redirect: 'manual',
   });
 
@@ -270,7 +317,9 @@ export async function fetchWithSafeRedirects(
       // No Location header — return the redirect response as-is.
       return response;
     }
-    // Resolve relative Location values against the current URL.
+    // Resolve relative Location values against the original (pre-pin) URL so
+    // that relative paths are interpreted against the public hostname, not the
+    // pinned IP address.
     let redirectUrl: string;
     try {
       redirectUrl = new URL(location, url).href;
@@ -286,6 +335,8 @@ export async function fetchWithSafeRedirects(
         'ERR_SSRF_REDIRECT',
       );
     }
+    // Pass original options (without the Host pin) so the next hop re-resolves
+    // and pins its own hostname independently.
     return fetchWithSafeRedirects(
       isBlockedHost,
       redirectUrl,
