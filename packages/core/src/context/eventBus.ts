@@ -34,6 +34,12 @@ export interface TokenGroundTruthEvent {
   promptBaseUnits: number;
 }
 
+export interface NormalizeNeededEvent {
+  nodes: readonly ConcreteNode[];
+  targetDeficit: number;
+  targetNodeIds: Set<string>;
+}
+
 export class ContextEventBus extends EventEmitter {
   emitTokenGroundTruth(event: TokenGroundTruthEvent) {
     this.emit('TOKEN_GROUND_TRUTH', event);
@@ -67,6 +73,14 @@ export class ContextEventBus extends EventEmitter {
 
   onConsolidationNeeded(listener: (event: ContextConsolidationEvent) => void) {
     this.on('BUDGET_RETAINED_CROSSED', listener);
+  }
+
+  emitNormalizeNeeded(event: NormalizeNeededEvent) {
+    this.emit('BUDGET_NORMALIZED_CROSSED', event);
+  }
+
+  onNormalizeNeeded(listener: (event: NormalizeNeededEvent) => void) {
+    this.on('BUDGET_NORMALIZED_CROSSED', listener);
   }
 
   emitProcessorResult(event: ProcessorResultEvent) {
