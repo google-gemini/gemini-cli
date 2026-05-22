@@ -288,6 +288,11 @@ export class McpClient implements McpProgressReporter {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
+    for (const registries of this.registeredRegistries) {
+      registries.toolRegistry.removeMcpToolsByServer(this.serverName);
+      registries.promptRegistry.removePromptsByServer(this.serverName);
+      registries.resourceRegistry.removeResourcesByServer(this.serverName);
+    }
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
