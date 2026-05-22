@@ -19,6 +19,7 @@ import type * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   type Config,
+  GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
   type Storage,
 } from '@google/gemini-cli-core';
@@ -78,6 +79,7 @@ describe('AcpSessionManager', () => {
       validatePathAccess: vi.fn().mockReturnValue(null),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
+        getDirectories: vi.fn().mockReturnValue(['/tmp']),
       }),
       getPolicyEngine: vi.fn().mockReturnValue({
         addRule: vi.fn(),
@@ -208,7 +210,7 @@ describe('AcpSessionManager', () => {
     expect(response.models?.availableModels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          modelId: 'auto-gemini-3',
+          modelId: GEMINI_MODEL_ALIAS_AUTO,
           name: expect.stringContaining('Auto'),
         }),
       ]),

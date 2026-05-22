@@ -333,6 +333,7 @@ export interface PolicySettings {
   mcp?: {
     excluded?: string[];
     allowed?: string[];
+    autoAllowInHeadless?: boolean;
   };
   tools?: {
     core?: string[];

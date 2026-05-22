@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
@@ -112,7 +112,8 @@ export function createRollingSummaryProcessor(
       try {
         // Synthesize the rolling summary synchronously
         const snapshotText = await generateRollingSummary(nodesToSummarize);
-        const newId = randomUUID();
+        const consumedIds = nodesToSummarize.map((n) => n.id);
+        const newId = deriveStableId(consumedIds);
 
         const summaryNode: RollingSummary = {
           id: newId,
@@ -121,10 +122,9 @@ export function createRollingSummaryProcessor(
           timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',
           payload: { text: snapshotText },
-          abstractsIds: nodesToSummarize.map((n) => n.id),
+          abstractsIds: consumedIds,
         };
 
-        const consumedIds = nodesToSummarize.map((n) => n.id);
         const returnedNodes = targets.filter(
           (t) => !consumedIds.includes(t.id),
         );

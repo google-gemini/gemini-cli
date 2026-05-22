@@ -28,6 +28,7 @@ import {
   DEFAULT_QUERY_STRING,
   type RemoteAgentDefinition,
   type SubagentProgress,
+  SubagentState,
   getRemoteAgentTargetUrl,
   getAgentCardLoadOptions,
 } from './types.js';
@@ -81,8 +82,21 @@ class RemoteSubagentProtocol implements AgentProtocol {
     private readonly context: AgentLoopContext,
     // Required for API parity across protocol constructors (local, remote, legacy)
     _messageBus: MessageBus,
+    initialState?: { contextId?: string; taskId?: string },
   ) {
     this._agentName = definition.displayName ?? definition.name;
+    if (initialState) {
+      this.contextId = initialState.contextId;
+      this.taskId = initialState.taskId;
+    }
+  }
+
+  /**
+   * Returns the current A2A conversation state.
+   * Used by the invocation layer to persist state across invocations.
+   */
+  getSessionState(): { contextId?: string; taskId?: string } {
+    return { contextId: this.contextId, taskId: this.taskId };
   }
 
   // ---------------------------------------------------------------------------
@@ -233,7 +247,7 @@ class RemoteSubagentProtocol implements AgentProtocol {
       this._latestProgress = {
         isSubagentProgress: true,
         agentName: this._agentName,
-        state: 'running',
+        state: SubagentState.RUNNING,
         recentActivity: reassembler.toActivityItems(),
         result: currentText,
       };
@@ -259,7 +273,7 @@ class RemoteSubagentProtocol implements AgentProtocol {
     const finalProgress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: this._agentName,
-      state: 'completed',
+      state: SubagentState.COMPLETED,
       result: finalOutput,
       recentActivity: reassembler.toActivityItems(),
     };
@@ -393,11 +407,13 @@ export class RemoteSubagentSession extends AgentSession {
     definition: RemoteAgentDefinition,
     context: AgentLoopContext,
     messageBus: MessageBus,
+    initialState?: { contextId?: string; taskId?: string },
   ) {
     const protocol = new RemoteSubagentProtocol(
       definition,
       context,
       messageBus,
+      initialState,
     );
     super(protocol);
     this._remoteProtocol = protocol;
@@ -417,6 +433,14 @@ export class RemoteSubagentSession extends AgentSession {
    */
   getLatestProgress(): SubagentProgress | undefined {
     return this._remoteProtocol.getLatestProgress();
+  }
+
+  /**
+   * Returns the current A2A conversation state (contextId/taskId).
+   * Used by the invocation layer to persist state across invocations.
+   */
+  getSessionState(): { contextId?: string; taskId?: string } {
+    return this._remoteProtocol.getSessionState();
   }
 
   /**

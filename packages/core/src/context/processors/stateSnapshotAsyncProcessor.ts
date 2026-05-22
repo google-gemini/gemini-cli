@@ -117,6 +117,15 @@ export function createStateSnapshotAsyncProcessor(
             maxStateTokens: options.maxStateTokens,
           },
         );
+
+        env.tracer.logEvent(
+          'StateSnapshotAsyncProcessor',
+          'Snapshot Synthesized',
+          {
+            snapshotText,
+          },
+        );
+
         const newConsumedIds = [
           ...previousConsumedIds,
           ...targets.map((t) => t.id),

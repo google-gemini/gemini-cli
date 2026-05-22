@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content, Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import { type ConcreteNode, NodeType } from './types.js';
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
-
-interface PartWithSynthId extends Part {
-  _synthId?: string;
-}
+import type { NodeIdService } from './nodeIdService.js';
+import type { HistoryTurn } from '../../core/agentChatHistory.js';
+import { isSnapshotState } from '../utils/snapshotGenerator.js';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
+import { ensureStableToolIds } from '../../utils/sessionUtils.js';
 
 // Global WeakMap to cache hashes for Part objects.
 // This optimizes getStableId by avoiding redundant stringify/hash operations
@@ -42,9 +43,9 @@ function isFileDataPart(
   );
 }
 
-function isFunctionCallPart(
-  part: Part,
-): part is Part & { functionCall: { id: string; name: string } } {
+function isFunctionCallPart(part: Part): part is Part & {
+  functionCall: { id?: string; name: string; args: Record<string, unknown> };
+} {
   return (
     typeof part.functionCall === 'object' &&
     part.functionCall !== null &&
@@ -52,9 +53,13 @@ function isFunctionCallPart(
   );
 }
 
-function isFunctionResponsePart(
-  part: Part,
-): part is Part & { functionResponse: { id: string; name: string } } {
+function isFunctionResponsePart(part: Part): part is Part & {
+  functionResponse: {
+    id?: string;
+    name: string;
+    response: Record<string, unknown>;
+  };
+} {
   return (
     typeof part.functionResponse === 'object' &&
     part.functionResponse !== null &&
@@ -62,34 +67,53 @@ function isFunctionResponsePart(
   );
 }
 
+function isExecutableCodePart(
+  part: Part,
+): part is Part & { executableCode: { code: string; language: string } } {
+  return (
+    typeof part.executableCode === 'object' &&
+    part.executableCode !== null &&
+    typeof part.executableCode.code === 'string' &&
+    typeof part.executableCode.language === 'string'
+  );
+}
+
+function isCodeExecutionResultPart(
+  part: Part,
+): part is Part & { codeExecutionResult: { outcome: string; output: string } } {
+  return (
+    typeof part.codeExecutionResult === 'object' &&
+    part.codeExecutionResult !== null &&
+    typeof part.codeExecutionResult.output === 'string' &&
+    typeof part.codeExecutionResult.outcome === 'string'
+  );
+}
+
 /**
- * Generates a stable ID for an object reference using a WeakMap.
+ * Generates a stable ID for an object reference using a NodeIdService.
  * Falls back to content-based hashing for Part-like objects to ensure
  * stability across object re-creations (e.g. during history mapping).
  */
 export function getStableId(
   obj: object,
-  nodeIdentityMap: WeakMap<object, string>,
+  idService: NodeIdService,
   turnSalt: string = '',
   partIdx: number = 0,
 ): string {
-  let id = nodeIdentityMap.get(obj);
+  let id = idService.get(obj);
   if (id) return id;
 
   const cachedHash = PART_HASH_CACHE.get(obj);
   if (cachedHash) {
     id = `${cachedHash}_${turnSalt}_${partIdx}`;
-    nodeIdentityMap.set(obj, id);
+    idService.set(obj, id);
     return id;
   }
 
-  const part = obj as PartWithSynthId;
+  const part = obj as Part;
   let contentHash: string | undefined;
 
-  // If the object already has a synthetic ID property, use it.
-  if (typeof part._synthId === 'string') {
-    id = part._synthId;
-  } else if (isTextPart(part)) {
+  if (isTextPart(part)) {
     contentHash = createHash('sha256').update(part.text).digest('hex');
     id = `text_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isInlineDataPart(part)) {
@@ -103,19 +127,41 @@ export function getStableId(
       .digest('hex');
     id = `file_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isFunctionCallPart(part)) {
-    contentHash = createHash('sha256')
-      .update(
-        `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
-      )
-      .digest('hex');
-    id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
+    if (part.functionCall.id) {
+      id = `call_${part.functionCall.id}`;
+    } else {
+      contentHash = createHash('sha256')
+        .update(
+          `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+        )
+        .digest('hex');
+      id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
+    }
   } else if (isFunctionResponsePart(part)) {
+    if (part.functionResponse.id) {
+      id = `resp_${part.functionResponse.id}`;
+    } else {
+      contentHash = createHash('sha256')
+        .update(
+          `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+        )
+        .digest('hex');
+      id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+    }
+  } else if (isExecutableCodePart(part)) {
     contentHash = createHash('sha256')
       .update(
-        `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+        `exec:${part.executableCode.language}:${part.executableCode.code}`,
       )
       .digest('hex');
-    id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+    id = `exec_${contentHash}_${turnSalt}_${partIdx}`;
+  } else if (isCodeExecutionResultPart(part)) {
+    contentHash = createHash('sha256')
+      .update(
+        `result:${part.codeExecutionResult.outcome}:${part.codeExecutionResult.output}`,
+      )
+      .digest('hex');
+    id = `result_${contentHash}_${turnSalt}_${partIdx}`;
   }
 
   if (contentHash) {
@@ -123,10 +169,14 @@ export function getStableId(
   }
 
   if (!id) {
-    id = randomUUID();
+    if (turnSalt && partIdx === -1) {
+      id = `turn_${turnSalt}`;
+    } else {
+      id = `${turnSalt}_f_${partIdx}`;
+    }
   }
 
-  nodeIdentityMap.set(obj, id);
+  idService.set(obj, id);
   return id;
 }
 
@@ -135,64 +185,53 @@ export function getStableId(
  * Every Part in history is mapped to exactly one ConcreteNode.
  */
 export class ContextGraphBuilder {
-  constructor(
-    private readonly nodeIdentityMap: WeakMap<object, string> = new WeakMap(),
-  ) {}
+  constructor(private readonly idService: NodeIdService) {}
 
-  processHistory(history: readonly Content[]): ConcreteNode[] {
+  processHistory(history: readonly HistoryTurn[]): ConcreteNode[] {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(history as HistoryTurn[]);
     const nodes: ConcreteNode[] = [];
 
-    // Tracks occurrences of identical turn content to ensure unique stable IDs
-    const seenHashes = new Map<string, number>();
-
     for (let turnIdx = 0; turnIdx < history.length; turnIdx++) {
-      const msg = history[turnIdx];
+      const turn = history[turnIdx];
+      const msg = turn.content;
       if (!msg.parts) continue;
 
-      // Defensive: Skip legacy environment header regardless of where it appears.
-      // We now manage this as an orthogonal late-addition header.
-      if (msg.role === 'user' && msg.parts.length === 1) {
-        const text = msg.parts[0].text;
-        if (
-          text?.startsWith('<session_context>') &&
-          text?.includes('This is the Gemini CLI')
-        ) {
-          debugLogger.log(
-            '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
-          );
-          continue;
-        }
-      }
-
-      // Generate a stable salt for this turn based on its role and content
-      const turnContent = JSON.stringify(msg.parts);
-      const h = createHash('md5')
-        .update(`${msg.role}:${turnContent}`)
-        .digest('hex');
-      const occurrence = (seenHashes.get(h) || 0) + 1;
-      seenHashes.set(h, occurrence);
-      const turnSalt = `${h}_${occurrence}`;
-      const turnId = getStableId(msg, this.nodeIdentityMap, turnSalt, -1);
+      const turnSalt = turn.id;
+      const turnId = turnSalt.startsWith('turn_')
+        ? turnSalt
+        : `turn_${turnSalt}`;
 
       if (msg.role === 'user') {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId =
-            isFunctionResponsePart(part) &&
-            typeof part.functionResponse.id === 'string'
-              ? `resp_${part.functionResponse.id}_${turnSalt}_${partIdx}`
-              : isFunctionCallPart(part) &&
-                  typeof part.functionCall.id === 'string'
-                ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
-                : undefined;
-          const id =
-            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
+
+          // Skip legacy session context headers if they appear later in history (after Turn 0).
+          // We identify Turn 0 by its deterministic ID.
+          const envTurnId = deriveStableId(['environment-context']);
+          if (
+            isTextPart(part) &&
+            part.text.trim().startsWith('<session_context>') &&
+            turnSalt !== envTurnId
+          ) {
+            debugLogger.log(
+              '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
+            );
+            continue;
+          }
+
+          const isSnapshot = isTextPart(part) && isSnapshotState(part.text);
+
+          const id = getStableId(part, this.idService, turnSalt, partIdx);
+
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
             type: isFunctionResponsePart(part)
               ? NodeType.TOOL_EXECUTION
-              : NodeType.USER_PROMPT,
+              : isSnapshot
+                ? NodeType.SNAPSHOT
+                : NodeType.USER_PROMPT,
             role: 'user',
             payload: part,
             turnId,
@@ -202,12 +241,9 @@ export class ContextGraphBuilder {
       } else if (msg.role === 'model') {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId =
-            isFunctionCallPart(part) && typeof part.functionCall.id === 'string'
-              ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
-              : undefined;
-          const id =
-            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
+
+          const id = getStableId(part, this.idService, turnSalt, partIdx);
+
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),

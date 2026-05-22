@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from './render.js';
 import type { ConcreteNode } from './types.js';
 import { NodeType } from './types.js';
+import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
@@ -15,7 +16,7 @@ import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { Part } from '@google/genai';
 
 describe('render', () => {
-  it('should filter out previewNodeIds', async () => {
+  it('should render all provided nodes', async () => {
     const mockNodes: ConcreteNode[] = [
       {
         id: '1',
@@ -33,11 +34,24 @@ describe('render', () => {
         payload: {} as Part,
       } as unknown as ConcreteNode,
     ];
-    const previewNodeIds = new Set(['preview-1']);
 
     const orchestrator = {} as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn().mockReturnValue({
+        tokens: 100,
+        baseUnits: 100,
+      }),
+      getRawBaseUnits: vi.fn().mockReturnValue(100),
+      calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+      getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
+    };
+
     const env = {
+      tokenCalculator: {
+        calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+        calculateTokenBreakdown: vi.fn().mockReturnValue({}),
+      },
       graphMapper: {
         fromGraph: vi.fn((nodes: readonly ConcreteNode[]) =>
           nodes.map((n) => ({ text: n.id })),
@@ -54,12 +68,19 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
-      new Map(),
-      0,
-      previewNodeIds,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
-    expect(result.history).toEqual([{ text: '1' }, { text: '2' }]);
+    expect(result.history).toEqual([
+      { text: '1' },
+      { text: '2' },
+      { text: 'preview-1' },
+    ]);
+    expect(result.baseUnits).toBe(100);
   });
 
   it('simulates the boundary knapsack problem (loose boundary policy)', async () => {
@@ -108,12 +129,28 @@ describe('render', () => {
 
     const currentTokens = 160000;
 
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        const tokens =
+          nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+        return { tokens, baseUnits: tokens };
+      }),
+      getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+    };
+
     const env = {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
       tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+        calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -136,9 +173,11 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
-      new Map(),
-      0,
-      new Set(),
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -147,6 +186,7 @@ describe('render', () => {
     // Adding C pushes rolling total (70k) above retainedTokens (65k).
     // Under loose policy, C survives. D is strictly older and drops.
     expect(surviving).toEqual(['C', 'B', 'A']); // D is dropped
+    expect(result.baseUnits).toBe(160000);
   });
 
   it('drops nodes that are STRICTLY older than the boundary node', async () => {
@@ -188,12 +228,28 @@ describe('render', () => {
 
     const currentTokens = 160000;
 
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        const tokens =
+          nodes.length === 1 ? tokenMap[nodes[0].id] : currentTokens;
+        return { tokens, baseUnits: tokens };
+      }),
+      getRawBaseUnits: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+      calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
+        if (nodes.length === 1) return tokenMap[nodes[0].id];
+        return currentTokens;
+      }),
+    };
+
     const env = {
       llmClient: {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 1000 }),
       },
       tokenCalculator: {
-        calculateConcreteListTokens: vi.fn((nodes) => {
+        calculateConcreteListTokens: vi.fn((nodes: readonly ConcreteNode[]) => {
           if (nodes.length === 1) return tokenMap[nodes[0].id];
           return currentTokens;
         }),
@@ -216,14 +272,79 @@ describe('render', () => {
       sidecar,
       tracer,
       env,
-      new Map(),
-      0,
-      new Set(),
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
+      {
+        protectionReasons: new Map(),
+        header: undefined,
+      },
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const surviving = result.history.map((c: any) => c.text);
     // C(40k), B(40k). Adding B pushes total to 80k. B is the boundary node and survives. A drops.
     expect(surviving).toEqual(['B', 'C']); // A is dropped
+    expect(result.baseUnits).toBe(160000);
+  });
+
+  it('should exclude the last turn when lateBindPrompt is true', async () => {
+    const mockNodes: ConcreteNode[] = [
+      {
+        id: '1',
+        type: NodeType.USER_PROMPT,
+        turnId: 'turn-1',
+        payload: {} as Part,
+      } as unknown as ConcreteNode,
+      {
+        id: '2',
+        type: NodeType.AGENT_THOUGHT,
+        turnId: 'turn-2',
+        payload: {} as Part,
+      } as unknown as ConcreteNode,
+    ];
+
+    const orchestrator = {
+      executeTriggerSync: vi.fn(async (trigger, nodes) => nodes),
+    } as unknown as PipelineOrchestrator;
+    const sidecar = { config: {} } as ContextProfile; // No budget
+    const mockAdvancedTokenCalculator = {
+      calculateTokensAndBaseUnits: vi.fn().mockReturnValue({
+        tokens: 100,
+        baseUnits: 100,
+      }),
+      getRawBaseUnits: vi.fn().mockReturnValue(50),
+      calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+      getRawBaseUnitsForContent: vi.fn().mockReturnValue(0),
+    };
+
+    const env = {
+      tokenCalculator: {
+        calculateConcreteListTokens: vi.fn().mockReturnValue(100),
+        calculateTokenBreakdown: vi.fn().mockReturnValue({}),
+      },
+      graphMapper: {
+        fromGraph: vi.fn((nodes: readonly ConcreteNode[]) =>
+          nodes.map((n) => ({ text: n.id })),
+        ),
+      },
+    } as unknown as ContextEnvironment;
+    const tracer = {
+      logEvent: vi.fn(),
+    } as unknown as ContextTracer;
+
+    const result = await render(
+      mockNodes,
+      orchestrator,
+      sidecar,
+      tracer,
+      env,
+      mockAdvancedTokenCalculator as unknown as AdvancedTokenCalculator,
+      {
+        lateBindPrompt: true,
+      },
+    );
+
+    expect(result.history).toEqual([{ text: '1' }]); // Turn 2 (node 2) is excluded
+    expect(result.pendingHistory).toEqual([{ text: '2' }]); // Turn 2 is included here
+    expect(result.baseUnits).toBe(50);
   });
 });

@@ -55,6 +55,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
 
@@ -171,11 +172,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ matrix.sha }}'
           path: 'release'
           fetch-depth: 0
@@ -216,11 +219,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -288,11 +293,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -360,6 +367,7 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Setup Node.js'
@@ -395,6 +403,7 @@ jobs:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
           NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          GIT_PUSH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |-
           git add package.json packages/*/package.json
           if [ -f package-lock.json ]; then
@@ -403,7 +412,7 @@ jobs:
           git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
-            git push --set-upstream origin "${BRANCH_NAME}"
+            git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
           else
             echo "Dry run enabled. Skipping push."
           fi

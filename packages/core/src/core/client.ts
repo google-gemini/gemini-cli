@@ -46,13 +46,14 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import type { ContextManager } from '../context/contextManager.js';
+import type { HistoryTurn } from './agentChatHistory.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { logNextSpeakerCheck } from '../telemetry/loggers.js';
 import type {
   DefaultHookOutput,
   AfterAgentHookOutput,
 } from '../hooks/types.js';
-import { NextSpeakerCheckEvent, type LlmRole } from '../telemetry/types.js';
+import { NextSpeakerCheckEvent, LlmRole } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -67,6 +68,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
+import { randomUUID } from 'node:crypto';
 import {
   coreEvents,
   CoreEvent,
@@ -293,7 +295,7 @@ export class GeminiClient {
     this.getChat().stripThoughtsFromHistory();
   }
 
-  setHistory(history: readonly Content[]) {
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>) {
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
@@ -335,7 +337,7 @@ export class GeminiClient {
   }
 
   async resumeChat(
-    history: Content[],
+    history: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
@@ -376,7 +378,7 @@ export class GeminiClient {
   }
 
   async startChat(
-    extraHistory?: Content[],
+    extraHistory?: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
@@ -387,9 +389,7 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history = this.config.getContextManagementConfig().enabled
-      ? (extraHistory ?? [])
-      : await getInitialChatHistory(this.config, extraHistory);
+    const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -398,7 +398,7 @@ export class GeminiClient {
         this.config,
         systemInstruction,
         tools,
-        history,
+        [...history],
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
@@ -419,7 +419,7 @@ export class GeminiClient {
       await reportError(
         error,
         'Error initializing Gemini chat session.',
-        history,
+        [...history],
         'startChat',
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
@@ -637,18 +637,45 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    let currentBaseUnits = 0;
+    let apiHistoryOverride: Content[] | undefined = undefined;
+
     if (this.config.getContextManagementConfig().enabled) {
       if (this.contextManager) {
-        const pendingRequest = createUserContent(request);
-        const { history: newHistory, didApplyManagement } =
-          await this.contextManager.renderHistory(pendingRequest);
+        const rawPendingRequest = createUserContent(request);
+        const pendingRequest = {
+          id: randomUUID(),
+          content: rawPendingRequest,
+        };
+        const {
+          history: newHistory,
+          apiHistory,
+          pendingApiHistory,
+          baseUnits,
+        } = await this.contextManager.renderHistory(
+          pendingRequest,
+          undefined,
+          signal,
+        );
 
-        if (didApplyManagement) {
-          // If the manager pruned history, we update the chat before continuing.
-          // Note: we don't include the pendingRequest in this setHistory,
-          // because Turn.run will add it normally.
-          this.getChat().setHistory(newHistory, { silent: true });
-        }
+        currentBaseUnits = baseUnits;
+
+        // Use the PROCESSED pending content if available (e.g. if cleaned or distilled)
+        const finalPendingContent =
+          pendingApiHistory.length > 0
+            ? pendingApiHistory[0]
+            : rawPendingRequest;
+
+        // Late-bind the prompt: Append the active request to the managed history
+        // only for the purpose of the upcoming API call.
+        apiHistoryOverride = [...apiHistory, finalPendingContent];
+
+        this.getChat().setHistory(newHistory);
+
+        // Use the original request for display/recording,
+        // but the processed one for the API and durable history.
+        displayContent = rawPendingRequest.parts || [];
+        request = finalPendingContent.parts || [];
       } else {
         const newHistory = await this.agentHistoryProvider.manageHistory(
           this.getHistory(),
@@ -773,12 +800,11 @@ export class GeminiClient {
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
 
-    const resultStream = turn.run(
-      modelConfigKey,
-      request,
-      signal,
+    const resultStream = turn.run(modelConfigKey, request, signal, {
       displayContent,
-    );
+      role: LlmRole.MAIN,
+      apiHistoryOverride,
+    });
     let isError = false;
 
     let loopDetectedAbort = false;
@@ -800,8 +826,16 @@ export class GeminiClient {
       }
       yield event;
 
+      if (event.type === GeminiEventType.Finished && this.contextManager) {
+        const usageMetadata = event.value.usageMetadata;
+        if (usageMetadata && usageMetadata.promptTokenCount !== undefined) {
+          this.contextManager.getEnvironment().eventBus.emitTokenGroundTruth({
+            actualTokens: usageMetadata.promptTokenCount,
+            promptBaseUnits: currentBaseUnits,
+          });
+        }
+      }
       this.updateTelemetryTokenCount();
-
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
