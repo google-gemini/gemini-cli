@@ -67,22 +67,14 @@ describe('Dynamic Configuration Parity', () => {
   const flagCombos = [
     {
       useGemini3_1: false,
-      useGemini3_1FlashLite: false,
       useCustomToolModel: false,
     },
     {
       useGemini3_1: true,
-      useGemini3_1FlashLite: false,
       useCustomToolModel: false,
     },
     {
       useGemini3_1: true,
-      useGemini3_1FlashLite: true,
-      useCustomToolModel: false,
-    },
-    {
-      useGemini3_1: true,
-      useGemini3_1FlashLite: true,
       useCustomToolModel: true,
     },
   ];
@@ -105,7 +97,6 @@ describe('Dynamic Configuration Parity', () => {
           const legacy = resolveModel(
             model,
             flags.useGemini3_1,
-            flags.useGemini3_1FlashLite,
             flags.useCustomToolModel,
             hasAccess,
             mockLegacyConfig,
@@ -113,7 +104,6 @@ describe('Dynamic Configuration Parity', () => {
           const dynamic = resolveModel(
             model,
             flags.useGemini3_1,
-            flags.useGemini3_1FlashLite,
             flags.useCustomToolModel,
             hasAccess,
             mockDynamicConfig,
@@ -152,7 +142,6 @@ describe('Dynamic Configuration Parity', () => {
               anchor,
               tier,
               flags.useGemini3_1,
-              flags.useGemini3_1FlashLite,
               flags.useCustomToolModel,
               hasAccess,
               mockLegacyConfig,
@@ -161,7 +150,6 @@ describe('Dynamic Configuration Parity', () => {
               anchor,
               tier,
               flags.useGemini3_1,
-              flags.useGemini3_1FlashLite,
               flags.useCustomToolModel,
               hasAccess,
               mockDynamicConfig,
@@ -422,7 +410,7 @@ describe('resolveModel', () => {
     });
 
     it('should return Gemini 3.1 Pro Custom Tools when auto-gemini-3 is requested, useGemini3_1 is true, and useCustomToolModel is true', () => {
-      const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, true);
+      const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, true);
       expect(model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
     });
 
@@ -436,8 +424,8 @@ describe('resolveModel', () => {
       expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
-    it('should return the Flash-Lite model when flash-lite is requested and useGemini3_1FlashLite is true', () => {
-      const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH_LITE, false, true);
+    it('should return the Flash-Lite model when flash-lite is requested', () => {
+      const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH_LITE, false);
       expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
@@ -469,45 +457,39 @@ describe('resolveModel', () => {
 
   describe('hasAccessToPreview logic', () => {
     it('should return default model when access to preview is false and preview model is requested', () => {
-      expect(
-        resolveModel(PREVIEW_GEMINI_MODEL, false, false, false, false),
-      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(resolveModel(PREVIEW_GEMINI_MODEL, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
 
     it('should return default flash model when access to preview is false and preview flash model is requested', () => {
       expect(
-        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false, false),
+        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
 
     it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
       expect(
-        resolveModel(
-          PREVIEW_GEMINI_FLASH_LITE_MODEL,
-          false,
-          false,
-          false,
-          false,
-        ),
+        resolveModel(PREVIEW_GEMINI_FLASH_LITE_MODEL, false, false, false),
       ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
     it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
-      expect(
-        resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false, false),
-      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
 
     it('should return default model when access to preview is false and Gemini 3.1 is requested', () => {
-      expect(
-        resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false, false),
-      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
 
     it('should still return default model when access to preview is false and auto-gemini-2.5 is requested', () => {
-      expect(
-        resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false, false),
-      ).toBe(DEFAULT_GEMINI_MODEL);
+      expect(resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
   });
 });
@@ -599,7 +581,6 @@ describe('resolveClassifierModel', () => {
         PREVIEW_GEMINI_MODEL_AUTO,
         GEMINI_MODEL_ALIAS_PRO,
         true,
-        false,
         true,
       ),
     ).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
@@ -616,12 +597,10 @@ describe('isActiveModel', () => {
   it('should return true for Gemma 4 models when experimentalGemma is not provided (defaults to true)', () => {
     expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(true);
     expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(true);
-    expect(isActiveModel(GEMMA_4_31B_IT_MODEL, false, false, false, true)).toBe(
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL, false, false, true)).toBe(true);
+    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL, false, false, true)).toBe(
       true,
     );
-    expect(
-      isActiveModel(GEMMA_4_26B_A4B_IT_MODEL, false, false, false, true),
-    ).toBe(true);
   });
 
   it('should return false for Gemini 3.1 models when Gemini 3.1 is not launched', () => {
@@ -670,23 +649,19 @@ describe('isActiveModel', () => {
 
   it('should correctly filter Gemini 3.1 models based on useCustomToolModel when useGemini3_1 is true', () => {
     // When custom tools are preferred, standard 3.1 should be inactive
-    expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, true, false, true)).toBe(
-      false,
-    );
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, true, true)).toBe(false);
     expect(
-      isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, true, false, true),
+      isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, true, true),
     ).toBe(true);
 
     // When custom tools are NOT preferred, custom tools 3.1 should be inactive
-    expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, true, false, false)).toBe(
-      true,
-    );
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, true, false)).toBe(true);
     expect(
-      isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, true, false, false),
+      isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, true, false),
     ).toBe(false);
   });
 
-  it('should return false for Gemini 3.1 preview models when useGemini3_1 and useGemini3_1FlashLite are false', () => {
+  it('should return false for Gemini 3.1 preview models when useGemini3_1 is false', () => {
     expect(isActiveModel(PREVIEW_GEMINI_3_1_MODEL, false, false, true)).toBe(
       false,
     );

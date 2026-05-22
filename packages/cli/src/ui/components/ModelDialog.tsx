@@ -67,8 +67,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel() ?? false;
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
-  const useGemini31FlashLite =
-    config?.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -131,7 +129,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
-          useGemini3_1FlashLite: useGemini31FlashLite,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -184,7 +181,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     shouldShowPreviewModels,
     manualModelSelected,
     useGemini31,
-    useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
   ]);
@@ -199,7 +195,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
-          useGemini3_1FlashLite: useGemini31FlashLite,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -272,7 +267,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (useGemini31FlashLite && PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
+      if (PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
         previewOptions.push({
           value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
           title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
@@ -292,7 +287,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [
     shouldShowPreviewModels,
     useGemini31,
-    useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
     config,

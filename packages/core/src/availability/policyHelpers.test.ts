@@ -30,7 +30,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     getGemini31LaunchedSync: () => false,
-    getGemini31FlashLiteLaunchedSync: () => false,
     getUseCustomToolModelSync: () => {
       const useGemini31 = config.getGemini31LaunchedSync();
       const authType = config.getContentGeneratorConfig().authType;
@@ -227,7 +226,6 @@ describe('policyHelpers', () => {
               getExperimentalDynamicModelConfiguration: () => dynamic,
               getModel: () => model,
               getGemini31LaunchedSync: () => useGemini31 ?? false,
-              getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
               getReleaseChannel: () => 'preview',
