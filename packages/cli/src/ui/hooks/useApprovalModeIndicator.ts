@@ -49,12 +49,12 @@ export function useApprovalModeIndicator({
         ) {
           if (addItem) {
             let text =
-              'You cannot enter YOLO mode since it is disabled in your settings.';
+              'You cannot enter Full Access mode since it is disabled in your settings.';
             const adminSettings = config.getRemoteAdminSettings();
             const hasSettings =
               adminSettings && Object.keys(adminSettings).length > 0;
             if (hasSettings && !adminSettings.strictModeDisabled) {
-              text = getAdminErrorMessage('YOLO mode', config);
+              text = getAdminErrorMessage('Full Access mode', config);
             }
 
             addItem(

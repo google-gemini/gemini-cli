@@ -8,6 +8,7 @@ import {
   getPackageJson,
   type SandboxConfig,
   FatalSandboxError,
+  isPrivilegedApprovalModeString,
 } from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
@@ -22,6 +23,9 @@ const __dirname = path.dirname(__filename);
 // to avoid circular dependencies.
 interface SandboxCliArgs {
   sandbox?: boolean | string | null;
+  fullAccess?: boolean;
+  yolo?: boolean;
+  approvalMode?: string;
 }
 const VALID_SANDBOX_COMMANDS = [
   'docker',
@@ -127,7 +131,16 @@ export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
-  const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
+  const hasPrivilegedApprovalMode =
+    argv.fullAccess === true ||
+    argv.yolo === true ||
+    isPrivilegedApprovalModeString(argv.approvalMode);
+  const sandboxOption =
+    argv.sandbox !== undefined && argv.sandbox !== null
+      ? argv.sandbox
+      : hasPrivilegedApprovalMode
+        ? true
+        : settings.tools?.sandbox;
 
   let sandboxValue: boolean | string | null | undefined;
   let allowedPaths: string[] = [];

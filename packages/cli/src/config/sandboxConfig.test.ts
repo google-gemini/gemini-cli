@@ -79,6 +79,58 @@ describe('loadSandboxConfig', () => {
     expect(config).toBeUndefined();
   });
 
+  describe('with privileged approval modes', () => {
+    beforeEach(() => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+    });
+
+    it.each([
+      { argv: { fullAccess: true }, description: '--full-access' },
+      { argv: { yolo: true }, description: '--yolo' },
+      {
+        argv: { approvalMode: 'full_access' },
+        description: '--approval-mode=full_access',
+      },
+      {
+        argv: { approvalMode: 'full-access' },
+        description: '--approval-mode=full-access',
+      },
+      { argv: { approvalMode: 'yolo' }, description: '--approval-mode=yolo' },
+    ])('should enable sandbox by default for $description', async ({ argv }) => {
+      const config = await loadSandboxConfig({}, argv);
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: true,
+        command: 'docker',
+        image: 'default/image',
+      });
+    });
+
+    it('should enable sandbox for privileged mode even when settings disable sandbox', async () => {
+      const config = await loadSandboxConfig(
+        { tools: { sandbox: false } },
+        { fullAccess: true },
+      );
+      expect(config?.enabled).toBe(true);
+      expect(config?.command).toBe('docker');
+    });
+
+    it('should not enable sandbox when --sandbox=false is explicit', async () => {
+      const config = await loadSandboxConfig(
+        { tools: { sandbox: true } },
+        { sandbox: false, fullAccess: true },
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('should not enable sandbox by default for non-privileged approval modes', async () => {
+      const config = await loadSandboxConfig({}, { approvalMode: 'auto_edit' });
+      expect(config).toBeUndefined();
+    });
+  });
+
   it('should return undefined if already inside a sandbox (SANDBOX env var is set)', async () => {
     process.env['SANDBOX'] = '1';
     const config = await loadSandboxConfig({}, { sandbox: true });

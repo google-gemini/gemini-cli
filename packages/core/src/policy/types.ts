@@ -52,6 +52,16 @@ export enum ApprovalMode {
   PLAN = 'plan',
 }
 
+export function isPrivilegedApprovalMode(mode: ApprovalMode): boolean {
+  return mode === ApprovalMode.YOLO;
+}
+
+export function isPrivilegedApprovalModeString(mode?: string): boolean {
+  if (!mode) return false;
+  const normalizedMode = mode.toLowerCase().replace('-', '_');
+  return normalizedMode === 'yolo' || normalizedMode === 'full_access';
+}
+
 /**
  * The order of permissiveness for approval modes.
  * Tools allowed in a less permissive mode should also be allowed
