@@ -1244,9 +1244,15 @@ describe('mcp-client', () => {
       await client.disconnect();
 
       expect(mockedClient.close).toHaveBeenCalledOnce();
-      expect(mockedToolRegistry.removeMcpToolsByServer).not.toHaveBeenCalled();
-      expect(mockedPromptRegistry.removePromptsByServer).not.toHaveBeenCalled();
-      expect(resourceRegistry.removeResourcesByServer).not.toHaveBeenCalled();
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
     });
   });
 

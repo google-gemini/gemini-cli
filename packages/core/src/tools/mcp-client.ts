@@ -759,14 +759,12 @@ export class McpClient implements McpProgressReporter {
               );
             }
 
-            if (newTools.length > 0) {
-              registries.toolRegistry.removeMcpToolsByServer(this.serverName);
+            registries.toolRegistry.removeMcpToolsByServer(this.serverName);
 
-              for (const tool of newTools) {
-                registries.toolRegistry.registerTool(tool);
-              }
-              registries.toolRegistry.sortTools();
+            for (const tool of newTools) {
+              registries.toolRegistry.registerTool(tool);
             }
+            registries.toolRegistry.sortTools();
           }
         } catch (err) {
           debugLogger.error(
@@ -1406,6 +1404,7 @@ export async function discoverTools(
         error,
         mcpServerName,
       );
+      throw error;
     }
     return [];
   }
