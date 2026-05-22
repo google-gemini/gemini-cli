@@ -936,6 +936,8 @@ export async function loadCliConfig(
   let profileSelector: string | undefined = undefined;
   if (settings.experimental?.stressTestProfile) {
     profileSelector = 'stressTestProfile';
+  } else if (settings.experimental?.powerUserProfile) {
+    profileSelector = 'powerUserProfile';
   } else if (
     settings.experimental?.generalistProfile ||
     settings.experimental?.contextManagement
