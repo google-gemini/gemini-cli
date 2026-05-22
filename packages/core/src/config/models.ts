@@ -387,7 +387,7 @@ export function isGemini3Model(
   }
 
   const resolved = resolveModel(model);
-  return /^gemini-3(\.|-|$)/.test(resolved);
+  return /(^|\/)gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**

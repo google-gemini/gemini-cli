@@ -326,6 +326,14 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model(DEFAULT_GEMINI_MODEL_AUTO)).toBe(false);
   });
 
+  it('should return true for Vertex AI model resource paths', () => {
+    expect(
+      isGemini3Model(
+        'projects/test/locations/us-central1/publishers/google/models/gemini-3.1-pro-preview',
+      ),
+    ).toBe(true);
+  });
+
   it('should return false for arbitrary strings', () => {
     expect(isGemini3Model('gpt-4')).toBe(false);
   });
