@@ -2449,6 +2449,15 @@ const SETTINGS_SCHEMA = {
           'Suitable for general coding and software development tasks.',
         showInDialog: true,
       },
+      powerUserProfile: {
+        type: 'boolean',
+        label: 'Use the power user profile to manage agent contexts.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Less cache friendly version of the generalist profile.',
+        showInDialog: false,
+      },
       contextManagement: {
         type: 'boolean',
         label: 'Enable Context Management',

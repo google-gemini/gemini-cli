@@ -14,6 +14,7 @@ import type { ContextEnvironment } from '../pipeline/environment.js';
 import { performCalibration } from '../utils/tokenCalibration.js';
 import type { AdvancedTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { HistoryTurn } from '../../core/agentChatHistory.js';
+import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 
 export interface RenderOptions {
   protectionReasons?: Map<string, string>;
@@ -178,7 +179,20 @@ export async function render(
     rollingTokens += nodeTokens;
 
     if (priorTokens > sidecar.config.budget.retainedTokens) {
-      agedOutNodes.add(node.id);
+      if (sidecar.config.gcStrategy === 'incremental') {
+        // Only target enough of the oldest nodes to get back under maxTokens
+        // priorTokens represents tokens newer than this node.
+        // If the newer tokens alone are enough to push us over maxTokens, we MUST compress this node.
+        // If the newer tokens are under maxTokens, we can stop compressing.
+        if (priorTokens > maxTokens) {
+          agedOutNodes.add(node.id);
+        } else if (rollingTokens > maxTokens) {
+          // This is the boundary node that pushes us over maxTokens. Compress it.
+          agedOutNodes.add(node.id);
+        }
+      } else {
+        agedOutNodes.add(node.id);
+      }
     }
   }
 
@@ -190,12 +204,14 @@ export async function render(
     }
   }
 
-  const processedNodes = await orchestrator.executeTriggerSync(
+  const processedBuffer = await orchestrator.executeTriggerSync(
     'gc_backstop',
-    nodes,
+    ContextWorkingBufferImpl.initialize(nodes),
     agedOutNodes,
     protectedIds,
   );
+
+  const processedNodes = processedBuffer.nodes;
 
   const skipList = new Set<string>();
   for (const node of processedNodes) {

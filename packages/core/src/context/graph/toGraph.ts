@@ -197,7 +197,13 @@ export class ContextGraphBuilder {
       const msg = turn.content;
       if (!msg.parts) continue;
 
-      const turnSalt = turn.id;
+      const hasEnvHeader = msg.parts?.some(
+        (p) => isTextPart(p) && p.text.trim().startsWith('<session_context>'),
+      );
+      const turnSalt =
+        hasEnvHeader && turnIdx === 0
+          ? deriveStableId(['environment-context'])
+          : turn.id;
       const turnId = turnSalt.startsWith('turn_')
         ? turnSalt
         : `turn_${turnSalt}`;
@@ -207,12 +213,10 @@ export class ContextGraphBuilder {
           const part = msg.parts[partIdx];
 
           // Skip legacy session context headers if they appear later in history (after Turn 0).
-          // We identify Turn 0 by its deterministic ID.
-          const envTurnId = deriveStableId(['environment-context']);
           if (
             isTextPart(part) &&
             part.text.trim().startsWith('<session_context>') &&
-            turnSalt !== envTurnId
+            turnIdx > 0
           ) {
             debugLogger.log(
               '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
