@@ -825,7 +825,7 @@ export class ChatRecordingService {
 
       // 1. Sync content and IDs
       const newMessages: MessageRecord[] = history
-        .filter((turn) => {
+        .filter((turn, index) => {
           // Filter out injected session context prompts to prevent metadata corruption on resume.
           // The <session_context> tag is the only reliable identifier for these synthetic turns
           // because HistoryTurn is bound to the raw GenAI SDK Content interface (role + parts only)
@@ -833,9 +833,10 @@ export class ChatRecordingService {
           // during session initialization in geminiChat.ts. A schema change to HistoryTurn would
           // be a more robust long-term fix.
           const isSystemContext =
+            index === 0 &&
             turn.content.role === 'user' &&
             turn.content.parts?.some(
-              (p) => 'text' in p && p.text?.includes('<session_context>'),
+              (p) => isTextPart(p) && p.text.includes('<session_context>'),
             );
           return !isSystemContext;
         })
