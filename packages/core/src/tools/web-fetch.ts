@@ -287,16 +287,21 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   /**
    * Async variant of isBlockedHost that also resolves hostnames via DNS.
    * Prevents SSRF via domains that resolve to private/link-local addresses
-   * (e.g. 169.254.169.254.nip.io → AWS IMDS).
+   * (e.g. 169.254.169.254.nip.io → AWS IMDS) and rejects non-http(s) protocols
+   * in redirect destinations (e.g. file:, ftp:).
    */
   private async isBlockedHostAsync(urlStr: string): Promise<boolean> {
     if (this.isBlockedHost(urlStr)) {
       return true;
     }
     try {
+      const url = new URL(urlStr);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return true;
+      }
       return await isPrivateIpAsync(urlStr);
     } catch {
-      return true; // fail closed on DNS errors
+      return true; // fail closed on DNS errors or invalid URL
     }
   }
 
