@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { spawn } from 'node:child_process';
 import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
@@ -720,6 +721,55 @@ describe('GrepTool', () => {
       const params: GrepToolParams = { pattern: 'testPattern', dir_path: '.' };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");
+    });
+  });
+
+  describe('isCommandAvailable (regression: Node DEP0190)', () => {
+    // Regression for https://github.com/google-gemini/gemini-cli/issues/27140.
+    // `spawn(cmd, args, { shell: true })` triggers DEP0190 in Node 22+
+    // because it concatenates args without escaping. The presence-check only
+    // runs `which`/`where` against a hardcoded command name, so no shell is
+    // needed.
+    it('does not pass shell:true to spawn when checking command availability', async () => {
+      vi.mocked(spawn).mockClear();
+
+      const params: GrepToolParams = { pattern: 'anything' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+      };
+
+      await invocation.isCommandAvailable('git');
+
+      expect(spawn).toHaveBeenCalled();
+      const calls = vi.mocked(spawn).mock.calls;
+      // Defensive: if anything else used spawn earlier in the test lifecycle,
+      // assert that *every* call we observe is shell-free, because shell:true
+      // anywhere with an args[] would produce DEP0190.
+      for (const callArgs of calls) {
+        const options = callArgs[2] as { shell?: boolean } | undefined;
+        expect(options?.shell).not.toBe(true);
+      }
+    });
+
+    it('uses a real executable (which/where), not the `command` shell builtin', async () => {
+      vi.mocked(spawn).mockClear();
+
+      const params: GrepToolParams = { pattern: 'anything' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+      };
+
+      await invocation.isCommandAvailable('git');
+
+      expect(spawn).toHaveBeenCalled();
+      const [program, args] = vi.mocked(spawn).mock.calls[0] as [
+        string,
+        string[],
+        unknown,
+      ];
+      const expected = process.platform === 'win32' ? 'where' : 'which';
+      expect(program).toBe(expected);
+      expect(args).toEqual(['git']);
     });
   });
 });
