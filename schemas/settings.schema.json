@@ -3400,6 +3400,13 @@
           "default": false,
           "type": "boolean"
         },
+        "powerUserProfile": {
+          "title": "Use the power user profile to manage agent contexts.",
+          "description": "Less cache friendly version of the generalist profile.",
+          "markdownDescription": "Less cache friendly version of the generalist profile.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "contextManagement": {
           "title": "Enable Context Management",
           "description": "Enable logic for context management.",

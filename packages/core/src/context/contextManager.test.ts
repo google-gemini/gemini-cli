@@ -16,6 +16,8 @@ import type {
 } from '../core/agentChatHistory.js';
 import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
 import { createMockEnvironment } from './testing/contextTestUtils.js';
+import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
+import { deriveStableId } from '../utils/cryptoUtils.js';
 
 describe('ContextManager', () => {
   let mockSidecar: ContextProfile;
@@ -43,7 +45,7 @@ describe('ContextManager', () => {
       waitForPipelines: vi.fn().mockResolvedValue(undefined),
       executeTriggerSync: vi
         .fn()
-        .mockImplementation(async (trigger, nodes) => nodes),
+        .mockImplementation(async (trigger, buffer) => buffer),
       shutdown: vi.fn(),
     } as unknown as PipelineOrchestrator;
 
@@ -108,14 +110,15 @@ describe('ContextManager', () => {
 
     expect(mockOrchestrator.executeTriggerSync).toHaveBeenCalledExactlyOnceWith(
       'new_message',
-      expect.any(Array),
+      expect.any(ContextWorkingBufferImpl),
       expect.any(Set),
     );
 
     // Check that the node passed to the orchestrator corresponds to our pendingRequest
     const call = (mockOrchestrator.executeTriggerSync as unknown as Mock).mock
       .calls[0];
-    const passedNodes = call[1];
+    const passedBuffer = call[1];
+    const passedNodes = passedBuffer.nodes;
     const passedNodeIds = call[2];
 
     expect(passedNodes).toHaveLength(1);
@@ -124,6 +127,61 @@ describe('ContextManager', () => {
       largeToolOutput,
     );
     expect(passedNodeIds.has(passedNodes[0].id)).toBe(true);
+  });
+
+  it('should correctly split historical context and pending prompt for late binding', async () => {
+    const envContextId = deriveStableId(['environment-context']);
+    const historicalTurn: HistoryTurn = {
+      id: `turn_${envContextId}`, // Turn 0
+      content: { role: 'user', parts: [{ text: 'System instruction' }] },
+    };
+    const organicTurn: HistoryTurn = {
+      id: 'turn-1',
+      content: { role: 'model', parts: [{ text: 'Previous model message' }] },
+    };
+
+    // Setup history with Turn 0 and Turn 1
+    (mockChatHistory.get as Mock).mockReturnValue([
+      historicalTurn,
+      organicTurn,
+    ]);
+
+    const contextManager = new ContextManager(
+      mockSidecar,
+      mockEnv,
+      mockTracer,
+      mockOrchestrator,
+      mockChatHistory,
+      mockAdvancedTokenCalculator,
+    );
+
+    const pendingRequest: HistoryTurn = {
+      id: 'pending-turn',
+      content: { role: 'user', parts: [{ text: 'Active prompt' }] },
+    };
+
+    const { apiHistory, pendingApiHistory } =
+      await contextManager.renderHistory(pendingRequest);
+
+    // apiHistory should contain Turn 0 and the previous model message.
+    // Note: hardenHistory may inject a sentinel user turn if the history segment
+    // being hardened starts with a model turn.
+    expect(apiHistory.length).toBeGreaterThanOrEqual(2);
+    expect((apiHistory[0].parts![0] as unknown as { text: string }).text).toBe(
+      'System instruction',
+    );
+
+    // pendingApiHistory should contain ONLY the pending request
+    expect(pendingApiHistory).toHaveLength(1);
+    expect(
+      (pendingApiHistory[0].parts![0] as unknown as { text: string }).text,
+    ).toBe('Active prompt');
+
+    // The total combined history should be a valid alternating sequence
+    const combined = [...apiHistory, ...pendingApiHistory];
+    for (let i = 1; i < combined.length; i++) {
+      expect(combined[i].role).not.toBe(combined[i - 1].role);
+    }
   });
 
   it('renderHistory should exclude pendingRequest from the result (late binding)', async () => {

@@ -1974,6 +1974,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.powerUserProfile`** (boolean):
+  - **Description:** Less cache friendly version of the generalist profile.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.contextManagement`** (boolean):
   - **Description:** Enable logic for context management.
   - **Default:** `false`
