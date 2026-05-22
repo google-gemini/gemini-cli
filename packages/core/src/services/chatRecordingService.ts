@@ -824,34 +824,49 @@ export class ChatRecordingService {
       let updated = false;
 
       // 1. Sync content and IDs
-      const newMessages: MessageRecord[] = history.map((turn) => {
-        const existing = this.cachedConversation?.messages.find(
-          (m) => m.id === turn.id,
-        );
+      const newMessages: MessageRecord[] = history
+        .filter((turn) => {
+          // Filter out injected session context prompts to prevent metadata corruption on resume.
+          // The <session_context> tag is the only reliable identifier for these synthetic turns
+          // because HistoryTurn is bound to the raw GenAI SDK Content interface (role + parts only)
+          // and the stable ID assigned in environmentContext.ts gets overwritten with a random UUID
+          // during session initialization in geminiChat.ts. A schema change to HistoryTurn would
+          // be a more robust long-term fix.
+          const isSystemContext =
+            turn.content.role === 'user' &&
+            turn.content.parts?.some(
+              (p) => 'text' in p && p.text?.includes('<session_context>'),
+            );
+          return !isSystemContext;
+        })
+        .map((turn) => {
+          const existing = this.cachedConversation?.messages.find(
+            (m) => m.id === turn.id,
+          );
 
-        if (existing) {
-          // If content parts have changed (e.g. masking), update them
-          if (
-            JSON.stringify(existing.content) !==
-            JSON.stringify(turn.content.parts)
-          ) {
-            updated = true;
+          if (existing) {
+            // If content parts have changed (e.g. masking), update them
+            if (
+              JSON.stringify(existing.content) !==
+              JSON.stringify(turn.content.parts)
+            ) {
+              updated = true;
+            }
+            return {
+              ...existing,
+              content: turn.content.parts || [],
+            };
           }
-          return {
-            ...existing,
-            content: turn.content.parts || [],
-          };
-        }
 
-        // It's a new (possibly synthetic) turn like a summary
-        updated = true;
-        return this.newMessage(
-          turn.content.role === 'user' ? 'user' : 'gemini',
-          turn.content.parts || [],
-          undefined,
-          turn.id,
-        );
-      });
+          // It's a new (possibly synthetic) turn like a summary
+          updated = true;
+          return this.newMessage(
+            turn.content.role === 'user' ? 'user' : 'gemini',
+            turn.content.parts || [],
+            undefined,
+            turn.id,
+          );
+        });
 
       // 2. Specialized 'Masking Sync' for tool call results
       // If a user turn in history contains a functionResponse, we update the
