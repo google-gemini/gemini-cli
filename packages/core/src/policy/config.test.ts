@@ -919,6 +919,51 @@ modes = ["plan"]
 
     feedbackSpy.mockRestore();
   });
+
+  describe('trustReadOnlyHintInPlanMode setting', () => {
+    it('should NOT inject the trust-readOnlyHint rule when setting is unset', async () => {
+      const config = await createPolicyEngineConfig(
+        {},
+        ApprovalMode.PLAN,
+        MOCK_DEFAULT_DIR,
+      );
+      const trustRule = config.rules?.find(
+        (r) => r.source === 'Settings (general.plan.trustReadOnlyHint)',
+      );
+      expect(trustRule).toBeUndefined();
+    });
+
+    it('should NOT inject the rule when setting is explicitly false', async () => {
+      const config = await createPolicyEngineConfig(
+        { trustReadOnlyHintInPlanMode: false },
+        ApprovalMode.PLAN,
+        MOCK_DEFAULT_DIR,
+      );
+      const trustRule = config.rules?.find(
+        (r) => r.source === 'Settings (general.plan.trustReadOnlyHint)',
+      );
+      expect(trustRule).toBeUndefined();
+    });
+
+    it('should inject a high-priority ALLOW rule when setting is true', async () => {
+      const config = await createPolicyEngineConfig(
+        { trustReadOnlyHintInPlanMode: true },
+        ApprovalMode.PLAN,
+        MOCK_DEFAULT_DIR,
+      );
+      const trustRule = config.rules?.find(
+        (r) => r.source === 'Settings (general.plan.trustReadOnlyHint)',
+      );
+      expect(trustRule).toBeDefined();
+      expect(trustRule!.decision).toBe(PolicyDecision.ALLOW);
+      expect(trustRule!.modes).toEqual([ApprovalMode.PLAN]);
+      expect(trustRule!.toolAnnotations).toEqual({ readOnlyHint: true });
+      expect(trustRule!.mcpName).toBe('*');
+      // Priority 4.5 — user tier, above the 1.05 ASK_USER rule from plan.toml,
+      // below MCP_EXCLUDED_PRIORITY (4.9) so admin/security blocks still win.
+      expect(trustRule!.priority).toBeCloseTo(4.5, 5);
+    });
+  });
 });
 
 describe('getPolicyDirectories', () => {
