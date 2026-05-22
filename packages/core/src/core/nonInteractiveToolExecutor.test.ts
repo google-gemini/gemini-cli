@@ -1,0 +1,386 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { executeToolCall } from './nonInteractiveToolExecutor.js';
+import type {
+  ToolRegistry,
+  ToolCallRequestInfo,
+  ToolResult,
+  Config,
+} from '../index.js';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  ToolErrorType,
+  ApprovalMode,
+  HookSystem,
+  PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
+} from '../index.js';
+import type { Part } from '@google/genai';
+import { MockTool } from '../test-utils/mock-tool.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+
+describe('executeToolCall', () => {
+  let mockToolRegistry: ToolRegistry;
+  let mockTool: MockTool;
+  let executeFn: Mock;
+  let abortController: AbortController;
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    executeFn = vi.fn();
+    mockTool = new MockTool({ name: 'testTool', execute: executeFn });
+
+    mockToolRegistry = {
+      getTool: vi.fn(),
+      getAllToolNames: vi.fn(),
+    } as unknown as ToolRegistry;
+
+    mockConfig = {
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getActiveModel: () => PREVIEW_GEMINI_MODEL,
+      getGeminiClient: () => null, // No client needed for these tests
+      getMessageBus: () => null,
+      getPolicyEngine: () => ({
+        check: async () => ({ decision: PolicyDecision.ALLOW }),
+      }),
+      isInteractive: () => false,
+      getExperiments: () => {},
+      getEnableHooks: () => false,
+    } as unknown as Config;
+
+    // Use proper MessageBus mocking for Phase 3 preparation
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+    abortController = new AbortController();
+  });
+
+  it('should execute a tool successfully', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call1',
+      name: 'testTool',
+      args: { param1: 'value1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+    const toolResult: ToolResult = {
+      llmContent: 'Tool executed successfully',
+      returnDisplay: 'Success!',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockResolvedValue(toolResult);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(mockToolRegistry.getTool).toHaveBeenCalledWith('testTool');
+    expect(executeFn).toHaveBeenCalledWith(request.args);
+    expect(response).toStrictEqual({
+      callId: 'call1',
+      error: undefined,
+      errorType: undefined,
+      outputFile: undefined,
+      resultDisplay: 'Success!',
+      contentLength:
+        typeof toolResult.llmContent === 'string'
+          ? toolResult.llmContent.length
+          : undefined,
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'testTool',
+            id: 'call1',
+            response: { output: 'Tool executed successfully' },
+          },
+        },
+      ],
+    });
+  });
+
+  it('should return an error if tool is not found', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call2',
+      name: 'nonexistentTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-2',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
+    vi.mocked(mockToolRegistry.getAllToolNames).mockReturnValue([
+      'testTool',
+      'anotherTool',
+    ]);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    const expectedErrorMessage =
+      'Tool "nonexistentTool" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "testTool", "anotherTool"?';
+    expect(response).toStrictEqual({
+      callId: 'call2',
+      error: new Error(expectedErrorMessage),
+      errorType: ToolErrorType.TOOL_NOT_REGISTERED,
+      resultDisplay: expectedErrorMessage,
+      contentLength: expectedErrorMessage.length,
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'nonexistentTool',
+            id: 'call2',
+            response: {
+              error: expectedErrorMessage,
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('should return an error if tool validation fails', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call3',
+      name: 'testTool',
+      args: { param1: 'invalid' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-3',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    vi.spyOn(mockTool, 'build').mockImplementation(() => {
+      throw new Error('Invalid parameters');
+    });
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response).toStrictEqual({
+      callId: 'call3',
+      error: new Error('Invalid parameters'),
+      errorType: ToolErrorType.INVALID_TOOL_PARAMS,
+      responseParts: [
+        {
+          functionResponse: {
+            id: 'call3',
+            name: 'testTool',
+            response: {
+              error: 'Invalid parameters',
+            },
+          },
+        },
+      ],
+      resultDisplay: 'Invalid parameters',
+      contentLength: 'Invalid parameters'.length,
+    });
+  });
+
+  it('should return an error if tool execution fails', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call4',
+      name: 'testTool',
+      args: { param1: 'value1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-4',
+    };
+    const executionErrorResult: ToolResult = {
+      llmContent: 'Error: Execution failed',
+      returnDisplay: 'Execution failed',
+      error: {
+        message: 'Execution failed',
+        type: ToolErrorType.EXECUTION_FAILED,
+      },
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockResolvedValue(executionErrorResult);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+    expect(response).toStrictEqual({
+      callId: 'call4',
+      error: new Error('Execution failed'),
+      errorType: ToolErrorType.EXECUTION_FAILED,
+      responseParts: [
+        {
+          functionResponse: {
+            id: 'call4',
+            name: 'testTool',
+            response: {
+              error: 'Execution failed',
+            },
+          },
+        },
+      ],
+      resultDisplay: 'Execution failed',
+      contentLength: 'Execution failed'.length,
+    });
+  });
+
+  it('should return an unhandled exception error if execution throws', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call5',
+      name: 'testTool',
+      args: { param1: 'value1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-5',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockRejectedValue(new Error('Something went very wrong'));
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response).toStrictEqual({
+      callId: 'call5',
+      error: new Error('Something went very wrong'),
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+      resultDisplay: 'Something went very wrong',
+      contentLength: 'Something went very wrong'.length,
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'testTool',
+            id: 'call5',
+            response: { error: 'Something went very wrong' },
+          },
+        },
+      ],
+    });
+  });
+
+  it('should correctly format llmContent with inlineData', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call6',
+      name: 'testTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-6',
+    };
+    const imageDataPart: Part = {
+      inlineData: { mimeType: 'image/png', data: 'base64data' },
+    };
+    const toolResult: ToolResult = {
+      llmContent: [imageDataPart],
+      returnDisplay: 'Image processed',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockResolvedValue(toolResult);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response).toStrictEqual({
+      callId: 'call6',
+      error: undefined,
+      errorType: undefined,
+      outputFile: undefined,
+      resultDisplay: 'Image processed',
+      contentLength: undefined,
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'testTool',
+            id: 'call6',
+            response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [imageDataPart],
+          },
+        },
+      ],
+    });
+  });
+
+  it('should calculate contentLength for a string llmContent', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call7',
+      name: 'testTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-7',
+    };
+    const toolResult: ToolResult = {
+      llmContent: 'This is a test string.',
+      returnDisplay: 'String returned',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockResolvedValue(toolResult);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response.contentLength).toBe(
+      typeof toolResult.llmContent === 'string'
+        ? toolResult.llmContent.length
+        : undefined,
+    );
+  });
+
+  it('should have undefined contentLength for array llmContent with no string parts', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call8',
+      name: 'testTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-8',
+    };
+    const toolResult: ToolResult = {
+      llmContent: [{ inlineData: { mimeType: 'image/png', data: 'fakedata' } }],
+      returnDisplay: 'Image data returned',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    executeFn.mockResolvedValue(toolResult);
+
+    const { response } = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response.contentLength).toBeUndefined();
+  });
+});
