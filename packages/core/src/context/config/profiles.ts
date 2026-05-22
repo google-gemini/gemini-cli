@@ -177,8 +177,8 @@ export const stressTestProfile: ContextProfile = {
   name: 'Stress Test',
   config: {
     budget: {
-      retainedTokens: 4000,
-      maxTokens: 10000,
+      retainedTokens: 1500,
+      maxTokens: 5000,
     },
     processorOptions: {
       ToolMasking: {

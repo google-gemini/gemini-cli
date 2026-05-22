@@ -126,7 +126,7 @@ async function run() {
     while (true) {
       try {
         const exitCode = await runner();
-        if (exitCode !== RELAUNCH_EXIT_CODE) {
+        if (process.platform === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
           process.exit(exitCode);
         }
       } catch (error: unknown) {

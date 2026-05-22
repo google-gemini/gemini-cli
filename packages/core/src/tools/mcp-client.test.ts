@@ -40,6 +40,7 @@ import {
   discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
+import { McpComplianceTransport } from './mcp-compliance-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
@@ -70,6 +71,9 @@ const MOCK_CONTEXT_DEFAULT = {
 };
 
 let MOCK_CONTEXT: McpContext = MOCK_CONTEXT_DEFAULT;
+
+const unwrap = (t: any) =>
+  t instanceof McpComplianceTransport ? t.transport : t;
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -1937,7 +1941,7 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        const testableTransport = transport as unknown as {
+        const testableTransport = unwrap(transport) as unknown as {
           _authProvider?: {
             tokens: () => Promise<{ access_token: string } | undefined>;
           };
@@ -1983,7 +1987,7 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        const testableTransport = transport as unknown as {
+        const testableTransport = unwrap(transport) as unknown as {
           _authProvider?: {
             tokens: () => Promise<
               { access_token: string; expires_in?: number } | undefined
@@ -2032,7 +2036,7 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        const testableTransport = transport as unknown as {
+        const testableTransport = unwrap(transport) as unknown as {
           _authProvider?: {
             tokens: () => Promise<{ access_token: string } | undefined>;
           };
@@ -2075,7 +2079,7 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        const testableTransport = transport as unknown as {
+        const testableTransport = unwrap(transport) as unknown as {
           _authProvider?: {
             tokens: () => Promise<{ access_token: string } | undefined>;
           };
@@ -2128,7 +2132,7 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        const testableTransport = transport as unknown as {
+        const testableTransport = unwrap(transport) as unknown as {
           _authProvider?: {
             tokens: () => Promise<
               { access_token: string; expires_in?: number } | undefined
@@ -2167,7 +2171,7 @@ describe('mcp-client', () => {
           );
 
           const wrappedFetch = (
-            transport as unknown as {
+            unwrap(transport) as unknown as {
               _fetch: (
                 url: URL | string,
                 init?: RequestInit,
@@ -2209,7 +2213,7 @@ describe('mcp-client', () => {
 
           // For SSEClientTransport, the fetch is private or passed to the SDK.
           // We can check if it creates the transport successfully.
-          expect(transport).toBeInstanceOf(SSEClientTransport);
+          expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
         } finally {
           vi.unstubAllEnvs();
           vi.unstubAllGlobals();
@@ -2227,8 +2231,8 @@ describe('mcp-client', () => {
           false,
           MOCK_CONTEXT,
         );
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -2245,8 +2249,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { Authorization: 'derp' },
@@ -2265,8 +2269,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -2283,8 +2287,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -2300,8 +2304,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
@@ -2319,8 +2323,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { Authorization: 'Bearer token' },
@@ -2340,8 +2344,8 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: { 'X-API-Key': 'key123' },
@@ -2361,8 +2365,8 @@ describe('mcp-client', () => {
         );
 
         // httpUrl should take priority and create HTTP transport
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toMatchObject({
           _url: new URL('http://test-server-http'),
           _requestInit: { headers: {} },
         });
@@ -2587,8 +2591,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
         const googUserProject =
@@ -2618,9 +2624,11 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(mockGetRequestHeaders).toHaveBeenCalled();
-        const testableTransport = transport as unknown as TestableTransport;
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const headers = testableTransport._requestInit?.headers;
         expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
@@ -2650,8 +2658,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(StreamableHTTPClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const headers = testableTransport._requestInit?.headers;
         expect(headers?.['X-Goog-User-Project']).toBe('provider-project');
       });
@@ -2671,8 +2681,10 @@ describe('mcp-client', () => {
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        const testableTransport = transport as unknown as TestableTransport;
+        expect(unwrap(transport)).toBeInstanceOf(SSEClientTransport);
+        const testableTransport = unwrap(
+          transport,
+        ) as unknown as TestableTransport;
         const authProvider = testableTransport._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
       });
@@ -2842,7 +2854,7 @@ describe('connectToMcpServer with OAuth', () => {
     let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport as unknown as TestableTransport;
+        capturedTransport = unwrap(transport) as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2860,8 +2872,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
-    const authHeader = (capturedTransport as TestableTransport)._requestInit
-      ?.headers?.['Authorization'];
+    const authHeader = (unwrap(capturedTransport) as TestableTransport)
+      ._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token');
   });
 
@@ -2887,7 +2899,7 @@ describe('connectToMcpServer with OAuth', () => {
     let capturedTransport: TestableTransport | undefined;
     vi.mocked(mockedClient.connect).mockImplementationOnce(
       async (transport) => {
-        capturedTransport = transport as unknown as TestableTransport;
+        capturedTransport = unwrap(transport) as unknown as TestableTransport;
         return Promise.resolve();
       },
     );
@@ -2906,8 +2918,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
 
-    const authHeader = (capturedTransport as TestableTransport)._requestInit
-      ?.headers?.['Authorization'];
+    const authHeader = (unwrap(capturedTransport) as TestableTransport)
+      ._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
 

@@ -63,7 +63,6 @@ const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
   '@github/keytar',
-  '@google/gemini-cli-devtools',
 ];
 
 const baseConfig = {
@@ -110,6 +109,10 @@ const cliConfig = {
       __dirname,
       'packages/cli/src/patches/http-proxy-agent.ts',
     ),
+    '@google/gemini-cli-devtools': path.resolve(
+      __dirname,
+      'packages/devtools/src/index.ts',
+    ),
     ...commonAliases,
   },
   metafile: true,
@@ -117,6 +120,9 @@ const cliConfig = {
 
 const workerConfig = {
   ...baseConfig,
+  banner: {
+    js: `const require = (await import('node:module')).createRequire(import.meta.url); const __chunk_filename = (await import('node:url')).fileURLToPath(import.meta.url); const __chunk_dirname = (await import('node:path')).dirname(__chunk_filename);`,
+  },
   entryPoints: {
     'worker/worker-entry': path.join(
       path.dirname(require.resolve('ink')),
@@ -125,6 +131,8 @@ const workerConfig = {
   },
   outdir: 'bundle',
   define: {
+    __filename: '__chunk_filename',
+    __dirname: '__chunk_dirname',
     'process.env.NODE_ENV': JSON.stringify(
       process.env.NODE_ENV || 'production',
     ),

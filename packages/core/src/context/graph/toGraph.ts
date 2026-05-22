@@ -11,6 +11,8 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { NodeIdService } from './nodeIdService.js';
 import type { HistoryTurn } from '../../core/agentChatHistory.js';
 import { isSnapshotState } from '../utils/snapshotGenerator.js';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
+import { ensureStableToolIds } from '../../utils/sessionUtils.js';
 
 // Global WeakMap to cache hashes for Part objects.
 // This optimizes getStableId by avoiding redundant stringify/hash operations
@@ -41,9 +43,9 @@ function isFileDataPart(
   );
 }
 
-function isFunctionCallPart(
-  part: Part,
-): part is Part & { functionCall: { id: string; name: string } } {
+function isFunctionCallPart(part: Part): part is Part & {
+  functionCall: { id?: string; name: string; args: Record<string, unknown> };
+} {
   return (
     typeof part.functionCall === 'object' &&
     part.functionCall !== null &&
@@ -51,9 +53,13 @@ function isFunctionCallPart(
   );
 }
 
-function isFunctionResponsePart(
-  part: Part,
-): part is Part & { functionResponse: { id: string; name: string } } {
+function isFunctionResponsePart(part: Part): part is Part & {
+  functionResponse: {
+    id?: string;
+    name: string;
+    response: Record<string, unknown>;
+  };
+} {
   return (
     typeof part.functionResponse === 'object' &&
     part.functionResponse !== null &&
@@ -121,19 +127,27 @@ export function getStableId(
       .digest('hex');
     id = `file_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isFunctionCallPart(part)) {
-    contentHash = createHash('sha256')
-      .update(
-        `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
-      )
-      .digest('hex');
-    id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
+    if (part.functionCall.id) {
+      id = `call_${part.functionCall.id}`;
+    } else {
+      contentHash = createHash('sha256')
+        .update(
+          `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+        )
+        .digest('hex');
+      id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
+    }
   } else if (isFunctionResponsePart(part)) {
-    contentHash = createHash('sha256')
-      .update(
-        `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
-      )
-      .digest('hex');
-    id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+    if (part.functionResponse.id) {
+      id = `resp_${part.functionResponse.id}`;
+    } else {
+      contentHash = createHash('sha256')
+        .update(
+          `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+        )
+        .digest('hex');
+      id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+    }
   } else if (isExecutableCodePart(part)) {
     contentHash = createHash('sha256')
       .update(
@@ -174,6 +188,8 @@ export class ContextGraphBuilder {
   constructor(private readonly idService: NodeIdService) {}
 
   processHistory(history: readonly HistoryTurn[]): ConcreteNode[] {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(history as HistoryTurn[]);
     const nodes: ConcreteNode[] = [];
 
     for (let turnIdx = 0; turnIdx < history.length; turnIdx++) {
@@ -181,42 +197,32 @@ export class ContextGraphBuilder {
       const msg = turn.content;
       if (!msg.parts) continue;
 
-      // Defensive: Skip legacy environment header regardless of where it appears.
-      // We now manage this as an orthogonal late-addition header.
-      if (msg.role === 'user' && msg.parts.length === 1) {
-        const text = msg.parts[0].text;
-        if (
-          text?.startsWith('<session_context>') &&
-          text?.includes('This is the Gemini CLI')
-        ) {
-          debugLogger.log(
-            '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
-          );
-          continue;
-        }
-      }
-
       const turnSalt = turn.id;
-      const turnId = `turn_${turnSalt}`;
+      const turnId = turnSalt.startsWith('turn_')
+        ? turnSalt
+        : `turn_${turnSalt}`;
 
       if (msg.role === 'user') {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId =
-            isFunctionResponsePart(part) &&
-            typeof part.functionResponse.id === 'string'
-              ? part.functionResponse.id
-              : isFunctionCallPart(part) &&
-                  typeof part.functionCall.id === 'string'
-                ? part.functionCall.id
-                : undefined;
+
+          // Skip legacy session context headers if they appear later in history (after Turn 0).
+          // We identify Turn 0 by its deterministic ID.
+          const envTurnId = deriveStableId(['environment-context']);
+          if (
+            isTextPart(part) &&
+            part.text.trim().startsWith('<session_context>') &&
+            turnSalt !== envTurnId
+          ) {
+            debugLogger.log(
+              '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
+            );
+            continue;
+          }
 
           const isSnapshot = isTextPart(part) && isSnapshotState(part.text);
 
-          // Use stable API ID if available, otherwise anchor to the turn and index.
-          const id = apiId
-            ? `${apiId}_${turnSalt}_${partIdx}`
-            : `${turnSalt}_${partIdx}`;
+          const id = getStableId(part, this.idService, turnSalt, partIdx);
 
           const node: ConcreteNode = {
             id,
@@ -231,19 +237,12 @@ export class ContextGraphBuilder {
             turnId,
           };
           nodes.push(node);
-          this.idService.set(part, id);
         }
       } else if (msg.role === 'model') {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId =
-            isFunctionCallPart(part) && typeof part.functionCall.id === 'string'
-              ? part.functionCall.id
-              : undefined;
 
-          const id = apiId
-            ? `${apiId}_${turnSalt}_${partIdx}`
-            : `${turnSalt}_${partIdx}`;
+          const id = getStableId(part, this.idService, turnSalt, partIdx);
 
           const node: ConcreteNode = {
             id,
@@ -256,7 +255,6 @@ export class ContextGraphBuilder {
             turnId,
           };
           nodes.push(node);
-          this.idService.set(part, id);
         }
       }
     }

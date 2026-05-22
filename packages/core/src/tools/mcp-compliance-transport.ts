@@ -12,19 +12,16 @@ import type {
 import { EventEmitter } from 'node:events';
 
 /**
- * A wrapper transport that intercepts messages from Xcode's mcpbridge and fixes
+ * A wrapper transport that intercepts messages from MCP servers and fixes
  * non-compliant responses.
  *
- * Issue: Xcode 26.3's mcpbridge returns tool results in `content` but misses
- * `structuredContent` when the tool has an output schema.
+ * Issue: Some MCP servers (e.g., Xcode 26.3's mcpbridge) return tool results in
+ * `content` but miss `structuredContent` when the tool has an output schema.
  *
- * Fix: Parse the text content as JSON and populate `structuredContent`.
+ * Fix: Parse the text content as JSON and populate `structuredContent` if it's missing.
  */
-export class XcodeMcpBridgeFixTransport
-  extends EventEmitter
-  implements Transport
-{
-  constructor(private readonly transport: Transport) {
+export class McpComplianceTransport extends EventEmitter implements Transport {
+  constructor(readonly transport: Transport) {
     super();
 
     // Forward messages from the underlying transport

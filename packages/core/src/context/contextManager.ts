@@ -15,24 +15,24 @@ import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
 import type { ContextProfile } from './config/profiles.js';
 import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
-import { HistoryObserver } from './historyObserver.js';
 import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { deriveStableId } from '../utils/cryptoUtils.js';
 import { hardenHistory } from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
 import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
 
 export class ContextManager {
-  // The master state containing the pristine graph and current active graph.
+  // Master state containing the pristine graph and current active graph.
   private buffer: ContextWorkingBufferImpl =
     ContextWorkingBufferImpl.initialize([]);
 
   private readonly eventBus: ContextEventBus;
-
-  // Internal sub-components
   private readonly orchestrator: PipelineOrchestrator;
-  private readonly historyObserver: HistoryObserver;
+
+  // Track what IDs have been evaluated for triggers to prevent redundant processing
+  private readonly evaluatedNodeIds = new Set<string>();
 
   // Hysteresis tracking to prevent utility call churn
   private lastTriggeredDeficit = 0;
@@ -43,6 +43,7 @@ export class ContextManager {
     result: {
       history: HistoryTurn[];
       apiHistory: Content[];
+      pendingApiHistory: Content[];
       didApplyManagement: boolean;
       baseUnits: number;
       processedNodes: readonly ConcreteNode[];
@@ -56,7 +57,7 @@ export class ContextManager {
     private readonly env: ContextEnvironment,
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
-    chatHistory: AgentChatHistory,
+    private readonly chatHistory: AgentChatHistory,
     private readonly advancedTokenCalculator: AdvancedTokenCalculator,
     private readonly headerProvider?: () => Promise<Content | undefined>,
   ) {
@@ -66,23 +67,8 @@ export class ContextManager {
     // Provide the orchestrator with a way to fetch the latest nodes from the live buffer
     this.orchestrator.setNodeProvider(() => this.buffer.nodes);
 
-    this.historyObserver = new HistoryObserver(
-      chatHistory,
-      this.env.eventBus,
-      this.tracer,
-      this.env.graphMapper,
-    );
-
-    this.eventBus.onPristineHistoryUpdated((event) => {
-      // Sync the entire pristine history chronologically
-      this.buffer = this.buffer.syncPristineHistory(event.nodes);
-
-      this.evaluateTriggers(event.newNodes);
-    });
     this.eventBus.onProcessorResult((event) => {
       // Defensive: Verify all targets are still present in the buffer.
-      // If a synchronous render or a previous async task already removed them,
-      // this result is stale and should be dropped.
       const currentIds = new Set(this.buffer.nodes.map((n) => n.id));
       const allTargetsPresent = event.targets.every((t) =>
         currentIds.has(t.id),
@@ -100,14 +86,7 @@ export class ContextManager {
         event.targets,
         event.returnedNodes,
       );
-      // We explicitly DO NOT call evaluateTriggers here.
-      // The Context Manager is a one-way assembly line. It only evaluates triggers
-      // when fundamentally new organic context is added via PristineHistoryUpdated.
-      // Re-evaluating after a processor finishes creates infinite feedback loops if
-      // the processor fails to reduce the token count below the threshold.
     });
-
-    this.historyObserver.start();
   }
 
   /**
@@ -122,21 +101,21 @@ export class ContextManager {
    */
   shutdown() {
     this.orchestrator.shutdown();
-    this.historyObserver.stop();
   }
 
   /**
    * Evaluates if the current working buffer exceeds configured budget thresholds,
    * firing consolidation events if necessary.
    */
-  private evaluateTriggers(newNodes: Set<string>) {
+  private async evaluateTriggers(newNodes: Set<string>) {
     if (!this.sidecar.config.budget) return;
 
     if (newNodes.size > 0) {
-      this.eventBus.emitChunkReceived({
-        nodes: this.buffer.nodes,
-        targetNodeIds: newNodes,
-      });
+      await this.orchestrator.executeTriggerSync(
+        'new_message',
+        this.buffer.nodes,
+        newNodes,
+      );
     }
 
     const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
@@ -149,11 +128,6 @@ export class ContextManager {
 
       // Identify nodes that must NEVER be truncated
       const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
-      if (protectedIds.size > 0) {
-        debugLogger.log(
-          `[ContextManager] Pinning ${protectedIds.size} nodes (recent_turn or external_active_task) to prevent truncation.`,
-        );
-      }
 
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
@@ -163,11 +137,7 @@ export class ContextManager {
           node,
         ]);
 
-        // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
-        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
-        // strictly *older* than the boundary node.
         if (priorTokens > this.sidecar.config.budget.retainedTokens) {
-          // Only age out if not protected
           if (!protectedIds.has(node.id)) {
             agedOutNodes.add(node.id);
           }
@@ -178,17 +148,12 @@ export class ContextManager {
         const targetDeficit =
           currentTokens - this.sidecar.config.budget.retainedTokens;
 
-        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
-        // so we can track growth from this new, smaller deficit.
         if (targetDeficit < this.lastTriggeredDeficit) {
           this.lastTriggeredDeficit = targetDeficit;
         }
 
-        // Respect coalescing threshold for background work
         const threshold =
           this.sidecar.config.budget.coalescingThresholdTokens || 0;
-
-        // Only trigger if deficit has grown significantly since last time
         const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
 
         if (
@@ -199,25 +164,21 @@ export class ContextManager {
           this.env.tokenCalculator.garbageCollectCache(
             new Set(this.buffer.nodes.map((n) => n.id)),
           );
-          this.eventBus.emitConsolidationNeeded({
-            nodes: this.buffer.nodes,
-            targetDeficit,
-            targetNodeIds: agedOutNodes,
-          });
+
+          // Trigger synchronous consolidation for budget deficit
+          await this.orchestrator.executeTriggerSync(
+            'nodes_aged_out',
+            this.buffer.nodes,
+            agedOutNodes,
+            new Set(protectedIds.keys()),
+          );
         }
       } else {
-        // Budget is healthy, reset hysteresis
         this.lastTriggeredDeficit = 0;
       }
     }
   }
 
-  /**
-   * Identifies 'pinned' nodes that should not be truncated.
-   * This includes:
-   * 1. The entire last turn (Recent context).
-   * 2. Active tool calls (calls without responses in the graph).
-   */
   private getProtectedNodeIds(
     nodes: readonly ConcreteNode[],
     extraProtectedIds: Set<string> = new Set(),
@@ -225,17 +186,18 @@ export class ContextManager {
     const protectionMap = new Map<string, string>();
     if (nodes.length === 0) return protectionMap;
 
-    // 1. Identify all nodes belonging to the last turn (Recent context)
     const lastNode = nodes[nodes.length - 1];
     const lastTurnId = lastNode.turnId;
+    const envTurnId = `turn_${deriveStableId(['environment-context'])}`;
 
     for (const node of nodes) {
       if (node.turnId === lastTurnId) {
         protectionMap.set(node.id, 'recent_turn');
+      } else if (node.turnId === envTurnId) {
+        protectionMap.set(node.id, 'environment_context');
       }
     }
 
-    // 2. Any externally requested protections
     for (const id of extraProtectedIds) {
       protectionMap.set(id, 'external_active_task');
     }
@@ -243,11 +205,6 @@ export class ContextManager {
     return protectionMap;
   }
 
-  /**
-   * Retrieves the raw, uncompressed Episodic Context Graph graph.
-   * Useful for internal tool rendering (like the trace viewer).
-   * Note: This is an expensive, deep clone operation.
-   */
   getPristineGraph(): readonly ConcreteNode[] {
     const pristineSet = new Map<string, ConcreteNode>();
     for (const node of this.buffer.nodes) {
@@ -256,58 +213,70 @@ export class ContextManager {
         pristineSet.set(root.id, root);
       }
     }
-    // We sort them by timestamp to ensure they are returned in chronological order
     return Array.from(pristineSet.values()).sort(
       (a, b) => a.timestamp - b.timestamp,
     );
   }
 
-  /**
-   * Generates a virtual view of the pristine graph, substituting in variants
-   * up to the configured token budget.
-   * This is the view that will eventually be projected back to the LLM.
-   */
   getNodes(): readonly ConcreteNode[] {
     return [...this.buffer.nodes];
   }
 
-  getEnvironment(): ContextEnvironment {
-    return this.env;
-  }
-
   /**
-   * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
-   * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
-   * This is the primary method called by the agent framework before sending a request.
+   * Generates a virtual view of the pristine graph, substituting in variants
+   * up to the configured token budget.
    */
   async renderHistory(
-    pendingRequest?: HistoryTurn,
+    pendingRequest?: { id: string; content: Content },
     activeTaskIds: Set<string> = new Set(),
     abortSignal?: AbortSignal,
   ): Promise<{
     history: HistoryTurn[];
     apiHistory: Content[];
+    pendingApiHistory: Content[];
     didApplyManagement: boolean;
     baseUnits: number;
     processedNodes: readonly ConcreteNode[];
   }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
-    let previewNodes: ConcreteNode[] = [];
-    if (pendingRequest) {
-      previewNodes = this.env.graphMapper.applyEvent({
-        type: 'PUSH',
-        payload: [pendingRequest],
-      });
+    // 1. Explicit Sync with the durable history.
+    // This replaces the background HistoryObserver.
+    const currentHistory = this.chatHistory.get();
+    const pristineNodes = this.env.graphMapper.sync(currentHistory);
+
+    this.buffer = this.buffer.syncPristineHistory(pristineNodes);
+
+    // Identify truly "new" nodes that haven't been evaluated for triggers yet.
+    const newPrimalNodes = new Set<string>();
+    for (const node of pristineNodes) {
+      if (!this.evaluatedNodeIds.has(node.id)) {
+        newPrimalNodes.add(node.id);
+        this.evaluatedNodeIds.add(node.id);
+      }
     }
 
+    // 2. Preview the pending request.
+    let previewNodes: readonly ConcreteNode[] = [];
+    if (pendingRequest) {
+      previewNodes = this.env.graphMapper.sync([pendingRequest]);
+
+      const previewNodeIds = new Set(previewNodes.map((n) => n.id));
+
+      previewNodes = await this.orchestrator.executeTriggerSync(
+        'new_message',
+        previewNodes,
+        previewNodeIds,
+      );
+    }
+
+    // 3. Trigger evaluation (Sync budget management).
+    await this.evaluateTriggers(newPrimalNodes);
+
     // --- Hot Start Calibration ---
-    // If we are resuming a session with history, we don't want the adaptive token calculator
-    // to fly blind on its first GC pass. We do a one-time API calibration.
     const hotStartPromise = (async () => {
       if (!this.hasPerformedHotStart) {
         this.hasPerformedHotStart = true;
-
         if (this.buffer.nodes.length > 0) {
           const nodesForHotStart = [...this.buffer.nodes, ...previewNodes];
           await this.performHotStartCalibration(nodesForHotStart, abortSignal);
@@ -315,14 +284,11 @@ export class ContextManager {
       }
     })();
 
-    // 1. Synchronous Pressure Barrier: Wait for background management pipelines to finish.
-    // We run hot start calibration in parallel to hide the network latency.
     await Promise.all([this.orchestrator.waitForPipelines(), hotStartPromise]);
 
     let nodes = this.buffer.nodes;
     const previewNodeIds = new Set<string>();
 
-    // Apply the preview nodes to the final graph
     if (previewNodes.length > 0) {
       for (const n of previewNodes) {
         previewNodeIds.add(n.id);
@@ -330,13 +296,10 @@ export class ContextManager {
       nodes = [...nodes, ...previewNodes];
     }
 
-    // 2. Fetch Header and calculate tokens
     const header = this.headerProvider
       ? await this.headerProvider()
       : undefined;
 
-    // 3. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
-    // We combine the graph hash with a hash of the header to ensure total freshness.
     const graphHash = nodes.map((n) => n.id).join('|');
     const headerHash = header ? JSON.stringify(header.parts) : 'no-header';
     const totalHash = `${graphHash}::${headerHash}`;
@@ -350,7 +313,6 @@ export class ContextManager {
 
     const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
-    // Apply final GC Backstop pressure barrier synchronously before mapping
     const renderResult = await render(
       nodes,
       this.orchestrator,
@@ -358,22 +320,22 @@ export class ContextManager {
       this.tracer,
       this.env,
       this.advancedTokenCalculator,
-      protectionReasons,
-      header,
-      previewNodeIds,
+      {
+        protectionReasons,
+        header,
+        lateBindPrompt: !!pendingRequest,
+      },
     );
 
     const {
       history: renderedHistory,
+      pendingHistory,
       didApplyManagement,
       baseUnits,
       processedNodes,
     } = renderResult;
 
     if (didApplyManagement) {
-      // Commit the GC backstop results back to the master buffer.
-      // We filter out preview nodes because they are ephemeral and will be
-      // added to history naturally by the client after the turn completes.
       this.buffer = this.buffer.applyProcessorResult(
         'sync_backstop',
         this.buffer.nodes,
@@ -381,54 +343,52 @@ export class ContextManager {
       );
     }
 
-    // Structural validation in debug mode
     checkContextInvariants(this.buffer.nodes, 'RenderHistory');
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    // We must temporarily append the pendingRequest (if any) before hardening.
-    // Otherwise, the hardener will see dangling functionCalls and inject sentinels
-    // even though the pendingRequest provides the required functionResponses.
-    const fullHistoryToHarden = pendingRequest
-      ? [...renderedHistory, pendingRequest]
-      : renderedHistory;
-
-    const hardenedHistory = hardenHistory(fullHistoryToHarden, {
+    const allHistory = [...renderedHistory, ...pendingHistory];
+    const hardenedAllHistory = hardenHistory(allHistory, {
       sentinels: this.sidecar.sentinels,
     });
 
-    if (pendingRequest) {
-      const last = hardenedHistory[hardenedHistory.length - 1];
-      if (last && last.content.parts) {
-        const numPartsToRemove = pendingRequest.content.parts?.length || 0;
-        if (
-          numPartsToRemove > 0 &&
-          last.content.parts.length > numPartsToRemove
-        ) {
-          last.content.parts.splice(-numPartsToRemove);
-        } else {
-          hardenedHistory.pop();
-        }
-      } else {
-        hardenedHistory.pop();
+    const firstPendingId = pendingHistory[0]?.id;
+    let splitIndex = renderedHistory.length;
+    if (firstPendingId) {
+      const foundIndex = hardenedAllHistory.findIndex(
+        (h) => h.id === firstPendingId,
+      );
+      if (foundIndex !== -1) {
+        splitIndex = foundIndex;
       }
     }
 
-    const apiHistory = hardenedHistory.map((h) => h.content);
+    const apiHistory = hardenedAllHistory
+      .slice(0, splitIndex)
+      .map((h) => h.content);
+
+    const pendingApiHistory = hardenedAllHistory
+      .slice(splitIndex)
+      .map((h) => h.content);
+
     if (header) {
       apiHistory.unshift(header);
     }
 
     const result = {
-      history: hardenedHistory,
+      history: renderedHistory,
       apiHistory,
+      pendingApiHistory,
       didApplyManagement,
       baseUnits,
       processedNodes,
     };
 
-    // Update cache
-    this.lastRenderCache = { nodesHash: totalHash, result };
+    this.lastRenderCache = {
+      nodesHash: totalHash,
+      result,
+    };
+
     return result;
   }
 
@@ -436,47 +396,28 @@ export class ContextManager {
     nodes: readonly ConcreteNode[],
     abortSignal?: AbortSignal,
   ) {
+    const history = this.env.graphMapper.fromGraph(nodes);
+    const contents = history.map((h) => h.content);
+
     try {
-      this.tracer.logEvent(
-        'ContextManager',
-        'Performing Hot Start Token Calibration',
-      );
+      const { totalTokens } = await this.env.llmClient.countTokens({
+        modelConfigKey: { model: 'context-calibrator' },
+        contents,
+        abortSignal,
+      });
 
-      const contents = this.env.graphMapper.fromGraph(nodes);
-      const rawContents = contents.map((h) => h.content);
-      const header = this.headerProvider
-        ? await this.headerProvider()
-        : undefined;
-      const combinedHistory = header ? [header, ...rawContents] : rawContents;
-
-      const baseUnits =
-        this.advancedTokenCalculator.getRawBaseUnits(nodes) +
-        (header
-          ? this.advancedTokenCalculator.getRawBaseUnitsForContent(header)
-          : 0);
-
-      // We only make the network call if we have actual contents to send,
-      // avoiding 400 Bad Request errors from the API.
-      if (combinedHistory.length > 0) {
-        const result = await this.env.llmClient.countTokens({
-          contents: combinedHistory,
-          abortSignal,
+      if (totalTokens !== undefined) {
+        this.env.eventBus.emitTokenGroundTruth({
+          actualTokens: totalTokens,
+          promptBaseUnits: this.advancedTokenCalculator.getRawBaseUnits(nodes),
         });
-        if (result.totalTokens > 0) {
-          this.env.eventBus.emitTokenGroundTruth({
-            actualTokens: result.totalTokens,
-            promptBaseUnits: baseUnits,
-          });
-        }
       }
-    } catch (error) {
-      // Hot start calibration is purely an optimization. If the network fails or auth is weird,
-      // we silently swallow and fallback to the un-calibrated 1.0 ratio heuristic.
-      this.tracer.logEvent(
-        'ContextManager',
-        'Hot Start Token Calibration Failed (Ignored)',
-        { error },
-      );
+    } catch (e) {
+      debugLogger.warn('[ContextManager] Hot start calibration failed', e);
     }
+  }
+
+  getEnvironment(): ContextEnvironment {
+    return this.env;
   }
 }

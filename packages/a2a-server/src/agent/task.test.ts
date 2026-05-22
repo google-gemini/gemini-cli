@@ -294,6 +294,66 @@ describe('Task', () => {
       ]);
     });
 
+    it('should capture usageMetadata on Finished event and include it in final status update', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const finishedEvent = {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: 'STOP',
+          usageMetadata: {
+            promptTokenCount: 100,
+            candidatesTokenCount: 50,
+            totalTokenCount: 150,
+          },
+        },
+      };
+
+      await task.acceptAgentMessage(finishedEvent);
+      expect(task.usageMetadata).toEqual({
+        promptTokenCount: 100,
+        candidatesTokenCount: 50,
+        totalTokenCount: 150,
+      });
+
+      task.setTaskStateAndPublishUpdate(
+        'input-required',
+        { kind: CoderAgentEvent.StateChangeEvent },
+        undefined,
+        undefined,
+        true, // final
+      );
+
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          final: true,
+          metadata: expect.objectContaining({
+            usageMetadata: {
+              promptTokenCount: 100,
+              candidatesTokenCount: 50,
+              totalTokenCount: 150,
+            },
+          }),
+        }),
+      );
+    });
+
     it('should update modelInfo and reflect it in metadata and status updates', async () => {
       const mockConfig = createMockConfig();
       const mockEventBus: ExecutionEventBus = {
