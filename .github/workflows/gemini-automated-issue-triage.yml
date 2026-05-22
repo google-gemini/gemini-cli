@@ -335,14 +335,41 @@ jobs:
               return;
             }
 
+            const newAreaLabel = labelsToAdd[0];
+
+            // Get current labels to resolve conflicts
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+            const currentLabelNames = currentLabels.map(l => l.name);
+            const currentAreaLabels = currentLabelNames.filter(name => name.startsWith('area/'));
+
+            const labelsToRemove = currentAreaLabels.filter(name => name !== newAreaLabel);
+
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name: label
+                });
+                core.info(`Removed conflicting area label: ${label}`);
+              } catch (e) {
+                core.warning(`Failed to remove label ${label}: ${e.message}`);
+              }
+            }
+
             // Set labels based on triage result
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              labels: labelsToAdd
+              labels: [newAreaLabel]
             });
-            core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
+            core.info(`Successfully added labels for #${issueNumber}: ${newAreaLabel}`);
 
       - name: 'Post Issue Analysis Failure Comment'
         if: |-

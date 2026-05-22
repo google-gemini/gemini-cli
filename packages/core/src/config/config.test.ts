@@ -863,6 +863,16 @@ describe('Server Config (config.ts)', () => {
       expect(GeminiClient).toHaveBeenCalledWith(config);
     });
 
+    it('should clear fallback overrides when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+    });
+
     it('should pass Vertex AI routing settings when refreshing auth', async () => {
       const vertexAiRouting = {
         requestType: 'shared' as const,
@@ -1902,6 +1912,21 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  it('clears fallback overrides when session changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    await config.initialize();
+
+    config.activateFallbackMode('fallback-model', 'failed-model');
+    expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+    config.setSessionId('session-two');
+
+    expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+  });
+
   it('does not throw when changing sessions before the previous plans dir exists', async () => {
     const config = new Config({
       ...baseParams,
@@ -2019,7 +2044,6 @@ describe('Server Config (config.ts)', () => {
     expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
     expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
     expect(configInternal.lastQuotaFetchTime).toBe(0);
-    expect(configInternal.hasAccessToPreviewModel).toBeNull();
 
     // Event emission
     expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
@@ -2714,6 +2738,16 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('should preserve fallback overrides when setting a new model', () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      config.setModel('new-model');
+
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
     });
 
     it('should allow setting auto model from auto model and reset availability', () => {
@@ -3476,6 +3510,53 @@ describe('Config Quota & Preview Model Access', () => {
         planSettings: { modelRouting: false },
       });
       expect(await config.getPlanModeRoutingEnabled()).toBe(false);
+    });
+  });
+
+  describe('validatePathAccess (PathValidator integration)', () => {
+    it('should reject pathologically long paths', () => {
+      const config = new Config(baseParams);
+      const longPath = path.join(baseParams.targetDir, 'a'.repeat(5000));
+      const result = config.validatePathAccess(longPath, 'read');
+      expect(result).toContain('Invalid path: Path is too long');
+    });
+
+    it('should reject paths with log markers', () => {
+      const config = new Config(baseParams);
+      const logPath = path.join(
+        baseParams.targetDir,
+        'AssertionError: expected true to be false',
+      );
+      const result = config.validatePathAccess(logPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path appears to be a misinterpreted log fragment',
+      );
+    });
+
+    it('should reject paths with control characters', () => {
+      const config = new Config(baseParams);
+      const malformedPath = path.join(
+        baseParams.targetDir,
+        'file\nwith\nnewline.txt',
+      );
+      const result = config.validatePathAccess(malformedPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path contains invalid characters',
+      );
+    });
+
+    it('should allow normal paths', () => {
+      const config = new Config(baseParams);
+      const normalPath = path.resolve(baseParams.targetDir, 'src/index.ts');
+      const result = config.validatePathAccess(normalPath, 'read');
+
+      // It might return "Path not in workspace" or similar if not authorized,
+      // but it should NOT return the "Invalid path" prefix from PathValidator.
+      if (result) {
+        expect(result).not.toContain('Invalid path:');
+      } else {
+        expect(result).toBeNull();
+      }
     });
   });
 });

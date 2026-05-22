@@ -105,9 +105,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.preferredEditor`** (string):
-  - **Description:** The preferred editor to open files in.
+- **`general.preferredEditor`** (enum):
+  - **Description:** The preferred editor to open files in. Must be one of the
+    built-in supported identifiers. Use /editor in the CLI to pick
+    interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
+  - **Values:** `"vscode"`, `"vscodium"`, `"windsurf"`, `"cursor"`, `"zed"`,
+    `"antigravity"`, `"sublimetext"`, `"lapce"`, `"nova"`, `"bbedit"`, `"vim"`,
+    `"neovim"`, `"emacs"`, `"hx"`, `"emacsclient"`, `"micro"`
+
+- **`general.openEditorInNewWindow`** (boolean):
+  - **Description:** Open VS Code-family editors in a new window when editing
+    files.
+  - **Default:** `false`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
@@ -548,6 +558,24 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "chat-base-3",
         "modelConfig": {
           "model": "gemini-3-flash-preview"
+        }
+      },
+      "gemini-3.1-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview"
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview-customtools"
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview"
         }
       },
       "gemini-2.5-pro": {
@@ -1021,12 +1049,6 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "releaseChannel": "stable"
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -1165,13 +1187,6 @@ their corresponding top-level category object in your `settings.json` file.
           {
             "condition": {
               "hasAccessToPreview": false
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
-              "releaseChannel": "stable",
-              "requestedModels": ["auto"]
             },
             "target": "gemini-2.5-pro"
           },
@@ -1833,6 +1848,12 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
   - **Description:** Enable the agent session implementation for the interactive
     CLI.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.adk.agentSessionSubagentEnabled`** (boolean):
+  - **Description:** Route subagent invocations through the AgentSession
+    protocol instead of legacy executors.
   - **Default:** `false`
   - **Requires restart:** Yes
 
