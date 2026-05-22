@@ -396,7 +396,6 @@ describe('isGemini3Model', () => {
     expect(isGemini2Model(vertexPath)).toBe(false);
     expect(isCustomModel(vertexPath)).toBe(false);
     expect(isAutoModel(vertexPath)).toBe(false);
-    expect(supportsMultimodalFunctionResponse(vertexPath)).toBe(true);
 
     const vertexGemini2 =
       'projects/test/locations/us-central1/publishers/google/models/gemini-2.5-flash';
@@ -461,8 +460,24 @@ describe('getDisplayString', () => {
 });
 
 describe('supportsMultimodalFunctionResponse', () => {
-  it('should return true for gemini-3 model', () => {
+  it('should return true for gemini-3 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-pro-preview')).toBe(
+      true,
+    );
+  });
+
+  it('should return true for aliases that resolve to Gemini 3', () => {
+    expect(supportsMultimodalFunctionResponse('auto')).toBe(true);
+    expect(supportsMultimodalFunctionResponse('pro')).toBe(true);
+  });
+
+  it('should return true for Vertex AI Gemini 3 resource paths', () => {
+    expect(
+      supportsMultimodalFunctionResponse(
+        'projects/test/locations/us-central1/publishers/google/models/gemini-3.1-pro-preview',
+      ),
+    ).toBe(true);
   });
 
   it('should return false for gemini-2 models', () => {

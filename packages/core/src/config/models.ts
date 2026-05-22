@@ -488,14 +488,7 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
-  const baseModel = getBaseModelName(model);
-  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return (
-      config.modelConfigService.getModelDefinition(baseModel)?.features
-        ?.multimodalToolUse === true
-    );
-  }
-  return /^gemini-3(\.|-|$)/.test(baseModel);
+  return isGemini3Model(model, config);
 }
 
 /**
