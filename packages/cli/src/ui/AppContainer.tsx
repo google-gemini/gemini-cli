@@ -254,7 +254,6 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [mouseMode, setOptions]);
 
   const [corgiMode, setCorgiMode] = useState(false);
-  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -1687,8 +1686,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
-  const isInitialMount = useRef(true);
-
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1741,8 +1738,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { handleSuspend } = useSuspend({
     handleWarning,
     setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
     shouldUseAlternateScreen,
   });
 
@@ -1752,21 +1747,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowIdeRestartPrompt(true);
     }
   }, [ideNeedsRestart]);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const handler = setTimeout(() => {
-      refreshStatic();
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);
@@ -2872,7 +2852,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
                   <ShellFocusContext.Provider value={isFocused}>
                     <MouseProvider mouseEventsEnabled={mouseMode}>
                       <ScrollProvider>
-                        <App key={`app-${forceRerenderKey}`} />
+                        <App />
                       </ScrollProvider>
                     </MouseProvider>
                   </ShellFocusContext.Provider>
