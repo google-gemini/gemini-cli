@@ -142,6 +142,17 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         ? context.request
         : [context.request];
 
+      const isRequestFunctionResponse = requestParts.some(
+        (part) => typeof part === 'object' && part !== null && 'functionResponse' in part,
+      );
+
+      if (isRequestFunctionResponse && finalHistory.length === 0) {
+        debugLogger.warn(
+          '[Routing] Bypassing classifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
+
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
           return { text: part };

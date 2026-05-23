@@ -158,6 +158,21 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
+      const requestParts = Array.isArray(context.request)
+        ? context.request
+        : [context.request];
+
+      const isRequestFunctionResponse = requestParts.some(
+        (part) => typeof part === 'object' && part !== null && 'functionResponse' in part,
+      );
+
+      if (isRequestFunctionResponse && finalHistory.length === 0) {
+        debugLogger.warn(
+          '[Routing] Bypassing classifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
+
       const jsonResponse = await baseLlmClient.generateJson({
         modelConfigKey: { model: 'classifier' },
         contents: [...finalHistory, createUserContent(context.request)],
