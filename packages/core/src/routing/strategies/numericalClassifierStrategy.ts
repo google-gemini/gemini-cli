@@ -142,11 +142,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         ? context.request
         : [context.request];
 
-      const isRequestFunctionResponse = requestParts.some(
-        (part) =>
-          typeof part === 'object' &&
-          part !== null &&
-          'functionResponse' in part,
+      const isRequestFunctionResponse = isFunctionResponse(
+        createUserContent(context.request),
       );
 
       if (isRequestFunctionResponse && finalHistory.length === 0) {

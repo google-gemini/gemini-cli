@@ -158,15 +158,8 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      const requestParts = Array.isArray(context.request)
-        ? context.request
-        : [context.request];
-
-      const isRequestFunctionResponse = requestParts.some(
-        (part) =>
-          typeof part === 'object' &&
-          part !== null &&
-          'functionResponse' in part,
+      const isRequestFunctionResponse = isFunctionResponse(
+        createUserContent(context.request),
       );
 
       if (isRequestFunctionResponse && finalHistory.length === 0) {
