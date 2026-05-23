@@ -412,7 +412,7 @@ describe('ClassifierStrategy', () => {
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
-  it('should still route if history has text turns and request is a function response', async () => {
+  it('should return null (bypass classifier) if history has text turns and request is a function response', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'some task' }] },
       { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
@@ -422,14 +422,6 @@ describe('ClassifierStrategy', () => {
       { functionResponse: { name: 'tool', response: { ok: true } } },
     ];
 
-    const mockApiResponse = {
-      reasoning: 'Simple.',
-      model_choice: 'flash',
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-
     const decision = await strategy.route(
       mockContext,
       mockConfig,
@@ -437,7 +429,8 @@ describe('ClassifierStrategy', () => {
       mockLocalLiteRtLmClient,
     );
 
-    expect(decision).not.toBeNull();
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
   it('should still route if history is only tool turns but request is text', async () => {
