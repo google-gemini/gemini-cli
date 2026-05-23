@@ -43,6 +43,8 @@ locations for these files:
     user, project, or system override settings.
 - **User settings file:**
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
+    If `GEMINI_CLI_HOME` is set, the user settings file is
+    `$GEMINI_CLI_HOME/.gemini/settings.json`.
   - **Scope:** Applies to all Gemini CLI sessions for the current user. User
     settings override system defaults.
 - **Project settings file:**
@@ -2373,6 +2375,9 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     storage.
   - By default, this is the user's system home directory. The CLI will create a
     `.gemini` folder inside this directory.
+  - User settings still live inside that `.gemini` folder. For example, if
+    `GEMINI_CLI_HOME=/path/to/user/config`, the user settings file is
+    `/path/to/user/config/.gemini/settings.json`.
   - Useful for shared compute environments or keeping CLI state isolated.
   - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
     PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
