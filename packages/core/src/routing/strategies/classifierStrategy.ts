@@ -158,11 +158,10 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      const isRequestFunctionResponse = isFunctionResponse(
-        createUserContent(context.request),
-      );
-
-      if (isRequestFunctionResponse && finalHistory.length === 0) {
+      if (
+        finalHistory.length === 0 &&
+        isFunctionResponse(createUserContent(context.request))
+      ) {
         debugLogger.warn(
           '[Routing] Bypassing classifier: request is FunctionResponse but history is empty after slicing.',
         );
