@@ -37,6 +37,7 @@ import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 vi.mock('node:fs');
 
@@ -614,6 +615,121 @@ describe('ToolRegistry', () => {
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
+    });
+
+    it('should parse callCommand arguments before executing discovered tools', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue(
+        'python3 script.py --call',
+      );
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'callable-tool',
+        description: 'A tool that succeeds',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {},
+        },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'callable-tool',
+      );
+      expect(discoveredTool).toBeDefined();
+
+      const executionProcess = createExecutionProcess(0);
+      mockSpawn.mockReturnValueOnce(executionProcess as any);
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        2,
+        'python3',
+        ['script.py', '--call', 'callable-tool'],
+        expect.objectContaining({
+          env: process.env,
+        }),
+      );
+      expect(executionProcess.stdin.write).toHaveBeenCalledWith('{}');
+    });
+
+    it('should pass parsed callCommand arguments to sandbox preparation', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue(
+        'python3 script.py --call',
+      );
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'sandboxed-tool',
+        description: 'A tool that succeeds',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {},
+        },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'sandboxed-tool',
+      );
+      expect(discoveredTool).toBeDefined();
+
+      const mockSandboxManager: SandboxManager = {
+        prepareCommand: vi.fn().mockResolvedValue({
+          program: 'sandbox-program',
+          args: ['sandbox-arg'],
+          env: process.env,
+        }),
+        isKnownSafeCommand: vi.fn().mockReturnValue(false),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        parseDenials: vi.fn(),
+        getWorkspace: vi.fn().mockReturnValue('/tmp'),
+        getOptions: vi.fn(),
+      };
+      vi.spyOn(config, 'sandboxManager', 'get').mockReturnValue(
+        mockSandboxManager,
+      );
+
+      const executionProcess = createExecutionProcess(0);
+      mockSpawn.mockReturnValueOnce(executionProcess as any);
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(mockSandboxManager.prepareCommand).toHaveBeenCalledWith({
+        command: 'python3',
+        args: ['script.py', '--call', 'sandboxed-tool'],
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        2,
+        'sandbox-program',
+        ['sandbox-arg'],
+        expect.objectContaining({
+          env: process.env,
+        }),
+      );
     });
 
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {

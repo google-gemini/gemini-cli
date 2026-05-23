@@ -40,6 +40,33 @@ import {
 
 type ToolParams = Record<string, unknown>;
 
+function parseConfiguredCommand(
+  configuredCommand: string,
+  commandType: string,
+): {
+  command: string;
+  args: string[];
+} {
+  const commandParts = parse(configuredCommand);
+  if (commandParts.length === 0) {
+    throw new Error(
+      `${commandType} command is empty or contains only whitespace.`,
+    );
+  }
+
+  const firstPart = commandParts[0];
+  if (typeof firstPart !== 'string') {
+    throw new Error(`${commandType} command must start with a program name.`);
+  }
+
+  return {
+    command: firstPart,
+    args: commandParts
+      .slice(1)
+      .filter((part): part is string => typeof part === 'string'),
+  };
+}
+
 class DiscoveredToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
@@ -63,9 +90,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     updateOutput: _updateOutput,
   }: ExecuteOptions): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const args = [this.originalToolName];
+    const parsedCallCommand = parseConfiguredCommand(callCommand, 'Tool call');
+    const args = [...parsedCallCommand.args, this.originalToolName];
 
-    let finalCommand = callCommand;
+    let finalCommand = parsedCallCommand.command;
     let finalArgs = args;
     let finalEnv = process.env;
     let cleanupFunc: (() => void) | undefined;
@@ -73,7 +101,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     const sandboxManager = this.config.sandboxManager;
     if (sandboxManager) {
       const prepared = await sandboxManager.prepareCommand({
-        command: callCommand,
+        command: finalCommand,
         args,
         cwd: process.cwd(),
         env: process.env,
@@ -364,24 +392,13 @@ export class ToolRegistry {
     }
 
     try {
-      const cmdParts = parse(discoveryCmd);
-      if (cmdParts.length === 0) {
-        throw new Error(
-          'Tool discovery command is empty or contains only whitespace.',
-        );
-      }
+      const parsedDiscoveryCommand = parseConfiguredCommand(
+        discoveryCmd,
+        'Tool discovery',
+      );
 
-      const firstPart = cmdParts[0];
-      if (typeof firstPart !== 'string') {
-        throw new Error(
-          'Tool discovery command must start with a program name.',
-        );
-      }
-
-      let finalCommand: string = firstPart;
-      let finalArgs: string[] = cmdParts
-        .slice(1)
-        .filter((p): p is string => typeof p === 'string');
+      let finalCommand: string = parsedDiscoveryCommand.command;
+      let finalArgs: string[] = parsedDiscoveryCommand.args;
       let finalEnv = process.env;
       let cleanupFunc: (() => void) | undefined;
 
