@@ -162,8 +162,8 @@ export class ClassifierStrategy implements RoutingStrategy {
         finalHistory.length === 0 &&
         isFunctionResponse(createUserContent(context.request))
       ) {
-        debugLogger.warn(
-          '[Routing] Bypassing classifier: request is FunctionResponse but history is empty after slicing.',
+        debugLogger.log(
+          '[Routing] Bypassing Classifier: request is FunctionResponse but history is empty after slicing.',
         );
         return null;
       }
