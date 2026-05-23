@@ -62,6 +62,13 @@ describe('NumericalClassifierStrategy', () => {
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
+      getNumericalRoutingRules: vi.fn().mockImplementation(async () => {
+        const t = await mockConfig.getResolvedClassifierThreshold();
+        return [
+          { maxScore: t - 1, model: 'flash' },
+          { maxScore: 100, model: 'pro' },
+        ];
+      }),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
