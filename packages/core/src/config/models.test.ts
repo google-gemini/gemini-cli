@@ -440,6 +440,15 @@ describe('resolveModel', () => {
       expect(model).toBe(customModel);
     });
 
+    it('should fallback for known legacy models like gemini-pro-latest', () => {
+      expect(resolveModel('gemini-pro-latest')).toBe(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should NOT fallback for unknown gemini models that might be future versions', () => {
+      const futureModel = 'gemini-4-pro';
+      expect(resolveModel(futureModel)).toBe(futureModel);
+    });
+
     it('should handle non-string inputs gracefully', () => {
       // @ts-expect-error - testing invalid runtime input
       expect(resolveModel(['a', 'b'])).toBe('b');

@@ -195,6 +195,12 @@ export function resolveModel(
     }
   }
 
+  // Fallback for known legacy Gemini model aliases that are no longer supported
+  // by the API but may still be present in user settings.
+  if (resolved === 'gemini-pro-latest') {
+    return DEFAULT_GEMINI_MODEL;
+  }
+
   if (!hasAccessToPreview && isPreviewModel(resolved)) {
     // Downgrade to stable models if user lacks preview access.
     switch (resolved) {
