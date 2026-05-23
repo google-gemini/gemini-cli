@@ -324,7 +324,10 @@ export function getDisplayString(
 /**
  * Extracts the base model name from a potentially full resource path.
  */
-function getBaseModelName(modelId: string): string {
+function getBaseModelName(modelId: string | undefined | null): string {
+  if (!modelId) {
+    return '';
+  }
   return modelId.split('/').pop() ?? '';
 }
 
