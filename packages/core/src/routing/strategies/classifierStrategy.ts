@@ -163,7 +163,10 @@ export class ClassifierStrategy implements RoutingStrategy {
         : [context.request];
 
       const isRequestFunctionResponse = requestParts.some(
-        (part) => typeof part === 'object' && part !== null && 'functionResponse' in part,
+        (part) =>
+          typeof part === 'object' &&
+          part !== null &&
+          'functionResponse' in part,
       );
 
       if (isRequestFunctionResponse && finalHistory.length === 0) {

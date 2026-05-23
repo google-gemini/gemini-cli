@@ -392,9 +392,7 @@ describe('ClassifierStrategy', () => {
       { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
       {
         role: 'user',
-        parts: [
-          { functionResponse: { name: 'tool', response: { ok: true } } },
-        ],
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
       },
       { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
     ];
@@ -447,9 +445,7 @@ describe('ClassifierStrategy', () => {
       { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
       {
         role: 'user',
-        parts: [
-          { functionResponse: { name: 'tool', response: { ok: true } } },
-        ],
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
       },
       { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
     ];
