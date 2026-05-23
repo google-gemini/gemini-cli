@@ -5,42 +5,49 @@
  */
 
 import type { Content } from '@google/genai';
-import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import { isToolExecution, type ConcreteNode } from './graph/types.js';
+import type {
+  AgentChatHistory,
+  HistoryTurn,
+} from '../core/agentChatHistory.js';
+import type { ConcreteNode } from './graph/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
 import type { ContextProfile } from './config/profiles.js';
 import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
-import { HistoryObserver } from './historyObserver.js';
 import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { deriveStableId } from '../utils/cryptoUtils.js';
 import { hardenHistory } from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
 import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
 
 export class ContextManager {
-  // The master state containing the pristine graph and current active graph.
+  // Master state containing the pristine graph and current active graph.
   private buffer: ContextWorkingBufferImpl =
     ContextWorkingBufferImpl.initialize([]);
 
   private readonly eventBus: ContextEventBus;
-
-  // Internal sub-components
   private readonly orchestrator: PipelineOrchestrator;
-  private readonly historyObserver: HistoryObserver;
+
+  // Track what IDs have been evaluated for triggers to prevent redundant processing
+  private readonly evaluatedNodeIds = new Set<string>();
 
   // Hysteresis tracking to prevent utility call churn
   private lastTriggeredDeficit = 0;
+  private lastTriggeredNormalizeDeficit = 0;
 
   // Cache for Anomaly 3 (Redundant Renders)
   private lastRenderCache?: {
     nodesHash: string;
     result: {
-      history: Content[];
+      history: HistoryTurn[];
+      apiHistory: Content[];
+      pendingApiHistory: Content[];
       didApplyManagement: boolean;
       baseUnits: number;
+      processedNodes: readonly ConcreteNode[];
     };
   };
 
@@ -51,254 +58,82 @@ export class ContextManager {
     private readonly env: ContextEnvironment,
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
-    chatHistory: AgentChatHistory,
+    private readonly chatHistory: AgentChatHistory,
     private readonly advancedTokenCalculator: AdvancedTokenCalculator,
     private readonly headerProvider?: () => Promise<Content | undefined>,
   ) {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
 
-    // Provide the orchestrator with a way to fetch the latest nodes from the live buffer
+    // Direct synchronization: ContextManager is the "Pull Master"
+    // and tells the orchestrator what to do.
     this.orchestrator.setNodeProvider(() => this.buffer.nodes);
 
-    this.historyObserver = new HistoryObserver(
-      chatHistory,
-      this.env.eventBus,
-      this.tracer,
-      this.env.graphMapper,
-    );
-
-    this.eventBus.onPristineHistoryUpdated((event) => {
-      // Sync the entire pristine history chronologically
-      this.buffer = this.buffer.syncPristineHistory(event.nodes);
-
-      this.evaluateTriggers(event.newNodes);
-    });
     this.eventBus.onProcessorResult((event) => {
+      // Defensive: Verify all targets are still present in the buffer.
+      const bufferIds = new Set(this.buffer.nodes.map((n) => n.id));
+      if (!event.targets.every((t) => bufferIds.has(t.id))) {
+        debugLogger.warn(
+          `[ContextManager] Dropping processor result from ${event.processorId}: targets no longer in buffer.`,
+        );
+        return;
+      }
+
       this.buffer = this.buffer.applyProcessorResult(
         event.processorId,
         event.targets,
         event.returnedNodes,
       );
-      // We explicitly DO NOT call evaluateTriggers here.
-      // The Context Manager is a one-way assembly line. It only evaluates triggers
-      // when fundamentally new organic context is added via PristineHistoryUpdated.
-      // Re-evaluating after a processor finishes creates infinite feedback loops if
-      // the processor fails to reduce the token count below the threshold.
     });
-
-    this.historyObserver.start();
   }
 
-  /**
-   * Returns a promise that resolves when all currently executing async pipelines have finished.
-   */
-  async waitForPipelines(): Promise<void> {
-    return this.orchestrator.waitForPipelines();
-  }
-
-  /**
-   * Safely stops background async pipelines and clears event listeners.
-   */
-  shutdown() {
-    this.orchestrator.shutdown();
-    this.historyObserver.stop();
-  }
-
-  /**
-   * Evaluates if the current working buffer exceeds configured budget thresholds,
-   * firing consolidation events if necessary.
-   */
-  private evaluateTriggers(newNodes: Set<string>) {
-    if (!this.sidecar.config.budget) return;
-
-    if (newNodes.size > 0) {
-      this.eventBus.emitChunkReceived({
-        nodes: this.buffer.nodes,
-        targetNodeIds: newNodes,
-      });
-    }
-
-    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
-      this.buffer.nodes,
-    );
-
-    if (currentTokens > this.sidecar.config.budget.retainedTokens) {
-      const agedOutNodes = new Set<string>();
-      let rollingTokens = 0;
-
-      // Identify active tool calls that must NEVER be truncated
-      const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
-      if (protectedIds.size > 0) {
-        debugLogger.log(
-          `[ContextManager] Pinning ${protectedIds.size} active tool call nodes to prevent truncation.`,
-        );
-      }
-
-      // Walk backwards finding nodes that fall out of the retained budget
-      for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
-        const node = this.buffer.nodes[i];
-        const priorTokens = rollingTokens;
-        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
-          node,
-        ]);
-
-        // Loose Boundary Policy: If this node is the one that pushes us over the retained limit,
-        // we KEEP it to prevent aggressive undershooting. We only age out nodes that are
-        // strictly *older* than the boundary node.
-        if (priorTokens > this.sidecar.config.budget.retainedTokens) {
-          // Only age out if not protected
-          if (!protectedIds.has(node.id)) {
-            agedOutNodes.add(node.id);
-          }
-        }
-      }
-
-      if (agedOutNodes.size > 0) {
-        const targetDeficit =
-          currentTokens - this.sidecar.config.budget.retainedTokens;
-
-        // If the deficit has shrunk (e.g. after a consolidation), update the baseline
-        // so we can track growth from this new, smaller deficit.
-        if (targetDeficit < this.lastTriggeredDeficit) {
-          this.lastTriggeredDeficit = targetDeficit;
-        }
-
-        // Respect coalescing threshold for background work
-        const threshold =
-          this.sidecar.config.budget.coalescingThresholdTokens || 0;
-
-        // Only trigger if deficit has grown significantly since last time
-        const growthSinceLast = targetDeficit - this.lastTriggeredDeficit;
-
-        if (
-          targetDeficit >= threshold &&
-          (growthSinceLast >= threshold || this.lastTriggeredDeficit === 0)
-        ) {
-          this.lastTriggeredDeficit = targetDeficit;
-          this.env.tokenCalculator.garbageCollectCache(
-            new Set(this.buffer.nodes.map((n) => n.id)),
-          );
-          this.eventBus.emitConsolidationNeeded({
-            nodes: this.buffer.nodes,
-            targetDeficit,
-            targetNodeIds: agedOutNodes,
-          });
-        }
-      } else {
-        // Budget is healthy, reset hysteresis
-        this.lastTriggeredDeficit = 0;
-      }
-    }
-  }
-
-  /**
-   * Identifies 'pinned' nodes that should not be truncated.
-   * This includes:
-   * 1. The entire last turn (Recent context).
-   * 2. Active tool calls (calls without responses in the graph).
-   */
-  private getProtectedNodeIds(
-    nodes: readonly ConcreteNode[],
-    extraProtectedIds: Set<string> = new Set(),
-  ): Map<string, string> {
-    const protectionMap = new Map<string, string>();
-    if (nodes.length === 0) return protectionMap;
-
-    // 1. Identify all nodes belonging to the last turn (Recent context)
-    const lastNode = nodes[nodes.length - 1];
-    const lastTurnId = lastNode.turnId;
-
-    for (const node of nodes) {
-      if (node.turnId === lastTurnId) {
-        protectionMap.set(node.id, 'recent_turn');
-      }
-    }
-
-    // 2. Identify active tool calls that must NEVER be truncated
-    const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
-    const responses = new Set(
-      nodes
-        .filter((n) => isToolExecution(n) && n.role === 'user')
-        .map((n) => n.payload.functionResponse?.id)
-        .filter((id): id is string => !!id),
-    );
-
-    for (const call of calls) {
-      const id = call.payload.functionCall?.id;
-      // If we have a call but no response in the current graph, it's 'in flight'
-      if (id && !responses.has(id)) {
-        protectionMap.set(call.id, 'in_flight_tool_call');
-      }
-    }
-
-    // 3. Any externally requested protections
-    for (const id of extraProtectedIds) {
-      protectionMap.set(id, 'external_active_task');
-    }
-
-    return protectionMap;
-  }
-
-  /**
-   * Retrieves the raw, uncompressed Episodic Context Graph graph.
-   * Useful for internal tool rendering (like the trace viewer).
-   * Note: This is an expensive, deep clone operation.
-   */
-  getPristineGraph(): readonly ConcreteNode[] {
-    const pristineSet = new Map<string, ConcreteNode>();
-    for (const node of this.buffer.nodes) {
-      const roots = this.buffer.getPristineNodes(node.id);
-      for (const root of roots) {
-        pristineSet.set(root.id, root);
-      }
-    }
-    // We sort them by timestamp to ensure they are returned in chronological order
-    return Array.from(pristineSet.values()).sort(
-      (a, b) => a.timestamp - b.timestamp,
-    );
-  }
-
-  /**
-   * Generates a virtual view of the pristine graph, substituting in variants
-   * up to the configured token budget.
-   * This is the view that will eventually be projected back to the LLM.
-   */
-  getNodes(): readonly ConcreteNode[] {
-    return [...this.buffer.nodes];
-  }
-
-  getEnvironment(): ContextEnvironment {
-    return this.env;
-  }
-
-  /**
-   * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
-   * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
-   * This is the primary method called by the agent framework before sending a request.
-   */
   async renderHistory(
-    pendingRequest?: Content,
+    pendingRequest?: HistoryTurn,
     activeTaskIds: Set<string> = new Set(),
     abortSignal?: AbortSignal,
   ): Promise<{
-    history: Content[];
+    history: HistoryTurn[];
+    apiHistory: Content[];
+    pendingApiHistory: Content[];
     didApplyManagement: boolean;
     baseUnits: number;
+    processedNodes: readonly ConcreteNode[];
   }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
-    let previewNodes: ConcreteNode[] = [];
+    // 1. Explicit Sync with the durable history.
+    const currentHistory = this.chatHistory.get();
+    const pristineNodes = this.env.graphMapper.sync(currentHistory);
+
+    this.buffer = this.buffer.syncPristineHistory(pristineNodes);
+
+    // Identify truly "new" nodes that haven't been evaluated for triggers yet.
+    const newPrimalNodes = new Set<string>();
+    for (const node of pristineNodes) {
+      if (!this.evaluatedNodeIds.has(node.id)) {
+        newPrimalNodes.add(node.id);
+        this.evaluatedNodeIds.add(node.id);
+      }
+    }
+
+    // 2. Preview the pending request.
+    let previewNodes: readonly ConcreteNode[] = [];
     if (pendingRequest) {
-      previewNodes = this.env.graphMapper.applyEvent({
-        type: 'PUSH',
-        payload: [pendingRequest],
-      });
+      const syncedNodes = this.env.graphMapper.sync([pendingRequest]);
+      const previewNodeIds = new Set(syncedNodes.map((n) => n.id));
+
+      const previewBuffer = ContextWorkingBufferImpl.initialize(syncedNodes);
+
+      const processedPreviewBuffer = await this.orchestrator.executeTriggerSync(
+        'new_message',
+        previewBuffer,
+        previewNodeIds,
+      );
+
+      previewNodes = processedPreviewBuffer.nodes;
     }
 
     // --- Hot Start Calibration ---
-    // If we are resuming a session with history, we don't want the adaptive token calculator
-    // to fly blind on its first GC pass. We do a one-time API calibration.
     const hotStartPromise = (async () => {
       if (!this.hasPerformedHotStart) {
         this.hasPerformedHotStart = true;
@@ -309,124 +144,350 @@ export class ContextManager {
       }
     })();
 
-    // 1. Synchronous Pressure Barrier: Wait for background management pipelines to finish.
-    // We run hot start calibration in parallel to hide the network latency.
+    // 3. Synchronous Pressure Barrier
     await Promise.all([this.orchestrator.waitForPipelines(), hotStartPromise]);
 
     let nodes = this.buffer.nodes;
     const previewNodeIds = new Set<string>();
 
-    // Apply the preview nodes to the final graph
     if (previewNodes.length > 0) {
-      for (const n of previewNodes) {
-        previewNodeIds.add(n.id);
-      }
       nodes = [...nodes, ...previewNodes];
+      for (const node of previewNodes) {
+        previewNodeIds.add(node.id);
+      }
     }
 
-    // 2. Fetch Header and calculate tokens
+    // 4. Trigger Management (GC/Distillation/Normalization)
+    await this.evaluateTriggers(nodes, newPrimalNodes, activeTaskIds);
+
+    // Re-fetch nodes from buffer (master) and combine with ephemeral previews
+    nodes = [...this.buffer.nodes, ...previewNodes];
+
+    // 5. Final Render
     const header = this.headerProvider
       ? await this.headerProvider()
       : undefined;
 
-    // 3. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
-    // We combine the graph hash with a hash of the header to ensure total freshness.
-    const graphHash = nodes.map((n) => n.id).join('|');
-    const headerHash = header ? JSON.stringify(header.parts) : 'no-header';
-    const totalHash = `${graphHash}::${headerHash}`;
+    const nodesHash = deriveStableId([
+      ...nodes.map((n) => n.id),
+      header ? JSON.stringify(header.parts) : 'no-header',
+    ]);
 
-    if (this.lastRenderCache?.nodesHash === totalHash) {
-      debugLogger.log(
-        '[ContextManager] Render cache hit. Skipping redundant render.',
-      );
+    if (this.lastRenderCache?.nodesHash === nodesHash) {
+      this.tracer.logEvent('ContextManager', 'Render Cache Hit', { nodesHash });
       return this.lastRenderCache.result;
     }
 
     const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
-    // Apply final GC Backstop pressure barrier synchronously before mapping
-    const {
-      history: renderedHistory,
-      didApplyManagement,
-      baseUnits,
-    } = await render(
+    const renderResult = await render(
       nodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,
       this.env,
       this.advancedTokenCalculator,
-      protectionReasons,
-      header,
-      previewNodeIds,
+      {
+        protectionReasons,
+        header,
+        lateBindPrompt: !!pendingRequest,
+      },
     );
 
-    // Structural validation in debug mode
-    checkContextInvariants(this.buffer.nodes, 'RenderHistory');
-
-    this.tracer.logEvent('ContextManager', 'Finished rendering');
-
-    const combinedHistory = header
-      ? [header, ...renderedHistory]
-      : renderedHistory;
-
-    const result = {
-      history: hardenHistory(combinedHistory, {
-        sentinels: this.sidecar.sentinels,
-      }),
+    const {
+      history: renderedHistory,
+      pendingHistory,
       didApplyManagement,
       baseUnits,
+      processedNodes,
+    } = renderResult;
+
+    if (didApplyManagement) {
+      // Commit the GC backstop results back to the master buffer.
+      // We must be careful to only apply results to the nodes that belong to the master buffer.
+      const masterIdsInResult = new Set(this.buffer.nodes.map((n) => n.id));
+      const processedMasterNodes = processedNodes.filter(
+        (n) => !previewNodeIds.has(n.id) || masterIdsInResult.has(n.id),
+      );
+
+      this.buffer = this.buffer.applyProcessorResult(
+        'sync_backstop',
+        this.buffer.nodes,
+        processedMasterNodes,
+      );
+    }
+
+    // Structural validation
+    checkContextInvariants(this.buffer.nodes, 'RenderHistory');
+
+    const fullHistoryToHarden = [...renderedHistory, ...pendingHistory];
+
+    const hardenedFullHistory = hardenHistory(fullHistoryToHarden, {
+      sentinels: this.sidecar.sentinels,
+    });
+
+    const envContextId = deriveStableId(['environment-context']);
+    const pendingIds = new Set(pendingHistory.map((t) => t.id));
+    const resultHistory: HistoryTurn[] = [];
+    const resultPending: HistoryTurn[] = [];
+
+    let foundPending = false;
+    for (const turn of hardenedFullHistory) {
+      if (
+        !foundPending &&
+        (pendingIds.has(turn.id) ||
+          (turn.id.startsWith('turn_') &&
+            pendingIds.has(turn.id.substring(5)))) &&
+        turn.id !== envContextId &&
+        turn.id !== `turn_${envContextId}`
+      ) {
+        foundPending = true;
+      }
+
+      if (foundPending) {
+        resultPending.push(turn);
+      } else {
+        resultHistory.push(turn);
+      }
+    }
+
+    const result = {
+      history: renderedHistory,
+      apiHistory: resultHistory.map((h) => h.content),
+      pendingApiHistory: resultPending.map((h) => h.content),
+      didApplyManagement,
+      baseUnits,
+      processedNodes,
     };
 
-    // Update cache
-    this.lastRenderCache = { nodesHash: totalHash, result };
+    if (header) {
+      result.apiHistory.unshift(header);
+    }
+
+    this.lastRenderCache = { nodesHash, result };
+
+    this.tracer.logEvent('ContextManager', 'Rendering Complete', {
+      historySize: renderedHistory.length,
+      pendingSize: pendingHistory.length,
+      didApplyManagement,
+    });
+
     return result;
+  }
+
+  async waitForPipelines(): Promise<void> {
+    await this.orchestrator.waitForPipelines();
+  }
+
+  shutdown() {
+    this.orchestrator.shutdown();
+  }
+
+  getNodes(): readonly ConcreteNode[] {
+    return this.buffer.nodes;
+  }
+
+  getEnvironment(): ContextEnvironment {
+    return this.env;
+  }
+
+  getPristineGraph(): readonly ConcreteNode[] {
+    const pristineSet = new Map<string, ConcreteNode>();
+    for (const node of this.buffer.nodes) {
+      const roots = this.buffer.getPristineNodes(node.id);
+      for (const root of roots) {
+        pristineSet.set(root.id, root);
+      }
+    }
+    return Array.from(pristineSet.values()).sort(
+      (a, b) => a.timestamp - b.timestamp,
+    );
+  }
+
+  private async evaluateTriggers(
+    nodes: readonly ConcreteNode[],
+    newPrimalNodes: ReadonlySet<string>,
+    activeTaskIds: Set<string>,
+  ) {
+    if (newPrimalNodes.size > 0) {
+      this.buffer = await this.orchestrator.executeTriggerSync(
+        'nodes_added',
+        this.buffer,
+        newPrimalNodes,
+      );
+    }
+
+    // Identify ephemeral preview nodes that are NOT in the master buffer.
+    const bufferIds = new Set(this.buffer.nodes.map((n) => n.id));
+    const previewNodes = nodes.filter((n) => !bufferIds.has(n.id));
+    const currentNodes = [...this.buffer.nodes, ...previewNodes];
+
+    const currentTokens =
+      this.env.tokenCalculator.calculateConcreteListTokens(currentNodes);
+
+    if (currentTokens > this.sidecar.config.budget.retainedTokens) {
+      const agedOutRetainedNodes = new Set<string>();
+      const agedOutNormalizedNodes = new Set<string>();
+
+      const protectionMap = this.getProtectedNodeIds(
+        currentNodes,
+        activeTaskIds,
+      );
+      const protectedIds = new Set(protectionMap.keys());
+
+      // Also pin Turn 0 (Environment Context)
+      const envTurnId = `turn_${deriveStableId(['environment-context'])}`;
+      const turn0Nodes = currentNodes.filter((n) => n.turnId === envTurnId);
+      for (const n of turn0Nodes) {
+        protectedIds.add(n.id);
+      }
+
+      let rollingTokens = 0;
+      for (let i = currentNodes.length - 1; i >= 0; i--) {
+        const node = currentNodes[i];
+        const priorTokens = rollingTokens;
+        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
+          node,
+        ]);
+
+        if (priorTokens > this.sidecar.config.budget.retainedTokens) {
+          if (!protectedIds.has(node.id)) {
+            const hasNormalizedTier =
+              this.sidecar.config.budget.normalizedTokens !== undefined;
+            if (
+              !hasNormalizedTier ||
+              priorTokens <= this.sidecar.config.budget.normalizedTokens!
+            ) {
+              agedOutRetainedNodes.add(node.id);
+            }
+            if (
+              hasNormalizedTier &&
+              priorTokens > this.sidecar.config.budget.normalizedTokens!
+            ) {
+              agedOutNormalizedNodes.add(node.id);
+            }
+          }
+        }
+      }
+
+      if (agedOutRetainedNodes.size > 0) {
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.retainedTokens;
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        if (targetDeficit < this.lastTriggeredDeficit) {
+          this.lastTriggeredDeficit = targetDeficit;
+        }
+
+        if (targetDeficit > this.lastTriggeredDeficit + threshold) {
+          this.lastTriggeredDeficit = targetDeficit;
+
+          this.eventBus.emitConsolidationNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutRetainedNodes,
+          });
+
+          this.env.tokenCalculator.garbageCollectCache(
+            new Set(this.buffer.nodes.map((n) => n.id)),
+          );
+
+          this.buffer = await this.orchestrator.executeTriggerSync(
+            'nodes_aged_out',
+            this.buffer,
+            agedOutRetainedNodes,
+            protectedIds,
+          );
+        }
+      } else {
+        this.lastTriggeredDeficit = 0;
+      }
+
+      if (agedOutNormalizedNodes.size > 0) {
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.normalizedTokens!;
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        if (targetDeficit < this.lastTriggeredNormalizeDeficit) {
+          this.lastTriggeredNormalizeDeficit = targetDeficit;
+        }
+
+        if (targetDeficit > this.lastTriggeredNormalizeDeficit + threshold) {
+          this.lastTriggeredNormalizeDeficit = targetDeficit;
+
+          this.eventBus.emitNormalizeNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNormalizedNodes,
+          });
+
+          this.buffer = await this.orchestrator.executeTriggerSync(
+            'normalized_exceeded',
+            this.buffer,
+            agedOutNormalizedNodes,
+            protectedIds,
+          );
+        }
+      } else {
+        this.lastTriggeredNormalizeDeficit = 0;
+      }
+    }
+  }
+
+  private getProtectedNodeIds(
+    nodes: readonly ConcreteNode[],
+    extraProtectedIds: Set<string> = new Set(),
+  ): Map<string, string> {
+    const protectionMap = new Map<string, string>();
+    if (nodes.length === 0) return protectionMap;
+
+    const lastNode = nodes[nodes.length - 1];
+    const lastTurnId = lastNode.turnId;
+
+    // Identify Environment Context (Turn 0) for pinning
+    const envContextId = deriveStableId(['environment-context']);
+    const envContextTurnId = `turn_${envContextId}`;
+
+    for (const node of nodes) {
+      if (node.turnId === envContextTurnId || node.turnId === envContextId) {
+        protectionMap.set(node.id, 'environment_context');
+      }
+      if (node.turnId === lastTurnId) {
+        protectionMap.set(node.id, 'recent_turn');
+      }
+    }
+
+    for (const id of extraProtectedIds) {
+      protectionMap.set(id, 'external_active_task');
+    }
+
+    return protectionMap;
   }
 
   private async performHotStartCalibration(
     nodes: readonly ConcreteNode[],
     abortSignal?: AbortSignal,
   ) {
+    const history = this.env.graphMapper.fromGraph(nodes);
+    const contents = history.map((h) => h.content);
+
     try {
-      this.tracer.logEvent(
-        'ContextManager',
-        'Performing Hot Start Token Calibration',
-      );
+      const { totalTokens } = await this.env.llmClient.countTokens({
+        modelConfigKey: { model: 'context-calibrator' },
+        contents,
+        abortSignal,
+      });
 
-      const contents = this.env.graphMapper.fromGraph(nodes);
-      const header = this.headerProvider
-        ? await this.headerProvider()
-        : undefined;
-      const combinedHistory = header ? [header, ...contents] : contents;
-
-      const baseUnits =
-        this.advancedTokenCalculator.getRawBaseUnits(nodes) +
-        (header
-          ? this.advancedTokenCalculator.getRawBaseUnitsForContent(header)
-          : 0);
-
-      // We only make the network call if we have actual contents to send,
-      // avoiding 400 Bad Request errors from the API.
-      if (combinedHistory.length > 0) {
-        const result = await this.env.llmClient.countTokens({
-          contents: combinedHistory,
-          abortSignal,
+      if (totalTokens !== undefined) {
+        this.env.eventBus.emitTokenGroundTruth({
+          actualTokens: totalTokens,
+          promptBaseUnits: this.advancedTokenCalculator.getRawBaseUnits(nodes),
         });
-        if (result.totalTokens > 0) {
-          this.env.eventBus.emitTokenGroundTruth({
-            actualTokens: result.totalTokens,
-            promptBaseUnits: baseUnits,
-          });
-        }
       }
-    } catch (error) {
-      // Hot start calibration is purely an optimization. If the network fails or auth is weird,
-      // we silently swallow and fallback to the un-calibrated 1.0 ratio heuristic.
-      this.tracer.logEvent(
-        'ContextManager',
-        'Hot Start Token Calibration Failed (Ignored)',
-        { error },
-      );
+    } catch (e) {
+      debugLogger.warn('[ContextManager] Hot start calibration failed', e);
     }
   }
 }

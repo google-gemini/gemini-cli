@@ -14,7 +14,6 @@ import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
-import type { Content } from '@google/genai';
 import {
   checkExhaustive,
   coreEvents,
@@ -58,7 +57,7 @@ async function rewindConversation(
     const { uiHistory } = convertSessionToHistoryFormats(conversation.messages);
     const clientHistory = convertSessionToClientHistory(conversation.messages);
 
-    client.setHistory(clientHistory as Content[]);
+    client.setHistory(clientHistory);
 
     // Reset context manager as we are rewinding history
     await context.services.agentContext?.config
