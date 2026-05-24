@@ -16,6 +16,7 @@ import type { Key } from '../hooks/useKeypress.js';
 
 export enum Command {
   // Basic Controls
+  ABORT = 'basic.abort',
   RETURN = 'basic.confirm',
   ESCAPE = 'basic.cancel',
   QUIT = 'basic.quit',
@@ -255,6 +256,7 @@ export type KeyBindingConfig = Map<Command, readonly KeyBinding[]>;
  */
 export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Basic Controls
+  [Command.ABORT, [new KeyBinding('ctrl+c'), new KeyBinding('f10')]],
   [Command.RETURN, [new KeyBinding('enter')]],
   [Command.ESCAPE, [new KeyBinding('escape'), new KeyBinding('ctrl+[')]],
   [Command.QUIT, [new KeyBinding('ctrl+c')]],
@@ -433,7 +435,13 @@ interface CommandCategory {
 export const commandCategories: readonly CommandCategory[] = [
   {
     title: 'Basic Controls',
-    commands: [Command.RETURN, Command.ESCAPE, Command.QUIT, Command.EXIT],
+    commands: [
+      Command.ABORT,
+      Command.RETURN,
+      Command.ESCAPE,
+      Command.QUIT,
+      Command.EXIT,
+    ],
   },
   {
     title: 'Cursor Movement',
@@ -564,6 +572,8 @@ export const commandCategories: readonly CommandCategory[] = [
  */
 export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Basic Controls
+  [Command.ABORT]:
+    'Abort the current running request without quitting the CLI.',
   [Command.RETURN]: 'Confirm the current selection or choice.',
   [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
   [Command.QUIT]:

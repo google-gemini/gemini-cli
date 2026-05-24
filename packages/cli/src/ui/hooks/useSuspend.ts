@@ -27,12 +27,14 @@ interface UseSuspendProps {
   handleWarning: (message: string) => void;
   setRawMode: (mode: boolean) => void;
   shouldUseAlternateScreen: boolean;
+  shouldUseMouseEvents: boolean;
 }
 
 export function useSuspend({
   handleWarning,
   setRawMode,
   shouldUseAlternateScreen,
+  shouldUseMouseEvents,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
   const ctrlZTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,7 +102,7 @@ export function useSuspend({
 
           terminalCapabilityManager.enableSupportedModes();
           writeToStdout('\x1b[?25l'); // Hide cursor
-          if (shouldUseAlternateScreen) {
+          if (shouldUseMouseEvents) {
             enableMouseEvents();
           }
 
@@ -130,7 +132,13 @@ export function useSuspend({
         ctrlZTimerRef.current = null;
       }, WARNING_PROMPT_DURATION_MS);
     }
-  }, [ctrlZPressCount, handleWarning, setRawMode, shouldUseAlternateScreen]);
+  }, [
+    ctrlZPressCount,
+    handleWarning,
+    setRawMode,
+    shouldUseAlternateScreen,
+    shouldUseMouseEvents,
+  ]);
 
   const handleSuspend = useCallback(() => {
     setCtrlZPressCount((prev) => prev + 1);

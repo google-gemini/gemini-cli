@@ -1620,6 +1620,7 @@ describe('startInteractiveUI', () => {
         hideWindowTitle: false,
         useAlternateBuffer: true,
         incrementalRendering: true,
+        mouseEvents: 'auto',
       },
       general: {
         debugKeystrokeLogging: false,
@@ -1654,6 +1655,7 @@ describe('startInteractiveUI', () => {
   }));
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.stubEnv('SHPOOL_SESSION_NAME', '');
   });
 
@@ -1714,7 +1716,7 @@ describe('startInteractiveUI', () => {
     expect(reactElement).toBeDefined();
   });
 
-  it('should enable mouse events when alternate buffer is enabled', async () => {
+  it('should enable mouse events when alternate buffer is enabled on desktop', async () => {
     const { enableMouseEvents } = await import('@google/gemini-cli-core');
     await startTestInteractiveUI(
       mockConfig,
@@ -1725,6 +1727,42 @@ describe('startInteractiveUI', () => {
       mockInitializationResult,
     );
     expect(enableMouseEvents).toHaveBeenCalled();
+  });
+
+  it('should not enable mouse events when disabled in settings', async () => {
+    const { enableMouseEvents } = await import('@google/gemini-cli-core');
+    const customSettings = {
+      merged: {
+        ...mockSettings.merged,
+        ui: { ...mockSettings.merged.ui, mouseEvents: 'disabled' },
+      },
+    } as LoadedSettings;
+
+    await startTestInteractiveUI(
+      mockConfig,
+      customSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      undefined,
+      mockInitializationResult,
+    );
+    expect(enableMouseEvents).not.toHaveBeenCalled();
+  });
+
+  it('should not enable mouse events by default in Termux', async () => {
+    const { enableMouseEvents } = await import('@google/gemini-cli-core');
+    vi.stubEnv('TERMUX_VERSION', '0.118.0');
+
+    await startTestInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      undefined,
+      mockInitializationResult,
+    );
+
+    expect(enableMouseEvents).not.toHaveBeenCalled();
   });
 
   it('should patch console', async () => {

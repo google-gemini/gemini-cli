@@ -297,6 +297,14 @@
           "default": true,
           "type": "boolean"
         },
+        "mouseEvents": {
+          "title": "Mouse Events",
+          "description": "Controls terminal mouse tracking in alternate buffer mode. Auto disables mouse tracking in touch-oriented terminals such as Termux.",
+          "markdownDescription": "Controls terminal mouse tracking in alternate buffer mode. Auto disables mouse tracking in touch-oriented terminals such as Termux.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `auto`",
+          "default": "auto",
+          "type": "string",
+          "enum": ["auto", "enabled", "disabled"]
+        },
         "terminalBackgroundPollingInterval": {
           "title": "Terminal Background Polling Interval",
           "description": "Interval in seconds to poll the terminal background color.",
