@@ -14,11 +14,11 @@ import { isLikelyShellCommand } from './shellCommandValidator.js';
  */
 type CommentedRecord = Record<string | symbol, unknown>;
 
-/**
- * Recursively walks the updates object and warns about any object with
- * `type: "command"` whose `command` value looks like natural language
- * rather than a valid shell command.
- */
+  /**
+   * Recursively walks the updates object and warns about any object with
+   * `type: "command"` or `type: "stdio"` whose `command` value looks like
+   * natural language rather than a valid shell command.
+   */
 function warnAboutNaturalLanguageCommandValues(
   updates: Record<string, unknown>,
   path: string,
@@ -33,10 +33,10 @@ function warnAboutNaturalLanguageCommandValues(
     ) {
       const objValue = value as Record<string, unknown>;
       if (
-        objValue['type'] === 'command' &&
+        (objValue['type'] === 'command' || objValue['type'] === 'stdio') &&
         typeof objValue['command'] === 'string'
       ) {
-        if (!isLikelyShellCommand(objValue['command'] as string)) {
+        if (!isLikelyShellCommand(objValue['command'])) {
           coreEvents.emitFeedback(
             'warn',
             `Setting "${currentPath}.command" contains text that does not look like a valid shell command. ` +
