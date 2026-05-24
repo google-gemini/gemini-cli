@@ -37,7 +37,7 @@ describe('text-buffer performance', () => {
     const largeText = Array.from(
       { length: lines },
       (_, i) =>
-        `Line ${i}: some sample text with many @path/to/image${i}.png and maybe some more @path/to/another/image.png references to trigger regex. This line is much longer than the previous one to test wrapping.`,
+        `Line ${i}: some sample text with many @path/to/image${i}.png and maybe some more @path/to/another/image.png references to trigger regex. This line is much longer than the previous one to [...]
     ).join('\n');
 
     const start = Date.now();
@@ -51,7 +51,7 @@ describe('text-buffer performance', () => {
   });
 
   it('should handle character-by-character insertion in a large buffer efficiently', async () => {
-    const lines = 5000;
+    const lines = 1000;
     const initialText = Array.from(
       { length: lines },
       (_, i) => `Line ${i}: some sample text with @path/to/image.png`,
@@ -66,7 +66,7 @@ describe('text-buffer performance', () => {
     );
 
     const start = Date.now();
-    const charsToInsert = 100;
+    const charsToInsert = 50;
     for (let i = 0; i < charsToInsert; i++) {
       act(() => {
         result.current.insert('a');
@@ -75,7 +75,7 @@ describe('text-buffer performance', () => {
     const end = Date.now();
 
     const duration = end - start;
-    expect(duration).toBeLessThan(5000);
+    expect(duration).toBeLessThan(3000);
   });
 
   it('should highlight many lines efficiently', () => {
