@@ -281,7 +281,7 @@ describe('ShellExecutionService', () => {
         createMockSerializeTerminalToObjectReturnValue('file1.txt'),
       );
       const { result, handle } = await simulateExecution('ls -l', (pty) => {
-        pty.onData.mock.calls[0][0]('file1.txt\n');
+        pty.onData.mock.calls[0][0](Buffer.from('file1.txt\n'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -311,7 +311,7 @@ describe('ShellExecutionService', () => {
         createMockSerializeTerminalToObjectReturnValue('aredword'),
       );
       const { result } = await simulateExecution('ls --color=auto', (pty) => {
-        pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
+        pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -327,11 +327,33 @@ describe('ShellExecutionService', () => {
     it('should correctly decode multi-byte characters split across chunks', async () => {
       const { result } = await simulateExecution('echo "你好"', (pty) => {
         const multiByteChar = '你好';
-        pty.onData.mock.calls[0][0](multiByteChar.slice(0, 1));
-        pty.onData.mock.calls[0][0](multiByteChar.slice(1));
+        pty.onData.mock.calls[0][0](Buffer.from(multiByteChar.slice(0, 1)));
+        pty.onData.mock.calls[0][0](Buffer.from(multiByteChar.slice(1)));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
       expect(result.output.trim()).toBe('你好');
+    });
+
+    it('should decode a single multi-byte UTF-8 character split on byte boundaries across different onData callbacks', async () => {
+      const {result} = await simulateExecution('split-utf8-bytes', (pty) => {
+        // '你' UTF-8 bytes: [0xE4, 0xBD, 0xA0]
+        pty.onData.mock.calls[0][0](Buffer.from([0xe4, 0xbd]));
+        pty.onData.mock.calls[0][0](Buffer.from([0xa0]));
+        pty.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+      });
+      expect(result.output.trim()).toBe('你');
+    });
+
+    it('should process large PTY output chunks in 1MB segments without data loss', async () => {
+      const LARGE_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+      const largeBuffer = Buffer.alloc(LARGE_CHUNK_SIZE, 'a');
+
+      const {result} = await simulateExecution('large-pty-output', (pty) => {
+        pty.onData.mock.calls[0][0](largeBuffer);
+        pty.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+      });
+
+      expect(result.rawOutput.length).toBe(LARGE_CHUNK_SIZE); // No data loss
     });
 
     it('should handle commands with no output', async () => {
@@ -362,7 +384,7 @@ describe('ShellExecutionService', () => {
           const chunkSize = 1000;
           for (let i = 0; i < lineCount; i += chunkSize) {
             const chunk = lines.slice(i, i + chunkSize).join('\r\n') + '\r\n';
-            pty.onData.mock.calls[0][0](chunk);
+            pty.onData.mock.calls[0][0](Buffer.from(chunk));
           }
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
@@ -391,7 +413,7 @@ describe('ShellExecutionService', () => {
       const { result } = await simulateExecution(
         'long-line-command',
         (pty) => {
-          pty.onData.mock.calls[0][0](longString);
+          pty.onData.mock.calls[0][0](Buffer.from(longString));
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         narrowConfig,
@@ -405,7 +427,7 @@ describe('ShellExecutionService', () => {
       const { result } = await simulateExecution('cmd', (pty) => {
         // "value" should not get terminal-width padding
         // "value2    " should keep its spaces
-        pty.onData.mock.calls[0][0]('value\r\nvalue2    ');
+        pty.onData.mock.calls[0][0](Buffer.from('value\r\nvalue2    '));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -422,7 +444,7 @@ describe('ShellExecutionService', () => {
         'overflow-command',
         (pty) => {
           const chunk = lines.join('\r\n') + '\r\n';
-          pty.onData.mock.calls[0][0](chunk);
+          pty.onData.mock.calls[0][0](Buffer.from(chunk));
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         { ...shellExecutionConfig, scrollback: scrollbackLimit },
@@ -509,7 +531,7 @@ describe('ShellExecutionService', () => {
 
     it('should resize the pty and the headless terminal', async () => {
       await simulateExecution('ls -l', (pty) => {
-        pty.onData.mock.calls[0][0]('file1.txt\n');
+        pty.onData.mock.calls[0][0](Buffer.from('file1.txt\n'));
         ShellExecutionService.resizePty(pty.pid, 100, 40);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
@@ -568,7 +590,7 @@ describe('ShellExecutionService', () => {
 
     it('should scroll the headless terminal', async () => {
       await simulateExecution('ls -l', (pty) => {
-        pty.onData.mock.calls[0][0]('file1.txt\n');
+        pty.onData.mock.calls[0][0](Buffer.from('file1.txt\n'));
         ShellExecutionService.scrollPty(pty.pid, 10);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
@@ -597,7 +619,7 @@ describe('ShellExecutionService', () => {
   describe('Failed Execution', () => {
     it('should capture a non-zero exit code', async () => {
       const { result } = await simulateExecution('a-bad-command', (pty) => {
-        pty.onData.mock.calls[0][0]('command not found');
+        pty.onData.mock.calls[0][0](Buffer.from('command not found'));
         pty.onExit.mock.calls[0][0]({ exitCode: 127, signal: null });
       });
 
@@ -704,7 +726,7 @@ describe('ShellExecutionService', () => {
         (pty, abortController) => {
           // Simulate a lot of data being in the queue to be processed
           for (let i = 0; i < 1000; i++) {
-            pty.onData.mock.calls[0][0]('some data');
+            pty.onData.mock.calls[0][0](Buffer.from('some data'));
           }
           abortController.abort();
           pty.onExit.mock.calls[0][0]({ exitCode: 1, signal: null });
@@ -777,7 +799,7 @@ describe('ShellExecutionService', () => {
 
       // Use the registered onData listener
       const onDataListener = mockPtyProcess.onData.mock.calls[0][0];
-      onDataListener('initial pty output');
+      onDataListener(Buffer.from('initial pty output'));
 
       // Wait for async write to headless terminal
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -1083,7 +1105,7 @@ describe('ShellExecutionService', () => {
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
-          pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
+          pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         coloredShellExecutionConfig,
@@ -1106,7 +1128,7 @@ describe('ShellExecutionService', () => {
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
-          pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
+          pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         {
@@ -1138,7 +1160,7 @@ describe('ShellExecutionService', () => {
         'ls --color=auto',
         (pty) => {
           pty.onData.mock.calls[0][0](
-            'line 1\n\u001b[32mline 2\u001b[0m\nline 3',
+            Buffer.from('line 1\n\u001b[32mline 2\u001b[0m\nline 3'),
           );
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
@@ -1369,6 +1391,19 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.emit('close', 0, null);
       });
       expect(result.output.trim()).toBe('你好');
+    });
+
+    it('should process large output chunks in 1MB segments in fallback without data loss', async () => {
+      const LARGE_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+      const largeBuffer = Buffer.alloc(LARGE_CHUNK_SIZE, 'a');
+
+      const {result} = await simulateExecution('large-output', (cp) => {
+        cp.stdout?.emit('data', largeBuffer);
+        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
+      });
+
+      expect(result.rawOutput.length).toBe(LARGE_CHUNK_SIZE); // No data loss
     });
 
     it('should handle commands with no output', async () => {
@@ -2197,5 +2232,194 @@ describe('ShellExecutionService environment variables', () => {
     await new Promise(process.nextTick);
 
     vi.unstubAllEnvs();
+  });
+
+  it('should set TERM=dumb when enableInteractiveShell is false', async () => {
+    vi.resetModules();
+    const {ShellExecutionService} = await import('./shellExecutionService.js');
+
+    const nonInteractiveConfig = {
+      ...shellExecutionConfig,
+      enableInteractiveShell: false,
+      pager: 'less',
+    };
+
+    // Test pty path
+    await ShellExecutionService.execute(
+      'test-pty-non-interactive',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      nonInteractiveConfig,
+    );
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv).toHaveProperty('TERM', 'dumb');
+    expect(ptyEnv).toHaveProperty('PAGER', 'cat');
+    expect(ptyEnv).toHaveProperty('GIT_PAGER', 'cat');
+
+    // Ensure pty process exits
+    mockPtyProcess.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+    await new Promise(process.nextTick);
+
+    // Test child_process path
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-non-interactive',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      nonInteractiveConfig,
+    );
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty('TERM', 'dumb');
+    expect(cpEnv).toHaveProperty('PAGER', 'cat');
+    expect(cpEnv).toHaveProperty('GIT_PAGER', 'cat');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+  });
+});
+
+describe('ShellExecutionService - Task CEOQ Stress Testing', () => {
+  let onOutputEventMock: Mock<(event: ShellOutputEvent) => void>;
+  let mockPtyProcess: EventEmitter & {
+    pid: number;
+    kill: Mock;
+    onData: Mock;
+    onExit: Mock;
+    write: Mock;
+    resize: Mock;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onOutputEventMock = vi.fn();
+
+    mockPtyProcess = new EventEmitter() as EventEmitter & {
+      pid: number;
+      kill: Mock;
+      onData: Mock;
+      onExit: Mock;
+      write: Mock;
+      resize: Mock;
+    };
+    mockPtyProcess.pid = 12345;
+    mockPtyProcess.kill = vi.fn();
+    mockPtyProcess.onData = vi.fn();
+    mockPtyProcess.onExit = vi.fn();
+    mockPtyProcess.write = vi.fn();
+    mockPtyProcess.resize = vi.fn();
+
+    mockPtySpawn.mockReturnValue(mockPtyProcess);
+    mockGetPty.mockResolvedValue({
+      module: {spawn: mockPtySpawn},
+      name: 'mock-pty',
+    });
+  });
+
+  it('should default to interactive TERM and user pager when flag is missing (Before behavior)', async () => {
+    const configWithoutFlag = {...shellExecutionConfig};
+    delete (configWithoutFlag as unknown as Record<string, unknown>)
+      .enableInteractiveShell;
+
+    await ShellExecutionService.execute(
+      'test-command',
+      '/',
+      onOutputEventMock,
+      new AbortController().signal,
+      true,
+      configWithoutFlag,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv.TERM).toBeDefined();
+    expect(ptyEnv.TERM).not.toBe('dumb');
+    expect(ptyEnv.PAGER).toBe('cat');
+  });
+
+  it('should correctly handle explicit enableInteractiveShell: true', async () => {
+    const interactiveConfig = {
+      ...shellExecutionConfig,
+      enableInteractiveShell: true,
+    };
+
+    await ShellExecutionService.execute(
+      'test-command',
+      '/',
+      onOutputEventMock,
+      new AbortController().signal,
+      true,
+      interactiveConfig,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv.TERM).toBe('xterm-256color');
+  });
+
+  it('should handle non-boolean values for enableInteractiveShell gracefully (Bad Data)', async () => {
+    const badConfig = {
+      ...shellExecutionConfig,
+      enableInteractiveShell: 'maybe' as unknown as boolean,
+    };
+
+    await ShellExecutionService.execute(
+      'test-command',
+      '/',
+      onOutputEventMock,
+      new AbortController().signal,
+      true,
+      badConfig,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(['dumb', 'xterm-256color']).toContain(ptyEnv.TERM);
+  });
+
+  it('should handle potentially malicious pager strings safely (Bad Data)', async () => {
+    const maliciousConfig = {
+      ...shellExecutionConfig,
+      pager: 'cat; ls -l',
+    };
+
+    await ShellExecutionService.execute(
+      'test-command',
+      '/',
+      onOutputEventMock,
+      new AbortController().signal,
+      true,
+      maliciousConfig,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv.PAGER).toBe('cat; ls -l');
+    expect(mockPtySpawn).toHaveBeenCalledWith(
+      'bash',
+      expect.arrayContaining([expect.stringContaining('test-command')]),
+      expect.any(Object),
+    );
+  });
+
+  it('should handle invalid terminal dimensions gracefully (Bad Data)', async () => {
+    const invalidDimensionsConfig = {
+      ...shellExecutionConfig,
+      terminalWidth: -80,
+      terminalHeight: 0,
+    };
+
+    const handle = await ShellExecutionService.execute(
+      'test-command',
+      '/',
+      onOutputEventMock,
+      new AbortController().signal,
+      true,
+      invalidDimensionsConfig,
+    );
+
+    expect(handle.pid).toBe(12345);
+    expect(mockPtySpawn).toHaveBeenCalled();
   });
 });
