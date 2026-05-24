@@ -16,6 +16,7 @@ import {
   GeminiChat,
   InvalidStreamError,
   StreamEventType,
+  SYNTHETIC_BINARY_ACK,
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
   stripToolCallIdPrefixes,
@@ -2820,8 +2821,9 @@ describe('GeminiChat', () => {
         output: 'Success',
       });
       expect(capturedContents[1].role).toBe('model');
+      expect(capturedContents[1].parts![0].text).toBe(SYNTHETIC_BINARY_ACK);
       expect(capturedContents[1].parts![0].text).toContain(
-        'Binary content received',
+        'rather than infer or fabricate',
       );
       expect(capturedContents[1].parts![0].thoughtSignature).toBe(
         SYNTHETIC_THOUGHT_SIGNATURE,

@@ -18,6 +18,17 @@ import type { Config } from '../config/config.js';
 export const BINARY_INJECTION_KEY = '__binary_injection__';
 
 /**
+ * Anti-hallucination directive appended to every model-facing message that
+ * announces binary content. The binary payload itself may or may not actually
+ * reach the model (model selection, multimodal support, request-size limits,
+ * silent provider stripping). Without this directive, models read the
+ * announcement as confirmation they have the data and fabricate plausible
+ * contents to fill the gap. See issue #27408.
+ */
+export const BINARY_NO_FABRICATION_DIRECTIVE =
+  'If you cannot directly observe the attached content in your next response, you MUST state that explicitly — do not infer, guess, or fabricate details from the filename, path, or surrounding context.';
+
+/**
  * Formats tool output for a Gemini FunctionResponse.
  */
 function createFunctionResponsePart(
@@ -119,13 +130,29 @@ export function convertToFunctionResponse(
 
     if (isReadFileTool) {
       textParts.unshift(
-        `Binary content (${uniqueMimes}) read successfully. Content will be injected for analysis in the next sequence.`,
+        `Binary content (${uniqueMimes}) read successfully. Content will be injected for analysis in the next sequence. ${BINARY_NO_FABRICATION_DIRECTIVE}`,
       );
     } else {
       textParts.unshift(
-        `[SYSTEM: Binary content (${uniqueMimes}) stripped from response due to protocol limitations.]`,
+        `[SYSTEM: Binary content (${uniqueMimes}) stripped from response due to protocol limitations. ${BINARY_NO_FABRICATION_DIRECTIVE}]`,
       );
     }
+  }
+
+  // Whenever binary content is attached or referenced as a sibling, the
+  // anti-fabrication directive must reach the model alongside any companion
+  // text — the binary payload can be silently dropped by the model/transport
+  // (see #27408), and unguarded companion text was the exact gap flagged in
+  // the PR review of the original fix.
+  const totalAttachedBinaryItems =
+    filteredInlineDataParts.length + fileDataParts.length;
+  if (
+    totalAttachedBinaryItems > 0 &&
+    !textParts.some((t) => t.includes(BINARY_NO_FABRICATION_DIRECTIVE))
+  ) {
+    textParts.push(
+      `Binary content provided (${totalAttachedBinaryItems} item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
+    );
   }
 
   // Build the primary response part
@@ -162,18 +189,6 @@ export function convertToFunctionResponse(
       // Otherwise treat as siblings
       siblingParts.push(...filteredInlineDataParts);
     }
-  }
-
-  // Add descriptive text if the response object is empty but we have binary content
-  if (
-    textParts.length === 0 &&
-    (filteredInlineDataParts.length > 0 || fileDataParts.length > 0)
-  ) {
-    const totalBinaryItems =
-      filteredInlineDataParts.length + fileDataParts.length;
-    part.functionResponse!.response = {
-      output: `Binary content provided (${totalBinaryItems} item(s)).`,
-    };
   }
 
   if (siblingParts.length > 0) {

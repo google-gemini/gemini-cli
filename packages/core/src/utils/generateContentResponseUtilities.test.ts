@@ -15,6 +15,7 @@ import {
   getStructuredResponseFromParts,
   getCitations,
   convertToFunctionResponse,
+  BINARY_NO_FABRICATION_DIRECTIVE,
 } from './generateContentResponseUtilities.js';
 import {
   FinishReason,
@@ -178,8 +179,9 @@ describe('generateContentResponseUtilities', () => {
       }
       const output = response['output'] as string;
       expect(output).toContain(
-        '[SYSTEM: Binary content (audio/mpeg) stripped from response due to protocol limitations.]',
+        '[SYSTEM: Binary content (audio/mpeg) stripped from response due to protocol limitations.',
       );
+      expect(output).toContain(BINARY_NO_FABRICATION_DIRECTIVE);
       expect(output).not.toContain('__binary_injection__');
     });
 
@@ -203,6 +205,7 @@ describe('generateContentResponseUtilities', () => {
           Object.assign(response, frPart.functionResponse.response);
         }
         expect(response['output']).toContain('read successfully');
+        expect(response['output']).toContain(BINARY_NO_FABRICATION_DIRECTIVE);
         expect(response['__binary_injection__']).toBeDefined();
         const injection = response['__binary_injection__'] as Part[];
         expect(injection[0].inlineData?.mimeType).toBe('audio/mpeg');
@@ -224,7 +227,9 @@ describe('generateContentResponseUtilities', () => {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content provided (1 item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
+            },
           },
         },
         llmContent,
@@ -246,7 +251,9 @@ describe('generateContentResponseUtilities', () => {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content provided (1 item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
+            },
             parts: [llmContent],
           },
         },
@@ -268,7 +275,9 @@ describe('generateContentResponseUtilities', () => {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content provided (1 item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
+            },
           },
         },
         llmContent,
@@ -324,7 +333,7 @@ describe('generateContentResponseUtilities', () => {
             name: toolName,
             id: callId,
             response: {
-              output: 'Some textual description\nAnother text part',
+              output: `Some textual description\nAnother text part\nBinary content provided (1 item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
             },
             parts: [
               {
@@ -334,6 +343,54 @@ describe('generateContentResponseUtilities', () => {
           },
         },
       ]);
+    });
+
+    it('should append the no-fabrication directive when tool returns both text and attached binary (PR #27412 follow-up)', () => {
+      // Scenario from gemini-code-assist review of #27412: a tool returns a
+      // log message + an image. If the image is silently dropped downstream
+      // the model must still see the directive in the text output, otherwise
+      // it can fabricate plausible details about the missing image.
+      const llmContent: PartListUnion = [
+        { text: 'Operation completed at 12:00.' },
+        { inlineData: { mimeType: 'image/png', data: 'screenshot...' } },
+      ];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      const output = result[0].functionResponse?.response?.['output'] as string;
+      expect(output).toContain('Operation completed at 12:00.');
+      expect(output).toContain(BINARY_NO_FABRICATION_DIRECTIVE);
+    });
+
+    it('should not duplicate the no-fabrication directive when the unsupported-MIME branch already prepended one', () => {
+      // For read_file with audio (unsupported MIME), the prepend branch
+      // already inserts the directive. The new "ensure directive present"
+      // branch must detect that and skip, otherwise the output gets two
+      // copies of the directive.
+      const llmContent: PartListUnion = [
+        { text: 'Reading audio' },
+        { inlineData: { mimeType: 'audio/mpeg', data: 'audio_data' } },
+      ];
+      const result = convertToFunctionResponse(
+        'read_file',
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      const output = result[0].functionResponse?.response?.['output'] as string;
+      const matches = output.match(
+        new RegExp(
+          BINARY_NO_FABRICATION_DIRECTIVE.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            '\\$&',
+          ),
+          'g',
+        ),
+      );
+      expect(matches?.length).toBe(1);
     });
 
     it('should handle llmContent as an array with a single inlineData Part', () => {
@@ -351,7 +408,9 @@ describe('generateContentResponseUtilities', () => {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content provided (1 item(s)). ${BINARY_NO_FABRICATION_DIRECTIVE}`,
+            },
             parts: llmContent,
           },
         },

@@ -105,6 +105,18 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
+ * Synthetic "model thought" inserted after a tool returns binary content. The
+ * binary itself is sent as the following user turn (see binary injection
+ * expansion). Wording is deliberately hedged: it must not promise the model has
+ * actually observed the content, because the binary payload can be silently
+ * dropped (model routing, multimodal support, request-size limits). Without
+ * the hedge, the model treats the ack as confirmation it has the data and
+ * fabricates details. See issue #27408.
+ */
+export const SYNTHETIC_BINARY_ACK =
+  'Binary content received. I will only describe what I can directly observe in the attached content; if I cannot observe it I will say so rather than infer or fabricate details.';
+
+/**
  * Internal interface for parts that carry the magic 'callIndex' property
  * used during model response consolidation.
  */
@@ -460,7 +472,7 @@ export class GeminiChat {
             'gemini',
             [
               {
-                text: 'Binary content received. Proceeding with analysis.',
+                text: SYNTHETIC_BINARY_ACK,
                 thought: true,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
               },
@@ -472,7 +484,7 @@ export class GeminiChat {
               role: 'model',
               parts: [
                 {
-                  text: 'Binary content received. Proceeding with analysis.',
+                  text: SYNTHETIC_BINARY_ACK,
                   thought: true,
                   thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
                 },
