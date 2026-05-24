@@ -1307,15 +1307,17 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
     if (this.ephemeral) {
-      const uniqueSuffix = `${Date.now().toString(36)}-${Math.random()
-        .toString(36)
-        .slice(2, 10)}`;
-      const ephemeralRoot = path.join(
-        os.tmpdir(),
-        'gemini-cli-ephemeral',
-        uniqueSuffix,
+      const ephemeralRoot = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-ephemeral-'),
       );
       this.storage.setEphemeralTempDir(ephemeralRoot);
+      process.on('exit', () => {
+        try {
+          fs.rmSync(ephemeralRoot, { recursive: true, force: true });
+        } catch {
+          // Best-effort cleanup during process exit.
+        }
+      });
     }
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
