@@ -495,6 +495,10 @@ export class ShellExecutionService {
     };
 
     if (!isInteractive) {
+      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+      for (const key of gitConfigKeys) {
+        baseEnv[key] = process.env[key];
+      }
       const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
       const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
       const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
