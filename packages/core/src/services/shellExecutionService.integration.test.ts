@@ -7,6 +7,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {getPty} from '../utils/getPty.js';
 import {ShellExecutionService} from './shellExecutionService.js';
+import {NoopSandboxManager} from './sandboxManager.js';
 
 const ptyInfo = await getPty();
 const hasPty = ptyInfo !== null;
@@ -27,6 +28,7 @@ describe('ShellExecutionService Native Integration', () => {
         true, // shouldUseNodePty
         {
           enableInteractiveShell: false, // Enforce TERM=dumb
+          sandboxManager: new NoopSandboxManager(),
           sanitizationConfig: {
             enableEnvironmentVariableRedaction: false,
             allowedEnvironmentVariables: [],
@@ -62,6 +64,7 @@ describe('ShellExecutionService Native Integration', () => {
         true,
         {
           enableInteractiveShell: false,
+          sandboxManager: new NoopSandboxManager(),
           sanitizationConfig: {
             enableEnvironmentVariableRedaction: false,
             allowedEnvironmentVariables: [],

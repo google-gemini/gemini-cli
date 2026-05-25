@@ -335,11 +335,11 @@ describe('ShellExecutionService', () => {
     });
 
     it('should decode a single multi-byte UTF-8 character split on byte boundaries across different onData callbacks', async () => {
-      const {result} = await simulateExecution('split-utf8-bytes', (pty) => {
+      const { result } = await simulateExecution('split-utf8-bytes', (pty) => {
         // '你' UTF-8 bytes: [0xE4, 0xBD, 0xA0]
         pty.onData.mock.calls[0][0](Buffer.from([0xe4, 0xbd]));
         pty.onData.mock.calls[0][0](Buffer.from([0xa0]));
-        pty.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
       expect(result.output.trim()).toBe('你');
     });
@@ -348,12 +348,12 @@ describe('ShellExecutionService', () => {
       const LARGE_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
       const largeBuffer = Buffer.alloc(LARGE_CHUNK_SIZE, 'a');
 
-      const {result} = await simulateExecution('large-pty-output', (pty) => {
+      const { result } = await simulateExecution('large-pty-output', (pty) => {
         pty.onData.mock.calls[0][0](largeBuffer);
-        pty.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
-      expect(result.rawOutput.length).toBe(LARGE_CHUNK_SIZE); // No data loss
+      expect(result.rawOutput!.length).toBe(LARGE_CHUNK_SIZE); // No data loss
     });
 
     it('should handle commands with no output', async () => {
@@ -1105,7 +1105,9 @@ describe('ShellExecutionService', () => {
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
-          pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
+          pty.onData.mock.calls[0][0](
+            Buffer.from('a\u001b[31mred\u001b[0mword'),
+          );
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         coloredShellExecutionConfig,
@@ -1128,7 +1130,9 @@ describe('ShellExecutionService', () => {
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
-          pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
+          pty.onData.mock.calls[0][0](
+            Buffer.from('a\u001b[31mred\u001b[0mword'),
+          );
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
         {
@@ -1397,13 +1401,13 @@ describe('ShellExecutionService child_process fallback', () => {
       const LARGE_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
       const largeBuffer = Buffer.alloc(LARGE_CHUNK_SIZE, 'a');
 
-      const {result} = await simulateExecution('large-output', (cp) => {
+      const { result } = await simulateExecution('large-output', (cp) => {
         cp.stdout?.emit('data', largeBuffer);
         cp.emit('exit', 0, null);
         cp.emit('close', 0, null);
       });
 
-      expect(result.rawOutput.length).toBe(LARGE_CHUNK_SIZE); // No data loss
+      expect(result.rawOutput!.length).toBe(LARGE_CHUNK_SIZE); // No data loss
     });
 
     it('should handle commands with no output', async () => {
@@ -2236,7 +2240,9 @@ describe('ShellExecutionService environment variables', () => {
 
   it('should set TERM=dumb when enableInteractiveShell is false', async () => {
     vi.resetModules();
-    const {ShellExecutionService} = await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     const nonInteractiveConfig = {
       ...shellExecutionConfig,
@@ -2259,7 +2265,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(ptyEnv).toHaveProperty('GIT_PAGER', 'cat');
 
     // Ensure pty process exits
-    mockPtyProcess.onExit.mock.calls[0][0]({exitCode: 0, signal: null});
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
     await new Promise(process.nextTick);
 
     // Test child_process path
@@ -2317,15 +2323,14 @@ describe('ShellExecutionService - Task CEOQ Stress Testing', () => {
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
     mockGetPty.mockResolvedValue({
-      module: {spawn: mockPtySpawn},
+      module: { spawn: mockPtySpawn },
       name: 'mock-pty',
     });
   });
 
   it('should default to interactive TERM and user pager when flag is missing (Before behavior)', async () => {
-    const configWithoutFlag = {...shellExecutionConfig};
-    delete (configWithoutFlag as unknown as Record<string, unknown>)
-      .enableInteractiveShell;
+    const configWithoutFlag = { ...shellExecutionConfig };
+    delete (configWithoutFlag as unknown as Record<string, unknown>)['enableInteractiveShell'];
 
     await ShellExecutionService.execute(
       'test-command',
