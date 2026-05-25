@@ -19,7 +19,10 @@ import {
   type GenerateContentParameters,
   type FunctionCall,
 } from '@google/genai';
-import { AgentChatHistory } from './agentChatHistory.js';
+export { AgentChatHistory, type HistoryTurn } from './agentChatHistory.js';
+import { AgentChatHistory, type HistoryTurn } from './agentChatHistory.js';
+
+import { randomUUID } from 'node:crypto';
 import { toParts } from '../code_assist/converter.js';
 import {
   retryWithBackoff,
@@ -54,8 +57,11 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { scrubHistory } from '../utils/historyHardening.js';
-import { partListUnionToString } from './geminiRequest.js';
+import { scrubHistory, scrubContents } from '../utils/historyHardening.js';
+import {
+  partListUnionToString,
+  ensureStableToolIds,
+} from '../utils/sessionUtils.js';
 import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
@@ -65,7 +71,6 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -165,8 +170,9 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history does not start with a user turn.
  * @throws Error if the history contains an invalid role.
  */
-function validateHistory(history: Content[]) {
-  for (const content of history) {
+function validateHistory(history: Array<Content | HistoryTurn>) {
+  for (const item of history) {
+    const content = 'content' in item ? item.content : item;
     if (content.role !== 'user' && content.role !== 'model') {
       throw new Error(`Role must be user or model, but got ${content.role}.`);
     }
@@ -181,23 +187,25 @@ function validateHistory(history: Content[]) {
  * filters or recitation). Extracting valid turns from the history
  * ensures that subsequent requests could be accepted by the model.
  */
-function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
+function extractCuratedHistory(
+  comprehensiveHistory: readonly HistoryTurn[],
+): HistoryTurn[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
-  const curatedHistory: Content[] = [];
+  const curatedHistory: HistoryTurn[] = [];
   const length = comprehensiveHistory.length;
   let i = 0;
   while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
+    if (comprehensiveHistory[i].content.role === 'user') {
       curatedHistory.push(comprehensiveHistory[i]);
       i++;
     } else {
-      const modelOutput: Content[] = [];
+      const modelOutput: HistoryTurn[] = [];
       let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
+      while (i < length && comprehensiveHistory[i].content.role === 'model') {
         modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
+        if (isValid && !isValidContent(comprehensiveHistory[i].content)) {
           isValid = false;
         }
         i++;
@@ -279,15 +287,45 @@ export class GeminiChat {
     readonly context: AgentLoopContext,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
-    history: Content[] = [],
+    history: Array<Content | HistoryTurn> = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
-    this.agentHistory = new AgentChatHistory(history);
+
+    let initialHistory: HistoryTurn[];
+    // If history is passed, it is the most up-to-date in-memory state and takes precedence.
+    // This is critical for hot-restarts after operations like context compression.
+    if (history.length > 0) {
+      initialHistory = history.map((item) =>
+        'id' in item && 'content' in item
+          ? item
+          : { id: randomUUID(), content: item },
+      );
+    } else if (resumedSessionData) {
+      // Otherwise, if resuming from disk, build from the persisted record.
+      initialHistory = resumedSessionData.conversation.messages
+        .filter((m) => m.type === 'user' || m.type === 'gemini')
+        .map((m) => ({
+          id: m.id,
+          content: {
+            role: m.type === 'user' ? 'user' : 'model',
+            parts: Array.isArray(m.content)
+              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                (m.content as Part[])
+              : [{ text: String(m.content) }],
+          },
+        }));
+    } else {
+      initialHistory = [];
+    }
+
+    this.agentHistory = new AgentChatHistory(initialHistory);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.agentHistory.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.content.parts || []),
     );
   }
 
@@ -298,12 +336,21 @@ export class GeminiChat {
   async initialize(
     resumedSessionData?: ResumedSessionData,
     kind: 'main' | 'subagent' = 'main',
-  ) {
+  ): Promise<void> {
     await this.chatRecordingService.initialize(resumedSessionData, kind);
+    // Sync initial history with the recorder to ensure all turns (even bootstrapped ones)
+    // are durable and coordinated.
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
   }
 
   setSystemInstruction(sysInstr: string) {
     this.systemInstruction = sysInstr;
+  }
+
+  getSystemInstruction(): string {
+    return this.systemInstruction;
   }
 
   /**
@@ -339,6 +386,7 @@ export class GeminiChat {
     signal: AbortSignal,
     role: LlmRole,
     displayContent?: PartListUnion,
+    apiHistoryOverride?: Content[],
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -351,6 +399,9 @@ export class GeminiChat {
     let userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
+
+    const isContextManagementEnabled =
+      this.context.config.isContextManagementEnabled();
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
@@ -369,44 +420,101 @@ export class GeminiChat {
         }
       }
 
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'user',
-        content: userMessageParts,
-        displayContent: finalDisplayContent,
-      });
+      if (!isContextManagementEnabled) {
+        const id = this.chatRecordingService.recordMessage({
+          model,
+          type: 'user',
+          content: userMessageParts,
+          displayContent: finalDisplayContent,
+        });
+        this.agentHistory.push({ id, content: userContent });
+      } else {
+        // With Context Management, the client has already recorded the user message
+        // and called setHistory to ensure the graph is in sync.
+        // We just verify it's there.
+        const history = this.agentHistory.get();
+        const lastTurn = history[history.length - 1];
+        if (
+          !lastTurn ||
+          partListUnionToString(lastTurn.content.parts || []) !==
+            userMessageContent
+        ) {
+          const id = this.chatRecordingService.recordMessage({
+            model,
+            type: 'user',
+            content: userMessageParts,
+            displayContent: finalDisplayContent,
+          });
+          this.agentHistory.push({ id, content: userContent });
+        }
+      }
+    } else {
+      // Record tool response as a message to ensure durable ID and linear history for resume.
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        'user',
+        userContent.parts || [],
+      );
+
+      if (!isContextManagementEnabled) {
+        // Binary injections: If the tool output contains binary data, we expand the history.
+        const binaryParts = this.extractBinaryInjections(userContent.parts);
+        if (binaryParts) {
+          // Turn 1: The original tool response (now cleaned)
+          this.agentHistory.push({ id, content: userContent });
+
+          // Turn 2: Synthetic Model Acknowledgment
+          const modelId = this.chatRecordingService.recordSyntheticMessage(
+            'gemini',
+            [
+              {
+                text: 'Binary content received. Proceeding with analysis.',
+                thought: true,
+                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+              },
+            ],
+          );
+          this.agentHistory.push({
+            id: modelId,
+            content: {
+              role: 'model',
+              parts: [
+                {
+                  text: 'Binary content received. Proceeding with analysis.',
+                  thought: true,
+                  thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                },
+              ],
+            },
+          });
+
+          // Turn 3: The actual binary data (becomes the current request message)
+          const binaryId = this.chatRecordingService.recordSyntheticMessage(
+            'info',
+            binaryParts,
+          );
+          userContent = {
+            role: 'user',
+            parts: binaryParts,
+          };
+          this.agentHistory.push({ id: binaryId, content: userContent });
+        } else {
+          this.agentHistory.push({ id, content: userContent });
+        }
+      } else {
+        // With Context Management, we just push it to the history if not already there.
+        // (The client should have handled this, but we're defensive).
+        const history = this.agentHistory.get();
+        const lastTurn = history[history.length - 1];
+        if (
+          !lastTurn ||
+          partListUnionToString(lastTurn.content.parts || []) !==
+            partListUnionToString(userContent.parts || [])
+        ) {
+          this.agentHistory.push({ id, content: userContent });
+        }
+      }
     }
-
-    // Add user content to history ONCE before any attempts.
-    const binaryInjections = this.extractBinaryInjections(userContent.parts);
-    if (binaryInjections) {
-      // Turn 1: The original tool response (now cleaned)
-      this.agentHistory.push(userContent);
-
-      // Turn 2: Synthetic Model Acknowledgment
-      this.agentHistory.push({
-        role: 'model',
-        parts: [
-          {
-            text: 'Binary content received. Proceeding with analysis.',
-            thought: true,
-            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
-          },
-        ],
-      });
-
-      // Turn 3: The actual binary data (becomes the current request message)
-      userContent = {
-        role: 'user',
-        parts: binaryInjections,
-      };
-    }
-
-    this.agentHistory.push(userContent);
-    if (this.isActiveModelLocalGemma4()) {
-      this.stripThoughtBlocksFromHistory();
-    }
-    const requestContents = this.getHistory(true);
+    const requestHistory = this.getHistoryTurns(true);
 
     const streamWithRetries = async function* (
       this: GeminiChat,
@@ -430,10 +538,11 @@ export class GeminiChat {
             isConnectionPhase = true;
             const stream = await this.makeApiCallAndProcessStream(
               currentConfigKey,
-              requestContents,
+              requestHistory,
               prompt_id,
               signal,
               role,
+              apiHistoryOverride,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -552,44 +661,46 @@ export class GeminiChat {
   private extractBinaryInjections(
     parts: Part[] | undefined,
   ): Part[] | undefined {
-    if (!parts) {
-      return undefined;
-    }
-
-    const binaryInjections: Part[] = [];
-
-    for (const part of parts) {
-      const response = part.functionResponse?.response;
-
-      if (response && BINARY_INJECTION_KEY in response) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const binaryParts = response[BINARY_INJECTION_KEY] as Part[];
-        delete response[BINARY_INJECTION_KEY];
-
-        if (Array.isArray(binaryParts)) {
-          binaryInjections.push(...binaryParts);
+    const binaryParts: Part[] = [];
+    if (parts) {
+      for (const part of parts) {
+        const response = part.functionResponse?.response;
+        if (response && BINARY_INJECTION_KEY in response) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const injected = response[BINARY_INJECTION_KEY] as Part[];
+          delete response[BINARY_INJECTION_KEY];
+          if (Array.isArray(injected)) {
+            binaryParts.push(...injected);
+          }
         }
       }
     }
 
-    return binaryInjections.length > 0 ? binaryInjections : undefined;
+    return binaryParts.length > 0 ? binaryParts : undefined;
   }
 
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
-    requestContents: readonly Content[],
+    requestHistory: readonly HistoryTurn[],
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
+    apiHistoryOverride?: Content[],
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
-    const scrubbedContents = this.context.config.isContextManagementEnabled()
-      ? scrubHistory([...requestContents])
-      : [...requestContents];
+    const scrubbedHistory = this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...requestHistory])
+      : [...requestHistory];
+
+    const scrubbedContents = scrubbedHistory.map((h) => h.content);
+
+    const requestContents = apiHistoryOverride
+      ? scrubContents(apiHistoryOverride)
+      : scrubbedContents;
 
     const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(scrubbedContents);
+      this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
     // Track final request parameters for AfterModel hooks
     const {
@@ -845,14 +956,21 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(curated: boolean = false): readonly Content[] {
+  getHistory(curated: boolean = false): Content[] {
+    return this.getHistoryTurns(curated).map((h) => h.content);
+  }
+
+  /**
+   * Returns the chat history as HistoryTurns.
+   */
+  getHistoryTurns(curated: boolean = false): HistoryTurn[] {
     const history = curated
-      ? extractCuratedHistory([...this.agentHistory.get()])
-      : this.agentHistory.get();
+      ? extractCuratedHistory(this.agentHistory.get())
+      : [...this.agentHistory.get()];
 
     return this.context.config.isContextManagementEnabled()
-      ? scrubHistory([...history])
-      : [...history];
+      ? scrubHistory(history)
+      : history;
   }
 
   /**
@@ -865,24 +983,44 @@ export class GeminiChat {
   /**
    * Adds a new entry to the chat history.
    */
-  addHistory(content: Content): void {
-    this.agentHistory.push(content);
+  addHistory(content: Content | HistoryTurn): void {
+    if ('id' in content && 'content' in content) {
+      this.agentHistory.push(content);
+    } else {
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        content.role === 'user' ? 'user' : 'gemini',
+        content.parts || [],
+      );
+      this.agentHistory.push({ id, content });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
   }
 
-  setHistory(
-    history: readonly Content[],
-    options: { silent?: boolean } = {},
-  ): void {
-    this.agentHistory.set(history, options);
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
+    const wrappedHistory: HistoryTurn[] = history.map((item) => {
+      if ('id' in item && 'content' in item) {
+        return item;
+      }
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        item.role === 'user' ? 'user' : 'gemini',
+        item.parts || [],
+      );
+      return { id, content: item };
+    });
+    ensureStableToolIds(wrappedHistory);
+    this.agentHistory.set(wrappedHistory);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.agentHistory.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.content.parts || []),
     );
-    this.chatRecordingService.updateMessagesFromHistory(history);
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
   }
 
   stripThoughtsFromHistory(): void {
-    this.agentHistory.map((content) => {
-      const newContent = { ...content };
+    const newHistory = this.agentHistory.map((turn) => {
+      const newContent = { ...turn.content };
       if (newContent.parts) {
         newContent.parts = newContent.parts.map((part) => {
           if (part && typeof part === 'object' && 'thoughtSignature' in part) {
@@ -893,31 +1031,9 @@ export class GeminiChat {
           return part;
         });
       }
-      return newContent;
+      return { id: turn.id, content: newContent };
     });
-  }
-
-  stripThoughtBlocksFromHistory(): void {
-    const thoughtBlockRegex = /<\|channel\|>thought\b[\s\S]*?<\|channel\|>/gi;
-    this.agentHistory.map((content) => {
-      const newContent = { ...content };
-      if (newContent.parts) {
-        newContent.parts = newContent.parts.map((part) => {
-          if (
-            part &&
-            typeof part === 'object' &&
-            'text' in part &&
-            typeof part.text === 'string'
-          ) {
-            const newPart = { ...part };
-            newPart.text = part.text.replace(thoughtBlockRegex, '');
-            return newPart;
-          }
-          return part;
-        });
-      }
-      return newContent;
-    });
+    this.agentHistory.set(newHistory);
   }
 
   isActiveModelLocalGemma4(): boolean {
@@ -1038,6 +1154,10 @@ export class GeminiChat {
     this.tools = tools;
   }
 
+  getTools(): Tool[] {
+    return this.tools;
+  }
+
   async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
     // Check for potentially problematic cyclic tools with cyclic schemas
     // and include a recommendation to remove potentially problematic tools.
@@ -1106,9 +1226,6 @@ export class GeminiChat {
               if (!id) {
                 id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
                 callIndexToId.set(globalIndex, id);
-                debugLogger.log(
-                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${globalIndex}: ${fnCall.name}`,
-                );
               }
               fnCall.id = id;
             }
@@ -1205,9 +1322,6 @@ export class GeminiChat {
 
     let currentCallSourceIndex = -1;
     if (this.context.config.isContextManagementEnabled()) {
-      debugLogger.log(
-        `[GeminiChat] Starting consolidation for ${modelResponseParts.length} raw parts and ${finalFunctionCalls.length} assembled function calls.`,
-      );
       for (const part of modelResponseParts) {
         if (part.functionCall) {
           const partIndex = isIndexedPart(part) ? part.callIndex : undefined;
@@ -1264,15 +1378,22 @@ export class GeminiChat {
       .join('')
       .trim();
 
+    let id: string;
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
     // so that BeforeTool hooks always see the latest transcript state.
     if (responseText || hasThoughts || hasToolCall) {
-      this.chatRecordingService.recordMessage({
+      id = this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
         content: responseText,
       });
+    } else {
+      // Still need a durable ID even if response is empty (e.g. only tool calls)
+      id = this.chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        consolidatedParts,
+      );
     }
 
     // Stream validation logic: A stream is considered successful if:
@@ -1310,7 +1431,10 @@ export class GeminiChat {
       }
     }
 
-    this.agentHistory.push({ role: 'model', parts: consolidatedParts });
+    this.agentHistory.push({
+      id,
+      content: { role: 'model', parts: consolidatedParts },
+    });
   }
 
   getLastPromptTokenCount(): number {

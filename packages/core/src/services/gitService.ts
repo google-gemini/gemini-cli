@@ -24,6 +24,30 @@ import {
 export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
 export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
 
+const SHADOW_REPO_UNSAFE_OPTIONS = {
+  allowUnsafeAlias: true,
+  allowUnsafeAskPass: true,
+  allowUnsafeConfigEnvCount: true,
+  allowUnsafeConfigPaths: true,
+  allowUnsafeCredentialHelper: true,
+  allowUnsafeCustomBinary: true,
+  allowUnsafeDiffExternal: true,
+  allowUnsafeDiffTextConv: true,
+  allowUnsafeEditor: true,
+  allowUnsafeFilter: true,
+  allowUnsafeFsMonitor: true,
+  allowUnsafeGitProxy: true,
+  allowUnsafeGpgProgram: true,
+  allowUnsafeHooksPath: true,
+  allowUnsafeMergeDriver: true,
+  allowUnsafePack: true,
+  allowUnsafePager: true,
+  allowUnsafeProtocolOverride: true,
+  allowUnsafeSshCommand: true,
+  allowUnsafeTemplateDir: true,
+} satisfies NonNullable<SimpleGitOptions['unsafe']> &
+  Record<`allowUnsafe${string}`, boolean>;
+
 /**
  * Common configuration for the shadow Git repository used for checkpointing.
  *
@@ -32,15 +56,7 @@ export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
  * regardless of the user's local environment (e.g., PAGER, EDITOR, or SSH settings).
  */
 const SHADOW_REPO_GIT_OPTIONS: Partial<SimpleGitOptions> = {
-  unsafe: {
-    allowUnsafeCustomBinary: true,
-    allowUnsafeDiffExternal: true,
-    allowUnsafeGitProxy: true,
-    allowUnsafeHooksPath: true,
-    allowUnsafePack: true,
-    allowUnsafeProtocolOverride: true,
-    allowUnsafeSshCommand: true,
-  },
+  unsafe: SHADOW_REPO_UNSAFE_OPTIONS,
 };
 
 export class GitService {
