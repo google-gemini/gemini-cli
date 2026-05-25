@@ -14,10 +14,42 @@ import { isLikelyShellCommand } from './shellCommandValidator.js';
  */
 type CommentedRecord = Record<string | symbol, unknown>;
 
+/** Keys that can cause prototype pollution if merged into settings. */
+const PROTOTYPE_POLLUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+/**
+ * Recursively strips prototype-pollution keys from a nested object
+ * to prevent untrusted updates from polluting Object.prototype.
+ */
+function stripPrototypeKeys<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(stripPrototypeKeys) as unknown as T;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (!PROTOTYPE_POLLUTION_KEYS.has(k)) {
+        clean[k] = stripPrototypeKeys(v);
+      }
+    }
+    return clean as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Strips characters from a command string that could enable injection
+ * (e.g., newlines that break command boundaries).
+ */
+function sanitizeCommandValue(command: string): string {
+  return command.replace(/[\n\r]/g, ' ');
+}
+
   /**
    * Recursively walks the updates object and warns about any object with
    * `type: "command"` or `type: "stdio"` whose `command` value looks like
    * natural language rather than a valid shell command.
+   * Also sanitizes command values to strip injection vectors.
    */
 function warnAboutNaturalLanguageCommandValues(
   updates: Record<string, unknown>,
@@ -36,6 +68,7 @@ function warnAboutNaturalLanguageCommandValues(
         (objValue['type'] === 'command' || objValue['type'] === 'stdio') &&
         typeof objValue['command'] === 'string'
       ) {
+        objValue['command'] = sanitizeCommandValue(objValue['command']);
         if (!isLikelyShellCommand(objValue['command'])) {
           coreEvents.emitFeedback(
             'warn',
@@ -69,10 +102,12 @@ export function updateSettingsFilePreservingFormat(
   filePath: string,
   updates: Record<string, unknown>,
 ): void {
-  warnAboutNaturalLanguageCommandValues(updates, '');
+  // Sanitize untrusted input before any processing
+  const sanitizedUpdates = stripPrototypeKeys(updates);
+  warnAboutNaturalLanguageCommandValues(sanitizedUpdates, '');
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(sanitizedUpdates, null, 2), 'utf-8');
     return;
   }
 
@@ -91,7 +126,7 @@ export function updateSettingsFilePreservingFormat(
     return;
   }
 
-  const updatedStructure = applyUpdates(parsed, updates);
+  const updatedStructure = applyUpdates(parsed, sanitizedUpdates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
   fs.writeFileSync(filePath, updatedContent, 'utf-8');
