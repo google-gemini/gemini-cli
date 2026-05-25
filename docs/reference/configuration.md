@@ -105,9 +105,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.preferredEditor`** (string):
-  - **Description:** The preferred editor to open files in.
+- **`general.preferredEditor`** (enum):
+  - **Description:** The preferred editor to open files in. Must be one of the
+    built-in supported identifiers. Use /editor in the CLI to pick
+    interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
+  - **Values:** `"vscode"`, `"vscodium"`, `"windsurf"`, `"cursor"`, `"zed"`,
+    `"antigravity"`, `"sublimetext"`, `"lapce"`, `"nova"`, `"bbedit"`, `"vim"`,
+    `"neovim"`, `"emacs"`, `"hx"`, `"emacsclient"`, `"micro"`
+
+- **`general.openEditorInNewWindow`** (boolean):
+  - **Description:** Open VS Code-family editors in a new window when editing
+    files.
+  - **Default:** `false`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
@@ -1045,12 +1055,6 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         "contexts": [
           {
             "condition": {
-              "releaseChannel": "stable"
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
@@ -1189,13 +1193,6 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
           {
             "condition": {
               "hasAccessToPreview": false
-            },
-            "target": "gemini-2.5-pro"
-          },
-          {
-            "condition": {
-              "releaseChannel": "stable",
-              "requestedModels": ["auto"]
             },
             "target": "gemini-2.5-pro"
           },
@@ -1860,6 +1857,12 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.adk.agentSessionSubagentEnabled`** (boolean):
+  - **Description:** Route subagent invocations through the AgentSession
+    protocol instead of legacy executors.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`
@@ -1974,6 +1977,11 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
 
 - **`experimental.generalistProfile`** (boolean):
   - **Description:** Suitable for general coding and software development tasks.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.powerUserProfile`** (boolean):
+  - **Description:** Less cache friendly version of the generalist profile.
   - **Default:** `false`
   - **Requires restart:** Yes
 
