@@ -77,6 +77,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         check: async () => ({ decision: 'allow' }),
       }) as unknown as PolicyEngine,
     isContextManagementEnabled: () => false,
+    getToolCallTimeout: () => 600000,
   } as unknown as Config;
 
   const mockConfig = Object.assign({}, baseConfig, overrides) as Config;

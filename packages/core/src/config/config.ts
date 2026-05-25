@@ -221,6 +221,10 @@ export interface TelemetrySettings {
   useCliAuth?: boolean;
 }
 
+export interface ToolSettings {
+  callTimeout?: number;
+}
+
 export interface OutputSettings {
   format?: OutputFormat;
 }
@@ -563,6 +567,11 @@ export const ConfigSchema = z.object({
       }
     })
     .optional(),
+  tools: z
+    .object({
+      callTimeout: z.number().optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -744,6 +753,7 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+  tools?: ToolSettings;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -982,12 +992,14 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private readonly toolCallTimeout: number;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
     this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
+    this.toolCallTimeout = params.tools?.callTimeout ?? 600000;
 
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
@@ -3735,6 +3747,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getShellToolInactivityTimeout(): number {
     return this.shellToolInactivityTimeout;
+  }
+
+  getToolCallTimeout(): number {
+    return this.toolCallTimeout;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {

@@ -22,6 +22,7 @@ import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
+import { withTimeout } from '../utils/withTimeout.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -123,7 +124,12 @@ export class ToolExecutor {
             true, // skipBeforeHook
           );
 
-          const toolResult: ToolResult = await promise;
+          const timeoutMs = this.config.getToolCallTimeout();
+          const toolResult: ToolResult = await withTimeout(
+            promise,
+            timeoutMs,
+            `Tool execution timed out after ${timeoutMs}ms`,
+          );
 
           if (call.request.inputModifiedByHook) {
             const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
