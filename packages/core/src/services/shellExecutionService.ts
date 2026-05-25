@@ -388,7 +388,7 @@ export class ShellExecutionService {
       onOutputEvent,
       abortSignal,
       shellExecutionConfig,
-      shouldUseNodePty,
+      shouldUseNodePty && shellExecutionConfig.enableInteractiveShell !== false,
     );
   }
 
@@ -586,6 +586,7 @@ export class ShellExecutionService {
         env: finalEnv,
       });
 
+      const outputChunks: Buffer[] = [];
       const state = {
         output: '',
         truncated: false,
@@ -660,6 +661,7 @@ export class ShellExecutionService {
       let sniffedBytes = 0;
 
       const handleOutputChunk = (chunk: Buffer, stream: 'stdout' | 'stderr') => {
+        outputChunks.push(chunk);
         if (!stdoutDecoder || !stderrDecoder) {
           stdoutDecoder = new TextDecoder('utf-8');
           stderrDecoder = new TextDecoder('utf-8');
@@ -760,7 +762,7 @@ export class ShellExecutionService {
             : null;
 
         const resultPayload: ShellExecutionResult = {
-          rawOutput: Buffer.from(''),
+          rawOutput: Buffer.concat(outputChunks),
           output: finalStrippedOutput,
           exitCode,
           signal: exitSignal,
@@ -979,6 +981,7 @@ export class ShellExecutionService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       spawnedPty = ptyProcess as DestroyablePty;
       const ptyPid = Number(ptyProcess.pid);
+      const outputChunks: Buffer[] = [];
 
       const headlessTerminal = new Terminal({
         allowProposedApi: true,
@@ -1174,6 +1177,7 @@ export class ShellExecutionService {
       });
 
       const handleOutput = (data: Buffer) => {
+        outputChunks.push(data);
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolveChunk) => {
@@ -1297,7 +1301,7 @@ export class ShellExecutionService {
             });
 
             ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.from(''),
+              rawOutput: Buffer.concat(outputChunks),
               output: finalOutput,
               ansiOutput: ansiOutputSnapshot,
               exitCode,
