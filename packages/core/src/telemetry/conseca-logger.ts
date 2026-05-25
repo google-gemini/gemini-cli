@@ -11,6 +11,7 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 import {
   ClearcutLogger,
   EventNames,
+  type EventValue,
 } from './clearcut-logger/clearcut-logger.js';
 import { EventMetadataKey } from './clearcut-logger/event-metadata-key.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -27,20 +28,24 @@ export function logConsecaPolicyGeneration(
   debugLogger.debug('Conseca Policy Generation Event:', event);
   const clearcutLogger = ClearcutLogger.getInstance(config);
   if (clearcutLogger) {
-    const data = [
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_USER_PROMPT,
-        value: safeJsonStringify(event.user_prompt),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_TRUSTED_CONTENT,
-        value: safeJsonStringify(event.trusted_content),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_GENERATED_POLICY,
-        value: safeJsonStringify(event.policy),
-      },
-    ];
+    const data: EventValue[] = [];
+
+    if (config.getTelemetryLogPromptsEnabled()) {
+      data.push(
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_USER_PROMPT,
+          value: safeJsonStringify(event.user_prompt),
+        },
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_TRUSTED_CONTENT,
+          value: safeJsonStringify(event.trusted_content),
+        },
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_GENERATED_POLICY,
+          value: safeJsonStringify(event.policy),
+        },
+      );
+    }
 
     if (event.error) {
       data.push({
@@ -71,28 +76,33 @@ export function logConsecaVerdict(
   debugLogger.debug('Conseca Verdict Event:', event);
   const clearcutLogger = ClearcutLogger.getInstance(config);
   if (clearcutLogger) {
-    const data = [
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_USER_PROMPT,
-        value: safeJsonStringify(event.user_prompt),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_GENERATED_POLICY,
-        value: safeJsonStringify(event.policy),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
-        value: safeJsonStringify(event.tool_call),
-      },
+    const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.CONSECA_VERDICT_RESULT,
         value: safeJsonStringify(event.verdict),
       },
-      {
-        gemini_cli_key: EventMetadataKey.CONSECA_VERDICT_RATIONALE,
-        value: event.verdict_rationale,
-      },
     ];
+
+    if (config.getTelemetryLogPromptsEnabled()) {
+      data.push(
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_USER_PROMPT,
+          value: safeJsonStringify(event.user_prompt),
+        },
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_GENERATED_POLICY,
+          value: safeJsonStringify(event.policy),
+        },
+        {
+          gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
+          value: safeJsonStringify(event.tool_call),
+        },
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_VERDICT_RATIONALE,
+          value: event.verdict_rationale,
+        },
+      );
+    }
 
     if (event.error) {
       data.push({

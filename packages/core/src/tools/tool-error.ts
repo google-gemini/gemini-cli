@@ -55,6 +55,7 @@ export enum ToolErrorType {
 
   // MCP-specific Errors
   MCP_TOOL_ERROR = 'mcp_tool_error',
+  MCP_RESOURCE_NOT_FOUND = 'mcp_resource_not_found',
 
   // Memory-specific Errors
   MEMORY_TOOL_EXECUTION_ERROR = 'memory_tool_execution_error',

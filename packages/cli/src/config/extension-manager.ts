@@ -92,7 +92,9 @@ interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
   settings: MergedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
-  requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
+  requestSetting:
+    | ((setting: ExtensionSetting) => Promise<string | undefined>)
+    | null;
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
@@ -110,7 +112,7 @@ export class ExtensionManager extends ExtensionLoader {
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
-    | ((setting: ExtensionSetting) => Promise<string>)
+    | ((setting: ExtensionSetting) => Promise<string | undefined>)
     | undefined;
   private telemetryConfig: Config;
   private workspaceDir: string;
@@ -165,7 +167,7 @@ export class ExtensionManager extends ExtensionLoader {
   }
 
   setRequestSetting(
-    requestSetting?: (setting: ExtensionSetting) => Promise<string>,
+    requestSetting?: (setting: ExtensionSetting) => Promise<string | undefined>,
   ): void {
     this.requestSetting = requestSetting;
   }
@@ -1299,7 +1301,8 @@ export async function inferInstallMetadata(
     source.startsWith('git@') ||
     source.startsWith('sso://') ||
     source.startsWith('github:') ||
-    source.startsWith('gitlab:')
+    source.startsWith('gitlab:') ||
+    source.startsWith('ssh://')
   ) {
     return {
       source,

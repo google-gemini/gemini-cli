@@ -148,18 +148,20 @@ describe('ReadFileTool', () => {
 
     it('should throw error if start_line is less than 1', () => {
       const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
+        file_path: 'test.txt',
         start_line: 0,
       };
-      expect(() => tool.build(params)).toThrow('start_line must be at least 1');
+      expect(() => tool.build(params)).toThrow(
+        'params/start_line must be >= 1',
+      );
     });
 
     it('should throw error if end_line is less than 1', () => {
       const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
+        file_path: 'test.txt',
         end_line: 0,
       };
-      expect(() => tool.build(params)).toThrow('end_line must be at least 1');
+      expect(() => tool.build(params)).toThrow('params/end_line must be >= 1');
     });
 
     it('should throw error if start_line is greater than end_line', () => {
@@ -237,10 +239,18 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: 'textfile.txt' };
       const invocation = tool.build(params);
 
-      expect(await invocation.execute(abortSignal)).toEqual({
-        llmContent: fileContent,
-        returnDisplay: '',
-      });
+      const result = await invocation.execute({ abortSignal });
+      expect(result).toEqual(
+        expect.objectContaining({
+          llmContent: fileContent,
+          returnDisplay: '',
+          display: expect.objectContaining({
+            name: 'ReadFile',
+            description: expect.stringContaining('textfile.txt'),
+            resultSummary: '1 lines',
+          }),
+        }),
+      );
     });
 
     it('should return error if file does not exist', async () => {
@@ -248,7 +258,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result).toEqual({
         llmContent:
           'Could not read file because no file was found at the specified path.',
@@ -267,10 +277,18 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
-      expect(await invocation.execute(abortSignal)).toEqual({
-        llmContent: fileContent,
-        returnDisplay: '',
-      });
+      const result = await invocation.execute({ abortSignal });
+      expect(result).toEqual(
+        expect.objectContaining({
+          llmContent: fileContent,
+          returnDisplay: '',
+          display: expect.objectContaining({
+            name: 'ReadFile',
+            description: expect.stringContaining('textfile.txt'),
+            resultSummary: '1 lines',
+          }),
+        }),
+      );
     });
 
     it('should return error if path is a directory', async () => {
@@ -279,7 +297,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: dirPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result).toEqual({
         llmContent:
           'Could not read file because the provided path is a directory, not a file.',
@@ -299,7 +317,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result).toHaveProperty('error');
       expect(result.error?.type).toBe(ToolErrorType.FILE_TOO_LARGE);
       expect(result.error?.message).toContain(
@@ -315,7 +333,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'IMPORTANT: The file content has been truncated',
       );
@@ -333,7 +351,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: imagePath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toEqual({
         inlineData: {
           data: pngHeader.toString('base64'),
@@ -351,7 +369,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: pdfPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toEqual({
         inlineData: {
           data: pdfHeader.toString('base64'),
@@ -369,7 +387,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: binPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toBe(
         'Cannot display content of binary file: binary.bin',
       );
@@ -383,7 +401,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: svgPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toBe(svgContent);
       expect(result.returnDisplay).toBe('Read SVG as text: image.svg');
     });
@@ -396,7 +414,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: svgPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toBe(
         'Cannot display content of SVG file larger than 1MB: large.svg',
       );
@@ -411,7 +429,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: emptyPath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toBe('');
       expect(result.returnDisplay).toBe('');
     });
@@ -429,7 +447,7 @@ describe('ReadFileTool', () => {
       };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'IMPORTANT: The file content has been truncated',
       );
@@ -454,7 +472,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: tempFilePath };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toBe(tempFileContent);
       expect(result.returnDisplay).toBe('');
     });
@@ -624,7 +642,7 @@ describe('ReadFileTool', () => {
       await fsp.writeFile(filePath, fileContent, 'utf-8');
 
       const invocation = tool.build({ file_path: filePath });
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(discoverJitContext).toHaveBeenCalled();
       expect(result.llmContent).toContain('Newly Discovered Project Context');
@@ -640,7 +658,7 @@ describe('ReadFileTool', () => {
       await fsp.writeFile(filePath, fileContent, 'utf-8');
 
       const invocation = tool.build({ file_path: filePath });
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).not.toContain(
         'Newly Discovered Project Context',
@@ -666,7 +684,7 @@ describe('ReadFileTool', () => {
       await fsp.writeFile(filePath, pngHeader);
 
       const invocation = tool.build({ file_path: filePath });
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(discoverJitContext).toHaveBeenCalled();
       // Result should be an array containing both the image part and JIT context

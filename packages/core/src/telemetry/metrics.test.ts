@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import type {
   Counter,
   Meter,
@@ -501,6 +509,10 @@ describe('Telemetry Metrics', () => {
       getTelemetryEnabled: () => true,
     } as unknown as Config;
 
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('should not record metrics if not initialized', () => {
       const event = new ModelRoutingEvent(
         'gemini-pro',
@@ -578,6 +590,85 @@ describe('Telemetry Metrics', () => {
         'routing.reasoning': 'test-reason',
         'routing.approval_mode': ApprovalMode.DEFAULT,
         'routing.error_message': 'test-error',
+      });
+    });
+
+    it('should truncate long reasoning and error_message when GEMINI_STRICT_TELEMETRY_LIMITS is true', () => {
+      vi.stubEnv('GEMINI_STRICT_TELEMETRY_LIMITS', 'true');
+      initializeMetricsModule(mockConfig);
+      const longReason = 'a'.repeat(2000);
+      const longError = 'b'.repeat(2000);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'Classifier',
+        200,
+        longReason,
+        true,
+        longError,
+        ApprovalMode.DEFAULT,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'a'.repeat(1000) + '...',
+        'routing.approval_mode': ApprovalMode.DEFAULT,
+      });
+
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'a'.repeat(1000) + '...',
+        'routing.approval_mode': ApprovalMode.DEFAULT,
+        'routing.error_message': 'b'.repeat(1000) + '...',
+      });
+    });
+
+    it('should NOT truncate long reasoning and error_message when GEMINI_STRICT_TELEMETRY_LIMITS is false or unset', () => {
+      initializeMetricsModule(mockConfig);
+      const longReason = 'a'.repeat(2000);
+      const longError = 'b'.repeat(2000);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'Classifier',
+        200,
+        longReason,
+        true,
+        longError,
+        ApprovalMode.DEFAULT,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': longReason,
+        'routing.approval_mode': ApprovalMode.DEFAULT,
+      });
+
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': longReason,
+        'routing.approval_mode': ApprovalMode.DEFAULT,
+        'routing.error_message': longError,
       });
     });
   });

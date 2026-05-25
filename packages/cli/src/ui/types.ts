@@ -11,6 +11,7 @@ import {
   type ThoughtSummary,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
+  type ToolDisplay,
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
   type AgentDefinition,
@@ -41,8 +42,8 @@ export enum AuthState {
   AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
-  // Waiting for the user to restart after a Google login
-  AwaitingGoogleLoginRestart = 'awaiting_google_login_restart',
+  // Waiting for the user to restart after a login
+  AwaitingLoginRestart = 'awaiting_login_restart',
 }
 
 // Only defining the state enum needed by the UI
@@ -121,6 +122,7 @@ export interface IndividualToolCallDisplay {
   name: string;
   args?: Record<string, unknown>;
   description: string;
+  display?: ToolDisplay;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
   // True when the tool was initiated directly by the user (slash/@/shell flows).
@@ -144,6 +146,11 @@ export interface CompressionProps {
   originalTokenCount: number | null;
   newTokenCount: number | null;
   compressionStatus: CompressionStatus | null;
+}
+
+export interface ExportSessionProps {
+  isPending: boolean;
+  targetPath?: string;
 }
 
 /**
@@ -258,6 +265,20 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   borderDimColor?: boolean;
 };
 
+export type ToolDisplayItem = ToolDisplay & {
+  status: CoreToolCallStatus;
+  originalRequestName?: string;
+};
+
+export type HistoryItemToolDisplayGroup = HistoryItemBase & {
+  type: 'tool_display_group';
+  tools: ToolDisplayItem[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
+};
+
 export type HistoryItemUserShell = HistoryItemBase & {
   type: 'user_shell';
   text: string;
@@ -266,6 +287,11 @@ export type HistoryItemUserShell = HistoryItemBase & {
 export type HistoryItemCompression = HistoryItemBase & {
   type: 'compression';
   compression: CompressionProps;
+};
+
+export type HistoryItemExportSession = HistoryItemBase & {
+  type: 'export_session';
+  exportSession: ExportSessionProps;
 };
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
@@ -353,6 +379,19 @@ export interface JsonMcpResource {
   description?: string;
 }
 
+export type HistoryItemGemmaStatus = HistoryItemBase & {
+  type: 'gemma_status';
+  binaryInstalled: boolean;
+  binaryPath: string | null;
+  modelName: string;
+  modelDownloaded: boolean;
+  serverRunning: boolean;
+  serverPid: number | null;
+  serverPort: number;
+  settingsEnabled: boolean;
+  allPassing: boolean;
+};
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
@@ -391,17 +430,20 @@ export type HistoryItemWithoutId =
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
+  | HistoryItemToolDisplayGroup
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
+  | HistoryItemExportSession
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
+  | HistoryItemGemmaStatus
   | HistoryItemChatList
   | HistoryItemThinking
   | HistoryItemHint
@@ -423,11 +465,13 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXPORT_SESSION = 'export_session',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
+  GEMMA_STATUS = 'gemma_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',
 }

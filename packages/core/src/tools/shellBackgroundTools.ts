@@ -11,7 +11,9 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
+
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -40,7 +42,7 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
     return 'Lists all active and recently completed background processes for the current session.';
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const processes = ShellExecutionService.listBackgroundProcesses(
       this.context.config.getSessionId(),
     );
@@ -128,7 +130,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     return `Reading output for background process ${this.params.pid}`;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const pid = this.params.pid;
 
     if (this.params.delay_ms && this.params.delay_ms > 0) {

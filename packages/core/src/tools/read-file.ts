@@ -16,6 +16,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
@@ -104,7 +105,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(): Promise<ToolResult> {
+  async execute(_options: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(
       this.resolvedPath,
       'read',
@@ -185,8 +186,20 @@ ${result.llmContent}`;
       }
     }
 
+    const displayResultSummary = result.isTruncated
+      ? `${result.linesShown![0]}-${result.linesShown![1]} of ${result.originalLineCount}`
+      : lines !== undefined
+        ? `${lines} lines`
+        : undefined;
+
     return {
       llmContent,
+      display: {
+        name: READ_FILE_DISPLAY_NAME,
+        description: this.getDescription(),
+        resultSummary: displayResultSummary,
+        result: { type: 'text', text: result.returnDisplay || '' },
+      },
       returnDisplay: result.returnDisplay || '',
     };
   }
@@ -242,12 +255,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
-    if (params.start_line !== undefined && params.start_line < 1) {
-      return 'start_line must be at least 1';
-    }
-    if (params.end_line !== undefined && params.end_line < 1) {
-      return 'end_line must be at least 1';
-    }
     if (
       params.start_line !== undefined &&
       params.end_line !== undefined &&
