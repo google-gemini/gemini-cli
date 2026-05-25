@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,9 +34,6 @@ import {
   sanitizeErrorMessage,
 } from '../utils/agent-sanitization-utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-const INPUT_PREVIEW_MAX_LENGTH = 50;
-const DESCRIPTION_MAX_LENGTH = 200;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -80,14 +77,10 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     const inputSummary = Object.entries(this.params)
-      .map(
-        ([key, value]) =>
-          `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`,
-      )
+      .map(([key, value]) => `${key}: ${String(value)}`)
       .join(', ');
 
-    const description = `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }`;
-    return description.slice(0, DESCRIPTION_MAX_LENGTH);
+    return `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }`;
   }
 
   private publishActivity(activity: SubagentActivityItem): void {
@@ -168,8 +161,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             const args = JSON.stringify(
               sanitizeToolArgs(activity.data['args']),
             );
+            const callId = activity.data['callId']
+              ? String(activity.data['callId'])
+              : randomUUID();
             recentActivity.push({
-              id: randomUUID(),
+              id: callId,
               type: 'tool_call',
               content: name,
               displayName,
@@ -186,23 +182,28 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             break;
           }
           case 'TOOL_CALL_END': {
-            const name = String(activity.data['name']);
             const data = activity.data['data'];
             const isError = isToolActivityError(data);
 
-            for (let i = recentActivity.length - 1; i >= 0; i--) {
-              if (
-                recentActivity[i].type === 'tool_call' &&
-                recentActivity[i].content === name &&
-                recentActivity[i].status === SubagentState.RUNNING
-              ) {
-                recentActivity[i].status = isError
-                  ? SubagentState.ERROR
-                  : SubagentState.COMPLETED;
-                updated = true;
+            const callId = activity.data['id']
+              ? String(activity.data['id'])
+              : undefined;
 
-                this.publishActivity(recentActivity[i]);
-                break;
+            if (callId) {
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].id === callId &&
+                  recentActivity[i].status === SubagentState.RUNNING
+                ) {
+                  recentActivity[i].status = isError
+                    ? SubagentState.ERROR
+                    : SubagentState.COMPLETED;
+                  updated = true;
+
+                  this.publishActivity(recentActivity[i]);
+                  break;
+                }
               }
             }
             break;
@@ -218,31 +219,23 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               errorType === SubagentActivityErrorType.REJECTED ||
               error.startsWith(SUBAGENT_REJECTED_ERROR_PREFIX);
 
-            const toolName = activity.data['name']
-              ? String(activity.data['name'])
+            const callId = activity.data['callId']
+              ? String(activity.data['callId'])
               : undefined;
 
-            if (toolName && (isCancellation || isRejection)) {
+            if (callId) {
+              const targetStatus =
+                isCancellation || isRejection
+                  ? SubagentState.CANCELLED
+                  : SubagentState.ERROR;
+
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
-                  recentActivity[i].content === toolName &&
+                  recentActivity[i].id === callId &&
                   recentActivity[i].status === SubagentState.RUNNING
                 ) {
-                  recentActivity[i].status = SubagentState.CANCELLED;
-                  updated = true;
-                  break;
-                }
-              }
-            } else if (toolName) {
-              // Mark non-rejection/non-cancellation errors as 'error'
-              for (let i = recentActivity.length - 1; i >= 0; i--) {
-                if (
-                  recentActivity[i].type === 'tool_call' &&
-                  recentActivity[i].content === toolName &&
-                  recentActivity[i].status === SubagentState.RUNNING
-                ) {
-                  recentActivity[i].status = SubagentState.ERROR;
+                  recentActivity[i].status = targetStatus;
                   updated = true;
                   break;
                 }

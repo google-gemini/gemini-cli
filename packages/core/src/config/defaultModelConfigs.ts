@@ -467,7 +467,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       default: 'gemini-3-pro-preview',
       contexts: [
-        { condition: { releaseChannel: 'stable' }, target: 'gemini-2.5-pro' },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -557,10 +556,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       contexts: [
         {
           condition: { hasAccessToPreview: false },
-          target: 'gemini-2.5-pro',
-        },
-        {
-          condition: { releaseChannel: 'stable', requestedModels: ['auto'] },
           target: 'gemini-2.5-pro',
         },
         {
