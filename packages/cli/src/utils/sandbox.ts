@@ -1080,15 +1080,8 @@ async function start_lxc_sandbox(
 // Helper functions to ensure sandbox image is present
 async function imageExists(sandbox: string, image: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const args = ['images', '-q', image];
-    const checkProcess = spawn(sandbox, args);
-
-    let stdoutData = '';
-    if (checkProcess.stdout) {
-      checkProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-      });
-    }
+    const args = ['inspect', '--type=image', image];
+    const checkProcess = spawn(sandbox, args, { stdio: 'ignore' });
 
     checkProcess.on('error', (err) => {
       debugLogger.warn(
@@ -1098,12 +1091,7 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
     });
 
     checkProcess.on('close', (code) => {
-      // Non-zero code might indicate docker daemon not running, etc.
-      // The primary success indicator is non-empty stdoutData.
-      if (code !== 0) {
-        // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
-      }
-      resolve(stdoutData.trim() !== '');
+      resolve(code === 0);
     });
   });
 }

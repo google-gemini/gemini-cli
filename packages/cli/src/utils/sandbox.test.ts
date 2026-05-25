@@ -299,18 +299,15 @@ describe('sandbox', () => {
       });
 
       // Mock image check to return true (image exists)
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
+      const mockImageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
-        if (args && args[0] === 'images') {
+        if (args && args[0] === 'inspect') {
           setTimeout(() => {
-            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
             mockImageCheckProcess.emit('close', 0);
           }, 1);
-          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+          return mockImageCheckProcess;
         }
         return new EventEmitter() as unknown as ReturnType<typeof spawn>; // fallback
       });
@@ -425,45 +422,35 @@ describe('sandbox', () => {
         image: 'missing-image',
       });
 
-      // 1. Image check fails
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
+      // 1. Image check fails (exit code 1)
       const mockImageCheckProcess1 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess1.stdout = new EventEmitter();
+        new EventEmitter() as unknown as ReturnType<typeof spawn>;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess1.emit('close', 0);
+          mockImageCheckProcess1.emit('close', 1);
         }, 1);
-        return mockImageCheckProcess1 as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess1;
       });
 
       // 2. Pull image succeeds
-      interface MockProcessWithStdoutStderr extends EventEmitter {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-      }
-      const mockPullProcess = new EventEmitter() as MockProcessWithStdoutStderr;
-      mockPullProcess.stdout = new EventEmitter();
-      mockPullProcess.stderr = new EventEmitter();
+      const mockPullProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
           mockPullProcess.emit('close', 0);
         }, 1);
-        return mockPullProcess as unknown as ReturnType<typeof spawn>;
+        return mockPullProcess;
       });
 
-      // 3. Image check succeeds
+      // 3. Image check succeeds (exit code 0)
       const mockImageCheckProcess2 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess2.stdout = new EventEmitter();
+        new EventEmitter() as unknown as ReturnType<typeof spawn>;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess2.stdout.emit('data', Buffer.from('image-id'));
           mockImageCheckProcess2.emit('close', 0);
         }, 1);
-        return mockImageCheckProcess2 as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess2;
       });
 
       // 4. Docker run
@@ -494,33 +481,25 @@ describe('sandbox', () => {
         image: 'missing-image',
       });
 
-      // 1. Image check fails
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
+      // 1. Image check fails (exit code 1)
       const mockImageCheckProcess1 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess1.stdout = new EventEmitter();
+        new EventEmitter() as unknown as ReturnType<typeof spawn>;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess1.emit('close', 0);
+          mockImageCheckProcess1.emit('close', 1);
         }, 1);
-        return mockImageCheckProcess1 as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess1;
       });
 
-      // 2. Pull image fails
-      interface MockProcessWithStdoutStderr extends EventEmitter {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-      }
-      const mockPullProcess = new EventEmitter() as MockProcessWithStdoutStderr;
-      mockPullProcess.stdout = new EventEmitter();
-      mockPullProcess.stderr = new EventEmitter();
+      // 2. Pull image fails (exit code 1)
+      const mockPullProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
           mockPullProcess.emit('close', 1);
         }, 1);
-        return mockPullProcess as unknown as ReturnType<typeof spawn>;
+        return mockPullProcess;
       });
 
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
@@ -535,17 +514,14 @@ describe('sandbox', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true); // For mount path check
 
       // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
+      const mockImageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
           mockImageCheckProcess.emit('close', 0);
         }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess;
       });
 
       const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
@@ -561,11 +537,12 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      // The first call is 'docker images -q ...'
+      // The first call is 'docker inspect --type=image ...'
       expect(spawn).toHaveBeenNthCalledWith(
         1,
         'docker',
-        expect.arrayContaining(['images', '-q']),
+        expect.arrayContaining(['inspect', '--type=image']),
+        expect.objectContaining({ stdio: 'ignore' }),
       );
 
       // The second call is 'docker run ...'
@@ -711,17 +688,14 @@ describe('sandbox', () => {
       process.env['GOOGLE_VERTEX_BASE_URL'] = 'http://vertex.proxy';
 
       // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
+      const mockImageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
           mockImageCheckProcess.emit('close', 0);
         }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess;
       });
 
       const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
@@ -763,17 +737,14 @@ describe('sandbox', () => {
       });
 
       // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
+      const mockImageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
       vi.mocked(spawn).mockImplementationOnce(() => {
         setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
           mockImageCheckProcess.emit('close', 0);
         }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        return mockImageCheckProcess;
       });
 
       const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
