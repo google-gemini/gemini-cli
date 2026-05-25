@@ -51,9 +51,34 @@
       "properties": {
         "preferredEditor": {
           "title": "Preferred Editor",
-          "description": "The preferred editor to open files in.",
-          "markdownDescription": "The preferred editor to open files in.\n\n- Category: `General`\n- Requires restart: `no`",
-          "type": "string"
+          "description": "The preferred editor to open files in. Must be one of the built-in supported identifiers. Use /editor in the CLI to pick interactively, or leave unset to use $VISUAL/$EDITOR.",
+          "markdownDescription": "The preferred editor to open files in. Must be one of the built-in supported identifiers. Use /editor in the CLI to pick interactively, or leave unset to use $VISUAL/$EDITOR.\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string",
+          "enum": [
+            "vscode",
+            "vscodium",
+            "windsurf",
+            "cursor",
+            "zed",
+            "antigravity",
+            "sublimetext",
+            "lapce",
+            "nova",
+            "bbedit",
+            "vim",
+            "neovim",
+            "emacs",
+            "hx",
+            "emacsclient",
+            "micro"
+          ]
+        },
+        "openEditorInNewWindow": {
+          "title": "Open Editor in New Window",
+          "description": "Open VS Code-family editors in a new window when editing files.",
+          "markdownDescription": "Open VS Code-family editors in a new window when editing files.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "vimMode": {
           "title": "Vim Mode",
@@ -3372,6 +3397,13 @@
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",
           "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "powerUserProfile": {
+          "title": "Use the power user profile to manage agent contexts.",
+          "description": "Less cache friendly version of the generalist profile.",
+          "markdownDescription": "Less cache friendly version of the generalist profile.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

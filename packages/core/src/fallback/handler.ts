@@ -42,8 +42,17 @@ export async function handleFallback(
     return { service: availability, policy: failedPolicy };
   };
 
+  const activeModel = config.getActiveModel();
   let fallbackModel: string;
+
   if (!candidates.length) {
+    if (
+      failedModel !== activeModel &&
+      availability.snapshot(activeModel).available
+    ) {
+      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      return processIntent(config, 'retry_always', activeModel, failedModel);
+    }
     fallbackModel = failedModel;
   } else {
     const selection = availability.selectFirstAvailable(
@@ -70,9 +79,21 @@ export async function handleFallback(
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
 
-    if (action === 'silent') {
+    if (
+      action === 'silent' ||
+      (fallbackModel === activeModel && failedModel !== activeModel)
+    ) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', fallbackModel);
+      // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
+      // For utility bypass, we want a hard runtime override, so pass failedModel.
+      const overrideFailedModel =
+        failedModel !== activeModel ? failedModel : undefined;
+      return processIntent(
+        config,
+        'retry_always',
+        fallbackModel,
+        overrideFailedModel,
+      );
     }
 
     // This will be used in the future when FallbackRecommendation is passed through UI
@@ -103,7 +124,12 @@ export async function handleFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
     }
 
-    return await processIntent(config, intent, fallbackModel);
+    return await processIntent(
+      config,
+      intent,
+      fallbackModel,
+      failedModel !== activeModel ? failedModel : undefined,
+    );
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
@@ -131,12 +157,13 @@ async function processIntent(
   config: Config,
   intent: FallbackIntent | null,
   fallbackModel: string,
+  failedModel?: string,
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
-      config.activateFallbackMode(fallbackModel);
+      config.activateFallbackMode(fallbackModel, failedModel);
       return true;
 
     case 'retry_once':
