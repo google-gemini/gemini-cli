@@ -33,24 +33,9 @@ defaults:
     shell: 'bash'
 
 jobs:
-  merge_queue_skipper:
-    permissions: 'read-all'
-    name: 'Merge Queue Skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.repository == 'google-gemini/gemini-cli'"
-    outputs:
-      skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
-    steps:
-      - id: 'merge-queue-ci-skipper'
-        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
-        with:
-          secret: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
-
   lint:
     name: 'Lint'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    runs-on: 'ubuntu-latest'
     env:
       GEMINI_LINT_TEMP_DIR: '${{ github.workspace }}/.gemini-linters'
     steps:
@@ -127,7 +112,6 @@ jobs:
   link_checker:
     name: 'Link Checker'
     runs-on: 'ubuntu-latest'
-    if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -140,10 +124,7 @@ jobs:
           fail: true
   test_linux:
     name: 'Test (Linux) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    needs:
-      - 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read'
       checks: 'write'
@@ -236,10 +217,7 @@ jobs:
 
   test_mac:
     name: 'Test (Mac) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
-    runs-on: 'macos-latest-large'
-    needs:
-      - 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    runs-on: 'macos-latest'
     permissions:
       contents: 'read'
       checks: 'write'
@@ -335,9 +313,7 @@ jobs:
 
   codeql:
     name: 'CodeQL'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    runs-on: 'ubuntu-latest'
     permissions:
       actions: 'read'
       contents: 'read'
@@ -360,9 +336,8 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
-    needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'"
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.event_name == 'pull_request'"
+    runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read' # For checkout
       pull-requests: 'write' # For commenting
@@ -385,9 +360,7 @@ jobs:
 
   test_windows:
     name: 'Slow Test - Win - ${{ matrix.shard }}'
-    runs-on: 'gemini-cli-windows-16-core'
-    needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    runs-on: 'windows-latest'
     timeout-minutes: 60
     strategy:
       matrix:
@@ -484,7 +457,7 @@ jobs:
 
   ci:
     name: 'CI'
-    if: "github.repository == 'google-gemini/gemini-cli' && always()"
+    if: "always()"
     needs:
       - 'lint'
       - 'link_checker'
@@ -493,7 +466,7 @@ jobs:
       - 'test_windows'
       - 'codeql'
       - 'bundle_size'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check all job results'
         run: |
