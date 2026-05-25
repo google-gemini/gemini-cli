@@ -19,15 +19,11 @@ const SHELL_SYNTAX_PATTERNS = [
 ];
 
 /**
- * Checks whether a string is likely a valid shell command as opposed to
- * natural language text.
+ * Checks whether a string looks like a shell command rather than
+ * natural language text, using heuristic regex matching.
  *
- * Uses two heuristics:
- * 1. Presence of shell operators or known command names.
- * 2. Invoking the platform shell to verify the command is executable.
- *
- * Returns true if the text appears to be a shell command, false if it
- * looks like natural language or is empty.
+ * Returns true if the text contains shell operators or known
+ * command names, false if it looks like natural language or is empty.
  */
 export function isLikelyShellCommand(text: string): boolean {
   if (!text || text.trim().length === 0) {
