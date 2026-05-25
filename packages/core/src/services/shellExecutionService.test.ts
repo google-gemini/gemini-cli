@@ -2297,6 +2297,7 @@ describe('ShellExecutionService - Task CEOQ Stress Testing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveExecutable.mockImplementation((exe: string) => exe);
     onOutputEventMock = vi.fn();
 
     mockPtyProcess = new EventEmitter() as EventEmitter & {
@@ -2419,7 +2420,9 @@ describe('ShellExecutionService - Task CEOQ Stress Testing', () => {
       invalidDimensionsConfig,
     );
 
-    expect(handle.pid).toBe(12345);
+    expect(handle.pid).toBeUndefined();
     expect(mockPtySpawn).toHaveBeenCalled();
+    const result = await handle.result;
+    expect(result.error).toBeDefined();
   });
 });
