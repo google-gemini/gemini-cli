@@ -14,6 +14,7 @@ import {
   getSpawnConfig,
   getScriptArgs,
 } from './src/utils/processUtils.js';
+import { getBootstrapSettingsPath } from './src/utils/bootstrapSettings.js';
 
 // --- Global Entry Point ---
 
@@ -44,11 +45,7 @@ async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
   try {
     const { readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    // Respect GEMINI_CLI_HOME environment variable, falling back to os.homedir()
-    const baseDir =
-      process.env['GEMINI_CLI_HOME'] || join(os.homedir(), '.gemini');
-    const settingsPath = join(baseDir, 'settings.json');
+    const settingsPath = getBootstrapSettingsPath();
     const rawSettings = readFileSync(settingsPath, 'utf8');
     const settings = JSON.parse(rawSettings);
     if (settings?.advanced?.autoConfigureMemory === false) {
