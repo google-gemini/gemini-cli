@@ -105,6 +105,35 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
+  it('should ignore <session_context> and <hook_context>', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: '1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: '<session_context>\nOld context\n</session_context>',
+      },
+      {
+        id: '2',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: '<hook_context>\nOld hook context\n</hook_context>',
+      },
+      {
+        id: '3',
+        type: 'user',
+        timestamp: '2024-01-01T10:02:00Z',
+        content: 'Actual query',
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history.map((h) => h.content)).toEqual([
+      { role: 'user', parts: [{ text: 'Actual query' }] },
+    ]);
+  });
+
   it('should correctly map tool calls and their responses', () => {
     const messages: ConversationRecord['messages'] = [
       {
