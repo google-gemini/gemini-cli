@@ -221,7 +221,11 @@ async function calculateFlexibleReplacement(
       const newBlockWithIndent = applyIndentation(replaceLines, indentation);
 
       let replacementText = newBlockWithIndent.join('\n');
-      if (sourceLines[index + searchLinesStripped.length - 1].endsWith('\n')) {
+      if (
+        normalizedReplace.trim() !== '' &&
+        !replacementText.endsWith('\n') &&
+        sourceLines[index + searchLinesStripped.length - 1].endsWith('\n')
+      ) {
         replacementText += '\n';
       }
 
