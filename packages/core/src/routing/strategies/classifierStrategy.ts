@@ -145,12 +145,22 @@ export class ClassifierStrategy implements RoutingStrategy {
         return null;
       }
 
+      // TODO - Consider using function req/res if they help accuracy.
+      // Bypass the classifier if the request is a function response.
+      // Since we prune all tool turns from history, sending a function response
+      // request would result in an invalid payload (missing the preceding function call).
+      if (isFunctionResponse(createUserContent(context.request))) {
+        debugLogger.log(
+          '[Routing] Bypassing Classifier: request is FunctionResponse.',
+        );
+        return null;
+      }
+
       const promptId = getPromptIdWithFallback('classifier-router');
 
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 
       // Filter out tool-related turns.
-      // TODO - Consider using function req/res if they help accuracy.
       const cleanHistory = historySlice.filter(
         (content) => !isFunctionCall(content) && !isFunctionResponse(content),
       );
