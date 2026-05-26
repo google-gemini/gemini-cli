@@ -59,15 +59,10 @@ export async function handleEnable(args: EnableArgs) {
       // Note: No restartServer() - CLI exits immediately, servers load on next session
     }
 
-    if (args.scope) {
-      const msg = `Extension "${args.name}" successfully enabled for scope "${args.scope}".`;
-      coreEvents.emitConsoleLog('log', msg);
-      debugLogger.log(msg);
-    } else {
-      const msg = `Extension "${args.name}" successfully enabled in all scopes.`;
-      coreEvents.emitConsoleLog('log', msg);
-      debugLogger.log(msg);
-    }
+    const scopeLabel = args.scope ?? SettingScope.User;
+    const msg = `Extension "${args.name}" successfully enabled for scope "${scopeLabel}".`;
+    coreEvents.emitConsoleLog('log', msg);
+    debugLogger.log(msg);
   } catch (error) {
     throw new FatalConfigError(getErrorMessage(error));
   }

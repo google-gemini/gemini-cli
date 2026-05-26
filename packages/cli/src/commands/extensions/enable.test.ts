@@ -105,8 +105,9 @@ describe('extensions enable command', () => {
         name: 'my-extension',
         scope: undefined,
         expectedScope: SettingScope.User,
+        // scope falls back to SettingScope.User when not provided (matches disable command behaviour)
         expectedLog:
-          'Extension "my-extension" successfully enabled in all scopes.',
+          'Extension "my-extension" successfully enabled for scope "User".',
       },
       {
         name: 'my-extension',
