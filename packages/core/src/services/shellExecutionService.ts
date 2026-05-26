@@ -17,7 +17,6 @@ import {
   getShellConfiguration,
   resolveExecutable,
   type ShellType,
-  BASH_HUP_GUARD,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -113,32 +112,6 @@ function injectUtf8CodepageForPty(
     return `chcp 65001>nul&${command}`;
   }
   return command;
-}
-
-/**
- * Prepends a POSIX SIGHUP-ignore guard to bash commands on non-Windows platforms.
- *
- * PTY environments such as WSL2, Kitty, and Alacritty aggressively send SIGHUP
- * to process groups that lose their controlling terminal. By prepending
- * `trap '' HUP;` we apply the same mechanism as the POSIX `nohup` utility:
- * SIG_IGN is inherited across exec(), so every child spawned by the command
- * also ignores SIGHUP — making the guard genuinely effective even in subshells.
- *
- * The guard is bash-only and idempotent (won't be doubled if already present).
- * It is stripped back out by stripShellWrapper() / stripHupGuard() before any
- * sandbox or permission-check logic sees the command, so there is no
- * privilege-escalation surface from the preamble itself.
- */
-function ensureHupIgnored(command: string, shell: ShellType): string {
-  if (shell !== 'bash') {
-    return command;
-  }
-  const trimmed = command.trimStart();
-  const prefix = `${BASH_HUP_GUARD} `;
-  if (trimmed.startsWith(prefix) || trimmed === BASH_HUP_GUARD) {
-    return command; // Already guarded — idempotent
-  }
-  return `${BASH_HUP_GUARD} ${command}`;
 }
 
 /** A structured result from a shell command execution. */
@@ -477,16 +450,9 @@ export class ShellExecutionService {
 
     const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
-    const promptGuarded = ensurePromptvarsDisabled(commandToExecute, shell);
-    // Prepend the SIGHUP-ignore guard for bash on non-Windows. This uses the
-    // same mechanism as POSIX `nohup`: SIG_IGN is inherited across exec(), so
-    // child processes spawned by the command also ignore SIGHUP. The guard is
-    // stripped by stripShellWrapper() before any sandbox permission checks.
-    const hupGuarded = !isWindows
-      ? ensureHupIgnored(promptGuarded, shell)
-      : promptGuarded;
+    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
     const finalCommand = injectUtf8CodepageForPty(
-      hupGuarded,
+      guardedCommand,
       shell,
       isWindows,
       usingPty,
