@@ -9,6 +9,7 @@ import { loadSettings, SettingScope } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import {
+  coreEvents,
   debugLogger,
   FatalConfigError,
   getErrorMessage,
@@ -59,13 +60,13 @@ export async function handleEnable(args: EnableArgs) {
     }
 
     if (args.scope) {
-      debugLogger.log(
-        `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
-      );
+      const msg = `Extension "${args.name}" successfully enabled for scope "${args.scope}".`;
+      coreEvents.emitConsoleLog('log', msg);
+      debugLogger.log(msg);
     } else {
-      debugLogger.log(
-        `Extension "${args.name}" successfully enabled in all scopes.`,
-      );
+      const msg = `Extension "${args.name}" successfully enabled in all scopes.`;
+      coreEvents.emitConsoleLog('log', msg);
+      debugLogger.log(msg);
     }
   } catch (error) {
     throw new FatalConfigError(getErrorMessage(error));

@@ -6,7 +6,11 @@
 
 import { type CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  debugLogger,
+  getErrorMessage,
+} from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
@@ -36,11 +40,18 @@ export async function handleDisable(args: DisableArgs) {
     } else {
       await extensionManager.disableExtension(args.name, SettingScope.User);
     }
+    const scopeLabel = args.scope ?? SettingScope.User;
+    coreEvents.emitConsoleLog(
+      'log',
+      `Extension "${args.name}" successfully disabled for scope "${scopeLabel}".`,
+    );
     debugLogger.log(
-      `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,
+      `Extension "${args.name}" successfully disabled for scope "${scopeLabel}".`,
     );
   } catch (error) {
-    debugLogger.error(getErrorMessage(error));
+    const message = getErrorMessage(error);
+    coreEvents.emitConsoleLog('error', message);
+    debugLogger.error(message);
     process.exit(1);
   }
 }

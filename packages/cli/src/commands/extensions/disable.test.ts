@@ -88,8 +88,9 @@ describe('extensions disable command', () => {
         name: 'my-extension',
         scope: undefined,
         expectedScope: SettingScope.User,
+        // scope falls back to SettingScope.User when not provided
         expectedLog:
-          'Extension "my-extension" successfully disabled for scope "undefined".',
+          'Extension "my-extension" successfully disabled for scope "User".',
       },
       {
         name: 'my-extension',
@@ -138,6 +139,7 @@ describe('extensions disable command', () => {
       ).mockRejectedValue(error);
       mockGetErrorMessage.mockReturnValue('Disable failed message');
       await handleDisable({ name: 'my-extension' });
+      // Error must be visible to the user via coreEvents, not just in the debug log
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'error',
         'Disable failed message',
