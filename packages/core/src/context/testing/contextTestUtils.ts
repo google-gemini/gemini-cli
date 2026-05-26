@@ -181,8 +181,8 @@ export function createMockEnvironment(
 
   let env = new ContextEnvironmentImpl(
     () => llmClient as BaseLlmClient,
-    () => 'mock-session',
-    'mock-model',
+    () => 'mock-model',
+    'mock-session',
     'mock-prompt-id',
     '/tmp/.gemini/trace',
     '/tmp/.gemini/tool-outputs',
@@ -197,7 +197,7 @@ export function createMockEnvironment(
     if (overrides.llmClient) {
       env = new ContextEnvironmentImpl(
         () => overrides.llmClient!,
-        () => overrides.model!,
+        () => overrides.model ?? env.model,
         env.sessionId,
         env.promptId,
         env.traceDir,
