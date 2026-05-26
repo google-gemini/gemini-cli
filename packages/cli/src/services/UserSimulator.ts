@@ -317,7 +317,6 @@ ${strippedScreen}
       const model = resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
         false, // useGemini3_1
-        false, // useGemini3_1FlashLite
         false, // useCustomToolModel
         this.config.getHasAccessToPreviewModel?.() ?? true,
         this.config,
@@ -510,7 +509,6 @@ ${memoryToCompress.map((m, i) => `${i + 1}. ${m}`).join('\n')}`;
       const model = resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
         false, // useGemini3_1
-        false, // useGemini3_1FlashLite
         false, // useCustomToolModel
         this.config.getHasAccessToPreviewModel?.() ?? true,
         this.config,

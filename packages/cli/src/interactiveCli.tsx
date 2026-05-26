@@ -146,7 +146,6 @@ export async function startInteractiveUI(
     // Wait a moment for shpool to stabilize terminal size and state.
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const simulateUser = config.getSimulateUser();
   const simulatedStdin = new PassThrough({ encoding: 'utf8' });
 
   let lastFrame: string | undefined;

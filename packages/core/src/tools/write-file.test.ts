@@ -1176,6 +1176,9 @@ describe('WriteFileTool', () => {
       const planFilePath = `${plansDirName}/tracks/fibsqrt_20260519/spec.md`;
       const params = { file_path: planFilePath, content: '# Spec' };
       const invocation = tool.build(params);
+      expect(
+        (invocation as unknown as { resolvedPath: string }).resolvedPath,
+      ).toBe(path.resolve(plansDir, 'tracks/fibsqrt_20260519/spec.md'));
     });
   });
 });
