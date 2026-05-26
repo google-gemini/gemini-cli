@@ -109,9 +109,12 @@ export function convertSessionToClientHistory(
 
     if (msg.type === 'user') {
       const contentString = partListUnionToString(msg.content);
+      const trimmedContent = contentString.trim();
       if (
-        contentString.trim().startsWith('/') ||
-        contentString.trim().startsWith('?')
+        trimmedContent.startsWith('/') ||
+        trimmedContent.startsWith('?') ||
+        trimmedContent.startsWith('<session_context>') ||
+        trimmedContent.startsWith('<hook_context>')
       ) {
         continue;
       }
