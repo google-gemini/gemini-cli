@@ -510,8 +510,25 @@ export class ChatRecordingService {
   private appendRecord(record: unknown): void {
     if (!this.conversationFile) return;
     try {
-      const line = JSON.stringify(record) + '\n';
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
+      // If the conversation file was removed mid-session (e.g. by an external
+      // cleanup or a manual deletion) the appendFileSync() below would recreate
+      // it containing only this record and no metadata line, leaving a "zombie"
+      // file that loadConversationRecord() can never parse. Re-seed it from the
+      // in-memory record first so the file stays a valid, resumable session.
+      // The initial metadata line written during initialize() is itself a
+      // metadata record, so it is skipped here to avoid duplicating the header.
+      if (
+        this.cachedConversation &&
+        !isPartialMetadataRecord(record) &&
+        !fs.existsSync(this.conversationFile)
+      ) {
+        fs.appendFileSync(
+          this.conversationFile,
+          JSON.stringify(this.cachedConversation) + '\n',
+        );
+      }
+      const line = JSON.stringify(record) + '\n';
       fs.appendFileSync(this.conversationFile, line);
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {

@@ -276,6 +276,41 @@ describe('ChatRecordingService', () => {
       expect(conversation.messages).toHaveLength(1);
       expect(conversation.messages[0].content).toBe('World');
     });
+
+    it('re-seeds metadata and prior messages when the file is deleted mid-session', async () => {
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'first message',
+        model: 'gemini-pro',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+
+      // Simulate an external cleanup or manual deletion while the session is
+      // still live. Before the fix the next append recreated the file with no
+      // metadata line, producing a "zombie" file that could never be parsed.
+      fs.unlinkSync(sessionFile);
+      expect(fs.existsSync(sessionFile)).toBe(false);
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'second message',
+        model: 'gemini-pro',
+      });
+
+      // The recreated file must still load as a valid session...
+      const conversation = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord | null;
+      expect(conversation).not.toBeNull();
+      const loaded = conversation as ConversationRecord;
+      expect(loaded.sessionId).toBe('test-session-id');
+      expect(loaded.projectHash).toBe('test-project-hash');
+      // ...and no message recorded before the deletion should be lost.
+      expect(loaded.messages).toHaveLength(2);
+      expect(loaded.messages[0].content).toBe('first message');
+      expect(loaded.messages[1].content).toBe('second message');
+    });
   });
 
   describe('recordThought', () => {
