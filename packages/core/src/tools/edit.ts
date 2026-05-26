@@ -28,7 +28,6 @@ import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { resolvePlanPath } from '../utils/planUtils.js';
 import { isNodeError } from '../utils/errors.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';

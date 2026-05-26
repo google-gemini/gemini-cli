@@ -11,7 +11,7 @@ import os from 'node:os';
 import {
   validatePlanPath,
   validatePlanContent,
-  resolvePlanPath,
+  resolveAndValidatePlanPath,
 } from './planUtils.js';
 
 describe('planUtils', () => {
@@ -80,9 +80,9 @@ describe('planUtils', () => {
     });
   });
 
-  describe('resolvePlanPath', () => {
+  describe('resolveAndValidatePlanPath', () => {
     it('should resolve simple filenames relative to plansDir', () => {
-      const result = resolvePlanPath(
+      const result = resolveAndValidatePlanPath(
         'implementation_plan.md',
         plansDir,
         tempRootDir,
@@ -97,7 +97,7 @@ describe('planUtils', () => {
         'fibsqrt_20260519',
         'spec.md',
       );
-      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
+      const result = resolveAndValidatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toBe(
         path.join(plansDir, 'tracks', 'fibsqrt_20260519', 'spec.md'),
       );
@@ -105,16 +105,17 @@ describe('planUtils', () => {
 
     it('should resolve paths relative to plansDir if they contain subdirectories', () => {
       const planPath = path.join('tracks', 'fibsqrt_20260519', 'spec.md');
-      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
+      const result = resolveAndValidatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toBe(
         path.join(plansDir, 'tracks', 'fibsqrt_20260519', 'spec.md'),
       );
     });
 
-    it('should fallback to safe basename when escaping', () => {
+    it('should throw access denied when escaping', () => {
       const planPath = '../../escaped.md';
-      const result = resolvePlanPath(planPath, plansDir, tempRootDir);
-      expect(result).toBe(path.join(plansDir, 'escaped.md'));
+      expect(() =>
+        resolveAndValidatePlanPath(planPath, plansDir, tempRootDir),
+      ).toThrow(/Access denied/);
     });
   });
 

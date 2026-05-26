@@ -22,6 +22,14 @@ export const PlanErrorMessages = {
   READ_FAILURE: (detail: string) => `Failed to read plan file: ${detail}`,
 } as const;
 
+/**
+ * Resolves a plan file path and strictly validates it against the plans directory boundary.
+ * Useful for tools that need to write or read plans.
+ * @param planPath The untrusted file path provided by the model.
+ * @param plansDir The authorized project plans directory.
+ * @returns The safely resolved path string.
+ * @throws Error if the path is empty, malicious, or escapes boundaries.
+ */
 export function resolveAndValidatePlanPath(
   planPath: string,
   plansDir: string,
