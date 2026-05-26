@@ -120,10 +120,6 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   convertColorToHex: () => '#000000',
   ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
-vi.mock('../utils/systemEncoding.js', () => ({
-  getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
-}));
-
 const mockProcessKill = vi
   .spyOn(process, 'kill')
   .mockImplementation(() => true);
@@ -213,7 +209,7 @@ describe('ShellExecutionService', () => {
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
-    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
+    mockResolveExecutable.mockImplementation((exe: string) => exe);
     process.env['PATH'] = '/test/path';
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },
@@ -1030,7 +1026,7 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Platform-Specific Behavior', () => {
-    it('should use powershell.exe on Windows', async () => {
+    it('should use powershell.exe on Windows and prefix the command with chcp 65001 for the PTY session', async () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (pty) =>
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
@@ -1038,8 +1034,16 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
-        expect.any(Object),
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'chcp 65001 >$null;dir "foo bar"',
+        ],
+        expect.objectContaining({
+          handleFlowControl: false,
+          useConpty: true,
+        }),
       );
     });
 
@@ -1055,7 +1059,9 @@ describe('ShellExecutionService', () => {
           '-c',
           'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
-        expect.any(Object),
+        expect.objectContaining({
+          handleFlowControl: true,
+        }),
       );
     });
   });
@@ -1648,7 +1654,7 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        ['-NoProfile', '-NonInteractive', '-Command', 'dir "foo bar"'],
         expect.objectContaining({
           shell: false,
           detached: false,
@@ -2064,7 +2070,7 @@ describe('ShellExecutionService environment variables', () => {
       sandboxManager: mockSandboxManager,
     };
 
-    mockResolveExecutable.mockResolvedValue('/bin/bash/resolved');
+    mockResolveExecutable.mockReturnValue('/bin/bash/resolved');
     const mockChild = new EventEmitter() as unknown as ChildProcess;
     mockChild.stdout = new EventEmitter() as unknown as Readable;
     mockChild.stderr = new EventEmitter() as unknown as Readable;

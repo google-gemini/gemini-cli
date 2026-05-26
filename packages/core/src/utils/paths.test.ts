@@ -19,6 +19,7 @@ import {
   deduplicateAbsolutePaths,
   toAbsolutePath,
   toPathKey,
+  isTrustedSystemPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -795,6 +796,126 @@ describe('normalizePath', () => {
 
       mockPlatform('linux');
       expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
+    });
+  });
+
+  describe('isTrustedSystemPath', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    });
+
+    it('should reject paths in the current working directory', () => {
+      const cwd = process.cwd();
+      expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      expect(isTrustedSystemPath(cwd)).toBe(false);
+    });
+
+    it('should not reject paths if the current working directory is the root directory', () => {
+      mockPlatform('linux');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('/');
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      process.cwd = originalCwd;
+    });
+
+    it('should not reject paths if the current working directory is a Windows root directory', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('C:\\');
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      process.cwd = originalCwd;
+      vi.unstubAllEnvs();
+    });
+
+    it('should allow trusted paths on Windows', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+      vi.stubEnv('ProgramFiles(x86)', 'C:\\Program Files (x86)');
+
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      expect(isTrustedSystemPath('C:\\Program Files\\ripgrep\\rg.exe')).toBe(
+        true,
+      );
+      expect(
+        isTrustedSystemPath('C:\\Program Files (x86)\\ripgrep\\rg.exe'),
+      ).toBe(true);
+
+      // Case insensitive
+      expect(isTrustedSystemPath('c:\\windows\\system32\\rg.exe')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('D:\\Downloads\\rg.exe')).toBe(false);
+      expect(isTrustedSystemPath('C:\\Users\\User\\rg.exe')).toBe(false);
+    });
+
+    it('should allow trusted paths on macOS and Linux', () => {
+      mockPlatform('darwin');
+
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/usr/local/bin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/opt/homebrew/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath('/opt/homebrew/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath('/usr/local/Cellar/ripgrep/13.0.0/bin/rg'),
+      ).toBe(true);
+      expect(isTrustedSystemPath('/usr/sbin/rg')).toBe(true);
+      expect(isTrustedSystemPath('/sbin/rg')).toBe(true);
+
+      // Untrusted paths
+      expect(isTrustedSystemPath('/home/user/bin/rg')).toBe(false);
+      expect(isTrustedSystemPath('/tmp/rg')).toBe(false);
+      expect(isTrustedSystemPath('/Library/rg')).toBe(false);
+    });
+
+    it('should allow 1P internal hermetic execution paths', () => {
+      mockPlatform('linux');
+
+      expect(isTrustedSystemPath('/google/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/bazel-out/k8-fastbuild/bin/rg',
+        ),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/blaze-out/k8-opt/bin/rg',
+        ),
+      ).toBe(true);
+    });
+
+    describe('in secure hermetic environments', () => {
+      const originalCwd = process.cwd;
+      const cwd = '/sandbox';
+
+      beforeEach(() => {
+        mockPlatform('linux');
+        process.cwd = vi.fn().mockReturnValue(cwd);
+      });
+
+      afterEach(() => {
+        process.cwd = originalCwd;
+        vi.unstubAllEnvs();
+      });
+
+      it('should reject paths in the CWD by default', () => {
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      });
+
+      it.each([
+        ['TEST_SRCDIR', '/mock/runfiles'],
+        ['BAZEL_TEST', '1'],
+        ['TEST_WORKSPACE', 'my_workspace'],
+        ['RUNFILES_DIR', '/mock/runfiles'],
+      ])('should bypass CWD rejection when %s is set', (envVar, value) => {
+        vi.stubEnv(envVar, value);
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      });
     });
   });
 });

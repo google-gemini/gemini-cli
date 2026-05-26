@@ -22,8 +22,8 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
-import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { AdaptiveTokenCalculator } from './utils/adaptiveTokenCalculator.js';
+import { estimateContextBreakdown } from '../core/loggingContentGenerator.js';
 import { NodeBehaviorRegistry } from './graph/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from './graph/builtinBehaviors.js';
 
@@ -92,10 +92,26 @@ export async function initializeContextManager(
   const behaviorRegistry = new NodeBehaviorRegistry();
   registerBuiltInBehaviors(behaviorRegistry);
 
+  const getOverheadTokens = () => {
+    const breakdown = estimateContextBreakdown([], {
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: chat.getSystemInstruction() }],
+      },
+      tools: chat.getTools(),
+    });
+    return (
+      breakdown.system_instructions +
+      breakdown.tool_definitions +
+      breakdown.mcp_servers
+    );
+  };
+
   const calculator = new AdaptiveTokenCalculator(
     charsPerToken,
     behaviorRegistry,
     eventBus,
+    getOverheadTokens,
   );
 
   const env = new ContextEnvironmentImpl(
@@ -119,7 +135,6 @@ export async function initializeContextManager(
     sidecarProfile.buildPipelines(env),
     sidecarProfile.buildAsyncPipelines(env),
     env,
-    eventBus,
     tracer,
   );
 
@@ -130,9 +145,5 @@ export async function initializeContextManager(
     orchestrator,
     chat.agentHistory,
     calculator,
-    async () => {
-      const parts = await getEnvironmentContext(config);
-      return { role: 'user', parts };
-    },
   );
 }

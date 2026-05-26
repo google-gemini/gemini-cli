@@ -440,7 +440,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       e &&
       typeof e === 'object' &&
       'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
+      (e.code === 'ENOENT' ||
+        e.code === 'EISDIR' ||
+        e.code === 'ENAMETOOLONG' ||
+        e.code === 'ENOTDIR')
     ) {
       try {
         const stat = fs.lstatSync(p);
@@ -457,7 +460,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+            (lstatError.code === 'ENOENT' ||
+              lstatError.code === 'EISDIR' ||
+              lstatError.code === 'ENAMETOOLONG' ||
+              lstatError.code === 'ENOTDIR')
           )
         ) {
           throw lstatError;
@@ -511,4 +517,58 @@ export function toPathKey(p: string): string {
   const platform = process.platform;
   const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
   return isCaseInsensitive ? norm.toLowerCase() : norm;
+}
+
+/**
+ * Verifies if a path is a trusted system directory.
+ */
+export function isTrustedSystemPath(filePath: string): boolean {
+  const normPath = normalizePath(filePath);
+
+  // 1. Explicitly reject paths in current working directory to prevent RCE
+  // Exclude root directories to avoid inadvertently rejecting all system paths.
+  // Bypass this restriction in secure, hermetic environments (e.g., Bazel/Blaze).
+  const isHermeticEnv =
+    !!process.env['TEST_SRCDIR'] ||
+    !!process.env['TEST_WORKSPACE'] ||
+    !!process.env['BAZEL_TEST'] ||
+    !!process.env['RUNFILES_DIR'];
+
+  const normCwd = normalizePath(process.cwd());
+  const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
+  if (!isRoot && isSubpath(normCwd, normPath)) {
+    return isHermeticEnv;
+  }
+
+  // 2. Allow standard system directories
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const trustedPrefixes = [
+      process.env['SystemRoot'] || 'C:\\Windows',
+      process.env['ProgramFiles'] || 'C:\\Program Files',
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  } else {
+    const trustedPrefixes = [
+      '/usr/bin',
+      '/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/Cellar',
+      '/usr/local/Cellar',
+      '/usr/sbin',
+      '/sbin',
+      // 1P internal hermetic execution paths
+      '/google/bin',
+      '/google/src/cloud',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  }
 }

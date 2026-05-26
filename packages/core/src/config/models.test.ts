@@ -34,6 +34,7 @@ import {
   isProModel,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+  getAutoModelDescription,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -670,5 +671,57 @@ describe('isActiveModel', () => {
     expect(
       isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false),
     ).toBe(false);
+  });
+});
+
+describe('Gemini 3.1 Config Resolution', () => {
+  it('PREVIEW_GEMINI_3_1_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+
+  it('PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+
+  it('PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL should resolve to chat-base-3 config (including thinkingLevel)', () => {
+    const resolved = modelConfigService.getResolvedConfig({
+      model: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+      isChatModel: true,
+    });
+    expect(
+      resolved.generateContentConfig?.thinkingConfig?.thinkingLevel,
+    ).toBeDefined();
+  });
+});
+
+describe('getAutoModelDescription', () => {
+  it('should return Gemini 2.5 description when hasAccessToPreview is false', () => {
+    const desc = getAutoModelDescription(false, false);
+    expect(desc).toContain('gemini-2.5-pro');
+    expect(desc).toContain('gemini-2.5-flash');
+  });
+
+  it('should return Gemini 3.0 description when hasAccessToPreview is true', () => {
+    const desc = getAutoModelDescription(true, false);
+    expect(desc).toContain('gemini-3-pro');
+    expect(desc).toContain('gemini-3-flash');
+  });
+
+  it('should return Gemini 3.1 description when hasAccessToPreview and useGemini3_1 are true', () => {
+    const desc = getAutoModelDescription(true, true);
+    expect(desc).toContain('gemini-3.1-pro');
+    expect(desc).toContain('gemini-3-flash');
   });
 });

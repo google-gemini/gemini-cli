@@ -18,6 +18,21 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.43.0 - 2026-05-22
+
+- **Surgical Code Edits:** Steered Gemini models to prefer the `edit` tool for
+  surgical modifications, improving speed and precision
+  ([#26480](https://github.com/google-gemini/gemini-cli/pull/26480) by
+  @aishaneeshah).
+- **Session Export and Import:** Added the ability to export sessions to files
+  and import them via a new flag, facilitating session portability
+  ([#26514](https://github.com/google-gemini/gemini-cli/pull/26514) by
+  @cocosheng-g).
+- **Adaptive Token Estimation:** Introduced an adaptive token calculator for
+  more accurate content size estimation, enhancing context management efficiency
+  ([#26888](https://github.com/google-gemini/gemini-cli/pull/26888) by
+  @joshualitt).
+
 ## Announcements: v0.42.0 - 2026-05-12
 
 - **Auto Memory Inbox:** Introduced a new inbox flow for Auto Memory with a

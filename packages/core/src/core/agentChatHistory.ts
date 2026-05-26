@@ -6,66 +6,68 @@
 
 import type { Content } from '@google/genai';
 
-export type HistoryEventType = 'PUSH' | 'SYNC_FULL' | 'CLEAR' | 'SILENT_SYNC';
-
-export interface HistoryEvent {
-  type: HistoryEventType;
-  payload: readonly Content[];
+/**
+ * A durable wrapper for Gemini Content that carries a stable ID.
+ * This ID is preserved across all transformations and is used as the anchor
+ * for context graph node identity.
+ */
+export interface HistoryTurn {
+  readonly id: string;
+  readonly content: Content;
 }
 
-export type HistoryListener = (event: HistoryEvent) => void;
-
+/**
+ * The 'Strong Owner' of chat history turns.
+ * It ensures that every turn in the session is associated with a durable ID.
+ */
 export class AgentChatHistory {
-  private history: Content[];
-  private listeners: Set<HistoryListener> = new Set();
+  private history: HistoryTurn[] = [];
 
-  constructor(initialHistory: Content[] = []) {
-    this.history = [...initialHistory];
+  constructor(initialTurns: HistoryTurn[] = []) {
+    this.history = [...initialTurns];
   }
 
-  subscribe(listener: HistoryListener): () => void {
-    this.listeners.add(listener);
-    // Emit initial state to new subscriber
-    listener({ type: 'SYNC_FULL', payload: this.history });
-    return () => this.listeners.delete(listener);
+  /**
+   * Adds a new turn to the history.
+   * Every turn must have a durable ID, usually provided by the ChatRecordingService.
+   */
+  push(turn: HistoryTurn) {
+    this.history.push(turn);
   }
 
-  private notify(type: HistoryEventType, payload: readonly Content[]) {
-    const event: HistoryEvent = { type, payload };
-    for (const listener of this.listeners) {
-      listener(event);
-    }
-  }
-
-  push(content: Content) {
-    this.history.push(content);
-    this.notify('PUSH', [content]);
-  }
-
-  set(history: readonly Content[], options: { silent?: boolean } = {}) {
-    this.history = [...history];
-    this.notify(options.silent ? 'SILENT_SYNC' : 'SYNC_FULL', this.history);
+  /**
+   * Overwrites the entire history with a new list of turns.
+   */
+  set(turns: readonly HistoryTurn[]) {
+    this.history = [...turns];
   }
 
   clear() {
     this.history = [];
-    this.notify('CLEAR', []);
   }
 
-  get(): readonly Content[] {
+  get(): readonly HistoryTurn[] {
     return this.history;
   }
 
-  map(callback: (value: Content, index: number, array: Content[]) => Content) {
-    this.history = this.history.map(callback);
-    this.notify('SYNC_FULL', this.history);
+  /**
+   * Returns a copy of the raw Gemini Content[] for API consumption.
+   */
+  getContents(): Content[] {
+    return this.history.map((h) => h.content);
+  }
+
+  map<U>(
+    callback: (value: HistoryTurn, index: number, array: HistoryTurn[]) => U,
+  ): U[] {
+    return this.history.map(callback);
   }
 
   flatMap<U>(
     callback: (
-      value: Content,
+      value: HistoryTurn,
       index: number,
-      array: Content[],
+      array: HistoryTurn[],
     ) => U | readonly U[],
   ): U[] {
     return this.history.flatMap(callback);

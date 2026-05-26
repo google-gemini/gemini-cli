@@ -52,7 +52,7 @@ import { ShellTool } from '../tools/shell.js';
 import { AgentTool } from '../agents/agent-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import { RipGrepTool, resolveRipgrepPath } from '../tools/ripGrep.js';
 import {
   logRipgrepFallback,
   logApprovalModeDuration,
@@ -89,6 +89,22 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    resolveToRealPath: vi.fn((p) => p),
+  };
+});
+
+vi.mock('../utils/fileUtils.js', () => ({
+  fileExists: vi.fn(),
+}));
+
+vi.mock('../utils/shell-utils.js', () => ({
+  resolveExecutable: vi.fn(),
+}));
+
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
@@ -111,16 +127,12 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   })),
 }));
 
-vi.mock('../utils/memoryDiscovery.js', () => ({
-  loadServerHierarchicalMemory: vi.fn(),
-}));
-
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
 vi.mock('../tools/read-file');
 vi.mock('../tools/grep.js');
 vi.mock('../tools/ripGrep.js', () => ({
-  canUseRipgrep: vi.fn(),
+  resolveRipgrepPath: vi.fn(),
   RipGrepTool: class MockRipGrepTool {},
 }));
 vi.mock('../tools/glob');
@@ -129,13 +141,15 @@ vi.mock('../tools/shell');
 vi.mock('../tools/write-file');
 vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
-vi.mock('../tools/memoryTool', () => ({
-  MemoryTool: vi.fn(),
-  setGeminiMdFilename: vi.fn(),
-  getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
-  DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
-  GEMINI_DIR: '.gemini',
-}));
+vi.mock('../tools/memoryTool', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../tools/memoryTool.js')>();
+  return {
+    ...actual,
+    setGeminiMdFilename: vi.fn(),
+    getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'),
+  };
+});
 
 vi.mock('../core/contentGenerator.js');
 
@@ -847,6 +861,16 @@ describe('Server Config (config.ts)', () => {
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should clear fallback overrides when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getFallbackOverride('failed-model')).toBeUndefined();
     });
 
     it('should pass Vertex AI routing settings when refreshing auth', async () => {
@@ -1888,6 +1912,21 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  it('clears fallback overrides when session changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    await config.initialize();
+
+    config.activateFallbackMode('fallback-model', 'failed-model');
+    expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+    config.setSessionId('session-two');
+
+    expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+  });
+
   it('does not throw when changing sessions before the previous plans dir exists', async () => {
     const config = new Config({
       ...baseParams,
@@ -2005,7 +2044,6 @@ describe('Server Config (config.ts)', () => {
     expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
     expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
     expect(configInternal.lastQuotaFetchTime).toBe(0);
-    expect(configInternal.hasAccessToPreviewModel).toBeNull();
 
     // Event emission
     expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
@@ -2288,7 +2326,7 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
-      vi.mocked(canUseRipgrep).mockResolvedValue(true);
+      vi.mocked(resolveRipgrepPath).mockResolvedValue('/mock/rg');
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2306,7 +2344,7 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
-      vi.mocked(canUseRipgrep).mockResolvedValue(false);
+      vi.mocked(resolveRipgrepPath).mockResolvedValue(null);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2330,7 +2368,7 @@ describe('setApprovalMode with folder trust', () => {
 
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
       const error = new Error('ripGrep check failed');
-      vi.mocked(canUseRipgrep).mockRejectedValue(error);
+      vi.mocked(resolveRipgrepPath).mockRejectedValue(error);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2366,7 +2404,7 @@ describe('setApprovalMode with folder trust', () => {
 
       expect(wasRipGrepRegistered).toBe(false);
       expect(wasGrepRegistered).toBe(true);
-      expect(canUseRipgrep).not.toHaveBeenCalled();
+      expect(resolveRipgrepPath).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
     });
   });
@@ -2700,6 +2738,16 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('should preserve fallback overrides when setting a new model', () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      config.setModel('new-model');
+
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
     });
 
     it('should allow setting auto model from auto model and reset availability', () => {
@@ -3237,8 +3285,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -3247,8 +3295,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Never set => stays null (unknown); getter returns true so UI shows preview
-      expect(config.getHasAccessToPreviewModel()).toBe(true);
+      // Never set => stays null (unknown); getter returns false by default
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
     });
     it('should derive quota from remainingFraction when remainingAmount is missing', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
@@ -3464,6 +3512,53 @@ describe('Config Quota & Preview Model Access', () => {
       expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });
   });
+
+  describe('validatePathAccess (PathValidator integration)', () => {
+    it('should reject pathologically long paths', () => {
+      const config = new Config(baseParams);
+      const longPath = path.join(baseParams.targetDir, 'a'.repeat(5000));
+      const result = config.validatePathAccess(longPath, 'read');
+      expect(result).toContain('Invalid path: Path is too long');
+    });
+
+    it('should reject paths with log markers', () => {
+      const config = new Config(baseParams);
+      const logPath = path.join(
+        baseParams.targetDir,
+        'AssertionError: expected true to be false',
+      );
+      const result = config.validatePathAccess(logPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path appears to be a misinterpreted log fragment',
+      );
+    });
+
+    it('should reject paths with control characters', () => {
+      const config = new Config(baseParams);
+      const malformedPath = path.join(
+        baseParams.targetDir,
+        'file\nwith\nnewline.txt',
+      );
+      const result = config.validatePathAccess(malformedPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path contains invalid characters',
+      );
+    });
+
+    it('should allow normal paths', () => {
+      const config = new Config(baseParams);
+      const normalPath = path.resolve(baseParams.targetDir, 'src/index.ts');
+      const result = config.validatePathAccess(normalPath, 'read');
+
+      // It might return "Path not in workspace" or similar if not authorized,
+      // but it should NOT return the "Invalid path" prefix from PathValidator.
+      if (result) {
+        expect(result).not.toContain('Invalid path:');
+      } else {
+        expect(result).toBeNull();
+      }
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
@@ -3487,13 +3582,12 @@ describe('Config JIT Initialization', () => {
     );
   });
 
-  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
       debugMode: false,
       model: 'test-model',
-      experimentalJitContext: true,
       userMemory: 'Initial Memory',
       cwd: '/tmp/test',
     };
@@ -3540,78 +3634,17 @@ describe('Config JIT Initialization', () => {
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
-    const params: ConfigParameters = {
-      sessionId: 'test-session',
-      targetDir: '/tmp/test',
-      debugMode: false,
-      model: 'test-model',
-      experimentalJitContext: false,
-      userMemory: 'Initial Memory',
-      cwd: '/tmp/test',
-    };
-
-    config = new Config(params);
-    await config.initialize();
-
-    expect(MemoryContextManager).not.toHaveBeenCalled();
-    expect(config.getUserMemory()).toBe('Initial Memory');
-  });
-
-  describe('isMemoryV2Enabled', () => {
-    it('should default to true', () => {
+  describe('memory path access', () => {
+    it('should NOT add the global ~/.gemini directory to the workspace', async () => {
+      // Memory does not broaden the workspace to include the global ~/.gemini/
+      // directory. Cross-project personal preferences are routed to
+      // ~/.gemini/GEMINI.md via the surgical isPathAllowed allowlist instead.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should return false when experimentalMemoryV2 is explicitly false', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: false,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(false);
-    });
-
-    it('should return true when experimentalMemoryV2 is true', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
-    });
-
-    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
-      // The prompt-driven memoryV2 mode does not broaden the workspace
-      // to include the global ~/.gemini/ directory. Cross-project personal
-      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
-      // isPathAllowed allowlist instead — see the next two tests.
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3622,16 +3655,15 @@ describe('Config JIT Initialization', () => {
     });
 
     it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
-      // Surgical allowlist: when memoryV2 is on, the prompt routes
-      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
-      // agent must be able to edit that exact file via edit/write_file.
+      // Surgical allowlist: the prompt routes cross-project personal
+      // preferences to ~/.gemini/GEMINI.md, so the agent must be able to edit
+      // that exact file via edit/write_file.
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3653,7 +3685,6 @@ describe('Config JIT Initialization', () => {
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
@@ -3945,18 +3976,16 @@ describe('Config JIT Initialization', () => {
       expect(config.getExperimentalGemma()).toBe(true);
     });
 
-    it('should be independent of experimentalMemoryV2', () => {
+    it('should default to disabled', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryV2Enabled()).toBe(true);
       expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });

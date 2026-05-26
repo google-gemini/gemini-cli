@@ -197,11 +197,24 @@ async function calculateFlexibleReplacement(
     );
 
     if (isMatch) {
-      matchIndices.push(i);
-      i += searchLinesStripped.length;
-    } else {
-      i++;
+      flexibleOccurrences++;
+      const firstLineInMatch = window[0];
+      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+      const newBlockWithIndent = applyIndentation(replaceLines, indentation);
+
+      let replacementText = newBlockWithIndent.join('\n');
+      if (
+        new_string !== '' &&
+        window[window.length - 1].endsWith('\n') &&
+        !replacementText.endsWith('\n')
+      ) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(i, searchLinesStripped.length, replacementText);
     }
+    i++;
   }
 
   if (matchIndices.length > 0) {
