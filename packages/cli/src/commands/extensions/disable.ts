@@ -9,6 +9,7 @@ import { loadSettings, SettingScope } from '../../config/settings.js';
 import {
   coreEvents,
   debugLogger,
+  FatalConfigError,
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -49,10 +50,7 @@ export async function handleDisable(args: DisableArgs) {
       `Extension "${args.name}" successfully disabled for scope "${scopeLabel}".`,
     );
   } catch (error) {
-    const message = getErrorMessage(error);
-    coreEvents.emitConsoleLog('error', message);
-    debugLogger.error(message);
-    process.exit(1);
+    throw new FatalConfigError(getErrorMessage(error));
   }
 }
 
