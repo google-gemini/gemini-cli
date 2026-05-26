@@ -213,6 +213,7 @@ Another paragraph.
         { path: '', settings: {}, originalSettings: {} },
         true,
         [],
+        '',
       );
 
       const { lastFrame, unmount } = await renderWithProviders(
