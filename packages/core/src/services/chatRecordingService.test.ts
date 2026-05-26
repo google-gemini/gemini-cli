@@ -967,6 +967,46 @@ describe('ChatRecordingService', () => {
       expect(result).not.toBeNull();
       expect(result!.messages).toHaveLength(1);
     });
+
+    it('preserves the rewound history when the file was deleted mid-session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'msg1',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'msg2',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'msg3',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const before = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+      const secondMsgId = before.messages[1].id;
+
+      // Delete the file mid-session, then rewind. The re-seeded snapshot already
+      // reflects the rewound state, so the $rewindTo delta must not be replayed
+      // on top of it: its target message is gone from the snapshot, and on load
+      // an unmatched $rewindTo clears the entire history.
+      fs.unlinkSync(sessionFile);
+      chatRecordingService.rewindTo(secondMsgId);
+
+      const conversation = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord | null;
+      expect(conversation).not.toBeNull();
+      const loaded = conversation as ConversationRecord;
+      expect(loaded.messages).toHaveLength(1);
+      expect(loaded.messages[0].content).toBe('msg1');
+    });
   });
 
   describe('ENOSPC (disk full) graceful degradation - issue #16266', () => {
