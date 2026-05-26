@@ -19,6 +19,7 @@ export interface RenderOptions {
 
 export interface ContextEnvironment {
   readonly llmClient: BaseLlmClient;
+  readonly model: string;
   readonly promptId: string;
   readonly sessionId: string;
   readonly traceDir: string;

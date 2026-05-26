@@ -181,7 +181,8 @@ export function createMockEnvironment(
 
   let env = new ContextEnvironmentImpl(
     () => llmClient as BaseLlmClient,
-    'mock-session',
+    () => 'mock-session',
+    'mock-model',
     'mock-prompt-id',
     '/tmp/.gemini/trace',
     '/tmp/.gemini/tool-outputs',
@@ -196,6 +197,7 @@ export function createMockEnvironment(
     if (overrides.llmClient) {
       env = new ContextEnvironmentImpl(
         () => overrides.llmClient!,
+        () => overrides.model!,
         env.sessionId,
         env.promptId,
         env.traceDir,
@@ -276,6 +278,7 @@ export function createMockContextConfig(
     getTargetDir: vi.fn().mockReturnValue('/tmp'),
     getSessionId: vi.fn().mockReturnValue('test-session'),
     getExperimentalContextManagementConfig: vi.fn().mockReturnValue(undefined),
+    getActiveModel: vi.fn().mockReturnValue('mock-model'),
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -303,6 +306,7 @@ export function setupContextComponentTest(
 
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
+    () => config.getActiveModel(),
     'test prompt-id',
     'test-session',
     '/tmp',
