@@ -4406,7 +4406,7 @@ describe('InputPrompt', () => {
         <TestInputPrompt {...props} />,
       );
       await waitFor(() => {
-        expect(stdout.lastFrame()).toContain('[🖼️');
+        expect(stdout.lastFrame()).toContain('[Image');
       });
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();

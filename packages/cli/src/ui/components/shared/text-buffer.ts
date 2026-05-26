@@ -936,7 +936,7 @@ export function getTransformedImagePath(filePath: string): string {
       ? `...${baseName.slice(-maxBaseLength)}`
       : baseName;
 
-  return `[🖼️ ${truncatedBase}${extension}]`;
+  return `[Image ${truncatedBase}${extension}]`;
 }
 
 const transformationsCache = new LRUCache<string, Transformation[]>(
