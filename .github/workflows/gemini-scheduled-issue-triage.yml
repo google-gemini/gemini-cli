@@ -29,6 +29,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: 'Install Utilities'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+      - name: 'Get Current Version'
+        id: 'get_version'
+        run: |
+          VERSION=$(jq -r .version package.json | cut -d'-' -f1)
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "🚀 Current CLI Version: ${VERSION}"
+
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
@@ -163,6 +175,7 @@ jobs:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+          CLI_VERSION: '${{ steps.get_version.outputs.version }}'
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GEMINI_EXP: 'gemini_exp.json'
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
@@ -222,9 +235,9 @@ jobs:
                ]
                ```
               If an issue cannot be classified, do not include it in the output array.
-            9. For each issue, carefully check if the CLI version is present. It is usually found under the "### Client information" header, as a bullet point (e.g., "• CLI Version: 0.33.1"), or in the output of the `/about` command.
-              - If the version is provided but is more than 6 minor versions older than the most recent release, apply the status/need-information label and leave a comment politely asking the user to verify if the issue persists in the latest version.
-            10. If the issue does not have sufficient information, recommend the status/need-information label and leave a comment politely requesting the missing details. For example, if repro steps are missing, ask for them; if the CLI version is completely missing, ask for the version information in the explanation section below. Do not ask for version info if it is already in the issue body.
+            9. For each issue, carefully check if the CLI version is present. It is usually found under the "### Client information" header, as a bullet point (e.g., "• CLI Version: 0.33.1", "* **CLI Version:** 0.42.0"), or in the output of the `/about` command.
+              - **Only for issues classified as kind/bug:** If the version is provided but is more than 6 minor versions older than the most recent release (current version is ${{ steps.get_version.outputs.version }}), apply the status/need-information label and leave a comment politely asking the user to verify if the issue persists in the latest version.
+            10. **Only for issues classified as kind/bug:** If the issue does not have sufficient information, recommend the status/need-information label and leave a comment politely requesting the missing details. For example, if repro steps are missing, ask for them; if the CLI version is completely missing, ask for the version information in the explanation section below. Do not ask for version info if it is already in the issue body. (Check both bullet points and bold text). For features and enhancements, the CLI version is NOT required.
             11. If you think an issue is a Priority/P0, you MUST apply the priority/p1 label AND the status/manual-triage label, and include a note in your explanation that it likely requires P0 escalation.
             12. If the issue is highly ambiguous, completely lacks a description, or you are torn between two lower priorities (like P2 vs P3), you MUST retain the existing priority label if one is already present. Do not toggle the priority if you do not have enough information to make a definitive change.
             13. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
@@ -284,6 +297,7 @@ jobs:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+          CLI_VERSION: '${{ steps.get_version.outputs.version }}'
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GEMINI_EXP: 'gemini_exp.json'
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
@@ -298,7 +312,7 @@ jobs:
           use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
           settings: |-
             {
-              "maxSessionTurns": 25,
+              "maxSessionTurns": 30,
               "coreTools": [
                 "run_shell_command(echo)",
                 "grep_search",
@@ -392,30 +406,14 @@ jobs:
             - This product is designed to use different models eg.. using pro, downgrading to flash etc.
             - When users report that they dont expect the model to change those would be categorized as feature requests.
 
-      - name: 'Apply Standard Labels to Issues'
+      - name: 'Apply Triaged Labels'
         if: |-
-          ${{ steps.gemini_standard_issue_analysis.outcome == 'success' &&
-              steps.gemini_standard_issue_analysis.outputs.summary != '[]' &&
-              steps.gemini_standard_issue_analysis.outputs.summary != '' }}
+          always() &&
+          ( (steps.gemini_standard_issue_analysis.outcome == 'success' && steps.gemini_standard_issue_analysis.outputs.summary != '[]' && steps.gemini_standard_issue_analysis.outputs.summary != '') ||
+            (steps.gemini_effort_issue_analysis.outcome == 'success' && steps.gemini_effort_issue_analysis.outputs.summary != '[]' && steps.gemini_effort_issue_analysis.outputs.summary != '') )
         env:
-          REPOSITORY: '${{ github.repository }}'
-          LABELS_OUTPUT: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
-          SUPPRESS_COMMENT: 'true'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
-        with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
-          script: |-
-            const applyLabels = require('./.github/scripts/apply-issue-labels.cjs');
-            await applyLabels({ github, context, core });
-
-      - name: 'Apply Effort Labels to Issues'
-        if: |-
-          ${{ steps.gemini_effort_issue_analysis.outcome == 'success' &&
-              steps.gemini_effort_issue_analysis.outputs.summary != '[]' &&
-              steps.gemini_effort_issue_analysis.outputs.summary != '' }}
-        env:
-          REPOSITORY: '${{ github.repository }}'
-          LABELS_OUTPUT: '${{ steps.gemini_effort_issue_analysis.outputs.summary }}'
+          LABELS_OUTPUT_STANDARD: '${{ steps.gemini_standard_issue_analysis.outputs.summary }}'
+          LABELS_OUTPUT_EFFORT: '${{ steps.gemini_effort_issue_analysis.outputs.summary }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
