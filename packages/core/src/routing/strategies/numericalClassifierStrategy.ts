@@ -142,6 +142,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         ? context.request
         : [context.request];
 
+      // Bypass the classifier if the request is a function response and history is empty.
+      // Since we prune leading tool turns, if the history becomes empty, sending a
+      // function response request would result in an invalid payload (starts with function response).
+      if (
+        finalHistory.length === 0 &&
+        isFunctionResponse(createUserContent(context.request))
+      ) {
+        debugLogger.log(
+          '[Routing] Bypassing NumericalClassifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
+
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
           return { text: part };
