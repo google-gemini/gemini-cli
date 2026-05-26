@@ -438,19 +438,23 @@ ${strippedScreen}
         if (false) /* Disabled dynamic knowledge generation for evaluation stability */ {
           const newKnowledge = `- ${parsedJson.new_rule}\n`;
           this.knowledgeBase += newKnowledge;
-          try {
-            fs.appendFileSync(this.editableKnowledgeFile, newKnowledge);
-            debugLogger.log(
-              `[SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}`,
-            );
-            if (this.interactionsFile) {
-              fs.appendFileSync(
-                this.interactionsFile,
-                `[LOG] [SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}\n\n`,
+          const file = this.editableKnowledgeFile;
+          const logFile = this.interactionsFile;
+          if (file) {
+            try {
+              fs.appendFileSync(file, newKnowledge);
+              debugLogger.log(
+                `[SIMULATOR] Saved new knowledge to ${file}`,
               );
+              if (logFile) {
+                fs.appendFileSync(
+                  logFile,
+                  `[LOG] [SIMULATOR] Saved new knowledge to ${file}\n\n`,
+                );
+              }
+            } catch (e) {
+              debugLogger.error(`Failed to append knowledge`, e);
             }
-          } catch (e) {
-            debugLogger.error(`Failed to append knowledge`, e);
           }
         }
 
