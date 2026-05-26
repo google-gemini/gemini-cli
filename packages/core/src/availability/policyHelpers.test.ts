@@ -30,7 +30,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     getGemini31LaunchedSync: () => false,
-    getGemini31FlashLiteLaunchedSync: () => false,
     getUseCustomToolModelSync: () => {
       const useGemini31 = config.getGemini31LaunchedSync();
       const authType = config.getContentGeneratorConfig().authType;
@@ -114,7 +113,7 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_FLASH_LITE_MODEL);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
@@ -125,7 +124,7 @@ describe('policyHelpers', () => {
       });
       const chain = resolvePolicyChain(config);
       expect(chain).toHaveLength(3);
-      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[0]?.model).toBe('gemini-3.1-flash-lite');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
       expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
@@ -227,7 +226,6 @@ describe('policyHelpers', () => {
               getExperimentalDynamicModelConfiguration: () => dynamic,
               getModel: () => model,
               getGemini31LaunchedSync: () => useGemini31 ?? false,
-              getGemini31FlashLiteLaunchedSync: () => false,
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
               getReleaseChannel: () => 'preview',
