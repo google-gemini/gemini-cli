@@ -440,15 +440,15 @@ ${strippedScreen}
           this.knowledgeBase += newKnowledge;
           const file = this.editableKnowledgeFile;
           const logFile = this.interactionsFile;
-          if (file) {
+          if (file !== null) {
             try {
-              fs.appendFileSync(file, newKnowledge);
+              fs.appendFileSync(file!, newKnowledge);
               debugLogger.log(
                 `[SIMULATOR] Saved new knowledge to ${file}`,
               );
-              if (logFile) {
+              if (logFile !== null) {
                 fs.appendFileSync(
-                  logFile,
+                  logFile!,
                   `[LOG] [SIMULATOR] Saved new knowledge to ${file}\n\n`,
                 );
               }
