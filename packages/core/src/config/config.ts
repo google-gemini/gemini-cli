@@ -2051,7 +2051,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       model,
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2091,7 +2090,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2107,7 +2105,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2123,7 +2120,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -3514,15 +3510,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   * This method is async and ensures that experiments are loaded before returning the result.
-   */
-  async getGemini31FlashLiteLaunched(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-    return this.getGemini31FlashLiteLaunchedSync();
-  }
-
-  /**
    * Returns whether the custom tool model should be used.
    */
   async getUseCustomToolModel(): Promise<boolean> {
@@ -3581,24 +3568,6 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     return undefined;
-  }
-
-  /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   *
-   * Note: This method should only be called after startup, once experiments have been loaded.
-   * If you need to call this during startup or from an async context, use
-   * getGemini31FlashLiteLaunched instead.
-   */
-  getGemini31FlashLiteLaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    if (this.isGemini31LaunchedForAuthType(authType)) {
-      return true;
-    }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
-        ?.boolValue ?? false
-    );
   }
 
   /**
