@@ -28,7 +28,7 @@ jobs:
 
       - name: 'Run Docs Audit with Gemini'
         id: 'run_gemini'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489'
         env:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
