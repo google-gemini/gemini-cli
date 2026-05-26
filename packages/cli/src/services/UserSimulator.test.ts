@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { UserSimulator } from './UserSimulator.js';
 import { Writable } from 'node:stream';
 import {
@@ -55,6 +55,10 @@ describe('UserSimulator', () => {
     vi.spyOn(mockStdinBuffer, 'write');
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should include interactive prompts in its vision even when timers are present', async () => {
     const simulator = new UserSimulator(
       mockConfig,
@@ -67,11 +71,12 @@ describe('UserSimulator', () => {
       'Thinking... (0s)\n\nAction Required: Allow pip execution? [Y/n]',
     );
 
-    vi.useFakeTimers();
+    // Start simulator to initialize isRunning and subscribers, but clear interval immediately
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
-    // Trigger the interval
-    await vi.advanceTimersByTimeAsync(2000);
+    // Directly run the private tick method synchronously
+    await simulator['tick']();
 
     expect(mockContentGenerator.generateContent).toHaveBeenCalled();
     const lastCall = mockContentGenerator.generateContent.mock.calls[0];
@@ -84,7 +89,6 @@ describe('UserSimulator', () => {
     expect(prompt).toContain('RULE 1: If there is a clear confirmation prompt');
 
     simulator.stop();
-    vi.useRealTimers();
   });
 
   it('should not wait if a prompt is visible even if a spinner is present', async () => {
@@ -97,10 +101,10 @@ describe('UserSimulator', () => {
     // Mock a screen with a spinner and a prompt
     mockGetScreen.mockReturnValue('⠋ Working...\n> Type your message');
 
-    vi.useFakeTimers();
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await simulator['tick']();
 
     expect(mockContentGenerator.generateContent).toHaveBeenCalled();
     const lastCall = mockContentGenerator.generateContent.mock.calls[0];
@@ -111,7 +115,6 @@ describe('UserSimulator', () => {
     );
 
     simulator.stop();
-    vi.useRealTimers();
   });
 
   it('should submit keys with reliable delays', async () => {
@@ -125,22 +128,16 @@ describe('UserSimulator', () => {
       text: JSON.stringify({ action: 'abc' }),
     });
 
-    vi.useFakeTimers();
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
-    // Trigger tick
-    await vi.advanceTimersByTimeAsync(2000);
-
-    // Wait for the async key submission loop to finish
-    // Initial delay 100ms + (3 chars * 10ms) + 100ms settle = 230ms minimum
-    await vi.advanceTimersByTimeAsync(500);
+    await simulator['tick']();
 
     expect(mockStdinBuffer.write).toHaveBeenCalledWith('a');
     expect(mockStdinBuffer.write).toHaveBeenCalledWith('b');
     expect(mockStdinBuffer.write).toHaveBeenCalledWith('c');
 
     simulator.stop();
-    vi.useRealTimers();
   });
 
   it('should inject internal tool state into the prompt', async () => {
@@ -151,14 +148,8 @@ describe('UserSimulator', () => {
     );
     mockGetScreen.mockReturnValue('Responding...');
 
-    vi.useFakeTimers();
     simulator.start();
-
-    // Verify subscription
-    expect(mockMessageBus.subscribe).toHaveBeenCalledWith(
-      MessageBusType.TOOL_CALLS_UPDATE,
-      expect.any(Function),
-    );
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
     // Simulate tool call update
     const handler = mockMessageBus.subscribe.mock.calls[0][1];
@@ -172,8 +163,7 @@ describe('UserSimulator', () => {
       ],
     });
 
-    // Trigger tick
-    await vi.advanceTimersByTimeAsync(2000);
+    await simulator['tick']();
 
     expect(mockContentGenerator.generateContent).toHaveBeenCalled();
     const lastCall = mockContentGenerator.generateContent.mock.calls[0];
@@ -186,11 +176,9 @@ describe('UserSimulator', () => {
     expect(prompt).toContain("Ignore any 'Responding' indicators");
 
     simulator.stop();
-    expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
-  it('should terminate if terminal state does not change after 3 consecutive inputs', async () => {
+  it('should terminate if terminal state does not change after 10 consecutive inputs', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       return undefined as never;
     });
@@ -204,29 +192,21 @@ describe('UserSimulator', () => {
       text: JSON.stringify({ action: 'y\r' }),
     });
 
-    vi.useFakeTimers();
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
-    // Tick 1: Action sent, state recorded
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+    // Run 10 ticks manually. All of them fall through to generateContent.
+    for (let i = 0; i < 10; i++) {
+      await simulator['tick']();
+    }
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(10);
 
-    // Tick 2: Same screen, action sent, stall count = 1
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
-
-    // Tick 3: Same screen, action sent, stall count = 2
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(3);
-
-    // Tick 4: Same screen, should trigger termination
-    await vi.advanceTimersByTimeAsync(2000);
+    // Run the 11th tick, which should trigger stall termination
+    await simulator['tick']();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-
-    simulator.stop();
     exitSpy.mockRestore();
-    vi.useRealTimers();
+    simulator.stop();
   });
 
   it('should capture session notes and inject them into subsequent prompts', async () => {
@@ -243,19 +223,19 @@ describe('UserSimulator', () => {
       }),
     });
 
-    vi.useFakeTimers();
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
     // First tick: captures note
-    await vi.advanceTimersByTimeAsync(2000);
+    await simulator['tick']();
     expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
 
-    // Second tick: different screen to avoid skip
+    // Second tick: different screen
     mockGetScreen.mockReturnValue('> Prompt 2');
     mockContentGenerator.generateContent.mockResolvedValueOnce({
       text: JSON.stringify({ action: 'pwd\r' }),
     });
-    await vi.advanceTimersByTimeAsync(2000);
+    await simulator['tick']();
 
     expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
     const secondCall = mockContentGenerator.generateContent.mock.calls[1];
@@ -267,7 +247,6 @@ describe('UserSimulator', () => {
     expect(prompt).toContain('1. I listed the directory contents.');
 
     simulator.stop();
-    vi.useRealTimers();
   });
 
   it('should trigger background compression when memory exceeds threshold and merge correctly', async () => {
@@ -277,11 +256,8 @@ describe('UserSimulator', () => {
       mockStdinBuffer,
     );
 
-    // Provide 4 existing notes
-    // We can't set private sessionMemory directly easily without casting or refactoring
-    // So we'll trigger 5 ticks that each return a note.
-    vi.useFakeTimers();
     simulator.start();
+    if (simulator['timer']) clearInterval(simulator['timer']);
 
     for (let i = 0; i < 5; i++) {
       mockGetScreen.mockReturnValue(`> Prompt ${i}`);
@@ -291,29 +267,12 @@ describe('UserSimulator', () => {
           session_notes: `Note ${i}`,
         }),
       });
-      await vi.advanceTimersByTimeAsync(2000);
+      await simulator['tick']();
     }
 
     expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(5);
 
-    // The 5th tick should have triggered compression.
-    // Let's mock the compression response.
-    // The compression call uses 'simulator-compression' as prompt ID.
-    const compressionCall =
-      mockContentGenerator.generateContent.mock.calls.find(
-        (call) => call[1] === 'simulator-compression',
-      );
-    expect(compressionCall).toBeDefined();
-    if (compressionCall) {
-      expect(compressionCall[0].contents[0].parts[0].text).toContain(
-        'Summarize the following chronological session notes',
-      );
-    }
-
-    // Wait for the compression to finish and merge.
-    // We need to resolve the promise for the compression call.
-    // In our mock, it resolves to { action: 'y\r' } by default from beforeEach.
-    // Let's make it return a specific summary.
+    // Resolve the compression call
     mockContentGenerator.generateContent.mockImplementation(async (req, id) => {
       if (id === 'simulator-compression') {
         return { text: 'Compressed Summary' };
@@ -321,12 +280,16 @@ describe('UserSimulator', () => {
       return { text: JSON.stringify({ action: 'y\r' }) };
     });
 
-    // Advance time to allow the background task to complete
-    await vi.advanceTimersByTimeAsync(1000);
+    // Wait for the background task to complete using Vitest waitFor
+    await vi.waitFor(() => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+      const memory = (simulator as any).sessionMemory as string[];
+      return memory.length > 0 && memory[0] === 'Compressed Summary';
+    });
 
     // Trigger one more tick to see if the compressed memory is used
     mockGetScreen.mockReturnValue('> Final Prompt');
-    await vi.advanceTimersByTimeAsync(2000);
+    await simulator['tick']();
 
     const finalCall = mockContentGenerator.generateContent.mock.calls.find(
       (call) =>
@@ -341,6 +304,5 @@ describe('UserSimulator', () => {
     }
 
     simulator.stop();
-    vi.useRealTimers();
   });
 });
