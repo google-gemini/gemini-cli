@@ -71,6 +71,9 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const [isOverflowing, setIsOverflowing] = useState(
+    confirmationDetails.type === 'exec' || confirmationDetails.type === 'edit',
+  );
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
@@ -120,6 +123,54 @@ export const ToolConfirmationMessage: React.FC<
       )
       .join('\n\n')}`;
   }, [deceptiveUrlWarnings]);
+
+  const totalContentLines = useMemo(() => {
+    if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      return commands.reduce((acc, cmd) => {
+        return (
+          acc +
+          cmd.split('\n').reduce((lineAcc, line) => {
+            return (
+              lineAcc +
+              Math.max(1, Math.ceil(line.length / Math.max(terminalWidth, 1)))
+            );
+          }, 0)
+        );
+      }, 0);
+    }
+    if (confirmationDetails.type === 'edit') {
+      return confirmationDetails.fileDiff.split('\n').length;
+    }
+    return 0;
+  }, [confirmationDetails, terminalWidth]);
+
+  const isContentStaticallyTruncated = useMemo(() => {
+    if (
+      confirmationDetails.type !== 'exec' &&
+      confirmationDetails.type !== 'edit'
+    )
+      return false;
+    if (availableTerminalHeight === undefined) return false;
+    // Surrounding height when truncated is 6 lines + deceptiveUrlWarning lines if any
+    const securityWarningsHeight = deceptiveUrlWarningText
+      ? measuredSecurityWarningsHeight + 1
+      : 0;
+    const surroundingHeight = 6 + securityWarningsHeight;
+    const bodyHeight = Math.max(availableTerminalHeight - surroundingHeight, 1);
+    return totalContentLines > bodyHeight;
+  }, [
+    confirmationDetails.type,
+    totalContentLines,
+    availableTerminalHeight,
+    deceptiveUrlWarningText,
+    measuredSecurityWarningsHeight,
+  ]);
+
+  const isTruncated = isContentStaticallyTruncated || isOverflowing;
 
   const onSecurityWarningsRefChange = useCallback((node: DOMElement | null) => {
     if (observerRef.current) {
@@ -276,6 +327,21 @@ export const ToolConfirmationMessage: React.FC<
   );
 
   const getOptions = useCallback(() => {
+    if (isTruncated) {
+      return [
+        {
+          label: `⚠️ Expand to view full ${confirmationDetails.type === 'exec' ? 'command' : 'content'} (Press Ctrl+O)`,
+          value: ToolConfirmationOutcome.Cancel,
+          key: 'Truncated lockout',
+        },
+        {
+          label: 'No, cancel (esc)',
+          value: ToolConfirmationOutcome.Cancel,
+          key: 'No, cancel (esc)',
+        },
+      ];
+    }
+
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
 
     if (confirmationDetails.type === 'edit') {
@@ -598,6 +664,7 @@ export const ToolConfirmationMessage: React.FC<
               filename={sanitizeForDisplay(confirmationDetails.fileName)}
               availableTerminalHeight={availableBodyContentHeight()}
               terminalWidth={terminalWidth}
+              onOverflowChange={setIsOverflowing}
             />
           );
         }
@@ -708,6 +775,7 @@ export const ToolConfirmationMessage: React.FC<
             <MaxSizedBox
               maxHeight={bodyContentHeight}
               maxWidth={Math.max(terminalWidth, 1)}
+              onOverflowChange={setIsOverflowing}
             >
               <Box flexDirection="column">
                 {commandsToDisplay.map((cmd, idx) => (
@@ -865,6 +933,7 @@ export const ToolConfirmationMessage: React.FC<
               maxHeight={availableBodyContentHeight()}
               maxWidth={terminalWidth}
               overflowDirection={bodyOverflowDirection}
+              onOverflowChange={setIsOverflowing}
             >
               {bodyContent}
             </MaxSizedBox>

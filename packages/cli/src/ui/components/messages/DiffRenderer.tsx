@@ -88,6 +88,7 @@ interface DiffRendererProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   theme?: Theme;
+  onOverflowChange?: (isOverflowing: boolean) => void;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -99,6 +100,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   availableTerminalHeight,
   terminalWidth,
   theme,
+  onOverflowChange,
 }) => {
   const settings = useSettings();
 
@@ -169,6 +171,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         maxWidth: terminalWidth,
         theme,
         settings,
+        onOverflowChange,
       });
     } else {
       return renderDiffContent(
@@ -177,6 +180,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
+        onOverflowChange,
       );
     }
   }, [
@@ -190,6 +194,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     theme,
     settings,
     tabWidth,
+    onOverflowChange,
   ]);
 
   return renderedOutput;
@@ -201,6 +206,7 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  onOverflowChange?: (isOverflowing: boolean) => void,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -376,6 +382,7 @@ const renderDiffContent = (
       maxHeight={availableTerminalHeight}
       maxWidth={terminalWidth}
       key={key}
+      onOverflowChange={onOverflowChange}
     >
       {content}
     </MaxSizedBox>

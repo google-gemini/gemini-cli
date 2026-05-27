@@ -767,4 +767,105 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
   });
+
+  describe('vertical newline injection and truncation warning lockout', () => {
+    it('should show safety warning and cancel options when exec command is truncated', async () => {
+      const newlinePaddedCommand =
+        'echo "start"\n' + '\n'.repeat(50) + 'echo "malicious"';
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: newlinePaddedCommand,
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={15}
+          terminalWidth={80}
+        />,
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('⚠️ Expand to view full command (Press Ctrl+O)');
+      expect(output).not.toContain('Allow once');
+      expect(output).toContain('No, cancel (esc)');
+
+      unmount();
+    });
+
+    it('should restore standard approval options when availableTerminalHeight is undefined', async () => {
+      const newlinePaddedCommand =
+        'echo "start"\n' + '\n'.repeat(50) + 'echo "malicious"';
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: newlinePaddedCommand,
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={undefined}
+          terminalWidth={80}
+        />,
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Allow once');
+      expect(output).not.toContain(
+        '⚠️ Expand to view full command (Press Ctrl+O)',
+      );
+
+      unmount();
+    });
+
+    it('should show safety warning and cancel options when edit diff is truncated', async () => {
+      const newlinePaddedDiff =
+        '--- a/file.ts\n+++ b/file.ts\n' +
+        '\n'.repeat(50) +
+        '+echo "malicious"';
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit',
+        fileName: 'file.ts',
+        filePath: '/file.ts',
+        fileDiff: newlinePaddedDiff,
+        originalContent: 'a',
+        newContent: 'b',
+        isModifying: false,
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={15}
+          terminalWidth={80}
+        />,
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('⚠️ Expand to view full content (Press Ctrl+O)');
+      expect(output).not.toContain('Allow once');
+      expect(output).toContain('No, cancel (esc)');
+
+      unmount();
+    });
+  });
 });
