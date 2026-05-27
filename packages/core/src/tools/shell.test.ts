@@ -152,6 +152,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
@@ -213,7 +214,7 @@ describe('ShellTool', () => {
         callback: (event: ShellOutputEvent) => void,
       ) => {
         mockShellOutputCallback = callback;
-        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        const match = cmd.match(/_bgpids_file=([^\r\n]+)/);
         if (match) {
           extractedTmpFile = match[1].replace(/['"]/g, '');
         }
@@ -308,19 +309,22 @@ describe('ShellTool', () => {
       resolveExecutionPromise(fullResult);
     };
 
-    it('should wrap command on linux and parse pgrep output', async () => {
+    it('should wrap command on linux and parse background PID output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
-      // Simulate pgrep output file creation by the shell command
+      // Simulate background PID output file creation by the shell command
       fs.writeFileSync(extractedTmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       resolveShellExecution({ pid: 54321 });
 
       const result = await promise;
+      const wrappedCommand = mockShellExecutionService.mock.calls[0][0];
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(
+          /_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp['"]?\n\(\n {2}trap 'jobs -p > "\$_bgpids_file"' EXIT/,
+        ),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -331,9 +335,57 @@ describe('ShellTool', () => {
           sandboxManager: expect.any(Object),
         }),
       );
+      expect(wrappedCommand).toMatch(
+        /^_bgpids_file=.*\n\(\n {2}trap 'jobs -p > "\$_bgpids_file"' EXIT\nmy-command &\n\)\n__code=\$\?\nexit \$__code$/,
+      );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
       expect(fs.existsSync(extractedTmpFile)).toBe(false);
+    });
+
+    it('should preserve exit code and capture background PIDs when command uses explicit exit', async () => {
+      const invocation = shellTool.build({
+        command: "sh -c 'sleep 60 & exit 1'",
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      fs.writeFileSync(extractedTmpFile, `67890${os.EOL}`);
+      expect(fs.readFileSync(extractedTmpFile, 'utf8').trim()).toBe('67890');
+
+      resolveShellExecution({ exitCode: 1, output: '' });
+
+      const result = await promise;
+      const wrappedCommand = mockShellExecutionService.mock.calls[0][0];
+
+      expect(wrappedCommand).toContain(
+        'trap \'jobs -p > "$_bgpids_file"\' EXIT',
+      );
+      expect(wrappedCommand).toContain('sleep 60 & exit 1');
+      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(result.llmContent).toContain('Background PIDs: 67890');
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
+    });
+
+    it('should disable PTY execution when interactive shell is unavailable', async () => {
+      (mockConfig.getEnableInteractiveShell as Mock).mockReturnValue(true);
+      (mockConfig.isInteractiveShellEnabled as Mock).mockReturnValue(false);
+
+      const invocation = shellTool.build({ command: 'python --version' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.any(String),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.objectContaining({
+          pager: 'cat',
+        }),
+      );
     });
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
@@ -343,7 +395,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(/_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -359,7 +411,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(/_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -379,7 +431,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(/_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp/),
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -402,7 +454,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(/_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp/),
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
@@ -481,7 +533,7 @@ EOF`;
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        expect.stringMatching(/_bgpids_file=.*gemini-shell-.*[/\\]bgpids\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -508,7 +560,7 @@ EOF`;
 
       const result = await promise;
       expect(result.llmContent).toContain('Error: wrapped command failed');
-      expect(result.llmContent).not.toContain('pgrep');
+      expect(result.llmContent).not.toContain('background pid output');
       expect(result.display).toEqual(
         expect.objectContaining({
           name: 'Shell',
@@ -599,7 +651,7 @@ EOF`;
     it('should clean up the temp file on synchronous execution error', async () => {
       const error = new Error('sync spawn error');
       mockShellExecutionService.mockImplementation((cmd: string) => {
-        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        const match = cmd.match(/_bgpids_file=([^\r\n]+)/);
         if (match) {
           extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
           // Create the temp file before throwing to simulate it being left behind
@@ -616,7 +668,7 @@ EOF`;
       expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
-    it('should not log "missing pgrep output" when process is backgrounded', async () => {
+    it('should not log "missing background pid output" when process is backgrounded', async () => {
       vi.useFakeTimers();
       const debugErrorSpy = vi.spyOn(debugLogger, 'error');
 
@@ -631,7 +683,9 @@ EOF`;
 
       await promise;
 
-      expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
+      expect(debugErrorSpy).not.toHaveBeenCalledWith(
+        'missing background pid output',
+      );
     });
 
     describe('Streaming to `updateOutput`', () => {

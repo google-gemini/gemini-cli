@@ -79,6 +79,7 @@ describe('AcpSessionManager', () => {
       validatePathAccess: vi.fn().mockReturnValue(null),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
+        getDirectories: vi.fn().mockReturnValue(['/tmp']),
       }),
       getPolicyEngine: vi.fn().mockReturnValue({
         addRule: vi.fn(),
@@ -216,13 +217,12 @@ describe('AcpSessionManager', () => {
     );
   });
 
-  it('should include gemini-3.1-flash-lite when useGemini31FlashLite is true', async () => {
+  it('should NOT include retired preview models (none) in available models', async () => {
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
     });
     mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
     mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
-    mockConfig.getGemini31FlashLiteLaunchedSync = vi.fn().mockReturnValue(true);
 
     const response = await manager.newSession(
       {
@@ -232,14 +232,9 @@ describe('AcpSessionManager', () => {
       {},
     );
 
-    expect(response.models?.availableModels).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          modelId: 'gemini-3.1-flash-lite-preview',
-          name: 'gemini-3.1-flash-lite-preview',
-        }),
-      ]),
-    );
+    const modelIds =
+      response.models?.availableModels?.map((m) => m.modelId) ?? [];
+    expect(modelIds).not.toContain('none');
   });
 
   it('should return modes with plan mode when plan is enabled', async () => {

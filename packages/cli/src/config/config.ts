@@ -103,6 +103,7 @@ export interface CliArgs {
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
+  fakeResponsesNonStrict?: string | undefined;
   recordResponses: string | undefined;
   startupMessages?: string[];
   rawOutput: boolean | undefined;
@@ -474,6 +475,12 @@ export async function parseArguments(
           description: 'Path to a file with fake model responses for testing.',
           hidden: true,
         })
+        .option('fake-responses-non-strict', {
+          type: 'string',
+          description:
+            'Path to a file with fake model responses for testing (non-strict mode).',
+          hidden: true,
+        })
         .option('record-responses', {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
@@ -569,6 +576,7 @@ export interface LoadCliConfigOptions {
   };
   worktreeSettings?: WorktreeSettings;
   skipExtensions?: boolean;
+  loadedSettings?: LoadedSettings;
 }
 
 export async function loadCliConfig(
@@ -577,7 +585,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks, skipExtensions = false } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    loadedSettings,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -929,6 +942,8 @@ export async function loadCliConfig(
   let profileSelector: string | undefined = undefined;
   if (settings.experimental?.stressTestProfile) {
     profileSelector = 'stressTestProfile';
+  } else if (settings.experimental?.powerUserProfile) {
+    profileSelector = 'powerUserProfile';
   } else if (
     settings.experimental?.generalistProfile ||
     settings.experimental?.contextManagement
@@ -976,12 +991,17 @@ export async function loadCliConfig(
     agents: settings.agents,
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
-      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      ? (argv.allowedMcpServerNames ??
+        (loadedSettings
+          ? loadedSettings.getConsolidatedAllowedMcpServers()
+          : settings.mcp?.allowed))
       : undefined,
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames
         ? undefined
-        : settings.mcp?.excluded
+        : loadedSettings
+          ? loadedSettings.getConsolidatedExcludedMcpServers()
+          : settings.mcp?.excluded
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
@@ -1074,6 +1094,7 @@ export async function loadCliConfig(
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
     adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
+    fakeResponsesNonStrict: argv.fakeResponsesNonStrict,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,

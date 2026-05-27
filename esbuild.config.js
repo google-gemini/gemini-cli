@@ -63,7 +63,6 @@ export const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
   '@github/keytar',
-  '@google/gemini-cli-devtools',
 ];
 
 export const baseConfig = {
@@ -102,9 +101,44 @@ const cliConfig = {
   plugins: createWasmPlugins(),
   alias: {
     'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+    'https-proxy-agent': path.resolve(
+      __dirname,
+      'packages/cli/src/patches/https-proxy-agent.ts',
+    ),
+    'http-proxy-agent': path.resolve(
+      __dirname,
+      'packages/cli/src/patches/http-proxy-agent.ts',
+    ),
+    '@google/gemini-cli-devtools': path.resolve(
+      __dirname,
+      'packages/devtools/src/index.ts',
+    ),
     ...commonAliases,
   },
   metafile: true,
+};
+
+const workerConfig = {
+  ...baseConfig,
+  banner: {
+    js: `const require = (await import('node:module')).createRequire(import.meta.url); const __chunk_filename = (await import('node:url')).fileURLToPath(import.meta.url); const __chunk_dirname = (await import('node:path')).dirname(__chunk_filename);`,
+  },
+  entryPoints: {
+    'worker/worker-entry': path.join(
+      path.dirname(require.resolve('ink')),
+      'worker/worker-entry.js',
+    ),
+  },
+  outdir: 'bundle',
+  define: {
+    __filename: '__chunk_filename',
+    __dirname: '__chunk_dirname',
+    'process.env.NODE_ENV': JSON.stringify(
+      process.env.NODE_ENV || 'production',
+    ),
+  },
+  plugins: createWasmPlugins(),
+  alias: commonAliases,
 };
 
 const a2aServerConfig = {
@@ -133,11 +167,16 @@ Promise.allSettled([
       writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
     }
   }),
+  esbuild.build(workerConfig),
   esbuild.build(a2aServerConfig),
 ]).then((results) => {
-  const [cliResult, a2aResult] = results;
+  const [cliResult, workerResult, a2aResult] = results;
   if (cliResult.status === 'rejected') {
     console.error('gemini.js build failed:', cliResult.reason);
+    process.exit(1);
+  }
+  if (workerResult.status === 'rejected') {
+    console.error('worker-entry.js build failed:', workerResult.reason);
     process.exit(1);
   }
   // error in a2a-server bundling will not stop gemini.js bundling process

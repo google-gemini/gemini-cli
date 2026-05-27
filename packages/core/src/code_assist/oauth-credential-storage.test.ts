@@ -180,14 +180,18 @@ describe('OAuthCredentialStorage', () => {
       expect(result).toEqual(mockCredentials);
     });
 
-    it('should throw an error if the migration file contains invalid JSON', async () => {
+    it('should return null and log a warning if the migration file contains invalid JSON', async () => {
       vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
         null,
       );
       vi.spyOn(fs, 'readFile').mockResolvedValue('invalid json');
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
+      const result = await OAuthCredentialStorage.loadCredentials();
+
+      expect(result).toBeNull();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Corrupted OAuth credential file'),
       );
     });
 
