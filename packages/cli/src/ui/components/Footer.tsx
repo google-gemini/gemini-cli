@@ -426,20 +426,69 @@ export const Footer: React.FC = () => {
       }
       case 'token-count': {
         let total = 0;
-        for (const m of Object.values(uiState.sessionStats.metrics.models))
+        let input = 0;
+        let output = 0;
+        for (const m of Object.values(uiState.sessionStats.metrics.models)) {
           total += m.tokens.total;
+          input += m.tokens.input;
+          output += m.tokens.candidates;
+        }
         if (total > 0) {
           const formatter = new Intl.NumberFormat('en-US', {
             notation: 'compact',
             maximumFractionDigits: 1,
           });
           const formatted = formatter.format(total).toLowerCase();
+          const inStr = formatter.format(input).toLowerCase();
+          const outStr = formatter.format(output).toLowerCase();
+          const displayStr = `${formatted} tokens (↑${inStr} ↓${outStr})`;
           addCol(
             id,
             header,
-            () => <Text color={itemColor}>{formatted} tokens</Text>,
-            formatted.length + 7,
+            () => <Text color={itemColor}>{displayStr}</Text>,
+            displayStr.length,
           );
+        }
+        break;
+      }
+      case 'session-cost': {
+        let cost = 0;
+        for (const [modelName, m] of Object.entries(
+          uiState.sessionStats.metrics.models,
+        )) {
+          // Simplified cost estimator (mock values, assuming standard $ per 1M tokens)
+          const inCost = modelName.includes('pro') ? 1.25 : 0.075;
+          const outCost = modelName.includes('pro') ? 5.0 : 0.3;
+          cost += (m.tokens.input / 1000000) * inCost;
+          cost += (m.tokens.candidates / 1000000) * outCost;
+        }
+        if (cost > 0) {
+          const formatted = `$${cost.toFixed(3)}`;
+          addCol(
+            id,
+            header,
+            () => <Text color={theme.status.warning}>{formatted}</Text>,
+            formatted.length,
+          );
+        }
+        break;
+      }
+      case 'quota-reset': {
+        if (quotaStats?.resetTime) {
+          const resetTimeMs = new Date(quotaStats.resetTime).getTime();
+          const nowMs = Date.now();
+          if (resetTimeMs > nowMs) {
+            const diffMin = Math.ceil((resetTimeMs - nowMs) / 60000);
+            const hours = Math.floor(diffMin / 60);
+            const mins = diffMin % 60;
+            const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+            addCol(
+              id,
+              header,
+              () => <Text color={theme.text.secondary}>{timeStr}</Text>,
+              timeStr.length,
+            );
+          }
         }
         break;
       }
