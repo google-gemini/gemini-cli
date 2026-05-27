@@ -151,14 +151,15 @@ export class CachingContentGenerator implements ContentGenerator {
       role,
     );
 
-    cache[promptHash] = {
+    const finalCache = this.readCache();
+    finalCache[promptHash] = {
       promptHash,
       originalPrompt: req,
       response,
       timestamp: Date.now(),
       projectPath,
     };
-    this.writeCache(cache);
+    this.writeCache(finalCache);
 
     return response;
   }
