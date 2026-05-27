@@ -7,7 +7,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote, type ParseEntry } from 'shell-quote';
+import { quote, parse, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
@@ -61,6 +61,10 @@ export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
  * An identifier for the shell type.
  */
 export type ShellType = 'cmd' | 'powershell' | 'bash';
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
 
 /**
  * Defines the configuration required to execute a command string within a specific shell.
@@ -580,15 +584,14 @@ function parsePowerShellCommandDetails(
 
     const details = (parsed.commands ?? [])
       .map((commandDetail): ParsedCommandDetail | null => {
-        if (!commandDetail || typeof commandDetail.name !== 'string') {
+        if (!commandDetail || !isString(commandDetail.name)) {
           return null;
         }
 
         const name = normalizeCommandName(commandDetail.name);
-        const text =
-          typeof commandDetail.text === 'string'
-            ? commandDetail.text.trim()
-            : command;
+        const text = isString(commandDetail.text)
+          ? commandDetail.text.trim()
+          : command;
 
         return {
           name,
@@ -849,7 +852,13 @@ export function stripShellWrapper(command: string): string {
       (newCommand.startsWith('"') && newCommand.endsWith('"')) ||
       (newCommand.startsWith("'") && newCommand.endsWith("'"))
     ) {
-      newCommand = newCommand.substring(1, newCommand.length - 1);
+      const parsed = parse(newCommand, (key) => '$' + key);
+      const firstEntry = parsed[0];
+      if (parsed.length === 1 && isString(firstEntry)) {
+        newCommand = firstEntry;
+      } else {
+        newCommand = newCommand.substring(1, newCommand.length - 1);
+      }
     }
     return newCommand;
   }
@@ -1067,7 +1076,7 @@ export async function* execStreaming(
 export function detectCommandSubstitution(command: string): boolean {
   const shell = getShellConfiguration().shell;
   const isPowerShell =
-    typeof shell === 'string' &&
+    isString(shell) &&
     (shell.toLowerCase().includes('powershell') ||
       shell.toLowerCase().includes('pwsh'));
   if (isPowerShell) {
