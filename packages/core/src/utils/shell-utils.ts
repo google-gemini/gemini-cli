@@ -7,7 +7,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote, type ParseEntry } from 'shell-quote';
+import { quote, parse, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
@@ -61,10 +61,6 @@ export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
  * An identifier for the shell type.
  */
 export type ShellType = 'cmd' | 'powershell' | 'bash';
-
-function isString(value: unknown): value is string {
-  return typeof value === 'string';
-}
 
 /**
  * Defines the configuration required to execute a command string within a specific shell.
@@ -584,14 +580,15 @@ function parsePowerShellCommandDetails(
 
     const details = (parsed.commands ?? [])
       .map((commandDetail): ParsedCommandDetail | null => {
-        if (!commandDetail || !isString(commandDetail.name)) {
+        if (!commandDetail || typeof commandDetail.name !== 'string') {
           return null;
         }
 
         const name = normalizeCommandName(commandDetail.name);
-        const text = isString(commandDetail.text)
-          ? commandDetail.text.trim()
-          : command;
+        const text =
+          typeof commandDetail.text === 'string'
+            ? commandDetail.text.trim()
+            : command;
 
         return {
           name,
@@ -853,28 +850,19 @@ export function stripShellWrapper(command: string): string {
       ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
         (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
-      const isWindowsShell = /cmd(?:\.exe)?|powershell|pwsh/i.test(match[0]);
-      if (!isWindowsShell && newCommand.startsWith('"')) {
-        const inner = newCommand.substring(1, newCommand.length - 1);
-        let unescaped = '';
-        let i = 0;
-        while (i < inner.length) {
-          const char = inner[i];
-          if (char === '\\' && i + 1 < inner.length) {
-            const next = inner[i + 1];
-            if (['$', '`', '"', '\\', '\n'].includes(next)) {
-              unescaped += next;
-              i += 2;
-            } else {
-              unescaped += '\\';
-              i++;
-            }
+      const isPosixShell = match[0].trim().endsWith('-c');
+      if (isPosixShell && newCommand.startsWith('"')) {
+        try {
+          const parsed = parse(newCommand, (key) => '$' + key);
+          const firstEntry = parsed[0];
+          if (parsed.length === 1 && typeof firstEntry === 'string') {
+            newCommand = firstEntry;
           } else {
-            unescaped += char;
-            i++;
+            newCommand = newCommand.substring(1, newCommand.length - 1);
           }
+        } catch {
+          newCommand = newCommand.substring(1, newCommand.length - 1);
         }
-        newCommand = unescaped;
       } else {
         newCommand = newCommand.substring(1, newCommand.length - 1);
       }
@@ -1095,7 +1083,7 @@ export async function* execStreaming(
 export function detectCommandSubstitution(command: string): boolean {
   const shell = getShellConfiguration().shell;
   const isPowerShell =
-    isString(shell) &&
+    typeof shell === 'string' &&
     (shell.toLowerCase().includes('powershell') ||
       shell.toLowerCase().includes('pwsh'));
   if (isPowerShell) {
