@@ -59,7 +59,7 @@ export function encodeTagName(str: string): string {
 export function decodeTagName(str: string): string {
   try {
     return decodeURIComponent(str);
-  } catch (_e) {
+  } catch {
     // Fallback for old, potentially malformed encoding
     return str.replace(/%([0-9A-F]{2})/g, (_, hex) =>
       String.fromCharCode(parseInt(hex, 16)),
@@ -134,7 +134,7 @@ export class Logger {
     try {
       await fs.rename(this.logFilePath, backupPath);
       debugLogger.debug(`Backed up corrupted log file to ${backupPath}`);
-    } catch (_backupError) {
+    } catch {
       // If rename fails (e.g. file doesn't exist), no need to log an error here as the primary error (e.g. invalid JSON) is already handled.
     }
   }
@@ -153,7 +153,7 @@ export class Logger {
       let fileExisted = true;
       try {
         await fs.access(this.logFilePath);
-      } catch (_e) {
+      } catch {
         fileExisted = false;
       }
       this.logs = await this._readLogFile();
@@ -277,7 +277,7 @@ export class Logger {
         // then this instance can increment its idea of the next messageId for this session.
         this.messageId = writtenEntry.messageId + 1;
       }
-    } catch (_error) {
+    } catch {
       // Error already logged by _updateLogFile or _readLogFile
     }
   }

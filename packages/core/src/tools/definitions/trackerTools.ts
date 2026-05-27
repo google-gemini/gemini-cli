@@ -23,11 +23,13 @@ export const TRACKER_CREATE_TASK_DEFINITION: ToolDefinition = {
       properties: {
         title: {
           type: 'string',
-          description: 'Short title of the task.',
+          description:
+            'Detailed title of the task. Should be concise but provide enough detail to understand the objective.',
         },
         description: {
           type: 'string',
-          description: 'Detailed description of the task.',
+          description:
+            'Detailed description of the task. Must contain more specific details and context than the title.',
         },
         type: {
           type: 'string',
@@ -66,7 +68,7 @@ export const TRACKER_UPDATE_TASK_DEFINITION: ToolDefinition = {
         },
         description: {
           type: 'string',
-          description: 'New description for the task.',
+          description: 'New detailed description for the task.',
         },
         status: {
           type: 'string',

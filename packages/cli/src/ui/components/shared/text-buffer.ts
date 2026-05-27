@@ -13,6 +13,7 @@ import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
   debugLogger,
+  getErrorMessage,
   unescapePath,
   type EditorType,
 } from '@google/gemini-cli-core';
@@ -30,6 +31,7 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
@@ -2840,6 +2842,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const settings = useSettings();
   const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -2889,6 +2892,8 @@ export function useTextBuffer({
     transformationsByLine,
     pastedContent,
     expandedPaste,
+    undoStack,
+    redoStack,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -2907,6 +2912,25 @@ export function useTextBuffer({
 
   const [scrollRowState, setScrollRowState] = useState<number>(0);
 
+  const { height } = viewport;
+  const totalVisualLines = visualLines.length;
+  const maxScrollStart = Math.max(0, totalVisualLines - height);
+  let newVisualScrollRow = scrollRowState;
+
+  if (visualCursor[0] < scrollRowState) {
+    newVisualScrollRow = visualCursor[0];
+  } else if (visualCursor[0] >= scrollRowState + height) {
+    newVisualScrollRow = visualCursor[0] - height + 1;
+  }
+
+  newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
+
+  if (newVisualScrollRow !== scrollRowState) {
+    setScrollRowState(newVisualScrollRow);
+  }
+
+  const actualScrollRowState = newVisualScrollRow;
+
   useEffect(() => {
     if (onChange) {
       onChange(text);
@@ -2919,28 +2943,6 @@ export function useTextBuffer({
       payload: { width: viewport.width, height: viewport.height },
     });
   }, [viewport.width, viewport.height]);
-
-  // Update visual scroll (vertical)
-  useEffect(() => {
-    const { height } = viewport;
-    const totalVisualLines = visualLines.length;
-    const maxScrollStart = Math.max(0, totalVisualLines - height);
-    let newVisualScrollRow = scrollRowState;
-
-    if (visualCursor[0] < scrollRowState) {
-      newVisualScrollRow = visualCursor[0];
-    } else if (visualCursor[0] >= scrollRowState + height) {
-      newVisualScrollRow = visualCursor[0] - height + 1;
-    }
-
-    // When the number of visual lines shrinks (e.g., after widening the viewport),
-    // ensure scroll never starts beyond the last valid start so we can render a full window.
-    newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
-
-    if (newVisualScrollRow !== scrollRowState) {
-      setScrollRowState(newVisualScrollRow);
-    }
-  }, [visualCursor, scrollRowState, viewport, visualLines.length]);
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
@@ -3326,6 +3328,7 @@ export function useTextBuffer({
         stdin,
         setRawMode,
         getPreferredEditor?.(),
+        settings.merged.general.openEditorInNewWindow,
       );
 
       let newText = fs.readFileSync(filePath, 'utf8');
@@ -3343,11 +3346,7 @@ export function useTextBuffer({
 
       dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
     } catch (err) {
-      coreEvents.emitFeedback(
-        'error',
-        '[useTextBuffer] external editor error',
-        err,
-      );
+      coreEvents.emitFeedback('error', getErrorMessage(err), err);
     } finally {
       try {
         fs.unlinkSync(filePath);
@@ -3360,7 +3359,14 @@ export function useTextBuffer({
         /* ignore */
       }
     }
-  }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
+  }, [
+    text,
+    pastedContent,
+    stdin,
+    setRawMode,
+    getPreferredEditor,
+    settings.merged.general.openEditorInNewWindow,
+  ]);
 
   const handleInput = useCallback(
     (key: Key): boolean => {
@@ -3457,10 +3463,16 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.UNDO](key)) {
+        if (undoStack.length === 0) {
+          return false;
+        }
         undo();
         return true;
       }
       if (keyMatchers[Command.REDO](key)) {
+        if (redoStack.length === 0) {
+          return false;
+        }
         redo();
         return true;
       }
@@ -3489,16 +3501,18 @@ export function useTextBuffer({
       visualCursor,
       visualLines,
       keyMatchers,
+      undoStack.length,
+      redoStack.length,
     ],
   );
 
   const visualScrollRow = useMemo(() => {
     const totalVisualLines = visualLines.length;
     return Math.min(
-      scrollRowState,
+      actualScrollRowState,
       Math.max(0, totalVisualLines - viewport.height),
     );
-  }, [visualLines.length, scrollRowState, viewport.height]);
+  }, [visualLines.length, actualScrollRowState, viewport.height]);
 
   const renderedVisualLines = useMemo(
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
@@ -3694,6 +3708,7 @@ export function useTextBuffer({
       viewportVisualLines: renderedVisualLines,
       visualCursor,
       visualScrollRow,
+      viewportHeight: viewport.height,
       visualToLogicalMap,
       transformedToLogicalMaps,
       visualToTransformedMap,
@@ -3799,6 +3814,7 @@ export function useTextBuffer({
       renderedVisualLines,
       visualCursor,
       visualScrollRow,
+      viewport.height,
       visualToLogicalMap,
       transformedToLogicalMaps,
       visualToTransformedMap,
@@ -3914,6 +3930,7 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
+  viewportHeight: number; // The maximum height of the viewport
   /**
    * For each visual line (by absolute index in allVisualLines) provides a tuple
    * [logicalLineIndex, startColInLogical] that maps where that visual line

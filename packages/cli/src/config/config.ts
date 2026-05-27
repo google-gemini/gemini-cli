@@ -13,28 +13,28 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
-  getCurrentGeminiMdFilename,
+  resetGeminiMdFilename,
+  DEFAULT_CONTEXT_FILENAME,
   ApprovalMode,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   resolveTelemetrySettings,
   FatalConfigError,
+  getErrorMessage,
   getPty,
   debugLogger,
-  loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
-  type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  SimpleExtensionLoader,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -58,6 +58,7 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { isRecord } from '../utils/settingsUtils.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -93,6 +94,8 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionFile?: string | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -100,10 +103,12 @@ export interface CliArgs {
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
+  fakeResponsesNonStrict?: string | undefined;
   recordResponses: string | undefined;
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
 
@@ -180,6 +185,7 @@ export async function parseArguments(
         extensionsCommand,
         skillsCommand,
         hooksCommand,
+        gemmaCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -232,6 +238,16 @@ export async function parseArguments(
         ? query.length > 0
         : !!query;
 
+      const sessionFlags = [
+        argv['resume'] !== undefined,
+        argv['session-id'] !== undefined,
+        argv['session-file'] !== undefined,
+      ].filter(Boolean).length;
+
+      if (sessionFlags > 1) {
+        return 'The flags --resume, --session-id, and --session-file are mutually exclusive. Please provide only one.';
+      }
+
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
       }
@@ -259,6 +275,7 @@ export async function parseArguments(
   yargsInstance.command(extensionsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -286,6 +303,11 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('skip-trust', {
+          type: 'boolean',
+          description: 'Trust the current workspace for this session.',
+          default: false,
         })
         .option('worktree', {
           alias: 'w',
@@ -395,6 +417,30 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-file', {
+          type: 'string',
+          nargs: 1,
+          description: 'Load a session from a JSON file',
+        })
+        .option('session-id', {
+          type: 'string',
+          nargs: 1,
+          description: 'Start a new session with a manually provided UUID.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              throw new Error('The --session-id option cannot be empty.');
+            }
+            if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+              throw new Error(
+                'Invalid session ID "' +
+                  trimmed +
+                  '": Only alphanumeric characters, dashes, and underscores are allowed.',
+              );
+            }
+            return trimmed;
+          },
+        })
         .option('list-sessions', {
           type: 'boolean',
           description:
@@ -429,6 +475,12 @@ export async function parseArguments(
           description: 'Path to a file with fake model responses for testing.',
           hidden: true,
         })
+        .option('fake-responses-non-strict', {
+          type: 'string',
+          description:
+            'Path to a file with fake model responses for testing (non-strict mode).',
+          hidden: true,
+        })
         .option('record-responses', {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
@@ -455,9 +507,16 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = await yargsInstance.parse();
+    const parsed = await yargsInstance.parse();
+    if (!isRecord(parsed)) {
+      throw new Error('Failed to parse arguments');
+    }
+    result = parsed;
+    if (result['skip-trust']) {
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+    }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = getErrorMessage(e);
     debugLogger.error(msg);
     yargsInstance.showHelp();
     await runExitCleanup();
@@ -471,11 +530,13 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const queryArg = (result as { query?: string | string[] | undefined }).query;
-  const q: string | undefined = Array.isArray(queryArg)
-    ? queryArg.join(' ')
-    : queryArg;
+  const queryArg = result['query'];
+  let q: string | undefined;
+  if (Array.isArray(queryArg)) {
+    q = queryArg.join(' ');
+  } else if (typeof queryArg === 'string') {
+    q = queryArg;
+  }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
@@ -490,8 +551,8 @@ export async function parseArguments(
   }
 
   // Keep CliArgs.query as a string for downstream typing
-  (result as Record<string, unknown>)['query'] = q || undefined;
-  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
+  result['query'] = q || undefined;
+  result['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
@@ -514,6 +575,8 @@ export interface LoadCliConfigOptions {
     disabled?: string[];
   };
   worktreeSettings?: WorktreeSettings;
+  skipExtensions?: boolean;
+  loadedSettings?: LoadedSettings;
 }
 
 export async function loadCliConfig(
@@ -522,7 +585,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    loadedSettings,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -532,7 +600,6 @@ export async function loadCliConfig(
     process.env['GEMINI_SANDBOX'] = 'true';
   }
 
-  const memoryImportFormat = settings.context?.importFormat || 'tree';
   const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
 
   const ideMode = settings.ide?.enabled ?? false;
@@ -543,12 +610,12 @@ export async function loadCliConfig(
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
+    isWorkspaceTrusted(settings, cwd, {
       prompt: argv.prompt,
       query: argv.query,
     })?.isTrusted ?? false;
 
-  // Set the context filename in the server's memoryTool module BEFORE loading memory
+  // Set the context filename in the server's memory file helpers before loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
   // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
@@ -556,15 +623,10 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(settings.context.fileName);
   } else {
     // Reset to default if not provided in settings.
-    setServerGeminiMdFilename(getCurrentGeminiMdFilename());
+    resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
   }
 
   const fileService = new FileDiscoveryService(cwd);
-
-  const memoryFileFiltering = {
-    ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-    ...settings.context?.fileFiltering,
-  };
 
   const fileFiltering = {
     ...DEFAULT_FILE_FILTERING_OPTIONS,
@@ -589,7 +651,7 @@ export async function loadCliConfig(
         return resolveToRealPath(trimmedPath) !== realCwd;
       } catch (e) {
         debugLogger.debug(
-          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${getErrorMessage(e)})`,
         );
         return false;
       }
@@ -597,23 +659,24 @@ export async function loadCliConfig(
     includeDirectories.push(...ideFolders);
   }
 
-  const extensionManager = new ExtensionManager({
-    settings,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
-  });
-  await extensionManager.loadExtensions();
+  let extensionManager: ExtensionManager | undefined;
+  if (!skipExtensions) {
+    extensionManager = new ExtensionManager({
+      settings,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      workspaceDir: cwd,
+      enabledExtensionOverrides: argv.extensions,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
+      clientVersion: await getVersion(),
+    });
+    await extensionManager.loadExtensions();
+  }
 
   const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
-
-  const experimentalJitContext = settings.experimental.jitContext;
+    ?.getExtensions()
+    ?.find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -625,29 +688,8 @@ export async function loadCliConfig(
     );
   }
 
-  let memoryContent: string | HierarchicalMemory = '';
-  let fileCount = 0;
-  let filePaths: string[] = [];
-
-  if (!experimentalJitContext) {
-    // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-    const result = await loadServerHierarchicalMemory(
-      cwd,
-      settings.context?.loadMemoryFromIncludeDirectories || false
-        ? includeDirectories
-        : [],
-      fileService,
-      extensionManager,
-      trustedFolder,
-      memoryImportFormat,
-      memoryFileFiltering,
-      settings.context?.discoveryMaxDirs,
-      settings.context?.memoryBoundaryMarkers,
-    );
-    memoryContent = result.memoryContent;
-    fileCount = result.fileCount;
-    filePaths = result.filePaths;
-  }
+  const finalExtensionLoader =
+    extensionManager ?? new SimpleExtensionLoader([]);
 
   const question = argv.promptInteractive || argv.prompt || '';
 
@@ -669,9 +711,9 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!(settings.general?.plan?.enabled ?? true)) {
           debugLogger.warn(
-            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+            'Approval mode "plan" is disabled in your settings. Falling back to "default".',
           );
           approvalMode = ApprovalMode.DEFAULT;
         } else {
@@ -796,9 +838,16 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
-  const specifiedModel =
+  const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
+  const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
+  const specifiedModel = Array.isArray(rawModel)
+    ? String(rawModel.at(-1) ?? '').trim() || ''
+    : rawModel === undefined
+      ? undefined
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
@@ -880,8 +929,31 @@ export async function loadCliConfig(
       (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
     ) {
       clientName = `acp-${ide.name}`;
+    } else {
+      clientName = 'acp';
     }
+  } else if (argv.isCommand) {
+    clientName = 'cli-command';
+  } else {
+    clientName = 'tui';
   }
+
+  // TODO(joshualitt): Clean this up alongside removal of the legacy config.
+  let profileSelector: string | undefined = undefined;
+  if (settings.experimental?.stressTestProfile) {
+    profileSelector = 'stressTestProfile';
+  } else if (settings.experimental?.powerUserProfile) {
+    profileSelector = 'powerUserProfile';
+  } else if (
+    settings.experimental?.generalistProfile ||
+    settings.experimental?.contextManagement
+  ) {
+    profileSelector = 'generalistProfile';
+  }
+
+  const contextManagement = {
+    enabled: !!profileSelector,
+  };
 
   return new Config({
     acpMode: isAcpMode,
@@ -904,6 +976,7 @@ export async function loadCliConfig(
     worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
+    experimentalContextManagementConfig: profileSelector,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     policyUpdateConfirmationRequest,
@@ -918,20 +991,24 @@ export async function loadCliConfig(
     agents: settings.agents,
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
-      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      ? (argv.allowedMcpServerNames ??
+        (loadedSettings
+          ? loadedSettings.getConsolidatedAllowedMcpServers()
+          : settings.mcp?.allowed))
       : undefined,
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames
         ? undefined
-        : settings.mcp?.excluded
+        : loadedSettings
+          ? loadedSettings.getConsolidatedExcludedMcpServers()
+          : settings.mcp?.excluded
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
-    userMemory: memoryContent,
-    geminiMdFileCount: fileCount,
-    geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
@@ -962,11 +1039,12 @@ export async function loadCliConfig(
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
-    extensionLoader: extensionManager,
+    extensionLoader: finalExtensionLoader,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    plan: settings.general?.plan?.enabled ?? true,
+    voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -975,19 +1053,13 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    experimentalMemoryManager: settings.experimental?.memoryManager,
-    experimentalAgentHistoryTruncation:
-      settings.experimental?.agentHistoryTruncation,
-    experimentalAgentHistoryTruncationThreshold:
-      settings.experimental?.agentHistoryTruncationThreshold,
-    experimentalAgentHistoryRetainedMessages:
-      settings.experimental?.agentHistoryRetainedMessages,
-    experimentalAgentHistorySummarization:
-      settings.experimental?.agentHistorySummarization,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
+    experimentalGemma: settings.experimental?.gemma,
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -998,6 +1070,8 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellBackgroundCompletionBehavior: settings.tools?.shell
@@ -1005,7 +1079,11 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    // In ACP mode, always skip the next-speaker check. This check triggers
+    // recursive continuation turns inside GeminiClient.processTurn() that
+    // conflict with ACP's explicit turn management via session/prompt,
+    // causing infinite agent_thought_chunk loops.
+    skipNextSpeakerCheck: isAcpMode || settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -1014,10 +1092,13 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
+    fakeResponsesNonStrict: argv.fakeResponsesNonStrict,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
@@ -1068,7 +1149,7 @@ async function resolveWorktreeSettings(
     if (isGeminiWorktree(toplevel, projectRoot)) {
       worktreePath = toplevel;
     }
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 
@@ -1084,7 +1165,7 @@ async function resolveWorktreeSettings(
     worktreeBaseSha = stdout.trim();
   } catch (e: unknown) {
     debugLogger.debug(
-      `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${getErrorMessage(e)}`,
     );
   }
 

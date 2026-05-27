@@ -33,7 +33,6 @@ export {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -41,6 +40,10 @@ export {
   ENTER_PLAN_MODE_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -77,7 +80,6 @@ export {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -192,13 +194,6 @@ export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
   overrides: (modelId) => getToolSet(modelId).read_many_files,
 };
 
-export const MEMORY_DEFINITION: ToolDefinition = {
-  get base() {
-    return DEFAULT_LEGACY_SET.save_memory;
-  },
-  overrides: (modelId) => getToolSet(modelId).save_memory,
-};
-
 export const WRITE_TODOS_DEFINITION: ToolDefinition = {
   get base() {
     return DEFAULT_LEGACY_SET.write_todos;
@@ -278,3 +273,17 @@ export function getActivateSkillDefinition(
     overrides: (modelId) => getToolSet(modelId).activate_skill(skillNames),
   };
 }
+
+export const READ_MCP_RESOURCE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.read_mcp_resource;
+  },
+  overrides: (modelId) => getToolSet(modelId).read_mcp_resource,
+};
+
+export const LIST_MCP_RESOURCES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.list_mcp_resources;
+  },
+  overrides: (modelId) => getToolSet(modelId).list_mcp_resources,
+};

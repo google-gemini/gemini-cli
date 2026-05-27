@@ -28,7 +28,7 @@ import * as trustedFolders from '../../config/trustedFolders.js';
 import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedExit = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async () => {

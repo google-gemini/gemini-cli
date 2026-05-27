@@ -43,41 +43,38 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
-import { AgentHistoryProvider } from '../services/agentHistoryProvider.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
+import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
+import type { ContextManager } from '../context/contextManager.js';
+import type { HistoryTurn } from './agentChatHistory.js';
 import { ideContextStore } from '../ide/ideContext.js';
-import {
-  logContentRetryFailure,
-  logNextSpeakerCheck,
-} from '../telemetry/loggers.js';
+import { logNextSpeakerCheck } from '../telemetry/loggers.js';
 import type {
   DefaultHookOutput,
   AfterAgentHookOutput,
 } from '../hooks/types.js';
-import {
-  ContentRetryFailureEvent,
-  NextSpeakerCheckEvent,
-  type LlmRole,
-} from '../telemetry/types.js';
+import { NextSpeakerCheckEvent, LlmRole } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
+import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  getDisplayString,
-  resolveModel,
-  isGemini2Model,
-} from '../config/models.js';
+import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import { randomUUID } from 'node:crypto';
+import {
+  coreEvents,
+  CoreEvent,
+  type ApprovalModeChangedPayload,
+} from '../utils/events.js';
+import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
 
@@ -101,6 +98,7 @@ export class GeminiClient {
   private readonly compressionService: ChatCompressionService;
   private readonly agentHistoryProvider: AgentHistoryProvider;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
+  private contextManager?: ContextManager;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -115,17 +113,19 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
-    this.agentHistoryProvider = new AgentHistoryProvider(this.config, {
-      truncationThreshold:
-        this.config.getExperimentalAgentHistoryTruncationThreshold(),
-      retainedMessages:
-        this.config.getExperimentalAgentHistoryRetainedMessages(),
-    });
+    this.agentHistoryProvider = new AgentHistoryProvider(
+      this.config.agentHistoryProviderConfig,
+      this.config,
+    );
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.on(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   private get config(): Config {
@@ -138,6 +138,12 @@ export class GeminiClient {
 
   private handleMemoryChanged = () => {
     this.updateSystemInstruction();
+  };
+
+  private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
+    if (payload.sessionId === this.config.getSessionId()) {
+      this.updateSystemInstruction();
+    }
   };
 
   clearCurrentSequenceModel(): void {
@@ -289,7 +295,7 @@ export class GeminiClient {
     this.getChat().stripThoughtsFromHistory();
   }
 
-  setHistory(history: readonly Content[]) {
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>) {
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
@@ -318,16 +324,20 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
     // Reset JIT context loaded paths so subdirectory context can be
     // re-discovered in the new session.
-    await this.config.getContextManager()?.refresh();
+    await this.config.getMemoryContextManager()?.refresh();
   }
 
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.off(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   async resumeChat(
-    history: Content[],
+    history: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
@@ -368,7 +378,7 @@ export class GeminiClient {
   }
 
   async startChat(
-    extraHistory?: Content[],
+    extraHistory?: ReadonlyArray<Content | HistoryTurn>,
     resumedSessionData?: ResumedSessionData,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
@@ -384,11 +394,11 @@ export class GeminiClient {
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.config,
         systemInstruction,
         tools,
-        history,
+        [...history],
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
@@ -398,11 +408,18 @@ export class GeminiClient {
           return [{ functionDeclarations: toolDeclarations }];
         },
       );
+      await chat.initialize(resumedSessionData, 'main');
+      this.contextManager = await initializeContextManager(
+        this.config,
+        chat,
+        this.lastPromptId,
+      );
+      return chat;
     } catch (error) {
       await reportError(
         error,
         'Error initializing Gemini chat session.',
-        history,
+        [...history],
         'startChat',
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
@@ -587,7 +604,6 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
-      this.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       this.config.getHasAccessToPreviewModel?.() ?? true,
       this.config,
@@ -599,7 +615,6 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     boundedTurns: number,
-    isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
@@ -621,13 +636,53 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    if (this.config.isExperimentalAgentHistoryTruncationEnabled()) {
-      const newHistory = await this.agentHistoryProvider.manageHistory(
-        this.getHistory(),
-        signal,
-      );
-      if (newHistory.length !== this.getHistory().length) {
+    let currentBaseUnits = 0;
+    let apiHistoryOverride: Content[] | undefined = undefined;
+
+    if (this.config.getContextManagementConfig().enabled) {
+      if (this.contextManager) {
+        const rawPendingRequest = createUserContent(request);
+        const pendingRequest = {
+          id: randomUUID(),
+          content: rawPendingRequest,
+        };
+        const {
+          history: newHistory,
+          apiHistory,
+          pendingApiHistory,
+          baseUnits,
+        } = await this.contextManager.renderHistory(
+          pendingRequest,
+          undefined,
+          signal,
+        );
+
+        currentBaseUnits = baseUnits;
+
+        // Use the PROCESSED pending content if available (e.g. if cleaned or distilled)
+        const finalPendingContent =
+          pendingApiHistory.length > 0
+            ? pendingApiHistory[0]
+            : rawPendingRequest;
+
+        // Late-bind the prompt: Append the active request to the managed history
+        // only for the purpose of the upcoming API call.
+        apiHistoryOverride = [...apiHistory, finalPendingContent];
+
         this.getChat().setHistory(newHistory);
+
+        // Use the original request for display/recording,
+        // but the processed one for the API and durable history.
+        displayContent = rawPendingRequest.parts || [];
+        request = finalPendingContent.parts || [];
+      } else {
+        const newHistory = await this.agentHistoryProvider.manageHistory(
+          this.getHistory(),
+          signal,
+        );
+        if (newHistory.length !== this.getHistory().length) {
+          this.getChat().setHistory(newHistory);
+        }
       }
     } else {
       const compressed = await this.tryCompressChat(prompt_id, false, signal);
@@ -688,9 +743,6 @@ export class GeminiClient {
     // Re-initialize turn with fresh history
     turn = new Turn(this.getChat(), prompt_id);
 
-    const controller = new AbortController();
-    const linkedSignal = AbortSignal.any([signal, controller.signal]);
-
     const loopResult = await this.loopDetector.turnStarted(signal);
     if (loopResult.count > 1) {
       yield { type: GeminiEventType.LoopDetected };
@@ -705,7 +757,6 @@ export class GeminiClient {
         signal,
         prompt_id,
         boundedTurns,
-        isInvalidStreamRetry,
         displayContent,
       );
     }
@@ -748,14 +799,12 @@ export class GeminiClient {
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
 
-    const resultStream = turn.run(
-      modelConfigKey,
-      request,
-      linkedSignal,
+    const resultStream = turn.run(modelConfigKey, request, signal, {
       displayContent,
-    );
+      role: LlmRole.MAIN,
+      apiHistoryOverride,
+    });
     let isError = false;
-    let isInvalidStream = false;
 
     let loopDetectedAbort = false;
     let loopRecoverResult: { detail?: string } | undefined;
@@ -776,18 +825,22 @@ export class GeminiClient {
       }
       yield event;
 
-      this.updateTelemetryTokenCount();
-
-      if (event.type === GeminiEventType.InvalidStream) {
-        isInvalidStream = true;
+      if (event.type === GeminiEventType.Finished && this.contextManager) {
+        const usageMetadata = event.value.usageMetadata;
+        if (usageMetadata && usageMetadata.promptTokenCount !== undefined) {
+          this.contextManager.getEnvironment().eventBus.emitTokenGroundTruth({
+            actualTokens: usageMetadata.promptTokenCount,
+            promptBaseUnits: currentBaseUnits,
+          });
+        }
       }
+      this.updateTelemetryTokenCount();
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
     }
 
     if (loopDetectedAbort) {
-      controller.abort();
       return turn;
     }
 
@@ -797,12 +850,9 @@ export class GeminiClient {
         signal,
         prompt_id,
         boundedTurns,
-        isInvalidStreamRetry,
         displayContent,
-        controller,
       );
     }
-
     if (isError) {
       return turn;
     }
@@ -818,36 +868,6 @@ export class GeminiClient {
         hookState.cumulativeResponse = hookState.cumulativeResponse
           ? `${hookState.cumulativeResponse}\n${responseText}`
           : responseText;
-      }
-    }
-
-    if (isInvalidStream) {
-      if (
-        this.config.getContinueOnFailedApiCall() &&
-        isGemini2Model(modelToUse)
-      ) {
-        if (isInvalidStreamRetry) {
-          logContentRetryFailure(
-            this.config,
-            new ContentRetryFailureEvent(
-              4,
-              'FAILED_AFTER_PROMPT_INJECTION',
-              modelToUse,
-            ),
-          );
-          return turn;
-        }
-        const nextRequest = [{ text: 'System: Please continue.' }];
-        // Recursive call - update turn with result
-        turn = yield* this.sendMessageStream(
-          nextRequest,
-          signal,
-          prompt_id,
-          boundedTurns - 1,
-          true,
-          displayContent,
-        );
-        return turn;
       }
     }
 
@@ -877,7 +897,6 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            false, // isInvalidStreamRetry is false
             displayContent,
           );
           return turn;
@@ -892,13 +911,10 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
-    isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!isInvalidStreamRetry) {
-      this.config.resetTurn();
-    }
+    this.config.resetTurn();
 
     const hooksEnabled = this.config.getEnableHooks();
     const messageBus = this.context.messageBus;
@@ -950,7 +966,6 @@ export class GeminiClient {
         signal,
         prompt_id,
         boundedTurns,
-        isInvalidStreamRetry,
         displayContent,
       );
 
@@ -1012,7 +1027,6 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            false,
             displayContent,
             true, // stopHookActive: signal retry to AfterAgent hooks
           );
@@ -1240,9 +1254,6 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
-    if (!this.config.getToolOutputMaskingEnabled()) {
-      return;
-    }
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,
@@ -1260,12 +1271,8 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     boundedTurns: number,
-    isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
-    controllerToAbort?: AbortController,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    controllerToAbort?.abort();
-
     // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
     this.loopDetector.clearDetection();
 
@@ -1285,7 +1292,6 @@ export class GeminiClient {
       signal,
       prompt_id,
       boundedTurns - 1,
-      isInvalidStreamRetry,
       displayContent,
     );
   }

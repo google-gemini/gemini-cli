@@ -8,15 +8,19 @@ import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
+import { useInputState, type InputState } from '../contexts/InputContext.js';
 import { TransientMessageType } from '../../utils/events.js';
 
-export function shouldShowToast(uiState: UIState): boolean {
+export function shouldShowToast(
+  uiState: UIState,
+  inputState: InputState,
+): boolean {
   return (
     uiState.ctrlCPressedOnce ||
     Boolean(uiState.transientMessage) ||
     uiState.ctrlDPressedOnce ||
-    (uiState.showEscapePrompt &&
-      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    (inputState.showEscapePrompt &&
+      (inputState.buffer.text.length > 0 || uiState.history.length > 0)) ||
     Boolean(uiState.queueErrorMessage) ||
     uiState.showIsExpandableHint
   );
@@ -24,6 +28,7 @@ export function shouldShowToast(uiState: UIState): boolean {
 
 export const ToastDisplay: React.FC = () => {
   const uiState = useUIState();
+  const inputState = useInputState();
 
   if (uiState.ctrlCPressedOnce) {
     return (
@@ -46,8 +51,8 @@ export const ToastDisplay: React.FC = () => {
     );
   }
 
-  if (uiState.showEscapePrompt) {
-    const isPromptEmpty = uiState.buffer.text.length === 0;
+  if (inputState.showEscapePrompt) {
+    const isPromptEmpty = inputState.buffer.text.length === 0;
     const hasHistory = uiState.history.length > 0;
 
     if (isPromptEmpty && !hasHistory) {

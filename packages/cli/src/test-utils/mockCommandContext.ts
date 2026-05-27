@@ -61,6 +61,7 @@ export const createMockCommandContext = (
       toggleCorgiMode: vi.fn(),
       toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
+      reloadCommands: vi.fn(),
       openAgentConfigDialog: vi.fn(),
       closeAgentConfigDialog: vi.fn(),
       extensionsUpdateState: new Map(),
@@ -111,5 +112,11 @@ export const createMockCommandContext = (
     return output;
   };
 
-  return merge(defaultMocks, overrides);
+  const merged: unknown = merge(defaultMocks, overrides);
+  const isCommandContext = (val: unknown): val is CommandContext =>
+    typeof val === 'object' && val !== null;
+  if (isCommandContext(merged)) {
+    return merged;
+  }
+  throw new Error('Unreachable');
 };

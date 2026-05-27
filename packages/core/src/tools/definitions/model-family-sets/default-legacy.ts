@@ -21,10 +21,11 @@ import {
   WRITE_TODOS_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -58,7 +59,6 @@ import {
   READ_MANY_PARAM_EXCLUDE,
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
-  MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -94,12 +94,14 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
         [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_FILE_PATH],
@@ -220,6 +222,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
+          minimum: 0,
         },
         [GREP_PARAM_AFTER]: {
           description:
@@ -510,30 +513,6 @@ Use this tool when the user's query implies needing the content of several files
     },
   },
 
-  save_memory: {
-    name: MEMORY_TOOL_NAME,
-    description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
-
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
-
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {
-        [MEMORY_PARAM_FACT]: {
-          type: 'string',
-          description:
-            'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
-        },
-      },
-      required: [MEMORY_PARAM_FACT],
-      additionalProperties: false,
-    },
-  },
-
   write_todos: {
     name: WRITE_TODOS_TOOL_NAME,
     description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
@@ -688,12 +667,12 @@ The agent did not use the todo list because this task could be completed by a ti
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
-                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               },
               [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
-                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
                 items: {
                   type: 'object',
                   required: [
@@ -722,7 +701,7 @@ The agent did not use the todo list because this task could be completed by a ti
               [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
-                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               },
             },
           },
@@ -749,4 +728,37 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  read_mcp_resource: {
+    name: READ_MCP_RESOURCE_TOOL_NAME,
+    description:
+      'Reads the content of a specified Model Context Protocol (MCP) resource.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          description: 'The URI of the MCP resource to read.',
+          type: 'string',
+        },
+      },
+      required: ['uri'],
+    },
+  },
+
+  list_mcp_resources: {
+    name: LIST_MCP_RESOURCES_TOOL_NAME,
+    description:
+      'Lists all available resources exposed by connected MCP servers.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        serverName: {
+          description:
+            'Optional filter to list resources from a specific server.',
+          type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
 };

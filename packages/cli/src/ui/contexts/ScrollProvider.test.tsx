@@ -14,6 +14,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
 import { Box, type DOMElement } from 'ink';
 import type { MouseEvent } from '../hooks/useMouse.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+
+vi.mock('../utils/terminalCapabilityManager.js', () => ({
+  terminalCapabilityManager: {
+    isGhosttyTerminal: vi.fn(() => false),
+  },
+}));
 
 // Mock useMouse hook
 const mockUseMouseCallbacks = new Set<(event: MouseEvent) => void | boolean>();
@@ -78,6 +85,7 @@ describe('ScrollProvider', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -519,5 +527,158 @@ describe('ScrollProvider', () => {
     }
 
     expect(scrollBy).toHaveBeenCalled();
+  });
+
+  describe('Scroll Acceleration', () => {
+    it('accelerates scroll for non-Ghostty terminals during rapid scrolling', async () => {
+      const scrollBy = vi.fn();
+      const getScrollState = vi.fn(() => ({
+        scrollTop: 50,
+        scrollHeight: 1000,
+        innerHeight: 10,
+      }));
+
+      vi.mocked(terminalCapabilityManager.isGhosttyTerminal).mockReturnValue(
+        false,
+      );
+
+      await render(
+        <ScrollProvider>
+          <TestScrollable
+            id="test-scrollable"
+            scrollBy={scrollBy}
+            getScrollState={getScrollState}
+          />
+        </ScrollProvider>,
+      );
+
+      const mouseEvent: MouseEvent = {
+        name: 'scroll-down',
+        col: 5,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+        button: 'none',
+      };
+
+      // Perform 60 rapid scrolls (within 50ms of each other)
+      for (let i = 0; i < 60; i++) {
+        for (const callback of mockUseMouseCallbacks) {
+          callback(mouseEvent);
+        }
+        // Advance time by 10ms for each scroll
+        vi.advanceTimersByTime(10);
+      }
+
+      await vi.runAllTimersAsync();
+
+      // We sum all calls to scrollBy as they might have been flushed individually due to advanceTimersByTime
+      const totalDelta = scrollBy.mock.calls.reduce(
+        (sum, call) => sum + call[0],
+        0,
+      );
+      expect(totalDelta).toBeGreaterThan(60);
+      expect(totalDelta).toBe(150);
+    });
+
+    it('does not accelerate for Ghostty terminals even during rapid scrolling', async () => {
+      const scrollBy = vi.fn();
+      const getScrollState = vi.fn(() => ({
+        scrollTop: 50,
+        scrollHeight: 1000,
+        innerHeight: 10,
+      }));
+
+      vi.mocked(terminalCapabilityManager.isGhosttyTerminal).mockReturnValue(
+        true,
+      );
+
+      await render(
+        <ScrollProvider>
+          <TestScrollable
+            id="test-scrollable"
+            scrollBy={scrollBy}
+            getScrollState={getScrollState}
+          />
+        </ScrollProvider>,
+      );
+
+      const mouseEvent: MouseEvent = {
+        name: 'scroll-down',
+        col: 5,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+        button: 'none',
+      };
+
+      for (let i = 0; i < 60; i++) {
+        for (const callback of mockUseMouseCallbacks) {
+          callback(mouseEvent);
+        }
+        vi.advanceTimersByTime(10);
+      }
+
+      await vi.runAllTimersAsync();
+
+      // No acceleration means 60 scrolls = delta 60
+      const totalDelta = scrollBy.mock.calls.reduce(
+        (sum, call) => sum + call[0],
+        0,
+      );
+      expect(totalDelta).toBe(60);
+    });
+
+    it('resets acceleration count if scrolling is slow', async () => {
+      const scrollBy = vi.fn();
+      const getScrollState = vi.fn(() => ({
+        scrollTop: 50,
+        scrollHeight: 1000,
+        innerHeight: 10,
+      }));
+
+      vi.mocked(terminalCapabilityManager.isGhosttyTerminal).mockReturnValue(
+        false,
+      );
+
+      await render(
+        <ScrollProvider>
+          <TestScrollable
+            id="test-scrollable"
+            scrollBy={scrollBy}
+            getScrollState={getScrollState}
+          />
+        </ScrollProvider>,
+      );
+
+      const mouseEvent: MouseEvent = {
+        name: 'scroll-down',
+        col: 5,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+        button: 'none',
+      };
+
+      // Perform scrolls with 100ms gap (greater than 50ms threshold)
+      for (let i = 0; i < 60; i++) {
+        for (const callback of mockUseMouseCallbacks) {
+          callback(mouseEvent);
+        }
+        vi.advanceTimersByTime(100);
+      }
+
+      await vi.runAllTimersAsync();
+
+      // No acceleration because gaps were too large
+      const totalDelta = scrollBy.mock.calls.reduce(
+        (sum, call) => sum + call[0],
+        0,
+      );
+      expect(totalDelta).toBe(60);
+    });
   });
 });

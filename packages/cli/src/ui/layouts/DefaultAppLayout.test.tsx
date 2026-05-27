@@ -5,8 +5,11 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DefaultAppLayout } from './DefaultAppLayout.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useInputState } from '../contexts/InputContext.js';
+
+vi.mock('../contexts/InputContext.js');
 import { StreamingState } from '../types.js';
 import { Text } from 'ink';
 import type { UIState } from '../contexts/UIStateContext.js';
@@ -95,6 +98,9 @@ const createMockShell = (pid: number): BackgroundTask => ({
 describe('<DefaultAppLayout />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useInputState).mockReturnValue({
+      copyModeEnabled: false,
+    } as unknown as ReturnType<typeof useInputState>);
     // Reset mock state defaults
     mockUIState.backgroundTasks = new Map();
     mockUIState.activeBackgroundTaskPid = null;

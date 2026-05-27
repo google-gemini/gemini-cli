@@ -76,29 +76,30 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-export async function resolveExecutable(
-  exe: string,
-): Promise<string | undefined> {
-  if (path.isAbsolute(exe)) {
-    try {
-      await fs.promises.access(exe, fs.constants.X_OK);
-      return exe;
-    } catch {
-      return undefined;
-    }
+function isExecutable(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  const paths = (process.env['PATH'] || '').split(path.delimiter);
+}
+
+export function resolveExecutable(exe: string): string | undefined {
+  if (path.isAbsolute(exe)) {
+    return isExecutable(exe) ? exe : undefined;
+  }
+  const pathEnv = process.env['PATH'];
+  if (!pathEnv) {
+    return undefined;
+  }
   const extensions =
     os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
-
-  for (const p of paths) {
+  for (const dir of pathEnv.split(path.delimiter)) {
     for (const ext of extensions) {
-      const fullPath = path.join(p, exe + ext);
-      try {
-        await fs.promises.access(fullPath, fs.constants.X_OK);
+      const fullPath = path.join(dir, exe + ext);
+      if (isExecutable(fullPath)) {
         return fullPath;
-      } catch {
-        continue;
       }
     }
   }
@@ -179,6 +180,7 @@ export interface ParsedCommandDetail {
   name: string;
   text: string;
   startIndex: number;
+  args?: string[];
 }
 
 interface CommandParseResult {
@@ -218,9 +220,16 @@ foreach ($commandAst in $commandAsts) {
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
   }
+  $args = @()
+  if ($commandAst.CommandElements.Count -gt 1) {
+    for ($i = 1; $i -lt $commandAst.CommandElements.Count; $i++) {
+      $args += $commandAst.CommandElements[$i].Extent.Text.Trim()
+    }
+  }
   $commandObjects += [PSCustomObject]@{
     name = $name
     text = $commandAst.Extent.Text.Trim()
+    args = $args
   }
 }
 [PSCustomObject]@{
@@ -232,11 +241,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -302,6 +315,20 @@ function normalizeCommandName(raw: string): string {
   return raw.trim();
 }
 
+/**
+ * Normalizes a command name for sandbox policy lookups.
+ * Converts to lowercase and removes the .exe extension for cross-platform consistency.
+ *
+ * @param commandName - The command name to normalize.
+ * @returns The normalized command name.
+ */
+export function normalizeCommand(commandName: string): string {
+  // Split by both separators and get the last non-empty part
+  const parts = commandName.split(/[\\/]/).filter(Boolean);
+  const base = parts.length > 0 ? parts[parts.length - 1] : '';
+  return base.toLowerCase().replace(/\.exe$/, '');
+}
+
 function extractNameFromNode(node: Node): string | null {
   switch (node.type) {
     case 'command': {
@@ -338,6 +365,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -355,11 +390,31 @@ function collectCommandDetails(
 
     const name = extractNameFromNode(current);
     if (name) {
-      details.push({
+      const detail: ParsedCommandDetail = {
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
-      });
+      };
+
+      if (current.type === 'command') {
+        const args: string[] = [];
+        const nameNode = current.childForFieldName('name');
+        for (let i = 0; i < current.childCount; i += 1) {
+          const child = current.child(i);
+          if (
+            child &&
+            child.type === 'word' &&
+            child.startIndex !== nameNode?.startIndex
+          ) {
+            args.push(child.text);
+          }
+        }
+        if (args.length > 0) {
+          detail.args = args;
+        }
+      }
+
+      details.push(detail);
     }
 
     // Traverse all children to find all sub-components (commands, redirections, etc.)
@@ -455,7 +510,7 @@ export function parseBashCommandDetails(
         'Syntax Errors:',
         syntaxErrors,
       );
-    } catch (_e) {
+    } catch {
       // Ignore query errors
     } finally {
       query?.delete();
@@ -509,7 +564,7 @@ function parsePowerShellCommandDetails(
 
     let parsed: {
       success?: boolean;
-      commands?: Array<{ name?: string; text?: string }>;
+      commands?: Array<{ name?: string; text?: string; args?: string[] }>;
       hasRedirection?: boolean;
     } | null = null;
     try {
@@ -524,7 +579,7 @@ function parsePowerShellCommandDetails(
     }
 
     const details = (parsed.commands ?? [])
-      .map((commandDetail) => {
+      .map((commandDetail): ParsedCommandDetail | null => {
         if (!commandDetail || typeof commandDetail.name !== 'string') {
           return null;
         }
@@ -539,6 +594,9 @@ function parsePowerShellCommandDetails(
           name,
           text,
           startIndex: 0,
+          args: Array.isArray(commandDetail.args)
+            ? commandDetail.args
+            : undefined,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -587,10 +645,23 @@ export function parseCommandDetails(
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, PowerShell 7 (pwsh.exe) is preferred over Windows PowerShell 5.1
+ * (powershell.exe) when available on PATH. Windows PowerShell 5.1 silently
+ * strips embedded double quotes from arguments to native executables — see
+ * issue #25859. PowerShell 7 uses standards-compliant argument passing and
+ * does not exhibit this regression. When pwsh.exe is not installed, we fall
+ * back to powershell.exe to preserve the existing behavior and the full
+ * cmdlet surface users depend on.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // -NonInteractive prevents PSReadLine from intercepting console input
+    // events inside the ConPTY session, which otherwise causes interactive
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
+    // and exit when arrow keys are pressed.
+    const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
@@ -600,16 +671,25 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: powershellArgsPrefix,
           shell: 'powershell',
         };
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
+    const pwshPath = resolveExecutable('pwsh.exe');
+    if (pwshPath) {
+      return {
+        executable: pwshPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: powershellArgsPrefix,
       shell: 'powershell',
     };
   }
@@ -638,9 +718,17 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
   switch (shell) {
     case 'powershell':
-      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      // For PowerShell, avoid quoting simple alphanumeric strings (like UUIDs).
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
+      // Otherwise, wrap in single quotes and escape internal single quotes by doubling them.
       return `'${arg.replace(/'/g, "''")}'`;
     case 'cmd':
+      // Avoid quoting simple strings for cmd.exe as well.
+      if (/^[a-zA-Z0-9\-_.]+$/.test(arg)) {
+        return arg;
+      }
       // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
       return `"${arg.replace(/"/g, '""')}"`;
     case 'bash':
@@ -802,34 +890,40 @@ export const spawnAsync = async (
 
   const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(finalCommand, finalArgs, {
-      ...options,
-      env: finalEnv,
-    });
-    let stdout = '';
-    let stderr = '';
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(finalCommand, finalArgs, {
+        ...options,
+        env: finalEnv,
+      });
+      let stdout = '';
+      let stderr = '';
 
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
-      }
-    });
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          reject(
+            new Error(`Command failed with exit code ${code}:\n${stderr}`),
+          );
+        }
+      });
 
-    child.on('error', (err) => {
-      reject(err);
+      child.on('error', (err) => {
+        reject(err);
+      });
     });
-  });
+  } finally {
+    prepared.cleanup?.();
+  }
 };
 
 /**
@@ -857,109 +951,231 @@ export async function* execStreaming(
     env: options?.env ?? process.env,
   });
 
-  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
-
-  const child = spawn(finalCommand, finalArgs, {
-    ...options,
-    env: finalEnv,
-    // ensure we don't open a window on windows if possible/relevant
-    windowsHide: true,
-  });
-
-  const rl = readline.createInterface({
-    input: child.stdout,
-    terminal: false,
-  });
-
-  const errorChunks: Buffer[] = [];
-  let stderrTotalBytes = 0;
-  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
-
-  child.stderr.on('data', (chunk) => {
-    if (stderrTotalBytes < MAX_STDERR_BYTES) {
-      errorChunks.push(chunk);
-      stderrTotalBytes += chunk.length;
-    }
-  });
-
-  let error: Error | null = null;
-  child.on('error', (err) => {
-    error = err;
-  });
-
-  const onAbort = () => {
-    // If manually aborted by signal, we kill immediately.
-    if (!child.killed) child.kill();
-  };
-
-  if (options?.signal?.aborted) {
-    onAbort();
-  } else {
-    options?.signal?.addEventListener('abort', onAbort);
-  }
-
-  let finished = false;
   try {
-    for await (const line of rl) {
-      if (options?.signal?.aborted) break;
-      yield line;
-    }
-    finished = true;
-  } finally {
-    rl.close();
-    options?.signal?.removeEventListener('abort', onAbort);
+    const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
 
-    // Ensure process is killed when the generator is closed (consumer breaks loop)
-    let killedByGenerator = false;
-    if (!finished && child.exitCode === null && !child.killed) {
-      try {
-        child.kill();
-      } catch (_e) {
-        // ignore error if process is already dead
+    const child = spawn(finalCommand, finalArgs, {
+      ...options,
+      env: finalEnv,
+      // ensure we don't open a window on windows if possible/relevant
+      windowsHide: true,
+    });
+
+    const rl = readline.createInterface({
+      input: child.stdout,
+      terminal: false,
+    });
+
+    const errorChunks: Buffer[] = [];
+    let stderrTotalBytes = 0;
+    const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+    child.stderr.on('data', (chunk) => {
+      if (stderrTotalBytes < MAX_STDERR_BYTES) {
+        errorChunks.push(chunk);
+        stderrTotalBytes += chunk.length;
       }
-      killedByGenerator = true;
+    });
+
+    let error: Error | null = null;
+    child.on('error', (err) => {
+      error = err;
+    });
+
+    const onAbort = () => {
+      // If manually aborted by signal, we kill immediately.
+      if (!child.killed) child.kill();
+    };
+
+    if (options?.signal?.aborted) {
+      onAbort();
+    } else {
+      options?.signal?.addEventListener('abort', onAbort);
     }
 
-    // Ensure we wait for the process to exit to check codes
-    await new Promise<void>((resolve, reject) => {
-      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
-      if (error) {
-        reject(error);
-        return;
+    let finished = false;
+    try {
+      for await (const line of rl) {
+        if (options?.signal?.aborted) break;
+        yield line;
+      }
+      finished = true;
+    } finally {
+      rl.close();
+      options?.signal?.removeEventListener('abort', onAbort);
+
+      // Ensure process is killed when the generator is closed (consumer breaks loop)
+      let killedByGenerator = false;
+      if (!finished && child.exitCode === null && !child.killed) {
+        try {
+          child.kill();
+        } catch {
+          // ignore error if process is already dead
+        }
+        killedByGenerator = true;
       }
 
-      function checkExit(code: number | null) {
-        // If we aborted or killed it manually, we treat it as success (stop waiting)
-        if (options?.signal?.aborted || killedByGenerator) {
-          resolve();
+      // Ensure we wait for the process to exit to check codes
+      await new Promise<void>((resolve, reject) => {
+        // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+        if (error) {
+          reject(error);
           return;
         }
 
-        const allowed = options?.allowedExitCodes ?? [0];
-        if (code !== null && allowed.includes(code)) {
-          resolve();
-        } else {
-          // If we have an accumulated error or explicit error event
-          if (error) reject(error);
-          else {
-            const stderr = Buffer.concat(errorChunks).toString('utf8');
-            const truncatedMsg =
-              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-            reject(
-              new Error(
-                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-              ),
-            );
+        function checkExit(code: number | null) {
+          // If we aborted or killed it manually, we treat it as success (stop waiting)
+          if (options?.signal?.aborted || killedByGenerator) {
+            resolve();
+            return;
+          }
+
+          const allowed = options?.allowedExitCodes ?? [0];
+          if (code !== null && allowed.includes(code)) {
+            resolve();
+          } else {
+            // If we have an accumulated error or explicit error event
+            if (error) reject(error);
+            else {
+              const stderr = Buffer.concat(errorChunks).toString('utf8');
+              const truncatedMsg =
+                stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+              reject(
+                new Error(
+                  `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+                ),
+              );
+            }
           }
         }
-      }
 
-      if (child.exitCode !== null) {
-        checkExit(child.exitCode);
-      } else {
-        child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
-      }
-    });
+        if (child.exitCode !== null) {
+          checkExit(child.exitCode);
+        } else {
+          child.on('close', (code) => checkExit(code));
+          child.on('error', (err) => {
+            reject(err);
+          });
+        }
+      });
+    }
+  } finally {
+    prepared.cleanup?.();
   }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

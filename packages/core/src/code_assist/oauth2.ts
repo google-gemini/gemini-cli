@@ -60,6 +60,10 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
     client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
+    quota_project_id:
+      process.env['GOOGLE_CLOUD_QUOTA_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'],
   };
 
   // Execute all registered post-authentication callbacks.
@@ -119,7 +123,8 @@ async function initOauthClient(
     credentials &&
     typeof credentials === 'object' &&
     'type' in credentials &&
-    credentials.type === 'external_account_authorized_user'
+    (credentials.type === 'external_account_authorized_user' ||
+      credentials.type === 'service_account')
   ) {
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
@@ -130,7 +135,7 @@ async function initOauthClient(
     });
     const token = await byoidClient.getAccessToken();
     if (token) {
-      debugLogger.debug('Created BYOID auth client.');
+      debugLogger.debug(`Created ${credentials.type} auth client.`);
       return byoidClient;
     }
   }
@@ -355,8 +360,10 @@ async function initOauthClient(
 
       // Note that SIGINT might not get raised on Ctrl+C in raw mode
       // so we also need to look for Ctrl+C directly in stdin.
+      // Only match a lone 0x03 byte — some terminals (e.g. Ghostty) embed
+      // 0x03 inside multi-byte escape sequences, causing false cancellations.
       stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
+        if (data.length === 1 && data[0] === 0x03) {
           reject(
             new FatalCancellationError('Authentication cancelled by user.'),
           );
@@ -423,6 +430,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
+    let authTimeoutId: NodeJS.Timeout | undefined;
     const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
@@ -430,20 +438,29 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         terminal: true,
       });
 
-      const timeout = setTimeout(() => {
-        rl.close();
-        reject(
+      const abortController = new AbortController();
+      authTimeoutId = setTimeout(() => {
+        abortController.abort(
           new FatalAuthenticationError(
             'Authorization timed out after 5 minutes.',
           ),
         );
       }, 300000); // 5 minute timeout
+      authTimeoutId.unref();
+
+      const onAbort = () => {
+        rl.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       rl.question('Enter the authorization code: ', (code) => {
-        clearTimeout(timeout);
+        abortController.signal.removeEventListener('abort', onAbort);
         rl.close();
         resolve(code.trim());
       });
+    }).finally(() => {
+      if (authTimeoutId) clearTimeout(authTimeoutId);
     });
 
     if (!code) {
@@ -662,8 +679,13 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(keyFileString);
+      const parsed: unknown = JSON.parse(keyFileString);
+      const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
+        typeof val === 'object' && val !== null;
+      if (isOAuthCreds(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid credentials format');
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(

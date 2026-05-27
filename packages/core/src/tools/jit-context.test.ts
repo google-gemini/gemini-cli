@@ -7,54 +7,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import type { Config } from '../config/config.js';
-import type { ContextManager } from '../services/contextManager.js';
+import type { MemoryContextManager } from '../context/memoryContextManager.js';
 
 describe('jit-context', () => {
   describe('discoverJitContext', () => {
     let mockConfig: Config;
-    let mockContextManager: ContextManager;
+    let mockMemoryContextManager: MemoryContextManager;
 
     beforeEach(() => {
-      mockContextManager = {
+      mockMemoryContextManager = {
         discoverContext: vi.fn().mockResolvedValue(''),
-      } as unknown as ContextManager;
+      } as unknown as MemoryContextManager;
 
       mockConfig = {
-        isJitContextEnabled: vi.fn().mockReturnValue(false),
-        getContextManager: vi.fn().mockReturnValue(mockContextManager),
+        getMemoryContextManager: vi
+          .fn()
+          .mockReturnValue(mockMemoryContextManager),
         getWorkspaceContext: vi.fn().mockReturnValue({
           getDirectories: vi.fn().mockReturnValue(['/app']),
         }),
       } as unknown as Config;
     });
 
-    it('should return empty string when JIT is disabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-
-      const result = await discoverJitContext(mockConfig, '/app/src/file.ts');
-
-      expect(result).toBe('');
-      expect(mockContextManager.discoverContext).not.toHaveBeenCalled();
-    });
-
-    it('should return empty string when contextManager is undefined', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+    it('should return empty string when memoryContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue(undefined);
 
       const result = await discoverJitContext(mockConfig, '/app/src/file.ts');
 
       expect(result).toBe('');
     });
 
-    it('should call contextManager.discoverContext with correct args when JIT is enabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockContextManager.discoverContext).mockResolvedValue(
+    it('should call memoryContextManager.discoverContext with correct args', async () => {
+      vi.mocked(mockMemoryContextManager.discoverContext).mockResolvedValue(
         'Subdirectory context content',
       );
 
       const result = await discoverJitContext(mockConfig, '/app/src/file.ts');
 
-      expect(mockContextManager.discoverContext).toHaveBeenCalledWith(
+      expect(mockMemoryContextManager.discoverContext).toHaveBeenCalledWith(
         '/app/src/file.ts',
         ['/app'],
       );
@@ -62,23 +52,21 @@ describe('jit-context', () => {
     });
 
     it('should pass all workspace directories as trusted roots', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
       vi.mocked(mockConfig.getWorkspaceContext).mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/app', '/lib']),
       } as unknown as ReturnType<Config['getWorkspaceContext']>);
-      vi.mocked(mockContextManager.discoverContext).mockResolvedValue('');
+      vi.mocked(mockMemoryContextManager.discoverContext).mockResolvedValue('');
 
       await discoverJitContext(mockConfig, '/app/src/file.ts');
 
-      expect(mockContextManager.discoverContext).toHaveBeenCalledWith(
+      expect(mockMemoryContextManager.discoverContext).toHaveBeenCalledWith(
         '/app/src/file.ts',
         ['/app', '/lib'],
       );
     });
 
     it('should return empty string when no new context is found', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockContextManager.discoverContext).mockResolvedValue('');
+      vi.mocked(mockMemoryContextManager.discoverContext).mockResolvedValue('');
 
       const result = await discoverJitContext(mockConfig, '/app/src/file.ts');
 
@@ -86,8 +74,7 @@ describe('jit-context', () => {
     });
 
     it('should return empty string when discoverContext throws', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockContextManager.discoverContext).mockRejectedValue(
+      vi.mocked(mockMemoryContextManager.discoverContext).mockRejectedValue(
         new Error('Permission denied'),
       );
 

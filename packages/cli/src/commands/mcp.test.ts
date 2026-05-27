@@ -32,7 +32,7 @@ describe('mcp command', () => {
 
     try {
       await parser.parse('mcp');
-    } catch (_error) {
+    } catch {
       // yargs might throw an error when demandCommand is not met
     }
 

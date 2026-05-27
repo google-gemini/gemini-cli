@@ -10,6 +10,7 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
   makeFakeConfig,
   CoreToolCallStatus,
@@ -279,8 +280,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
@@ -292,7 +293,7 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            summary: 'This is the summary',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
       ];
@@ -307,8 +308,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the summary');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the summary');
       unmount();
     });
 
@@ -364,6 +365,39 @@ describe('<ToolGroupMessage />', () => {
       expect(output).toContain('run_shell_command');
       expect(output).toContain('write_file');
       expect(output).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders update_topic in the middle of other tools', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'read_file',
+          status: CoreToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'topic-tool-middle',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Middle Topic',
+          },
+        }),
+        createToolCall({
+          callId: 'tool-2',
+          name: 'write_file',
+          status: CoreToolCallStatus.Success,
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot('update_topic_middle');
       unmount();
     });
 
@@ -481,7 +515,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
       const { lastFrame, unmount } = await renderWithProviders(
-        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+        <Scrollable height={12} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {

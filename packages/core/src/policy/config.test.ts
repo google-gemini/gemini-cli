@@ -24,6 +24,7 @@ import {
 import { Storage } from '../config/storage.js';
 import * as tomlLoader from './toml-loader.js';
 import { coreEvents } from '../utils/events.js';
+import { MCPServerConfig } from '../config/config.js';
 
 vi.unmock('../config/storage.js');
 
@@ -53,16 +54,16 @@ afterEach(() => {
 });
 
 describe('createPolicyEngineConfig', () => {
-  const MOCK_DEFAULT_DIR = '/tmp/mock/default/policies';
+  const MOCK_DEFAULT_DIR = nodePath.resolve('/tmp/mock/default/policies');
 
   beforeEach(async () => {
     clearEmittedPolicyWarnings();
     // Mock Storage to avoid host environment contamination
     vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
-      '/non/existent/user/policies',
+      nodePath.resolve('/non/existent/user/policies'),
     );
     vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
-      '/non/existent/system/policies',
+      nodePath.resolve('/non/existent/system/policies'),
     );
     vi.mocked(isDirectorySecure).mockResolvedValue({ secure: true });
   });
@@ -71,13 +72,14 @@ describe('createPolicyEngineConfig', () => {
    * Helper to mock a policy file in the filesystem.
    */
   function mockPolicyFile(path: string, content: string) {
+    const resolvedPath = nodePath.resolve(path);
     vi.mocked(
       fs.readdir as (path: PathLike) => Promise<string[] | Dirent[]>,
     ).mockImplementation(async (p) => {
-      if (nodePath.resolve(p.toString()) === nodePath.dirname(path)) {
+      if (nodePath.resolve(p.toString()) === nodePath.dirname(resolvedPath)) {
         return [
           {
-            name: nodePath.basename(path),
+            name: nodePath.basename(resolvedPath),
             isFile: () => true,
             isDirectory: () => false,
           } as unknown as Dirent,
@@ -91,13 +93,13 @@ describe('createPolicyEngineConfig', () => {
     });
 
     vi.mocked(fs.stat).mockImplementation(async (p) => {
-      if (nodePath.resolve(p.toString()) === nodePath.dirname(path)) {
+      if (nodePath.resolve(p.toString()) === nodePath.dirname(resolvedPath)) {
         return {
           isDirectory: () => true,
           isFile: () => false,
         } as unknown as Stats;
       }
-      if (nodePath.resolve(p.toString()) === path) {
+      if (nodePath.resolve(p.toString()) === resolvedPath) {
         return {
           isDirectory: () => false,
           isFile: () => true,
@@ -111,7 +113,7 @@ describe('createPolicyEngineConfig', () => {
     });
 
     vi.mocked(fs.readFile).mockImplementation(async (p) => {
-      if (nodePath.resolve(p.toString()) === path) {
+      if (nodePath.resolve(p.toString()) === resolvedPath) {
         return content;
       }
       return (
@@ -137,23 +139,21 @@ describe('createPolicyEngineConfig', () => {
       .spyOn(tomlLoader, 'loadPoliciesFromToml')
       .mockResolvedValue({ rules: [], checkers: [], errors: [] });
 
-    await createPolicyEngineConfig(
-      {},
-      ApprovalMode.DEFAULT,
-      '/tmp/mock/default/policies',
-    );
+    await createPolicyEngineConfig({}, ApprovalMode.DEFAULT, MOCK_DEFAULT_DIR);
 
     expect(loadPoliciesSpy).toHaveBeenCalled();
     const calledDirs = loadPoliciesSpy.mock.calls[0][0];
-    expect(calledDirs).not.toContain(systemPolicyDir);
-    expect(calledDirs).toContain('/non/existent/user/policies');
-    expect(calledDirs).toContain('/tmp/mock/default/policies');
+    expect(calledDirs).not.toContain(nodePath.resolve(systemPolicyDir));
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/user/policies'),
+    );
+    expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
   });
 
   it('should NOT filter out insecure supplemental admin policy directories', async () => {
-    const adminPolicyDir = '/insecure/admin/policies';
+    const adminPolicyDir = nodePath.resolve('/insecure/admin/policies');
     vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
-      if (nodePath.resolve(path) === nodePath.resolve(adminPolicyDir)) {
+      if (nodePath.resolve(path) === adminPolicyDir) {
         return { secure: false, reason: 'Insecure directory' };
       }
       return { secure: true };
@@ -166,14 +166,18 @@ describe('createPolicyEngineConfig', () => {
     await createPolicyEngineConfig(
       { adminPolicyPaths: [adminPolicyDir] },
       ApprovalMode.DEFAULT,
-      '/tmp/mock/default/policies',
+      MOCK_DEFAULT_DIR,
     );
 
     const calledDirs = loadPoliciesSpy.mock.calls[0][0];
     expect(calledDirs).toContain(adminPolicyDir);
-    expect(calledDirs).toContain('/non/existent/system/policies');
-    expect(calledDirs).toContain('/non/existent/user/policies');
-    expect(calledDirs).toContain('/tmp/mock/default/policies');
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/system/policies'),
+    );
+    expect(calledDirs).toContain(
+      nodePath.resolve('/non/existent/user/policies'),
+    );
+    expect(calledDirs).toContain(MOCK_DEFAULT_DIR);
   });
 
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
@@ -274,6 +278,145 @@ describe('createPolicyEngineConfig', () => {
         r.mcpName === 'untrusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(untrustedRule).toBeUndefined();
+  });
+
+  it('should NOT automatically allow configured MCP servers in non-interactive mode by default', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcpServers: {
+          'server-1': new MCPServerConfig('node', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      false, // non-interactive
+    );
+
+    const rule = config.rules?.find(
+      (r) => r.mcpName === 'server-1' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeUndefined();
+  });
+
+  it('should automatically allow configured MCP servers in non-interactive mode if opted-in', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcp: { autoAllowInHeadless: true },
+        mcpServers: {
+          'server-1': new MCPServerConfig('node', []),
+          'server-2': new MCPServerConfig('python', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      false, // non-interactive
+    );
+
+    const rule1 = config.rules?.find(
+      (r) => r.mcpName === 'server-1' && r.decision === PolicyDecision.ALLOW,
+    );
+    const rule2 = config.rules?.find(
+      (r) => r.mcpName === 'server-2' && r.decision === PolicyDecision.ALLOW,
+    );
+
+    expect(rule1).toBeDefined();
+    expect(rule1?.source).toBe('Settings (Headless MCP Auto-Allow)');
+    expect(rule2).toBeDefined();
+    expect(rule2?.source).toBe('Settings (Headless MCP Auto-Allow)');
+  });
+
+  it('should NOT automatically allow configured MCP servers in interactive mode even if opted-in', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcp: { autoAllowInHeadless: true },
+        mcpServers: {
+          'server-1': new MCPServerConfig('node', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      true, // interactive
+    );
+
+    const rule = config.rules?.find(
+      (r) => r.mcpName === 'server-1' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeUndefined();
+  });
+
+  it('should NOT duplicate allow rules if an MCP server is already explicitly allowed, wildcard allowed, or trusted', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcp: {
+          autoAllowInHeadless: true,
+          allowed: ['server-1', '*'],
+        },
+        mcpServers: {
+          'server-1': new MCPServerConfig('node', []),
+          'server-2': new MCPServerConfig('node', []),
+          'server-3': { trust: true },
+          'server-4': new MCPServerConfig('node', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      false, // non-interactive
+    );
+
+    // server-1: already in mcp.allowed
+    const rules1 = config.rules?.filter(
+      (r) => r.mcpName === 'server-1' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rules1).toHaveLength(1);
+    expect(rules1?.[0].source).toBe('Settings (MCP Allowed)');
+
+    // server-2: covered by '*' in mcp.allowed
+    // Note: the logic adds a rule for '*' which will match server-2 at runtime,
+    // but the loop in headless auto-allow should skip adding a specific rule for server-2.
+    const rules2 = config.rules?.filter(
+      (r) => r.mcpName === 'server-2' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rules2).toHaveLength(0);
+
+    // server-3: already trusted
+    const rules3 = config.rules?.filter(
+      (r) => r.mcpName === 'server-3' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rules3).toHaveLength(1);
+    expect(rules3?.[0].source).toBe('Settings (MCP Trusted)');
+
+    // server-4: NOT explicitly allowed or trusted, but SHOULD NOT be added because '*' exists in mcp.allowed
+    const rules4 = config.rules?.filter(
+      (r) => r.mcpName === 'server-4' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rules4).toHaveLength(0);
+
+    // Verify the wildcard rule exists
+    const wildcardRule = config.rules?.find(
+      (r) => r.mcpName === '*' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(wildcardRule).toBeDefined();
+    expect(wildcardRule?.toolName).toBe('mcp_*');
+  });
+
+  it('should use correct tool name pattern for wildcard server in headless auto-allow', async () => {
+    const config = await createPolicyEngineConfig(
+      {
+        mcp: { autoAllowInHeadless: true },
+        mcpServers: {
+          '*': new MCPServerConfig('node', []),
+        },
+      },
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+      false, // non-interactive
+    );
+
+    const rule = config.rules?.find(
+      (r) => r.mcpName === '*' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.toolName).toBe('mcp_*');
   });
 
   it('should handle multiple MCP server configurations together', async () => {
@@ -736,7 +879,9 @@ modes = ["plan"]
   });
 
   it('should deduplicate security warnings when called multiple times', async () => {
-    const systemPoliciesDir = '/tmp/gemini-cli-test/system/policies';
+    const systemPoliciesDir = nodePath.resolve(
+      '/tmp/gemini-cli-test/system/policies',
+    );
     vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
       systemPoliciesDir,
     );
@@ -756,7 +901,7 @@ modes = ["plan"]
 
     // First call
     await createPolicyEngineConfig(
-      { adminPolicyPaths: ['/tmp/other/admin/policies'] },
+      { adminPolicyPaths: [nodePath.resolve('/tmp/other/admin/policies')] },
       ApprovalMode.DEFAULT,
     );
     expect(feedbackSpy).toHaveBeenCalledWith(

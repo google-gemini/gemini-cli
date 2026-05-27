@@ -20,12 +20,12 @@ import {
   ShellExecutionService,
   ExecutionLifecycleService,
   CoreToolCallStatus,
+  escapeShellArg,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatBytes } from '../utils/formatters.js';
-import crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -362,18 +362,6 @@ export const useExecutionLifecycle = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
-      // On non-windows, wrap the command to capture the final working directory.
-      if (!isWindows) {
-        let command = rawQuery.trim();
-        const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
-        pwdFilePath = path.join(os.tmpdir(), pwdFileName);
-        // Ensure command ends with a separator before adding our own.
-        if (!command.endsWith(';') && !command.endsWith('&')) {
-          command += ';';
-        }
-        commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
-      }
-
       const executeCommand = async () => {
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
@@ -403,12 +391,27 @@ export const useExecutionLifecycle = (
         };
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-        onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
-
         try {
+          // On non-windows, wrap the command to capture the final working directory.
+          if (!isWindows) {
+            let command = rawQuery.trim();
+            if (command.endsWith('\\')) {
+              command += ' ';
+            }
+            const tmpDir = fs.mkdtempSync(
+              path.join(os.tmpdir(), 'gemini-shell-'),
+            );
+            pwdFilePath = path.join(tmpDir, 'pwd.tmp');
+            const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
+            commandToExecute = `{\n${command}\n}\n__code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
+          }
+
+          onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
+
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
             ...config.getShellExecutionConfig(),
+            sessionId: config.getSessionId(),
             terminalWidth,
             terminalHeight,
             defaultFg: activeTheme.colors.Foreground,
@@ -534,31 +537,69 @@ export const useExecutionLifecycle = (
               result.output.trim() || '(Command produced no output)';
           }
 
-          let finalOutput = mainContent;
+          let finalOutput: string | AnsiOutput =
+            result.ansiOutput && result.ansiOutput.length > 0
+              ? result.ansiOutput
+              : mainContent;
           let finalStatus = CoreToolCallStatus.Success;
+
+          const prependToAnsiOutput = (
+            output: AnsiOutput,
+            text: string,
+          ): AnsiOutput => {
+            const newLines: AnsiOutput = text.split('\n').map((line) => [
+              {
+                text: line,
+                fg: '',
+                bg: '',
+                dim: false,
+                bold: false,
+                italic: false,
+                underline: false,
+                inverse: false,
+                isUninitialized: false,
+              },
+            ]);
+            return [...newLines, [], ...output];
+          };
+
+          let prefix = '';
 
           if (result.error) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `${result.error.message}\n${finalOutput}`;
+            prefix = result.error.message;
           } else if (result.aborted) {
             finalStatus = CoreToolCallStatus.Cancelled;
-            finalOutput = `Command was cancelled.\n${finalOutput}`;
+            prefix = 'Command was cancelled.';
           } else if (result.backgrounded) {
             finalStatus = CoreToolCallStatus.Success;
             finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+            mainContent = finalOutput;
           } else if (result.signal) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
+            prefix = `Command terminated by signal: ${result.signal}.`;
           } else if (result.exitCode !== 0) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
+            prefix = `Command exited with code ${result.exitCode}.`;
+          }
+
+          if (prefix) {
+            finalOutput =
+              typeof finalOutput === 'string'
+                ? `${prefix}\n${finalOutput}`
+                : prependToAnsiOutput(finalOutput, prefix);
+            mainContent = `${prefix}\n${mainContent}`;
           }
 
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
             if (finalPwd && finalPwd !== targetDir) {
               const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
-              finalOutput = `${warning}\n\n${finalOutput}`;
+              finalOutput =
+                typeof finalOutput === 'string'
+                  ? `${warning}\n\n${finalOutput}`
+                  : prependToAnsiOutput(finalOutput, warning);
+              mainContent = `${warning}\n\n${mainContent}`;
             }
           }
 
@@ -578,7 +619,7 @@ export const useExecutionLifecycle = (
             );
           }
 
-          addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
+          addShellCommandToGeminiHistory(geminiClient, rawQuery, mainContent);
         } catch (err) {
           setPendingHistoryItem(null);
           const errorMessage = err instanceof Error ? err.message : String(err);
@@ -591,8 +632,18 @@ export const useExecutionLifecycle = (
           );
         } finally {
           abortSignal.removeEventListener('abort', abortHandler);
-          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            fs.unlinkSync(pwdFilePath);
+          if (pwdFilePath) {
+            const tmpDir = path.dirname(pwdFilePath);
+            try {
+              if (fs.existsSync(pwdFilePath)) {
+                fs.unlinkSync(pwdFilePath);
+              }
+              if (fs.existsSync(tmpDir)) {
+                fs.rmSync(tmpDir, { recursive: true, force: true });
+              }
+            } catch {
+              // Ignore cleanup errors
+            }
           }
 
           dispatch({ type: 'SET_ACTIVE_PTY', pid: null });

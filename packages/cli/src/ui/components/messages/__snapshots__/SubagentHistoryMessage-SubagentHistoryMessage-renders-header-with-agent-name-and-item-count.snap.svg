@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="105" viewBox="0 0 920 105">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="105" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#00cdcd" textLength="234" lengthAdjust="spacingAndGlyphs" font-weight="bold">🤖 research Trace (3 items)</text>
+    <text x="18" y="36" fill="#7f7f7f" textLength="270" lengthAdjust="spacingAndGlyphs">🧠 Thinking about the problem ✅</text>
+    <text x="18" y="53" fill="#e5e5e5" textLength="297" lengthAdjust="spacingAndGlyphs">🛠️ Calling search_web (Running...)</text>
+    <text x="18" y="70" fill="#e5e5e5" textLength="234" lengthAdjust="spacingAndGlyphs">🛠️ Calling read_file fail ❌</text>
+  </g>
+</svg>

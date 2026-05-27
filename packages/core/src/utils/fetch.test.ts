@@ -4,32 +4,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import {
-  isPrivateIp,
-  isPrivateIpAsync,
-  isAddressPrivate,
-  fetchWithTimeout,
-} from './fetch.js';
+import { updateGlobalFetchTimeouts } from './fetch.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
+
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent } = vi.hoisted(() => ({
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+  EnvHttpProxyAgent: vi.fn(),
+}));
+
+vi.mock('undici', () => ({
+  setGlobalDispatcher,
+  Agent,
+  EnvHttpProxyAgent,
+}));
 
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
 }));
 
-// Mock global fetch
-const originalFetch = global.fetch;
-global.fetch = vi.fn();
-
+// Import after mocks are established
+const {
+  isPrivateIp,
+  isPrivateIpAsync,
+  isAddressPrivate,
+  fetchWithTimeout,
+  setGlobalProxy,
+  createSafeProxyAgent,
+} = await import('./fetch.js');
 interface ErrorWithCode extends Error {
   code?: string;
 }
 
 describe('fetch utils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(global, 'fetch').mockImplementation(vi.fn() as any);
     // Default DNS lookup to return a public IP, or the IP itself if valid
     vi.mocked(
       dnsPromises.lookup as (
@@ -42,10 +55,12 @@ describe('fetch utils', () => {
       }
       return [{ address: '93.184.216.34', family: 4 }];
     });
+    vi.unstubAllEnvs();
+    updateGlobalFetchTimeouts(60000);
   });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('isAddressPrivate', () => {
@@ -161,7 +176,7 @@ describe('fetch utils', () => {
   });
 
   describe('fetchWithTimeout', () => {
-    it('should handle timeouts', async () => {
+    it('should throw FetchError with ETIMEDOUT on an internal timeout', async () => {
       vi.mocked(global.fetch).mockImplementation(
         (_input, init) =>
           new Promise((_resolve, reject) => {
@@ -181,6 +196,125 @@ describe('fetch utils', () => {
       await expect(fetchWithTimeout('http://example.com', 50)).rejects.toThrow(
         'Request timed out after 50ms',
       );
+    });
+
+    it('should throw an AbortError (not ETIMEDOUT) when the caller signal is aborted', async () => {
+      vi.mocked(global.fetch).mockImplementation(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            const rejectWithAbortError = () => {
+              const error = new Error('The operation was aborted');
+              error.name = 'AbortError';
+              // @ts-expect-error - for mocking purposes
+              error.code = 'ABORT_ERR';
+              reject(error);
+            };
+
+            // Handle the case where the signal is already aborted before
+            // fetch is called (e.g. controller.abort() called synchronously).
+            if (init?.signal?.aborted) {
+              rejectWithAbortError();
+              return;
+            }
+
+            if (init?.signal) {
+              init.signal.addEventListener('abort', rejectWithAbortError, {
+                once: true,
+              });
+            }
+          }),
+      );
+
+      const controller = new AbortController();
+      // Abort the external signal before the request even starts
+      controller.abort();
+
+      const rejection = fetchWithTimeout('http://example.com', 10_000, {
+        signal: controller.signal,
+      });
+
+      await expect(rejection).rejects.toMatchObject({ name: 'AbortError' });
+      // Must NOT be classified as a timeout
+      await expect(rejection).rejects.not.toThrow('timed out');
+    });
+  });
+
+  describe('setGlobalProxy', () => {
+    it('should configure EnvHttpProxyAgent with experiment flag timeout and noProxy', () => {
+      const proxyUrl = ' http://proxy.example.com ';
+      const noProxyValue = ' localhost,127.0.0.1 ';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      updateGlobalFetchTimeouts(45773134);
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: 'localhost,127.0.0.1',
+        headersTimeout: 45773134,
+        bodyTimeout: 300000,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalled();
+    });
+
+    it('should fall back to no_proxy if NO_PROXY is not set', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('no_proxy', noProxyValue);
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: noProxyValue,
+        }),
+      );
+    });
+
+    it('should handle empty NO_PROXY', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      vi.stubEnv('NO_PROXY', '');
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: '',
+        }),
+      );
+    });
+
+    it('should handle multi-entry NO_PROXY with trimming', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      const noProxyValue = '  google.com, 127.0.0.1 , localhost  ';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      setGlobalProxy(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          noProxy: 'google.com, 127.0.0.1 , localhost',
+        }),
+      );
+    });
+  });
+
+  describe('createSafeProxyAgent', () => {
+    it('should create an EnvHttpProxyAgent with trimmed values and default timeouts', () => {
+      const proxyUrl = ' http://proxy.example.com ';
+      const noProxyValue = ' localhost,127.0.0.1 ';
+      vi.stubEnv('NO_PROXY', noProxyValue);
+
+      createSafeProxyAgent(proxyUrl);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: 'localhost,127.0.0.1',
+        headersTimeout: 60000,
+        bodyTimeout: 300000,
+      });
     });
   });
 });

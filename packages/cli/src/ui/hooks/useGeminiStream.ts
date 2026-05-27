@@ -26,6 +26,8 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  SHELL_TOOL_NAME,
+  hasRedirection,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -39,7 +41,8 @@ import {
   isBackgroundExecutionData,
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
-  shouldHideToolCall,
+  isRenderedInHistory,
+  buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
@@ -84,6 +87,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
+import { isCompactTool } from '../components/messages/ToolGroupMessage.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -222,10 +226,13 @@ export const useGeminiStream = (
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: (error: string) => void,
-  performMemoryRefresh: () => Promise<void>,
+  _performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -246,15 +253,8 @@ export const useGeminiStream = (
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
-  const [isResponding, setIsRespondingState] = useState<boolean>(false);
-  const isRespondingRef = useRef<boolean>(false);
-  const setIsResponding = useCallback(
-    (value: boolean) => {
-      setIsRespondingState(value);
-      isRespondingRef.current = value;
-    },
-    [setIsRespondingState],
-  );
+  const [isResponding, isRespondingRef, setIsResponding] =
+    useStateAndRef<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -266,26 +266,27 @@ export const useGeminiStream = (
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
-  const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const storage = config.storage;
-  const logger = useLogger(storage);
+  const logger = useLogger(config);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot(), storage);
-  }, [config, storage]);
+    return new GitService(config.getProjectRoot(), config.storage);
+  }, [config]);
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      if (turnCancelledRef.current || !isRespondingRef.current) {
+        return;
+      }
       setRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, []);
+  }, [isRespondingRef]);
 
   const [
     toolCalls,
@@ -303,9 +304,32 @@ export const useGeminiStream = (
           (tc) => !pushedToolCallIdsRef.current.has(tc.request.callId),
         );
         if (toolsToPush.length > 0) {
+          const isCompactModeEnabled =
+            settings.merged.ui?.compactToolOutput === true;
+          const firstToolToPush = toolsToPush[0];
+          const tcIndex = toolCalls.indexOf(firstToolToPush);
+          const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
+
+          let borderTop = isFirstToolInGroupRef.current;
+          if (!borderTop && prevTool) {
+            // If the first tool in this push is non-compact but follows a compact tool,
+            // we must start a new border group.
+            const currentIsCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
+              isCompactModeEnabled,
+            );
+            const prevWasCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(prevTool).tools[0],
+              isCompactModeEnabled,
+            );
+            if (!currentIsCompact && prevWasCompact) {
+              borderTop = true;
+            }
+          }
+
           addItem(
             mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
-              borderTop: isFirstToolInGroupRef.current,
+              borderTop,
               borderBottom: true,
               borderColor: theme.border.default,
               borderDimColor: false,
@@ -340,9 +364,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
-          completedToolCallsFromScheduler as TrackedToolCall[],
-        );
+        await handleCompletedTools(completedToolCallsFromScheduler);
       }
     },
     config,
@@ -472,26 +494,85 @@ export const useGeminiStream = (
 
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
+      const isFirstInThisPush = isFirstToolInGroupRef.current;
+      const isCompactModeEnabled =
+        settings.merged.ui?.compactToolOutput === true;
+
+      const groups: TrackedToolCall[][] = [];
+      let currentGroup: TrackedToolCall[] = [];
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
+
+        if (tc.tool?.kind === Kind.Agent) {
+          currentGroup.push(tc);
+        } else {
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+            currentGroup = [];
+          }
+          groups.push([tc]);
+        }
+      }
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
       }
 
-      const isLastInBatch =
-        toolsToPush[toolsToPush.length - 1] === toolCalls[toolCalls.length - 1];
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        const isFirstInBatch = i === 0 && isFirstInThisPush;
+        const lastTcInGroup = group[group.length - 1];
+        const tcIndexInBatch = toolCalls.indexOf(lastTcInGroup);
+        const isLastInBatch = tcIndexInBatch === toolCalls.length - 1;
 
-      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
-        borderTop: isFirstToolInGroupRef.current,
-        borderBottom: isLastInBatch,
-        ...getToolGroupBorderAppearance(
-          { type: 'tool_group', tools: toolCalls },
-          activeShellPtyId,
-          !!isShellFocused,
-          [],
-          backgroundTasks,
-        ),
-      });
-      addItem(historyItem);
+        const nextTcInBatch =
+          tcIndexInBatch < toolCalls.length - 1
+            ? toolCalls[tcIndexInBatch + 1]
+            : null;
+        const prevTcInBatch =
+          toolCalls.indexOf(group[0]) > 0
+            ? toolCalls[toolCalls.indexOf(group[0]) - 1]
+            : null;
+
+        const historyItem = mapTrackedToolCallsToDisplay(group, {
+          ...getToolGroupBorderAppearance(
+            { type: 'tool_group', tools: toolCalls },
+            activeShellPtyId,
+            !!isShellFocused,
+            [],
+            backgroundTasks,
+          ),
+        });
+
+        // Determine if this group starts with a compact tool
+        const currentIsCompact =
+          historyItem.tools.length === 1 &&
+          isCompactTool(historyItem.tools[0], isCompactModeEnabled);
+
+        let nextIsCompact = false;
+        if (nextTcInBatch) {
+          const nextHistoryItem = mapTrackedToolCallsToDisplay(nextTcInBatch);
+          nextIsCompact =
+            nextHistoryItem.tools.length === 1 &&
+            isCompactTool(nextHistoryItem.tools[0], isCompactModeEnabled);
+        }
+
+        let prevWasCompact = false;
+        if (prevTcInBatch) {
+          const prevHistoryItem = mapTrackedToolCallsToDisplay(prevTcInBatch);
+          prevWasCompact =
+            prevHistoryItem.tools.length === 1 &&
+            isCompactTool(prevHistoryItem.tools[0], isCompactModeEnabled);
+        }
+
+        historyItem.borderTop =
+          isFirstInBatch || (!currentIsCompact && prevWasCompact);
+        historyItem.borderBottom = currentIsCompact
+          ? isLastInBatch && !nextIsCompact
+          : isLastInBatch || nextIsCompact;
+
+        addItem(historyItem);
+      }
 
       setPushedToolCallIds(newPushed);
 
@@ -516,6 +597,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundTasks,
+    settings.merged.ui?.compactToolOutput,
   ]);
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
@@ -569,31 +651,9 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const anyVisibleInHistory = pushedToolCallIds.size > 0;
-    const anyVisibleInPending = remainingTools.some((tc) => {
-      const displayName = tc.tool?.displayName ?? tc.request.name;
-
-      let hasResultDisplay = false;
-      if (
-        tc.status === CoreToolCallStatus.Success ||
-        tc.status === CoreToolCallStatus.Error ||
-        tc.status === CoreToolCallStatus.Cancelled
-      ) {
-        hasResultDisplay = !!tc.response?.resultDisplay;
-      } else if (tc.status === CoreToolCallStatus.Executing) {
-        hasResultDisplay = !!tc.liveOutput;
-      }
-
+    const isToolVisible = (tc: TrackedToolCall) => {
       // AskUser tools and Plan Mode write/edit are handled by this logic
-      if (
-        shouldHideToolCall({
-          displayName,
-          status: tc.status,
-          approvalMode: tc.approvalMode,
-          hasResultDisplay,
-          parentCallId: tc.request.parentCallId,
-        })
-      ) {
+      if (!isRenderedInHistory(buildToolVisibilityContext(tc))) {
         return false;
       }
 
@@ -607,12 +667,25 @@ export const useGeminiStream = (
       // ToolGroupMessage now shows all non-canceled tools, so they are visible
       // in pending and we need to draw the closing border for them.
       return true;
-    });
+    };
+
+    let lastVisibleIsCompact = false;
+    const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+    for (let i = toolCalls.length - 1; i >= 0; i--) {
+      if (isToolVisible(toolCalls[i])) {
+        const mapped = mapTrackedToolCallsToDisplay(toolCalls[i]);
+        lastVisibleIsCompact = mapped.tools[0]
+          ? isCompactTool(mapped.tools[0], isCompactModeEnabled)
+          : false;
+        break;
+      }
+    }
 
     if (
       toolCalls.length > 0 &&
       !(allTerminal && allPushed) &&
-      (anyVisibleInHistory || anyVisibleInPending)
+      toolCalls.some(isToolVisible) &&
+      !lastVisibleIsCompact
     ) {
       items.push({
         type: 'tool_group' as const,
@@ -630,6 +703,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundTasks,
+    settings.merged.ui?.compactToolOutput,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -733,99 +807,129 @@ export const useGeminiStream = (
     [addItem, config, isLowErrorVerbosity],
   );
 
-  const cancelOngoingRequest = useCallback(() => {
-    if (
-      streamingState !== StreamingState.Responding &&
-      streamingState !== StreamingState.WaitingForConfirmation
-    ) {
-      return;
-    }
-    if (turnCancelledRef.current) {
-      return;
-    }
-    turnCancelledRef.current = true;
-
-    // A full cancellation means no tools have produced a final result yet.
-    // This determines if we show a generic "Request cancelled" message.
-    const isFullCancellation = !toolCalls.some(
-      (tc) => tc.status === 'success' || tc.status === 'error',
-    );
-
-    // Ensure we have an abort controller, creating one if it doesn't exist.
-    if (!abortControllerRef.current) {
-      abortControllerRef.current = new AbortController();
-    }
-
-    // The order is important here.
-    // 1. Fire the signal to interrupt any active async operations.
-    abortControllerRef.current.abort();
-    // 2. Call the imperative cancel to clear the queue of pending tools.
-    cancelAllToolCalls(abortControllerRef.current.signal);
-
-    if (pendingHistoryItemRef.current) {
-      const isShellCommand =
-        pendingHistoryItemRef.current.type === 'tool_group' &&
-        pendingHistoryItemRef.current.tools.some(
-          (t) => t.name === SHELL_COMMAND_NAME,
-        );
-
-      // If it is a shell command, we update the status to Canceled and clear the output
-      // to avoid artifacts, then add it to history immediately.
-      if (isShellCommand) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
-        const updatedTools = toolGroup.tools.map((tool) => {
-          if (tool.name === SHELL_COMMAND_NAME) {
-            return {
-              ...tool,
-              status: CoreToolCallStatus.Cancelled,
-              resultDisplay: tool.resultDisplay,
-            };
-          }
-          return tool;
-        });
-        addItem({ ...toolGroup, tools: updatedTools } as HistoryItemWithoutId);
-      } else {
-        addItem(pendingHistoryItemRef.current);
+  const cancelOngoingRequest = useCallback(
+    (clearBuffer: boolean = true) => {
+      // If we are already cancelled, do nothing
+      if (turnCancelledRef.current) {
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
-    setPendingHistoryItem(null);
 
-    // If it was a full cancellation, add the info message now.
-    // Otherwise, we let handleCompletedTools figure out the next step,
-    // which might involve sending partial results back to the model.
-    if (isFullCancellation) {
-      // If shell is active, we delay this message to ensure correct ordering
-      // (Shell item first, then Info message).
-      if (!activeShellPtyId) {
-        addItem({
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        });
-        setIsResponding(false);
+      const hasActiveTools = toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          tc.status === CoreToolCallStatus.Scheduled ||
+          tc.status === CoreToolCallStatus.Validating,
+      );
+
+      // If we are not responding, not waiting for confirmation, and have no active tools,
+      // there is nothing to abort.
+      if (
+        streamingState === StreamingState.Idle &&
+        !isRespondingRef.current &&
+        !hasActiveTools
+      ) {
+        // Even if we are "idle", if we are called with clearBuffer=true (Ctrl+C),
+        // we still want to clear the buffer.
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
 
-    onCancelSubmit(false);
-    setShellInputFocused(false);
-  }, [
-    streamingState,
-    addItem,
-    setPendingHistoryItem,
-    onCancelSubmit,
-    pendingHistoryItemRef,
-    setShellInputFocused,
-    cancelAllToolCalls,
-    toolCalls,
-    activeShellPtyId,
-    setIsResponding,
-  ]);
+      turnCancelledRef.current = true;
+      setRetryStatus(null);
+
+      // A full cancellation means no tools have produced a final result yet.
+      // This determines if we show a generic "Request cancelled" message.
+      const isFullCancellation = !toolCalls.some(
+        (tc) => tc.status === 'success' || tc.status === 'error',
+      );
+
+      // Ensure we have an abort controller, creating one if it doesn't exist.
+      if (!abortControllerRef.current) {
+        abortControllerRef.current = new AbortController();
+      }
+
+      // The order is important here.
+      // 1. Fire the signal to interrupt any active async operations.
+      abortControllerRef.current.abort();
+      // 2. Call the imperative cancel to clear the queue of pending tools.
+      cancelAllToolCalls(abortControllerRef.current.signal);
+
+      if (pendingHistoryItemRef.current) {
+        // If it is a shell command, we update the status to Canceled and clear the output
+        // to avoid artifacts, then add it to history immediately.
+        if (
+          pendingHistoryItemRef.current.type === 'tool_group' &&
+          pendingHistoryItemRef.current.tools.some(
+            (t) => t.name === SHELL_COMMAND_NAME,
+          )
+        ) {
+          const toolGroup = pendingHistoryItemRef.current;
+          const updatedTools = toolGroup.tools.map((tool) => {
+            if (tool.name === SHELL_COMMAND_NAME) {
+              return {
+                ...tool,
+                status: CoreToolCallStatus.Cancelled,
+                resultDisplay: tool.resultDisplay,
+              };
+            }
+            return tool;
+          });
+          const newToolGroup: HistoryItemToolGroup = {
+            ...toolGroup,
+            tools: updatedTools,
+          };
+          addItem(newToolGroup);
+        } else {
+          addItem(pendingHistoryItemRef.current);
+        }
+      }
+      setPendingHistoryItem(null);
+
+      // If it was a full cancellation, add the info message now.
+      // Otherwise, we let handleCompletedTools figure out the next step,
+      // which might involve sending partial results back to the model.
+      if (isFullCancellation) {
+        // If shell is active, we delay this message to ensure correct ordering
+        // (Shell item first, then Info message).
+        if (!activeShellPtyId) {
+          addItem({
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          });
+          setIsResponding(false);
+        }
+      }
+
+      onCancelSubmit(false, clearBuffer);
+      setShellInputFocused(false);
+    },
+    [
+      streamingState,
+      addItem,
+      setPendingHistoryItem,
+      onCancelSubmit,
+      pendingHistoryItemRef,
+      isRespondingRef,
+      setShellInputFocused,
+      cancelAllToolCalls,
+      toolCalls,
+      activeShellPtyId,
+      setIsResponding,
+    ],
+  );
 
   useKeypress(
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
-        cancelOngoingRequest();
+        cancelOngoingRequest(false);
+        return true;
       }
+      return false;
     },
     {
       isActive:
@@ -1488,6 +1592,7 @@ export const useGeminiStream = (
           operation: options?.isContinuation
             ? GeminiCliOperation.SystemPrompt
             : GeminiCliOperation.UserPrompt,
+          sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
@@ -1566,7 +1671,6 @@ export const useGeminiStream = (
                 abortSignal,
                 prompt_id!,
                 undefined,
-                false,
                 query,
               );
               const processingStatus = await processGeminiStreamEvents(
@@ -1670,6 +1774,7 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      isRespondingRef,
       settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
@@ -1716,10 +1821,21 @@ export const useGeminiStream = (
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
+        // or shell commands with redirection (which act as edits).
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) =>
-            EDIT_TOOL_NAMES.has(call.request.name),
-          );
+          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) => {
+            if (EDIT_TOOL_NAMES.has(call.request.name)) {
+              return true;
+            }
+
+            if (call.request.name === SHELL_TOOL_NAME) {
+              const command = (call.request.args as { command?: string })
+                .command;
+              return command && hasRedirection(command);
+            }
+
+            return false;
+          });
         }
 
         // Process pending tool calls sequentially to reduce UI chaos
@@ -1780,8 +1896,8 @@ export const useGeminiStream = (
         if (geminiClient) {
           for (const tool of clientTools) {
             // Only manually record skill activations in the chat history.
-            // Other client-initiated tools (like save_memory) update the system
-            // prompt/context and don't strictly need to be in the history.
+            // Other client-initiated tools update context and don't strictly
+            // need to be in the history.
             if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
               continue;
             }
@@ -1808,14 +1924,6 @@ export const useGeminiStream = (
         }
       }
 
-      // Identify new, successful save_memory calls that we haven't processed yet.
-      const newSuccessfulMemorySaves = completedAndReadyToSubmitTools.filter(
-        (t) =>
-          t.request.name === 'save_memory' &&
-          t.status === 'success' &&
-          !processedMemoryToolsRef.current.has(t.request.callId),
-      );
-
       for (const toolCall of completedAndReadyToSubmitTools) {
         const backgroundedTool = getBackgroundedToolInfo(toolCall);
         if (backgroundedTool) {
@@ -1825,15 +1933,6 @@ export const useGeminiStream = (
             backgroundedTool.initialOutput,
           );
         }
-      }
-
-      if (newSuccessfulMemorySaves.length > 0) {
-        // Perform the refresh only if there are new ones.
-        void performMemoryRefresh();
-        // Mark them as processed so we don't do this again on the next render.
-        newSuccessfulMemorySaves.forEach((t) =>
-          processedMemoryToolsRef.current.add(t.request.callId),
-        );
       }
 
       const geminiTools = completedAndReadyToSubmitTools.filter(
@@ -1873,11 +1972,20 @@ export const useGeminiStream = (
       }
 
       // If all the tools were cancelled, don't submit a response to Gemini.
-      const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === CoreToolCallStatus.Cancelled,
+      // Note: we ignore the topic tool because the user doesn't have a chance to decline it.
+      const declinableTools = geminiTools.filter(
+        (tc) => !isTopicTool(tc.request.name),
       );
+      const allDeclinableToolsCancelled =
+        declinableTools.length > 0 &&
+        declinableTools.every(
+          (tc) => tc.status === CoreToolCallStatus.Cancelled,
+        );
+      const allToolsCancelled =
+        geminiTools.length > 0 &&
+        geminiTools.every((tc) => tc.status === CoreToolCallStatus.Cancelled);
 
-      if (allToolsCancelled) {
+      if (allDeclinableToolsCancelled || allToolsCancelled) {
         // If the turn was cancelled via the imperative escape key flow,
         // the cancellation message is added there. We check the ref to avoid duplication.
         if (!turnCancelledRef.current) {
@@ -1950,7 +2058,6 @@ export const useGeminiStream = (
       submitQuery,
       markToolsAsSubmitted,
       geminiClient,
-      performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundTask,
@@ -2003,7 +2110,7 @@ export const useGeminiStream = (
         }
 
         if (checkpointsToWrite.size > 0) {
-          const checkpointDir = storage.getProjectTempCheckpointsDir();
+          const checkpointDir = config.storage.getProjectTempCheckpointsDir();
           try {
             await fs.mkdir(checkpointDir, { recursive: true });
             for (const [fileName, content] of checkpointsToWrite) {
@@ -2020,15 +2127,7 @@ export const useGeminiStream = (
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
-  }, [
-    toolCalls,
-    config,
-    onDebugMessage,
-    gitService,
-    history,
-    geminiClient,
-    storage,
-  ]);
+  }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
   const lastOutputTime = Math.max(
     lastToolOutputTime,

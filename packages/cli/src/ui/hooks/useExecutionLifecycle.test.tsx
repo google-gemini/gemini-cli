@@ -16,7 +16,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { NoopSandboxManager } from '@google/gemini-cli-core';
+import { NoopSandboxManager, escapeShellArg } from '@google/gemini-cli-core';
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
@@ -76,7 +76,21 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     isBinary: mockIsBinary,
   };
 });
-vi.mock('node:fs');
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mockFs = {
+    ...actual,
+    existsSync: vi.fn(),
+    mkdtempSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    readFileSync: vi.fn(),
+    rmSync: vi.fn(),
+  };
+  return {
+    ...mockFs,
+    default: mockFs,
+  };
+});
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
   const mocked = {
@@ -101,6 +115,7 @@ import {
   type GeminiClient,
   type ShellExecutionResult,
   type ShellOutputEvent,
+  type AnsiOutput,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
@@ -132,6 +147,7 @@ describe('useExecutionLifecycle', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getSessionId: () => 'test-session-id',
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
@@ -152,6 +168,7 @@ describe('useExecutionLifecycle', () => {
     );
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.mkdtempSync).mockReturnValue('/tmp/gemini-shell-abcdef');
 
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
@@ -237,17 +254,39 @@ describe('useExecutionLifecycle', () => {
         }),
       ],
     });
-    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
-    const wrappedCommand = `{ ls -l; }; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
+    const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+    const wrappedCommand = `{\nls -l\n}\n__code=$?; pwd > ${escapedTmpFile}; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       '/test/dir',
       expect.any(Function),
       expect.any(Object),
       false,
-      expect.any(Object),
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('should pass the config sessionId into shell execution config', async () => {
+    const { result } = await renderProcessorHook();
+
+    await act(async () => {
+      result.current.handleShellCommand('top', new AbortController().signal);
+    });
+
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      expect.any(String),
+      '/test/dir',
+      expect.any(Function),
+      expect.any(Object),
+      false,
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
+    );
   });
 
   it('should handle successful execution and update history correctly', async () => {
@@ -326,11 +365,9 @@ describe('useExecutionLifecycle', () => {
         );
       });
 
-      // Verify it's using the non-pty shell
-      const wrappedCommand = `{ stream; }; __code=$?; pwd > "${path.join(
-        os.tmpdir(),
-        'shell_pwd_abcdef.tmp',
-      )}"; exit $__code`;
+      const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{\nstream\n}\n__code=$?; pwd > ${escapedTmpFile}; exit $__code`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         '/test/dir',
@@ -521,6 +558,53 @@ describe('useExecutionLifecycle', () => {
     );
   });
 
+  it('should prepend warnings to AnsiOutput array', async () => {
+    const { result } = await renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand('ls', new AbortController().signal);
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    const ansiOutput: AnsiOutput = [
+      [
+        {
+          text: 'ansi line 1',
+          fg: '',
+          bg: '',
+          bold: false,
+          dim: false,
+          italic: false,
+          underline: false,
+          inverse: false,
+          isUninitialized: false,
+        },
+      ],
+    ];
+
+    act(() => {
+      resolveExecutionPromise(
+        createMockServiceResult({
+          exitCode: 1,
+          output: 'ansi line 1',
+          ansiOutput,
+        }),
+      );
+    });
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
+
+    const historyCall = addItemToHistoryMock.mock.calls[1][0];
+    const display = historyCall.tools[0].resultDisplay;
+
+    expect(Array.isArray(display)).toBe(true);
+    expect(display.length).toBe(3); // Error line, empty line, original output
+    expect(display[0][0].text).toBe('Command exited with code 1.');
+    expect(display[2][0].text).toBe('ansi line 1');
+  });
+
   it('should handle promise rejection and show an error', async () => {
     const { result } = await renderProcessorHook();
     const testError = new Error('Unexpected failure');
@@ -574,7 +658,7 @@ describe('useExecutionLifecycle', () => {
       type: 'error',
       text: 'An unexpected error occurred: Synchronous spawn error',
     });
-    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
     // Verify that the temporary file was cleaned up
     expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
     expect(setShellInputFocusedMock).toHaveBeenCalledWith(false);
@@ -582,7 +666,7 @@ describe('useExecutionLifecycle', () => {
 
   describe('Directory Change Warning', () => {
     it('should show a warning if the working directory changes', async () => {
-      const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+      const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('/test/dir/new'); // A different directory
 

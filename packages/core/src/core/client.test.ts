@@ -39,7 +39,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -62,6 +62,10 @@ vi.mock('node:fs', () => {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
+    }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
     }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
@@ -203,6 +207,7 @@ describe('Gemini Client (client.ts)', () => {
       authType: AuthType.USE_GEMINI,
     };
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
@@ -218,10 +223,13 @@ describe('Gemini Client (client.ts)', () => {
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       getSystemInstructionMemory: vi.fn().mockReturnValue(''),
       getSessionMemory: vi.fn().mockReturnValue(''),
-      isJitContextEnabled: vi.fn().mockReturnValue(false),
-      getContextManager: vi.fn().mockReturnValue(undefined),
-      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
+      getMemoryContextManager: vi.fn().mockReturnValue(undefined),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingConfig: vi.fn().mockReturnValue({
+        protectionThresholdTokens: 50000,
+        minPrunableThresholdTokens: 30000,
+        protectLatestTurn: true,
+      }),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -250,7 +258,6 @@ describe('Gemini Client (client.ts)', () => {
       getCompressionThreshold: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
-      getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
@@ -279,16 +286,10 @@ describe('Gemini Client (client.ts)', () => {
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
-      isExperimentalAgentHistoryTruncationEnabled: vi
-        .fn()
-        .mockReturnValue(false),
-      getExperimentalAgentHistoryTruncationThreshold: vi
-        .fn()
-        .mockReturnValue(30),
-      getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(15),
-      isExperimentalAgentHistorySummarizationEnabled: vi
-        .fn()
-        .mockReturnValue(false),
+
+      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
+      getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -388,19 +389,19 @@ describe('Gemini Client (client.ts)', () => {
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
     });
 
-    it('should refresh ContextManager to reset JIT loaded paths', async () => {
+    it('should refresh MemoryContextManager to reset JIT loaded paths', async () => {
       const mockRefresh = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(mockConfig.getContextManager).mockReturnValue({
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue({
         refresh: mockRefresh,
-      } as unknown as ReturnType<typeof mockConfig.getContextManager>);
+      } as unknown as ReturnType<typeof mockConfig.getMemoryContextManager>);
 
       await client.resetChat();
 
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
 
-    it('should not fail when ContextManager is undefined', async () => {
-      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+    it('should not fail when MemoryContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue(undefined);
 
       await expect(client.resetChat()).resolves.not.toThrow();
     });
@@ -716,9 +717,9 @@ describe('Gemini Client (client.ts)', () => {
   describe('sendMessageStream', () => {
     it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
       // Arrange
-      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+      mockConfig.getContextManagementConfig = vi
         .fn()
-        .mockReturnValue(true);
+        .mockReturnValue({ enabled: true });
       const manageHistorySpy = vi
         .spyOn(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1000,7 +1001,7 @@ ${JSON.stringify(
         { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
-        undefined,
+        expect.objectContaining({ displayContent: undefined }),
       );
     });
 
@@ -1242,9 +1243,6 @@ ${JSON.stringify(
         count: 2,
       });
 
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-
-      // Act
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
@@ -1265,7 +1263,6 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
-      expect(abortSpy).toHaveBeenCalled();
       expect(finalResult).toBeInstanceOf(Turn);
     });
 
@@ -1306,9 +1303,6 @@ ${JSON.stringify(
     });
 
     it('should stop infinite loop after MAX_TURNS when nextSpeaker always returns model', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        true,
-      );
       // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
       const { checkNextSpeaker } = await import(
         '../utils/nextSpeakerChecker.js'
@@ -1490,7 +1484,7 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (_) {
+      } catch {
         // If the test framework times out, that also demonstrates the infinite loop
       }
 
@@ -1522,8 +1516,8 @@ ${JSON.stringify(
       // A string of length 404 is roughly 101 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1582,8 +1576,8 @@ ${JSON.stringify(
       // We need a request > 100 tokens.
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
-      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      // estimateTextOnlyLength counts only text content (404 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.25);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -1878,7 +1872,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1896,7 +1890,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // Second turn
@@ -1914,7 +1908,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1932,7 +1926,7 @@ ${JSON.stringify(
           { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // New prompt
@@ -1954,7 +1948,7 @@ ${JSON.stringify(
           { model: 'new-routed-model', isChatModel: true },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -1982,7 +1976,7 @@ ${JSON.stringify(
           { model: 'original-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -2005,13 +1999,12 @@ ${JSON.stringify(
           { model: 'fallback-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
     });
 
-    it('should use getSystemInstructionMemory for system instruction when JIT is enabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
+    it('should use getSystemInstructionMemory for system instruction', async () => {
       vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
         'Global JIT Memory',
       );
@@ -2024,23 +2017,6 @@ ${JSON.stringify(
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
         'Global JIT Memory',
-      );
-    });
-
-    it('should use getSystemInstructionMemory for system instruction when JIT is disabled', async () => {
-      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
-        'Legacy Memory',
-      );
-
-      const { getCoreSystemPrompt } = await import('./prompts.js');
-      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
-
-      client.updateSystemInstruction();
-
-      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
-        mockConfig,
-        'Legacy Memory',
       );
     });
 
@@ -2061,82 +2037,36 @@ ${JSON.stringify(
       );
     });
 
-    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received for Gemini 2 models', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        true,
+    it('should update system instruction when ApprovalModeChanged event is emitted', async () => {
+      const { ApprovalMode } = await import('../policy/types.js');
+
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('session-1');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Current Memory',
       );
-      // Arrange - router must return a Gemini 2 model for retry to trigger
-      mockRouterService.route.mockResolvedValue({
-        model: 'gemini-2.0-flash',
-        reason: 'test',
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+      mockGetCoreSystemPrompt.mockClear();
+
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: 'session-1',
+        mode: ApprovalMode.YOLO,
       });
 
-      const mockStream1 = (async function* () {
-        yield { type: GeminiEventType.InvalidStream };
-      })();
-      const mockStream2 = (async function* () {
-        yield { type: GeminiEventType.Content, value: 'Continued content' };
-      })();
-
-      mockTurnRunFn
-        .mockReturnValueOnce(mockStream1)
-        .mockReturnValueOnce(mockStream2);
-
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        setTools: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-        getLastPromptTokenCount: vi.fn(),
-      };
-      client['chat'] = mockChat as GeminiChat;
-
-      const initialRequest = [{ text: 'Hi' }];
-      const promptId = 'prompt-id-invalid-stream';
-      const signal = new AbortController().signal;
-
-      // Act
-      const stream = client.sendMessageStream(initialRequest, signal, promptId);
-      const events = await fromAsync(stream);
-
-      // Assert
-      expect(events).toEqual([
-        { type: GeminiEventType.ModelInfo, value: 'gemini-2.0-flash' },
-        { type: GeminiEventType.InvalidStream },
-        { type: GeminiEventType.Content, value: 'Continued content' },
-      ]);
-
-      // Verify that turn.run was called twice
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
-
-      // First call with original request
-      expect(mockTurnRunFn).toHaveBeenNthCalledWith(
-        1,
-        { model: 'gemini-2.0-flash', isChatModel: true },
-        initialRequest,
-        expect.any(AbortSignal),
-        undefined,
-      );
-
-      // Second call with "Please continue."
-      expect(mockTurnRunFn).toHaveBeenNthCalledWith(
-        2,
-        { model: 'gemini-2.0-flash', isChatModel: true },
-        [{ text: 'System: Please continue.' }],
-        expect.any(AbortSignal),
-        undefined,
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Current Memory',
       );
     });
 
-    it('should not recursively call sendMessageStream with "Please continue." when InvalidStream event is received and flag is false', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        false,
-      );
-      // Arrange
-      const mockStream1 = (async function* () {
+    it('should propagate InvalidStream events without injecting "Please continue." or recursing', async () => {
+      // Arrange: a single turn that yields an InvalidStream event.
+      const mockStream = (async function* () {
         yield { type: GeminiEventType.InvalidStream };
       })();
 
-      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+      mockTurnRunFn.mockReturnValueOnce(mockStream);
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
@@ -2154,101 +2084,14 @@ ${JSON.stringify(
       const stream = client.sendMessageStream(initialRequest, signal, promptId);
       const events = await fromAsync(stream);
 
-      // Assert
+      // Assert: the InvalidStream event is forwarded to the consumer and the
+      // turn ends. No "System: Please continue." is injected and turn.run is
+      // not called a second time.
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
       ]);
-
-      // Verify that turn.run was called only once
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        true,
-      );
-      // Arrange - router returns a non-Gemini-2 model
-      mockRouterService.route.mockResolvedValue({
-        model: 'gemini-3.0-pro',
-        reason: 'test',
-      });
-
-      const mockStream1 = (async function* () {
-        yield { type: GeminiEventType.InvalidStream };
-      })();
-
-      mockTurnRunFn.mockReturnValueOnce(mockStream1);
-
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        setTools: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-        getLastPromptTokenCount: vi.fn(),
-      };
-      client['chat'] = mockChat as GeminiChat;
-
-      const initialRequest = [{ text: 'Hi' }];
-      const promptId = 'prompt-id-invalid-stream-non-g2';
-      const signal = new AbortController().signal;
-
-      // Act
-      const stream = client.sendMessageStream(initialRequest, signal, promptId);
-      const events = await fromAsync(stream);
-
-      // Assert
-      expect(events).toEqual([
-        { type: GeminiEventType.ModelInfo, value: 'gemini-3.0-pro' },
-        { type: GeminiEventType.InvalidStream },
-      ]);
-
-      // Verify that turn.run was called only once (no retry)
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should stop recursing after one retry when InvalidStream events are repeatedly received', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        true,
-      );
-      // Arrange - router must return a Gemini 2 model for retry to trigger
-      mockRouterService.route.mockResolvedValue({
-        model: 'gemini-2.0-flash',
-        reason: 'test',
-      });
-      // Always return a new invalid stream
-      mockTurnRunFn.mockImplementation(() =>
-        (async function* () {
-          yield { type: GeminiEventType.InvalidStream };
-        })(),
-      );
-
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        setTools: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-        getLastPromptTokenCount: vi.fn(),
-      };
-      client['chat'] = mockChat as GeminiChat;
-
-      const initialRequest = [{ text: 'Hi' }];
-      const promptId = 'prompt-id-infinite-invalid-stream';
-      const signal = new AbortController().signal;
-
-      // Act
-      const stream = client.sendMessageStream(initialRequest, signal, promptId);
-      const events = await fromAsync(stream);
-
-      // Assert
-      // We expect 3 events (model_info + original + 1 retry)
-      expect(events.length).toBe(3);
-      expect(
-        events
-          .filter((e) => e.type === GeminiEventType.ModelInfo)
-          .map((e) => e.value),
-      ).toEqual(['gemini-2.0-flash']);
-
-      // Verify that turn.run was called twice
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
     });
 
     describe('Editor context delta', () => {
@@ -2585,7 +2428,7 @@ ${JSON.stringify(
           expect.objectContaining({ model: 'model-a' }),
           expect.anything(),
           expect.anything(),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
       });
 
@@ -2627,42 +2470,6 @@ ${JSON.stringify(
         await fromAsync(stream);
 
         expect(mockConfig.resetTurn).toHaveBeenCalled();
-      });
-
-      it('should NOT reset turn on invalid stream retry', async () => {
-        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
-          {
-            selectedModel: 'model-a',
-            skipped: [],
-          },
-        );
-        // We simulate a retry by calling sendMessageStream with isInvalidStreamRetry=true
-        // But the public API doesn't expose that argument directly unless we use the private method or simulate the recursion.
-        // We can simulate recursion by mocking turn run to return invalid stream once.
-
-        vi.spyOn(
-          client['config'],
-          'getContinueOnFailedApiCall',
-        ).mockReturnValue(true);
-        const mockStream1 = (async function* () {
-          yield { type: GeminiEventType.InvalidStream };
-        })();
-        const mockStream2 = (async function* () {
-          yield { type: 'content', value: 'ok' };
-        })();
-        mockTurnRunFn
-          .mockReturnValueOnce(mockStream1)
-          .mockReturnValueOnce(mockStream2);
-
-        const stream = client.sendMessageStream(
-          [{ text: 'Hi' }],
-          new AbortController().signal,
-          'prompt-retry',
-        );
-        await fromAsync(stream);
-
-        // resetTurn should be called once (for the initial call) but NOT for the recursive call
-        expect(mockConfig.resetTurn).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -3662,7 +3469,7 @@ ${JSON.stringify(
           expect.anything(),
           [{ text: 'Please explain' }],
           expect.anything(),
-          undefined,
+          expect.objectContaining({ displayContent: undefined }),
         );
 
         // First call should have stopHookActive=false, retry should have stopHookActive=true

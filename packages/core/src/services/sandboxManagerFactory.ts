@@ -24,10 +24,6 @@ export function createSandboxManager(
   options: GlobalSandboxOptions,
   approvalMode?: string,
 ): SandboxManager {
-  if (approvalMode === 'yolo') {
-    return new NoopSandboxManager();
-  }
-
   if (!options.modeConfig && options.policyManager && approvalMode) {
     options.modeConfig = options.policyManager.getModeConfig(approvalMode);
   }
@@ -40,8 +36,8 @@ export function createSandboxManager(
     } else if (os.platform() === 'darwin') {
       return new MacOsSandboxManager(options);
     }
-    return new LocalSandboxManager();
+    return new LocalSandboxManager(options);
   }
 
-  return new NoopSandboxManager();
+  return new NoopSandboxManager(options);
 }

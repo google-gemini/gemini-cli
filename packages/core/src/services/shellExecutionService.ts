@@ -13,7 +13,6 @@ import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
-import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
@@ -81,6 +80,40 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   return `${BASH_SHOPT_GUARD} ${command}`;
 }
 
+// On Windows, a new ConPTY session inherits its codepage from the system
+// OEMCP (microsoft/terminal `src/host/settings.cpp:41` defaults
+// `_uCodePage` to `Globals.uiOEMCP`, set from `GetOEMCP()` in
+// `srvinit.cpp:44`). On locales without "Beta: Use Unicode UTF-8 for
+// worldwide language support" the OEMCP is a legacy codepage (e.g. 850,
+// 866, 936, 932), and conhost converts every byte from the child via
+// `MultiByteToWideChar(gci.OutputCP, ...)` in `_stream.cpp:341-343`,
+// turning UTF-8 output from child processes (perl, python, node, ...)
+// into mojibake.
+//
+// `CreatePseudoConsole` does not accept a codepage argument
+// (microsoft/terminal#9174 — open as a feature request). The only way
+// to set the ConPTY codepage is from inside the new session via
+// `SetConsoleOutputCP` (intercepted by conhost in `getset.cpp:1144`).
+// Prefix the command with `chcp 65001` so the first thing the new
+// session does is switch its codepage to UTF-8.
+function injectUtf8CodepageForPty(
+  command: string,
+  shell: ShellType,
+  isWindows: boolean,
+  usingPty: boolean,
+): string {
+  if (!isWindows || !usingPty) {
+    return command;
+  }
+  if (shell === 'powershell') {
+    return `chcp 65001 >$null;${command}`;
+  }
+  if (shell === 'cmd') {
+    return `chcp 65001>nul&${command}`;
+  }
+  return command;
+}
+
 /** A structured result from a shell command execution. */
 export type ShellExecutionResult = ExecutionResult;
 
@@ -103,6 +136,8 @@ export interface ShellExecutionConfig {
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
+  originalCommand?: string;
+  sessionId?: string;
 }
 
 /**
@@ -110,10 +145,14 @@ export interface ShellExecutionConfig {
  */
 export type ShellOutputEvent = ExecutionOutputEvent;
 
+export type DestroyablePty = IPty & { destroy?: () => void };
+
 interface ActivePty {
-  ptyProcess: IPty;
+  ptyProcess: DestroyablePty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  command: string;
+  sessionId?: string;
 }
 
 interface ActiveChildProcess {
@@ -124,6 +163,8 @@ interface ActiveChildProcess {
     sniffChunks: Buffer[];
     binaryBytesReceived: number;
   };
+  command: string;
+  sessionId?: string;
 }
 
 const findLastContentLine = (
@@ -230,11 +271,28 @@ const writeBufferToLogStream = (
  *
  */
 
+export type BackgroundProcess = {
+  pid: number;
+  command: string;
+  status: 'running' | 'exited';
+  exitCode?: number | null;
+  signal?: number | null;
+};
+
+export type BackgroundProcessRecord = Omit<BackgroundProcess, 'pid'> & {
+  startTime: number;
+  endTime?: number;
+};
+
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static backgroundLogPids = new Set<number>();
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
+  private static backgroundProcessHistory = new Map<
+    string, // sessionId
+    Map<number, BackgroundProcessRecord>
+  >();
 
   static getLogDir(): string {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
@@ -313,7 +371,7 @@ export class ShellExecutionService {
             shellExecutionConfig,
             ptyInfo,
           );
-        } catch (_e) {
+        } catch {
           // Fallback to child_process
         }
       }
@@ -364,11 +422,13 @@ export class ShellExecutionService {
     cwd: string,
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
+    usingPty: boolean,
   ): Promise<{
     program: string;
     args: string[];
-    env: Record<string, string | undefined>;
+    env: NodeJS.ProcessEnv;
     cwd: string;
+    cleanup?: () => void;
   }> {
     const sandboxManager =
       shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
@@ -388,11 +448,16 @@ export class ShellExecutionService {
       executable = 'cmd.exe';
     }
 
-    const resolvedExecutable =
-      (await resolveExecutable(executable)) ?? executable;
+    const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-    const spawnArgs = [...argsPrefix, guardedCommand];
+    const finalCommand = injectUtf8CodepageForPty(
+      guardedCommand,
+      shell,
+      isWindows,
+      usingPty,
+    );
+    const spawnArgs = [...argsPrefix, finalCommand];
 
     // 2. Prepare Environment
     const gitConfigKeys: string[] = [];
@@ -474,6 +539,7 @@ export class ShellExecutionService {
       args: sandboxedCommand.args,
       env: sandboxedCommand.env,
       cwd: sandboxedCommand.cwd ?? cwd,
+      cleanup: sandboxedCommand.cleanup,
     };
   }
 
@@ -485,27 +551,38 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
   ): Promise<ShellExecutionHandle> {
+    let cmdCleanup: (() => void) | undefined;
     try {
       const isWindows = os.platform() === 'win32';
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        isInteractive,
+        false,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        isInteractive,
-      );
+      } = prepared;
 
+      // Bun's child_process does not properly call setsid() for detached
+      // processes, leaving children in the parent's session without a
+      // controlling terminal. They receive SIGHUP immediately. Disable
+      // detached mode in Bun; killProcessGroup already falls back to
+      // direct-pid kill when the group kill fails.
+      const isBun = 'bun' in process.versions;
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
-        detached: !isWindows,
+        detached: !isWindows && !isBun,
         env: finalEnv,
       });
 
@@ -516,10 +593,12 @@ export class ShellExecutionService {
         binaryBytesReceived: 0,
       };
 
-      if (child.pid) {
+      if (child.pid !== undefined) {
         this.activeChildProcesses.set(child.pid, {
           process: child,
           state,
+          command: shellExecutionConfig.originalCommand ?? commandToExecute,
+          sessionId: shellExecutionConfig.sessionId,
         });
       }
 
@@ -582,14 +661,8 @@ export class ShellExecutionService {
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
-          const encoding = getCachedEncodingForBuffer(data);
-          try {
-            stdoutDecoder = new TextDecoder(encoding);
-            stderrDecoder = new TextDecoder(encoding);
-          } catch {
-            stdoutDecoder = new TextDecoder('utf-8');
-            stderrDecoder = new TextDecoder('utf-8');
-          }
+          stdoutDecoder = new TextDecoder('utf-8');
+          stderrDecoder = new TextDecoder('utf-8');
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -599,7 +672,7 @@ export class ShellExecutionService {
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-          const sniffBuffer = Buffer.concat(state.sniffChunks.slice(0, 20));
+          const sniffBuffer = Buffer.concat(state.sniffChunks);
           sniffedBytes = sniffBuffer.length;
 
           if (isBinary(sniffBuffer)) {
@@ -661,6 +734,7 @@ export class ShellExecutionService {
         signal: NodeJS.Signals | null,
       ) => {
         cleanup();
+        cmdCleanup?.();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -672,7 +746,10 @@ export class ShellExecutionService {
 
         const finalStrippedOutput = stripAnsi(combinedOutput).trim();
         const exitCode = code;
-        const exitSignal = signal ? os.constants.signals[signal] : null;
+        const exitSignal =
+          signal && os.constants.signals
+            ? (os.constants.signals[signal] ?? null)
+            : null;
 
         const resultPayload: ShellExecutionResult = {
           rawOutput: Buffer.from(''),
@@ -692,6 +769,17 @@ export class ShellExecutionService {
             exitCode,
             signal: exitSignal,
           };
+
+          const sessionId = shellExecutionConfig.sessionId ?? 'default';
+          const history =
+            ShellExecutionService.backgroundProcessHistory.get(sessionId);
+          const historyItem = history?.get(pid);
+          if (historyItem) {
+            historyItem.status = 'exited';
+            historyItem.exitCode = exitCode ?? undefined;
+            historyItem.signal = exitSignal ?? undefined;
+            historyItem.endTime = Date.now();
+          }
           onOutputEvent(event);
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -724,7 +812,7 @@ export class ShellExecutionService {
 
       abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-      child.on('exit', (code, signal) => {
+      child.on('close', (code, signal) => {
         handleExit(code, signal);
       });
 
@@ -771,6 +859,7 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
       return {
         pid: undefined,
         result: Promise.resolve({
@@ -786,6 +875,41 @@ export class ShellExecutionService {
       };
     }
   }
+  /**
+   * Destroys a PTY process to release its file descriptors.
+   * This is critical to prevent system-wide PTY exhaustion (see #15945).
+   */
+  private static destroyPtyProcess(ptyProcess: DestroyablePty): void {
+    try {
+      if (typeof ptyProcess?.destroy === 'function') {
+        ptyProcess.destroy();
+      } else if (typeof ptyProcess?.kill === 'function') {
+        // Fallback: if destroy() is unavailable, kill() may still close FDs
+        ptyProcess.kill();
+      }
+    } catch {
+      // Ignore errors during PTY cleanup — process may already be dead
+    }
+  }
+
+  /**
+   * Cleans up all resources associated with a PTY entry:
+   * the PTY process (file descriptors) and the headless terminal (memory buffers).
+   */
+  private static cleanupPtyEntry(pid: number): void {
+    const entry = this.activePtys.get(pid);
+    if (!entry) return;
+
+    this.destroyPtyProcess(entry.ptyProcess);
+
+    try {
+      entry.headlessTerminal.dispose();
+    } catch {
+      // Ignore errors during terminal cleanup
+    }
+
+    this.activePtys.delete(pid);
+  }
 
   private static async executeWithPty(
     commandToExecute: string,
@@ -799,24 +923,30 @@ export class ShellExecutionService {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
     }
-    let spawnedPty: IPty | undefined;
+    let spawnedPty: DestroyablePty | undefined;
+    let cmdCleanup: (() => void) | undefined;
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        true,
+        true,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        true,
-      );
+      } = prepared;
 
+      const isWindowsPlatform = os.platform() === 'win32';
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -824,11 +954,20 @@ export class ShellExecutionService {
         cols,
         rows,
         env: finalEnv,
-        handleFlowControl: true,
+        // handleFlowControl intercepts XON/XOFF (Ctrl+S/Q) and prevents them
+        // from reaching the child.  On Windows, the flag can interfere with
+        // ConPTY's internal input routing and cause interactive TUI tools to
+        // miss key events, so we disable it there.
+        handleFlowControl: !isWindowsPlatform,
+        // On Windows, explicitly request ConPTY (introduced in Windows 10 1809).
+        // Without this, @lydell/node-pty may silently fall back to WinPTY, which
+        // has known incompatibilities with interactive Node.js TUI applications
+        // that rely on VT-sequence-based arrow-key navigation.
+        ...(isWindowsPlatform ? { useConpty: true } : {}),
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      spawnedPty = ptyProcess as IPty;
+      spawnedPty = ptyProcess as DestroyablePty;
       const ptyPid = Number(ptyProcess.pid);
 
       const headlessTerminal = new Terminal({
@@ -844,6 +983,8 @@ export class ShellExecutionService {
         ptyProcess,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+        command: shellExecutionConfig.originalCommand ?? commandToExecute,
+        sessionId: shellExecutionConfig.sessionId,
       });
 
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
@@ -860,15 +1001,15 @@ export class ShellExecutionService {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             pty: ptyProcess,
           }).catch(() => {});
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
-          } catch {
-            // Ignore errors during cleanup
-          }
-          this.activePtys.delete(ptyPid);
         },
         isActive: () => {
+          // On Windows, process.kill(pid, 0) can return false negatives
+          // for ConPTY-managed shell wrappers (powershell.exe), causing
+          // writeToPty to silently discard input (including arrow keys).
+          // Check the internal activePtys map first for reliable status.
+          if (ShellExecutionService.activePtys.has(ptyPid)) {
+            return true;
+          }
           try {
             return process.kill(ptyPid, 0);
           } catch {
@@ -1027,12 +1168,7 @@ export class ShellExecutionService {
           () =>
             new Promise<void>((resolveChunk) => {
               if (!decoder) {
-                const encoding = getCachedEncodingForBuffer(data);
-                try {
-                  decoder = new TextDecoder(encoding);
-                } catch {
-                  decoder = new TextDecoder('utf-8');
-                }
+                decoder = new TextDecoder('utf-8');
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
@@ -1042,10 +1178,10 @@ export class ShellExecutionService {
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks.slice(0, 20));
+                const sniffBuffer = Buffer.concat(sniffChunks);
                 sniffedBytes = sniffBuffer.length;
 
-                if (isBinary(sniffBuffer)) {
+                if (isBinary(sniffBuffer, 512, true)) {
                   isStreamingRawContent = false;
                   binaryBytesReceived = sniffBuffer.length;
                   const event: ShellOutputEvent = { type: 'binary_detected' };
@@ -1094,23 +1230,53 @@ export class ShellExecutionService {
         ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
-          // Attempt to destroy the PTY to ensure FD is closed
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
-          } catch {
-            // Ignore errors during cleanup
-          }
+
+          // Immediately destroy the PTY to release its master FD.
+          // The headless terminal is kept alive until finalize() extracts
+          // its buffer contents, then disposed to free memory.
+          ShellExecutionService.destroyPtyProcess(ptyProcess);
 
           const finalize = () => {
             render(true);
+            cmdCleanup?.();
 
             const event: ShellOutputEvent = {
               type: 'exit',
               exitCode,
               signal: signal ?? null,
             };
+
+            const sessionId = shellExecutionConfig.sessionId ?? 'default';
+            const history =
+              ShellExecutionService.backgroundProcessHistory.get(sessionId);
+            const historyItem = history?.get(ptyPid);
+            if (historyItem) {
+              historyItem.status = 'exited';
+              historyItem.exitCode = exitCode;
+              historyItem.signal = signal ?? null;
+              historyItem.endTime = Date.now();
+            }
             onOutputEvent(event);
+
+            const endLine = headlessTerminal.buffer.active.length;
+            const startLine = Math.max(
+              0,
+              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+            );
+            const ansiOutputSnapshot = serializeTerminalToObject(
+              headlessTerminal,
+              startLine,
+              endLine,
+            );
+            const finalOutput = getFullBufferText(headlessTerminal);
+
+            // Dispose the headless terminal to free scrollback buffers.
+            // This must happen after getFullBufferText() extracts the output.
+            try {
+              headlessTerminal.dispose();
+            } catch {
+              // Ignore errors during terminal cleanup
+            }
 
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
@@ -1119,7 +1285,8 @@ export class ShellExecutionService {
 
             ExecutionLifecycleService.completeWithResult(ptyPid, {
               rawOutput: Buffer.from(''),
-              output: getFullBufferText(headlessTerminal),
+              output: finalOutput,
+              ansiOutput: ansiOutputSnapshot,
               exitCode,
               signal: signal ?? null,
               error,
@@ -1170,16 +1337,13 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
 
       if (spawnedPty) {
-        try {
-          (spawnedPty as IPty & { destroy?: () => void }).destroy?.();
-        } catch {
-          // Ignore errors during cleanup
-        }
+        ShellExecutionService.destroyPtyProcess(spawnedPty);
       }
 
-      if (error.message.includes('posix_spawnp failed')) {
+      if (error?.message?.includes('posix_spawnp failed')) {
         onOutputEvent({
           type: 'data',
           chunk:
@@ -1203,7 +1367,6 @@ export class ShellExecutionService {
       }
     }
   }
-
   /**
    * Writes a string to the pseudo-terminal (PTY) of a running process.
    *
@@ -1240,9 +1403,9 @@ export class ShellExecutionService {
    */
   static async kill(pid: number): Promise<void> {
     await this.cleanupLogStream(pid);
-    this.activePtys.delete(pid);
     this.activeChildProcesses.delete(pid);
     ExecutionLifecycleService.kill(pid);
+    this.cleanupPtyEntry(pid);
   }
 
   /**
@@ -1251,16 +1414,57 @@ export class ShellExecutionService {
    *
    * @param pid The process ID of the target PTY.
    */
-  static background(pid: number): void {
+  static background(pid: number, sessionId?: string, command?: string): void {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
+
+    const resolvedSessionId =
+      sessionId ?? activePty?.sessionId ?? activeChild?.sessionId;
+    const resolvedCommand =
+      command ??
+      activePty?.command ??
+      activeChild?.command ??
+      'unknown command';
+
+    if (!resolvedSessionId) {
+      throw new Error('Session ID is required for background operations');
+    }
+
+    const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
+    const history =
+      this.backgroundProcessHistory.get(resolvedSessionId) ??
+      new Map<
+        number,
+        {
+          command: string;
+          status: 'running' | 'exited';
+          exitCode?: number | null;
+          signal?: number | null;
+          startTime: number;
+          endTime?: number;
+        }
+      >();
+
+    if (history.size >= MAX_BACKGROUND_PROCESS_HISTORY_SIZE) {
+      const oldestPid = history.keys().next().value;
+      if (oldestPid !== undefined) {
+        history.delete(oldestPid);
+      }
+    }
+
+    history.set(pid, {
+      command: resolvedCommand,
+      status: 'running',
+      startTime: Date.now(),
+    });
+    this.backgroundProcessHistory.set(resolvedSessionId, history);
 
     // Set up background logging
     const logPath = this.getLogFilePath(pid);
     const logDir = this.getLogDir();
     try {
-      mkdirSync(logDir, { recursive: true });
-      const stream = fs.createWriteStream(logPath, { flags: 'w' });
+      mkdirSync(logDir, { recursive: true, mode: 0o700 });
+      const stream = fs.createWriteStream(logPath, { flags: 'wx' });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
       });
@@ -1313,12 +1517,13 @@ export class ShellExecutionService {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
         const isEsrch = err.code === 'ESRCH';
+        const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
         const isWindowsPtyError = err.message?.includes(
           'Cannot resize a pty that has already exited',
         );
 
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
+        if (isEsrch || isEbadf || isWindowsPtyError) {
+          // On Unix, we get an ESRCH or EBADF error.
           // On Windows, we get a message-based error.
           // In both cases, it's safe to ignore.
         } else {
@@ -1372,5 +1577,33 @@ export class ShellExecutionService {
         }
       }
     }
+  }
+
+  static listBackgroundProcesses(sessionId: string): BackgroundProcess[] {
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+    const history = this.backgroundProcessHistory.get(sessionId);
+    if (!history) return [];
+
+    return Array.from(history.entries()).map(([pid, info]) => ({
+      pid,
+      command: info.command,
+      status: info.status,
+      exitCode: info.exitCode,
+      signal: info.signal,
+    }));
+  }
+
+  /**
+   * Resets the internal state of the ShellExecutionService.
+   * This is intended for use in tests to ensure isolation.
+   */
+  static resetForTest(): void {
+    this.activePtys.clear();
+    this.activeChildProcesses.clear();
+    this.backgroundLogPids.clear();
+    this.backgroundLogStreams.clear();
+    this.backgroundProcessHistory.clear();
   }
 }

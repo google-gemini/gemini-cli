@@ -451,6 +451,25 @@ describe('retryWithBackoff', () => {
       });
       await vi.runAllTimersAsync();
       await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on undici timeout error codes (UND_ERR_HEADERS_TIMEOUT)', async () => {
+      const error = new Error('Headers timeout error');
+      (error as any).code = 'UND_ERR_HEADERS_TIMEOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
     it('should retry on SSL error code (ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)', async () => {
@@ -497,6 +516,40 @@ describe('retryWithBackoff', () => {
     it('should retry on EPROTO error (generic protocol/SSL error)', async () => {
       const error = new Error('Protocol error');
       (error as any).code = 'EPROTO';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on OpenSSL 3.x SSL error code (ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC)', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on unknown SSL BAD_RECORD_MAC variant via substring fallback', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SOME_FUTURE_BAD_RECORD_MAC';
       const mockFn = vi
         .fn()
         .mockRejectedValueOnce(error)
@@ -634,6 +687,58 @@ describe('retryWithBackoff', () => {
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
+
+  it('should not emit onRetry when aborted before catch retry handling', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error = new Error('Server error') as HttpError;
+      error.status = 500;
+      abortController.abort();
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not emit onRetry when aborted before content retry handling', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const shouldRetryOnContent = vi.fn().mockImplementation(() => {
+      abortController.abort();
+      return true;
+    });
+    const mockFn = vi.fn().mockResolvedValue({});
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+      shouldRetryOnContent,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(shouldRetryOnContent).toHaveBeenCalledTimes(1);
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 

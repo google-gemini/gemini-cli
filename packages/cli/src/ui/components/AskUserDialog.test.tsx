@@ -1409,6 +1409,53 @@ describe('AskUserDialog', () => {
         expect(lastFrame()).toMatchSnapshot();
       });
     });
+
+    it('supports "Other" option for yesno questions', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Is this correct?',
+          header: 'Confirm',
+          type: QuestionType.YESNO,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to "Other" (3rd option: 1. Yes, 2. No, 3. Other)
+      writeKey(stdin, '\x1b[B'); // Down to No
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(async () => {
+        await waitUntilReady();
+        expect(lastFrame()).toContain('Enter a custom value');
+      });
+
+      // Type feedback
+      for (const char of 'Yes, but with caveats') {
+        writeKey(stdin, char);
+      }
+
+      await waitFor(async () => {
+        await waitUntilReady();
+        expect(lastFrame()).toContain('Yes, but with caveats');
+      });
+
+      // Submit
+      writeKey(stdin, '\r');
+
+      await waitFor(async () => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'Yes, but with caveats' });
+      });
+    });
   });
 
   it('expands paste placeholders in multi-select custom option via Done', async () => {
@@ -1532,6 +1579,73 @@ describe('AskUserDialog', () => {
       expect(frame).toContain('Line 25');
       // Should still show the options
       expect(frame).toContain('1.  Option 1');
+    });
+  });
+
+  it('indents multi-line descriptions correctly', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Single choice?',
+        header: 'Indent Test',
+        type: QuestionType.CHOICE,
+        options: [
+          {
+            label: 'Option 1',
+            description:
+              'This is a very long description that is expected to wrap onto multiple lines in a narrow terminal. We want to ensure that all lines are correctly indented.',
+          },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={40} // Narrow width to force wrapping
+      />,
+      { width: 40 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      // Snapshot will capture the visual alignment
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  it('indents multi-line descriptions correctly in multi-select mode', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Multi-select?',
+        header: 'Indent Test',
+        type: QuestionType.CHOICE,
+        options: [
+          {
+            label: 'Option 1',
+            description:
+              'This is a very long description that is expected to wrap onto multiple lines in a narrow terminal. We want to ensure that all lines are correctly indented even with checkboxes.',
+          },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={40} // Narrow width to force wrapping
+      />,
+      { width: 40 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

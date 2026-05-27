@@ -12,7 +12,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
-  getShellConfiguration,
+  isWindows,
   type WorktreeSettings,
 } from '@google/gemini-cli-core';
 
@@ -21,7 +21,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    getShellConfiguration: vi.fn(),
+    isWindows: vi.fn(),
   };
 });
 
@@ -43,7 +43,7 @@ vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
   };
 });
 
-const getShellConfigurationMock = vi.mocked(getShellConfiguration);
+const isWindowsMock = vi.mocked(isWindows);
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
 const renderWithMockedStats = async (
@@ -101,11 +101,7 @@ describe('<SessionSummaryDisplay />', () => {
   };
 
   beforeEach(() => {
-    getShellConfigurationMock.mockReturnValue({
-      executable: 'bash',
-      argsPrefix: ['-c'],
-      shell: 'bash',
-    });
+    isWindowsMock.mockReturnValue(false);
   });
 
   it('renders the summary display with a title', async () => {
@@ -149,7 +145,7 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // Standard UUID characters should not be escaped/quoted by default for bash.
+      // Standard UUID characters are NOT wrapped in double quotes on non-Windows.
       expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
@@ -167,12 +163,8 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
-    it('renders a standard UUID-formatted session ID in the footer (powershell)', async () => {
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
+    it('renders a standard UUID-formatted session ID in the footer (powershell) on Windows', async () => {
+      isWindowsMock.mockReturnValue(true);
 
       const uuidSessionId = '1234-abcd-5678-efgh';
       const { lastFrame, unmount } = await renderWithMockedStats(
@@ -181,17 +173,13 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps strings in single quotes
-      expect(output).toContain("gemini --resume '1234-abcd-5678-efgh'");
+      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes on Windows.
+      expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
       unmount();
     });
 
     it('sanitizes a malicious session ID in the footer (powershell)', async () => {
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
+      isWindowsMock.mockReturnValue(true);
 
       const maliciousSessionId = "'; rm -rf / #";
       const { lastFrame, unmount } = await renderWithMockedStats(
@@ -200,7 +188,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them
+      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them.
+      // Since it's already quoted, we don't add redundant double quotes.
       expect(output).toContain("gemini --resume '''; rm -rf / #'");
       unmount();
     });
