@@ -30,6 +30,8 @@ import {
   debugLogger,
   SimpleExtensionLoader,
   GitService,
+  checkPathTrust,
+  isHeadlessMode,
 } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 
@@ -197,12 +199,23 @@ export async function createApp() {
     // Load the server configuration once on startup.
     const workspaceRoot = setTargetDir(undefined);
     loadEnvironment();
-    const settings = loadSettings(workspaceRoot);
+
+    // Use a temporary settings load to check if folder trust is enabled.
+    // This is similar to how the CLI handles the initial trust check.
+    const initialSettings = loadSettings(workspaceRoot, false);
+    const { isTrusted } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isHeadless: isHeadlessMode(),
+    });
+
+    const settings = loadSettings(workspaceRoot, isTrusted ?? false);
     const extensions = loadExtensions(workspaceRoot);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
+      isTrusted ?? false,
     );
 
     let git: GitService | undefined;

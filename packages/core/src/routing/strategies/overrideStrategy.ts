@@ -38,7 +38,6 @@ export class OverrideStrategy implements RoutingStrategy {
       model: resolveModel(
         overrideModel,
         config.getGemini31LaunchedSync?.() ?? false,
-        config.getGemini31FlashLiteLaunchedSync?.() ?? false,
         false,
         config.getHasAccessToPreviewModel?.() ?? true,
         config,
