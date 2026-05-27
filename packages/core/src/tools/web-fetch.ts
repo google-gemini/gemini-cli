@@ -38,6 +38,12 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
+import {
+  isAmazonUrl,
+  extractAmazonMetadata,
+  formatAmazonContext,
+} from '../utils/amazon-url-parser.js';
+
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 250000;
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
@@ -614,6 +620,25 @@ ${aggregatedContent}
 
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
+
+    // Amazon product metadata extraction
+    if (isAmazonUrl(url)) {
+      try {
+        const metadata = await extractAmazonMetadata(url);
+
+        const formattedContext = formatAmazonContext(metadata);
+
+        return {
+          llmContent: formattedContext,
+          returnDisplay: metadata.title || 'Amazon product metadata extracted.',
+        };
+      } catch (error) {
+        debugLogger.warn(
+          '[WebFetchTool] Amazon metadata extraction failed',
+          error,
+        );
+      }
+    }
 
     if (this.isBlockedHost(url)) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
