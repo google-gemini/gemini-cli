@@ -7,7 +7,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote, parse, type ParseEntry } from 'shell-quote';
+import { quote, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
@@ -854,16 +854,27 @@ export function stripShellWrapper(command: string): string {
         (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
       const isWindowsShell = /cmd(?:\.exe)?|powershell|pwsh/i.test(match[0]);
-      if (!isWindowsShell) {
-        try {
-          const parsed = parse(newCommand, (key) => '$' + key);
-          const firstEntry = parsed[0];
-          if (parsed.length === 1 && isString(firstEntry)) {
-            newCommand = firstEntry;
+      if (!isWindowsShell && newCommand.startsWith('"')) {
+        const inner = newCommand.substring(1, newCommand.length - 1);
+        let unescaped = '';
+        let i = 0;
+        while (i < inner.length) {
+          const char = inner[i];
+          if (char === '\\' && i + 1 < inner.length) {
+            const next = inner[i + 1];
+            if (['$', '`', '"', '\\', '\n'].includes(next)) {
+              unescaped += next;
+              i += 2;
+            } else {
+              unescaped += '\\';
+              i++;
+            }
+          } else {
+            unescaped += char;
+            i++;
           }
-        } catch {
-          // If parsing fails, we leave the command as is to avoid corruption
         }
+        newCommand = unescaped;
       } else {
         newCommand = newCommand.substring(1, newCommand.length - 1);
       }

@@ -55,15 +55,9 @@ vi.mock('node:child_process', () => ({
 }));
 
 const mockQuote = vi.hoisted(() => vi.fn());
-const mockParse = vi.hoisted(() => vi.fn());
-vi.mock('shell-quote', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('shell-quote')>();
-  return {
-    ...actual,
-    quote: mockQuote.mockImplementation(actual.quote),
-    parse: mockParse.mockImplementation(actual.parse),
-  };
-});
+vi.mock('shell-quote', () => ({
+  quote: mockQuote,
+}));
 
 const mockDebugLogger = vi.hoisted(() => ({
   error: vi.fn(),
