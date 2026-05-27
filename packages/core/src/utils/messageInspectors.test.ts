@@ -61,6 +61,30 @@ describe('isFunctionResponse', () => {
     expect(isFunctionResponse(content)).toBe(false);
   });
 
+  it('returns false when parts is not an actual array (defensive)', () => {
+    // Defensive against malformed runtime shapes where `parts` is not an
+    // array (e.g. a string or an object with a `length` property).
+    const content = {
+      role: 'user',
+      parts: 'not an array',
+    } as unknown as Content;
+    expect(isFunctionResponse(content)).toBe(false);
+
+    const fakeArrayLike = {
+      role: 'user',
+      parts: { length: 1, 0: { functionResponse: {} } },
+    } as unknown as Content;
+    expect(isFunctionResponse(fakeArrayLike)).toBe(false);
+  });
+
+  it('returns false when a part is null or undefined (defensive)', () => {
+    const content = {
+      role: 'user',
+      parts: [null, undefined],
+    } as unknown as Content;
+    expect(isFunctionResponse(content)).toBe(false);
+  });
+
   it('returns false for a model message even with functionResponse parts', () => {
     const content: Content = {
       role: 'model',
@@ -141,6 +165,30 @@ describe('isFunctionCall', () => {
 
   it('returns false when parts is undefined', () => {
     const content: Content = { role: 'model' };
+    expect(isFunctionCall(content)).toBe(false);
+  });
+
+  it('returns false when parts is not an actual array (defensive)', () => {
+    // Defensive against malformed runtime shapes where `parts` is not an
+    // array (e.g. a string or an object with a `length` property).
+    const content = {
+      role: 'model',
+      parts: 'not an array',
+    } as unknown as Content;
+    expect(isFunctionCall(content)).toBe(false);
+
+    const fakeArrayLike = {
+      role: 'model',
+      parts: { length: 1, 0: { functionCall: {} } },
+    } as unknown as Content;
+    expect(isFunctionCall(fakeArrayLike)).toBe(false);
+  });
+
+  it('returns false when a part is null or undefined (defensive)', () => {
+    const content = {
+      role: 'model',
+      parts: [null, undefined],
+    } as unknown as Content;
     expect(isFunctionCall(content)).toBe(false);
   });
 
