@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import type express from 'express';
 import * as fs from 'node:fs';
@@ -134,6 +134,10 @@ describe('Agent Server Endpoints', () => {
     }
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should create a new task via POST /tasks', async () => {
     const response = await createTask('test-context');
     expect(response.status).toBe(201);
@@ -162,27 +166,18 @@ describe('Agent Server Endpoints', () => {
   });
 
   it('should return 501 for all task metadata when using a persistent task store', async () => {
-    const originalBucketName = process.env['GCS_BUCKET_NAME'];
-    process.env['GCS_BUCKET_NAME'] = 'test-bucket';
+    vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
     vi.mocked(logger.error).mockClear();
 
-    try {
-      const persistentStoreApp = await createApp();
-      const response = await request(persistentStoreApp).get('/tasks/metadata');
+    const persistentStoreApp = await createApp();
+    const response = await request(persistentStoreApp).get('/tasks/metadata');
 
-      expect(response.status).toBe(501);
-      expect(response.body).toEqual({
-        error:
-          'Listing all task metadata is only supported when using InMemoryTaskStore.',
-      });
-      expect(logger.error).not.toHaveBeenCalled();
-    } finally {
-      if (originalBucketName === undefined) {
-        delete process.env['GCS_BUCKET_NAME'];
-      } else {
-        process.env['GCS_BUCKET_NAME'] = originalBucketName;
-      }
-    }
+    expect(response.status).toBe(501);
+    expect(response.body).toEqual({
+      error:
+        'Listing all task metadata is only supported when using InMemoryTaskStore.',
+    });
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('should return 404 for a non-existent task', async () => {
