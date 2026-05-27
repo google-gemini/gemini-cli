@@ -849,14 +849,19 @@ export function stripShellWrapper(command: string): string {
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
     if (
-      (newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-      (newCommand.startsWith("'") && newCommand.endsWith("'"))
+      newCommand.length >= 2 &&
+      ((newCommand.startsWith('"') && newCommand.endsWith('"')) ||
+        (newCommand.startsWith("'") && newCommand.endsWith("'")))
     ) {
-      const parsed = parse(newCommand, (key) => '$' + key);
-      const firstEntry = parsed[0];
-      if (parsed.length === 1 && isString(firstEntry)) {
-        newCommand = firstEntry;
-      } else {
+      try {
+        const parsed = parse(newCommand, (key) => '$' + key);
+        const firstEntry = parsed[0];
+        if (parsed.length === 1 && isString(firstEntry)) {
+          newCommand = firstEntry;
+        } else {
+          newCommand = newCommand.substring(1, newCommand.length - 1);
+        }
+      } catch {
         newCommand = newCommand.substring(1, newCommand.length - 1);
       }
     }
