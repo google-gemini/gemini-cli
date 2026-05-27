@@ -4,27 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useStdout } from 'ink';
 
 export function useTerminalSize(): { columns: number; rows: number } {
-  const [size, setSize] = useState({
-    columns: process.stdout.columns || 60,
-    rows: process.stdout.rows || 20,
-  });
+  const { stdout } = useStdout();
+
+  const getDimensions = useCallback(
+    () => ({
+      columns: stdout?.columns || process.stdout.columns || 60,
+      rows: stdout?.rows || process.stdout.rows || 20,
+    }),
+    [stdout],
+  );
+
+  const [size, setSize] = useState(getDimensions);
 
   useEffect(() => {
-    function updateSize() {
-      setSize({
-        columns: process.stdout.columns || 60,
-        rows: process.stdout.rows || 20,
-      });
-    }
+    const updateSize = () => setSize(getDimensions());
 
-    process.stdout.on('resize', updateSize);
+    // Sync dimensions immediately when stdout changes or on mount
+    updateSize();
+
+    const target = stdout || process.stdout;
+    target.on('resize', updateSize);
     return () => {
-      process.stdout.off('resize', updateSize);
+      target.off('resize', updateSize);
     };
-  }, []);
+  }, [stdout, getDimensions]);
 
   return size;
 }
