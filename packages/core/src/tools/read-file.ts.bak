@@ -225,12 +225,8 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    if (
-      !params ||
-      typeof params.file_path !== 'string' ||
-      params.file_path.trim() === ''
-    ) {
-      return "The 'file_path' parameter must be non-empty.";
+    if (!params || typeof params.file_path !== 'string' || params.file_path.trim() === '') {
+      return "The 'file_path' parameter must be a non-empty string.";
     }
 
     const resolvedPath = path.resolve(
@@ -248,12 +244,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
     if (params.start_line !== undefined) {
       if (typeof params.start_line !== 'number' || params.start_line < 1) {
-        return 'start_line must be at least 1';
+        return 'start_line must be a number at least 1';
       }
     }
     if (params.end_line !== undefined) {
       if (typeof params.end_line !== 'number' || params.end_line < 1) {
-        return 'end_line must be at least 1';
+        return 'end_line must be a number at least 1';
       }
     }
     if (
@@ -272,6 +268,20 @@ export class ReadFileTool extends BaseDeclarativeTool<
       )
     ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
+    }
+
+    const ext = path.extname(resolvedPath).toLowerCase();
+    const binaryExtensions = new Set([
+      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.tiff',
+      '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
+      '.mp4', '.avi', '.mkv', '.mov', '.flv', '.webm',
+      '.mp3', '.wav', '.ogg', '.flac', '.aac',
+      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+      '.exe', '.dll', '.so', '.dylib', '.bin', '.out', '.app',
+      '.sqlite', '.db', '.pcap', '.class', '.pyc', '.o', '.a'
+    ]);
+    if (binaryExtensions.has(ext)) {
+      return `Error: Cannot read binary files directly. File path '${params.file_path}' is a binary file. Please use appropriate CLI tools, python scripts, or specialized libraries to inspect or process this file.`;
     }
 
     return null;

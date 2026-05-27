@@ -983,14 +983,6 @@ ${snippet}`);
         llmContent = appendJitContext(llmContent, jitContext);
       }
 
-      const trackerReminder =
-        '\n\n--- MANDATORY POST-EDIT REMINDER ---\n' +
-        '1. TASK TRACKER: If the Task Management Protocol is enabled, you MUST immediately call tracker_create_task or tracker_update_task to register or update tasks for this change.\n' +
-        '2. VERIFICATION & TESTING: You MUST compile and run the code, and execute automated tests or verification/reproduction scripts. A change is NOT complete without verification logic.\n' +
-        '3. EXPLAIN BEFORE ACTING: You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before your next tool calls.\n' +
-        '------------------------------------';
-      llmContent += trackerReminder;
-
       return {
         llmContent,
         returnDisplay: displayResult,
@@ -1062,10 +1054,7 @@ export class EditTool
     if (typeof params.file_path !== 'string' || !params.file_path.trim()) {
       return "The 'file_path' parameter must be a non-empty string.";
     }
-    if (
-      typeof params.old_string !== 'string' ||
-      typeof params.new_string !== 'string'
-    ) {
+    if (typeof params.old_string !== 'string' || typeof params.new_string !== 'string') {
       return "The 'old_string' and 'new_string' parameters must be strings.";
     }
 

@@ -707,18 +707,11 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
-    if (
-      !params ||
-      typeof params.command !== 'string' ||
-      !params.command.trim()
-    ) {
+    if (!params.command.trim()) {
       return 'Command cannot be empty.';
     }
 
     if (params.dir_path) {
-      if (typeof params.dir_path !== 'string') {
-        return 'Directory path must be a string.';
-      }
       const resolvedPath = path.resolve(
         this.context.config.getTargetDir(),
         params.dir_path,

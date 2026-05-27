@@ -181,10 +181,9 @@ export function renderPreamble(options?: PreambleOptions): string {
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
-  const filenames =
-    options.contextFilenames && options.contextFilenames.length > 0
-      ? options.contextFilenames
-      : [DEFAULT_CONTEXT_FILENAME];
+  const filenames = options.contextFilenames && options.contextFilenames.length > 0
+    ? options.contextFilenames
+    : [DEFAULT_CONTEXT_FILENAME];
   const formattedFilenames =
     filenames.length > 1
       ? filenames
@@ -228,7 +227,7 @@ Use the following guidelines to optimize your search and read patterns.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
 - ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
-- ALWAYS use specialized tools like \`write_file\` or \`edit\` instead of executing shell commands with \`cat << 'EOF'\`, \`echo\`, or \`sed\` to create or modify files. This prevents massive conversation context duplication, avoids shell quoting syntax issues, and minimizes token rate-limit/quota failures.
+- ALWAYS use specialized tools like `write_file` or `edit` instead of executing shell commands with `cat << 'EOF'`, `echo`, or `sed` to create or modify files. This prevents massive conversation context duplication, avoids shell quoting syntax issues, and minimizes token rate-limit/quota failures.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
@@ -267,13 +266,9 @@ Use the following guidelines to optimize your search and read patterns.
 }
 
 export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
-  if (!subAgents || !Array.isArray(subAgents) || subAgents.length === 0)
-    return '';
+  if (!subAgents || !Array.isArray(subAgents) || subAgents.length === 0) return '';
   const subAgentsXml = subAgents
-    .filter(
-      (agent) =>
-        agent && typeof agent === 'object' && typeof agent.name === 'string',
-    )
+    .filter((agent) => agent && typeof agent === 'object' && typeof agent.name === 'string')
     .map(
       (agent) => `  <subagent>
     <name>${agent.name}</name>
@@ -315,10 +310,7 @@ For example:
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
   if (!skills || !Array.isArray(skills) || skills.length === 0) return '';
   const skillsXml = skills
-    .filter(
-      (skill) =>
-        skill && typeof skill === 'object' && typeof skill.name === 'string',
-    )
+    .filter((skill) => skill && typeof skill === 'object' && typeof skill.name === 'string')
     .map(
       (skill) => `  <skill>
     <name>${skill.name}</name>
@@ -547,10 +539,7 @@ ${trimmed}
         `<global_context>\n${memory.global.trim()}\n</global_context>`,
       );
     }
-    if (
-      typeof memory.userProjectMemory === 'string' &&
-      memory.userProjectMemory.trim()
-    ) {
+    if (typeof memory.userProjectMemory === 'string' && memory.userProjectMemory.trim()) {
       sections.push(
         `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
       );
@@ -581,7 +570,7 @@ export function renderTaskTracker(): string {
 You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
 
 1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
-2.  **IMMEDIATE DECOMPOSITION & INITIALIZATION**: Upon receiving any task, you MUST call ${trackerCreate} to register the tasks and initialize tracking *before calling any other tools (like shell, read_file, edit, or write_file)*. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
 3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
 4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
