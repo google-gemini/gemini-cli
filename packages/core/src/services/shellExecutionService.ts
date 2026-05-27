@@ -1511,16 +1511,15 @@ export class ShellExecutionService {
       return;
     }
 
-    // Defensive check: Verify with the OS that the process is actually still alive.
-    // This helps avoid a native crash in node-pty if the process died but our
-    // internal map hasn't updated yet.
-    try {
-      process.kill(pid, 0);
-    } catch (e) {
-      // If the OS explicitly says the process is gone (ESRCH), bail.
-      // Other errors (like EPERM) or successes (no error) mean we should proceed.
-      if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
-        return;
+    // Skip Windows: process.kill(pid, 0) is heavy and native errors are catchable there.
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(pid, 0);
+      } catch (e) {
+        // Bail only if the process is explicitly confirmed dead (ESRCH).
+        if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+          return;
+        }
       }
     }
 
