@@ -30,6 +30,7 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { CachingContentGenerator } from './cachingContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -384,9 +385,14 @@ export async function createContentGenerator(
     );
   })();
 
+  let finalGenerator: ContentGenerator = generator;
+
   if (gcConfig.recordResponses) {
-    return new RecordingContentGenerator(generator, gcConfig.recordResponses);
+    finalGenerator = new RecordingContentGenerator(
+      finalGenerator,
+      gcConfig.recordResponses,
+    );
   }
 
-  return generator;
+  return new CachingContentGenerator(finalGenerator, gcConfig);
 }
