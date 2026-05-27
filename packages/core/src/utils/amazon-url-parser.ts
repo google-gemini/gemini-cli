@@ -9,7 +9,6 @@ import { fetchWithTimeout, isPrivateIp, PrivateIpError } from './fetch.js';
 const REQUEST_TIMEOUT_MS = 10000;
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; GeminiCLI-AmazonParser/1.0)';
-
 export interface AmazonProductMetadata {
   canonicalUrl: string;
   title?: string;
