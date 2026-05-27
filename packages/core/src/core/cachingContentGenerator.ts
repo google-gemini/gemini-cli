@@ -67,7 +67,7 @@ export class CachingContentGenerator implements ContentGenerator {
     const data = JSON.stringify({
       model: req.model,
       contents: req.contents,
-      systemInstruction: req.config?.systemInstruction,
+      config: req.config,
       projectPath,
     });
     return crypto.createHash('sha256').update(data).digest('hex');
