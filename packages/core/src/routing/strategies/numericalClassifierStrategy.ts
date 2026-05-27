@@ -224,7 +224,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     rules.sort((a, b) => a.maxScore - b.maxScore);
 
     let modelAlias = rules[rules.length - 1].model;
-    let threshold = rules[0].maxScore;
+    let threshold = rules[rules.length - 1].maxScore;
 
     for (const rule of rules) {
       if (score <= rule.maxScore) {
