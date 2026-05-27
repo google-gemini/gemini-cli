@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
+import fs from 'node:fs';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
@@ -231,6 +232,21 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.file_path.trim() === ''
     ) {
       return "The 'file_path' parameter must be non-empty.";
+    }
+
+    if (fs.existsSync(path.resolve(this.config.getTargetDir(), '.tracker'))) {
+      const tasksDir = path.resolve(
+        this.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running read_file operations.";
+      }
     }
 
     const resolvedPath = path.resolve(

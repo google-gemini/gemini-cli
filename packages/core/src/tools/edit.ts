@@ -5,6 +5,7 @@
  */
 
 import * as fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
@@ -1059,6 +1060,22 @@ export class EditTool
     if (!params) {
       return 'Parameters cannot be empty.';
     }
+
+    if (fs.existsSync(path.resolve(this.config.getTargetDir(), '.tracker'))) {
+      const tasksDir = path.resolve(
+        this.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running edit operations.";
+      }
+    }
+
     if (typeof params.file_path !== 'string' || !params.file_path.trim()) {
       return "The 'file_path' parameter must be a non-empty string.";
     }
