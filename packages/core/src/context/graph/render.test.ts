@@ -15,6 +15,8 @@ import type { ContextProfile } from '../config/profiles.js';
 import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { Part } from '@google/genai';
 
+import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
+
 describe('render', () => {
   it('should render all provided nodes', async () => {
     const mockNodes: ConcreteNode[] = [
@@ -116,9 +118,12 @@ describe('render', () => {
     };
 
     const orchestrator = {
-      executeTriggerSync: vi.fn(async (trigger, nodes, agedOutNodes) =>
-        nodes.filter((n: ConcreteNode) => !agedOutNodes.has(n.id)),
-      ),
+      executeTriggerSync: vi.fn(async (trigger, buffer, agedOutNodes) => {
+        const filteredNodes = buffer.nodes.filter(
+          (n: ConcreteNode) => !agedOutNodes.has(n.id),
+        );
+        return ContextWorkingBufferImpl.initialize(filteredNodes);
+      }),
     } as unknown as PipelineOrchestrator;
 
     const sidecar = {
@@ -215,9 +220,12 @@ describe('render', () => {
     };
 
     const orchestrator = {
-      executeTriggerSync: vi.fn(async (trigger, nodes, agedOutNodes) =>
-        nodes.filter((n: ConcreteNode) => !agedOutNodes.has(n.id)),
-      ),
+      executeTriggerSync: vi.fn(async (trigger, buffer, agedOutNodes) => {
+        const filteredNodes = buffer.nodes.filter(
+          (n: ConcreteNode) => !agedOutNodes.has(n.id),
+        );
+        return ContextWorkingBufferImpl.initialize(filteredNodes);
+      }),
     } as unknown as PipelineOrchestrator;
 
     const sidecar = {
@@ -303,7 +311,7 @@ describe('render', () => {
     ];
 
     const orchestrator = {
-      executeTriggerSync: vi.fn(async (trigger, nodes) => nodes),
+      executeTriggerSync: vi.fn(async (trigger, buffer) => buffer),
     } as unknown as PipelineOrchestrator;
     const sidecar = { config: {} } as ContextProfile; // No budget
     const mockAdvancedTokenCalculator = {

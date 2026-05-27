@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PipelineOrchestrator } from './orchestrator.js';
+import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 import {
   createMockEnvironment,
   createDummyNode,
@@ -115,12 +116,14 @@ describe('PipelineOrchestrator (Component)', () => {
         payload: { text: 'Original' },
       });
 
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
@@ -142,12 +145,14 @@ describe('PipelineOrchestrator (Component)', () => {
         payload: { text: 'Original' },
       });
 
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed).toEqual([originalNode]); // Untouched
     });
@@ -170,12 +175,14 @@ describe('PipelineOrchestrator (Component)', () => {
       });
 
       // The throwing processor should be caught and logged, allowing Mod to still run.
-      const processed = await orchestrator.executeTriggerSync(
+      const processedBuffer = await orchestrator.executeTriggerSync(
         'new_message',
-        [originalNode],
+        ContextWorkingBufferImpl.initialize([originalNode]),
         new Set([originalNode.id]),
         new Set(),
       );
+
+      const processed = processedBuffer.nodes;
 
       expect(processed.length).toBe(1);
       const resultingNode = processed[0] as UserPrompt;
@@ -207,7 +214,7 @@ describe('PipelineOrchestrator (Component)', () => {
 
       await orchestrator.executeTriggerSync(
         'nodes_added',
-        [node1, node2],
+        ContextWorkingBufferImpl.initialize([node1, node2]),
         new Set([node2.id]),
       );
 

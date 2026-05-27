@@ -475,4 +475,258 @@ describe('mcp list command', () => {
     );
     expect(mockedCreateTransport).not.toHaveBeenCalled();
   });
+
+  it('should block servers excluded by user settings even if workspace settings override/clear the excluded list', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            excluded: ['blocked-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: ['blocked-server'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            excluded: [],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: [],
+          },
+        },
+      },
+      mcpServers: {
+        'blocked-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          excluded: [], // workspace has overridden user settings!
+        },
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should block servers case-insensitively when excluded', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            excluded: ['BLOCKED-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: ['BLOCKED-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'blocked-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+      merged: {
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should restrict allowed servers to the intersection of all defined allowlists', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'allowed-server-2'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'allowed-server-2'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'malicious-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'malicious-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'allowed-server-1': { command: '/allowed/1' },
+        'allowed-server-2': { command: '/allowed/2' },
+        'malicious-server': { command: '/malicious' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          allowed: ['allowed-server-1', 'malicious-server'], // workspace overrode user settings!
+        },
+        mcpServers: {
+          'allowed-server-1': { command: '/allowed/1' },
+          'allowed-server-2': { command: '/allowed/2' },
+          'malicious-server': { command: '/malicious' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    // allowed-server-1 is in the intersection, so it should connect
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'allowed-server-1: /allowed/1  (stdio) - Connected',
+      ),
+    );
+    // allowed-server-2 and malicious-server are not in the intersection, so they should be Blocked
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'allowed-server-2: /allowed/2  (stdio) - Blocked',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'malicious-server: /malicious  (stdio) - Blocked',
+      ),
+    );
+
+    expect(mockedCreateTransport).toHaveBeenCalledTimes(1);
+    expect(mockedCreateTransport).toHaveBeenCalledWith(
+      'allowed-server-1',
+      expect.any(Object),
+      false,
+      expect.any(Object),
+    );
+  });
+
+  it('should block all servers if the intersection of user and workspace allowlists is empty (disjoint allowlists)', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['user-allowed-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['user-allowed-server'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['workspace-allowed-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['workspace-allowed-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'user-allowed-server': { command: '/allowed/user' },
+        'workspace-allowed-server': { command: '/allowed/workspace' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          allowed: ['workspace-allowed-server'], // workspace override
+        },
+        mcpServers: {
+          'user-allowed-server': { command: '/allowed/user' },
+          'workspace-allowed-server': { command: '/allowed/workspace' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    // Since the intersection is empty ([]), both servers should be Blocked!
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'user-allowed-server: /allowed/user  (stdio) - Blocked',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'workspace-allowed-server: /allowed/workspace  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should block all servers if allowlist is configured as empty array []', async () => {
+    const mockSettings = createMockSettings({
+      mcp: {
+        allowed: [], // empty allowlist configured!
+      },
+      mcpServers: {
+        'test-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Blocked'),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
 });

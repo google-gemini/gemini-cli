@@ -1111,6 +1111,28 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should filter out <session_context> from UI history', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content:
+          '<session_context>\nThis is the Gemini CLI\n</session_context>',
+      },
+      {
+        id: '2',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content: 'Real message',
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0].text).toBe('Real message');
+  });
+
   it('should handle missing tool descriptions and displayNames', () => {
     const messages: MessageRecord[] = [
       {

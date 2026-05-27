@@ -606,7 +606,16 @@ export function convertSessionToHistoryFormats(
     const contentString = partListUnionToString(msg.content);
     const uiText = displayContentString || contentString;
 
-    if (uiText.trim()) {
+    // Skip internal context messages in the UI history
+    const trimmedText = uiText.trim();
+    if (
+      trimmedText.startsWith('<session_context>') ||
+      trimmedText.startsWith('<hook_context>')
+    ) {
+      continue;
+    }
+
+    if (trimmedText) {
       let messageType: MessageType;
       switch (msg.type) {
         case 'user':

@@ -509,6 +509,51 @@ export class LoadedSettings {
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
   }
+
+  /**
+   * Returns a consolidated list of excluded MCP servers across all settings files.
+   */
+  getConsolidatedExcludedMcpServers(): string[] {
+    const scopes = [
+      this.system,
+      this.systemDefaults,
+      this.user,
+      this.workspace,
+    ];
+    return scopes.flatMap((scope) => {
+      const excluded = scope?.settings?.mcp?.excluded;
+      return Array.isArray(excluded) ? excluded : [];
+    });
+  }
+
+  /**
+   * Returns a consolidated list of allowed MCP servers (via intersection of all defined lists).
+   */
+  getConsolidatedAllowedMcpServers(): string[] | undefined {
+    const scopes = [
+      this.system,
+      this.systemDefaults,
+      this.user,
+      this.workspace,
+    ];
+    const definedAllowlists = scopes.flatMap((scope) => {
+      const allowed = scope?.settings?.mcp?.allowed;
+      return Array.isArray(allowed) ? [allowed] : [];
+    });
+
+    if (definedAllowlists.length === 0) {
+      return undefined;
+    }
+
+    return definedAllowlists.reduce((acc, current) => {
+      const normalizedCurrent = new Set(
+        current.map((item) => item.toLowerCase().trim()),
+      );
+      return acc.filter((item) =>
+        normalizedCurrent.has(item.toLowerCase().trim()),
+      );
+    });
+  }
 }
 
 function findEnvFile(
