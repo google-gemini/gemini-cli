@@ -17,7 +17,7 @@ interface MockStdout extends EventEmitter {
 }
 
 vi.mock('ink', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal());
   return {
     ...actual,
     useStdout: vi.fn(),
@@ -35,7 +35,9 @@ describe('useTerminalSize', () => {
   });
 
   it('should use dimensions from Ink useStdout when available', async () => {
-    vi.mocked(useStdout).mockReturnValue({ stdout: mockStdout });
+    vi.mocked(useStdout).mockReturnValue({
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+    });
 
     const { result } = await renderHook(() => useTerminalSize());
 
@@ -67,7 +69,9 @@ describe('useTerminalSize', () => {
   });
 
   it('should update dimensions when resize event is triggered', async () => {
-    vi.mocked(useStdout).mockReturnValue({ stdout: mockStdout });
+    vi.mocked(useStdout).mockReturnValue({
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+    });
 
     const { result } = await renderHook(() => useTerminalSize());
     expect(result.current).toEqual({ columns: 100, rows: 40 });

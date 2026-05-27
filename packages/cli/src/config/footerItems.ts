@@ -62,6 +62,16 @@ export const ALL_ITEMS = [
     header: 'tokens',
     description: 'Total tokens used in the session (not shown when zero)',
   },
+  {
+    id: 'session-cost',
+    header: 'cost',
+    description: 'Estimated cost of current session',
+  },
+  {
+    id: 'quota-reset',
+    header: 'reset in',
+    description: 'Time remaining until rate limit resets',
+  },
 ] as const;
 
 export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
@@ -78,6 +88,8 @@ export const DEFAULT_ORDER = [
   'auth',
   'code-changes',
   'token-count',
+  'session-cost',
+  'quota-reset',
 ];
 
 export function deriveItemsFromLegacySettings(
