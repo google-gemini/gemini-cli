@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fetchWithTimeout } from './fetch.js';
-
-const AMAZON_HOST_PATTERNS = ['amazon.', 'amzn.in', 'amzn.to'];
+import { fetchWithTimeout, isPrivateIp, PrivateIpError } from './fetch.js';
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -30,7 +28,9 @@ export function isAmazonUrl(url: string): boolean {
 
     const host = parsed.hostname.toLowerCase();
 
-    return AMAZON_HOST_PATTERNS.some((pattern) => host.includes(pattern));
+    return /^(.*\.)?(amazon\.[a-z]{2,3}(\.[a-z]{2})?|amzn\.(in|to))$/i.test(
+      host,
+    );
   } catch {
     return false;
   }
@@ -179,6 +179,12 @@ export async function extractAmazonMetadata(
   url: string,
 ): Promise<AmazonProductMetadata> {
   const canonicalUrl = await expandAmazonUrl(url);
+
+  if (isPrivateIp(canonicalUrl)) {
+    throw new PrivateIpError(
+      `Access to private network is blocked: ${canonicalUrl}`,
+    );
+  }
 
   const html = await fetchAmazonHtml(canonicalUrl);
 
