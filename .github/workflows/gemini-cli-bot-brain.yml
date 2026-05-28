@@ -37,7 +37,7 @@ jobs:
     name: 'Brain (Reasoning Layer)'
     runs-on: 'ubuntu-latest'
     if: |
-      github.repository == 'google-gemini/gemini-cli' && (
+      github.repository == 'chadd28/gemini-cli' && (
         github.event_name == 'schedule' ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive != 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive == 'true') ||
@@ -221,7 +221,7 @@ jobs:
     name: 'Publish Artifacts (Archive Layer)'
     needs: 'reasoning'
     runs-on: 'ubuntu-latest'
-    if: "github.repository == 'google-gemini/gemini-cli'"
+    if: "github.repository == 'chadd28/gemini-cli'"
     # The publish phase is for archiving artifacts and optionally creating PRs.
     permissions:
       contents: 'write'
