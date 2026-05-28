@@ -5,6 +5,7 @@
  */
 
 import * as fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
@@ -1129,7 +1130,27 @@ export class EditTool
       }
     }
 
-    return this.config.validatePathAccess(resolvedPath);
+    const validationError = this.config.validatePathAccess(resolvedPath);
+    if (validationError) {
+      return validationError;
+    }
+
+    if (fs.existsSync(path.resolve(this.config.getTargetDir(), '.tracker'))) {
+      const tasksDir = path.resolve(
+        this.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running edit.";
+      }
+    }
+
+    return null;
   }
 
   protected createInvocation(

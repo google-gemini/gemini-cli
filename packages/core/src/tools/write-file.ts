@@ -560,6 +560,21 @@ export class WriteFileTool
       return "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.";
     }
 
+    if (fs.existsSync(path.resolve(this.config.getTargetDir(), '.tracker'))) {
+      const tasksDir = path.resolve(
+        this.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running write_file.";
+      }
+    }
+
     return null;
   }
 

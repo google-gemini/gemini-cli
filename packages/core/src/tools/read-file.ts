@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
+import fs from 'node:fs';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
@@ -271,6 +272,75 @@ export class ReadFileTool extends BaseDeclarativeTool<
       )
     ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
+    }
+
+    const ext = path.extname(resolvedPath).toLowerCase();
+    const binaryExtensions = new Set([
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.bmp',
+      '.ico',
+      '.webp',
+      '.tiff',
+      '.zip',
+      '.tar',
+      '.gz',
+      '.7z',
+      '.rar',
+      '.bz2',
+      '.xz',
+      '.mp4',
+      '.avi',
+      '.mkv',
+      '.mov',
+      '.flv',
+      '.webm',
+      '.mp3',
+      '.wav',
+      '.ogg',
+      '.flac',
+      '.aac',
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.exe',
+      '.dll',
+      '.so',
+      '.dylib',
+      '.bin',
+      '.out',
+      '.app',
+      '.sqlite',
+      '.db',
+      '.pcap',
+      '.class',
+      '.pyc',
+      '.o',
+      '.a',
+    ]);
+    if (binaryExtensions.has(ext)) {
+      return `Error: Cannot read binary files directly. Please use appropriate CLI tools or specialized scripts.`;
+    }
+
+    if (fs.existsSync(path.resolve(this.config.getTargetDir(), '.tracker'))) {
+      const tasksDir = path.resolve(
+        this.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running read_file.";
+      }
     }
 
     return null;

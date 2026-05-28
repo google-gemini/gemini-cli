@@ -820,6 +820,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
         if (backgroundPIDs.length) {
           llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+          llmContentParts.push(
+            `WARNING: Active background processes detected. Heavy background tasks (like compilations, database servers, or package installations) consume CPU and memory, which can severely throttle subsequent execution steps or cause an AgentTimeoutError. If a background process is no longer needed or if you have pivoted to another strategy, you MUST terminate it immediately (e.g. 'kill <PID>').`,
+          );
         }
         if (result.pid) {
           llmContentParts.push(`Process Group PGID: ${result.pid}`);
@@ -1114,6 +1117,33 @@ export class ShellTool extends BaseDeclarativeTool<
   ): string | null {
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
+    }
+
+    const command = params.command.trim();
+    if (
+      /\b(cat\s*<<|cat\s*>\s*|tee\s+)/i.test(command) ||
+      (/\becho\b/i.test(command) && />/i.test(command))
+    ) {
+      return "Creating or editing files via shell commands (e.g., 'cat', 'echo', 'tee') is strictly prohibited. You MUST use the specialized 'write_file' or 'edit' tools instead to prevent context duplication and rate-limiting.";
+    }
+
+    if (
+      fs.existsSync(
+        path.resolve(this.context.config.getTargetDir(), '.tracker'),
+      )
+    ) {
+      const tasksDir = path.resolve(
+        this.context.config.getTargetDir(),
+        '.tracker/tasks',
+      );
+      let hasTasks = false;
+      if (fs.existsSync(tasksDir)) {
+        const files = fs.readdirSync(tasksDir);
+        hasTasks = files.some((f: string) => f.endsWith('.json'));
+      }
+      if (!hasTasks) {
+        return "WARNING: Task Management Protocol violation. You have not initialized any tasks in '.tracker/tasks/'. You MUST first create tasks using the tracker_create_task tool before running shell commands.";
+      }
     }
 
     if (params.dir_path) {
