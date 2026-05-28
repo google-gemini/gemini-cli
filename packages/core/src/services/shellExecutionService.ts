@@ -1516,8 +1516,8 @@ export class ShellExecutionService {
         // due to a race condition between the exit event and this call.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
+        const isEbadf = err.code === "EBADF" || err.message?.includes("EBADF");
         const isEsrch = err.code === 'ESRCH';
-        const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
         const isWindowsPtyError = err.message?.includes(
           'Cannot resize a pty that has already exited',
         );
