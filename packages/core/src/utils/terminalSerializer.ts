@@ -186,6 +186,11 @@ export function serializeTerminalToObject(
 
     for (let x = 0; x < terminal.cols; x++) {
       const cellData = line.getCell(x, cellBuffer);
+      // Skip width-0 continuation cells for wide (CJK) characters to prevent
+      // extra spaces being injected between them.
+      if (cellData && cellData.getWidth() === 0) {
+        continue;
+      }
       currentCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
 
       if (x > 0 && !currentCell.equals(lastCell)) {
