@@ -259,6 +259,18 @@ export class PromptProvider {
         options: snippets.SystemPromptOptions,
       ) => string;
       basePrompt = getCoreSystemPrompt(options);
+
+      // Append the body of all programmatically activated skills natively to the system prompt
+      const activeSkills = skills.filter((s) =>
+        context.config.getSkillManager().isSkillActive(s.name),
+      );
+      if (activeSkills.length > 0) {
+        let activeSkillsPrompt = '\n\n# Natively Enabled Guidelines\n';
+        for (const s of activeSkills) {
+          activeSkillsPrompt += `\n## Skill: ${s.name}\n${s.body}\n`;
+        }
+        basePrompt += activeSkillsPrompt;
+      }
     }
 
     // --- Finalization (Shell) ---
