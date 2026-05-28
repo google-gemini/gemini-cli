@@ -441,7 +441,22 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.CYCLE_APPROVAL_MODE,
-      positive: [createKey('tab', { shift: true })],
+      positive: [createKey('tab', { shift: true }), createKey('f10')],
+      negative: [createKey('tab')],
+    },
+    {
+      command: Command.DIALOG_PREV,
+      positive: [createKey('tab', { shift: true }), createKey('f10')],
+      negative: [createKey('tab')],
+    },
+    {
+      command: Command.UNFOCUS_SHELL_INPUT,
+      positive: [createKey('tab', { shift: true }), createKey('f10')],
+      negative: [createKey('tab')],
+    },
+    {
+      command: Command.UNFOCUS_BACKGROUND_SHELL,
+      positive: [createKey('tab', { shift: true }), createKey('f10')],
       negative: [createKey('tab')],
     },
     {

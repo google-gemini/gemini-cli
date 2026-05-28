@@ -20,6 +20,24 @@
       "problemMatcher": [],
       "label": "npm: build: vscode-ide-companion",
       "detail": "npm run build -w packages/vscode-ide-companion"
+    },
+    {
+      "label": "npm:docs:keybindings",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "docs:keybindings"],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "npm:test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "test", "--workspaces"],
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "test"
     }
   ]
 }

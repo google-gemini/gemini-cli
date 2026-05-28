@@ -347,7 +347,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     [new KeyBinding('down'), new KeyBinding('j')],
   ],
   [Command.DIALOG_NEXT, [new KeyBinding('tab')]],
-  [Command.DIALOG_PREV, [new KeyBinding('shift+tab')]],
+  [Command.DIALOG_PREV, [new KeyBinding('shift+tab'), new KeyBinding('f10')]],
 
   // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION, [new KeyBinding('tab'), new KeyBinding('enter')]],
