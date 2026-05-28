@@ -35,7 +35,13 @@ export const enum ColorMode {
 }
 
 class Cell {
-  private cell: IBufferCell | null = null;
+  // Eagerly-cached primitive snapshots — no live reference to IBufferCell is
+  // retained. This is critical because the serialization loop reuses a single
+  // cellBuffer object via getCell(x, cellBuffer). Holding a reference to that
+  // object would mean both currentCell and lastCell silently share the same
+  // mutated state, corrupting lastCell reads on the next iteration.
+  private chars = ' ';
+  private uninitialized = true;
   private x = 0;
   private y = 0;
   private cursorX = 0;
@@ -63,7 +69,6 @@ class Cell {
     cursorX: number,
     cursorY: number,
   ) {
-    this.cell = cell;
     this.x = x;
     this.y = y;
     this.cursorX = cursorX;
@@ -71,8 +76,16 @@ class Cell {
     this.attributes = 0;
 
     if (!cell) {
+      this.chars = ' ';
+      this.uninitialized = true;
       return;
     }
+
+    // Eagerly copy the character string and uninitialized flag as primitives
+    // so that subsequent getCell() calls into the reused buffer cannot mutate
+    // the snapshot stored in this Cell instance.
+    this.chars = cell.getChars() || ' ';
+    this.uninitialized = cell.getCode() === 0 && cell.isAttributeDefault();
 
     if (cell.isInverse()) {
       this.attributes += Attribute.inverse;
@@ -124,13 +137,11 @@ class Cell {
   }
 
   getChars(): string {
-    return this.cell?.getChars() || ' ';
+    return this.chars;
   }
 
   isUninitialized(): boolean {
-    return this.cell
-      ? this.cell.getCode() === 0 && this.cell.isAttributeDefault()
-      : true;
+    return this.uninitialized;
   }
 
   isAttribute(attribute: Attribute): boolean {
