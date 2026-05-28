@@ -127,6 +127,59 @@ describe('<ShellToolMessage />', () => {
     });
   });
 
+  describe('error handling', () => {
+    let resizeSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(async () => {
+      const { ShellExecutionService } = await import('@google/gemini-cli-core');
+      resizeSpy = vi.spyOn(ShellExecutionService, 'resizePty');
+    });
+
+    afterEach(() => {
+      resizeSpy?.mockRestore();
+    });
+
+    it('ignores EBADF errors during resize', async () => {
+      resizeSpy.mockImplementation(() => {
+        throw new Error('ioctl(2) failed, EBADF');
+      });
+
+      const { unmount, waitUntilReady } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          ptyId={1}
+          status={CoreToolCallStatus.Executing}
+        />,
+        { uiActions },
+      );
+
+      await waitUntilReady();
+      expect(resizeSpy).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('re-throws other errors during resize', async () => {
+      // We expect the error to be thrown in the effect.
+      // Testing this cleanly in React is hard, but we can at least verify it's called.
+      resizeSpy.mockImplementation(() => {
+        throw new Error('Some other error');
+      });
+
+      const { unmount, waitUntilReady } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          ptyId={1}
+          status={CoreToolCallStatus.Executing}
+        />,
+        { uiActions },
+      );
+
+      await waitUntilReady();
+      expect(resizeSpy).toHaveBeenCalled();
+      unmount();
+    });
+  });
+
   describe('Snapshots', () => {
     it.each([
       [

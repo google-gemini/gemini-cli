@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -537,6 +537,23 @@ describe('ShellExecutionService', () => {
       const resizeError = new Error(
         'Cannot resize a pty that has already exited',
       );
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw resizeError;
+      });
+
+      // We don't expect this test to throw an error
+      await expect(
+        simulateExecution('ls -l', (pty) => {
+          ShellExecutionService.resizePty(pty.pid, 100, 40);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        }),
+      ).resolves.not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+    });
+
+    it('should ignore EBADF errors when resizing an exited pty', async () => {
+      const resizeError = new Error('ioctl(2) failed, EBADF');
       mockPtyProcess.resize.mockImplementation(() => {
         throw resizeError;
       });

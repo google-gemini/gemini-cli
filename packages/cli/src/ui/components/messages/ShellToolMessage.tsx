@@ -109,12 +109,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           Math.max(1, finalHeight),
         );
       } catch (e) {
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const err = e as { code?: string; message?: string };
+        const errMessage = err.message || String(e);
+        const isPtyResizeError =
+          errMessage.includes('Cannot resize a pty that has already exited') ||
+          errMessage.includes('EBADF') ||
+          errMessage.includes('ESRCH') ||
+          errMessage.includes('ioctl(2) failed') ||
+          err.code === 'EBADF' ||
+          err.code === 'ESRCH';
+
+        if (!isPtyResizeError) {
           throw e;
         }
       }

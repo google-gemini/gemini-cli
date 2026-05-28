@@ -2,7 +2,7 @@
 
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,13 +21,21 @@ import {
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
   if (error instanceof Error) {
+    const message = error.message || '';
     const isPtyResizeError =
-      error.message === 'Cannot resize a pty that has already exited';
-    const isEbadfError = error.message.includes('EBADF');
-    const isFromNodePty =
-      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+      message.includes('Cannot resize a pty that has already exited') ||
+      message.includes('EBADF') ||
+      message.includes('ESRCH') ||
+      message.includes('ioctl(2) failed');
 
-    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
+    const stack = error.stack || '';
+    const isFromNodePty =
+      stack.includes('node-pty') ||
+      stack.includes('PtyResize') ||
+      stack.includes('UnixTerminal.resize') ||
+      stack.includes('WindowsTerminal.resize');
+
+    if (isPtyResizeError && isFromNodePty) {
       // This error happens with node-pty when resizing a pty that has just exited.
       // It is a race condition in node-pty that we cannot prevent, so we silence it.
       return;

@@ -1509,16 +1509,24 @@ export class ShellExecutionService {
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
-        activePty.ptyProcess.resize(cols, rows);
-        activePty.headlessTerminal.resize(cols, rows);
+        if (activePty.ptyProcess) {
+          activePty.ptyProcess.resize(cols, rows);
+        }
+        if (activePty.headlessTerminal) {
+          activePty.headlessTerminal.resize(cols, rows);
+        }
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
-        const isEsrch = err.code === 'ESRCH';
-        const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
-        const isWindowsPtyError = err.message?.includes(
+        const errMessage = err.message || String(e);
+        const isEsrch = err.code === 'ESRCH' || errMessage.includes('ESRCH');
+        const isEbadf =
+          err.code === 'EBADF' ||
+          errMessage.includes('EBADF') ||
+          errMessage.includes('ioctl(2) failed');
+        const isWindowsPtyError = errMessage.includes(
           'Cannot resize a pty that has already exited',
         );
 
