@@ -186,6 +186,17 @@ export function serializeTerminalToObject(
 
     for (let x = 0; x < terminal.cols; x++) {
       const cellData = line.getCell(x, cellBuffer);
+
+      // Wide characters (e.g. CJK) span two columns in the terminal buffer.
+      // xterm.js stores the glyph in cell[x] (getWidth() === 2) and leaves
+      // cell[x+1] as a zero-width continuation placeholder (getWidth() === 0)
+      // with no character data. Emitting getChars() on that placeholder would
+      // fall through to the ' ' default in Cell.getChars(), inserting a
+      // spurious space between wide characters. Skip it entirely.
+      if (cellData && cellData.getWidth() === 0) {
+        continue;
+      }
+
       currentCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
 
       if (x > 0 && !currentCell.equals(lastCell)) {
