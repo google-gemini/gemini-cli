@@ -37,6 +37,7 @@ import {
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -1517,7 +1518,7 @@ export class ShellExecutionService {
         process.kill(pid, 0);
       } catch (e) {
         // Bail only if the process is explicitly confirmed dead (ESRCH).
-        if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+        if (isNodeError(e) && e.code === 'ESRCH') {
           return;
         }
       }
