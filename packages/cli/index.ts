@@ -20,16 +20,6 @@ import {
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
-<<<<<<< HEAD
-  if (
-    process.platform === 'win32' &&
-    error instanceof Error &&
-    error.message === 'Cannot resize a pty that has already exited'
-  ) {
-    // This error happens on Windows with node-pty when resizing a pty that has just exited.
-    // It is a race condition in node-pty that we cannot prevent, so we silence it.
-    return;
-=======
   if (error instanceof Error) {
     const message = error.message || '';
     const isPtyResizeError =
@@ -45,7 +35,6 @@ process.on('uncaughtException', (error) => {
       // It is a race condition in node-pty that we cannot prevent, so we silence it.
       return;
     }
->>>>>>> bd53951dc (fix(core): harden PTY resize against native crashes (#27496))
   }
 
   // For other errors, we rely on the default behavior, but since we attached a listener,

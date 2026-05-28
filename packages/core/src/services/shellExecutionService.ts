@@ -1542,28 +1542,6 @@ export class ShellExecutionService {
     }
 
     const activePty = this.activePtys.get(pid);
-<<<<<<< HEAD
-    if (activePty) {
-      try {
-        activePty.ptyProcess.resize(cols, rows);
-        activePty.headlessTerminal.resize(cols, rows);
-      } catch (e) {
-        // Ignore errors if the pty has already exited, which can happen
-        // due to a race condition between the exit event and this call.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const err = e as { code?: string; message?: string };
-        const isEsrch = err.code === 'ESRCH';
-        const isWindowsPtyError = err.message?.includes(
-          'Cannot resize a pty that has already exited',
-        );
-
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
-          // On Windows, we get a message-based error.
-          // In both cases, it's safe to ignore.
-        } else {
-          throw e;
-=======
     if (!activePty) {
       return;
     }
@@ -1576,7 +1554,6 @@ export class ShellExecutionService {
         // Bail only if the process is explicitly confirmed dead (ESRCH).
         if (isNodeError(e) && e.code === 'ESRCH') {
           return;
->>>>>>> bd53951dc (fix(core): harden PTY resize against native crashes (#27496))
         }
       }
     }
