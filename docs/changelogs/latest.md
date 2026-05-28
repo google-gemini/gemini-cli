@@ -1,6 +1,6 @@
-# Latest stable release: v0.43.0
+# Latest stable release: v0.44.1
 
-Released: May 22, 2026
+Released: May 28, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -29,6 +29,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick bd53951 to release/v0.44.0-pr-27496 [CONFLICTS] by
+  @gemini-cli-robot in
+  [#27534](https://github.com/google-gemini/gemini-cli/pull/27534)
 - feat(core): steer model to use edit tool for surgical edits, fix a typo by
   @aishaneeshah in
   [#26480](https://github.com/google-gemini/gemini-cli/pull/26480)
@@ -215,4 +218,4 @@ npm install -g @google/gemini-cli
   [#27256](https://github.com/google-gemini/gemini-cli/pull/27256)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.42.0...v0.43.0
+https://github.com/google-gemini/gemini-cli/compare/v0.44.0...v0.44.1
