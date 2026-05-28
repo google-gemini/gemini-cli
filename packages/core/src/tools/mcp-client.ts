@@ -21,6 +21,7 @@ import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListResourcesResultSchema,
@@ -48,7 +49,7 @@ import {
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
+import { McpComplianceTransport } from './mcp-compliance-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -1054,7 +1055,7 @@ async function createTransportWithOAuth(
   mcpServerConfig: MCPServerConfig,
   accessToken: string,
   cliConfig: McpContext,
-): Promise<StreamableHTTPClientTransport | SSEClientTransport | null> {
+): Promise<Transport | null> {
   try {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
@@ -1069,7 +1070,12 @@ async function createTransportWithOAuth(
       ),
     };
 
-    return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
+    const transport = createUrlTransport(
+      mcpServerName,
+      mcpServerConfig,
+      transportOptions,
+    );
+    return transport ? new McpComplianceTransport(transport) : null;
   } catch (error) {
     cliConfig.emitMcpDiagnostic(
       'error',
@@ -1305,6 +1311,46 @@ export async function discoverTools(
       try {
         if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
+        }
+
+        if (toolDef.inputSchema) {
+          try {
+            const transform = (obj: unknown): unknown => {
+              if (obj === null || typeof obj !== 'object') return obj;
+              if (Array.isArray(obj)) return obj.map(transform);
+
+              const res = { ...obj } as Record<string, unknown>;
+
+              if (Array.isArray(res['type']) && res['type'].length === 2) {
+                const nIdx = res['type'].indexOf('null');
+                if (nIdx !== -1 && typeof res['type'][1 - nIdx] === 'string') {
+                  res['type'] = res['type'][1 - nIdx];
+                  res['nullable'] = true;
+                }
+              }
+
+              for (const k in res) {
+                if (Object.prototype.hasOwnProperty.call(res, k)) {
+                  res[k] = transform(res[k]);
+                }
+              }
+              return res;
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            toolDef.inputSchema = transform(toolDef.inputSchema) as {
+              type: 'object';
+              properties?: Record<string, object>;
+              required?: string[];
+            };
+          } catch (error) {
+            cliConfig.emitMcpDiagnostic(
+              'error',
+              `Failed to parse adjusted inputSchema for tool '${toolDef.name}' from server '${mcpServerName}'. Using original schema. Error: ${error instanceof Error ? error.message : String(error)}`,
+              error,
+              mcpServerName,
+            );
+          }
         }
 
         const mcpCallableTool = new McpCallableTool(
@@ -2137,16 +2183,34 @@ function createUrlTransport(
     | StreamableHTTPClientTransportOptions
     | SSEClientTransportOptions,
 ): StreamableHTTPClientTransport | SSEClientTransport {
-  // Wrap fetch to treat GET 404 as 405 so servers that do not support the
-  // optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
+  // Create a proxy-aware fetcher that respects NO_PROXY for this MCP server
+  // This is especially important for local MCP servers (localhost, 127.0.0.1)
+  // when a company proxy is globally configured.
+  const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+  const agent = new EnvHttpProxyAgent({ noProxy });
+
+  // Wrap fetch to:
+  // 1. Use the proxy-aware agent (respecting NO_PROXY)
+  // 2. Treat GET 404 as 405 so servers that do not support the
+  //    optional SSE GET stream (e.g. n8n native MCP) are handled gracefully.
   // The SDK already silently ignores 405; 404 is semantically equivalent here.
   const baseFetch =
     (transportOptions as StreamableHTTPClientTransportOptions).fetch ??
     globalThis.fetch;
+
   const httpOptions: StreamableHTTPClientTransportOptions = {
     ...transportOptions,
     fetch: async (url, init) => {
-      const res = await baseFetch(url, init);
+      // If we have an explicit NO_PROXY, we use a proxy-aware dispatcher.
+      // We use the global fetch but pass a custom dispatcher in the init options.
+      // This avoids manual response reconstruction and dangerous type casts.
+      const res = noProxy
+        ? await globalThis.fetch(url, {
+            ...init,
+            dispatcher: agent,
+          } as RequestInit)
+        : await baseFetch(url, init);
+
       return init?.method === 'GET' && res.status === 404
         ? new Response(null, { status: 405, statusText: 'Method Not Allowed' })
         : res;
@@ -2259,7 +2323,9 @@ export async function createTransport(
       authProvider,
     };
 
-    return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
+    return new McpComplianceTransport(
+      createUrlTransport(mcpServerName, mcpServerConfig, transportOptions),
+    );
   }
 
   if (mcpServerConfig.command) {
@@ -2295,32 +2361,23 @@ export async function createTransport(
       }
     }
 
-    let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
-      env: finalEnv,
-      cwd: mcpServerConfig.cwd,
-      stderr: 'pipe',
-    });
-
-    // Fix for Xcode 26.3 mcpbridge non-compliant responses
-    // It returns JSON in `content` instead of `structuredContent`
-    if (
-      mcpServerConfig.command === 'xcrun' &&
-      mcpServerConfig.args?.includes('mcpbridge')
-    ) {
-      transport = new XcodeMcpBridgeFixTransport(transport);
-    }
+    const transport: Transport = new McpComplianceTransport(
+      new StdioClientTransport({
+        command: mcpServerConfig.command,
+        args: mcpServerConfig.args || [],
+        env: finalEnv,
+        cwd: mcpServerConfig.cwd,
+        stderr: 'pipe',
+      }),
+    );
 
     if (debugMode) {
-      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // The `McpComplianceTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
-        transport instanceof XcodeMcpBridgeFixTransport
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-            (transport as any).transport
+        transport instanceof McpComplianceTransport
+          ? transport.transport
           : transport;
 
       if (

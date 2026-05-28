@@ -177,6 +177,7 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { validatePath } from '../utils/path-validator.js';
 import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
@@ -237,6 +238,7 @@ export interface GemmaModelRouterSettings {
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
+  agentSessionSubagentEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -688,6 +690,7 @@ export interface ConfigParameters {
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
+  fakeResponsesNonStrict?: string;
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
@@ -831,6 +834,7 @@ export class Config implements McpContext, AgentLoopContext {
   private ideMode: boolean;
 
   private _activeModel: string;
+  private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
@@ -913,12 +917,14 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
+  private readonly agentSessionSubagentEnabled: boolean;
 
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
+  readonly fakeResponsesNonStrict?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
   private readonly disableAlwaysAllow: boolean;
@@ -1299,6 +1305,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
+    this.fakeResponsesNonStrict = params.fakeResponsesNonStrict;
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -1359,6 +1366,8 @@ export class Config implements McpContext, AgentLoopContext {
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.agentSessionInteractiveEnabled =
       params.adk?.agentSessionInteractiveEnabled ?? false;
+    this.agentSessionSubagentEnabled =
+      params.adk?.agentSessionSubagentEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1560,6 +1569,8 @@ export class Config implements McpContext, AgentLoopContext {
   ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
+    this.fallbackOverrides.clear();
+    this.modelConfigService.clearRuntimeOverrides();
 
     // Vertex and Genai have incompatible encryption and sending history with
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
@@ -1627,7 +1638,10 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const authType = this.contentGeneratorConfig.authType;
-    if (authType === AuthType.USE_GEMINI) {
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
       this.setHasAccessToPreviewModel(true);
     }
 
@@ -1818,6 +1832,8 @@ export class Config implements McpContext, AgentLoopContext {
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
+    this.fallbackOverrides.clear();
+    this.modelConfigService.clearRuntimeOverrides();
     this.approvedPlanPath = undefined;
     this.topicState.reset();
     this.skillManager.reset();
@@ -1830,7 +1846,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelQuotas.clear();
     this.lastRetrievedQuota = undefined;
     this.lastQuotaFetchTime = 0;
-    this.hasAccessToPreviewModel = null;
 
     // Force an event emission to clear the UI display
     coreEvents.emitQuotaChanged(undefined, undefined, undefined);
@@ -1914,12 +1929,38 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelAvailabilityService.reset();
   }
 
-  activateFallbackMode(model: string): void {
-    this.setModel(model, true);
+  activateFallbackMode(model: string, failedModel?: string): void {
+    if (this.getActiveModel() !== model) {
+      this.setModel(model, true);
+    }
+    if (failedModel) {
+      // Chained fallback mitigation: If we already have overrides that point to the model
+      // that just failed, we need to update them to point to the new fallback model.
+      // e.g. A -> B, then B fails and we fallback to C. We must update A to point to C.
+      for (const [source, target] of this.fallbackOverrides.entries()) {
+        if (target === failedModel) {
+          this.fallbackOverrides.set(source, model);
+          this.modelConfigService.registerRuntimeModelOverride({
+            match: { model: source },
+            modelConfig: { model },
+          });
+        }
+      }
+
+      this.fallbackOverrides.set(failedModel, model);
+      this.modelConfigService.registerRuntimeModelOverride({
+        match: { model: failedModel },
+        modelConfig: { model },
+      });
+    }
     const authType = this.getContentGeneratorConfig()?.authType;
     if (authType) {
       logFlashFallback(this, new FlashFallbackEvent(authType));
     }
+  }
+
+  getFallbackOverride(model: string): string | undefined {
+    return this.fallbackOverrides.get(model);
   }
 
   getActiveModel(): string {
@@ -2010,7 +2051,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       model,
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2050,7 +2090,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2066,7 +2105,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2082,7 +2120,6 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
@@ -2569,6 +2606,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isContextManagementEnabled(): boolean {
     return this.contextManagement.enabled;
+  }
+
+  isAgentSessionSubagentEnabled(): boolean {
+    return this.agentSessionSubagentEnabled;
   }
 
   getMemoryBoundaryMarkers(): readonly string[] {
@@ -3286,6 +3327,11 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    const pathValidation = validatePath(absolutePath);
+    if (!pathValidation.isValid) {
+      return `Invalid path: ${pathValidation.error}`;
+    }
+
     if (checkType === 'write' && hasScopedAutoMemoryExtractionWriteAccess()) {
       const resolvedPath = resolveToRealPath(absolutePath);
       if (
@@ -3464,15 +3510,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   * This method is async and ensures that experiments are loaded before returning the result.
-   */
-  async getGemini31FlashLiteLaunched(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-    return this.getGemini31FlashLiteLaunchedSync();
-  }
-
-  /**
    * Returns whether the custom tool model should be used.
    */
   async getUseCustomToolModel(): Promise<boolean> {
@@ -3531,24 +3568,6 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     return undefined;
-  }
-
-  /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   *
-   * Note: This method should only be called after startup, once experiments have been loaded.
-   * If you need to call this during startup or from an async context, use
-   * getGemini31FlashLiteLaunched instead.
-   */
-  getGemini31FlashLiteLaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    if (this.isGemini31LaunchedForAuthType(authType)) {
-      return true;
-    }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
-        ?.boolValue ?? false
-    );
   }
 
   /**

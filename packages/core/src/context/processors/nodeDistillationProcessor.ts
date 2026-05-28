@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import { type ConcreteNode, NodeType } from '../graph/types.js';
@@ -99,9 +99,10 @@ export function createNodeDistillationProcessor(
               if (newTokens < oldTokens) {
                 const distilledPayload = updatePart(payload, { text: summary });
 
+                const newId = deriveStableId([node.id, 'distilled']);
                 returnedNodes.push({
                   ...node,
-                  id: randomUUID(),
+                  id: newId,
                   payload: distilledPayload,
                   replacesId: node.id,
                   timestamp: node.timestamp,
@@ -158,9 +159,10 @@ export function createNodeDistillationProcessor(
                     functionResponse: newFR,
                   });
 
+                  const newId = deriveStableId([node.id, 'distilled']);
                   returnedNodes.push({
                     ...node,
-                    id: randomUUID(),
+                    id: newId,
                     payload: distilledPayload,
                     replacesId: node.id,
                     timestamp: node.timestamp,

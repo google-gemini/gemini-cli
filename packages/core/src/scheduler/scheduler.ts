@@ -547,6 +547,10 @@ export class Scheduler {
   }
 
   private _isParallelizable(request: ToolCallRequestInfo): boolean {
+    // update_topic tool is forced as sequential call
+    if (request.name === UPDATE_TOPIC_TOOL_NAME) {
+      return false;
+    }
     if (request.args) {
       const wait = request.args['wait_for_previous'];
       if (typeof wait === 'boolean') {

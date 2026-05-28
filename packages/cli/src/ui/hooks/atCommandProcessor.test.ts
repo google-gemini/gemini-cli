@@ -77,6 +77,12 @@ describe('handleAtCommand', () => {
       unsubscribe: vi.fn(),
     } as unknown as core.MessageBus;
 
+    const mockWorkspaceContext = {
+      isPathWithinWorkspace: (p: string) =>
+        p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
+      getDirectories: () => [testRootDir],
+    };
+
     mockConfig = {
       getToolRegistry,
       getTargetDir: () => testRootDir,
@@ -91,11 +97,7 @@ describe('handleAtCommand', () => {
       }),
       getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
-      getWorkspaceContext: () => ({
-        isPathWithinWorkspace: (p: string) =>
-          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
-        getDirectories: () => [testRootDir],
-      }),
+      getWorkspaceContext: () => mockWorkspaceContext,
       getMemoryContextManager: () => undefined,
       storage: {
         getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
@@ -106,7 +108,8 @@ describe('handleAtCommand', () => {
         }
 
         const workspaceContext = this.getWorkspaceContext();
-        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+        const directories = workspaceContext.getDirectories();
+        if (directories.some((dir) => absolutePath.startsWith(dir))) {
           return true;
         }
 
@@ -1462,31 +1465,126 @@ describe('handleAtCommand', () => {
     );
   });
 
-  it('should include agent nudge when agents are found', async () => {
-    const agentName = 'my-agent';
-    const otherAgent = 'other-agent';
+  it('should resolve files in multiple workspace directories', async () => {
+    const secondRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'second-root-'),
+    );
+    try {
+      const fileContent = 'Second root content';
+      const filePath = path.join(secondRootDir, 'second-file.txt');
+      await fsPromises.writeFile(filePath, fileContent);
 
-    // Mock getAgentRegistry on the config
-    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
-      getDefinition: (name: string) =>
-        name === agentName || name === otherAgent ? { name } : undefined,
+      vi.spyOn(
+        mockConfig.getWorkspaceContext(),
+        'getDirectories',
+      ).mockReturnValue([testRootDir, secondRootDir]);
+
+      const query = '@second-file.txt';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 700,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toContainEqual(
+        expect.objectContaining({ text: fileContent }),
+      );
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        expect.stringContaining(`resolved to file: ${filePath}`),
+      );
+    } finally {
+      await fsPromises.rm(secondRootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should attempt glob fallback if direct resolution is unauthorized', async () => {
+    const fileContent = 'Globbed content';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'secret', 'file.txt'),
+      fileContent,
+    );
+
+    // Mock validatePathAccess to deny direct access but allow it via glob (just for test purposes)
+    vi.spyOn(mockConfig, 'validatePathAccess').mockImplementation((p) => {
+      if (p.includes('secret') && !p.includes('file.txt'))
+        return 'Unauthorized';
+      // Let's say the direct path 'secret/file.txt' is unauthorized
+      if (p === filePath) return 'Access Denied';
+      return null;
     });
 
-    const query = `@${agentName} @${otherAgent}`;
+    const query = '@secret/file.txt';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 701,
+      signal: abortController.signal,
+    });
+
+    // In this case, resolveAtCommandPath returns status: 'unauthorized'.
+    // resolveFilePaths should then try glob fallback.
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining('not found directly, attempting glob search.'),
+    );
+  });
+
+  it('should skip malformed paths (the original crash scenario)', async () => {
+    // We use a quoted path so the parser treats the whole thing as one @path token
+    const malformedPath =
+      '"FAIL tests/int/my.test.ts ... AssertionError: expected true to be false"';
+    const query = `@${malformedPath}`;
 
     const result = await handleAtCommand({
       query,
       config: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
-      messageId: 600,
+      messageId: 702,
       signal: abortController.signal,
     });
 
-    const expectedNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentName}, ${otherAgent}. Please use the following tool(s) to delegate the task: '${agentName}', '${otherAgent}'.\n</system_note>\n`;
+    // Malformed path should be skipped and original query part preserved as text
+    expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
+    );
+  });
 
+  it('should recover a buried path from a malformed fragment during handleAtCommand', async () => {
+    const buriedFile = 'src/recovered.ts';
+    await createTestFile(
+      path.join(testRootDir, buriedFile),
+      'Recovered content',
+    );
+    const malformedFragment = `"FAIL ${buriedFile}:10:5 (AssertionError)"`;
+    const query = `@${malformedFragment}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 703,
+      signal: abortController.signal,
+    });
+
+    // It should extract src/recovered.ts and attach its content
     expect(result.processedQuery).toContainEqual(
-      expect.objectContaining({ text: expectedNudge }),
+      expect.objectContaining({ text: 'Recovered content' }),
+    );
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
     );
   });
 });

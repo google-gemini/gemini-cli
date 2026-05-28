@@ -79,6 +79,7 @@ import {
   type Status,
   type ToolCall,
 } from './types.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 
@@ -172,6 +173,12 @@ describe('Scheduler Parallel Execution', () => {
     isReadOnly: false,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
+  const topicTool = {
+    name: UPDATE_TOPIC_TOOL_NAME,
+    kind: Kind.Other,
+    isReadOnly: false,
+    build: vi.fn(),
+  } as unknown as AnyDeclarativeTool;
 
   const mockInvocation = {
     shouldConfirmExecute: vi.fn().mockResolvedValue(false),
@@ -195,6 +202,7 @@ describe('Scheduler Parallel Execution', () => {
         if (name === 'write-tool') return writeTool;
         if (name === 'agent-tool-1') return agentTool1;
         if (name === 'agent-tool-2') return agentTool2;
+        if (name === UPDATE_TOPIC_TOOL_NAME) return topicTool;
         return undefined;
       }),
       getAllToolNames: vi
@@ -205,6 +213,7 @@ describe('Scheduler Parallel Execution', () => {
           'write-tool',
           'agent-tool-1',
           'agent-tool-2',
+          UPDATE_TOPIC_TOOL_NAME,
         ]),
     } as unknown as Mocked<ToolRegistry>;
 
@@ -331,6 +340,9 @@ describe('Scheduler Parallel Execution', () => {
       mockInvocation as unknown as AnyToolInvocation,
     );
     vi.mocked(agentTool2.build).mockReturnValue(
+      mockInvocation as unknown as AnyToolInvocation,
+    );
+    vi.mocked(topicTool.build).mockReturnValue(
       mockInvocation as unknown as AnyToolInvocation,
     );
   });
@@ -554,5 +566,35 @@ describe('Scheduler Parallel Execution', () => {
     expect(executionLog[1]).toBe('end-r1');
     expect(executionLog[2]).toBe('start-r2');
     expect(executionLog[3]).toBe('end-r2');
+  });
+
+  it('should execute UPDATE_TOPIC_TOOL_NAME sequentially even without wait_for_previous', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const topicReq: ToolCallRequestInfo = {
+      callId: 'call-topic',
+      name: UPDATE_TOPIC_TOOL_NAME,
+      args: { title: 'New Topic' },
+      isClientInitiated: false,
+      prompt_id: 'p1',
+      schedulerId: ROOT_SCHEDULER_ID,
+    };
+
+    await scheduler.schedule([req1, topicReq, req2], signal);
+
+    expect(executionLog[0]).toBe('start-call-topic');
+    expect(executionLog[1]).toBe('end-call-topic');
+    expect(executionLog.slice(2, 4)).toContain('start-call-1');
+    expect(executionLog.slice(2, 4)).toContain('start-call-2');
   });
 });
