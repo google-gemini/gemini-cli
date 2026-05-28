@@ -1331,7 +1331,7 @@ export const useGeminiStream = (
         type: 'info',
         text:
           `The session has reached the maximum number of turns: ${config.getMaxSessionTurns()}. ` +
-          `Please update this limit in your setting.json file.`,
+          `Increase the limit by specifying maxSessionTurns in your settings.json file.`,
       }),
     [addItem, config],
   );
