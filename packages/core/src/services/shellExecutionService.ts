@@ -1526,8 +1526,8 @@ export class ShellExecutionService {
           // On Unix, we get an ESRCH or EBADF error.
           // On Windows, we get a message-based error.
           // In both cases, it's safe to ignore.
-          // return in order to mitigate the resize issue.
-          return; 
+          // Return early to prevent executing post-resize logic on a dead PTY.
+          return;
         } else {
           throw e;
         }
