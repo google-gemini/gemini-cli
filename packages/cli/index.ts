@@ -24,10 +24,22 @@ process.on('uncaughtException', (error) => {
     const isPtyResizeError =
       error.message === 'Cannot resize a pty that has already exited';
     const isEbadfError = error.message.includes('EBADF');
+    const isIoctlError = error.message?.includes('ioctl(2) failed') ?? false;
+    const isEsrchError =
+      (error.message?.includes('ESRCH') ?? false) ||
+      (typeof (error as { code?: string }).code === 'string' &&
+        (error as { code?: string }).code === 'ESRCH');
     const isFromNodePty =
-      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+      error.stack?.includes('node-pty') ||
+      error.stack?.includes('PtyResize') ||
+      error.stack?.includes('UnixTerminal.resize') ||
+      error.stack?.includes('WindowsTerminal.resize') ||
+      error.stack?.includes('resizePty');
 
-    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
+    if (
+      (isPtyResizeError || isEbadfError || isIoctlError || isEsrchError) &&
+      isFromNodePty
+    ) {
       // This error happens with node-pty when resizing a pty that has just exited.
       // It is a race condition in node-pty that we cannot prevent, so we silence it.
       return;
