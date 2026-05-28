@@ -199,6 +199,46 @@ describe('loggers', () => {
         { tokens_before: 9001, tokens_after: 9000 },
       );
     });
+
+    it('routes the OTEL emit through bufferTelemetryEvent (regression test for #23445)', () => {
+      // Without the buffer wrapper, events fired before the OTel SDK is
+      // initialized are silently dropped against a no-op provider. Every
+      // other function in this file uses bufferTelemetryEvent; this test
+      // pins logChatCompression to the same pattern.
+      const bufferSpy = vi.spyOn(sdk, 'bufferTelemetryEvent');
+      const mockConfig = makeFakeConfig();
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(bufferSpy).toHaveBeenCalled();
+    });
+
+    it('does not emit to OTEL when the SDK is not initialized', () => {
+      // Companion to the regression test above: if bufferTelemetryEvent is
+      // a no-op (SDK not initialized), the logger emit and metrics record
+      // must not run.
+      vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
+
+      const mockConfig = makeFakeConfig();
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordChatCompressionMetrics).not.toHaveBeenCalled();
+    });
   });
 
   describe('logCliConfiguration', () => {
