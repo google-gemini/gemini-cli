@@ -21,9 +21,12 @@ import {
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
   if (error instanceof Error) {
+    const message = error.message || '';
     const isPtyResizeError =
-      error.message === 'Cannot resize a pty that has already exited';
-    const isEbadfError = error.message.includes('EBADF');
+      message === 'Cannot resize a pty that has already exited';
+    const isEbadfError =
+      message.includes('EBADF') ||
+      (error as { code?: string }).code === 'EBADF';
     const isFromNodePty =
       error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
 
