@@ -23,14 +23,25 @@ const PROTOTYPE_POLLUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor
  */
 function stripPrototypeKeys<T>(value: T): T {
   if (Array.isArray(value)) {
-    return value.map(stripPrototypeKeys) as unknown as T;
+    const cleanArr = value.map(stripPrototypeKeys);
+    for (const sym of Object.getOwnPropertySymbols(value)) {
+      (cleanArr as Record<string | symbol, unknown>)[sym] = stripPrototypeKeys(
+        (value as Record<string | symbol, unknown>)[sym],
+      );
+    }
+    return cleanArr as unknown as T;
   }
   if (typeof value === 'object' && value !== null) {
-    const clean: Record<string, unknown> = {};
+    const clean: Record<string | symbol, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       if (!PROTOTYPE_POLLUTION_KEYS.has(k)) {
         clean[k] = stripPrototypeKeys(v);
       }
+    }
+    for (const sym of Object.getOwnPropertySymbols(value)) {
+      clean[sym] = stripPrototypeKeys(
+        (value as Record<string | symbol, unknown>)[sym],
+      );
     }
     return clean as unknown as T;
   }
@@ -38,8 +49,8 @@ function stripPrototypeKeys<T>(value: T): T {
 }
 
 /**
- * Strips characters from a command string that could enable injection
- * (e.g., newlines that break command boundaries).
+ * Strips newline characters from a command string that could break
+ * command boundaries when the value is later executed by a shell.
  */
 function sanitizeCommandValue(command: string): string {
   return command.replace(/[\n\r]/g, ' ');
@@ -54,44 +65,62 @@ function sanitizeCommandValue(command: string): string {
 function warnAboutNaturalLanguageCommandValues(
   updates: Record<string, unknown>,
   path: string,
-): void {
+): Record<string, unknown> {
+  const result: Record<string | symbol, unknown> = {};
+  for (const k of Object.getOwnPropertyNames(updates)) {
+    result[k] = updates[k];
+  }
+  for (const sym of Object.getOwnPropertySymbols(updates)) {
+    result[sym] = updates[sym];
+  }
+
   if (
-    (updates['type'] === 'command' || updates['type'] === 'stdio') &&
-    typeof updates['command'] === 'string'
+    (result['type'] === 'command' || result['type'] === 'stdio') &&
+    typeof result['command'] === 'string'
   ) {
-    updates['command'] = sanitizeCommandValue(updates['command']);
-    if (!isLikelyShellCommand(updates['command'])) {
+    result['command'] = sanitizeCommandValue(result['command'] as string);
+    if (!isLikelyShellCommand(result['command'] as string)) {
       coreEvents.emitFeedback(
-        'warn',
+        'warning',
         `Setting "${path}.command" contains text that does not look like a valid shell command. ` +
           'The value will be saved, but it may fail when executed.',
       );
     }
+  } else if (typeof result['command'] === 'string') {
+    result['command'] = sanitizeCommandValue(result['command'] as string);
   }
 
-  for (const [key, value] of Object.entries(updates)) {
+  for (const key of Object.getOwnPropertyNames(result)) {
+    const value = result[key];
     const currentPath = path ? `${path}.${key}` : key;
 
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      warnAboutNaturalLanguageCommandValues(
+      result[key] = warnAboutNaturalLanguageCommandValues(
         value as Record<string, unknown>,
         currentPath,
       );
     } else if (Array.isArray(value)) {
-      (value as unknown[]).forEach((item, index) => {
+      const cleanArr = (value as unknown[]).map((item, index) => {
         if (
           typeof item === 'object' &&
           item !== null &&
           !Array.isArray(item)
         ) {
-          warnAboutNaturalLanguageCommandValues(
+          return warnAboutNaturalLanguageCommandValues(
             item as Record<string, unknown>,
             `${currentPath}[${index}]`,
           );
         }
+        return item;
       });
+      for (const sym of Object.getOwnPropertySymbols(value)) {
+        (cleanArr as Record<string | symbol, unknown>)[sym] =
+          (value as Record<string | symbol, unknown>)[sym];
+      }
+      result[key] = cleanArr;
     }
   }
+  return result as Record<string, unknown>;
 }
 
 /**
@@ -103,10 +132,13 @@ export function updateSettingsFilePreservingFormat(
 ): void {
   // Sanitize untrusted input before any processing
   const sanitizedUpdates = stripPrototypeKeys(updates);
-  warnAboutNaturalLanguageCommandValues(sanitizedUpdates, '');
+  const warnedUpdates = warnAboutNaturalLanguageCommandValues(
+    sanitizedUpdates,
+    '',
+  );
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(sanitizedUpdates, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(warnedUpdates, null, 2), 'utf-8');
     return;
   }
 
@@ -125,7 +157,7 @@ export function updateSettingsFilePreservingFormat(
     return;
   }
 
-  const updatedStructure = applyUpdates(parsed, sanitizedUpdates);
+  const updatedStructure = applyUpdates(parsed, warnedUpdates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
   fs.writeFileSync(filePath, updatedContent, 'utf-8');
@@ -238,8 +270,48 @@ function applyKeyDiff(
       for (const el of desiredArr) {
         baseArr.push(el);
       }
+      for (const sym of Object.getOwnPropertySymbols(desiredArr)) {
+        (baseArr as Record<string | symbol, unknown>)[sym] =
+          (desiredArr as Record<string | symbol, unknown>)[sym];
+      }
     } else {
       base[nextKey] = nextVal;
+    }
+  }
+
+  for (const sym of Object.getOwnPropertySymbols(desired)) {
+    const nextVal = desired[sym];
+    const baseVal = (base as Record<string | symbol, unknown>)[sym];
+
+    const isObj =
+      typeof nextVal === 'object' &&
+      nextVal !== null &&
+      !Array.isArray(nextVal);
+    const isBaseObj =
+      typeof baseVal === 'object' &&
+      baseVal !== null &&
+      !Array.isArray(baseVal);
+    const isArr = Array.isArray(nextVal);
+    const isBaseArr = Array.isArray(baseVal);
+
+    if (isObj && isBaseObj) {
+      applyKeyDiff(
+        baseVal as Record<string, unknown>,
+        nextVal as Record<string, unknown>,
+      );
+    } else if (isArr && isBaseArr) {
+      const baseArr = baseVal as unknown[];
+      const desiredArr = nextVal as unknown[];
+      baseArr.length = 0;
+      for (const el of desiredArr) {
+        baseArr.push(el);
+      }
+      for (const arrSym of Object.getOwnPropertySymbols(desiredArr)) {
+        (baseArr as Record<string | symbol, unknown>)[arrSym] =
+          (desiredArr as Record<string | symbol, unknown>)[arrSym];
+      }
+    } else {
+      (base as Record<string | symbol, unknown>)[sym] = nextVal;
     }
   }
 }
