@@ -111,7 +111,8 @@ export function getSpawnConfig(
     // we must provide a placeholder for the script path.
     // We explicitly use process.execPath to break the cycle and prevent
     // compounding argument duplication on subsequent relaunches.
-    finalSpawnArgs.push(process.execPath, ...scriptArgs);
+    const execPath = process.env['TERMUX_ORIGINAL_EXE_PATH'] || process.execPath;
+    finalSpawnArgs.push(execPath, ...scriptArgs);
   } else {
     // Standard Node mode: pass all flags via command line.
     finalSpawnArgs.push(

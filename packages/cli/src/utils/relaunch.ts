@@ -56,7 +56,8 @@ export async function relaunchAppInChildProcess(
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
 
-    const child = spawn(process.execPath, spawnArgs, {
+    const execPath = process.env['TERMUX_ORIGINAL_EXE_PATH'] || process.execPath;
+    const child = spawn(execPath, spawnArgs, {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: newEnv,
     });
