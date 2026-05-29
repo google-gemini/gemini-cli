@@ -7,13 +7,16 @@
 import {
   checkExhaustive,
   partListUnionToString,
+  parseThought,
   SESSION_FILE_PREFIX,
   CoreToolCallStatus,
   type Storage,
   type ConversationRecord,
   type MessageRecord,
+  type ThoughtSummary,
   loadConversationRecord,
 } from '@google/gemini-cli-core';
+import { type Part, type PartListUnion } from '@google/genai';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
@@ -137,6 +140,58 @@ export interface SessionSelectionResult {
   sessionPath: string;
   sessionData: ConversationRecord;
   displayInfo: string;
+}
+
+/**
+ * Checks if a session has at least one user or assistant (gemini) message.
+ * Sessions with only system messages (info, error, warning) are considered empty.
+ * @param messages - The array of message records to check
+ * @returns true if the session has meaningful content
+ */
+export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
+  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
+
+function ensurePartArray(content: PartListUnion): Part[] {
+  if (Array.isArray(content)) {
+    return content.map((part) =>
+      typeof part === 'string' ? { text: part } : part,
+    );
+  }
+  if (typeof content === 'string') {
+    return [{ text: content }];
+  }
+  return [content];
+}
+
+function inlineThoughtText(part: Part): string | undefined {
+  const thoughtValue = (part as { thought?: unknown }).thought;
+  if (!thoughtValue) {
+    return undefined;
+  }
+  if (typeof part.text === 'string' && part.text.trim()) {
+    return part.text;
+  }
+  if (typeof thoughtValue === 'string' && thoughtValue.trim()) {
+    return thoughtValue;
+  }
+  return undefined;
+}
+
+function inlineThoughtSummaries(content: PartListUnion): ThoughtSummary[] {
+  return ensurePartArray(content)
+    .map(inlineThoughtText)
+    .filter((text): text is string => text !== undefined)
+    .map(parseThought);
+}
+
+function visibleContentString(content: PartListUnion): string {
+  const visibleParts = ensurePartArray(content).filter(
+    (part) => !(part as { thought?: unknown }).thought,
+  );
+  if (visibleParts.length === 0) {
+    return '';
+  }
+  return partListUnionToString(visibleParts);
 }
 
 /**
@@ -579,9 +634,13 @@ export function convertSessionToHistoryFormats(
   const uiHistory: HistoryItemWithoutId[] = [];
 
   for (const msg of messages) {
-    // Add thoughts if present
-    if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
-      for (const thought of msg.thoughts) {
+    if (msg.type === 'gemini') {
+      const thoughts =
+        msg.thoughts && msg.thoughts.length > 0
+          ? msg.thoughts
+          : inlineThoughtSummaries(msg.content);
+
+      for (const thought of thoughts) {
         uiHistory.push({
           type: 'thinking',
           thought: {
@@ -594,9 +653,9 @@ export function convertSessionToHistoryFormats(
 
     // Add the message only if it has content
     const displayContentString = msg.displayContent
-      ? partListUnionToString(msg.displayContent)
+      ? visibleContentString(msg.displayContent)
       : undefined;
-    const contentString = partListUnionToString(msg.content);
+    const contentString = visibleContentString(msg.content);
     const uiText = displayContentString || contentString;
 
     // Skip internal context messages in the UI history

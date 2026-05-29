@@ -104,6 +104,65 @@ export function isIgnoredUserContent(trimmedContent: string): boolean {
   );
 }
 
+function collectExplicitFunctionResponseIds(
+  messages: ConversationRecord['messages'],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const msg of messages) {
+    if (msg.type !== 'user') {
+      continue;
+    }
+
+    for (const part of ensurePartArray(msg.content)) {
+      const id = part.functionResponse?.id;
+      if (id) {
+        ids.add(id);
+      }
+    }
+  }
+  return ids;
+}
+
+function appendFunctionResponseParts(
+  target: Part[],
+  parts: Part[],
+  explicitResponseIds: ReadonlySet<string>,
+  generatedResponseIds: Set<string>,
+): void {
+  const partsToAppend: Part[] = [];
+  const idsToMark: string[] = [];
+  let hasFunctionResponse = false;
+  let hasNewFunctionResponse = false;
+
+  for (const part of parts) {
+    const id = part.functionResponse?.id;
+    if (!part.functionResponse) {
+      partsToAppend.push(part);
+      continue;
+    }
+
+    hasFunctionResponse = true;
+    if (id && (explicitResponseIds.has(id) || generatedResponseIds.has(id))) {
+      continue;
+    }
+
+    partsToAppend.push(part);
+    hasNewFunctionResponse = true;
+    if (id) {
+      idsToMark.push(id);
+    }
+  }
+
+  if (hasFunctionResponse && !hasNewFunctionResponse) {
+    return;
+  }
+
+  target.push(...partsToAppend);
+  for (const id of idsToMark) {
+    generatedResponseIds.add(id);
+  }
+}
+
 /**
  * Converts session/conversation data into Gemini client history formats.
  */
@@ -111,6 +170,7 @@ export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
 ): HistoryTurn[] {
   const clientHistory: HistoryTurn[] = [];
+  const explicitResponseIds = collectExplicitFunctionResponseIds(messages);
 
   for (const msg of messages) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
@@ -185,12 +245,18 @@ export function convertSessionToClientHistory(
         // 4. Generate tool response turns
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           const functionResponseParts: Part[] = [];
+          const generatedResponseIds = new Set<string>();
           for (const toolCall of msg.toolCalls) {
             if (toolCall.result) {
-              let responseData: Part;
-
               if (typeof toolCall.result === 'string') {
-                responseData = {
+                if (
+                  explicitResponseIds.has(toolCall.id) ||
+                  generatedResponseIds.has(toolCall.id)
+                ) {
+                  continue;
+                }
+
+                functionResponseParts.push({
                   functionResponse: {
                     id: toolCall.id,
                     name: toolCall.name,
@@ -198,15 +264,16 @@ export function convertSessionToClientHistory(
                       output: toolCall.result,
                     },
                   },
-                };
-              } else if (Array.isArray(toolCall.result)) {
-                functionResponseParts.push(...ensurePartArray(toolCall.result));
-                continue;
+                });
+                generatedResponseIds.add(toolCall.id);
               } else {
-                responseData = toolCall.result;
+                appendFunctionResponseParts(
+                  functionResponseParts,
+                  ensurePartArray(toolCall.result),
+                  explicitResponseIds,
+                  generatedResponseIds,
+                );
               }
-
-              functionResponseParts.push(responseData);
             }
           }
 

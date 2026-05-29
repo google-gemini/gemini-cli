@@ -1043,6 +1043,72 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should not render inline thought parts as message text', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: [
+          { text: '**Planning** I should inspect the files.', thought: true },
+          { text: 'I found the issue.' },
+        ],
+        thoughts: [
+          {
+            subject: 'Planning',
+            description: 'I should inspect the files.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toEqual({
+      type: 'thinking',
+      thought: {
+        subject: 'Planning',
+        description: 'I should inspect the files.',
+      },
+    });
+    expect(result.uiHistory[1]).toEqual({
+      type: 'gemini',
+      text: 'I found the issue.',
+    });
+    expect(JSON.stringify(result.uiHistory)).not.toContain('[Thought: true]');
+  });
+
+  it('should convert inline thought parts to thinking items without metadata', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: [
+          { text: '**Planning** I should inspect the files.', thought: true },
+          { text: 'I found the issue.' },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toEqual({
+      type: 'thinking',
+      thought: {
+        subject: 'Planning',
+        description: 'I should inspect the files.',
+      },
+    });
+    expect(result.uiHistory[1]).toEqual({
+      type: 'gemini',
+      text: 'I found the issue.',
+    });
+  });
+
   it('should filter out <session_context> from UI history', () => {
     const messages: MessageRecord[] = [
       {

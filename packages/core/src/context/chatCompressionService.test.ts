@@ -116,6 +116,17 @@ describe('modelStringToModelConfigAlias', () => {
     );
   });
 
+  it('should use Claude Vertex models directly', () => {
+    expect(modelStringToModelConfigAlias('claude-opus-4-8')).toBe(
+      'claude-opus-4-8',
+    );
+    expect(
+      modelStringToModelConfigAlias(
+        'publishers/anthropic/models/claude-opus-4-8',
+      ),
+    ).toBe('publishers/anthropic/models/claude-opus-4-8');
+  });
+
   it('should handle valid names', () => {
     expect(modelStringToModelConfigAlias('gemini-3-pro-preview')).toBe(
       'chat-compression-3-pro',

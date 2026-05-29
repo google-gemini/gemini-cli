@@ -186,6 +186,153 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
+  it('should not duplicate explicit tool response turns on resume', () => {
+    const toolResponse = {
+      functionResponse: {
+        id: 'toolu_1',
+        name: 'web_fetch',
+        response: { output: 'page content' },
+      },
+    };
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Fetch this page',
+      },
+      {
+        id: 'msg2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: [
+          { text: 'Let me fetch it.' },
+          {
+            functionCall: {
+              id: 'toolu_1',
+              name: 'web_fetch',
+              args: { url: 'https://example.com' },
+            },
+          },
+        ],
+        toolCalls: [
+          {
+            id: 'toolu_1',
+            name: 'web_fetch',
+            args: { url: 'https://example.com' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: [toolResponse],
+          },
+        ],
+      },
+      {
+        id: 'msg3',
+        type: 'user',
+        timestamp: '2024-01-01T10:01:06Z',
+        content: [toolResponse],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history.map((h) => h.content)).toEqual([
+      { role: 'user', parts: [{ text: 'Fetch this page' }] },
+      {
+        role: 'model',
+        parts: [
+          { text: 'Let me fetch it.' },
+          {
+            functionCall: {
+              id: 'toolu_1',
+              name: 'web_fetch',
+              args: { url: 'https://example.com' },
+            },
+          },
+        ],
+      },
+      { role: 'user', parts: [toolResponse] },
+    ]);
+  });
+
+  it('should deduplicate grouped tool results stored on multiple tool calls', () => {
+    const groupedResults = [
+      {
+        functionResponse: {
+          id: 'call1',
+          name: 'read_file',
+          response: { output: 'file contents' },
+        },
+      },
+      {
+        functionResponse: {
+          id: 'call2',
+          name: 'list_files',
+          response: { output: 'file.txt' },
+        },
+      },
+    ];
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Inspect the project',
+      },
+      {
+        id: 'msg2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'I will inspect it.',
+        toolCalls: [
+          {
+            id: 'call1',
+            name: 'read_file',
+            args: { path: 'README.md' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: groupedResults,
+          },
+          {
+            id: 'call2',
+            name: 'list_files',
+            args: { dir: '.' },
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:06Z',
+            result: groupedResults,
+          },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history.map((h) => h.content)).toEqual([
+      { role: 'user', parts: [{ text: 'Inspect the project' }] },
+      {
+        role: 'model',
+        parts: [
+          { text: 'I will inspect it.' },
+          {
+            functionCall: {
+              id: 'call1',
+              name: 'read_file',
+              args: { path: 'README.md' },
+            },
+          },
+          {
+            functionCall: {
+              id: 'call2',
+              name: 'list_files',
+              args: { dir: '.' },
+            },
+          },
+        ],
+      },
+      { role: 'user', parts: groupedResults },
+    ]);
+  });
+
   it('should preserve multi-modal parts (inlineData)', () => {
     const messages: ConversationRecord['messages'] = [
       {

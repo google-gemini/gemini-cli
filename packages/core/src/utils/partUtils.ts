@@ -30,10 +30,9 @@ export function partToString(
   }
 
   // Cast to Part, assuming it might contain project-specific fields
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const part = value as Part & {
     videoMetadata?: unknown;
-    thought?: string;
+    thought?: unknown;
     codeExecutionResult?: unknown;
     executableCode?: unknown;
   };
@@ -43,7 +42,11 @@ export function partToString(
       return `[Video Metadata]`;
     }
     if (part.thought !== undefined) {
-      return `[Thought: ${part.thought}]`;
+      const thoughtText =
+        typeof part.text === 'string' && part.text.length > 0
+          ? part.text
+          : String(part.thought);
+      return `[Thought: ${thoughtText}]`;
     }
     if (part.codeExecutionResult !== undefined) {
       return `[Code Execution Result]`;

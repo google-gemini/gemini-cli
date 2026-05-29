@@ -32,6 +32,10 @@ import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
 import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
+import {
+  VertexAiContentGeneratorRouter,
+  VertexAnthropicContentGenerator,
+} from './vertexAnthropicContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -380,7 +384,23 @@ export async function createContentGenerator(
           },
         }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      const contentGenerator =
+        config.authType === AuthType.USE_VERTEX_AI
+          ? new VertexAiContentGeneratorRouter(
+              googleGenAI.models,
+              new VertexAnthropicContentGenerator({
+                projectId:
+                  process.env['GOOGLE_CLOUD_PROJECT'] ||
+                  process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+                  undefined,
+                location: process.env['GOOGLE_CLOUD_LOCATION'] || undefined,
+                baseUrl,
+                headers,
+                proxy: proxyUrl,
+              }),
+            )
+          : googleGenAI.models;
+      return new LoggingContentGenerator(contentGenerator, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

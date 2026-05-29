@@ -33,6 +33,7 @@ import {
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
+import { isClaudeVertexModel } from '../core/vertexAnthropicContentGenerator.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -100,6 +101,10 @@ export function findCompressSplitPoint(
 }
 
 export function modelStringToModelConfigAlias(model: string): string {
+  if (isClaudeVertexModel(model)) {
+    return model;
+  }
+
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_3_1_MODEL:
