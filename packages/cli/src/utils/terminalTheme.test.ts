@@ -67,6 +67,13 @@ describe('setupTerminalAndTheme', () => {
     });
   });
 
+  afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+  });
+
   it('should emit warning when theme is incompatible and autoThemeSwitching is enabled', async () => {
     vi.mocked(
       terminalCapabilityManager.getTerminalBackgroundColor,
