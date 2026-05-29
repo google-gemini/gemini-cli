@@ -65,6 +65,7 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  BYOID = 'byoid',
 }
 
 /**
@@ -105,6 +106,7 @@ export type ContentGeneratorConfig = {
   baseUrl?: string;
   customHeaders?: Record<string, string>;
   vertexAiRouting?: VertexAiRoutingConfig;
+  byoidConfigPath?: string;
 };
 
 export type VertexAiRequestType = 'dedicated' | 'shared';
@@ -134,6 +136,7 @@ export async function createContentGeneratorConfig(
   baseUrl?: string,
   customHeaders?: Record<string, string>,
   vertexAiRouting?: VertexAiRoutingConfig,
+  byoidConfigPath?: string,
 ): Promise<ContentGeneratorConfig> {
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
@@ -141,6 +144,7 @@ export async function createContentGeneratorConfig(
     baseUrl,
     customHeaders,
     vertexAiRouting,
+    byoidConfigPath,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
@@ -148,7 +152,8 @@ export async function createContentGeneratorConfig(
   // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
+    authType === AuthType.COMPUTE_ADC ||
+    authType === AuthType.BYOID
   ) {
     return contentGeneratorConfig;
   }
@@ -277,8 +282,17 @@ export async function createContentGenerator(
     }
     if (
       config.authType === AuthType.LOGIN_WITH_GOOGLE ||
-      config.authType === AuthType.COMPUTE_ADC
+      config.authType === AuthType.COMPUTE_ADC ||
+      config.authType === AuthType.BYOID
     ) {
+      if (
+        config.authType === AuthType.BYOID &&
+        !gcConfig.isExperimentalByoidEnabled()
+      ) {
+        throw new Error(
+          'BYOID authentication is experimental and must be enabled via the experimentalByoid flag.',
+        );
+      }
       const httpOptions = { headers: baseHeaders };
       return new LoggingContentGenerator(
         await createCodeAssistContentGenerator(

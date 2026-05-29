@@ -2002,6 +2002,16 @@ const SETTINGS_SCHEMA = {
             description: 'Whether to use an external authentication flow.',
             showInDialog: false,
           },
+          byoidConfigPath: {
+            type: 'string',
+            label: 'BYOID Configuration Path',
+            category: 'Security',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to the BYOID (Bring Your Own IDentifier) configuration file.',
+            showInDialog: true,
+          },
         },
       },
       enableConseca: {
@@ -2465,6 +2475,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable logic for context management.',
+        showInDialog: true,
+      },
+      byoid: {
+        type: 'boolean',
+        label: 'Enable BYOID Auth',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable experimental support for BYOID (Bring Your Own IDentifier) authentication.',
         showInDialog: true,
       },
       topicUpdateNarration: {

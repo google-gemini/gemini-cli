@@ -715,6 +715,7 @@ export interface ConfigParameters {
   autoDistillation?: boolean;
   experimentalAutoMemory?: boolean;
   experimentalGemma?: boolean;
+  experimentalByoid?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -744,6 +745,7 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+  byoidConfigPath?: string;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -956,6 +958,7 @@ export class Config implements McpContext, AgentLoopContext {
     overageStrategy: OverageStrategy;
   };
   private readonly vertexAiRouting: VertexAiRoutingConfig | undefined;
+  private readonly byoidConfigPath: string | undefined;
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
@@ -965,6 +968,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalAutoMemory: boolean;
   private readonly experimentalGemma: boolean;
+  private readonly experimentalByoid: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
@@ -1186,6 +1190,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
     this.experimentalGemma = params.experimentalGemma ?? true;
+    this.experimentalByoid = params.experimentalByoid ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1598,6 +1603,7 @@ export class Config implements McpContext, AgentLoopContext {
       baseUrl,
       customHeaders,
       this.vertexAiRouting,
+      this.byoidConfigPath,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -2650,6 +2656,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isModelSteeringEnabled(): boolean {
     return this.modelSteering;
+  }
+
+  isExperimentalByoidEnabled(): boolean {
+    return this.experimentalByoid;
   }
 
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
@@ -4135,6 +4145,14 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }
+  }
+
+  isExperimentalByoidEnabled(): boolean {
+    return this.experimentalByoid;
+  }
+
+  getByoidConfigPath(): string | undefined {
+    return this.byoidConfigPath;
   }
 }
 // Export model constants for use in CLI

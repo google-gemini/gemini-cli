@@ -42,7 +42,10 @@ export async function validateNonInteractiveAuth(
     const authType: AuthType = effectiveAuthType;
 
     if (!useExternalAuth) {
-      const err = await validateAuthMethod(String(authType));
+      const err = await validateAuthMethod(
+        String(authType),
+        nonInteractiveConfig.isExperimentalByoidEnabled(),
+      );
       if (err != null) {
         throw new Error(err);
       }

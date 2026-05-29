@@ -21,6 +21,7 @@ import { validateAuthMethod } from '../../config/auth.js';
 export async function validateAuthMethodWithSettings(
   authType: AuthType,
   settings: LoadedSettings,
+  config?: Config,
 ): Promise<string | null> {
   const enforcedType = settings.merged.security.auth.enforcedType;
   if (enforcedType && enforcedType !== authType) {
@@ -33,7 +34,7 @@ export async function validateAuthMethodWithSettings(
   if (authType === AuthType.USE_GEMINI) {
     return null;
   }
-  return validateAuthMethod(authType);
+  return validateAuthMethod(authType, config?.isExperimentalByoidEnabled());
 }
 
 import type { AccountSuspensionInfo } from '../contexts/UIStateContext.js';
@@ -114,6 +115,7 @@ export const useAuthCommand = (
       const error = await validateAuthMethodWithSettings(
         authType,
         settings,
+        config,
       ).catch((e: unknown) => getErrorMessage(e));
 
       if (error) {

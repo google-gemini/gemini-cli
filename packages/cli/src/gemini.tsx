@@ -516,6 +516,7 @@ export async function main() {
       ) {
         const err = await validateAuthMethod(
           settings.merged.security.auth.selectedType,
+          partialConfig.isExperimentalByoidEnabled(),
         );
         if (err) {
           throw new Error(err);
