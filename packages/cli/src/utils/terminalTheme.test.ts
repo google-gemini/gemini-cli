@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupTerminalAndTheme } from './terminalTheme.js';
 import { terminalCapabilityManager } from '../ui/utils/terminalCapabilityManager.js';
 import { themeManager } from '../ui/themes/theme-manager.js';
