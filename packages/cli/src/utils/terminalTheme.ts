@@ -58,7 +58,7 @@ export async function setupTerminalAndTheme(
 
   if (
     terminalBackground !== undefined &&
-    settings.merged.ui.autoThemeSwitching !== false
+    (settings.merged.ui?.autoThemeSwitching ?? true)
   ) {
     const currentTheme = themeManager.getActiveTheme();
     if (!themeManager.isThemeCompatible(currentTheme, terminalBackground)) {
