@@ -56,7 +56,10 @@ export async function setupTerminalAndTheme(
   config.setTerminalBackground(terminalBackground);
   themeManager.setTerminalBackground(terminalBackground);
 
-  if (terminalBackground !== undefined) {
+  if (
+    terminalBackground !== undefined &&
+    settings.merged.ui.autoThemeSwitching !== false
+  ) {
     const currentTheme = themeManager.getActiveTheme();
     if (!themeManager.isThemeCompatible(currentTheme, terminalBackground)) {
       const backgroundType =
