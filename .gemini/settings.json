@@ -10,12 +10,6 @@
     }
   },
   "general": {
-    "devtools": true,
-    "plan": {
-      "enabled": true
-    }
-  },
-  "agents": {
-    "overrides": {}
+    "devtools": true
   }
 }
