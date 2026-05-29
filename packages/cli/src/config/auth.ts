@@ -45,5 +45,9 @@ export async function validateAuthMethod(
     return null;
   }
 
+  if (authMethod === AuthType.GATEWAY) {
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }
