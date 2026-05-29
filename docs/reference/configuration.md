@@ -602,6 +602,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3.1-flash-lite"
         }
       },
+      "gemini-3.5-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.5-flash"
+        }
+      },
       "gemma-4-31b-it": {
         "extends": "chat-base-3",
         "modelConfig": {
@@ -624,6 +630,12 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "base",
         "modelConfig": {
           "model": "gemini-3-flash-preview"
+        }
+      },
+      "gemini-3.5-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.5-flash"
         }
       },
       "classifier": {
@@ -868,6 +880,16 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": true
         }
       },
+      "gemini-3.5-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
       "gemini-2.5-pro": {
         "tier": "pro",
         "family": "gemini-2.5",
@@ -1020,9 +1042,44 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
+          }
+        ]
+      },
+      "gemini-3.5-flash": {
+        "default": "gemini-3.5-flash",
+        "contexts": [
+          {
+            "condition": {
+              "useGemini3_5Flash": false,
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-flash"
+          },
+          {
+            "condition": {
+              "useGemini3_5Flash": false
+            },
+            "target": "gemini-3-flash-preview"
+          }
+        ]
+      },
+      "gemini-2.5-flash": {
+        "default": "gemini-2.5-flash",
+        "contexts": [
+          {
+            "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
           }
         ]
       },
@@ -1106,6 +1163,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
+          {
+            "condition": {
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
@@ -1157,6 +1220,12 @@ their corresponding top-level category object in your `settings.json` file.
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
+          {
+            "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
