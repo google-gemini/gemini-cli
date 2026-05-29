@@ -167,7 +167,7 @@ async function handleExecuteCommand(
           id: 'taskId' in event ? event.taskId : (event as Message).messageId,
           result: event,
         };
-        res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+        res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n\n`);
       };
       eventBus.on('event', eventHandler);
 
