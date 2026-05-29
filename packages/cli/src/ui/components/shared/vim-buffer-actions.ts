@@ -6,8 +6,6 @@
 
 import type { TextBufferState, TextBufferAction } from './text-buffer.js';
 import {
-  getLineRangeOffsets,
-  getPositionFromOffsets,
   replaceRangeInternal,
   pushUndo,
   detachExpandedPaste,
@@ -520,24 +518,16 @@ export function handleVimAction(
       const linesToChange = Math.min(count, lines.length - cursorRow);
       const nextState = detachExpandedPaste(pushUndo(state));
 
-      const { startOffset, endOffset } = getLineRangeOffsets(
-        cursorRow,
-        linesToChange,
-        nextState.lines,
-      );
-      const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-        startOffset,
-        endOffset,
-        nextState.lines,
-      );
-      return replaceRangeInternal(
-        nextState,
-        startRow,
-        startCol,
-        endRow,
-        endCol,
-        '',
-      );
+      // Replace the content of the target line(s) with a single empty line,
+      // leaving the cursor at column 0 (Vim's `cc`). The end position is
+      // computed directly in code points so that non-last lines of a multi-line
+      // buffer and astral characters (e.g. emoji) are handled correctly; the
+      // previous offset-based helpers over-counted the trailing newline and
+      // measured columns in UTF-16 units, which made the resulting range exceed
+      // the line length and get rejected as invalid (a silent no-op).
+      const lastRow = cursorRow + linesToChange - 1;
+      const endCol = cpLen(nextState.lines[lastRow] ?? '');
+      return replaceRangeInternal(nextState, cursorRow, 0, lastRow, endCol, '');
     }
 
     case 'vim_delete_to_end_of_line':

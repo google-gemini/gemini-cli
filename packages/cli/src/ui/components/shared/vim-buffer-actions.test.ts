@@ -1359,6 +1359,47 @@ describe('vim-buffer-actions', () => {
         expect(result.lines[0]).toBe('');
         expect(result.cursorCol).toBe(0);
       });
+
+      it('should clear a non-last line of a multi-line buffer', () => {
+        const state = createTestState(['hello world', 'foo'], 0, 5);
+        const action = {
+          type: 'vim_change_line' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['', 'foo']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should clear a single line containing an astral character (emoji)', () => {
+        const state = createTestState(['\u{1F600}'], 0, 0);
+        const action = {
+          type: 'vim_change_line' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['']);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should collapse multiple changed lines into one empty line', () => {
+        const state = createTestState(['aaa', 'bbb', 'ccc'], 0, 1);
+        const action = {
+          type: 'vim_change_line' as const,
+          payload: { count: 2 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['', 'ccc']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
     });
 
     describe('vim_change_movement', () => {
