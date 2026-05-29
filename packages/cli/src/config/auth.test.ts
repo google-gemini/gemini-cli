@@ -30,7 +30,7 @@ describe('validateAuthMethod', () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
     vi.stubEnv('GOOGLE_API_KEY', undefined);
-    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', undefined);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
   });
 
   afterEach(() => {
