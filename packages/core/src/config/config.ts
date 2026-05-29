@@ -2054,6 +2054,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2093,6 +2094,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2108,6 +2110,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2123,6 +2126,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -3534,6 +3538,22 @@ export class Config implements McpContext, AgentLoopContext {
       authType === AuthType.USE_GEMINI ||
       authType === AuthType.USE_VERTEX_AI ||
       authType === AuthType.GATEWAY
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.5 Flash GA has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  hasGemini35FlashGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (this.isGemini31LaunchedForAuthType(authType)) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
+        ?.boolValue ?? false
     );
   }
 

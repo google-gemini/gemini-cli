@@ -745,3 +745,85 @@ describe('getAutoModelDescription', () => {
     expect(desc).toContain('gemini-3-flash-preview');
   });
 });
+
+describe('resolveModel Gemini 3.5 Flash GA', () => {
+  it('should resolve flash models to gemini-3.5-flash when useGemini3_5Flash is true', () => {
+    expect(
+      resolveModel(
+        GEMINI_MODEL_ALIAS_FLASH,
+        false,
+        false,
+        true,
+        undefined,
+        true,
+      ),
+    ).toBe('gemini-3.5-flash');
+    expect(
+      resolveModel(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        false,
+        false,
+        true,
+        undefined,
+        true,
+      ),
+    ).toBe('gemini-3.5-flash');
+    expect(
+      resolveModel(
+        PREVIEW_GEMINI_FLASH_MODEL,
+        false,
+        false,
+        true,
+        undefined,
+        true,
+      ),
+    ).toBe('gemini-3.5-flash');
+  });
+
+  it('should NOT resolve flash models to gemini-3.5-flash when useGemini3_5Flash is false', () => {
+    expect(
+      resolveModel(
+        GEMINI_MODEL_ALIAS_FLASH,
+        false,
+        false,
+        true,
+        undefined,
+        false,
+      ),
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(
+      resolveModel(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        false,
+        false,
+        true,
+        undefined,
+        false,
+      ),
+    ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(
+      resolveModel(
+        PREVIEW_GEMINI_FLASH_MODEL,
+        false,
+        false,
+        true,
+        undefined,
+        false,
+      ),
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+  });
+
+  it('should resolve auto to gemini-3.5-flash when useGemini3_5Flash is true and classifier selects flash', () => {
+    expect(
+      resolveClassifierModel(
+        GEMINI_MODEL_ALIAS_AUTO,
+        GEMINI_MODEL_ALIAS_FLASH,
+        false,
+        false,
+        true,
+        undefined,
+        true,
+      ),
+    ).toBe('gemini-3.5-flash');
+  });
+});
