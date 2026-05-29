@@ -584,13 +584,46 @@ describe('ShellExecutionService', () => {
         throw resizeError;
       });
 
-      // This should catch the specific error and not re-throw it.
       expect(() => {
         ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
       }).not.toThrow();
 
       expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
-      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
+      expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
+    });
+
+    it('should not throw on EBADF and still resize headless terminal', () => {
+      const resizeError = new Error('ioctl(2) failed, EBADF') as Error & {
+        code?: string;
+      };
+      resizeError.code = 'EBADF';
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw resizeError;
+      });
+
+      expect(() => {
+        ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
+      }).not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
+    });
+
+    it('should ignore ESRCH errors when resizing an exited pty (Unix)', () => {
+      const resizeError = new Error('ESRCH error') as Error & {
+        code?: string;
+      };
+      resizeError.code = 'ESRCH';
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw resizeError;
+      });
+
+      expect(() => {
+        ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
+      }).not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
     });
   });
 

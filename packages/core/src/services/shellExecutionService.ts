@@ -37,7 +37,6 @@ import {
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
-import { isNodeError } from '../utils/errors.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -1512,24 +1511,12 @@ export class ShellExecutionService {
       return;
     }
 
-    // Skip Windows: process.kill(pid, 0) is heavy and native errors are catchable there.
-    if (process.platform !== 'win32') {
-      try {
-        process.kill(pid, 0);
-      } catch (e) {
-        // Bail only if the process is explicitly confirmed dead (ESRCH).
-        if (isNodeError(e) && e.code === 'ESRCH') {
-          return;
-        }
-      }
-    }
+    cols = Math.max(10, Math.min(cols, 512));
+    rows = Math.max(2, Math.min(rows, 256));
 
     try {
       activePty.ptyProcess.resize(cols, rows);
-      activePty.headlessTerminal.resize(cols, rows);
     } catch (e) {
-      // Ignore errors if the pty has already exited, which can happen
-      // due to a race condition between the exit event and this call.
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const err = e as { code?: string; message?: string };
       const isEsrch = err.code === 'ESRCH';
@@ -1538,30 +1525,25 @@ export class ShellExecutionService {
         'Cannot resize a pty that has already exited',
       );
 
-      if (isEsrch || isEbadf || isWindowsPtyError) {
-        // On Unix, we get an ESRCH or EBADF error.
-        // On Windows, we get a message-based error.
-        // In both cases, it's safe to ignore.
-      } else {
+      if (!isEsrch && !isEbadf && !isWindowsPtyError) {
         throw e;
       }
     }
 
-    // Force emit the new state after resize
-    if (activePty) {
-      const endLine = activePty.headlessTerminal.buffer.active.length;
-      const startLine = Math.max(
-        0,
-        endLine - (activePty.maxSerializedLines ?? 2000),
-      );
-      const bufferData = serializeTerminalToObject(
-        activePty.headlessTerminal,
-        startLine,
-        endLine,
-      );
-      const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
-      ExecutionLifecycleService.emitEvent(pid, event);
-    }
+    activePty.headlessTerminal.resize(cols, rows);
+
+    const endLine = activePty.headlessTerminal.buffer.active.length;
+    const startLine = Math.max(
+      0,
+      endLine - (activePty.maxSerializedLines ?? 2000),
+    );
+    const bufferData = serializeTerminalToObject(
+      activePty.headlessTerminal,
+      startLine,
+      endLine,
+    );
+    const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
+    ExecutionLifecycleService.emitEvent(pid, event);
   }
 
   /**
