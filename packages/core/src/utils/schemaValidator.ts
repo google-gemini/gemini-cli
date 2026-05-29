@@ -45,6 +45,16 @@ addFormatsFunc(ajv2020);
 const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
 
 /**
+ * Extracts the $schema identifier from a schema for logging purposes,
+ * or returns a fallback string if it's not present.
+ */
+function getSchemaId(schema: unknown): string {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const id = (schema as Record<string, unknown> | undefined)?.['$schema'];
+  return typeof id === 'string' ? id : '<no $schema>';
+}
+
+/**
  * Returns the appropriate validator based on schema's $schema field.
  */
 function getValidator(schema: AnySchema): Ajv {
@@ -69,7 +79,7 @@ export class SchemaValidator {
    *  is null). Otherwise, returns a string describing the error.
    */
   static validate(schema: unknown | undefined, data: unknown): string | null {
-    if (!schema) {
+    if (schema === undefined || schema === null) {
       return null;
     }
     if (typeof data !== 'object' || data === null) {
@@ -91,16 +101,24 @@ export class SchemaValidator {
       // Skip validation rather than blocking tool usage.
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
-        `Failed to compile schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping parameter validation.',
+        `Failed to compile schema (${getSchemaId(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. Skipping parameter validation.`,
       );
       return null;
     }
 
-    const valid = validate(data);
+    let valid;
+    try {
+      valid = validate(data);
+    } catch (error) {
+      debugLogger.warn(
+        `Schema validation threw during data validation (${getSchemaId(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. Skipping parameter validation.`,
+      );
+      return null;
+    }
     if (!valid && validate.errors) {
       return validator.errorsText(validate.errors, { dataVar: 'params' });
     }
@@ -112,7 +130,7 @@ export class SchemaValidator {
    * otherwise returns a string describing the validation errors.
    */
   static validateSchema(schema: AnySchema | undefined): string | null {
-    if (!schema) {
+    if (schema === undefined || schema === null) {
       return null;
     }
     const validator = getValidator(schema);
@@ -123,11 +141,9 @@ export class SchemaValidator {
       // Schema validation failed (unsupported version, etc.)
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
-        `Failed to validate schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping schema validation.',
+        `Failed to validate schema (${getSchemaId(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. Skipping schema validation.`,
       );
       return null;
     }
