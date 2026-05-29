@@ -10,6 +10,7 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
 import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { safeLiteralReplace } from './textUtils.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
@@ -159,11 +160,22 @@ export async function FixLLMEditWithInstruction(
   if (cachedResult) {
     return cachedResult;
   }
-  const userPrompt = EDIT_USER_PROMPT.replace('{instruction}', instruction)
-    .replace('{old_string}', old_string)
-    .replace('{new_string}', new_string)
-    .replace('{error}', error)
-    .replace('{current_content}', current_content);
+  // Use safeLiteralReplace so that `$`-sequences (e.g. `$&`, `$$`, `` $` ``) in
+  // file content or edit parameters are inserted literally instead of being
+  // interpreted as String.prototype.replace substitution patterns.
+  let userPrompt = safeLiteralReplace(
+    EDIT_USER_PROMPT,
+    '{instruction}',
+    instruction,
+  );
+  userPrompt = safeLiteralReplace(userPrompt, '{old_string}', old_string);
+  userPrompt = safeLiteralReplace(userPrompt, '{new_string}', new_string);
+  userPrompt = safeLiteralReplace(userPrompt, '{error}', error);
+  userPrompt = safeLiteralReplace(
+    userPrompt,
+    '{current_content}',
+    current_content,
+  );
 
   const contents: Content[] = [
     {

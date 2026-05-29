@@ -10,6 +10,7 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
+import { safeLiteralReplace } from '../utils/textUtils.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const DEFAULT_MAX_MESSAGES = 20;
@@ -104,7 +105,14 @@ export class SessionSummaryService {
         })
         .join('\n\n');
 
-      const prompt = SUMMARY_PROMPT.replace('{conversation}', conversationText);
+      // Use safeLiteralReplace so that `$`-sequences in the conversation text
+      // (e.g. `$&`, `$$`) are inserted literally instead of being interpreted as
+      // String.prototype.replace substitution patterns.
+      const prompt = safeLiteralReplace(
+        SUMMARY_PROMPT,
+        '{conversation}',
+        conversationText,
+      );
 
       // Create abort controller with timeout
       const abortController = new AbortController();

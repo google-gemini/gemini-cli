@@ -156,6 +156,46 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('inserts content containing `$` sequences literally into the prompt', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    // Each of these is a special pattern for String.prototype.replace's
+    // replacement argument ($&, $$, $`, $') and must be preserved verbatim.
+    const dollarInstruction = 'replace $& with $$';
+    const dollarOldString = 'const price = "$$";';
+    const dollarNewString = 'const cmd = "echo $\'x\'";';
+    const dollarError = 'no match for `$`';
+    const dollarContent = "a$&b $` c $' d $$ e";
+
+    await promptIdContext.run('test-prompt-id-dollar', async () => {
+      await FixLLMEditWithInstruction(
+        dollarInstruction,
+        dollarOldString,
+        dollarNewString,
+        dollarError,
+        dollarContent,
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const userPromptContent =
+      mockGenerateJson.mock.calls[0][0].contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<instruction>\n${dollarInstruction}\n</instruction>`,
+    );
+    expect(userPromptContent).toContain(
+      `<search>\n${dollarOldString}\n</search>`,
+    );
+    expect(userPromptContent).toContain(
+      `<replace>\n${dollarNewString}\n</replace>`,
+    );
+    expect(userPromptContent).toContain(`<error>\n${dollarError}\n</error>`);
+    expect(userPromptContent).toContain(
+      `<file_content>\n${dollarContent}\n</file_content>`,
+    );
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';

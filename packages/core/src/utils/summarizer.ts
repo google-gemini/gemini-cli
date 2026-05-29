@@ -9,6 +9,7 @@ import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
+import { safeLiteralReplace } from './textUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import type { Config } from '../config/config.js';
 import { LlmRole } from '../telemetry/llmRole.js';
@@ -84,10 +85,17 @@ export async function summarizeToolOutput(
   if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
     return textToSummarize;
   }
-  const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-    '{maxOutputTokens}',
-    String(maxOutputTokens),
-  ).replace('{textToSummarize}', textToSummarize);
+  // Use safeLiteralReplace for the tool output so that `$`-sequences in the
+  // text (e.g. `$&`, `$$`) are inserted literally rather than being interpreted
+  // as String.prototype.replace substitution patterns.
+  const prompt = safeLiteralReplace(
+    SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
+      '{maxOutputTokens}',
+      String(maxOutputTokens),
+    ),
+    '{textToSummarize}',
+    textToSummarize,
+  );
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
   try {
