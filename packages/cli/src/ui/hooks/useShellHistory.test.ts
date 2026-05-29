@@ -230,6 +230,33 @@ describe('useShellHistory', () => {
     unmount();
   });
 
+  it('should not merge a command ending in a backslash with the next entry', async () => {
+    // The file stores commands verbatim, oldest-first. The first command ends in
+    // a single backslash (e.g. a Windows path); it must remain its own entry and
+    // not be concatenated with the following command.
+    mockedFs.readFile.mockResolvedValue('dir C:\\\nls');
+    const { result, unmount } = await renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
+
+    await waitFor(() => {
+      expect(mockedFs.readFile).toHaveBeenCalled();
+    });
+
+    let command: string | null = null;
+    act(() => {
+      command = result.current.getPreviousCommand();
+    });
+    expect(command).toBe('ls');
+
+    act(() => {
+      command = result.current.getPreviousCommand();
+    });
+    expect(command).toBe('dir C:\\');
+
+    unmount();
+  });
+
   it('should not add empty or whitespace-only commands to history', async () => {
     const { result, unmount } = await renderHook(() =>
       useShellHistory(MOCKED_PROJECT_ROOT),

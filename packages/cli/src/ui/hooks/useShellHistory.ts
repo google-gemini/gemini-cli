@@ -28,29 +28,16 @@ async function getHistoryFilePath(
   return storage.getHistoryFilePath();
 }
 
-// Handle multiline commands
 async function readHistoryFile(filePath: string): Promise<string[]> {
   try {
     const text = await fs.readFile(filePath, 'utf-8');
-    const result: string[] = [];
-    let cur = '';
-
-    for (const raw of text.split(/\r?\n/)) {
-      if (!raw.trim()) continue;
-      const line = raw;
-
-      const m = cur.match(/(\\+)$/);
-      if (m && m[1].length % 2) {
-        // odd number of trailing '\'
-        cur = cur.slice(0, -1) + ' ' + line;
-      } else {
-        if (cur) result.push(cur);
-        cur = line;
-      }
-    }
-
-    if (cur) result.push(cur);
-    return result;
+    // Each non-empty line is exactly one command, mirroring writeHistoryFile
+    // which stores commands verbatim, one per line. (A previous version tried to
+    // treat a trailing odd number of backslashes as a line-continuation marker,
+    // but writeHistoryFile never produced that escaped format, so the only effect
+    // was to merge real commands that legitimately end in a backslash — e.g. a
+    // Windows path like `C:\` — into the following entry.)
+    return text.split(/\r?\n/).filter((line) => line.trim() !== '');
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') return [];
     debugLogger.error('Error reading history:', err);
