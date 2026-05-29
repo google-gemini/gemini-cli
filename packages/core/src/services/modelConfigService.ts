@@ -252,6 +252,8 @@ export class ModelConfigService {
           return value === context.useGemini3_1;
         case 'useGemini3_1FlashLite':
           return value === context.useGemini3_1FlashLite;
+        case 'useGemini3_5Flash':
+          return value === context.useGemini3_5Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
