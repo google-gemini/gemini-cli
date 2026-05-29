@@ -37,6 +37,7 @@ import {
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -1507,28 +1508,42 @@ export class ShellExecutionService {
     }
 
     const activePty = this.activePtys.get(pid);
-    if (activePty) {
-      try {
-        activePty.ptyProcess.resize(cols, rows);
-        activePty.headlessTerminal.resize(cols, rows);
-      } catch (e) {
-        // Ignore errors if the pty has already exited, which can happen
-        // due to a race condition between the exit event and this call.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const err = e as { code?: string; message?: string };
-        const isEsrch = err.code === 'ESRCH';
-        const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
-        const isWindowsPtyError = err.message?.includes(
-          'Cannot resize a pty that has already exited',
-        );
+    if (!activePty) {
+      return;
+    }
 
-        if (isEsrch || isEbadf || isWindowsPtyError) {
-          // On Unix, we get an ESRCH or EBADF error.
-          // On Windows, we get a message-based error.
-          // In both cases, it's safe to ignore.
-        } else {
-          throw e;
+    // Skip Windows: process.kill(pid, 0) is heavy and native errors are catchable there.
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(pid, 0);
+      } catch (e) {
+        // Bail only if the process is explicitly confirmed dead (ESRCH).
+        if (isNodeError(e) && e.code === 'ESRCH') {
+          return;
         }
+      }
+    }
+
+    try {
+      activePty.ptyProcess.resize(cols, rows);
+      activePty.headlessTerminal.resize(cols, rows);
+    } catch (e) {
+      // Ignore errors if the pty has already exited, which can happen
+      // due to a race condition between the exit event and this call.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const err = e as { code?: string; message?: string };
+      const isEsrch = err.code === 'ESRCH';
+      const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
+      const isWindowsPtyError = err.message?.includes(
+        'Cannot resize a pty that has already exited',
+      );
+
+      if (isEsrch || isEbadf || isWindowsPtyError) {
+        // On Unix, we get an ESRCH or EBADF error.
+        // On Windows, we get a message-based error.
+        // In both cases, it's safe to ignore.
+      } else {
+        throw e;
       }
     }
 
