@@ -36,6 +36,7 @@ import {
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
+import { GrepTool } from './grep.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -280,6 +281,15 @@ class GrepToolInvocation extends BaseToolInvocation<
             `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
           );
         }
+        const fallbackResult = await this.executeGrepFallback(
+          pathParam,
+          totalMaxMatches,
+          signal,
+          error,
+        );
+        if (fallbackResult) {
+          return fallbackResult;
+        }
         throw error;
       } finally {
         clearTimeout(timeoutId);
@@ -389,6 +399,52 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
 
     return allMatches;
+  }
+
+  private async executeGrepFallback(
+    pathParam: string,
+    totalMaxMatches: number,
+    signal: AbortSignal,
+    error: unknown,
+  ): Promise<ToolResult | null> {
+    const errorMessage = getErrorMessage(error);
+    if (
+      !(
+        errorMessage.includes('Cannot find bundled ripgrep binary') ||
+        /Process exited with code (64|126|127)\b/.test(errorMessage) ||
+        /\b(EACCES|ENOENT)\b/.test(errorMessage)
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      this.params.case_sensitive ||
+      this.params.fixed_strings ||
+      this.params.context !== undefined ||
+      this.params.after !== undefined ||
+      this.params.before !== undefined ||
+      this.params.no_ignore
+    ) {
+      return null;
+    }
+
+    debugLogger.debug(
+      `GrepLogic: ripgrep failed, trying GrepTool fallback: ${errorMessage}`,
+    );
+
+    const fallbackTool = new GrepTool(this.config, this.messageBus);
+    const invocation = fallbackTool.build({
+      pattern: this.params.pattern,
+      dir_path: pathParam,
+      include_pattern: this.params.include_pattern,
+      exclude_pattern: this.params.exclude_pattern,
+      names_only: this.params.names_only,
+      max_matches_per_file: this.params.max_matches_per_file,
+      total_max_matches: totalMaxMatches,
+    });
+
+    return invocation.execute({ abortSignal: signal });
   }
 
   private async performRipgrepSearch(options: {

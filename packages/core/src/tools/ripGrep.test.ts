@@ -64,11 +64,12 @@ const mockSpawn = vi.mocked(spawn);
 function createMockSpawn(
   options: {
     outputData?: string;
+    errorData?: string;
     exitCode?: number | null;
     signal?: string;
   } = {},
 ) {
-  const { outputData, exitCode = 0, signal } = options;
+  const { outputData, errorData, exitCode = 0, signal } = options;
 
   return () => {
     // strict Readable implementation
@@ -97,6 +98,11 @@ function createMockSpawn(
 
     // Emulating process exit
     setTimeout(() => {
+      if (errorData) {
+        stderr.end(errorData);
+      } else {
+        stderr.end();
+      }
       mockProcess.emit('close', exitCode, signal);
     }, 10);
 
@@ -125,6 +131,9 @@ function createMockConfig(
     getFileFilteringRespectGeminiIgnore(this: Config) {
       return this.getFileFilteringOptions().respectGeminiIgnore;
     },
+    getFileExclusions: () => ({
+      getGlobExcludes: () => [],
+    }),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
     },
@@ -684,17 +693,60 @@ describe('RipGrepTool', () => {
       );
     });
 
-    it('should throw an error if ripgrep is not available', async () => {
+    it('should fall back when ripgrep is not available', async () => {
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue(null);
+      mockSpawn.mockImplementation(createMockSpawn({ exitCode: 1 }));
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
 
       const result = await invocation.execute({ abortSignal });
-      expect(result.llmContent).toContain('Cannot find bundled ripgrep binary');
+      expect(result.llmContent).toContain(
+        'Found 3 matches for pattern "world"',
+      );
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain(
+        `File: ${path.join('sub', 'fileC.txt')}`,
+      );
 
       // restore the mock for subsequent tests
       vi.mocked(mockConfig.getRipgrepPath).mockResolvedValue('/mock/rg');
+    });
+
+    it('should fall back to git grep without ripgrep-only arguments when rg fails at runtime', async () => {
+      await fs.mkdir(path.join(tempRootDir, '.git'));
+      mockSpawn
+        .mockImplementationOnce(
+          createMockSpawn({
+            errorData: 'error: unknown flag `json`',
+            exitCode: 64,
+          }),
+        )
+        .mockImplementationOnce(createMockSpawn())
+        .mockImplementationOnce(
+          createMockSpawn({
+            outputData: 'fileA.txt:1:hello world\n',
+          }),
+        );
+
+      const invocation = grepTool.build({
+        pattern: 'hello',
+        dir_path: 'fileA.txt',
+      });
+      const result = await invocation.execute({ abortSignal });
+
+      const gitCall = mockSpawn.mock.calls.find(
+        ([command, args]) =>
+          command === 'git' && Array.isArray(args) && args.includes('grep'),
+      );
+      expect(gitCall).toBeDefined();
+      expect(gitCall?.[1]).not.toContain('--json');
+      expect(gitCall?.[1]).toEqual(
+        expect.arrayContaining(['grep', '--', 'fileA.txt']),
+      );
+      expect(result.llmContent).toContain('Found 1 match');
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
     });
   });
 

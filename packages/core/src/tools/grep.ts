@@ -164,12 +164,13 @@ class GrepToolInvocation extends BaseToolInvocation<
 
         try {
           const stats = await fsPromises.stat(searchDirAbs);
-          if (!stats.isDirectory()) {
+          if (!stats.isDirectory() && !stats.isFile()) {
+            const message = `Path is not a valid directory or file: ${searchDirAbs}`;
             return {
-              llmContent: `Path is not a directory: ${searchDirAbs}`,
-              returnDisplay: 'Error: Path is not a directory.',
+              llmContent: message,
+              returnDisplay: 'Error: Path is not a valid directory or file.',
               error: {
-                message: `Path is not a directory: ${searchDirAbs}`,
+                message,
                 type: ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
               },
             };
@@ -200,13 +201,20 @@ class GrepToolInvocation extends BaseToolInvocation<
       const searchDirDisplay = pathParam || '.';
 
       // Determine which directories to search
-      let searchDirectories: readonly string[];
+      let searchTargets: ReadonlyArray<{
+        directory: string;
+        filePath?: string;
+      }>;
       if (searchDirAbs === null) {
         // No path specified - search all workspace directories
-        searchDirectories = workspaceContext.getDirectories();
+        searchTargets = workspaceContext
+          .getDirectories()
+          .map((directory) => ({ directory }));
       } else {
-        // Specific path provided - search only that directory
-        searchDirectories = [searchDirAbs];
+        const stats = await fsPromises.stat(searchDirAbs);
+        searchTargets = stats.isFile()
+          ? [{ directory: path.dirname(searchDirAbs), filePath: searchDirAbs }]
+          : [{ directory: searchDirAbs }];
       }
 
       // Collect matches from all search directories
@@ -237,13 +245,14 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       try {
-        for (const searchDir of searchDirectories) {
+        for (const searchTarget of searchTargets) {
           const remainingLimit = totalMaxMatches - allMatches.length;
           if (remainingLimit <= 0) break;
 
           const matches = await this.performGrepSearch({
             pattern: this.params.pattern,
-            path: searchDir,
+            path: searchTarget.directory,
+            filePath: searchTarget.filePath,
             include_pattern: this.params.include_pattern,
             exclude_pattern: this.params.exclude_pattern,
             maxMatches: remainingLimit,
@@ -252,8 +261,8 @@ class GrepToolInvocation extends BaseToolInvocation<
           });
 
           // Add directory prefix if searching multiple directories
-          if (searchDirectories.length > 1) {
-            const dirName = path.basename(searchDir);
+          if (searchTargets.length > 1) {
+            const dirName = path.basename(searchTarget.directory);
             matches.forEach((match) => {
               match.filePath = path.join(dirName, match.filePath);
             });
@@ -395,6 +404,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   private async performGrepSearch(options: {
     pattern: string;
     path: string; // Expects absolute path
+    filePath?: string;
     include_pattern?: string;
     exclude_pattern?: string;
     maxMatches: number;
@@ -404,6 +414,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     const {
       pattern,
       path: absolutePath,
+      filePath,
       include_pattern,
       exclude_pattern,
       maxMatches,
@@ -434,8 +445,13 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           gitArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include_pattern) {
-          gitArgs.push('--', include_pattern);
+        const pathspecs = filePath
+          ? [path.relative(absolutePath, filePath)]
+          : include_pattern
+            ? [include_pattern]
+            : [];
+        if (pathspecs.length > 0) {
+          gitArgs.push('--', ...pathspecs);
         }
 
         try {
@@ -503,11 +519,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           grepArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include_pattern) {
+        if (include_pattern && !filePath) {
           grepArgs.push(`--include=${include_pattern}`);
         }
         grepArgs.push(pattern);
-        grepArgs.push('.');
+        grepArgs.push(filePath ? path.relative(absolutePath, filePath) : '.');
 
         const results: GrepMatch[] = [];
         try {
@@ -554,14 +570,16 @@ class GrepToolInvocation extends BaseToolInvocation<
       const globPattern = include_pattern ? include_pattern : '**/*';
       const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
-      const filesStream = globStream(globPattern, {
-        cwd: absolutePath,
-        dot: true,
-        ignore: ignorePatterns,
-        absolute: true,
-        nodir: true,
-        signal: options.signal,
-      });
+      const filesStream = filePath
+        ? [filePath]
+        : globStream(globPattern, {
+            cwd: absolutePath,
+            dot: true,
+            ignore: ignorePatterns,
+            absolute: true,
+            nodir: true,
+            signal: options.signal,
+          });
 
       const regex = new RegExp(pattern, 'i');
       const allMatches: GrepMatch[] = [];
@@ -734,11 +752,11 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
         return validationError;
       }
 
-      // We still want to check if it's a directory
+      // We still want to check if it points to searchable filesystem content.
       try {
         const stats = fs.statSync(resolvedPath);
-        if (!stats.isDirectory()) {
-          return `Path is not a directory: ${resolvedPath}`;
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return `Path is not a valid directory or file: ${resolvedPath}`;
         }
       } catch (error: unknown) {
         if (isNodeError(error) && error.code === 'ENOENT') {

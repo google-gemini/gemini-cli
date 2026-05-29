@@ -45,6 +45,7 @@ describe('GrepTool', () => {
   let mockConfig: Config;
 
   beforeEach(async () => {
+    vi.mocked(execStreaming).mockReset();
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
 
     mockConfig = {
@@ -155,12 +156,10 @@ describe('GrepTool', () => {
       expect(grepTool.validateToolParams(params)).toContain('nonexistent');
     });
 
-    it('should return error if path is a file, not a directory', async () => {
+    it('should allow path to be a file', async () => {
       const filePath = path.join(tempRootDir, 'fileA.txt');
       const params: GrepToolParams = { pattern: 'hello', dir_path: filePath };
-      expect(grepTool.validateToolParams(params)).toContain(
-        `Path is not a directory: ${filePath}`,
-      );
+      expect(grepTool.validateToolParams(params)).toBeNull();
     });
   });
 
@@ -340,6 +339,39 @@ describe('GrepTool', () => {
           cwd: expect.any(String),
         }),
       );
+    });
+
+    it('should search an explicit file path with git grep', async () => {
+      await fs.mkdir(path.join(tempRootDir, '.git'));
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['fileA.txt:1:hello world']),
+      );
+
+      const invocation = grepTool.build({
+        pattern: 'hello',
+        dir_path: 'fileA.txt',
+      }) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (options: ExecuteOptions) => Promise<ToolResult>;
+      };
+      invocation.isCommandAvailable = vi.fn(
+        async (command: string) => command === 'git',
+      );
+
+      const result = await invocation.execute({ abortSignal });
+
+      expect(execStreaming).toHaveBeenCalledWith(
+        'git',
+        expect.arrayContaining(['grep', '--', 'fileA.txt']),
+        expect.objectContaining({
+          cwd: tempRootDir,
+        }),
+      );
+      const gitArgs = vi.mocked(execStreaming).mock.calls[0][1];
+      expect(gitArgs).not.toContain('--json');
+      expect(result.llmContent).toContain('Found 1 match');
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
     });
 
     it('should throw an error if params are invalid', async () => {
