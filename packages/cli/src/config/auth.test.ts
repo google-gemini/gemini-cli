@@ -30,6 +30,7 @@ describe('validateAuthMethod', () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
     vi.stubEnv('GOOGLE_API_KEY', undefined);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', undefined);
   });
 
   afterEach(() => {
@@ -91,6 +92,22 @@ describe('validateAuthMethod', () => {
         '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
         'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
+      description:
+        'should return null for GATEWAY if GOOGLE_GEMINI_BASE_URL is set',
+      authType: AuthType.GATEWAY,
+      envs: {
+        GOOGLE_GEMINI_BASE_URL: 'http://127.0.0.1:8080',
+      },
+      expected: null,
+    },
+    {
+      description:
+        'should return an error message for GATEWAY if GOOGLE_GEMINI_BASE_URL is not set',
+      authType: AuthType.GATEWAY,
+      envs: {},
+      expected: 'When using Gateway auth, GOOGLE_GEMINI_BASE_URL must be set.',
     },
     {
       description: 'should return an error message for an invalid auth method',

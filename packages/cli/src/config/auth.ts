@@ -45,5 +45,13 @@ export async function validateAuthMethod(
     return null;
   }
 
+  if (authMethod === AuthType.GATEWAY) {
+    if (!process.env['GOOGLE_GEMINI_BASE_URL']) {
+      return 'When using Gateway auth, GOOGLE_GEMINI_BASE_URL must be set.';
+    }
+
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }
