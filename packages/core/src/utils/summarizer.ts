@@ -9,7 +9,6 @@ import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
-import { safeLiteralReplace } from './textUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import type { Config } from '../config/config.js';
 import { LlmRole } from '../telemetry/llmRole.js';
@@ -85,16 +84,16 @@ export async function summarizeToolOutput(
   if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
     return textToSummarize;
   }
-  // Use safeLiteralReplace for the tool output so that `$`-sequences in the
-  // text (e.g. `$&`, `$$`) are inserted literally rather than being interpreted
-  // as String.prototype.replace substitution patterns.
-  const prompt = safeLiteralReplace(
-    SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-      '{maxOutputTokens}',
-      String(maxOutputTokens),
-    ),
-    '{textToSummarize}',
+  // Interpolate placeholders in a single pass with a replacer function so that
+  // `$`-sequences in the tool output (e.g. `$&`, `$$`) are inserted literally
+  // rather than being treated as String.prototype.replace substitution patterns.
+  const replacements: Record<string, string> = {
+    maxOutputTokens: String(maxOutputTokens),
     textToSummarize,
+  };
+  const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
+    /\{(\w+)\}/g,
+    (match, key: string) => replacements[key] ?? match,
   );
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];

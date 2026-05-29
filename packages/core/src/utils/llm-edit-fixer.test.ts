@@ -196,6 +196,33 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('does not re-interpolate placeholder tokens that appear inside inputs', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    // An edit parameter that itself contains a template placeholder string must
+    // be inserted verbatim, not substituted again by a later replacement.
+    await promptIdContext.run('test-prompt-id-injection', async () => {
+      await FixLLMEditWithInstruction(
+        'do the edit',
+        '{current_content}',
+        'replacement',
+        'an error',
+        'THE REAL FILE CONTENT',
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const userPromptContent =
+      mockGenerateJson.mock.calls[0][0].contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<search>\n{current_content}\n</search>`,
+    );
+    expect(userPromptContent).toContain(
+      `<file_content>\nTHE REAL FILE CONTENT\n</file_content>`,
+    );
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';
