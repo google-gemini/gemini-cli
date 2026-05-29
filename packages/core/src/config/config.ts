@@ -902,6 +902,7 @@ export class Config implements McpContext, AgentLoopContext {
   private initialized = false;
   private initPromise: Promise<void> | undefined;
   private mcpInitializationPromise: Promise<void> | null = null;
+  private lastIgnoredToolsCount = 0;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -1518,6 +1519,7 @@ export class Config implements McpContext, AgentLoopContext {
           debugLogger.error('Error initializing MCP clients:', result.reason);
         }
       }
+      this.checkAndWarnToolLimit();
     });
 
     if (!this.interactive || this.acpMode) {
@@ -2532,6 +2534,25 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Checks if any tools were ignored due to the 512 limit and emits a warning feedback event if changed.
+   */
+  checkAndWarnToolLimit(): void {
+    if (!this._toolRegistry) {
+      return;
+    }
+    const report = this._toolRegistry.getToolLimitReport();
+    if (report.ignoredTools.length > 0) {
+      if (report.ignoredTools.length !== this.lastIgnoredToolsCount) {
+        this.lastIgnoredToolsCount = report.ignoredTools.length;
+        const message = `⚠️ Tool limit exceeded: Maximum supported tool count is 512. The first 512 tools have been registered (built-in tools prioritized, then discovered and MCP tools). The following ${report.ignoredTools.length} tool(s) are being ignored to prevent API errors: ${report.ignoredTools.join(', ')}.`;
+        coreEvents.emitFeedback('warning', message);
+      }
+    } else {
+      this.lastIgnoredToolsCount = 0;
+    }
+  }
+
+  /**
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
@@ -2540,6 +2561,7 @@ export class Config implements McpContext, AgentLoopContext {
       await this._geminiClient.setTools();
       this._geminiClient.updateSystemInstruction();
     }
+    this.checkAndWarnToolLimit();
   }
 
   setUserMemory(newUserMemory: string | HierarchicalMemory): void {

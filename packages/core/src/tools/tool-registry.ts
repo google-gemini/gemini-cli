@@ -543,7 +543,49 @@ export class ToolRegistry {
   }
 
   /**
-   * @returns All the tools that are not excluded.
+   * Generates a report on the number of active, allowed, and ignored tools due to the 512 cap.
+   */
+  getToolLimitReport(): {
+    totalActive: number;
+    allowedCount: number;
+    ignoredTools: string[];
+  } {
+    const toolMetadata = this.buildToolMetadata();
+    const allKnownNames = new Set(this.allKnownTools.keys());
+    const excludedTools =
+      this.expandExcludeToolsWithAliases(
+        this.config.getExcludeTools(toolMetadata, allKnownNames),
+      ) ?? new Set([]);
+    const activeTools: AnyDeclarativeTool[] = [];
+    for (const tool of this.allKnownTools.values()) {
+      if (this.isActiveTool(tool, excludedTools)) {
+        activeTools.push(tool);
+      }
+    }
+
+    const MAX_TOOLS_LIMIT = 512;
+    if (activeTools.length > MAX_TOOLS_LIMIT) {
+      const ignored = activeTools
+        .slice(MAX_TOOLS_LIMIT)
+        .map((t) =>
+          t instanceof DiscoveredMCPTool ? t.getFullyQualifiedName() : t.name,
+        );
+      return {
+        totalActive: activeTools.length,
+        allowedCount: MAX_TOOLS_LIMIT,
+        ignoredTools: ignored,
+      };
+    }
+
+    return {
+      totalActive: activeTools.length,
+      allowedCount: activeTools.length,
+      ignoredTools: [],
+    };
+  }
+
+  /**
+   * @returns All the tools that are not excluded and fit within the 512 limit.
    */
   private getActiveTools(): AnyDeclarativeTool[] {
     const toolMetadata = this.buildToolMetadata();
@@ -557,6 +599,11 @@ export class ToolRegistry {
       if (this.isActiveTool(tool, excludedTools)) {
         activeTools.push(tool);
       }
+    }
+
+    const MAX_TOOLS_LIMIT = 512;
+    if (activeTools.length > MAX_TOOLS_LIMIT) {
+      return activeTools.slice(0, MAX_TOOLS_LIMIT);
     }
     return activeTools;
   }
@@ -800,7 +847,7 @@ export class ToolRegistry {
       }
     }
 
-    if (tool && this.isActiveTool(tool)) {
+    if (tool && this.getActiveTools().includes(tool)) {
       return tool;
     }
     return;

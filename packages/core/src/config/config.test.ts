@@ -116,6 +116,9 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getAllToolNames = vi.fn(() => []);
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
+  ToolRegistryMock.prototype.getToolLimitReport = vi
+    .fn()
+    .mockReturnValue({ totalActive: 0, allowedCount: 0, ignoredTools: [] });
   return { ToolRegistry: ToolRegistryMock };
 });
 
@@ -4344,5 +4347,83 @@ describe('ADKSettings', () => {
     };
     const config = new Config(params);
     expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
+  });
+});
+
+describe('Config Tool Limit Warning', () => {
+  const localParams: ConfigParameters = {
+    sessionId: 'test-session-id',
+    targetDir: '/test/dir',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '/tmp',
+  };
+
+  it('should emit warning feedback when tools are ignored', () => {
+    const config = new Config(localParams);
+
+    const mockReport = {
+      totalActive: 520,
+      allowedCount: 512,
+      ignoredTools: ['mcp_server_tool-1', 'mcp_server_tool-2'],
+    };
+
+    const mockToolRegistry = {
+      getToolLimitReport: vi.fn().mockReturnValue(mockReport),
+    };
+    (config as unknown as { _toolRegistry: unknown })._toolRegistry =
+      mockToolRegistry;
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    config.checkAndWarnToolLimit();
+
+    expect(emitFeedbackSpy).toHaveBeenCalledOnce();
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('Tool limit exceeded'),
+    );
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('mcp_server_tool-1'),
+    );
+  });
+
+  it('should deduplicate/suppress warnings if the ignored count has not changed', () => {
+    const config = new Config(localParams);
+
+    const mockReport = {
+      totalActive: 520,
+      allowedCount: 512,
+      ignoredTools: ['mcp_server_tool-1', 'mcp_server_tool-2'],
+    };
+
+    const mockToolRegistry = {
+      getToolLimitReport: vi.fn().mockReturnValue(mockReport),
+    };
+    (config as unknown as { _toolRegistry: unknown })._toolRegistry =
+      mockToolRegistry;
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    config.checkAndWarnToolLimit();
+    expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+
+    config.checkAndWarnToolLimit();
+    expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+
+    const newMockReport = {
+      totalActive: 521,
+      allowedCount: 512,
+      ignoredTools: [
+        'mcp_server_tool-1',
+        'mcp_server_tool-2',
+        'mcp_server_tool-3',
+      ],
+    };
+    mockToolRegistry.getToolLimitReport.mockReturnValue(newMockReport);
+
+    config.checkAndWarnToolLimit();
+    expect(emitFeedbackSpy).toHaveBeenCalledTimes(2);
   });
 });

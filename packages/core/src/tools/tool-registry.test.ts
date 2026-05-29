@@ -889,6 +889,64 @@ describe('ToolRegistry', () => {
       expect(description).toBe(JSON.stringify(params));
     });
   });
+
+  describe('512 tool limit and reporting', () => {
+    it('should correctly cap the number of active tools to 512', () => {
+      for (let i = 0; i < 520; i++) {
+        const tool = new MockTool({
+          name: `tool-${i}`,
+          displayName: `Tool ${i}`,
+        });
+        toolRegistry.registerTool(tool);
+      }
+
+      const activeTools = (toolRegistry as any).getActiveTools();
+      expect(activeTools).toHaveLength(512);
+
+      expect(toolRegistry.getAllTools()).toHaveLength(512);
+      expect(toolRegistry.getAllToolNames()).toHaveLength(512);
+      expect(toolRegistry.getFunctionDeclarations()).toHaveLength(512);
+    });
+
+    it('should return a correct report listing ignored tools', () => {
+      const builtIn = new MockTool({ name: 'my-builtin' });
+      toolRegistry.registerTool(builtIn);
+
+      for (let i = 0; i < 515; i++) {
+        const tool = createMCPTool('test-server', `mcp-tool-${i}`, `desc ${i}`);
+        toolRegistry.registerTool(tool);
+      }
+
+      toolRegistry.sortTools();
+
+      const report = toolRegistry.getToolLimitReport();
+      expect(report.totalActive).toBe(516);
+      expect(report.allowedCount).toBe(512);
+      expect(report.ignoredTools).toHaveLength(4);
+      expect(report.ignoredTools[0]).toContain('mcp_test-server_mcp-tool-');
+    });
+
+    it('should return undefined in getTool for a tool cut off by the 512 limit', () => {
+      const allowedTool = new MockTool({ name: 'builtin-allowed' });
+      toolRegistry.registerTool(allowedTool);
+
+      const toolsList: string[] = [];
+      for (let i = 0; i < 515; i++) {
+        const padded = String(i).padStart(3, '0');
+        const tool = createMCPTool('server', `tool-${padded}`, 'desc');
+        toolRegistry.registerTool(tool);
+        toolsList.push(tool.getFullyQualifiedName());
+      }
+
+      toolRegistry.sortTools();
+
+      const lastToolName = toolsList[514];
+
+      expect(toolRegistry.getTool('builtin-allowed')).toBe(allowedTool);
+      expect(toolRegistry.getTool(toolsList[0])).toBeDefined();
+      expect(toolRegistry.getTool(lastToolName)).toBeUndefined();
+    });
+  });
 });
 
 /**
