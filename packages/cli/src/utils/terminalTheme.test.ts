@@ -42,6 +42,7 @@ vi.mock('@google/gemini-cli-core', () => ({
 describe('setupTerminalAndTheme', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
+  const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
     vi.resetAllMocks();
