@@ -55,29 +55,28 @@ function warnAboutNaturalLanguageCommandValues(
   updates: Record<string, unknown>,
   path: string,
 ): void {
+  if (
+    (updates['type'] === 'command' || updates['type'] === 'stdio') &&
+    typeof updates['command'] === 'string'
+  ) {
+    updates['command'] = sanitizeCommandValue(updates['command']);
+    if (!isLikelyShellCommand(updates['command'])) {
+      coreEvents.emitFeedback(
+        'warn',
+        `Setting "${path}.command" contains text that does not look like a valid shell command. ` +
+          'The value will be saved, but it may fail when executed.',
+      );
+    }
+  }
+
   for (const [key, value] of Object.entries(updates)) {
     const currentPath = path ? `${path}.${key}` : key;
 
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value)
-    ) {
-      const objValue = value as Record<string, unknown>;
-      if (
-        (objValue['type'] === 'command' || objValue['type'] === 'stdio') &&
-        typeof objValue['command'] === 'string'
-      ) {
-        objValue['command'] = sanitizeCommandValue(objValue['command']);
-        if (!isLikelyShellCommand(objValue['command'])) {
-          coreEvents.emitFeedback(
-            'warn',
-            `Setting "${currentPath}.command" contains text that does not look like a valid shell command. ` +
-              'The value will be saved, but it may fail when executed.',
-          );
-        }
-      }
-      warnAboutNaturalLanguageCommandValues(objValue, currentPath);
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      warnAboutNaturalLanguageCommandValues(
+        value as Record<string, unknown>,
+        currentPath,
+      );
     } else if (Array.isArray(value)) {
       (value as unknown[]).forEach((item, index) => {
         if (

@@ -74,4 +74,27 @@ describe('isLikelyShellCommand', () => {
     expect(isLikelyShellCommand('ls')).toBe(true);
     expect(isLikelyShellCommand('pwd')).toBe(true);
   });
+
+  it('returns true for common shells and interpreters', () => {
+    expect(isLikelyShellCommand('bash script.sh')).toBe(true);
+    expect(isLikelyShellCommand('sh script.sh')).toBe(true);
+    expect(isLikelyShellCommand('powershell -Command Get-Process')).toBe(true);
+  });
+
+  it('returns true for path-prefixed commands', () => {
+    expect(isLikelyShellCommand('./my-script')).toBe(true);
+    expect(isLikelyShellCommand('../run.sh')).toBe(true);
+    expect(isLikelyShellCommand('/usr/bin/custom-tool')).toBe(true);
+    expect(isLikelyShellCommand('C:\\tools\\run.exe')).toBe(true);
+  });
+
+  it('returns true for commands ending with executable extensions', () => {
+    expect(isLikelyShellCommand('my-script.sh')).toBe(true);
+    expect(isLikelyShellCommand('run.bat')).toBe(true);
+    expect(isLikelyShellCommand('app.exe --help')).toBe(true);
+  });
+
+  it('returns true for g++ commands', () => {
+    expect(isLikelyShellCommand('g++ main.cpp')).toBe(true);
+  });
 });

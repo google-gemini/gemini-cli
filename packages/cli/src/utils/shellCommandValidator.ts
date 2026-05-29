@@ -15,7 +15,10 @@ const SHELL_SYNTAX_PATTERNS = [
   /\(\)\s*\{/,
   /&&/,
   /\|\|/,
-  /\b(?:echo|cat|ls|cd|pwd|grep|find|sort|uniq|wc|head|tail|sed|awk|cut|tr|tee|xargs|mkdir|rmdir|rm|cp|mv|chmod|chown|ps|kill|top|df|du|mount|umount|tar|gzip|gunzip|zip|unzip|curl|wget|ssh|scp|git|npm|npx|yarn|pnpm|docker|kubectl|node|python|python3|ruby|perl|php|java|javac|mvn|gradle|make|cmake|cc|gcc|g\+\+|clang|go|rustc|cargo|deno|bun|dotnet|pip|pip3|composer|gem)\b/i,
+  /^(?:\.\.?|~)?[/\\]/,
+  /^[a-zA-Z]:[/\\]/,
+  /^\S+\.(?:sh|bat|cmd|exe)\b/i,
+  /\b(?:bash|sh|zsh|cmd|powershell|pwsh|echo|cat|ls|cd|pwd|grep|find|sort|uniq|wc|head|tail|sed|awk|cut|tr|tee|xargs|mkdir|rmdir|rm|cp|mv|chmod|chown|ps|kill|top|df|du|mount|umount|tar|gzip|gunzip|zip|unzip|curl|wget|ssh|scp|git|npm|npx|yarn|pnpm|docker|kubectl|node|python|python3|ruby|perl|php|java|javac|mvn|gradle|make|cmake|cc|gcc|g\+\+|clang|go|rustc|cargo|deno|bun|dotnet|pip|pip3|composer|gem)(?!\w)/i,
 ];
 
 /**
