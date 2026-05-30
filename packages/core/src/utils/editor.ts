@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, spawnSync } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
@@ -102,30 +101,39 @@ interface DiffCommand {
   args: string[];
 }
 
-const execAsync = promisify(exec);
-
-function getCommandExistsCmd(cmd: string): string {
-  return process.platform === 'win32'
-    ? `where.exe ${cmd}`
-    : `command -v ${cmd}`;
-}
-
 function commandExists(cmd: string): boolean {
   try {
-    execSync(getCommandExistsCmd(cmd), { stdio: 'ignore' });
-    return true;
+    // Security: Use spawnSync with argument arrays (shell: false) to prevent
+    // command injection via shell metacharacters in the cmd parameter.
+    if (process.platform === 'win32') {
+      const result = spawnSync('where.exe', [cmd], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+      });
+      return result.status === 0;
+    } else {
+      const result = spawnSync('which', [cmd], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+      });
+      return result.status === 0;
+    }
   } catch {
     return false;
   }
 }
 
 async function commandExistsAsync(cmd: string): Promise<boolean> {
-  try {
-    await execAsync(getCommandExistsCmd(cmd));
-    return true;
-  } catch {
-    return false;
-  }
+  return new Promise<boolean>((resolve) => {
+    // Security: Use spawn with argument arrays (shell: false) to prevent
+    // command injection via shell metacharacters in the cmd parameter.
+    const bin = process.platform === 'win32' ? 'where.exe' : 'which';
+    const child = spawn(bin, [cmd], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.on('close', (code) => resolve(code === 0));
+    child.on('error', () => resolve(false));
+  });
 }
 
 /**
