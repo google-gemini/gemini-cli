@@ -145,6 +145,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const pathParam = this.params.dir_path;
 
       let searchDirAbs: string | null = null;
+      let searchDirStats: fs.Stats | null = null;
       if (pathParam) {
         searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
         const validationError = this.config.validatePathAccess(
@@ -163,8 +164,8 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
 
         try {
-          const stats = await fsPromises.stat(searchDirAbs);
-          if (!stats.isDirectory() && !stats.isFile()) {
+          searchDirStats = await fsPromises.stat(searchDirAbs);
+          if (!searchDirStats.isDirectory() && !searchDirStats.isFile()) {
             const message = `Path is not a valid directory or file: ${searchDirAbs}`;
             return {
               llmContent: message,
@@ -211,8 +212,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           .getDirectories()
           .map((directory) => ({ directory }));
       } else {
-        const stats = await fsPromises.stat(searchDirAbs);
-        searchTargets = stats.isFile()
+        searchTargets = searchDirStats?.isFile()
           ? [{ directory: path.dirname(searchDirAbs), filePath: searchDirAbs }]
           : [{ directory: searchDirAbs }];
       }
