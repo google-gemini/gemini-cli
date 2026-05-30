@@ -177,7 +177,7 @@ export async function clipboardHasImage(): Promise<boolean> {
           '-Command',
           'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
         ]);
-        return stdout.trim() === 'True';
+        return stdout.includes('True');
       } catch (error) {
         debugLogger.warn('Error checking WSL clipboard for image:', error);
         return false;
@@ -288,7 +288,7 @@ async function saveFileWithPowerShell(
     script,
   ]);
 
-  if (stdout.trim() !== 'success') {
+  if (!stdout.includes('success')) {
     return false;
   }
 

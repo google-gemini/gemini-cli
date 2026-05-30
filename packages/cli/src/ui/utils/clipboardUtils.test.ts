@@ -214,6 +214,17 @@ describe('clipboardUtils', () => {
       ]);
     });
 
+    it('should return true when PowerShell reports an image with extra output', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'Windows PowerShell\nTrue\n',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+    });
+
     it('should return false when PowerShell reports no image', async () => {
       vi.mocked(spawnAsync).mockResolvedValueOnce({
         stdout: 'False\n',
@@ -458,6 +469,22 @@ describe('clipboardUtils', () => {
       const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
 
       expect(result).toBe(null);
+    });
+
+    it('should save image when PowerShell reports success with extra output', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: '\\\\wsl.localhost\\Ubuntu\\tmp\\test.png\n',
+        stderr: '',
+      });
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'Windows PowerShell\nsuccess\n',
+        stderr: '',
+      });
+      vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toMatch(/clipboard-\d+\.png$/);
     });
 
     it('should escape single quotes in the Windows path for PowerShell', async () => {
