@@ -90,48 +90,97 @@ function parseAllAtCommands(
   escapePastedAtSymbols = false,
 ): AtCommandPart[] {
   const parts: AtCommandPart[] = [];
-  let lastIndex = 0;
 
-  // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
-  const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
-    'g',
-  );
-
-  let match: RegExpExecArray | null;
-
-  while ((match = atCommandRegex.exec(query)) !== null) {
-    const matchIndex = match.index;
-    const fullMatch = match[0];
-
-    // Add text before @
-    if (matchIndex > lastIndex) {
-      parts.push({
-        type: 'text',
-        content: escapePastedAtSymbols
-          ? unescapeLiteralAt(query.substring(lastIndex, matchIndex))
-          : query.substring(lastIndex, matchIndex),
-      });
-    }
-
-    // We strip the @ before unescaping so that unescapePath can handle quoted paths correctly on Windows.
-    const atPath = '@' + unescapePath(fullMatch.substring(1));
-    parts.push({ type: 'atPath', content: atPath });
-
-    lastIndex = matchIndex + fullMatch.length;
+  if (!query) {
+    return parts;
   }
 
-  // Add remaining text
-  if (lastIndex < query.length) {
+  let textStart = 0;
+  let i = 0;
+
+  while (i < query.length) {
+    // Detect unescaped @
+    if (
+      query[i] === '@' &&
+      (i === 0 || query[i - 1] !== '\\')
+    ) {
+      const commandStart = i;
+
+      // Add text before @
+      if (commandStart > textStart) {
+        const textContent = query.substring(textStart, commandStart);
+
+        parts.push({
+          type: 'text',
+          content: escapePastedAtSymbols
+            ? unescapeLiteralAt(textContent)
+            : textContent,
+        });
+      }
+
+      i++; // move past @
+
+      let inQuotes = false;
+
+      while (i < query.length) {
+        const ch = query[i];
+
+        // Handle quoted paths
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+          i++;
+          continue;
+        }
+
+        // Handle escaped characters
+        if (ch === '\\' && i + 1 < query.length) {
+          i += 2;
+          continue;
+        }
+
+        // Stop at delimiters when not inside quotes
+        if (
+          !inQuotes &&
+          /[ \t\n\r,;!?()[\]{}]/.test(ch)
+        ) {
+          break;
+        }
+
+        i++;
+      }
+
+      const fullMatch = query.substring(commandStart, i);
+
+      // Ignore standalone "@"
+      if (fullMatch.length > 1) {
+        const atPath = '@' + unescapePath(fullMatch.substring(1));
+
+        parts.push({
+          type: 'atPath',
+          content: atPath,
+        });
+      }
+
+      textStart = i;
+      continue;
+    }
+
+    i++;
+  }
+
+  // Remaining text
+  if (textStart < query.length) {
+    const textContent = query.substring(textStart);
+
     parts.push({
       type: 'text',
       content: escapePastedAtSymbols
-        ? unescapeLiteralAt(query.substring(lastIndex))
-        : query.substring(lastIndex),
+        ? unescapeLiteralAt(textContent)
+        : textContent,
     });
   }
 
-  // Filter out empty text parts that might result from consecutive @paths or leading/trailing spaces
+  // Preserve original behavior
   return parts.filter(
     (part) => !(part.type === 'text' && part.content.trim() === ''),
   );
