@@ -716,20 +716,6 @@ describe('Server Config (config.ts)', () => {
       });
     });
 
-    describe('getGemini31FlashLiteLaunchedSync', () => {
-      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
-        'should return true for %s',
-        async (authType) => {
-          const config = new Config(baseParams);
-          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
-            authType,
-          });
-          await config.refreshAuth(authType);
-          expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
-        },
-      );
-    });
-
     describe('getProModelNoAccessSync', () => {
       it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
         vi.mocked(getExperiments).mockResolvedValue({

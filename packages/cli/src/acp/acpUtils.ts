@@ -18,7 +18,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   getDisplayString,
   AuthType,
   ToolConfirmationOutcome,
@@ -265,8 +265,6 @@ export function buildAvailableModels(
   const preferredModel = config.getModel() || GEMINI_MODEL_ALIAS_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini31FlashLite =
-    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -278,7 +276,6 @@ export function buildAvailableModels(
   ) {
     const options = config.getModelConfigService().getAvailableModelOptions({
       useGemini3_1: useGemini31,
-      useGemini3_1FlashLite: useGemini31FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview: shouldShowPreviewModels,
     });
@@ -336,10 +333,10 @@ export function buildAvailableModels(
       },
     ];
 
-    if (useGemini31FlashLite) {
+    if (PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
       previewOptions.push({
-        value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+        value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
       });
     }
 

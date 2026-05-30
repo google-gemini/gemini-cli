@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -22,6 +22,7 @@ import {
   type EditorType,
   isEditorAvailable,
   EDITOR_DISPLAY_NAMES,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
@@ -70,9 +71,19 @@ export function EditorSettingsDialog({
         (item: EditorDisplay) => item.type === currentPreference,
       )
     : 0;
-  if (editorIndex === -1) {
+  const isUnsupportedEditor = editorIndex === -1;
+  if (isUnsupportedEditor) {
     editorIndex = 0;
   }
+
+  useEffect(() => {
+    if (isUnsupportedEditor && currentPreference) {
+      coreEvents.emitFeedback(
+        'error',
+        `Editor is not supported: ${currentPreference}`,
+      );
+    }
+  }, [isUnsupportedEditor, currentPreference]);
 
   const scopeItems: Array<{
     label: string;
