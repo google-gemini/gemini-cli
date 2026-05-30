@@ -60,12 +60,6 @@ exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios >
 ────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
-exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of the line' 2`] = `
-"────────────────────────────────────────────────────────────────────────────────────────────────────
- > hello
-────────────────────────────────────────────────────────────────────────────────────────────────────"
-`;
-
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'for multi-byte unicode characters' 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
  > hello 👍 world
