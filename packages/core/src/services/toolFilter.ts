@@ -30,6 +30,10 @@ interface ChatResponse {
   message?: { content?: string };
 }
 
+function sanitizePromptContent(text: string): string {
+  return text.replace(/[\n\r[\]]/g, ' ').trim();
+}
+
 function isChatResponse(value: unknown): value is ChatResponse {
   return typeof value === 'object' && value !== null;
 }
@@ -108,8 +112,10 @@ export class ToolFilter {
 
     const context = messages
       .slice(-this.config.maxContextMessages)
-      .map((m) => `${m.role}: ${m.content}`)
+      .map((m) => `${m.role}: ${sanitizePromptContent(m.content)}`)
       .join('\n');
+
+    const sanitizedQuery = sanitizePromptContent(userQuery);
 
     const prompt = `Given the following available tools and conversation context, determine which tools are relevant to the user's query. Return only a JSON array of tool names.
 
@@ -119,7 +125,7 @@ ${toolsPrompt}
 Conversation context:
 ${context}
 
-User query: ${userQuery}
+User query: ${sanitizedQuery}
 
 Relevant tool names (JSON array only):`;
 
