@@ -44,7 +44,14 @@ async function findCommand(
       if (result.status === 0 && result.stdout) {
         const firstPath = result.stdout.trim().split(/\r?\n/)[0];
         if (firstPath) {
-          return firstPath;
+          // Sanitize: resolve to absolute path and reject null bytes
+          // to prevent path traversal or null byte injection from
+          // untrusted command output.
+          const resolved = path.resolve(firstPath);
+          if (resolved.includes('\0')) {
+            return null;
+          }
+          return resolved;
         }
       }
     } else {
