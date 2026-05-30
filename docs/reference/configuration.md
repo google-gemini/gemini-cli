@@ -602,6 +602,12 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
           "model": "gemini-2.5-flash-lite"
         }
       },
+      "gemini-3.1-flash-lite": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite"
+        }
+      },
       "gemma-4-31b-it": {
         "extends": "chat-base-3",
         "modelConfig": {
@@ -629,7 +635,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "classifier": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 1024,
             "thinkingConfig": {
@@ -641,7 +647,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "prompt-completion": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "temperature": 0.3,
             "maxOutputTokens": 16000,
@@ -654,7 +660,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "fast-ack-helper": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "temperature": 0.2,
             "maxOutputTokens": 120,
@@ -667,7 +673,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "edit-corrector": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "thinkingConfig": {
               "thinkingBudget": 0
@@ -678,7 +684,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "summarizer-default": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 2000
           }
@@ -687,7 +693,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       "summarizer-shell": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 2000
           }
@@ -764,7 +770,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       },
       "chat-compression-3.1-flash-lite": {
         "modelConfig": {
-          "model": "gemini-3.1-flash-lite-preview"
+          "model": "gemini-3.1-flash-lite"
         }
       },
       "chat-compression-2.5-pro": {
@@ -818,10 +824,10 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
 
     ```json
     {
-      "gemini-3.1-flash-lite-preview": {
+      "gemini-3.1-flash-lite": {
         "tier": "flash-lite",
         "family": "gemini-3",
-        "isPreview": true,
+        "isPreview": false,
         "isVisible": true,
         "features": {
           "thinking": false,
@@ -1098,16 +1104,8 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
           }
         ]
       },
-      "gemini-3.1-flash-lite-preview": {
-        "default": "gemini-3.1-flash-lite-preview",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": false
-            },
-            "target": "gemini-2.5-flash-lite"
-          }
-        ]
+      "gemini-3.1-flash-lite": {
+        "default": "gemini-3.1-flash-lite"
       },
       "flash": {
         "default": "gemini-3-flash-preview",
@@ -1121,15 +1119,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
         ]
       },
       "flash-lite": {
-        "default": "gemini-2.5-flash-lite",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": true
-            },
-            "target": "gemini-3.1-flash-lite-preview"
-          }
-        ]
+        "default": "gemini-3.1-flash-lite"
       },
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
@@ -1369,7 +1359,7 @@ and examples): **[Local Gemma 4 user guide](../cli/local-gemma-4.md)**.
       ],
       "lite": [
         {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "actions": {
             "terminal": "silent",
             "transient": "silent",
