@@ -19,7 +19,7 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   AuthType,
   GEMMA_MODEL_ALIAS_4,
   GEMMA_MODEL_ALIAS_4_26B,
@@ -57,7 +57,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     LocalModelDiscoveryService: class {
       discoverBackends = mockDiscoverBackends;
     },
-    PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL: 'gemini-3.1-flash-lite-preview',
   };
 });
 
@@ -78,7 +77,6 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
-    getGemini31FlashLiteLaunchedSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
     getExperimentalGemma: () => boolean;
@@ -100,7 +98,6 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
-    getGemini31FlashLiteLaunchedSync: mockGetGemini31FlashLiteLaunchedSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
     getExperimentalGemma: () => false,
@@ -115,7 +112,6 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
-    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(false);
     mockGetProModelNoAccess.mockResolvedValue(false);
     mockGetProModelNoAccessSync.mockReturnValue(false);
     mockRefreshAuth.mockResolvedValue(undefined);
@@ -160,6 +156,31 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
+  it('renders the "manual" view initially for users with no pro access and filters Pro models with correct order', async () => {
+    mockGetProModelNoAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(true);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(true);
+    mockGetDisplayString.mockImplementation((val: string) => val);
+
+    const { lastFrame, unmount } = await renderComponent();
+
+    const output = lastFrame();
+    expect(output).toContain('Select Model');
+    expect(output).not.toContain(DEFAULT_GEMINI_MODEL);
+    expect(output).not.toContain(PREVIEW_GEMINI_MODEL);
+
+    // Verify order: Flash Preview -> Flash Lite (Preview/Default) -> Flash
+    const flashPreviewIdx = output.indexOf(PREVIEW_GEMINI_FLASH_MODEL);
+    const flashLiteIdx = output.indexOf(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    const flashIdx = output.indexOf(DEFAULT_GEMINI_FLASH_MODEL);
+
+    expect(flashPreviewIdx).toBeLessThan(flashLiteIdx);
+    expect(flashLiteIdx).toBeLessThan(flashIdx);
+
+    expect(output).not.toContain('Auto');
+    unmount();
+  });
   it('closes dialog on escape in "manual" view for users with no pro access', async () => {
     mockGetProModelNoAccessSync.mockReturnValue(true);
     mockGetProModelNoAccess.mockResolvedValue(true);
@@ -457,7 +478,7 @@ describe('<ModelDialog />', () => {
       unmount();
     });
 
-    it('shows Flash Lite Preview model regardless of tier when flag is enabled', async () => {
+    it('does not show Flash Lite Preview model when it is retired (none) even if flag is enabled', async () => {
       mockGetProModelNoAccessSync.mockReturnValue(false);
       mockGetProModelNoAccess.mockResolvedValue(false);
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
@@ -476,7 +497,8 @@ describe('<ModelDialog />', () => {
       await waitUntilReady();
 
       const output = lastFrame();
-      expect(output).toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
+      expect(output).not.toContain(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+      expect(output).toContain(DEFAULT_GEMINI_FLASH_LITE_MODEL);
       unmount();
     });
   });
