@@ -25,23 +25,37 @@ async function findCommand(
   command: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
-  // 1. Check PATH first.
+  // Security: Validate the command name to prevent injection attacks.
+  // Only allow alphanumeric characters, hyphens, underscores, dots, and path separators.
+  const safeCommandPattern = /^[a-zA-Z0-9.\-_/\\]+$/;
+  if (!safeCommandPattern.test(command)) {
+    return null;
+  }
+
+  // 1. Check PATH first using safe argument passing (no shell interpolation).
   try {
     if (platform === 'win32') {
       const result = child_process
-        .execSync(`where.exe ${command}`)
-        .toString()
-        .trim();
-      // `where.exe` can return multiple paths. Return the first one.
-      const firstPath = result.split(/\r?\n/)[0];
-      if (firstPath) {
-        return firstPath;
+        .spawnSync('where.exe', [command], {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false,
+        });
+      if (result.status === 0 && result.stdout) {
+        const firstPath = result.stdout.trim().split(/\r?\n/)[0];
+        if (firstPath) {
+          return firstPath;
+        }
       }
     } else {
-      child_process.execSync(`command -v ${command}`, {
-        stdio: 'ignore',
+      const result = child_process.spawnSync('which', [command], {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
       });
-      return command;
+      if (result.status === 0) {
+        return command;
+      }
     }
   } catch {
     // Not in PATH, continue to check common locations.
