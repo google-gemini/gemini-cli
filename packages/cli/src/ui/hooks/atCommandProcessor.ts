@@ -100,10 +100,7 @@ function parseAllAtCommands(
 
   while (i < query.length) {
     // Detect unescaped @
-    if (
-      query[i] === '@' &&
-      (i === 0 || query[i - 1] !== '\\')
-    ) {
+    if (query[i] === '@' && (i === 0 || query[i - 1] !== '\\')) {
       const commandStart = i;
 
       // Add text before @
@@ -139,10 +136,7 @@ function parseAllAtCommands(
         }
 
         // Stop at delimiters when not inside quotes
-        if (
-          !inQuotes &&
-          /[ \t\n\r,;!?()[\]{}]/.test(ch)
-        ) {
+        if (!inQuotes && /[ \t\n\r,;!?()[\]{}]/.test(ch)) {
           break;
         }
 
@@ -158,6 +152,12 @@ function parseAllAtCommands(
         parts.push({
           type: 'atPath',
           content: atPath,
+        });
+      } else {
+        // Preserve standalone "@"
+        parts.push({
+          type: 'text',
+          content: '@',
         });
       }
 
