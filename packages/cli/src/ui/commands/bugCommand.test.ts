@@ -14,6 +14,8 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
 import { MessageType } from '../types.js';
 import { captureHeapSnapshot } from '../utils/memorySnapshot.js';
+import { mkdtempSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 
 const { memoryUsageMock } = vi.hoisted(() => ({
   memoryUsageMock: vi.fn(() => ({
@@ -32,11 +34,21 @@ vi.mock('../utils/memorySnapshot.js', () => ({
   captureHeapSnapshot: vi.fn(),
   MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES: 2 * 1024 * 1024 * 1024,
 }));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    mkdtempSync: vi
+      .fn()
+      .mockImplementation((prefix: string) => `${prefix}secure`),
+  };
+});
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
     stat: vi.fn().mockResolvedValue({ size: 4096 }),
+    writeFile: vi.fn().mockResolvedValue(undefined),
   };
 });
 vi.mock('../utils/historyExportUtils.js', async (importOriginal) => {
@@ -247,6 +259,59 @@ describe('bugCommand', () => {
       .replace('{info}', encodeURIComponent(expectedInfo));
 
     expect(open).toHaveBeenCalledWith(expectedUrl);
+  });
+
+  it('writes oversized bug reports to a local markdown file before opening GitHub', async () => {
+    const longDescription = 'A'.repeat(9000);
+    const mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => false,
+            getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+            storage: {
+              getProjectTempDir: () => '/tmp/gemini',
+            },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
+            getChat: () => ({
+              getHistory: () => [],
+            }),
+          },
+        },
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, longDescription);
+
+    const expectedDir = path.join('/tmp/gemini', 'bug-report-secure');
+    const expectedPath = path.join(expectedDir, 'report.md');
+    expect(mkdtempSync).toHaveBeenCalledWith(
+      path.join('/tmp/gemini', 'bug-report-'),
+    );
+    expect(writeFile).toHaveBeenCalledWith(
+      expectedPath,
+      expect.stringContaining(longDescription),
+      'utf8',
+    );
+
+    const openedUrl = vi.mocked(open).mock.calls[0][0];
+    expect(openedUrl).toBe(
+      `https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title=${encodeURIComponent(`${'A'.repeat(117)}...`)}`,
+    );
+    expect(openedUrl.length).toBeLessThan(1000);
+    expect(openedUrl).not.toContain('&info=');
+    expect(openedUrl).not.toContain('&problem=');
+
+    const addItemCall = vi.mocked(mockContext.ui.addItem).mock.calls[0];
+    expect(addItemCall[0].text).toContain(expectedPath);
+    expect(addItemCall[0].text).toContain(
+      'The generated report was too large for a browser URL.',
+    );
   });
 
   const buildHighMemoryContext = (tempDir: string | undefined) =>

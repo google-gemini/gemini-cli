@@ -26,8 +26,15 @@ import {
   captureHeapSnapshot,
   MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES,
 } from '../utils/memorySnapshot.js';
-import { stat } from 'node:fs/promises';
+import { mkdtempSync } from 'node:fs';
+import { stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+
+const DEFAULT_BUG_REPORT_URL_TEMPLATE =
+  'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
+const SHORT_BUG_REPORT_URL_TEMPLATE =
+  'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}';
+const MAX_BUG_REPORT_URL_LENGTH = 8000;
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
@@ -100,23 +107,57 @@ export const bugCommand: SlashCommand = {
       }
     }
 
-    let bugReportUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
-
     const bugCommandSettings = config?.getBugCommand();
-    if (bugCommandSettings?.urlTemplate) {
-      bugReportUrl = bugCommandSettings.urlTemplate;
-    }
+    const bugReportUrlTemplate =
+      bugCommandSettings?.urlTemplate ?? DEFAULT_BUG_REPORT_URL_TEMPLATE;
+    let bugReportUrl = buildBugReportUrl(
+      bugReportUrlTemplate,
+      bugDescription,
+      info,
+      problemValue,
+    );
+    let longUrlFallbackMessage = '';
 
-    bugReportUrl = bugReportUrl
-      .replace('{title}', encodeURIComponent(bugDescription))
-      .replace('{info}', encodeURIComponent(info))
-      .replace('{problem}', encodeURIComponent(problemValue));
+    if (bugReportUrl.length > MAX_BUG_REPORT_URL_LENGTH) {
+      const tempDir = config?.storage?.getProjectTempDir();
+      if (tempDir) {
+        try {
+          const bugReportDir = mkdtempSync(path.join(tempDir, 'bug-report-'));
+          const bugReportFilePath = path.join(bugReportDir, 'report.md');
+          await writeFile(
+            bugReportFilePath,
+            formatBugReportFile(bugDescription, info, problemValue),
+            'utf8',
+          );
+          const fallbackProblem = `The full bug report was too large to place in a browser URL. It was saved locally at:\n${bugReportFilePath}\n\nPlease paste the file contents into this issue before submitting.`;
+          const fallbackTitle = shortenBugTitle(bugDescription);
+          bugReportUrl = bugCommandSettings?.urlTemplate
+            ? buildBugReportUrl(
+                bugReportUrlTemplate,
+                fallbackTitle,
+                '',
+                fallbackProblem,
+              )
+            : buildBugReportUrl(
+                SHORT_BUG_REPORT_URL_TEMPLATE,
+                fallbackTitle,
+                '',
+                '',
+              );
+          longUrlFallbackMessage = `\n\n--------------------------------------------------------------------------------\n\nFull bug report saved to:\n${bugReportFilePath}\n\nThe generated report was too large for a browser URL. Paste the saved markdown into the GitHub issue before submitting.`;
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          debugLogger.error(
+            `Failed to write oversized bug report: ${errorMessage}`,
+          );
+        }
+      }
+    }
 
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}${historyFileMessage}`,
+        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}${historyFileMessage}${longUrlFallbackMessage}`,
       },
       Date.now(),
     );
@@ -191,4 +232,37 @@ async function getIdeClientName(context: CommandContext) {
   }
   const ideClient = await IdeClient.getInstance();
   return ideClient.getDetectedIdeDisplayName() ?? '';
+}
+
+function buildBugReportUrl(
+  template: string,
+  title: string,
+  info: string,
+  problem: string,
+) {
+  return template
+    .replace('{title}', encodeURIComponent(title))
+    .replace('{info}', encodeURIComponent(info))
+    .replace('{problem}', encodeURIComponent(problem));
+}
+
+function formatBugReportFile(title: string, info: string, problem: string) {
+  return `# ${title || 'Bug report'}
+
+## Client information
+
+${info.trim()}
+
+## Problem
+
+${problem || '_No description provided._'}
+`;
+}
+
+function shortenBugTitle(title: string) {
+  const trimmed = title.trim();
+  if (!trimmed) {
+    return 'Bug report';
+  }
+  return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
 }
