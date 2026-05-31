@@ -18,6 +18,20 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.44.0 - 2026-05-27
+
+- **Unified Auto Mode:** Streamlined the automation experience by merging
+  specialized Auto modes into a single, unified mode
+  ([#26714](https://github.com/google-gemini/gemini-cli/pull/26714) by
+  @DavidAPierce).
+- **New Editor Integrations:** Added native support for Sublime Text and Emacs
+  Client ([#21090](https://github.com/google-gemini/gemini-cli/pull/21090) by
+  @alberti42).
+- **Enhanced TUI Testing:** Introduced `agent-tui` and `tui-tester` skills for
+  programmatic testing and automation of terminal UI applications
+  ([#27121](https://github.com/google-gemini/gemini-cli/pull/27121) by
+  @adamfweidman).
+
 ## Announcements: v0.43.0 - 2026-05-22
 
 - **Surgical Code Edits:** Steered Gemini models to prefer the `edit` tool for
