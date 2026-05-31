@@ -210,6 +210,9 @@ decision = "deny"
 
     const writtenContent = memfs.readFileSync(policyFile, 'utf-8') as string;
 
+    // Verify escaping - should be valid TOML and contain the values
+    // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'
+    // instead of "foo\"bar\"" if there are no single quotes in the string.
     try {
       expect(writtenContent).toContain('mcpName = "my\\"jira\\"server"');
     } catch {
@@ -249,7 +252,6 @@ decision = "deny"
     expect(content).toContain('toolName = "test_tool"');
   });
 
-
   it('should include error details in feedback message on persistence failure', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
@@ -273,12 +275,11 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-      expect(feedbackSpy).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Permission denied'),
-        expect.any(Error),
-      );
-    
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
   });
 
   it('should clean up tmp file on write failure', async () => {
@@ -294,7 +295,9 @@ decision = "deny"
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
-    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('ENOENT: no such file or directory', 'ENOENT'));
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
+    );
 
     const mockFileHandle = {
       writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
@@ -310,8 +313,7 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
-    
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
   });
 
   it('should abort persistence on non-ENOENT read errors', async () => {
@@ -327,7 +329,9 @@ decision = "deny"
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
-    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('Permission denied', 'EACCES'));
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
+      makeNodeError('Permission denied', 'EACCES'),
+    );
     const openSpy = vi.spyOn(fs, 'open');
 
     const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
@@ -339,13 +343,12 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-      expect(openSpy).not.toHaveBeenCalled();
-      expect(feedbackSpy).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Permission denied'),
-        expect.any(Error),
-      );
-    
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Permission denied'),
+      expect.any(Error),
+    );
   });
 
   it('should fall back to copy+unlink when rename fails with EXDEV', async () => {
@@ -361,14 +364,18 @@ decision = "deny"
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as never);
-    vi.spyOn(fs, 'readFile').mockRejectedValue(makeNodeError('ENOENT: no such file or directory', 'ENOENT'));
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
+    );
 
     const mockFileHandle = {
       writeFile: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
     vi.spyOn(fs, 'open').mockResolvedValue(mockFileHandle as never);
-    vi.spyOn(fs, 'rename').mockRejectedValue(makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'));
+    vi.spyOn(fs, 'rename').mockRejectedValue(
+      makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'),
+    );
     vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined as never);
     vi.spyOn(fs, 'unlink').mockResolvedValue(undefined as never);
 
@@ -379,12 +386,11 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-      expect(fs.copyFile).toHaveBeenCalledWith(
-        expect.stringMatching(/\.tmp$/),
-        policyFile,
-      );
-      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
-    
+    expect(fs.copyFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      policyFile,
+    );
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
   });
 
   it('should include modes if provided', async () => {
@@ -423,6 +429,7 @@ modes = [ "autoEdit", "yolo" ]
     memfs.mkdirSync(dir, { recursive: true });
     memfs.writeFileSync(policyFile, existingContent);
 
+    // Now grant in DEFAULT mode, which should include [default, autoEdit, yolo]
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'test_tool',
@@ -433,6 +440,7 @@ modes = [ "autoEdit", "yolo" ]
     await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    // Should NOT have two [[rule]] entries for test_tool
     const ruleCount = (content.match(/\[\[rule\]\]/g) || []).length;
     expect(ruleCount).toBe(1);
     expect(content).toContain('modes = [ "default", "autoEdit", "yolo" ]');
@@ -474,13 +482,12 @@ modes = [ "autoEdit", "yolo" ]
       persist: true,
     });
 
-    await vi.waitFor(() => {
-      expect(fs.copyFile).toHaveBeenCalledWith(
-        expect.stringMatching(/\.tmp$/),
-        policyFile,
-      );
-      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
-    });
+    await vi.runAllTimersAsync();
+    expect(fs.copyFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      policyFile,
+    );
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
   });
 
   it('should back up corrupted TOML file and recover', async () => {
