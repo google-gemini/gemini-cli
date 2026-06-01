@@ -814,7 +814,17 @@ export async function loadCliConfig(
     },
     mcp: {
       ...settings.mcp,
-      allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+      // Use the consolidated MCP lists (union of excluded across all scopes,
+      // intersection of allowed) for the policy engine, so a workspace-scoped
+      // mcp.excluded cannot drop a user/system block via REPLACE merge.
+      allowed:
+        argv.allowedMcpServerNames ??
+        (loadedSettings
+          ? loadedSettings.getConsolidatedAllowedMcpServers()
+          : settings.mcp?.allowed),
+      excluded: loadedSettings
+        ? loadedSettings.getConsolidatedExcludedMcpServers()
+        : settings.mcp?.excluded,
     },
     policyPaths: (argv.policy ?? settings.policyPaths)?.map((p) =>
       resolvePath(p),
