@@ -1061,18 +1061,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (tempFilePath) {
-        try {
-          await fsPromises.unlink(tempFilePath);
-        } catch {
-          // Ignore errors during unlink
+
+      // Only clean up if NOT running in background.
+      // Background processes need the temp directory and PID file to remain
+      // available until they exit.
+      if (!this.params.is_background) {
+        if (tempFilePath) {
+          try {
+            await fsPromises.unlink(tempFilePath);
+          } catch {
+            // Ignore errors during unlink
+          }
         }
-      }
-      if (tempDir) {
-        try {
-          await fsPromises.rm(tempDir, { recursive: true, force: true });
-        } catch {
-          // Ignore errors during rm
+        if (tempDir) {
+          try {
+            await fsPromises.rm(tempDir, { recursive: true, force: true });
+          } catch {
+            // Ignore errors during rm
+          }
         }
       }
     }

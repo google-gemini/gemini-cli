@@ -97,6 +97,7 @@ export interface ModelResolution {
 export interface ResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -107,6 +108,7 @@ export interface ResolutionContext {
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -250,6 +252,8 @@ export class ModelConfigService {
           return value === context.useGemini3_1;
         case 'useGemini3_1FlashLite':
           return value === context.useGemini3_1FlashLite;
+        case 'useGemini3_5Flash':
+          return value === context.useGemini3_5Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
