@@ -86,6 +86,7 @@ import {
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
+  setFlashModels,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -3548,13 +3549,23 @@ export class Config implements McpContext, AgentLoopContext {
    */
   hasGemini35FlashGAAccess(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    if (this.isGemini31LaunchedForAuthType(authType)) {
-      return true;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
+    // Used to set default flash models based on access
+    // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
+    if (hasAccess) {
+      setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+    } else {
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
     }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
-        ?.boolValue ?? false
-    );
+    return hasAccess;
   }
 
   /**

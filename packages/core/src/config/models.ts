@@ -55,10 +55,21 @@ export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
-export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
+// TODO: set to none and const once the experiment for 3_5 flash rollut can be
+// cleaned up.
+export let PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
-export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+// TODO: Set to const and update to 'gemini-3.5-flash' once the experiment for
+// 3_5 flash rollut can be cleaned up.
+export let DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash';
+
+// Used to set default flash models based on access
+// TODO: Cleanup once the experiment for 3_5 flash rollut can be cleaned up.
+export function setFlashModels(preview: string, defaultFlash: string) {
+  PREVIEW_GEMINI_FLASH_MODEL = preview;
+  DEFAULT_GEMINI_FLASH_MODEL = defaultFlash;
+}
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
 /** @deprecated Gemini 3.1 Flash Lite is now GA. Use DEFAULT_GEMINI_FLASH_LITE_MODEL. */
 export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
@@ -242,7 +253,9 @@ function isFlashModel(model: string): boolean {
   return (
     model === DEFAULT_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === 'flash'
+    model === DEFAULT_GEMINI_3_5_FLASH_MODEL ||
+    model === 'flash' ||
+    model.endsWith('flash')
   );
 }
 
