@@ -76,22 +76,22 @@ jobs:
           # 4. Check existing labels and update only if necessary
           EXISTING_LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name' 2>/dev/null || echo "")
           
-          LABELS_TO_REMOVE=""
+          LABELS_TO_REMOVE=()
           for L in size/XS size/S size/M size/L size/XL; do
             if echo "$EXISTING_LABELS" | grep -Fq "$L" && [ "$L" != "$SIZE" ]; then
-              LABELS_TO_REMOVE="$LABELS_TO_REMOVE --remove-label $L"
+              LABELS_TO_REMOVE+=("--remove-label" "$L")
             fi
           done
 
-          LABEL_TO_ADD=""
+          LABEL_TO_ADD=()
           if ! echo "$EXISTING_LABELS" | grep -Fq "$SIZE"; then
-            LABEL_TO_ADD="--add-label $SIZE"
+            LABEL_TO_ADD+=("--add-label" "$SIZE")
           fi
 
           # Perform a single, highly atomic edit call if changes are needed
-          if [ -n "$LABELS_TO_REMOVE" ] || [ -n "$LABEL_TO_ADD" ]; then
-            echo "Updating labels: removing$LABELS_TO_REMOVE, adding $SIZE"
-            gh pr edit "$PR_NUMBER" $LABELS_TO_REMOVE $LABEL_TO_ADD
+          if [ ${#LABELS_TO_REMOVE[@]} -gt 0 ] || [ ${#LABEL_TO_ADD[@]} -gt 0 ]; then
+            echo "Updating labels: removing ${LABELS_TO_REMOVE[*]}, adding $SIZE"
+            gh pr edit "$PR_NUMBER" "${LABELS_TO_REMOVE[@]}" "${LABEL_TO_ADD[@]}"
           else
             echo "✅ PR #$PR_NUMBER already has the correct size label ($SIZE)."
           fi
@@ -105,12 +105,12 @@ jobs:
 
           # Find any existing size labeler comment by the github-actions bot
           echo "Searching for existing size comment..."
-          COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments \
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("📊 PR Size:"))) | .id' | head -n 1)
 
           if [ -n "$COMMENT_ID" ]; then
             echo "Updating existing comment (ID: $COMMENT_ID)..."
-            gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID -X PATCH -f body="$COMMENT" > /dev/null
+            gh api "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -X PATCH -f body="$COMMENT" > /dev/null
           else
             echo "Creating new comment..."
             gh pr comment "$PR_NUMBER" --body "$COMMENT" > /dev/null

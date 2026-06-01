@@ -77,22 +77,22 @@ jobs:
             # Inspect existing labels to detect discrepancies
             EXISTING_LABELS=$(echo "$PR_JSON" | jq -r '.labels[].name' 2>/dev/null || echo "")
 
-            LABELS_TO_REMOVE=""
+            LABELS_TO_REMOVE=()
             for L in size/XS size/S size/M size/L size/XL; do
               if echo "$EXISTING_LABELS" | grep -Fq "$L" && [ "$L" != "$SIZE" ]; then
-                LABELS_TO_REMOVE="$LABELS_TO_REMOVE --remove-label $L"
+                LABELS_TO_REMOVE+=("--remove-label" "$L")
               fi
             done
 
-            LABEL_TO_ADD=""
+            LABEL_TO_ADD=()
             if ! echo "$EXISTING_LABELS" | grep -Fq "$SIZE"; then
-              LABEL_TO_ADD="--add-label $SIZE"
+              LABEL_TO_ADD+=("--add-label" "$SIZE")
             fi
 
             # Update labels if there's a difference
-            if [ -n "$LABELS_TO_REMOVE" ] || [ -n "$LABEL_TO_ADD" ]; then
+            if [ ${#LABELS_TO_REMOVE[@]} -gt 0 ] || [ ${#LABEL_TO_ADD[@]} -gt 0 ]; then
               echo "🔄 PR #$PR_NUMBER (+$ADDITIONS/-$DELETIONS = $TOTAL lines): updating size to $SIZE"
-              gh pr edit "$PR_NUMBER" $LABELS_TO_REMOVE $LABEL_TO_ADD 2>/dev/null || true
+              gh pr edit "$PR_NUMBER" "${LABELS_TO_REMOVE[@]}" "${LABEL_TO_ADD[@]}" 2>/dev/null || true
               UPDATED_COUNT=$((UPDATED_COUNT + 1))
             else
               echo "✅ PR #$PR_NUMBER (+$ADDITIONS/-$DELETIONS = $TOTAL lines): already has correct label ($SIZE). Skipping."
