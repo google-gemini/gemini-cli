@@ -199,6 +199,29 @@ describe('Dynamic Configuration Parity', () => {
     }
   });
 
+  it('should resolve Gemini 3.5 models correctly', () => {
+    const flash35 = resolveModel('gemini-3.5-flash-preview', false, false, true, dynamicConfig);
+    expect(flash35).toBe('gemini-3.5-flash-preview');
+
+    const flashLite35 = resolveModel('gemini-3.5-flash-lite-preview', false, false, true, dynamicConfig);
+    expect(flashLite35).toBe('gemini-3.5-flash-lite-preview');
+  });
+
+  it('should resolve flash to 3.5 when useGemini3_5 is true', () => {
+    const resolved = modelConfigService.resolveModelId('flash', { useGemini3_5: true });
+    expect(resolved).toBe('gemini-3.5-flash-preview');
+  });
+
+  it('should resolve flash-lite to 3.5 when useGemini3_5FlashLite is true', () => {
+    const resolved = modelConfigService.resolveModelId('flash-lite', { useGemini3_5FlashLite: true });
+    expect(resolved).toBe('gemini-3.5-flash-lite-preview');
+  });
+
+  it('isGemini3Model should return true for Gemini 3.5 models', () => {
+    expect(isGemini3Model('gemini-3.5-flash-preview')).toBe(true);
+    expect(isGemini3Model('gemini-3.5-flash-lite-preview')).toBe(true);
+  });
+
   it('isCustomModel should match legacy behavior', () => {
     for (const model of modelsToTest) {
       const legacy = isCustomModel(model, legacyConfig);

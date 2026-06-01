@@ -55,6 +55,9 @@ export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
+export const PREVIEW_GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash-preview';
+export const PREVIEW_GEMINI_3_5_FLASH_LITE_MODEL =
+  'gemini-3.5-flash-lite-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-3.1-flash-lite';
@@ -69,6 +72,8 @@ export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_5_FLASH_MODEL,
+  PREVIEW_GEMINI_3_5_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -473,7 +478,7 @@ export function supportsMultimodalFunctionResponse(
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  return /^gemini-3(\.|-)/.test(model);
 }
 
 /**

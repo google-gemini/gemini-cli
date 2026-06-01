@@ -29,6 +29,8 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_5_FLASH_MODEL,
+  PREVIEW_GEMINI_3_5_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
@@ -105,7 +107,9 @@ export function modelStringToModelConfigAlias(model: string): string {
     case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
+    case PREVIEW_GEMINI_3_5_FLASH_MODEL:
       return 'chat-compression-3-flash';
+    case PREVIEW_GEMINI_3_5_FLASH_LITE_MODEL:
     case PREVIEW_GEMINI_FLASH_LITE_MODEL:
     // fallthrough
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
