@@ -1174,7 +1174,7 @@ describe('mcp-client', () => {
       );
     });
 
-    it('should remove tools and prompts on disconnect', async () => {
+    it('should NOT remove tools and prompts on disconnect', async () => {
       const mockedClient = {
         connect: vi.fn(),
         close: vi.fn(),
@@ -1244,15 +1244,9 @@ describe('mcp-client', () => {
       await client.disconnect();
 
       expect(mockedClient.close).toHaveBeenCalledOnce();
-      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledWith(
-        'test-server',
-      );
-      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledWith(
-        'test-server',
-      );
-      expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledWith(
-        'test-server',
-      );
+      expect(mockedToolRegistry.removeMcpToolsByServer).not.toHaveBeenCalled();
+      expect(mockedPromptRegistry.removePromptsByServer).not.toHaveBeenCalled();
+      expect(resourceRegistry.removeResourcesByServer).not.toHaveBeenCalled();
     });
   });
 
