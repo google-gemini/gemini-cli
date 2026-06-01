@@ -1,4 +1,4 @@
-name: PR Size Labeler (Batch)
+name: 'PR Size Labeler (Batch)'
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
         description: 'Process all PRs (open and closed) or open only'
         required: true
         default: 'false'
-        type: choice
+        type: 'choice'
         options:
           - 'true'
           - 'false'
@@ -15,19 +15,19 @@ on:
         description: 'Max number of PRs to fetch and check'
         required: true
         default: '100'
-        type: string
+        type: 'string'
 
 permissions:
-  pull-requests: write
+  pull-requests: 'write'
 
 jobs:
   batch-label:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: Batch label PRs
+      - name: 'Batch label PRs'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_REPO: '${{ github.repository }}'
         run: |
           # Determine the state filter
           STATE="open"

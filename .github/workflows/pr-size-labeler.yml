@@ -1,27 +1,27 @@
-name: PR Size Labeler
+name: 'PR Size Labeler'
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: ['opened', 'synchronize', 'reopened']
   workflow_dispatch:
     inputs:
       pr_number:
         description: 'PR number to label manually (for workflow_dispatch)'
         required: false
-        type: string
+        type: 'string'
 
 permissions:
-  pull-requests: write
-  issues: write
+  pull-requests: 'write'
+  issues: 'write'
 
 jobs:
   size-label:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: Run size labeler
+      - name: 'Run size labeler'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_REPO: '${{ github.repository }}'
         run: |
           # Determine the target PR number
           if [ -n "${{ github.event.pull_request.number }}" ]; then
@@ -76,7 +76,7 @@ jobs:
 
           # 4. Check existing labels and update only if necessary
           EXISTING_LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name' 2>/dev/null || echo "")
-          
+
           LABELS_TO_REMOVE=()
           for L in size/XS size/S size/M size/L size/XL; do
             if echo "$EXISTING_LABELS" | grep -Fq "$L" && [ "$L" != "$SIZE" ]; then
