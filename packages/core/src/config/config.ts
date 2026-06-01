@@ -86,6 +86,7 @@ import {
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
+  setFlashModels,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -2054,6 +2055,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2093,6 +2095,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2108,6 +2111,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2123,6 +2127,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -3535,6 +3540,32 @@ export class Config implements McpContext, AgentLoopContext {
       authType === AuthType.USE_VERTEX_AI ||
       authType === AuthType.GATEWAY
     );
+  }
+
+  /**
+   * Returns whether Gemini 3.5 Flash GA has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  hasGemini35FlashGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
+    // Used to set default flash models based on access
+    // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
+    if (hasAccess) {
+      setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
+    } else {
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+    }
+    return hasAccess;
   }
 
   /**

@@ -721,7 +721,6 @@ export class GeminiChat {
         (await this.context.config.getGemini31Launched?.()) ?? false;
       const hasAccessToPreview =
         this.context.config.getHasAccessToPreviewModel?.() ?? true;
-
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
@@ -729,6 +728,7 @@ export class GeminiChat {
         false,
         hasAccessToPreview,
         this.context.config,
+        this.context.config.hasGemini35FlashGAAccess?.() ?? false,
       );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
@@ -740,6 +740,7 @@ export class GeminiChat {
           false,
           hasAccessToPreview,
           this.context.config,
+          this.context.config.hasGemini35FlashGAAccess?.() ?? false,
         );
       }
 
@@ -802,6 +803,7 @@ export class GeminiChat {
             false,
             hasAccessToPreview,
             this.context.config,
+            this.context.config.hasGemini35FlashGAAccess?.() ?? false,
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
