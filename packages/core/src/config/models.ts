@@ -385,8 +385,9 @@ export function isGemini3Model(
     // Legacy behavior resolves the model first.
     const resolved = resolveModel(model, false, false, true, config);
     return (
-      config.modelConfigService.getModelDefinition(resolved)?.family ===
-      'gemini-3'
+      config.modelConfigService
+        .getModelDefinition(resolved)
+        ?.family?.startsWith('gemini-3') ?? false
     );
   }
 

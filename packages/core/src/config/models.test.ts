@@ -220,6 +220,12 @@ describe('Dynamic Configuration Parity', () => {
   it('isGemini3Model should return true for Gemini 3.5 models', () => {
     expect(isGemini3Model('gemini-3.5-flash-preview')).toBe(true);
     expect(isGemini3Model('gemini-3.5-flash-lite-preview')).toBe(true);
+    expect(isGemini3Model('gemini-3.5-flash-preview', dynamicConfig)).toBe(
+      true,
+    );
+    expect(isGemini3Model('gemini-3.5-flash-lite-preview', dynamicConfig)).toBe(
+      true,
+    );
   });
 
   it('isCustomModel should match legacy behavior', () => {
