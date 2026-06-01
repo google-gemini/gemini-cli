@@ -576,6 +576,7 @@ export interface LoadCliConfigOptions {
   };
   worktreeSettings?: WorktreeSettings;
   skipExtensions?: boolean;
+  loadedSettings?: LoadedSettings;
 }
 
 export async function loadCliConfig(
@@ -584,7 +585,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks, skipExtensions = false } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    loadedSettings,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -985,12 +991,17 @@ export async function loadCliConfig(
     agents: settings.agents,
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
-      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      ? (argv.allowedMcpServerNames ??
+        (loadedSettings
+          ? loadedSettings.getConsolidatedAllowedMcpServers()
+          : settings.mcp?.allowed))
       : undefined,
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames
         ? undefined
-        : settings.mcp?.excluded
+        : loadedSettings
+          ? loadedSettings.getConsolidatedExcludedMcpServers()
+          : settings.mcp?.excluded
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,

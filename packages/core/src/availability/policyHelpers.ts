@@ -52,8 +52,6 @@ export function resolvePolicyChain(
 
   let chain: ModelPolicyChain | undefined;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini31FlashLite =
-    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
 
@@ -64,7 +62,6 @@ export function resolvePolicyChain(
     resolveModel(
       modelFromConfig,
       useGemini31,
-      useGemini31FlashLite,
       useCustomToolModel,
       hasAccessToPreview,
       config,
@@ -84,7 +81,6 @@ export function resolvePolicyChain(
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
     const context = {
       useGemini3_1: useGemini31,
-      useGemini3_1FlashLite: useGemini31FlashLite,
       useCustomTools: useCustomToolModel,
     };
 
@@ -139,7 +135,6 @@ export function resolvePolicyChain(
           isAutoSelection,
           userTier: config.getUserTier(),
           useGemini31,
-          useGemini31FlashLite,
           useCustomToolModel,
         });
       } else {
@@ -150,7 +145,6 @@ export function resolvePolicyChain(
           isAutoSelection,
           userTier: config.getUserTier(),
           useGemini31,
-          useGemini31FlashLite,
           useCustomToolModel,
         });
       }

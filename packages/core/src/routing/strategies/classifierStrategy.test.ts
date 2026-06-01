@@ -60,7 +60,6 @@ describe('ClassifierStrategy', () => {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
-      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig().authType;
@@ -385,6 +384,97 @@ describe('ClassifierStrategy', () => {
     expect(decision).not.toBeNull();
     // Since requestedModel is Pro, and choice is flash, it should resolve to Flash
     expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+  });
+
+  it('should return null (bypass classifier) if history is only tool turns and request is a function response', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
+      },
+      { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [
+      { functionResponse: { name: 'tool2', response: { ok: true } } },
+    ];
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should return null (bypass classifier) if history has text turns and request is a function response', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'some task' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [
+      { functionResponse: { name: 'tool', response: { ok: true } } },
+    ];
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should still route if history is only tool turns but request is text', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
+      },
+      { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [{ text: 'simple task' }];
+
+    const mockApiResponse = {
+      reasoning: 'Simple.',
+      model_choice: 'flash',
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // History should be empty because all turns were tool turns and stripped.
+    // Request should be present.
+    const expectedContents = [
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+    expect(contents).toEqual(expectedContents);
   });
 
   describe('Gemini 3.1 and Custom Tools Routing', () => {

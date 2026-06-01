@@ -93,7 +93,6 @@ export function getModelPolicyChain(
     const proModel = resolveModel(
       PREVIEW_GEMINI_MODEL,
       options.useGemini31,
-      options.useGemini31FlashLite,
       options.useCustomToolModel,
     );
     return [
