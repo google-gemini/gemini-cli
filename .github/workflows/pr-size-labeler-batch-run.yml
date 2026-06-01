@@ -27,6 +27,7 @@ jobs:
       - name: Batch label PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           # Determine the state filter
           STATE="open"

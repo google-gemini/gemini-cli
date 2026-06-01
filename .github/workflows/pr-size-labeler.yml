@@ -21,6 +21,7 @@ jobs:
       - name: Run size labeler
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           # Determine the target PR number
           if [ -n "${{ github.event.pull_request.number }}" ]; then
