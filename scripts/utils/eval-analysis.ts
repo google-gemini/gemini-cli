@@ -72,7 +72,7 @@ export function analyzeEvalSource(
     sourceText,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS,
+    getScriptKind(filePath),
   );
 
   const helpers = collectHelperMappings(sourceFile);
@@ -395,7 +395,24 @@ function getRelativePath(filePath: string, repoRoot: string | undefined) {
   if (filePath === '<inline>') {
     return filePath;
   }
-  return repoRoot ? path.relative(repoRoot, filePath) : filePath;
+  const relativePath = repoRoot ? path.relative(repoRoot, filePath) : filePath;
+  return relativePath.replace(/\\/g, '/');
+}
+
+function getScriptKind(filePath: string) {
+  const extension = path.extname(filePath).toLowerCase();
+  switch (extension) {
+    case '.tsx':
+      return ts.ScriptKind.TSX;
+    case '.jsx':
+      return ts.ScriptKind.JSX;
+    case '.js':
+    case '.mjs':
+    case '.cjs':
+      return ts.ScriptKind.JS;
+    default:
+      return ts.ScriptKind.TS;
+  }
 }
 
 function compareEvalCases(left: EvalCaseRecord, right: EvalCaseRecord) {

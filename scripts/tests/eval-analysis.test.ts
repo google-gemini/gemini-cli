@@ -200,6 +200,58 @@ describe('eval-analysis', () => {
     });
   });
 
+  it('parses TSX eval files with component helpers', () => {
+    const analysis = analyzeEvalSource(
+      `
+        import { componentEvalTest } from './component-test-helper.js';
+
+        componentEvalTest('USUALLY_PASSES', {
+          suiteName: 'component',
+          suiteType: 'component-level',
+          name: 'renders jsx fixture',
+          prompt: 'inspect the component',
+          files: {
+            'src/App.tsx': <div data-testid="app">Hello</div>,
+          },
+        });
+      `,
+      { filePath: '/repo/evals/component.eval.tsx', repoRoot: '/repo' },
+    );
+
+    expect(analysis.diagnostics).toEqual([]);
+    expect(analysis.cases).toHaveLength(1);
+    expect(analysis.cases[0]).toMatchObject({
+      relativePath: 'evals/component.eval.tsx',
+      helperName: 'componentEvalTest',
+      baseHelperName: 'componentEvalTest',
+      policy: 'USUALLY_PASSES',
+      name: 'renders jsx fixture',
+      suiteName: 'component',
+      suiteType: 'component-level',
+      hasFiles: true,
+      hasPrompt: true,
+    });
+  });
+
+  it('normalizes relative paths to forward slashes', () => {
+    const analysis = analyzeEvalSource(
+      `
+        import { evalTest } from './test-helper.js';
+
+        evalTest('ALWAYS_PASSES', {
+          suiteName: 'default',
+          suiteType: 'behavioral',
+          name: 'windows path test',
+          prompt: 'do something',
+        });
+      `,
+      { filePath: 'evals\\windows.eval.ts' },
+    );
+
+    expect(analysis.relativePath).toBe('evals/windows.eval.ts');
+    expect(analysis.cases[0]?.relativePath).toBe('evals/windows.eval.ts');
+  });
+
   it('reports diagnostics for dynamic eval shapes', () => {
     const analysis = analyzeEvalSource(
       `
