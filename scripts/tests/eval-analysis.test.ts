@@ -124,6 +124,57 @@ describe('eval-analysis', () => {
     });
   });
 
+  it('maps variable wrapper helpers in multi-declaration statements', () => {
+    const analysis = analyzeEvalSource(
+      `
+        import { evalTest } from './test-helper.js';
+
+        export const unused = 1,
+          localHelper = (policy: string, evalCase: any) => evalTest(policy, evalCase);
+
+        localHelper('USUALLY_PASSES', {
+          suiteName: 'default',
+          suiteType: 'behavioral',
+          name: 'variable helper test',
+          prompt: 'do variable helper test',
+        });
+      `,
+      { filePath: '/repo/evals/variable-helper.eval.ts', repoRoot: '/repo' },
+    );
+
+    expect(analysis.diagnostics).toEqual([]);
+    expect(analysis.helpers.localHelper).toBe('evalTest');
+    expect(analysis.cases).toHaveLength(1);
+    expect(analysis.cases[0]).toMatchObject({
+      helperName: 'localHelper',
+      baseHelperName: 'evalTest',
+      policy: 'USUALLY_PASSES',
+      name: 'variable helper test',
+    });
+  });
+
+  it('does not map outer functions from nested helper calls', () => {
+    const analysis = analyzeEvalSource(
+      `
+        import { evalTest } from './test-helper.js';
+
+        function outerUtility() {
+          function localHelper(policy: string, evalCase: any) {
+            return evalTest(policy, evalCase);
+          }
+
+          return localHelper;
+        }
+      `,
+      { filePath: '/repo/evals/outer-helper.eval.ts', repoRoot: '/repo' },
+    );
+
+    expect(analysis.helpers.outerUtility).toBeUndefined();
+    expect(analysis.helpers.localHelper).toBe('evalTest');
+    expect(analysis.cases).toEqual([]);
+    expect(analysis.diagnostics).toEqual([]);
+  });
+
   it('maps imported eval helper aliases', () => {
     const analysis = analyzeEvalSource(
       `

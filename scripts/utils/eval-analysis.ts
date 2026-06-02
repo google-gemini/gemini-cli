@@ -164,14 +164,17 @@ function collectHelperMappings(
     const visit = (node: ts.Node) => {
       const name = getFunctionLikeBindingName(node);
       if (name && !helpers[name]) {
-        const baseHelper = findCalledHelper(node, helpers);
-        if (
-          baseHelper &&
-          helpers[baseHelper] &&
-          helpers[baseHelper] !== 'unknown'
-        ) {
-          helpers[name] = helpers[baseHelper];
-          changed = true;
+        const functionNode = getFunctionLikeNode(node);
+        if (functionNode) {
+          const baseHelper = findCalledHelper(functionNode, helpers);
+          if (
+            baseHelper &&
+            helpers[baseHelper] &&
+            helpers[baseHelper] !== 'unknown'
+          ) {
+            helpers[name] = helpers[baseHelper];
+            changed = true;
+          }
         }
       }
       ts.forEachChild(node, visit);
@@ -234,13 +237,22 @@ function collectEvalCalls(
 }
 
 function findCalledHelper(
-  node: ts.Node,
+  functionNode: ts.Node,
   helpers: Record<string, BaseEvalHelper | 'unknown'>,
 ): string | undefined {
   let found: string | undefined;
 
   const visit = (candidate: ts.Node) => {
     if (found) {
+      return;
+    }
+    if (
+      candidate !== functionNode &&
+      (ts.isFunctionDeclaration(candidate) ||
+        ts.isFunctionExpression(candidate) ||
+        ts.isArrowFunction(candidate) ||
+        ts.isMethodDeclaration(candidate))
+    ) {
       return;
     }
     if (ts.isCallExpression(candidate)) {
@@ -253,7 +265,7 @@ function findCalledHelper(
     ts.forEachChild(candidate, visit);
   };
 
-  ts.forEachChild(node, visit);
+  ts.forEachChild(functionNode, visit);
   return found;
 }
 
@@ -262,20 +274,32 @@ function getFunctionLikeBindingName(node: ts.Node) {
     return node.name.text;
   }
 
-  if (
-    ts.isVariableStatement(node) &&
-    node.declarationList.declarations.length === 1
-  ) {
-    const [declaration] = node.declarationList.declarations;
+  if (ts.isVariableDeclaration(node)) {
     if (
-      declaration &&
-      ts.isIdentifier(declaration.name) &&
-      declaration.initializer &&
-      (ts.isArrowFunction(declaration.initializer) ||
-        ts.isFunctionExpression(declaration.initializer))
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) ||
+        ts.isFunctionExpression(node.initializer))
     ) {
-      return declaration.name.text;
+      return node.name.text;
     }
+  }
+
+  return undefined;
+}
+
+function getFunctionLikeNode(node: ts.Node) {
+  if (ts.isFunctionDeclaration(node)) {
+    return node;
+  }
+
+  if (
+    ts.isVariableDeclaration(node) &&
+    node.initializer &&
+    (ts.isArrowFunction(node.initializer) ||
+      ts.isFunctionExpression(node.initializer))
+  ) {
+    return node.initializer;
   }
 
   return undefined;
