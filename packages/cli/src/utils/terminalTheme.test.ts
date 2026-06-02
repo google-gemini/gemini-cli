@@ -10,6 +10,7 @@ import { terminalCapabilityManager } from '../ui/utils/terminalCapabilityManager
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { coreEvents, type Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
+import type { Theme } from '../ui/themes/theme.js';
 
 vi.mock('../ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
@@ -49,7 +50,7 @@ describe('setupTerminalAndTheme', () => {
     mockConfig = {
       isInteractive: vi.fn().mockReturnValue(true),
       setTerminalBackground: vi.fn(),
-    } as unknown as Config;
+    } as Partial<Config> as Config;
     mockSettings = {
       merged: {
         ui: {
@@ -58,7 +59,7 @@ describe('setupTerminalAndTheme', () => {
           autoThemeSwitching: true,
         },
       },
-    } as unknown as LoadedSettings;
+    } as Partial<LoadedSettings> as LoadedSettings;
 
     // Mock process.stdin.isTTY
     Object.defineProperty(process.stdin, 'isTTY', {
@@ -82,7 +83,7 @@ describe('setupTerminalAndTheme', () => {
     vi.mocked(themeManager.getActiveTheme).mockReturnValue({
       name: 'Dracula',
       type: 'dark',
-    } as unknown as never);
+    } as Theme);
     vi.mocked(themeManager.isThemeCompatible).mockReturnValue(false);
 
     await setupTerminalAndTheme(mockConfig, mockSettings);
@@ -104,7 +105,7 @@ describe('setupTerminalAndTheme', () => {
     vi.mocked(themeManager.getActiveTheme).mockReturnValue({
       name: 'Dracula',
       type: 'dark',
-    } as unknown as never);
+    } as Theme);
     vi.mocked(themeManager.isThemeCompatible).mockReturnValue(false);
 
     await setupTerminalAndTheme(mockConfig, mockSettings);
