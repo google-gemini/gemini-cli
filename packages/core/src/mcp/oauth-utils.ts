@@ -7,7 +7,7 @@
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isLoopbackHost, isPrivateIpAsync } from '../utils/fetch.js';
+import { fetchWithPrivateIpBlock } from '../utils/fetch.js';
 
 /**
  * Error thrown when the discovered resource metadata does not match the expected resource.
@@ -55,11 +55,6 @@ export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
  * Utility class for common OAuth operations.
  */
 export class OAuthUtils {
-  private static async isPrivateOrLoopbackUrl(url: string): Promise<boolean> {
-    const hostname = new URL(url).hostname;
-    return isLoopbackHost(hostname) || (await isPrivateIpAsync(url));
-  }
-
   /**
    * Construct well-known OAuth endpoint URLs per RFC 9728 §3.1.
    *
@@ -103,13 +98,7 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
-      if (await this.isPrivateOrLoopbackUrl(resourceMetadataUrl)) {
-        debugLogger.warn(
-          `[OAuthUtils] Blocked SSRF attempt to private host in OAuth metadata URL: ${resourceMetadataUrl}`,
-        );
-        return null;
-      }
-      const response = await fetch(resourceMetadataUrl);
+      const response = await fetchWithPrivateIpBlock(resourceMetadataUrl);
       if (!response.ok) {
         return null;
       }
@@ -133,13 +122,7 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
-      if (await this.isPrivateOrLoopbackUrl(authServerMetadataUrl)) {
-        debugLogger.warn(
-          `[OAuthUtils] Blocked SSRF attempt to private host in OAuth auth server URL: ${authServerMetadataUrl}`,
-        );
-        return null;
-      }
-      const response = await fetch(authServerMetadataUrl);
+      const response = await fetchWithPrivateIpBlock(authServerMetadataUrl);
       if (!response.ok) {
         return null;
       }
