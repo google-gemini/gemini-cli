@@ -1141,4 +1141,59 @@ describe('convertSessionToHistoryFormats', () => {
       throw new Error('Expected tool_group history item');
     }
   });
+
+  it('should NOT include tool response text messages in uiHistory', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        type: 'user',
+        timestamp: new Date().toISOString(),
+        content: [{ text: 'Hello' }],
+      },
+      {
+        id: '2',
+        type: 'gemini',
+        timestamp: new Date().toISOString(),
+        content: [{ text: 'Thinking...' }],
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'read_file',
+            args: { path: 'test.ts' },
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+            result: [{ text: 'file content' }],
+          },
+        ],
+      },
+      {
+        id: '3',
+        type: 'user',
+        timestamp: new Date().toISOString(),
+        content: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { content: 'file content' },
+            },
+          },
+        ],
+      },
+    ];
+
+    const { uiHistory } = convertSessionToHistoryFormats(messages);
+
+    const userMessages = uiHistory.filter((item) => item.type === 'user');
+    expect(userMessages).toHaveLength(1);
+    expect(userMessages[0].text).toBe('Hello');
+
+    const toolGroups = uiHistory.filter((item) => item.type === 'tool_group');
+    expect(toolGroups).toHaveLength(1);
+
+    // Verify no message contains the "[Function Response" string which comes from verbose partToString
+    const allText = uiHistory
+      .map((item) => ('text' in item ? item.text : ''))
+      .join(' ');
+    expect(allText).not.toContain('[Function Response');
+  });
 });

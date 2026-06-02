@@ -6,13 +6,13 @@
 
 import {
   checkExhaustive,
-  partListUnionToString,
   SESSION_FILE_PREFIX,
   CoreToolCallStatus,
   type Storage,
   type ConversationRecord,
   type MessageRecord,
   loadConversationRecord,
+  partToString,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -171,7 +171,7 @@ export const extractFirstUserMessage = (messages: MessageRecord[]): string => {
   const userMessage = messages
     // First try filtering out slash commands.
     .filter((msg) => {
-      const content = partListUnionToString(msg.content);
+      const content = partToString(msg.content);
       return (
         !content.startsWith('/') &&
         !content.startsWith('?') &&
@@ -186,9 +186,9 @@ export const extractFirstUserMessage = (messages: MessageRecord[]): string => {
     // Fallback to first user message even if it's a slash command
     const firstMsg = messages.find((msg) => msg.type === 'user');
     if (!firstMsg) return 'Empty conversation';
-    content = cleanMessage(partListUnionToString(firstMsg.content));
+    content = cleanMessage(partToString(firstMsg.content));
   } else {
-    content = cleanMessage(partListUnionToString(userMessage.content));
+    content = cleanMessage(partToString(userMessage.content));
   }
 
   return content;
@@ -312,14 +312,14 @@ export const getAllSessionFiles = async (
 
           if (options.includeFullContent) {
             fullContent = content.messages
-              .map((msg) => partListUnionToString(msg.content))
+              .map((msg) => partToString(msg.content))
               .join(' ');
             messages = content.messages.map((msg) => ({
               role:
                 msg.type === 'user'
                   ? ('user' as const)
                   : ('assistant' as const),
-              content: partListUnionToString(msg.content),
+              content: partToString(msg.content),
             }));
           }
 
@@ -601,9 +601,9 @@ export function convertSessionToHistoryFormats(
 
     // Add the message only if it has content
     const displayContentString = msg.displayContent
-      ? partListUnionToString(msg.displayContent)
+      ? partToString(msg.displayContent)
       : undefined;
-    const contentString = partListUnionToString(msg.content);
+    const contentString = partToString(msg.content);
     const uiText = displayContentString || contentString;
 
     if (uiText.trim()) {
