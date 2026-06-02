@@ -161,22 +161,23 @@ function collectHelperMappings(
   while (changed) {
     changed = false;
 
-    sourceFile.forEachChild((node) => {
+    const visit = (node: ts.Node) => {
       const name = getFunctionLikeBindingName(node);
-      if (!name || helpers[name]) {
-        return;
+      if (name && !helpers[name]) {
+        const baseHelper = findCalledHelper(node, helpers);
+        if (
+          baseHelper &&
+          helpers[baseHelper] &&
+          helpers[baseHelper] !== 'unknown'
+        ) {
+          helpers[name] = helpers[baseHelper];
+          changed = true;
+        }
       }
+      ts.forEachChild(node, visit);
+    };
 
-      const baseHelper = findCalledHelper(node, helpers);
-      if (
-        baseHelper &&
-        helpers[baseHelper] &&
-        helpers[baseHelper] !== 'unknown'
-      ) {
-        helpers[name] = helpers[baseHelper];
-        changed = true;
-      }
-    });
+    visit(sourceFile);
   }
 
   return helpers;

@@ -93,6 +93,37 @@ describe('eval-analysis', () => {
     });
   });
 
+  it('maps nested wrapper helpers defined inside describe blocks', () => {
+    const analysis = analyzeEvalSource(
+      `
+        import { evalTest } from './test-helper.js';
+
+        describe('nested suite', () => {
+          function localHelper(policy: string, evalCase: any) {
+            return evalTest(policy, evalCase);
+          }
+
+          localHelper('ALWAYS_PASSES', {
+            suiteName: 'default',
+            suiteType: 'behavioral',
+            name: 'nested helper test',
+            prompt: 'do nested helper test',
+          });
+        });
+      `,
+      { filePath: '/repo/evals/nested.eval.ts', repoRoot: '/repo' },
+    );
+
+    expect(analysis.diagnostics).toEqual([]);
+    expect(analysis.cases).toHaveLength(1);
+    expect(analysis.cases[0]).toMatchObject({
+      helperName: 'localHelper',
+      baseHelperName: 'evalTest',
+      policy: 'ALWAYS_PASSES',
+      name: 'nested helper test',
+    });
+  });
+
   it('maps imported eval helper aliases', () => {
     const analysis = analyzeEvalSource(
       `
