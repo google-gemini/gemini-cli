@@ -59,7 +59,7 @@ export function getInstallationInfo(
     const isGit = isGitRepository(process.cwd());
 
     // Check if running from Google corporate/internal release paths
-    if (realPath.startsWith('/google/')) {
+    if (realPath.startsWith('/google/bin/')) {
       return {
         packageManager: PackageManager.BINARY,
         isGlobal: true,
