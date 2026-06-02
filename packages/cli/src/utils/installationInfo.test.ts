@@ -71,6 +71,20 @@ describe('getInstallationInfo', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should detect running from a Google corporate/internal release path', () => {
+    process.argv[1] = '/google/bin/releases/gemini-cli/tools/gemini';
+    mockedRealPathSync.mockReturnValue('/google/bin/releases/gemini-cli/tools/gemini');
+    mockedIsGitRepository.mockReturnValue(false);
+
+    const info = getInstallationInfo(projectRoot, true);
+    expect(info.packageManager).toBe(PackageManager.BINARY);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateMessage).toBe(
+      'Running from a corporate release. Automatic update is disabled.',
+    );
+    expect(info.updateCommand).toBeUndefined();
+  });
+
   it('should return UNKNOWN when cliPath is not available', () => {
     process.argv[1] = '';
     const info = getInstallationInfo(projectRoot, true);

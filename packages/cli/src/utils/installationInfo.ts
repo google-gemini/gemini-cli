@@ -58,6 +58,16 @@ export function getInstallationInfo(
     const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
     const isGit = isGitRepository(process.cwd());
 
+    // Check if running from Google corporate/internal release paths
+    if (realPath.startsWith('/google/')) {
+      return {
+        packageManager: PackageManager.BINARY,
+        isGlobal: true,
+        updateMessage:
+          'Running from a corporate release. Automatic update is disabled.',
+      };
+    }
+
     // Check for local git clone first
     if (
       isGit &&
