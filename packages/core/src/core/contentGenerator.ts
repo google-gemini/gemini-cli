@@ -221,6 +221,7 @@ export async function createContentGenerator(
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
+      gcConfig.hasGemini35FlashGAAccess?.() ?? false,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;

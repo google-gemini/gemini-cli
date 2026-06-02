@@ -54,6 +54,7 @@ export function resolvePolicyChain(
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
+  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
 
   // Capture the original family intent before any normalization or early downgrade.
   const isOriginallyGemini3 = isGemini3Model(modelFromConfig, config);
@@ -65,6 +66,7 @@ export function resolvePolicyChain(
       useCustomToolModel,
       hasAccessToPreview,
       config,
+      useGemini3_5Flash,
     ),
   );
   const isAutoPreferred = normalizedPreferredModel
@@ -82,6 +84,7 @@ export function resolvePolicyChain(
     const context = {
       useGemini3_1: useGemini31,
       useCustomTools: useCustomToolModel,
+      useGemini3_5Flash,
     };
 
     if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
@@ -136,6 +139,7 @@ export function resolvePolicyChain(
           userTier: config.getUserTier(),
           useGemini31,
           useCustomToolModel,
+          useGemini3_5Flash,
         });
       } else {
         // User requested Gemini 3 but has no access. Proactively downgrade
@@ -146,6 +150,7 @@ export function resolvePolicyChain(
           userTier: config.getUserTier(),
           useGemini31,
           useCustomToolModel,
+          useGemini3_5Flash,
         });
       }
     } else {
