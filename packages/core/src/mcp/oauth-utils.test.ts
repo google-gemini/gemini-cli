@@ -10,6 +10,12 @@ import {
   type OAuthAuthorizationServerMetadata,
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
+import { isLoopbackHost, isPrivateIpAsync } from '../utils/fetch.js';
+
+vi.mock('../utils/fetch.js', () => ({
+  isLoopbackHost: vi.fn().mockReturnValue(false),
+  isPrivateIpAsync: vi.fn().mockResolvedValue(false),
+}));
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -17,7 +23,11 @@ global.fetch = mockFetch;
 
 describe('OAuthUtils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockReset();
+    vi.mocked(isLoopbackHost).mockReset();
+    vi.mocked(isLoopbackHost).mockReturnValue(false);
+    vi.mocked(isPrivateIpAsync).mockReset();
+    vi.mocked(isPrivateIpAsync).mockResolvedValue(false);
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -115,6 +125,29 @@ describe('OAuthUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should not fetch protected resource metadata from a private IP', async () => {
+      vi.mocked(isPrivateIpAsync).mockResolvedValueOnce(true);
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(
+        'http://169.254.169.254/.well-known/oauth-protected-resource',
+      );
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should not fetch protected resource metadata from loopback', async () => {
+      vi.mocked(isLoopbackHost).mockReturnValueOnce(true);
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(
+        'http://127.0.0.1/.well-known/oauth-protected-resource',
+      );
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(isPrivateIpAsync).not.toHaveBeenCalled();
+    });
   });
 
   describe('fetchAuthorizationServerMetadata', () => {
@@ -148,6 +181,29 @@ describe('OAuthUtils', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should not fetch authorization server metadata from a private IP', async () => {
+      vi.mocked(isPrivateIpAsync).mockResolvedValueOnce(true);
+
+      const result = await OAuthUtils.fetchAuthorizationServerMetadata(
+        'http://169.254.169.254/.well-known/oauth-authorization-server',
+      );
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should not fetch authorization server metadata from loopback', async () => {
+      vi.mocked(isLoopbackHost).mockReturnValueOnce(true);
+
+      const result = await OAuthUtils.fetchAuthorizationServerMetadata(
+        'http://localhost/.well-known/oauth-authorization-server',
+      );
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(isPrivateIpAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -299,6 +355,38 @@ describe('OAuthUtils', () => {
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
+    });
+
+    it('should not fetch attacker-supplied private authorization server metadata', async () => {
+      vi.mocked(isPrivateIpAsync).mockImplementation(async (url) =>
+        url.includes('169.254.169.254'),
+      );
+
+      mockFetch
+        // fetchProtectedResourceMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://attacker.example.com',
+              authorization_servers: ['http://169.254.169.254/'],
+              bearer_methods_supported: ['header'],
+            }),
+        })
+        // Fallback discovery against the original public server URL.
+        .mockResolvedValue({
+          ok: false,
+        });
+
+      const result = await OAuthUtils.discoverOAuthConfig(
+        'https://attacker.example.com',
+      );
+
+      const fetchedUrls = mockFetch.mock.calls.map(([url]) => String(url));
+      expect(result).toBeNull();
+      expect(
+        fetchedUrls.some((url) => url.includes('169.254.169.254')),
+      ).toBe(false);
     });
   });
 
