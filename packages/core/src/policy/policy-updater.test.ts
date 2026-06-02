@@ -121,7 +121,11 @@ describe('createPolicyUpdater', () => {
 
   it('should persist mcpName to TOML', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
-    vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
+    vi.mocked(fs.readFile).mockRejectedValue(
+      Object.assign(new Error('ENOENT: no such file or directory'), {
+        code: 'ENOENT',
+      }),
+    );
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
     const mockFileHandle = {
@@ -142,9 +146,9 @@ describe('createPolicyUpdater', () => {
     });
 
     // Wait for the async listener to complete
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(fs.open).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(fs.open).toHaveBeenCalled();
+    });
     const [content] = mockFileHandle.writeFile.mock.calls[0] as [
       string,
       string,
