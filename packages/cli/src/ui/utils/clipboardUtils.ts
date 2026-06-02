@@ -38,6 +38,11 @@ const isWSL = (): boolean =>
       process.env['WSL_INTEROP'],
   );
 
+const stdoutHasLine = (stdout: string, expected: string): boolean =>
+  stdout
+    .split(/\r?\n/)
+    .some((line) => line.replace(/^\uFEFF/, '').trim() === expected);
+
 // Track which tool works on Linux to avoid redundant checks/failures
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
@@ -177,7 +182,7 @@ export async function clipboardHasImage(): Promise<boolean> {
           '-Command',
           'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
         ]);
-        return stdout.includes('True');
+        return stdoutHasLine(stdout, 'True');
       } catch (error) {
         debugLogger.warn('Error checking WSL clipboard for image:', error);
         return false;
@@ -200,7 +205,7 @@ export async function clipboardHasImage(): Promise<boolean> {
         '-Command',
         'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
       ]);
-      return stdout.trim() === 'True';
+      return stdoutHasLine(stdout, 'True');
     } catch (error) {
       debugLogger.warn('Error checking clipboard for image:', error);
       return false;
@@ -288,7 +293,7 @@ async function saveFileWithPowerShell(
     script,
   ]);
 
-  if (!stdout.includes('success')) {
+  if (!stdoutHasLine(stdout, 'success')) {
     return false;
   }
 
@@ -412,7 +417,7 @@ export async function saveClipboardImage(
 
       const { stdout } = await spawnAsync('osascript', ['-e', script]);
 
-      if (stdout.trim() === 'success') {
+      if (stdoutHasLine(stdout, 'success')) {
         // Verify the file was created and has content
         try {
           const stats = await fs.stat(tempFilePath);

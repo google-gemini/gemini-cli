@@ -216,7 +216,7 @@ describe('clipboardUtils', () => {
 
     it('should return true when PowerShell reports an image with extra output', async () => {
       vi.mocked(spawnAsync).mockResolvedValueOnce({
-        stdout: 'Windows PowerShell\nTrue\n',
+        stdout: 'Windows PowerShell\r\n\uFEFFTrue\r\n',
         stderr: '',
       });
 
@@ -250,6 +250,39 @@ describe('clipboardUtils', () => {
         expect.any(Array),
       );
       expect(execSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clipboardHasImage (Windows)', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+    });
+
+    it('should return true when PowerShell reports an image with extra output', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'Windows PowerShell\r\n\uFEFFTrue\r\n',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(spawnAsync).toHaveBeenCalledWith('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+      ]);
+    });
+
+    it('should return false when PowerShell reports no image', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'Windows PowerShell\r\nFalse\r\n',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(false);
     });
   });
 
@@ -477,7 +510,7 @@ describe('clipboardUtils', () => {
         stderr: '',
       });
       vi.mocked(spawnAsync).mockResolvedValueOnce({
-        stdout: 'Windows PowerShell\nsuccess\n',
+        stdout: 'Windows PowerShell\r\n\uFEFFsuccess\r\n',
         stderr: '',
       });
       vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
