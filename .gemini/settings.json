@@ -9,5 +9,10 @@
   },
   "general": {
     "devtools": true
+  },
+  "ui": {
+    "maxScrollbackLength": 230,
+    "terminalBuffer": true,
+    "debugRainbow": true
   }
 }
