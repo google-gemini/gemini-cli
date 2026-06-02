@@ -103,6 +103,13 @@ describe('fetch utils', () => {
       expect(isAddressPrivate('febf::')).toBe(true);
     });
 
+    it('should identify IPv6 addresses with zone identifiers as private', () => {
+      expect(isAddressPrivate('fe80::1%25eth0')).toBe(true);
+      expect(isAddressPrivate('fe80::1%eth0')).toBe(true);
+      expect(isAddressPrivate('[fe80::1%25eth0]')).toBe(true);
+      expect(isAddressPrivate('[::1%25lo]')).toBe(true);
+    });
+
     it('should identify special local addresses', () => {
       expect(isAddressPrivate('0.0.0.0')).toBe(true);
       expect(isAddressPrivate('::')).toBe(true);
@@ -269,6 +276,20 @@ describe('fetch utils', () => {
       await expect(
         fetchWithPrivateIpBlock('http://169.254.169.254/'),
       ).rejects.toThrow(PrivateIpError);
+
+      expect(undiciFetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject IPv6 zone identifier URL forms before calling undici fetch', async () => {
+      await expect(
+        fetchWithPrivateIpBlock('http://[fe80::1%25eth0]/'),
+      ).rejects.toThrow(TypeError);
+      await expect(
+        fetchWithPrivateIpBlock('http://[fe80::1%eth0]/'),
+      ).rejects.toThrow(TypeError);
+      await expect(
+        fetchWithPrivateIpBlock('http://[::1%25lo]/'),
+      ).rejects.toThrow(TypeError);
 
       expect(undiciFetch).not.toHaveBeenCalled();
     });
