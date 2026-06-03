@@ -7,7 +7,6 @@
 export interface ModelResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_5Flash?: boolean;
-  useGemini3_Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
