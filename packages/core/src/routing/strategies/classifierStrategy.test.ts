@@ -522,5 +522,27 @@ describe('ClassifierStrategy', () => {
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
     });
+
+    it('should route to gemini-3.5-flash when hasGemini35FlashGAAccess is true', async () => {
+      mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
+      vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+
+      const mockApiResponse = {
+        reasoning: 'Simple task',
+        model_choice: 'flash',
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe('gemini-3.5-flash');
+    });
   });
 });
