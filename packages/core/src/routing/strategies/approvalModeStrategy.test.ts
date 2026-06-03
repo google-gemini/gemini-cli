@@ -243,7 +243,7 @@ describe('ApprovalModeStrategy', () => {
     expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
-  it('should route to gemini-3.5-flash when hasGemini35FlashGAAccess is true and plan is approved', async () => {
+  it('should route to DEFAULT_GEMINI_FLASH_MODEL when hasGemini35FlashGAAccess is true and plan is approved', async () => {
     vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
     mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
 
@@ -258,6 +258,6 @@ describe('ApprovalModeStrategy', () => {
       mockBaseLlmClient,
     );
 
-    expect(decision?.model).toBe('gemini-3.5-flash');
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });

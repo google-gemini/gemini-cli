@@ -20,6 +20,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -895,7 +896,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     });
 
-    it('should route to gemini-3.5-flash when hasGemini35FlashGAAccess is true', async () => {
+    it('should route to DEFAULT_GEMINI_FLASH_MODEL when hasGemini35FlashGAAccess is true', async () => {
       mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
       vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
 
@@ -914,7 +915,7 @@ describe('NumericalClassifierStrategy', () => {
         mockLocalLiteRtLmClient,
       );
 
-      expect(decision?.model).toBe('gemini-3.5-flash');
+      expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
   });
 });
