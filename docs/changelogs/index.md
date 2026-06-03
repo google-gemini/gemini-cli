@@ -18,6 +18,24 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.45.0 - 2026-06-03
+
+- **Context Simplification:** Completed major architectural work to simplify the
+  `ContextManager`, improving system robustness and performance
+  ([#27345](https://github.com/google-gemini/gemini-cli/pull/27345) by
+  @joshualitt).
+- **A2A Usage Metadata:** Exposed critical usage metadata in the Agent-to-Agent
+  (A2A) protocol for better resource tracking
+  ([#27288](https://github.com/google-gemini/gemini-cli/pull/27288) by
+  @jvargassanchez-dot).
+- **Reliability Fixes:** Addressed Termux relaunch loops, PTY resize errors, and
+  forced sequential execution for topic updates
+  ([#27110](https://github.com/google-gemini/gemini-cli/pull/27110) by @saymanq,
+  [#27357](https://github.com/google-gemini/gemini-cli/pull/27357) by
+  @jvargassanchez-dot,
+  [#27461](https://github.com/google-gemini/gemini-cli/pull/27461) by
+  @scidomino).
+
 ## Announcements: v0.44.0 - 2026-05-27
 
 - **Unified Auto Mode:** Streamlined the automation experience by merging
