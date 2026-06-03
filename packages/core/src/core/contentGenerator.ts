@@ -28,6 +28,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { CachingContentGenerator } from './cachingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
@@ -281,15 +282,24 @@ export async function createContentGenerator(
       config.authType === AuthType.COMPUTE_ADC
     ) {
       const httpOptions = { headers: baseHeaders };
-      return new LoggingContentGenerator(
-        await createCodeAssistContentGenerator(
-          httpOptions,
-          config.authType,
-          gcConfig,
-          sessionId,
-        ),
+      let inner = await createCodeAssistContentGenerator(
+        httpOptions,
+        config.authType,
         gcConfig,
+        sessionId,
       );
+      if (gcConfig.promptReplayCacheEnabled) {
+        const cacheDir = gcConfig.storage.getProjectPromptCacheDirSafe();
+        if (cacheDir) {
+          inner = new CachingContentGenerator(
+            inner,
+            cacheDir,
+            gcConfig.promptReplayCacheTtl,
+            true,
+          );
+        }
+      }
+      return new LoggingContentGenerator(inner, gcConfig);
     }
 
     if (
@@ -375,7 +385,19 @@ export async function createContentGenerator(
           },
         }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      let models = googleGenAI.models;
+      if (gcConfig.promptReplayCacheEnabled) {
+        const cacheDir = gcConfig.storage.getProjectPromptCacheDirSafe();
+        if (cacheDir) {
+          models = new CachingContentGenerator(
+            models,
+            cacheDir,
+            gcConfig.promptReplayCacheTtl,
+            true,
+          );
+        }
+      }
+      return new LoggingContentGenerator(models, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
