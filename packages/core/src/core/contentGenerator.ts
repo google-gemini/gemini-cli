@@ -294,7 +294,7 @@ export async function createContentGenerator(
           inner = new CachingContentGenerator(
             inner,
             cacheDir,
-            gcConfig.promptReplayCacheTtl,
+            gcConfig.promptReplayCacheTtl * 1000,
             true,
           );
         }
@@ -385,19 +385,20 @@ export async function createContentGenerator(
           },
         }),
       });
-      let models = googleGenAI.models;
+      const models = googleGenAI.models;
+      let cachingGenerator: ContentGenerator = models;
       if (gcConfig.promptReplayCacheEnabled) {
         const cacheDir = gcConfig.storage.getProjectPromptCacheDirSafe();
         if (cacheDir) {
-          models = new CachingContentGenerator(
+          cachingGenerator = new CachingContentGenerator(
             models,
             cacheDir,
-            gcConfig.promptReplayCacheTtl,
+            gcConfig.promptReplayCacheTtl * 1000,
             true,
           );
         }
       }
-      return new LoggingContentGenerator(models, gcConfig);
+      return new LoggingContentGenerator(cachingGenerator, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

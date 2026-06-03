@@ -16,8 +16,9 @@ import type {
   EmbedContentParameters,
 } from '@google/genai';
 import type { ContentGenerator } from './contentGenerator.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import type { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface CacheEntry {
   key: string;
@@ -51,7 +52,7 @@ export class CachingContentGenerator implements ContentGenerator {
     return this.wrapped.userTierName;
   }
 
-  get paidTier(): UserTierId | undefined {
+  get paidTier(): GeminiUserTier | undefined {
     return this.wrapped.paidTier;
   }
 
@@ -73,7 +74,6 @@ export class CachingContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse[] | null> {
     try {
       const filePath = this.getCacheFilePath(key);
-      if (!fs.existsSync(filePath)) return null;
       const raw = await fs.promises.readFile(filePath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const entry = JSON.parse(raw) as CacheEntry;
@@ -120,8 +120,14 @@ export class CachingContentGenerator implements ContentGenerator {
     const key = this.buildCacheKey(req);
     const cached = await this.loadFromCache(key);
     if (cached && cached.length > 0) {
+      debugLogger.debug(
+        `[PromptCache] Cache HIT for model=${req.model} key=${key.slice(0, 12)}...`,
+      );
       return cached[0];
     }
+    debugLogger.debug(
+      `[PromptCache] Cache MISS for model=${req.model} key=${key.slice(0, 12)}...`,
+    );
     const response = await this.wrapped.generateContent(
       req,
       userPromptId,
@@ -142,8 +148,14 @@ export class CachingContentGenerator implements ContentGenerator {
     const key = this.buildCacheKey(req);
     const cached = await this.loadFromCache(key);
     if (cached) {
+      debugLogger.debug(
+        `[PromptCache] Cache HIT (stream) for model=${req.model} key=${key.slice(0, 12)}...`,
+      );
       return this.streamFromCache(cached);
     }
+    debugLogger.debug(
+      `[PromptCache] Cache MISS (stream) for model=${req.model} key=${key.slice(0, 12)}...`,
+    );
     const stream = await this.wrapped.generateContentStream(
       req,
       userPromptId,
@@ -166,13 +178,15 @@ export class CachingContentGenerator implements ContentGenerator {
     model: string,
   ): AsyncGenerator<GenerateContentResponse> {
     const collected: GenerateContentResponse[] = [];
+    let completed = false;
     try {
       for await (const chunk of stream) {
         collected.push(chunk);
         yield chunk;
       }
+      completed = true;
     } finally {
-      if (collected.length > 0) {
+      if (completed && collected.length > 0) {
         await this.saveToCache(key, model, collected);
       }
     }

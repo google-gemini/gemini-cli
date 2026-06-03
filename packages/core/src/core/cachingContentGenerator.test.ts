@@ -14,6 +14,7 @@ import type {
 } from '@google/genai';
 import { CachingContentGenerator } from './cachingContentGenerator.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 
 function createMockGenerator(): ContentGenerator {
   let callCount = 0;
@@ -59,7 +60,7 @@ describe('CachingContentGenerator', () => {
 
   const req: GenerateContentParameters = {
     model: 'gemini-2.0-flash',
-    contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+    contents: [{ role: LlmRole.MAIN, parts: [{ text: 'hello' }] }],
   };
 
   it('should return cached response on second call', async () => {
@@ -71,8 +72,8 @@ describe('CachingContentGenerator', () => {
       true,
     );
 
-    const r1 = await caching.generateContent(req, 'prompt1', 'user');
-    const r2 = await caching.generateContent(req, 'prompt2', 'user');
+    const r1 = await caching.generateContent(req, 'prompt1', LlmRole.MAIN);
+    const r2 = await caching.generateContent(req, 'prompt2', LlmRole.MAIN);
 
     expect(mockGen.generateContent).toHaveBeenCalledTimes(1);
     expect(r1).toEqual(r2);
@@ -87,8 +88,8 @@ describe('CachingContentGenerator', () => {
       false,
     );
 
-    await caching.generateContent(req, 'prompt1', 'user');
-    await caching.generateContent(req, 'prompt2', 'user');
+    await caching.generateContent(req, 'prompt1', LlmRole.MAIN);
+    await caching.generateContent(req, 'prompt2', LlmRole.MAIN);
 
     expect(mockGen.generateContent).toHaveBeenCalledTimes(2);
   });
@@ -102,13 +103,21 @@ describe('CachingContentGenerator', () => {
       true,
     );
 
-    const stream1 = await caching.generateContentStream(req, 'prompt1', 'user');
+    const stream1 = await caching.generateContentStream(
+      req,
+      'prompt1',
+      LlmRole.MAIN,
+    );
     const collected1: GenerateContentResponse[] = [];
     for await (const chunk of stream1) {
       collected1.push(chunk);
     }
 
-    const stream2 = await caching.generateContentStream(req, 'prompt2', 'user');
+    const stream2 = await caching.generateContentStream(
+      req,
+      'prompt2',
+      LlmRole.MAIN,
+    );
     const collected2: GenerateContentResponse[] = [];
     for await (const chunk of stream2) {
       collected2.push(chunk);
@@ -122,9 +131,9 @@ describe('CachingContentGenerator', () => {
     const mockGen = createMockGenerator();
     const caching = new CachingContentGenerator(mockGen, cacheDir, 1, true); // 1ms TTL
 
-    await caching.generateContent(req, 'prompt1', 'user');
+    await caching.generateContent(req, 'prompt1', LlmRole.MAIN);
     await new Promise((r) => setTimeout(r, 10));
-    await caching.generateContent(req, 'prompt2', 'user');
+    await caching.generateContent(req, 'prompt2', LlmRole.MAIN);
 
     expect(mockGen.generateContent).toHaveBeenCalledTimes(2);
   });
@@ -140,11 +149,11 @@ describe('CachingContentGenerator', () => {
 
     const req2: GenerateContentParameters = {
       model: 'gemini-2.0-flash',
-      contents: [{ role: 'user', parts: [{ text: 'world' }] }],
+      contents: [{ role: LlmRole.MAIN, parts: [{ text: 'world' }] }],
     };
 
-    await caching.generateContent(req, 'prompt1', 'user');
-    await caching.generateContent(req2, 'prompt2', 'user');
+    await caching.generateContent(req, 'prompt1', LlmRole.MAIN);
+    await caching.generateContent(req2, 'prompt2', LlmRole.MAIN);
 
     expect(mockGen.generateContent).toHaveBeenCalledTimes(2);
   });

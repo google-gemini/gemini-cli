@@ -110,6 +110,8 @@ export interface CliArgs {
   acceptRawOutputRisk: boolean | undefined;
   skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
+  promptReplayCache: boolean | undefined;
+  promptReplayCacheTtl: number | undefined;
 }
 
 /**
@@ -494,6 +496,17 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('prompt-replay-cache', {
+          type: 'boolean',
+          description:
+            'Enable caching of model responses for identical prompts to reduce latency and cost.',
+        })
+        .option('prompt-replay-cache-ttl', {
+          type: 'number',
+          nargs: 1,
+          description:
+            'Time-to-live for prompt replay cache entries in seconds (default: 3600).',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -1047,6 +1060,14 @@ export async function loadCliConfig(
     voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
+    promptReplayCache: {
+      enabled:
+        argv.promptReplayCache ??
+        settings.experimental?.promptReplayCache?.enabled,
+      ttl:
+        argv.promptReplayCacheTtl ??
+        settings.experimental?.promptReplayCache?.ttl,
+    },
     planSettings: settings.general?.plan?.directory
       ? settings.general.plan
       : (extensionPlanSettings ?? settings.general?.plan),
