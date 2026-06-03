@@ -63,6 +63,10 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 // 3_5 flash rollut can be cleaned up.
 export let DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash';
+// This is resolved to 3.5 flash in backends where it is used,
+// however those backends do not expect to see the string gemini-3.5-flash
+// so we need to provide this model as an alternative name in certain instances.
+export const SECONDARY_GEMINI_3_5_FLASH_MODEL = 'gemini-3-flash';
 
 // Used to set default flash models based on access
 // TODO: Cleanup once the experiment for 3_5 flash rollut can be cleaned up.
@@ -86,6 +90,7 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  SECONDARY_GEMINI_3_5_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 
   GEMMA_4_31B_IT_MODEL,
