@@ -20,7 +20,10 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  parseCommandDetails,
+} from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
   NoopSandboxManager,
@@ -42,6 +45,35 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
         return command.split('&&').map((c) => c.trim());
       }
       return [command];
+    }),
+    parseCommandDetails: vi.fn().mockImplementation((command: string) => {
+      // Basic mock implementation for PolicyEngine test needs
+      const commands = command.includes('&&')
+        ? command.split('&&').map((c) => c.trim())
+        : [command.trim()];
+
+      // Detect $(...) or `...` and add as sub-commands for recursion tests
+      const subCommands = [...commands];
+      for (const cmd of commands) {
+        const subMatch = cmd.match(/\$\((.*)\)/) || cmd.match(/`(.*)`/);
+        if (subMatch?.[1]) {
+          subCommands.push(subMatch[1].trim());
+        }
+      }
+
+      return {
+        details: subCommands.map((c, i) => ({
+          name: c.split(' ')[0],
+          text: c,
+          startIndex: i === 0 ? 0 : -1, // Simple root indication
+        })),
+        hasError: false,
+      };
+    }),
+    stripShellWrapper: vi.fn().mockImplementation((command: string) => {
+      // Simple mock for stripping wrappers
+      const match = command.match(/^(?:bash|sh|zsh)\s+-c\s+["'](.*)["']$/i);
+      return match ? match[1] : command;
     }),
     hasRedirection: vi.fn().mockImplementation(
       (command: string) =>
@@ -446,6 +478,77 @@ describe('PolicyEngine', () => {
 
       // Priority 20 (DENY) should win over priority 10 (ASK_USER)
       const { decision } = await engine.check({ name: 'test-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing fails for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return { details: [], hasError: true };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing has errors for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return {
+              details: [{ name: 'echo', text: 'echo bypass', startIndex: 0 }],
+              hasError: true,
+            };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
       expect(decision).toBe(PolicyDecision.DENY);
     });
   });
@@ -1762,6 +1865,63 @@ describe('PolicyEngine', () => {
   });
 
   describe('shell command parsing failure', () => {
+    it('should return ALLOW in YOLO mode for dangerous commands due to heuristics override', async () => {
+      // Create an engine with YOLO mode and a sandbox manager that flags a command as dangerous
+      const rules: PolicyRule[] = [
+        {
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      const mockSandboxManager = new NoopSandboxManager();
+      mockSandboxManager.isDangerousCommand = vi.fn().mockReturnValue(true);
+      mockSandboxManager.isKnownSafeCommand = vi.fn().mockReturnValue(false);
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'powershell echo "dangerous"' },
+        },
+        undefined,
+      );
+
+      // Even though the command is flagged as dangerous, YOLO mode should preserve the ALLOW decision
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT downgrade to ASK_USER for redirected commands in YOLO mode even without sandbox', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+      });
+
+      const command = 'npm test 2>&1 | tail -80';
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
@@ -1829,7 +1989,6 @@ describe('PolicyEngine', () => {
     });
 
     it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -1844,7 +2003,11 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         { name: 'run_shell_command', args: { command: 'complex command' } },
@@ -2927,12 +3090,6 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
-            toolName: 'save_memory',
-            decision: PolicyDecision.ASK_USER,
-            priority: 70,
-            modes: [ApprovalMode.PLAN],
-          },
-          {
             toolName: 'exit_plan_mode',
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2976,7 +3133,6 @@ describe('PolicyEngine', () => {
         'web_fetch',
         'write_todos',
         'memory',
-        'save_memory',
         'mcp_mcp-server_read_tool',
         'mcp_mcp-server_write_tool',
       ]);
@@ -3012,7 +3168,6 @@ describe('PolicyEngine', () => {
       expect(excluded.has('web_fetch')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
-      expect(excluded.has('save_memory')).toBe(false);
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
       expect(excluded.has('mcp_mcp-server_read_tool')).toBe(false);
     });

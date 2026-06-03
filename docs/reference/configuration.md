@@ -105,9 +105,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.preferredEditor`** (string):
-  - **Description:** The preferred editor to open files in.
+- **`general.preferredEditor`** (enum):
+  - **Description:** The preferred editor to open files in. Must be one of the
+    built-in supported identifiers. Use /editor in the CLI to pick
+    interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
+  - **Values:** `"vscode"`, `"vscodium"`, `"windsurf"`, `"cursor"`, `"zed"`,
+    `"antigravity"`, `"sublimetext"`, `"lapce"`, `"nova"`, `"bbedit"`, `"vim"`,
+    `"neovim"`, `"emacs"`, `"hx"`, `"emacsclient"`, `"micro"`
+
+- **`general.openEditorInNewWindow`** (boolean):
+  - **Description:** Open VS Code-family editors in a new window when editing
+    files.
+  - **Default:** `false`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
@@ -134,9 +144,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`general.enableNotifications`** (boolean):
-  - **Description:** Enable run-event notifications for action-required prompts
-    and session completion.
+  - **Description:** Enable terminal run-event notifications for action-required
+    prompts and session completion.
   - **Default:** `false`
+
+- **`general.notificationMethod`** (enum):
+  - **Description:** How to send terminal notifications.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"osc9"`, `"osc777"`, `"bell"`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -192,6 +207,16 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
+
+- **`general.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the Topic & Update communication model for reduced
+    chattiness and structured progress reporting.
+  - **Default:** `true`
+
+- **`general.logRagSnippets`** (boolean):
+  - **Description:** Log full Code Customization (RAG) retrieved snippets to a
+    local file for debugging.
+  - **Default:** `false`
 
 #### `output`
 
@@ -426,6 +451,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"ask"`
   - **Values:** `"ask"`, `"always"`, `"never"`
 
+- **`billing.vertexAi.requestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI
+    requests.
+  - **Default:** `undefined`
+  - **Values:** `"dedicated"`, `"shared"`
+  - **Requires restart:** Yes
+
+- **`billing.vertexAi.sharedRequestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Shared-Request-Type header for
+    Vertex AI requests.
+  - **Default:** `undefined`
+  - **Values:** `"priority"`, `"flex"`
+  - **Requires restart:** Yes
+
 #### `model`
 
 - **`model.name`** (string):
@@ -521,6 +560,24 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-flash-preview"
         }
       },
+      "gemini-3.1-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview"
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview-customtools"
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -539,6 +596,30 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash-lite"
         }
       },
+      "gemini-3.1-flash-lite": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite"
+        }
+      },
+      "gemini-3.5-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.5-flash"
+        }
+      },
+      "gemma-4-31b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-31b-it"
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-26b-a4b-it"
+        }
+      },
       "gemini-2.5-flash-base": {
         "extends": "base",
         "modelConfig": {
@@ -551,10 +632,16 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-flash-preview"
         }
       },
+      "gemini-3.5-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.5-flash"
+        }
+      },
       "classifier": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 1024,
             "thinkingConfig": {
@@ -566,7 +653,7 @@ their corresponding top-level category object in your `settings.json` file.
       "prompt-completion": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "temperature": 0.3,
             "maxOutputTokens": 16000,
@@ -579,7 +666,7 @@ their corresponding top-level category object in your `settings.json` file.
       "fast-ack-helper": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "temperature": 0.2,
             "maxOutputTokens": 120,
@@ -592,7 +679,7 @@ their corresponding top-level category object in your `settings.json` file.
       "edit-corrector": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "thinkingConfig": {
               "thinkingBudget": 0
@@ -603,7 +690,7 @@ their corresponding top-level category object in your `settings.json` file.
       "summarizer-default": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 2000
           }
@@ -612,7 +699,7 @@ their corresponding top-level category object in your `settings.json` file.
       "summarizer-shell": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "generateContentConfig": {
             "maxOutputTokens": 2000
           }
@@ -664,6 +751,19 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "gemini-3-flash-base",
         "modelConfig": {}
       },
+      "context-snapshotter": {
+        "extends": "gemini-3-flash-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            },
+            "temperature": 1,
+            "topP": 0.95,
+            "topK": 64
+          }
+        }
+      },
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
@@ -676,7 +776,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-3.1-flash-lite": {
         "modelConfig": {
-          "model": "gemini-3.1-flash-lite-preview"
+          "model": "gemini-3.1-flash-lite"
         }
       },
       "chat-compression-2.5-pro": {
@@ -730,10 +830,10 @@ their corresponding top-level category object in your `settings.json` file.
 
     ```json
     {
-      "gemini-3.1-flash-lite-preview": {
+      "gemini-3.1-flash-lite": {
         "tier": "flash-lite",
         "family": "gemini-3",
-        "isPreview": true,
+        "isPreview": false,
         "isVisible": true,
         "features": {
           "thinking": false,
@@ -774,6 +874,16 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "flash",
         "family": "gemini-3",
         "isPreview": true,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.5-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
         "isVisible": true,
         "features": {
           "thinking": false,
@@ -810,10 +920,33 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": false
         }
       },
+      "gemma-4-31b-it": {
+        "displayName": "gemma-4-31b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "displayName": "gemma-4-26b-a4b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
       "auto": {
+        "displayName": "Auto",
         "tier": "auto",
         "isPreview": true,
-        "isVisible": false,
+        "isVisible": true,
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -847,26 +980,16 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "auto-gemini-3": {
-        "displayName": "Auto (Gemini 3)",
         "tier": "auto",
+        "family": "gemini-3",
         "isPreview": true,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
-        "features": {
-          "thinking": true,
-          "multimodalToolUse": false
-        }
+        "isVisible": false
       },
       "auto-gemini-2.5": {
-        "displayName": "Auto (Gemini 2.5)",
         "tier": "auto",
+        "family": "gemini-2.5",
         "isPreview": false,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
-        "features": {
-          "thinking": false,
-          "multimodalToolUse": false
-        }
+        "isVisible": false
       }
     }
     ```
@@ -880,6 +1003,12 @@ their corresponding top-level category object in your `settings.json` file.
 
     ```json
     {
+      "gemma-4-31b-it": {
+        "default": "gemma-4-31b-it"
+      },
+      "gemma-4-26b-a4b-it": {
+        "default": "gemma-4-26b-a4b-it"
+      },
       "gemini-3.1-pro-preview": {
         "default": "gemini-3.1-pro-preview",
         "contexts": [
@@ -913,37 +1042,50 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "hasAccessToPreview": false
+              "hasAccessToPreview": false,
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
+          {
+            "condition": {
+              "hasAccessToPreview": false,
+              "useGemini3_5Flash": false
             },
             "target": "gemini-2.5-flash"
           }
         ]
       },
-      "gemini-3-pro-preview": {
-        "default": "gemini-3-pro-preview",
+      "gemini-3.5-flash": {
+        "default": "gemini-3.5-flash",
         "contexts": [
           {
             "condition": {
+              "useGemini3_5Flash": false,
               "hasAccessToPreview": false
             },
-            "target": "gemini-2.5-pro"
+            "target": "gemini-2.5-flash"
           },
           {
             "condition": {
-              "useGemini3_1": true,
-              "useCustomTools": true
+              "useGemini3_5Flash": false
             },
-            "target": "gemini-3.1-pro-preview-customtools"
-          },
-          {
-            "condition": {
-              "useGemini3_1": true
-            },
-            "target": "gemini-3.1-pro-preview"
+            "target": "gemini-3-flash-preview"
           }
         ]
       },
-      "auto-gemini-3": {
+      "gemini-2.5-flash": {
+        "default": "gemini-2.5-flash",
+        "contexts": [
+          {
+            "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          }
+        ]
+      },
+      "gemini-3-pro-preview": {
         "default": "gemini-3-pro-preview",
         "contexts": [
           {
@@ -1015,23 +1157,18 @@ their corresponding top-level category object in your `settings.json` file.
           }
         ]
       },
-      "auto-gemini-2.5": {
-        "default": "gemini-2.5-pro"
-      },
-      "gemini-3.1-flash-lite-preview": {
-        "default": "gemini-3.1-flash-lite-preview",
-        "contexts": [
-          {
-            "condition": {
-              "useGemini3_1FlashLite": false
-            },
-            "target": "gemini-2.5-flash-lite"
-          }
-        ]
+      "gemini-3.1-flash-lite": {
+        "default": "gemini-3.1-flash-lite"
       },
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
+          {
+            "condition": {
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
           {
             "condition": {
               "hasAccessToPreview": false
@@ -1041,15 +1178,34 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "flash-lite": {
-        "default": "gemini-2.5-flash-lite",
+        "default": "gemini-3.1-flash-lite"
+      },
+      "auto-gemini-3": {
+        "default": "gemini-3-pro-preview",
         "contexts": [
           {
             "condition": {
-              "useGemini3_1FlashLite": true
+              "hasAccessToPreview": false
             },
-            "target": "gemini-3.1-flash-lite-preview"
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
           }
         ]
+      },
+      "auto-gemini-2.5": {
+        "default": "gemini-2.5-pro"
       }
     }
     ```
@@ -1068,15 +1224,21 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "useGemini3_5Flash": true
+            },
+            "target": "gemini-3.5-flash"
+          },
+          {
+            "condition": {
+              "hasAccessToPreview": false
             },
             "target": "gemini-2.5-flash"
           },
           {
             "condition": {
-              "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
-            "target": "gemini-3-flash-preview"
+            "target": "gemini-2.5-flash"
           }
         ]
       },
@@ -1085,7 +1247,13 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
             "target": "gemini-2.5-pro"
           },
@@ -1135,6 +1303,42 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-3-flash-preview",
           "isLastResort": true,
+          "maxAttempts": 10,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "auto-preview": [
+        {
+          "model": "gemini-3-pro-preview",
+          "maxAttempts": 3,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "silent",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "sticky_retry",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-3-flash-preview",
+          "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1160,7 +1364,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1168,6 +1372,42 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-2.5-flash",
           "isLastResort": true,
+          "maxAttempts": 10,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "auto-default": [
+        {
+          "model": "gemini-2.5-pro",
+          "maxAttempts": 3,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "silent",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "sticky_retry",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1184,7 +1424,7 @@ their corresponding top-level category object in your `settings.json` file.
       ],
       "lite": [
         {
-          "model": "gemini-2.5-flash-lite",
+          "model": "flash-lite",
           "actions": {
             "terminal": "silent",
             "transient": "silent",
@@ -1349,6 +1589,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.enableFileWatcher`** (boolean):
+  - **Description:** Enable file watcher updates for @ file suggestions
+    (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.
@@ -1434,6 +1680,12 @@ their corresponding top-level category object in your `settings.json` file.
     trusted commands (for example ["run_shell_command(git)",
     "run_shell_command(npm test)"]). See shell tool command restrictions for
     matching details.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`tools.confirmationRequired`** (array):
+  - **Description:** Tool names that always require user confirmation. Takes
+    precedence over allowed tools and core tool allowlists.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1604,11 +1856,50 @@ their corresponding top-level category object in your `settings.json` file.
     ["DEBUG", "DEBUG_MODE"]
     ```
 
+- **`advanced.ignoreLocalEnv`** (boolean):
+  - **Description:** Whether to ignore generic .env files in the project
+    directory.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.gemma`** (boolean):
+  - **Description:** Enable access to Gemma 4 models via Gemini API.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.voiceMode`** (boolean):
+  - **Description:** Enable experimental voice dictation and commands (/voice,
+    /voice model).
+  - **Default:** `false`
+
+- **`experimental.voice.activationMode`** (enum):
+  - **Description:** How to trigger voice recording with the Space key.
+  - **Default:** `"push-to-talk"`
+  - **Values:** `"push-to-talk"`, `"toggle"`
+
+- **`experimental.voice.backend`** (enum):
+  - **Description:** The backend to use for voice transcription. Note: When
+    using the Gemini Live backend, voice recordings are sent to Google Cloud for
+    transcription.
+  - **Default:** `"gemini-live"`
+  - **Values:** `"gemini-live"`, `"whisper"`
+
+- **`experimental.voice.whisperModel`** (enum):
+  - **Description:** The Whisper model to use for local transcription.
+  - **Default:** `"ggml-base.en.bin"`
+  - **Values:** `"ggml-tiny.en.bin"`, `"ggml-base.en.bin"`,
+    `"ggml-large-v3-turbo-q5_0.bin"`, `"ggml-large-v3-turbo-q8_0.bin"`
+
+- **`experimental.voice.stopGracePeriodMs`** (number):
+  - **Description:** How long to wait for final transcription after stopping
+    recording.
+  - **Default:** `4000`
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
@@ -1618,6 +1909,12 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
   - **Description:** Enable the agent session implementation for the interactive
     CLI.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.adk.agentSessionSubagentEnabled`** (boolean):
+  - **Description:** Route subagent invocations through the AgentSession
+    protocol instead of legacy executors.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1654,11 +1951,6 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1701,6 +1993,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
+  - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
+    starts and the Gemma router is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.binaryPath`** (string):
+  - **Description:** Custom path to the LiteRT-LM binary. Leave empty to use the
+    default location (~/.gemini/bin/litert/).
+  - **Default:** `""`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.classifier.host`** (string):
   - **Description:** The host of the classifier.
   - **Default:** `"http://localhost:9379"`
@@ -1712,15 +2016,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
-- **`experimental.memoryManager`** (boolean):
-  - **Description:** Replace the built-in save_memory tool with a memory manager
-    subagent that supports adding, removing, de-duplicating, and organizing
-    memories.
+- **`experimental.stressTestProfile`** (boolean):
+  - **Description:** Significantly lowers token limits to force early garbage
+    collection and distillation for testing purposes.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.autoMemory`** (boolean):
+  - **Description:** Automatically extract memory patches and skills from past
+    sessions in the background. Every change is written as a unified diff
+    `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review
+    in /memory inbox; nothing is applied until you approve it.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.generalistProfile`** (boolean):
   - **Description:** Suitable for general coding and software development tasks.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.powerUserProfile`** (boolean):
+  - **Description:** Less cache friendly version of the generalist profile.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1730,8 +2046,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.topicUpdateNarration`** (boolean):
-  - **Description:** Enable the experimental Topic & Update communication model
-    for reduced chattiness and structured progress reporting.
+  - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
 #### `skills`
@@ -1971,6 +2286,8 @@ see [Telemetry](../cli/telemetry.md).
 
 - **Properties:**
   - **`enabled`** (boolean): Whether or not telemetry is enabled.
+  - **`traces`** (boolean): Whether detailed traces with large attributes (like
+    tool outputs and file reads) are captured. Defaults to `false`.
   - **`target`** (string): The destination for collected telemetry. Supported
     values are `local` and `gcp`.
   - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
@@ -2070,7 +2387,7 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](../get-started/authentication.md) which covers
+[Authentication documentation](../get-started/authentication.mdx) which covers
 all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
@@ -2091,7 +2408,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
   - One of several available
-    [authentication methods](../get-started/authentication.md).
+    [authentication methods](../get-started/authentication.mdx).
   - Set this in your shell profile (for example, `~/.bashrc`, `~/.zshrc`) or an
     `.env` file.
 - **`GEMINI_MODEL`**:
@@ -2099,6 +2416,14 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
     `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_TRUST_WORKSPACE`**:
+  - If set to `"true"`, trusts the current workspace for the duration of the
+    session, bypassing the folder trust check.
+  - Useful for headless environments (for example, CI/CD pipelines).
+- **`GEMINI_CLI_TRUSTED_FOLDERS_PATH`**:
+  - Overrides the default location for the `trustedFolders.json` file.
+  - Useful if you want to store this configuration in a custom location instead
+    of the default `~/.gemini/`.
 - **`GEMINI_CLI_IDE_PID`**:
   - Manually specifies the PID of the IDE process to use for integration. This
     is useful when running Gemini CLI in a standalone terminal while still
@@ -2148,6 +2473,21 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - When set, overrides the default API version used by the SDK.
   - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
     `$env:GOOGLE_GENAI_API_VERSION="v1"`)
+- **`GOOGLE_GEMINI_BASE_URL`**:
+  - Overrides the default base URL for Gemini API requests (when using
+    `gemini-api-key` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"` (Windows
+    PowerShell: `$env:GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"`)
+- **`GOOGLE_VERTEX_BASE_URL`**:
+  - Overrides the default base URL for Vertex AI API requests (when using
+    `vertex-ai` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`
+    (Windows PowerShell:
+    `$env:GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`)
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
@@ -2156,6 +2496,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Set to `true` or `1` to enable telemetry. Any other value is treated as
     disabling it.
   - Overrides the `telemetry.enabled` setting.
+- **`GEMINI_TELEMETRY_TRACES_ENABLED`**:
+  - Set to `true` or `1` to enable detailed tracing with large attributes. Any
+    other value is treated as disabling it.
+  - Overrides the `telemetry.traces` setting.
 - **`GEMINI_TELEMETRY_TARGET`**:
   - Sets the telemetry target (`local` or `gcp`).
   - Overrides the `telemetry.target` setting.
@@ -2341,7 +2685,6 @@ for that specific session.
   - **Note:** For structured output and scripting, use the
     `--output-format json` or `--output-format stream-json` flag.
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
-  - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
@@ -2508,6 +2851,10 @@ sandbox image:
 ```bash
 BUILD_SANDBOX=1 gemini -s
 ```
+
+Building a custom sandbox with `BUILD_SANDBOX` is only supported when running
+Gemini CLI from source. If you installed the CLI with npm, build the Docker
+image separately and reference that image in your sandbox configuration.
 
 ## Usage statistics
 

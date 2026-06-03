@@ -25,6 +25,19 @@ export interface TokensSummary {
   total: number; // totalTokenCount
 }
 
+export type MemoryValidationStatus = 'passed' | 'failed' | 'unknown';
+
+/**
+ * Lightweight workflow metadata attached to a session for memory extraction.
+ */
+export interface MemoryScratchpad {
+  version: 1;
+  workflowSummary?: string;
+  toolSequence?: string[];
+  touchedPaths?: string[];
+  validationStatus?: MemoryValidationStatus;
+}
+
 /**
  * Base fields common to all messages.
  */
@@ -45,6 +58,7 @@ export interface ToolCallRecord {
   result?: PartListUnion | null;
   status: Status;
   timestamp: string;
+  agentId?: string;
   // UI-specific fields for display purposes
   displayName?: string;
   description?: string;
@@ -82,6 +96,7 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
   /** Workspace directories added during the session via /dir add */
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
@@ -119,6 +134,7 @@ export interface PartialMetadataRecord {
   startTime?: string;
   lastUpdated?: string;
   summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
   directories?: string[];
   kind?: 'main' | 'subagent';
 }

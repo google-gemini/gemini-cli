@@ -242,12 +242,15 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       'context-used': (
         <Text color={getColor('context-used', itemColor)}>85% used</Text>
       ),
-      quota: <Text color={getColor('quota', itemColor)}>97%</Text>,
+      quota: <Text color={getColor('quota', itemColor)}>42% used</Text>,
       'memory-usage': (
         <Text color={getColor('memory-usage', itemColor)}>260 MB</Text>
       ),
       'session-id': (
         <Text color={getColor('session-id', itemColor)}>769992f9</Text>
+      ),
+      hostname: (
+        <Text color={getColor('hostname', itemColor)}>dev-machine</Text>
       ),
       'code-changes': (
         <Box flexDirection="row">

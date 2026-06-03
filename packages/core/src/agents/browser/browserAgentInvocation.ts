@@ -22,7 +22,7 @@ import { LocalAgentExecutor } from '../local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import {
@@ -32,6 +32,7 @@ import {
   type SubagentActivityItem,
   AgentTerminateMode,
   isToolActivityError,
+  SubagentState,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
@@ -107,10 +108,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    * 3. Runs the agent via LocalAgentExecutor
    * 4. Cleans up browser resources
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
@@ -125,7 +124,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
           isSubagentProgress: true,
           agentName: this.agentName,
           recentActivity: [],
-          state: 'running',
+          state: SubagentState.RUNNING,
         };
         updateOutput(initialProgress);
       }
@@ -139,7 +138,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               id: randomUUID(),
               type: 'thought',
               content: sanitizedMsg,
-              status: 'completed',
+              status: SubagentState.COMPLETED,
             });
             if (recentActivity.length > MAX_RECENT_ACTIVITY) {
               recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
@@ -148,7 +147,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               isSubagentProgress: true,
               agentName: this.agentName,
               recentActivity: [...recentActivity],
-              state: 'running',
+              state: SubagentState.RUNNING,
             } as SubagentProgress);
           }
         : undefined;
@@ -177,7 +176,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             if (
               lastItem &&
               lastItem.type === 'thought' &&
-              lastItem.status === 'running'
+              lastItem.status === SubagentState.RUNNING
             ) {
               lastItem.content = sanitizeThoughtContent(text);
             } else {
@@ -185,7 +184,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 id: randomUUID(),
                 type: 'thought',
                 content: sanitizeThoughtContent(text),
-                status: 'running',
+                status: SubagentState.RUNNING,
               });
             }
             updated = true;
@@ -212,7 +211,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               displayName,
               description,
               args,
-              status: 'running',
+              status: SubagentState.RUNNING,
             });
             updated = true;
             break;
@@ -229,9 +228,11 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 recentActivity[i].type === 'tool_call' &&
                 callId != null &&
                 recentActivity[i].id === callId &&
-                recentActivity[i].status === 'running'
+                recentActivity[i].status === SubagentState.RUNNING
               ) {
-                recentActivity[i].status = isError ? 'error' : 'completed';
+                recentActivity[i].status = isError
+                  ? SubagentState.ERROR
+                  : SubagentState.COMPLETED;
                 updated = true;
                 break;
               }
@@ -244,7 +245,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const callId = activity.data['callId']
               ? String(activity.data['callId'])
               : undefined;
-            const newStatus = isCancellation ? 'cancelled' : 'error';
+            const newStatus = isCancellation
+              ? SubagentState.CANCELLED
+              : SubagentState.ERROR;
 
             if (callId) {
               // Mark the specific tool as error/cancelled
@@ -252,7 +255,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 if (
                   recentActivity[i].type === 'tool_call' &&
                   recentActivity[i].id === callId &&
-                  recentActivity[i].status === 'running'
+                  recentActivity[i].status === SubagentState.RUNNING
                 ) {
                   recentActivity[i].status = newStatus;
                   updated = true;
@@ -262,7 +265,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             } else {
               // No specific tool — mark ALL running tool_call items
               for (const item of recentActivity) {
-                if (item.type === 'tool_call' && item.status === 'running') {
+                if (
+                  item.type === 'tool_call' &&
+                  item.status === SubagentState.RUNNING
+                ) {
                   item.status = newStatus;
                   updated = true;
                 }
@@ -295,7 +301,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             isSubagentProgress: true,
             agentName: this.agentName,
             recentActivity: [...recentActivity],
-            state: 'running',
+            state: SubagentState.RUNNING,
           };
           updateOutput(progress);
         }
@@ -332,13 +338,13 @@ ${output.result}`;
       // GOAL = agent completed its task normally.
       // ABORTED = user cancelled.
       // Others (ERROR, MAX_TURNS, ERROR_NO_COMPLETE_TASK_CALL) = error.
-      let progressState: SubagentProgress['state'];
+      let progressState: SubagentState;
       if (output.terminate_reason === AgentTerminateMode.ABORTED) {
-        progressState = 'cancelled';
+        progressState = SubagentState.CANCELLED;
       } else if (output.terminate_reason === AgentTerminateMode.GOAL) {
-        progressState = 'completed';
+        progressState = SubagentState.COMPLETED;
       } else {
-        progressState = 'error';
+        progressState = SubagentState.ERROR;
       }
 
       const progress: SubagentProgress = {
@@ -368,8 +374,8 @@ ${output.result}`;
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
-        if (item.status === 'running') {
-          item.status = isAbort ? 'cancelled' : 'error';
+        if (item.status === SubagentState.RUNNING) {
+          item.status = isAbort ? SubagentState.CANCELLED : SubagentState.ERROR;
         }
       }
 
@@ -377,7 +383,7 @@ ${output.result}`;
         isSubagentProgress: true,
         agentName: this.agentName,
         recentActivity: [...recentActivity],
-        state: isAbort ? 'cancelled' : 'error',
+        state: isAbort ? SubagentState.CANCELLED : SubagentState.ERROR,
       };
 
       if (updateOutput) {

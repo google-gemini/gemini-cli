@@ -63,7 +63,9 @@ describe('CompleteTaskTool', () => {
 
     it('should execute and return correct data', async () => {
       const invocation = tool.build({ result: 'Success message' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.data).toEqual({
         taskCompleted: true,
@@ -133,7 +135,9 @@ describe('CompleteTaskTool', () => {
     it('should execute and return structured data', async () => {
       const outputValue = { report: 'Final findings', score: 42 };
       const invocation = tool.build({ my_output: outputValue });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.data?.['taskCompleted']).toBe(true);
       expect(result.data?.['submittedOutput']).toBe(
@@ -152,7 +156,9 @@ describe('CompleteTaskTool', () => {
 
       const outputValue = { report: 'Final findings', score: 42 };
       const invocation = toolWithProcess.build({ my_output: outputValue });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.data?.['submittedOutput']).toBe('Score was 42');
     });

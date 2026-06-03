@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Kind } from '../tools/tools.js';
 
 export type WithMeta = { _meta?: Record<string, unknown> };
@@ -106,7 +107,7 @@ export interface AgentEvents {
   /** Updates configuration about the current session/agent. */
   session_update: SessionUpdate;
   /** Message content provided by user, agent, or developer. */
-  message: Message;
+  message: AgentMessage;
   /** Event indicating the start of agent activity on a stream. */
   agent_start: AgentStart;
   /** Event indicating the end of agent activity on a stream. */
@@ -170,9 +171,60 @@ export type ContentPart =
   ) &
     WithMeta;
 
-export interface Message {
+export interface AgentMessage {
   role: 'user' | 'agent' | 'developer';
   content: ContentPart[];
+}
+
+export type DisplayText = { type: 'text'; text: string };
+export type DisplayDiff = {
+  type: 'diff';
+  path?: string;
+  beforeText: string;
+  afterText: string;
+};
+export type DisplayTerminal = {
+  type: 'terminal';
+  pid?: string;
+  exitCode?: number;
+  ansi?: AnsiOutput;
+};
+export type DisplayAgent = {
+  type: 'agent';
+  threadId: string;
+};
+
+export type DisplayContent =
+  | DisplayText
+  | DisplayDiff
+  | DisplayTerminal
+  | DisplayAgent;
+
+export type ToolDisplayFormat =
+  /**
+   * Displays as compact when user has enabled compact tools, box otherwise.
+   * This is the default format if none is selected.
+   **/
+  | 'auto'
+  /** Always display this tool in compact format. */
+  | 'compact'
+  /** Always display this tool in full box format. */
+  | 'box'
+  /** Hide this tool from the event history. */
+  | 'hidden'
+  /** Display this tool as a message-like notice. */
+  | 'notice';
+
+export interface ToolDisplay {
+  /** A display name for the tool. */
+  name?: string;
+  /** A short description of what the tool is doing. */
+  description?: string;
+  /** A short, one-line summary of the tool's results. */
+  resultSummary?: string | null;
+  result?: DisplayContent | null;
+  /** A tool may specify its preferred display format. */
+  format?: ToolDisplayFormat;
 }
 
 export interface ToolRequest {
@@ -181,6 +233,8 @@ export interface ToolRequest {
   /** The name of the tool being requested. */
   name: string;
   /** The arguments for the tool. */
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   args: Record<string, unknown>;
   /** UI specific metadata */
   _meta?: {
@@ -201,7 +255,8 @@ export interface ToolRequest {
  */
 export interface ToolUpdate {
   requestId: string;
-  displayContent?: ContentPart[];
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   content?: ContentPart[];
   data?: Record<string, unknown>;
   /** UI specific metadata */
@@ -221,8 +276,8 @@ export interface ToolUpdate {
 export interface ToolResponse {
   requestId: string;
   name: string;
-  /** Content representing the tool call's outcome to be presented to the user. */
-  displayContent?: ContentPart[];
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   /** Multi-part content to be sent to the model. */
   content?: ContentPart[];
   /** Structured data to be sent to the model. */

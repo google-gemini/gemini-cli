@@ -11,15 +11,18 @@ import {
   type ToolResult,
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { LocalSessionInvocation } from './local-session-invocation.js';
+import { RemoteSessionInvocation } from './remote-session-invocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
+import type { AgentEvent } from '../agent/types.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -46,6 +49,7 @@ export class AgentTool extends BaseDeclarativeTool<
   constructor(
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       AGENT_TOOL_NAME,
@@ -100,6 +104,7 @@ export class AgentTool extends BaseDeclarativeTool<
       this.context,
       _toolName,
       _toolDisplayName,
+      this.onAgentEvent,
     );
   }
 
@@ -133,6 +138,7 @@ class DelegateInvocation extends BaseToolInvocation<
     private readonly context: AgentLoopContext,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       params,
@@ -160,7 +166,21 @@ class DelegateInvocation extends BaseToolInvocation<
       );
     }
 
+    const useSession = this.context.config.isAgentSessionSubagentEnabled();
+    const options = this.onAgentEvent
+      ? { onAgentEvent: this.onAgentEvent }
+      : undefined;
+
     if (this.definition.kind === 'remote') {
+      if (useSession) {
+        return new RemoteSessionInvocation(
+          this.definition,
+          this.context,
+          agentArgs,
+          this.messageBus,
+          options,
+        );
+      }
       return new RemoteAgentInvocation(
         this.definition,
         this.context,
@@ -168,6 +188,15 @@ class DelegateInvocation extends BaseToolInvocation<
         this.messageBus,
       );
     } else {
+      if (useSession) {
+        return new LocalSessionInvocation(
+          this.definition,
+          this.context,
+          agentArgs,
+          this.messageBus,
+          options,
+        );
+      }
       return new LocalSubagentInvocation(
         this.definition,
         this.context,
@@ -185,10 +214,8 @@ class DelegateInvocation extends BaseToolInvocation<
     return invocation.shouldConfirmExecute(abortSignal);
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const hintedParams = this.withUserHints(this.mappedInputs);
     const invocation = this.buildChildInvocation(hintedParams);
 
@@ -196,6 +223,7 @@ class DelegateInvocation extends BaseToolInvocation<
       {
         operation: GeminiCliOperation.AgentCall,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.context.config.getTelemetryTracesEnabled(),
         sessionId: this.context.config.getSessionId(),
         attributes: {
           [GEN_AI_AGENT_NAME]: this.definition.name,
@@ -204,7 +232,10 @@ class DelegateInvocation extends BaseToolInvocation<
       },
       async ({ metadata }) => {
         metadata.input = this.params;
-        const result = await invocation.execute(signal, updateOutput);
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
         metadata.output = result;
         return result;
       },

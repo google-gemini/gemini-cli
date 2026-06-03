@@ -34,8 +34,8 @@ export const ALL_ITEMS = [
   },
   {
     id: 'quota',
-    header: '/stats',
-    description: 'Remaining usage on daily limit (not shown when unavailable)',
+    header: 'quota',
+    description: 'Percentage of daily limit used (not shown when unavailable)',
   },
   {
     id: 'memory-usage',
@@ -46,6 +46,11 @@ export const ALL_ITEMS = [
     id: 'session-id',
     header: 'session',
     description: 'Unique identifier for the current session',
+  },
+  {
+    id: 'hostname',
+    header: 'machine',
+    description: 'Current machine hostname',
   },
   {
     id: 'auth',
@@ -75,6 +80,7 @@ export const DEFAULT_ORDER = [
   'quota',
   'memory-usage',
   'session-id',
+  'hostname',
   'auth',
   'code-changes',
   'token-count',

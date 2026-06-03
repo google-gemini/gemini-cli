@@ -70,7 +70,7 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     debugLogger.debug(`Loading ignore patterns from: ${patternsFilePath}`);
 
     return (content ?? '')
-      .split('\n')
+      .split(/\r\n|\n|\r/)
       .map((p) => p.trim())
       .filter((p) => p !== '' && !p.startsWith('#'));
   }
@@ -105,7 +105,10 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       .slice()
       .reverse()
       .map((fileName) => path.join(this.projectRoot, fileName))
-      .filter((filePath) => fs.existsSync(filePath));
+      .filter(
+        (filePath) =>
+          fs.statSync(filePath, { throwIfNoEntry: false })?.isFile() ?? false,
+      );
   }
 
   /**

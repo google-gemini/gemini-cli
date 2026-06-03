@@ -13,6 +13,8 @@ import {
   type EmbedContentResponse,
   type EmbedContentParameters,
 } from '@google/genai';
+import { HttpProxyAgent } from 'http-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import * as os from 'node:os';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { isCloudShell } from '../ide/detect-ide.js';
@@ -80,6 +82,9 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
     return AuthType.USE_VERTEX_AI;
   }
+  if (process.env['GOOGLE_GEMINI_BASE_URL']) {
+    return AuthType.GATEWAY;
+  }
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
   }
@@ -99,7 +104,28 @@ export type ContentGeneratorConfig = {
   proxy?: string;
   baseUrl?: string;
   customHeaders?: Record<string, string>;
+  vertexAiRouting?: VertexAiRoutingConfig;
 };
+
+export type VertexAiRequestType = 'dedicated' | 'shared';
+export type VertexAiSharedRequestType = 'priority' | 'flex';
+
+export interface VertexAiRoutingConfig {
+  requestType?: VertexAiRequestType;
+  sharedRequestType?: VertexAiSharedRequestType;
+}
+
+const VERTEX_AI_REQUEST_TYPE_HEADER = 'X-Vertex-AI-LLM-Request-Type';
+const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
+  'X-Vertex-AI-LLM-Shared-Request-Type';
+
+function validateBaseUrl(baseUrl: string): void {
+  try {
+    new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+}
 
 export async function createContentGeneratorConfig(
   config: Config,
@@ -107,7 +133,26 @@ export async function createContentGeneratorConfig(
   apiKey?: string,
   baseUrl?: string,
   customHeaders?: Record<string, string>,
+  vertexAiRouting?: VertexAiRoutingConfig,
 ): Promise<ContentGeneratorConfig> {
+  const contentGeneratorConfig: ContentGeneratorConfig = {
+    authType,
+    proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
+    vertexAiRouting,
+  };
+
+  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now.
+  // Return before touching the API-key keychain: on Linux without a Secret Service
+  // (WSL/SSH/Docker/CI) keytar can block indefinitely on its functional probe.
+  if (
+    authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.COMPUTE_ADC
+  ) {
+    return contentGeneratorConfig;
+  }
+
   const geminiApiKey =
     apiKey ||
     process.env['GEMINI_API_KEY'] ||
@@ -119,21 +164,6 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
-
-  const contentGeneratorConfig: ContentGeneratorConfig = {
-    authType,
-    proxy: config?.getProxy(),
-    baseUrl,
-    customHeaders,
-  };
-
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
-  if (
-    authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.COMPUTE_ADC
-  ) {
-    return contentGeneratorConfig;
-  }
 
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
@@ -153,7 +183,8 @@ export async function createContentGeneratorConfig(
   }
 
   if (authType === AuthType.GATEWAY) {
-    contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
+    contentGeneratorConfig.apiKey =
+      apiKey || process.env['GEMINI_API_KEY'] || '';
     contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
@@ -168,6 +199,13 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
+    if (gcConfig.fakeResponsesNonStrict) {
+      const fakeGenerator = await FakeContentGenerator.fromFile(
+        gcConfig.fakeResponsesNonStrict,
+        { nonStrict: true },
+      );
+      return new LoggingContentGenerator(fakeGenerator, gcConfig);
+    }
     if (gcConfig.fakeResponses) {
       const fakeGenerator = await FakeContentGenerator.fromFile(
         gcConfig.fakeResponses,
@@ -180,12 +218,10 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
         config.authType === AuthType.USE_VERTEX_AI ||
         ((await gcConfig.getGemini31Launched?.()) ?? false),
-      config.authType === AuthType.USE_GEMINI ||
-        config.authType === AuthType.USE_VERTEX_AI ||
-        ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false),
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
+      gcConfig.hasGemini35FlashGAAccess?.() ?? false,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
@@ -265,6 +301,21 @@ export async function createContentGenerator(
       if (config.customHeaders) {
         headers = { ...headers, ...config.customHeaders };
       }
+      if (
+        config.authType === AuthType.USE_VERTEX_AI &&
+        config.vertexAiRouting
+      ) {
+        const { requestType, sharedRequestType } = config.vertexAiRouting;
+        headers = {
+          ...headers,
+          ...(requestType
+            ? { [VERTEX_AI_REQUEST_TYPE_HEADER]: requestType }
+            : {}),
+          ...(sharedRequestType
+            ? { [VERTEX_AI_SHARED_REQUEST_TYPE_HEADER]: sharedRequestType }
+            : {}),
+        };
+      }
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
@@ -273,20 +324,56 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
+      if (config.authType === AuthType.GATEWAY && config.apiKey === '') {
+        headers['x-goog-api-key'] = '';
+      }
+      let baseUrl = config.baseUrl;
+      if (!baseUrl) {
+        const envBaseUrl =
+          config.authType === AuthType.USE_VERTEX_AI
+            ? process.env['GOOGLE_VERTEX_BASE_URL']
+            : process.env['GOOGLE_GEMINI_BASE_URL'];
+        if (envBaseUrl) {
+          validateBaseUrl(envBaseUrl);
+          baseUrl = envBaseUrl;
+        }
+      } else {
+        validateBaseUrl(baseUrl);
+      }
+
       const httpOptions: {
         baseUrl?: string;
         headers: Record<string, string>;
       } = { headers };
 
-      if (config.baseUrl) {
-        httpOptions.baseUrl = config.baseUrl;
+      if (baseUrl) {
+        httpOptions.baseUrl = baseUrl;
       }
 
+      const proxyUrl = config.proxy?.trim();
+      const proxyAgent = proxyUrl
+        ? baseUrl?.startsWith('http://')
+          ? new HttpProxyAgent(proxyUrl)
+          : new HttpsProxyAgent(proxyUrl)
+        : undefined;
+
       const googleGenAI = new GoogleGenAI({
-        apiKey: config.apiKey === '' ? undefined : config.apiKey,
-        vertexai: config.vertexai,
+        apiKey:
+          config.authType === AuthType.GATEWAY
+            ? config.apiKey
+            : config.apiKey === ''
+              ? undefined
+              : config.apiKey,
+        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
+        ...(proxyAgent && {
+          googleAuthOptions: {
+            clientOptions: {
+              transporterOptions: { agent: proxyAgent },
+            },
+          },
+        }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }

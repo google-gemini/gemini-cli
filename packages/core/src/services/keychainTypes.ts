@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 /**
  * Interface for OS-level secure storage operations.
- * Note: Method names must match the underlying library (e.g. keytar)
+ * Note: Method names must match the underlying library (e.g. @github/keytar)
  * to support correct dynamic loading and schema validation.
  */
 export interface Keychain {
