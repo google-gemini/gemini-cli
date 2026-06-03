@@ -119,6 +119,38 @@ describe('Trust Utility (Core)', () => {
     expect(savedContent[finalKey]).toBe(TrustLevel.TRUST_FOLDER);
   });
 
+  it('should load list format config from file', () => {
+    const paths = [
+      path.resolve('/trusted/path'),
+      path.resolve('/another/trusted'),
+    ];
+    fs.writeFileSync(trustedFoldersPath, JSON.stringify(paths));
+
+    const folders = loadTrustedFolders();
+    const isWindows = process.platform === 'win32';
+
+    for (const p of paths) {
+      const normalizedKey = p.replace(/\\/g, '/');
+      const finalKey = isWindows ? normalizedKey.toLowerCase() : normalizedKey;
+      expect(folders.user.config[finalKey]).toBe(TrustLevel.TRUST_FOLDER);
+    }
+    expect(folders.errors).toEqual([]);
+  });
+
+  it('should report errors for invalid entries in list format', () => {
+    const content = JSON.stringify(['/valid/path', 123, '', null]);
+    fs.writeFileSync(trustedFoldersPath, content);
+
+    const folders = loadTrustedFolders();
+    expect(folders.errors.length).toBeGreaterThan(0);
+    // Valid path should still be loaded
+    expect(
+      Object.values(folders.user.config).some(
+        (v) => v === TrustLevel.TRUST_FOLDER,
+      ),
+    ).toBe(true);
+  });
+
   it('should handle comments in JSON', () => {
     const content = `
     {
