@@ -69,6 +69,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -4344,5 +4345,36 @@ describe('ADKSettings', () => {
     };
     const config = new Config(params);
     expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
+  });
+});
+
+describe('hasGemini35FlashGAAccess model setting', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true', () => {
+    const config = new Config(baseParams);
+
+    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+          boolValue: true,
+        },
+      },
+    });
+
+    // Call the method
+    const result = config.hasGemini35FlashGAAccess();
+    expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
   });
 });
