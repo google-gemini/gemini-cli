@@ -134,10 +134,8 @@ export async function installSkill(
     // Quick security check to prevent directory traversal out of temp dir when cloning
     if (tempDirToClean) {
       const resolvedTemp = path.resolve(tempDirToClean);
-      if (
-        sourcePath !== resolvedTemp &&
-        !sourcePath.startsWith(resolvedTemp + path.sep)
-      ) {
+      const relative = path.relative(resolvedTemp, sourcePath);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
         throw new Error('Invalid path: Directory traversal not allowed.');
       }
     }
@@ -172,7 +170,12 @@ export async function installSkill(
       const skillDir = path.dirname(skill.location);
       const destPath = path.resolve(resolvedTarget, skillName);
 
-      if (!destPath.startsWith(resolvedTarget + path.sep)) {
+      const relative = path.relative(resolvedTarget, destPath);
+      if (
+        relative.startsWith('..') ||
+        path.isAbsolute(relative) ||
+        relative === ''
+      ) {
         throw new Error('Invalid skill name: Path traversal detected.');
       }
 
@@ -249,7 +252,12 @@ export async function linkSkill(
     const skillSourceDir = path.dirname(skill.location);
     const destPath = path.resolve(resolvedTarget, skillName);
 
-    if (!destPath.startsWith(resolvedTarget + path.sep)) {
+    const relative = path.relative(resolvedTarget, destPath);
+    if (
+      relative.startsWith('..') ||
+      path.isAbsolute(relative) ||
+      relative === ''
+    ) {
       throw new Error('Invalid skill name: Path traversal detected.');
     }
 
@@ -301,7 +309,12 @@ export async function uninstallSkill(
     const skillPath = path.resolve(resolvedTarget, name);
 
     // Security check: ensure the resolved path is within the target directory to prevent path traversal
-    if (!skillPath.startsWith(resolvedTarget + path.sep)) {
+    const relative = path.relative(resolvedTarget, skillPath);
+    if (
+      relative.startsWith('..') ||
+      path.isAbsolute(relative) ||
+      relative === ''
+    ) {
       return null;
     }
 
@@ -316,7 +329,12 @@ export async function uninstallSkill(
   }
 
   const skillDir = path.resolve(path.dirname(skillToUninstall.location));
-  if (!skillDir.startsWith(resolvedTarget + path.sep)) {
+  const relative = path.relative(resolvedTarget, skillDir);
+  if (
+    relative.startsWith('..') ||
+    path.isAbsolute(relative) ||
+    relative === ''
+  ) {
     return null;
   }
 
