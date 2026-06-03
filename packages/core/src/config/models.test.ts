@@ -744,6 +744,12 @@ describe('getAutoModelDescription', () => {
     expect(desc).toContain('gemini-3.1-pro-preview');
     expect(desc).toContain('gemini-3-flash-preview');
   });
+
+  it('should return Gemini 3.5 Flash description when hasAccessToPreview and useGemini3_5Flash are true', () => {
+    const desc = getAutoModelDescription(true, true, true);
+    expect(desc).toContain('gemini-3.1-pro-preview');
+    expect(desc).toContain('gemini-3.5-flash');
+  });
 });
 
 describe('resolveModel Gemini 3.5 Flash GA', () => {
@@ -777,7 +783,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         undefined,
         true,
       ),
-    ).toBe('gemini-3.5-flash');
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
   it('should resolve flash models to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
@@ -815,7 +821,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         mockDynamicConfig,
         true,
       ),
-    ).toBe('gemini-3.5-flash');
+    ).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 
   it('should NOT resolve flash models to gemini-3.5-flash when useGemini3_5Flash is false', () => {
@@ -900,5 +906,146 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
         true,
       ),
     ).toBe('gemini-3.5-flash');
+  });
+
+  describe('Flash model promotion and manual override routing logic', () => {
+    it('should resolve flash alias to gemini-3.5-flash when useGemini3_5Flash is true (static)', () => {
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          undefined,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve flash alias to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          mockDynamicConfig,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve manual selection of gemini-3-flash-preview to gemini-3-flash-preview when useGemini3_5Flash is true and has preview access (static)', () => {
+      expect(
+        resolveModel(
+          PREVIEW_GEMINI_FLASH_MODEL,
+          false,
+          false,
+          true,
+          undefined,
+          true,
+        ),
+      ).toBe('gemini-3-flash-preview');
+    });
+
+    it('should resolve manual selection of gemini-3-flash-preview to gemini-3-flash-preview when useGemini3_5Flash is true and has preview access (dynamic)', () => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(
+          PREVIEW_GEMINI_FLASH_MODEL,
+          false,
+          false,
+          true,
+          mockDynamicConfig,
+          true,
+        ),
+      ).toBe('gemini-3-flash-preview');
+    });
+
+    it('should resolve manual selection of gemini-3-flash-preview to gemini-3.5-flash when useGemini3_5Flash is true but lacks preview access (static)', () => {
+      expect(
+        resolveModel(
+          PREVIEW_GEMINI_FLASH_MODEL,
+          false,
+          false,
+          false,
+          undefined,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve manual selection of gemini-3-flash-preview to gemini-3.5-flash when useGemini3_5Flash is true but lacks preview access (dynamic)', () => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(
+          PREVIEW_GEMINI_FLASH_MODEL,
+          false,
+          false,
+          false,
+          mockDynamicConfig,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve classifier-selected flash alias to gemini-3.5-flash when useGemini3_5Flash is true (static)', () => {
+      expect(
+        resolveClassifierModel(
+          GEMINI_MODEL_ALIAS_AUTO,
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          undefined,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve classifier-selected flash alias to gemini-3.5-flash when useGemini3_5Flash is true (dynamic)', () => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveClassifierModel(
+          GEMINI_MODEL_ALIAS_AUTO,
+          GEMINI_MODEL_ALIAS_FLASH,
+          false,
+          false,
+          true,
+          mockDynamicConfig,
+          true,
+        ),
+      ).toBe('gemini-3.5-flash');
+    });
+
+    it('should resolve auto to PREVIEW_GEMINI_MODEL when useGemini3_5Flash is true and has preview access', () => {
+      expect(
+        resolveModel(
+          GEMINI_MODEL_ALIAS_AUTO,
+          false,
+          false,
+          true, // hasAccessToPreview
+          undefined,
+          true, // useGemini3_5Flash
+        ),
+      ).toBe(PREVIEW_GEMINI_MODEL);
+    });
   });
 });

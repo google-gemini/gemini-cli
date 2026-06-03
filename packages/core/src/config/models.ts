@@ -7,6 +7,7 @@
 export interface ModelResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_5Flash?: boolean;
+  useGemini3_Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
@@ -111,6 +112,7 @@ export const DEFAULT_THINKING_MODE = 8192;
 export function getAutoModelDescription(
   hasAccessToPreview: boolean,
   useGemini3_1: boolean = false,
+  useGemini3_5Flash: boolean = false,
 ) {
   const proModel = hasAccessToPreview
     ? useGemini3_1
@@ -118,9 +120,11 @@ export function getAutoModelDescription(
       : PREVIEW_GEMINI_MODEL
     : DEFAULT_GEMINI_MODEL;
   const flashModel = hasAccessToPreview
-    ? PREVIEW_GEMINI_FLASH_MODEL
+    ? useGemini3_5Flash
+      ? DEFAULT_GEMINI_3_5_FLASH_MODEL
+      : PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
-  return `Let Gemini CLI decide the best model for the task: ${proModel}, ${flashModel}`;
+  return `Let Gemini CLI decide the best model for the task: ${getDisplayString(proModel)}, ${getDisplayString(flashModel)}`;
 }
 
 /**
@@ -217,7 +221,11 @@ export function resolveModel(
     return DEFAULT_GEMINI_FLASH_LITE_MODEL;
   }
 
-  if (useGemini3_5Flash && isFlashModel(resolved)) {
+  if (
+    useGemini3_5Flash &&
+    isFlashModel(resolved) &&
+    normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
+  ) {
     return DEFAULT_GEMINI_3_5_FLASH_MODEL;
   }
 
@@ -343,6 +351,8 @@ export function getDisplayString(
   }
 
   switch (model) {
+    case 'gemini-3-flash':
+      return DEFAULT_GEMINI_3_5_FLASH_MODEL;
     case GEMINI_MODEL_ALIAS_AUTO:
       return 'Auto';
     case PREVIEW_GEMINI_MODEL_AUTO:
