@@ -434,7 +434,7 @@ function shellEfficiencyGuidelines(enabled: boolean): string {
   const isWindows = process.platform === 'win32';
   const platformName = isWindows ? 'Windows' : 'Unix-like';
   const inspectExample = isWindows
-    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
+    ? "using commands like 'findstr' (on CMD) and 'Get-Content -Tail' or 'Select-String' (on PowerShell)"
     : "using commands like 'grep', 'tail', 'head'";
   return `
 ## Shell tool usage

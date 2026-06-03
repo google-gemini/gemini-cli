@@ -681,7 +681,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('The host platform is Windows (win32)');
       expect(prompt).toContain(
-        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
+        "using commands like 'findstr' (on CMD) and 'Get-Content -Tail' or 'Select-String' (on PowerShell)",
       );
       expect(prompt).not.toContain(
         "using commands like 'grep', 'tail', 'head'",
