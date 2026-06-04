@@ -12,12 +12,14 @@ import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from './token-storage/index.js';
 import type { OAuthCredentials, OAuthToken } from './token-storage/types.js';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { Storage } from '../config/storage.js';
 
 // Mock dependencies
 vi.mock('node:fs', () => ({
   promises: {
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    rename: vi.fn(),
     mkdir: vi.fn(),
     unlink: vi.fn(),
   },
@@ -76,6 +78,16 @@ describe('MCPOAuthTokenStorage', () => {
     tokenUrl: 'https://auth.example.com/token',
     updatedAt: Date.now(),
   };
+
+  beforeEach(() => {
+    vi.mocked(path.join).mockImplementation((...parts) => parts.join('/'));
+    vi.mocked(path.dirname).mockImplementation((filePath) =>
+      filePath.split('/').slice(0, -1).join('/'),
+    );
+    vi.mocked(Storage.getMcpOAuthTokensPath).mockReturnValue(
+      path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
+    );
+  });
 
   describe('with encrypted flag false', () => {
     beforeEach(() => {
@@ -159,11 +171,18 @@ describe('MCPOAuthTokenStorage', () => {
           path.join('/mock/home', GEMINI_DIR),
           { recursive: true },
         );
+        const tokenFile = path.join(
+          '/mock/home',
+          GEMINI_DIR,
+          'mcp-oauth-tokens.json',
+        );
+        const tempFile = vi.mocked(fs.writeFile).mock.calls[0][0] as string;
         expect(fs.writeFile).toHaveBeenCalledWith(
-          path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
+          expect.stringMatching(/mcp-oauth-tokens\.json\.\d+\.\d+\.tmp$/),
           expect.stringContaining('test-server'),
           { mode: 0o600 },
         );
+        expect(fs.rename).toHaveBeenCalledWith(tempFile, tokenFile);
       });
 
       it('should update existing token for same server', async () => {
@@ -238,6 +257,26 @@ describe('MCPOAuthTokenStorage', () => {
           'error',
           'Failed to save MCP OAuth token: Disk full',
           writeError,
+        );
+      });
+
+      it('should clean up the temp file when atomic replacement fails', async () => {
+        vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
+        vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+        const renameError = new Error('Permission denied');
+        vi.mocked(fs.rename).mockRejectedValue(renameError);
+
+        await expect(
+          tokenStorage.saveToken('test-server', mockToken),
+        ).rejects.toThrow('Permission denied');
+
+        const tempFile = vi.mocked(fs.writeFile).mock.calls[0][0] as string;
+        expect(fs.unlink).toHaveBeenCalledWith(tempFile);
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          'Failed to save MCP OAuth token: Permission denied',
+          renameError,
         );
       });
     });
