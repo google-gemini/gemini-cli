@@ -2225,6 +2225,26 @@ describe('mcp-client', () => {
           vi.unstubAllGlobals();
         }
       });
+
+      it('encodes non-ByteString header values for httpUrl transports', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server',
+            headers: { 'X-Custom': 'mąka' },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const headers = (unwrap(transport) as TestableTransport)._requestInit
+          ?.headers;
+
+        expect(() => new Headers(headers)).not.toThrow();
+        expect(headers?.['X-Custom']).toBe(
+          Buffer.from('mąka', 'utf8').toString('latin1'),
+        );
+      });
     });
 
     describe('should connect via url', () => {

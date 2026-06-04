@@ -1002,11 +1002,33 @@ function createTransportRequestInit(
   }
 
   return {
-    headers: {
+    headers: encodeHeaderValuesForFetch({
       ...expandedHeaders,
       ...headers,
-    },
+    }),
   };
+}
+
+function encodeHeaderValuesForFetch(
+  headers: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [
+      key,
+      isByteString(value)
+        ? value
+        : Buffer.from(value, 'utf8').toString('latin1'),
+    ]),
+  );
+}
+
+function isByteString(value: string): boolean {
+  for (const char of value) {
+    if (char.codePointAt(0)! > 255) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -1673,10 +1695,10 @@ function createSSETransportWithAuth(
   config: MCPServerConfig,
   accessToken?: string | null,
 ): SSEClientTransport {
-  const headers = {
+  const headers = encodeHeaderValuesForFetch({
     ...config.headers,
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-  };
+  });
 
   const options: SSEClientTransportOptions = {};
   if (Object.keys(headers).length > 0) {
