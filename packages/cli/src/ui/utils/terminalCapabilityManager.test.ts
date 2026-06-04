@@ -149,7 +149,7 @@ describe('TerminalCapabilityManager', () => {
 
   it('should NOT ignore other colors in tmux', async () => {
     const manager = TerminalCapabilityManager.getInstance();
-    vi.spyOn(manager, 'isTmux').mockReturnValue(true);
+    vi.stubEnv('TMUX', '1');
 
     const promise = manager.detectCapabilities();
 
