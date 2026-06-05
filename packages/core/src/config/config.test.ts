@@ -513,6 +513,41 @@ describe('Server Config (config.ts)', () => {
       expect(mcpStarted).toBe(true);
     });
 
+    it('should not crash when an entry in includeDirectories is missing on disk (#27311)', async () => {
+      // Regression for #27311: a configured includeDirectories entry that
+      // does not exist on disk (e.g. an optional `.kilocode/rules` dir)
+      // must not bring down the CLI on startup. The expected behaviour
+      // is that addDirectories logs a warning and continues with the
+      // directories that do exist.
+      const missingDir = '/path/to/missing/.kilocode/rules';
+      const presentDir = '/path/to/present/.cursor/rules';
+
+      const fsMod = await import('node:fs');
+      vi.mocked(fsMod.existsSync).mockImplementation(
+        (p) => String(p) !== missingDir,
+      );
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        includeDirectories: [missingDir, presentDir],
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+
+      const dirs = config.getWorkspaceContext().getDirectories();
+      expect(dirs).not.toContain(missingDir);
+      expect(dirs).toContain(presentDir);
+
+      const warnedAboutMissing = warnSpy.mock.calls.some((call) =>
+        String(call[0]).includes(missingDir),
+      );
+      expect(warnedAboutMissing).toBe(true);
+    });
+
     describe('getCompressionThreshold', () => {
       it('should return the local compression threshold if it is set', async () => {
         const config = new Config({

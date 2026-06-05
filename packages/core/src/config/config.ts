@@ -1446,10 +1446,12 @@ export class Config implements McpContext, AgentLoopContext {
     await this.storage.initialize();
     ragLogger.initialize(this.storage.getProjectTempLogsDir());
 
-    // Add pending directories to workspace context
-    for (const dir of this.pendingIncludeDirectories) {
-      this.workspaceContext.addDirectory(dir);
-    }
+    // Add pending directories to workspace context. Use addDirectories
+    // (plural) so missing optional directories — e.g. a project that
+    // configures `.kilocode/rules` in settings.context.includeDirectories
+    // but does not have that directory on disk — emit a warning and are
+    // skipped rather than throwing and crashing startup. See #27311.
+    this.workspaceContext.addDirectories(this.pendingIncludeDirectories);
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
