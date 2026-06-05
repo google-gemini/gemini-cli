@@ -77,10 +77,24 @@ describe('useBanner', () => {
         .update(defaultBannerData.defaultText)
         .digest('hex')]: 5,
     });
+  });
 
-    const { result } = await renderHook(() => useBanner(defaultBannerData));
+  it('should not hide banner if show count exceeds max limit (Legacy format) if it contains an Antigravity announcement', async () => {
+    const antigravityBannerData = {
+      defaultText: 'Antigravity is coming to town!',
+      warningText: '',
+    };
 
-    expect(result.current.bannerText).toBe('');
+    mockedPersistentStateGet.mockReturnValue({
+      [crypto
+        .createHash('sha256')
+        .update(antigravityBannerData.defaultText)
+        .digest('hex')]: 5,
+    });
+
+    const { result } = await renderHook(() => useBanner(antigravityBannerData));
+
+    expect(result.current.bannerText).toBe('Antigravity is coming to town!');
   });
 
   it('should increment the persistent count when banner is shown', async () => {
