@@ -246,6 +246,16 @@ export function classifyGoogleError(error: unknown): unknown {
     const errorMessage =
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
+
+    if (errorMessage.includes('limit: 0') || errorMessage.includes('limit:0')) {
+      const cause = googleApiError ?? {
+        code: status ?? 429,
+        message: errorMessage,
+        details: [],
+      };
+      return new TerminalQuotaError(errorMessage, cause);
+    }
+
     const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);

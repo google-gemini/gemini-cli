@@ -806,4 +806,21 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(ValidationRequiredError);
   });
+
+  it('should return TerminalQuotaError when limit is 0 even if message contains "Please retry in Xs"', () => {
+    const complexError = {
+      error: {
+        message:
+          '{"error": {"code": 429, "status": 429, "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0\\nPlease retry in 59.906331105s.", "details": [{"detail": "??? to (unknown) : APP_ERROR(8) You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0\\nPlease retry in 59.906331105s."}]}}',
+        code: 429,
+        status: 'Too Many Requests',
+      },
+    };
+    const rawError = new Error(JSON.stringify(complexError));
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+
+    const result = classifyGoogleError(rawError);
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
 });
