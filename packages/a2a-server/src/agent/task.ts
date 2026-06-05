@@ -1097,8 +1097,7 @@ export class Task {
       } else {
         parts = [response];
       }
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      this.geminiClient.addHistory({
+      void this.geminiClient.addHistory({
         role: 'user',
         parts,
       });
