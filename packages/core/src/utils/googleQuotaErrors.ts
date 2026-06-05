@@ -219,12 +219,12 @@ function classifyValidationRequiredError(
 export function classifyGoogleError(error: unknown): unknown {
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
+  const errorMessage =
+    googleApiError?.message ||
+    (error instanceof Error ? error.message : String(error));
 
   if (status === 404) {
-    const message =
-      googleApiError?.message ||
-      (error instanceof Error ? error.message : 'Model not found');
-    return new ModelNotFoundError(message, status);
+    return new ModelNotFoundError(errorMessage || 'Model not found', status);
   }
 
   // Check for 403 VALIDATION_REQUIRED errors from Cloud Code API
@@ -235,6 +235,22 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
+  // Universal limit: 0 check (moved outside and before the fallback block)
+  if (
+    (status === 429 ||
+      status === 499 ||
+      status === 503 ||
+      status === undefined) &&
+    /(?:Quota exceeded|quota_exceeded).*limit:\s*0(?!\d|\.)/i.test(errorMessage)
+  ) {
+    const cause = googleApiError ?? {
+      code: status ?? 429,
+      message: errorMessage,
+      details: [],
+    };
+    return new TerminalQuotaError(errorMessage, cause);
+  }
+
   if (
     !googleApiError ||
     (googleApiError.code !== 429 &&
@@ -243,19 +259,6 @@ export function classifyGoogleError(error: unknown): unknown {
     googleApiError.details.length === 0
   ) {
     // Fallback: try to parse the error message for a retry delay
-    const errorMessage =
-      googleApiError?.message ||
-      (error instanceof Error ? error.message : String(error));
-
-    if (/limit:\s*0(?!\d|\.)/.test(errorMessage)) {
-      const cause = googleApiError ?? {
-        code: status ?? 429,
-        message: errorMessage,
-        details: [],
-      };
-      return new TerminalQuotaError(errorMessage, cause);
-    }
-
     const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
@@ -404,8 +407,5 @@ export function classifyGoogleError(error: unknown): unknown {
 
   // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
-  const errorMessage =
-    googleApiError.message ||
-    (error instanceof Error ? error.message : String(error));
   return new RetryableQuotaError(errorMessage, googleApiError);
 }

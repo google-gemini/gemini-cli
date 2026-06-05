@@ -823,4 +823,22 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
+
+  it('should return TerminalQuotaError when limit is 0 even if structured RetryInfo is present', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Quota exceeded for limit: 0',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '59s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(
+      new Error('Quota exceeded for limit: 0'),
+    );
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
 });
