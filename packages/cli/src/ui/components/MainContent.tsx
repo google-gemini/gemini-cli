@@ -9,6 +9,8 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
+import { Banner } from './Banner.js';
+import { useBanner } from '../hooks/useBanner.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -41,6 +43,12 @@ export const MainContent = () => {
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
   const confirmingToolCallId = confirmingTool?.tool.callId;
+
+  const { bannerText } = useBanner(uiState.bannerData);
+  const showMigrationBanner =
+    uiState.bannerVisible &&
+    bannerText !== '' &&
+    bannerText.includes('Antigravity');
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -82,7 +90,7 @@ export const MainContent = () => {
 
   const augmentedHistory = useMemo(
     () =>
-      uiState.history.map((item, i) => {
+      uiState.history.flatMap((item, i) => {
         const prevType = i > 0 ? uiState.history[i - 1]?.type : undefined;
         const isFirstThinking =
           item.type === 'thinking' && prevType !== 'thinking';
@@ -92,63 +100,109 @@ export const MainContent = () => {
           (item.type !== 'tool_group' && prevType === 'tool_group') ||
           (item.type === 'tool_group' && prevType !== 'tool_group');
 
-        return {
+        const mainEntry = {
+          type: 'history' as const,
           item,
           isExpandable: i > lastUserPromptIndex,
           isFirstThinking,
           isFirstAfterThinking,
           isToolGroupBoundary,
         };
+
+        const nextItem = uiState.history[i + 1];
+        const isEndOfTurn =
+          !nextItem ||
+          nextItem.type === 'user' ||
+          nextItem.type === 'user_shell';
+
+        if (item.type === 'gemini' && isEndOfTurn && showMigrationBanner) {
+          return [
+            mainEntry,
+            {
+              type: 'banner' as const,
+              id: `banner-after-${item.id}`,
+            },
+          ];
+        }
+
+        return [mainEntry];
       }),
-    [uiState.history, lastUserPromptIndex],
+    [uiState.history, lastUserPromptIndex, showMigrationBanner],
   );
 
   const historyItems = useMemo(
     () =>
-      augmentedHistory.map(
-        ({
-          item,
-          isExpandable,
-          isFirstThinking,
-          isFirstAfterThinking,
-          isToolGroupBoundary,
-        }) => (
-          <MemoizedHistoryItemDisplay
-            terminalWidth={mainAreaWidth}
-            availableTerminalHeight={
-              uiState.constrainHeight || !isExpandable
-                ? staticAreaMaxItemHeight
-                : undefined
-            }
-            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={item.id}
-            item={item}
-            isPending={false}
-            commands={uiState.slashCommands}
-            isExpandable={isExpandable}
-            isFirstThinking={isFirstThinking}
-            isFirstAfterThinking={isFirstAfterThinking}
-            isToolGroupBoundary={isToolGroupBoundary}
-          />
-        ),
-      ),
+      augmentedHistory.map((entry) => {
+        if (entry.type === 'history') {
+          const {
+            item,
+            isExpandable,
+            isFirstThinking,
+            isFirstAfterThinking,
+            isToolGroupBoundary,
+          } = entry;
+          return (
+            <MemoizedHistoryItemDisplay
+              terminalWidth={mainAreaWidth}
+              availableTerminalHeight={
+                uiState.constrainHeight || !isExpandable
+                  ? staticAreaMaxItemHeight
+                  : undefined
+              }
+              availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+              key={item.id}
+              item={item}
+              isPending={false}
+              commands={uiState.slashCommands}
+              isExpandable={isExpandable}
+              isFirstThinking={isFirstThinking}
+              isFirstAfterThinking={isFirstAfterThinking}
+              isToolGroupBoundary={isToolGroupBoundary}
+            />
+          );
+        } else {
+          return (
+            <Banner
+              key={entry.id}
+              width={mainAreaWidth}
+              bannerText={bannerText}
+              isWarning={uiState.bannerData.warningText !== ''}
+            />
+          );
+        }
+      }),
     [
       augmentedHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
+      bannerText,
+      uiState.bannerData.warningText,
     ],
   );
 
+  const lastUserPromptHistoryIndex = useMemo(() => {
+    for (let i = augmentedHistory.length - 1; i >= 0; i--) {
+      const entry = augmentedHistory[i];
+      if (
+        entry.type === 'history' &&
+        (entry.item.type === 'user' || entry.item.type === 'user_shell')
+      ) {
+        return i;
+      }
+    }
+    return -1;
+  }, [augmentedHistory]);
+
   const staticHistoryItems = useMemo(
-    () => historyItems.slice(0, lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
+    () => historyItems.slice(0, lastUserPromptHistoryIndex + 1),
+    [historyItems, lastUserPromptHistoryIndex],
   );
 
   const lastResponseHistoryItems = useMemo(
-    () => historyItems.slice(lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
+    () => historyItems.slice(lastUserPromptHistoryIndex + 1),
+    [historyItems, lastUserPromptHistoryIndex],
   );
 
   const pendingItems = useMemo(
@@ -205,11 +259,21 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...augmentedHistory.map((data, index) => ({
-        type: 'history' as const,
-        item: data.item,
-        element: historyItems[index],
-      })),
+      ...augmentedHistory.map((data, index) => {
+        if (data.type === 'history') {
+          return {
+            type: 'history' as const,
+            item: data.item,
+            element: historyItems[index],
+          };
+        } else {
+          return {
+            type: 'banner' as const,
+            id: data.id,
+            element: historyItems[index],
+          };
+        }
+      }),
       { type: 'pending' as const },
     ],
     [augmentedHistory, historyItems],
@@ -225,7 +289,7 @@ export const MainContent = () => {
             showDetails={showHeaderDetails}
           />
         );
-      } else if (item.type === 'history') {
+      } else if (item.type === 'history' || item.type === 'banner') {
         return item.element;
       } else {
         return pendingItems;
@@ -240,6 +304,7 @@ export const MainContent = () => {
     (item: (typeof virtualizedData)[number], _index: number) => {
       if (item.type === 'header') return 'header';
       if (item.type === 'history') return item.item.id.toString();
+      if (item.type === 'banner') return item.id;
       return 'pending';
     },
     [],
