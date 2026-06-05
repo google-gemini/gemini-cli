@@ -48,17 +48,13 @@ export class ApprovalModeStrategy implements RoutingStrategy {
     const approvalMode = config.getApprovalMode();
     const approvedPlanPath = config.getApprovedPlanPath();
 
-    const [
-      useGemini3_1,
-      useGemini3_1FlashLite,
-      useCustomToolModel,
-      hasAccessToPreview,
-    ] = await Promise.all([
-      config.getGemini31Launched(),
-      config.getGemini31FlashLiteLaunched(),
-      config.getUseCustomToolModel(),
-      config.getHasAccessToPreviewModel(),
-    ]);
+    const [useGemini3_1, useCustomToolModel, hasAccessToPreview] =
+      await Promise.all([
+        config.getGemini31Launched(),
+        config.getUseCustomToolModel(),
+        config.getHasAccessToPreviewModel(),
+      ]);
+    const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
 
     // 1. Planning Phase: If ApprovalMode === PLAN, explicitly route to the Pro model.
     if (approvalMode === ApprovalMode.PLAN) {
@@ -66,10 +62,10 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         model,
         GEMINI_MODEL_ALIAS_PRO,
         useGemini3_1,
-        useGemini3_1FlashLite,
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useGemini3_5Flash,
       );
       return {
         model: proModel,
@@ -85,10 +81,10 @@ export class ApprovalModeStrategy implements RoutingStrategy {
         model,
         GEMINI_MODEL_ALIAS_FLASH,
         useGemini3_1,
-        useGemini3_1FlashLite,
         useCustomToolModel,
         hasAccessToPreview,
         config,
+        useGemini3_5Flash,
       );
       return {
         model: flashModel,

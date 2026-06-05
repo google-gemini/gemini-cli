@@ -6,6 +6,12 @@ Sort: s         Reverse: r      First/Last: g/G
 "
 `;
 
+exports[`SessionBrowser Search and Navigation Components > NavigationHelp renders correctly 2`] = `
+"Navigate: ↑/↓   Resume: Enter   Search: /   Delete: x   Quit: q
+Sort: s         Reverse: r      First/Last: g/G
+"
+`;
+
 exports[`SessionBrowser Search and Navigation Components > NoResultsDisplay renders correctly 1`] = `
 "
 No sessions found matching 'no match'.

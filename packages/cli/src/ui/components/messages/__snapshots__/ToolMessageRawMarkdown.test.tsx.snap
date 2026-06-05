@@ -16,6 +16,14 @@ exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderM
 "
 `;
 
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false, useAlternateBuffer=true '(raw markdown, alternate buffer)' 2`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│  Test **bold** and \`code\` markdown                                           │
+"
+`;
+
 exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=false '(constrained height, regular buffer -…' 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │

@@ -19,6 +19,7 @@ import type * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   type Config,
+  GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
   type Storage,
 } from '@google/gemini-cli-core';
@@ -208,20 +209,19 @@ describe('AcpSessionManager', () => {
     expect(response.models?.availableModels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          modelId: 'auto-gemini-3',
+          modelId: GEMINI_MODEL_ALIAS_AUTO,
           name: expect.stringContaining('Auto'),
         }),
       ]),
     );
   });
 
-  it('should include gemini-3.1-flash-lite when useGemini31FlashLite is true', async () => {
+  it('should NOT include retired preview models (none) in available models', async () => {
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
     });
     mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
     mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
-    mockConfig.getGemini31FlashLiteLaunchedSync = vi.fn().mockReturnValue(true);
 
     const response = await manager.newSession(
       {
@@ -231,14 +231,9 @@ describe('AcpSessionManager', () => {
       {},
     );
 
-    expect(response.models?.availableModels).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          modelId: 'gemini-3.1-flash-lite',
-          name: 'gemini-3.1-flash-lite',
-        }),
-      ]),
-    );
+    const modelIds =
+      response.models?.availableModels?.map((m) => m.modelId) ?? [];
+    expect(modelIds).not.toContain('none');
   });
 
   it('should return modes with plan mode when plan is enabled', async () => {

@@ -77,6 +77,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    getHasAccessToPreviewModel: vi.fn(() => true),
     ...overrides,
   }) as unknown as Config;
 

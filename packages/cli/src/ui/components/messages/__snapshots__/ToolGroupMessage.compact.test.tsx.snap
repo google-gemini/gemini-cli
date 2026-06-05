@@ -26,6 +26,12 @@ exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line i
 "
 `;
 
+exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line if a compact tool has a dense payload 2`] = `
+"  ✓  ReadFolder  Listing files → file1.txt
+  ✓  ReadFile  Reading file → read file
+"
+`;
+
 exports[`ToolGroupMessage Compact Rendering > renders consecutive compact tools without empty lines between them 1`] = `
 "  ✓  ReadFolder  Listing files → file1.txt file2.txt
   ✓  ReadFolder  Listing files → file3.txt

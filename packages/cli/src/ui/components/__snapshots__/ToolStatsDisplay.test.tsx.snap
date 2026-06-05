@@ -41,6 +41,27 @@ exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctl
 "
 `;
 
+exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctly 2`] = `
+"╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  Tool Stats For Nerds                                              │
+│                                                                    │
+│  Tool Name                   Calls   Success Rate   Avg Duration   │
+│  ────────────────────────────────────────────────────────────────  │
+│  tool-a                          2          50.0%          100ms   │
+│  tool-b                          1         100.0%          100ms   │
+│                                                                    │
+│  User Decision Summary                                             │
+│  Total Reviewed Suggestions:                                   3   │
+│   » Accepted:                                                  1   │
+│   » Rejected:                                                  1   │
+│   » Modified:                                                  1   │
+│  ────────────────────────────────────────────────────────────────  │
+│   Overall Agreement Rate:                                  33.3%   │
+╰────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`<ToolStatsDisplay /> > should handle large values without wrapping or overlapping 1`] = `
 "╭────────────────────────────────────────────────────────────────────╮
 │                                                                    │
