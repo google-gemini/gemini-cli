@@ -5,6 +5,7 @@
  */
 
 import * as crypto from 'node:crypto';
+import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
@@ -233,28 +234,38 @@ export class AgentRegistry {
 
     // Load user-level agents: ~/.gemini/agents/
     const userAgentsDir = Storage.getUserAgentsDir();
-    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
-    for (const error of userAgents.errors) {
-      debugLogger.warn(
-        `[AgentRegistry] Error loading user agent: ${error.message}`,
+    const projectAgentsDir = this.config.storage.getProjectAgentsDir();
+
+    // Fix: if user agents dir is the same as project agents dir (e.g. started in home dir),
+    // skip loading to avoid duplicate warnings.
+    if (path.resolve(userAgentsDir) !== path.resolve(projectAgentsDir)) {
+      const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+      for (const error of userAgents.errors) {
+        debugLogger.warn(
+          `[AgentRegistry] Error loading user agent: ${error.message}`,
+        );
+        const msg = `Agent loading error: ${error.message}`;
+        errors?.push(msg);
+        coreEvents.emitFeedback('error', msg);
+      }
+      await Promise.allSettled(
+        userAgents.agents.map(async (agent) => {
+          try {
+            this.ensureRemoteAgentHash(agent);
+            await this.registerAgent(agent, errors);
+          } catch (e) {
+            const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
+            debugLogger.warn(`[AgentRegistry] ${msg}`, e);
+            errors?.push(msg);
+            coreEvents.emitFeedback('error', msg);
+          }
+        }),
       );
-      const msg = `Agent loading error: ${error.message}`;
-      errors?.push(msg);
-      coreEvents.emitFeedback('error', msg);
+    } else if (this.config.getDebugMode()) {
+      debugLogger.log(
+        `[AgentRegistry] Skipping user agents load because userAgentsDir is the same as projectAgentsDir.`,
+      );
     }
-    await Promise.allSettled(
-      userAgents.agents.map(async (agent) => {
-        try {
-          this.ensureRemoteAgentHash(agent);
-          await this.registerAgent(agent, errors);
-        } catch (e) {
-          const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
-          debugLogger.warn(`[AgentRegistry] ${msg}`, e);
-          errors?.push(msg);
-          coreEvents.emitFeedback('error', msg);
-        }
-      }),
-    );
 
     // Load agents from extensions
     for (const extension of this.config.getExtensions()) {
