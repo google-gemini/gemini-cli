@@ -292,6 +292,26 @@ ${testRootDir}${path.sep}
       expect(structure).toContain('ignored.txt');
       expect(structure).toContain('file1.txt');
     });
+
+    it('should omit ignored folder names when requested', async () => {
+      await fsPromises.writeFile(
+        path.join(testRootDir, '.gitignore'),
+        'node_modules/\n.pytest_cache/',
+      );
+      await createTestFile('file1.txt');
+      await createTestFile('node_modules', 'some-package', 'index.js');
+      await createTestFile('.pytest_cache', 'README.md');
+
+      const fileService = new FileDiscoveryService(testRootDir);
+      const structure = await getFolderStructure(testRootDir, {
+        fileService,
+        showIgnoredFolders: false,
+      });
+
+      expect(structure).toContain('file1.txt');
+      expect(structure).not.toContain('node_modules');
+      expect(structure).not.toContain('.pytest_cache');
+    });
   });
 
   describe('with geminiignore', () => {
