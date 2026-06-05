@@ -247,7 +247,7 @@ export function classifyGoogleError(error: unknown): unknown {
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
 
-    if (errorMessage.includes('limit: 0') || errorMessage.includes('limit:0')) {
+    if (/limit:\s*0(?!\d|\.)/.test(errorMessage)) {
       const cause = googleApiError ?? {
         code: status ?? 429,
         message: errorMessage,
