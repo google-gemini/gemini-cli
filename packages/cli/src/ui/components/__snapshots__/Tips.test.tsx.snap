@@ -18,3 +18,12 @@ Tips for getting started:
 3. Be specific for the best results
 "
 `;
+
+exports[`Tips > 'renders fewer tips when GEMINI.md exi…' 2`] = `
+"
+Tips for getting started:
+1. /help for more information
+2. Ask coding questions, edit code or run commands
+3. Be specific for the best results
+"
+`;

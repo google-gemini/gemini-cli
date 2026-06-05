@@ -13,13 +13,11 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
-  GEMINI_3_1_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
@@ -28,6 +26,7 @@ import {
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
+  getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -64,12 +63,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [config]);
 
   // Determine the Preferred Model (read once when the dialog opens).
-  const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const preferredModel = config?.getModel() || GEMINI_MODEL_ALIAS_AUTO;
 
-  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
+  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel() ?? false;
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
-  const useGemini31FlashLite =
-    config?.getGemini31FlashLiteLaunchedSync?.() ?? false;
+  const useGemini3_5Flash = config?.hasGemini35FlashGAAccess?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -95,10 +93,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       PREVIEW_GEMINI_MODEL,
       PREVIEW_GEMINI_3_1_MODEL,
       PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-      GEMINI_3_1_FLASH_LITE_MODEL,
+      PREVIEW_GEMINI_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
-    ];
+    ].filter((m) => m !== 'none');
     if (manualModels.includes(preferredModel)) {
       return preferredModel;
     }
@@ -123,7 +120,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     },
     { isActive: true },
   );
-
   const mainOptions = useMemo(() => {
     // --- DYNAMIC PATH ---
     if (
@@ -134,7 +130,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
-          useGemini3_1FlashLite: useGemini31FlashLite,
+          useGemini3_5Flash,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -163,11 +159,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     // --- LEGACY PATH ---
     const list = [
       {
-        value: DEFAULT_GEMINI_MODEL_AUTO,
-        title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
-        key: DEFAULT_GEMINI_MODEL_AUTO,
+        value: GEMINI_MODEL_ALIAS_AUTO,
+        title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
+        description: getAutoModelDescription(
+          shouldShowPreviewModels,
+          useGemini31,
+          useGemini3_5Flash,
+        ),
+        key: GEMINI_MODEL_ALIAS_AUTO,
       },
       {
         value: 'Manual',
@@ -179,23 +178,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       },
     ];
 
-    if (shouldShowPreviewModels) {
-      list.unshift({
-        value: PREVIEW_GEMINI_MODEL_AUTO,
-        title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-        description: useGemini31
-          ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
-          : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-        key: PREVIEW_GEMINI_MODEL_AUTO,
-      });
-    }
     return list;
   }, [
     config,
     shouldShowPreviewModels,
     manualModelSelected,
     useGemini31,
-    useGemini31FlashLite,
+    useGemini3_5Flash,
     useCustomToolModel,
     hasAccessToProModel,
   ]);
@@ -210,7 +199,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .getModelConfigService()
         .getAvailableModelOptions({
           useGemini3_1: useGemini31,
-          useGemini3_1FlashLite: useGemini31FlashLite,
+          useGemini3_5Flash,
           useCustomTools: useCustomToolModel,
           hasAccessToPreview: shouldShowPreviewModels,
           hasAccessToProModel,
@@ -235,14 +224,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_MODEL,
       },
       {
-        value: DEFAULT_GEMINI_FLASH_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
-        key: DEFAULT_GEMINI_FLASH_MODEL,
-      },
-      {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+        key: DEFAULT_GEMINI_FLASH_MODEL,
       },
     ];
 
@@ -283,11 +272,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (useGemini31FlashLite) {
+      if (PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
         previewOptions.push({
-          value: GEMINI_3_1_FLASH_LITE_MODEL,
-          title: getDisplayString(GEMINI_3_1_FLASH_LITE_MODEL),
-          key: GEMINI_3_1_FLASH_LITE_MODEL,
+          value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
+          key: PREVIEW_GEMINI_FLASH_LITE_MODEL,
         });
       }
 
@@ -303,13 +292,23 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [
     shouldShowPreviewModels,
     useGemini31,
-    useGemini31FlashLite,
+    useGemini3_5Flash,
     useCustomToolModel,
     hasAccessToProModel,
     config,
   ]);
 
-  const options = view === 'main' ? mainOptions : manualOptions;
+  const options = useMemo(() => {
+    const rawOptions = view === 'main' ? mainOptions : manualOptions;
+    const seen = new Set<string>();
+    return rawOptions.filter((option) => {
+      if (seen.has(option.value)) {
+        return false;
+      }
+      seen.add(option.value);
+      return true;
+    });
+  }, [view, mainOptions, manualOptions]);
 
   // Calculate the initial index based on the preferred model.
   const initialIndex = useMemo(() => {

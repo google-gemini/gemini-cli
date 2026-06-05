@@ -16,6 +16,13 @@ exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders pending st
 "
 `;
 
+exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders pending state with renderMarkdown=true 2`] = `
+"✦ Test bold and code markdown
+
+   1 const x = 1;
+"
+`;
+
 exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false '(raw markdown with syntax highlightin…' 1`] = `
 "✦  Test **bold** and \`code\` markdown
 
@@ -33,6 +40,15 @@ exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with rende
 `;
 
 exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > wraps long lines correctly in raw markdown mode 1`] = `
+"✦  This is a long
+   line that should
+   wrap correctly
+   without
+   truncation
+"
+`;
+
+exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > wraps long lines correctly in raw markdown mode 2`] = `
 "✦  This is a long
    line that should
    wrap correctly
