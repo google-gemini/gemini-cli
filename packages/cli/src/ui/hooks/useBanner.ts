@@ -41,7 +41,9 @@ export function useBanner(bannerData: BannerData) {
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
   const showBanner =
-    activeText !== '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
+    activeText !== '' &&
+    (currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT ||
+      activeText.includes('Antigravity'));
 
   const rawBannerText = showBanner ? activeText : '';
   const bannerText = rawBannerText.replace(/\\n/g, '\n');
