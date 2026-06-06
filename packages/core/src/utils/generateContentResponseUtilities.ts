@@ -154,17 +154,37 @@ export function convertToFunctionResponse(
   // directory listing and describe files that match filenames instead of the
   // actual pixels (see issue #27710). The hint asks the model to ground the
   // answer on the attached image only.
-  const imageParts = filteredInlineDataParts.filter(
+  const inlineImageParts = filteredInlineDataParts.filter(
     (p) =>
       typeof p.inlineData?.mimeType === 'string' &&
       p.inlineData.mimeType.startsWith('image/'),
   );
-  const imageMimeTypes = Array.from(
-    new Set(imageParts.map((p) => p.inlineData?.mimeType).filter((m) => !!m)),
+  const fileImageParts = fileDataParts.filter(
+    (p) =>
+      typeof p.fileData?.mimeType === 'string' &&
+      p.fileData.mimeType.startsWith('image/'),
   );
+  const totalImageAttachments = inlineImageParts.length + fileImageParts.length;
+
+  const mimeTypeRegex = /^[a-zA-Z0-9\-]+\/[a-zA-Z0-9\-.]+$/;
+  const imageMimeTypesList: string[] = [];
+  for (const p of inlineImageParts) {
+    const mime = p.inlineData?.mimeType;
+    if (mime && mimeTypeRegex.test(mime)) {
+      imageMimeTypesList.push(mime);
+    }
+  }
+  for (const p of fileImageParts) {
+    const mime = p.fileData?.mimeType;
+    if (mime && mimeTypeRegex.test(mime)) {
+      imageMimeTypesList.push(mime);
+    }
+  }
+  const imageMimeTypes = Array.from(new Set(imageMimeTypesList));
+
   const imageHint =
-    imageParts.length > 0
-      ? `[Image grounding hint: This function response includes ${imageParts.length} image attachment(s) (${imageMimeTypes.join(', ')}). Describe ONLY what is optically present in the attached image(s). Do not infer content from workspace filenames, directory listings, prior conversation, or any other surrounding text context.]`
+    totalImageAttachments > 0
+      ? `[Image grounding hint: This function response includes ${totalImageAttachments} image attachment(s) (${imageMimeTypes.join(', ')}). Describe ONLY what is optically present in the attached image(s). Do not infer content from workspace filenames, directory listings, prior conversation, or any other surrounding text context.]`
       : undefined;
 
   const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
