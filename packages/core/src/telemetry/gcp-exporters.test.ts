@@ -88,15 +88,17 @@ describe('GCP Exporters', () => {
       expect(exporter).toBeDefined();
     });
 
-    it('should truncate long metric attributes/labels to 1024 characters during export', () => {
+    it('should truncate long metric attributes/labels to 1024 characters during export without mutating frozen objects, and safely handle multi-byte characters', () => {
       const exporter = new GcpMetricExporter('test-project');
 
       const longString = 'a'.repeat(2000);
+      // Construct a string with 2000 emojis (each taking more than 1 code unit)
+      const longEmojiString = '🎈'.repeat(2000);
       const mockMetrics = {
         resource: {
-          attributes: {
+          attributes: Object.freeze({
             'resource.label': longString,
-          },
+          }),
         },
         scopeMetrics: [
           {
@@ -108,10 +110,10 @@ describe('GCP Exporters', () => {
                 descriptor: { name: 'test_metric' },
                 dataPoints: [
                   {
-                    attributes: {
-                      routing_reasoning: longString,
+                    attributes: Object.freeze({
+                      routing_reasoning: longEmojiString,
                       short_label: 'short',
-                    },
+                    }),
                     value: 123,
                   },
                 ],
@@ -133,8 +135,9 @@ describe('GCP Exporters', () => {
 
       const dpAttrs =
         mockMetrics.scopeMetrics[0].metrics[0].dataPoints[0].attributes;
-      expect(dpAttrs['routing_reasoning'].length).toBe(1024);
-      expect(dpAttrs['routing_reasoning']).toBe('a'.repeat(1024));
+
+      // '🎈' takes 2 UTF-16 code units. 1024 graphemes * 2 code units = 2048 code units.
+      expect(dpAttrs['routing_reasoning']).toBe('🎈'.repeat(1024));
       expect(dpAttrs['short_label']).toBe('short');
     });
 

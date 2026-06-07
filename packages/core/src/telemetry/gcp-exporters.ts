@@ -39,20 +39,31 @@ export class GcpTraceExporter extends TraceExporter {
 /**
  * Truncates attribute string values to 1024 characters.
  */
-function truncateAttributes(attributes: Record<string, unknown>): void {
+function truncateAttributes(
+  attributes: Record<string, unknown>,
+): Record<string, unknown> {
+  let cloned: Record<string, unknown> | undefined;
   for (const key of Object.keys(attributes)) {
     const val = attributes[key];
-    if (typeof val === 'string' && val.length > 1024) {
-      attributes[key] = val.substring(0, 1024);
+    if (typeof val === 'string') {
+      const chars = Array.from(val);
+      if (chars.length > 1024) {
+        if (!cloned) {
+          cloned = { ...attributes };
+        }
+        cloned[key] = chars.slice(0, 1024).join('');
+      }
     }
   }
+  return cloned ?? attributes;
 }
 
 function processDataPoint(
   dp: ResourceMetrics['scopeMetrics'][number]['metrics'][number]['dataPoints'][number],
 ): void {
   if (dp?.attributes) {
-    truncateAttributes(dp.attributes as Record<string, unknown>);
+    (dp as { attributes: Record<string, unknown> }).attributes =
+      truncateAttributes(dp.attributes as Record<string, unknown>);
   }
 }
 
@@ -75,7 +86,10 @@ function truncateMetricAttributes(metrics: ResourceMetrics): void {
   if (!metrics) return;
 
   if (metrics.resource?.attributes) {
-    truncateAttributes(metrics.resource.attributes as Record<string, unknown>);
+    (metrics.resource as { attributes: Record<string, unknown> }).attributes =
+      truncateAttributes(
+        metrics.resource.attributes as Record<string, unknown>,
+      );
   }
 
   metrics.scopeMetrics?.forEach(processScopeMetric);
