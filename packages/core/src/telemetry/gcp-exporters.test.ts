@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExportResultCode } from '@opentelemetry/core';
 import type { ReadableLogRecord } from '@opentelemetry/sdk-logs';
+import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
 import {
   GcpTraceExporter,
   GcpMetricExporter,
@@ -24,21 +25,40 @@ const mockLogging = {
   log: vi.fn().mockReturnValue(mockLog),
 };
 
-vi.mock('@google-cloud/opentelemetry-cloud-trace-exporter', () => ({
-  TraceExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn(),
-    shutdown: vi.fn(),
-    forceFlush: vi.fn(),
-  })),
-}));
+vi.mock('@google-cloud/opentelemetry-cloud-trace-exporter', () => {
+  class MockTraceExporter {
+    export(): void {}
+    shutdown(): Promise<void> {
+      return Promise.resolve();
+    }
+    forceFlush(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+  return {
+    TraceExporter: MockTraceExporter,
+  };
+});
 
-vi.mock('@google-cloud/opentelemetry-cloud-monitoring-exporter', () => ({
-  MetricExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn(),
-    shutdown: vi.fn(),
-    forceFlush: vi.fn(),
-  })),
-}));
+vi.mock('@google-cloud/opentelemetry-cloud-monitoring-exporter', () => {
+  class MockMetricExporter {
+    export(
+      metrics: unknown,
+      resultCallback: (result: { code: number }) => void,
+    ): void {
+      resultCallback({ code: 0 }); // 0 is ExportResultCode.SUCCESS
+    }
+    shutdown(): Promise<void> {
+      return Promise.resolve();
+    }
+    forceFlush(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+  return {
+    MetricExporter: MockMetricExporter,
+  };
+});
 
 vi.mock('@google-cloud/logging', () => ({
   Logging: vi.fn().mockImplementation(() => mockLogging),
@@ -66,6 +86,85 @@ describe('GCP Exporters', () => {
     it('should create a metric exporter without project ID', () => {
       const exporter = new GcpMetricExporter();
       expect(exporter).toBeDefined();
+    });
+
+    it('should truncate long metric attributes/labels to 1024 characters during export', () => {
+      const exporter = new GcpMetricExporter('test-project');
+
+      const longString = 'a'.repeat(2000);
+      const mockMetrics = {
+        resource: {
+          attributes: {
+            'resource.label': longString,
+          },
+        },
+        scopeMetrics: [
+          {
+            scope: {
+              name: 'test-scope',
+            },
+            metrics: [
+              {
+                descriptor: { name: 'test_metric' },
+                dataPoints: [
+                  {
+                    attributes: {
+                      routing_reasoning: longString,
+                      short_label: 'short',
+                    },
+                    value: 123,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const callback = vi.fn();
+      exporter.export(mockMetrics as unknown as ResourceMetrics, callback);
+
+      expect(mockMetrics.resource.attributes['resource.label'].length).toBe(
+        1024,
+      );
+      expect(mockMetrics.resource.attributes['resource.label']).toBe(
+        'a'.repeat(1024),
+      );
+
+      const dpAttrs =
+        mockMetrics.scopeMetrics[0].metrics[0].dataPoints[0].attributes;
+      expect(dpAttrs['routing_reasoning'].length).toBe(1024);
+      expect(dpAttrs['routing_reasoning']).toBe('a'.repeat(1024));
+      expect(dpAttrs['short_label']).toBe('short');
+    });
+
+    it('should handle undefined or empty fields defensively when exporting', () => {
+      const exporter = new GcpMetricExporter('test-project');
+
+      const mockMetrics = {
+        resource: undefined,
+        scopeMetrics: [
+          {
+            scope: undefined,
+            metrics: [
+              {
+                descriptor: { name: 'test_metric' },
+                dataPoints: [
+                  {
+                    attributes: undefined,
+                    value: 123,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const callback = vi.fn();
+      expect(() =>
+        exporter.export(mockMetrics as unknown as ResourceMetrics, callback),
+      ).not.toThrow();
     });
   });
 
