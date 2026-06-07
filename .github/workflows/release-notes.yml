@@ -97,6 +97,8 @@ jobs:
           body: |
             This PR contains the auto-generated changelog for the ${{ steps.release_info.outputs.VERSION }} release.
 
+            For troubleshooting the automated release notes, see the [maintenance guide](.gemini/skills/docs-changelog/references/changelog-automation.md).
+
             Please review and merge.
 
             Related to #18505
