@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Buffer } from 'node:buffer';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -451,19 +452,69 @@ function transformTextBlock(block: McpTextBlock): Part {
   return { text: block.text };
 }
 
+function sniffImageMimeType(base64Data: string): string | undefined {
+  try {
+    const bytes = Buffer.from(base64Data, 'base64');
+    if (bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF') {
+      return bytes.toString('ascii', 8, 12) === 'WEBP'
+        ? 'image/webp'
+        : undefined;
+    }
+    if (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    ) {
+      return 'image/png';
+    }
+    if (
+      bytes.length >= 3 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff
+    ) {
+      return 'image/jpeg';
+    }
+    if (
+      bytes.length >= 6 &&
+      (bytes.toString('ascii', 0, 6) === 'GIF87a' ||
+        bytes.toString('ascii', 0, 6) === 'GIF89a')
+    ) {
+      return 'image/gif';
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function mimeTypeForInlineData(declaredMimeType: string, data: string): string {
+  return sniffImageMimeType(data) ?? declaredMimeType;
+}
+
 function transformImageAudioBlock(
   block: McpMediaBlock,
   toolName: string,
 ): Part[] {
+  const mimeType =
+    block.type === 'image'
+      ? mimeTypeForInlineData(block.mimeType, block.data)
+      : block.mimeType;
   return [
     {
       text: `[Tool '${toolName}' provided the following ${
         block.type
-      } data with mime-type: ${block.mimeType}]`,
+      } data with mime-type: ${mimeType}]`,
     },
     {
       inlineData: {
-        mimeType: block.mimeType,
+        mimeType,
         data: block.data,
       },
     },
@@ -479,7 +530,8 @@ function transformResourceBlock(
     return { text: resource.text };
   }
   if (resource?.blob) {
-    const mimeType = resource.mimeType || 'application/octet-stream';
+    const declaredMimeType = resource.mimeType || 'application/octet-stream';
+    const mimeType = mimeTypeForInlineData(declaredMimeType, resource.blob);
     return [
       {
         text: `[Tool '${toolName}' provided the following embedded resource with mime-type: ${mimeType}]`,

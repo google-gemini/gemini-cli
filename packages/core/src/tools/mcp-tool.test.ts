@@ -630,6 +630,72 @@ describe('DiscoveredMCPTool', () => {
       );
     });
 
+    it('should correct a misreported WebP image MIME type', async () => {
+      const webpData = 'UklGRnh4eHhXRUJQVlA4IA==';
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'image',
+              data: webpData,
+              mimeType: 'image/png',
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build({ param: 'image' });
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: webpData,
+          },
+        },
+      ]);
+    });
+
+    it('should correct embedded WebP resource MIME type', async () => {
+      const webpData = 'UklGRnh4eHhXRUJQVlA4IA==';
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'resource',
+              resource: {
+                blob: webpData,
+                mimeType: 'image/png',
+              },
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build({ param: 'resource' });
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: webpData,
+          },
+        },
+      ]);
+    });
+
     it('should ignore unknown content block types', async () => {
       const params = { param: 'test' };
       mockCallTool.mockResolvedValue(
