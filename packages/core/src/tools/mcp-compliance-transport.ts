@@ -11,6 +11,10 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import { EventEmitter } from 'node:events';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * A wrapper transport that intercepts messages from MCP servers and fixes
  * non-compliant responses.
@@ -87,11 +91,11 @@ export class McpComplianceTransport extends EventEmitter implements Transport {
       if (firstItem.type === 'text' && typeof firstItem.text === 'string') {
         try {
           // Attempt to parse the text as JSON
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const parsed = JSON.parse(firstItem.text);
-          // If successful, populate structuredContent
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          result.structuredContent = parsed;
+          const parsed: unknown = JSON.parse(firstItem.text);
+          if (isRecord(parsed)) {
+            // If successful, populate structuredContent
+            result.structuredContent = parsed;
+          }
         } catch {
           // Ignored: Content is likely plain text, not JSON.
         }
