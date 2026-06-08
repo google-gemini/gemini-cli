@@ -221,10 +221,15 @@ export function classifyGoogleError(error: unknown): unknown {
   const status = googleApiError?.code ?? getErrorStatus(error);
   const errorMessage =
     googleApiError?.message ||
-    (error instanceof Error ? error.message : String(error));
+    (error instanceof Error ? error.message : String(error)) ||
+    '';
 
   if (status === 404) {
-    return new ModelNotFoundError(errorMessage || 'Model not found', status);
+    const message =
+      googleApiError?.message?.trim() ||
+      (error instanceof Error ? error.message?.trim() : '') ||
+      'Model not found';
+    return new ModelNotFoundError(message, status);
   }
 
   // Check for 403 VALIDATION_REQUIRED errors from Cloud Code API
@@ -236,12 +241,10 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   // Universal limit: 0 check (moved outside and before the fallback block)
+  const lowerMessage = errorMessage.toLowerCase();
   if (
-    (status === 429 ||
-      status === 499 ||
-      status === 503 ||
-      status === undefined) &&
-    /(?:Quota exceeded|quota_exceeded).*limit:\s*0(?!\d|\.)/i.test(errorMessage)
+    (status === 429 || status === 499 || status === 503) &&
+    /limit:\s*0(?!\d|\.\d)/.test(lowerMessage)
   ) {
     const cause = googleApiError ?? {
       code: status ?? 429,
