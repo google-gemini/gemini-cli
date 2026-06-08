@@ -576,11 +576,9 @@ export function isActiveModel(
 }
 
 export const VERTEX_AI_MODEL_MAPPINGS: Record<string, string> = {
-  'gemini-3-flash': 'gemini-3.5-flash',
-  'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
+  SECONDARY_GEMINI_3_5_FLASH_MODEL: DEFAULT_GEMINI_3_5_FLASH_MODEL,
 };
 
 export const GEMINI_API_MODEL_MAPPINGS: Record<string, string> = {
-  'gemini-3-flash': 'gemini-3.5-flash',
-  'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
+  SECONDARY_GEMINI_3_5_FLASH_MODEL: DEFAULT_GEMINI_3_5_FLASH_MODEL,
 };
