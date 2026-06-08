@@ -5387,6 +5387,43 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('ghost text wrapping', () => {
+    it('does not freeze when ghost text contains wide chars and inputWidth is narrow', async () => {
+      // Regression test for issue #19985: when inputWidth (1) is smaller than a
+      // wide character's rendered width (2 for emoji), the inner for-loop
+      // consumed nothing and splitIndex stayed 0, so cpSlice(word, 0) returned
+      // the full word unchanged, causing an infinite while loop.
+      props.inputWidth = 1;
+      props.suggestionsWidth = 1;
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        promptCompletion: {
+          text: '😀',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: vi.fn(),
+        },
+      });
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.cursor = [0, 0];
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      // If the infinite-loop bug is present this waitFor will time out; with
+      // the fix the component renders immediately.
+      await waitFor(() => {
+        expect(lastFrame()).toBeDefined();
+      });
+      unmount();
+    });
+  });
+
   describe('terminal buffer rendering', () => {
     it('does not clip the last char of a visual line whose width equals inputWidth', async () => {
       const fullLine = '1234567890'; // 10 chars, exactly props.inputWidth

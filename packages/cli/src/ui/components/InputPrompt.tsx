@@ -1515,6 +1515,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 partWidth += charWidth;
                 splitIndex = i + 1;
               }
+              // When inputWidth is narrower than a single codepoint, nothing
+              // fits and splitIndex stays 0, causing an infinite loop. Force-
+              // advance by one codepoint so the loop always terminates.
+              if (splitIndex === 0 && wordCP.length > 0) {
+                part = wordCP[0];
+                splitIndex = 1;
+              }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);
             }
