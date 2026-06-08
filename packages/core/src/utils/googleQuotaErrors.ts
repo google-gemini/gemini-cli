@@ -219,16 +219,10 @@ function classifyValidationRequiredError(
 export function classifyGoogleError(error: unknown): unknown {
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
-  const errorMessage =
-    googleApiError?.message ||
-    (error instanceof Error ? error.message : String(error)) ||
-    '';
+  const errorMessage = googleApiError?.message || extractErrorMessage(error);
 
   if (status === 404) {
-    const message =
-      googleApiError?.message?.trim() ||
-      (error instanceof Error ? error.message?.trim() : '') ||
-      'Model not found';
+    const message = errorMessage.trim() || 'Model not found';
     return new ModelNotFoundError(message, status);
   }
 
@@ -411,4 +405,17 @@ export function classifyGoogleError(error: unknown): unknown {
   // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
   return new RetryableQuotaError(errorMessage, googleApiError);
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const msg = (error as { message: unknown }).message;
+    if (typeof msg === 'string') {
+      return msg;
+    }
+  }
+  return '';
 }

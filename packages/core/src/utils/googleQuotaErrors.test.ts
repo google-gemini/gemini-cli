@@ -898,6 +898,25 @@ describe('classifyGoogleError', () => {
     expect((result as ModelNotFoundError).message).toBe('Model not found');
   });
 
+  it('should parse custom 404 message from plain object correctly', () => {
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    const result = classifyGoogleError({
+      status: 404,
+      message: 'Custom 404 message',
+    });
+    expect(result).toBeInstanceOf(ModelNotFoundError);
+    expect((result as ModelNotFoundError).message).toBe('Custom 404 message');
+  });
+
+  it('should classify plain object with limit: 0 message as TerminalQuotaError correctly', () => {
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+    const result = classifyGoogleError({
+      status: 429,
+      message: 'Quota exceeded, limit: 0',
+    });
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
   it('should handle Error instances with undefined message gracefully', () => {
     const malformedError = new Error();
     delete (malformedError as { message?: string }).message;
