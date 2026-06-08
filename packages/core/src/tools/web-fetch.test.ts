@@ -27,6 +27,7 @@ import {
   type ToolConfirmationResponse,
 } from '../confirmation-bus/types.js';
 import { randomUUID } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
@@ -52,13 +53,15 @@ vi.mock('../utils/fetch.js', async (importOriginal) => {
   return {
     ...actual,
     fetchWithTimeout: vi.fn(),
-    isPrivateIpAsync: vi.fn().mockResolvedValue(false),
+    resolveAndValidateDns: vi.fn().mockResolvedValue(['8.8.8.8']),
   };
 });
 
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
+
+vi.mock('node:dns/promises');
 
 /**
  * Helper to mock fetchWithTimeout with URL matching.
@@ -67,7 +70,16 @@ const mockFetch = (url: string, response: Partial<Response> | Error) =>
   vi
     .spyOn(fetchUtils, 'fetchWithTimeout')
     .mockImplementation(async (actualUrl) => {
-      if (actualUrl !== url) {
+      let pinnedUrlStr = url;
+      try {
+        const u = new URL(url);
+        u.hostname = '8.8.8.8';
+        pinnedUrlStr = u.toString();
+      } catch {
+        // ignore error
+      }
+
+      if (actualUrl !== url && actualUrl !== pinnedUrlStr) {
         throw new Error(
           `Unexpected fetch URL: expected "${url}", got "${actualUrl}"`,
         );
@@ -270,6 +282,10 @@ describe('WebFetchTool', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(lookup).mockResolvedValue([
+      { address: '8.8.8.8', family: 4 },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any);
     bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
     mockConfig = {
@@ -376,7 +392,9 @@ describe('WebFetchTool', () => {
 
   describe('execute', () => {
     it('should return WEB_FETCH_PROCESSING_ERROR on rate limit exceeded', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
       mockGenerateContent.mockResolvedValue({
         candidates: [{ content: { parts: [{ text: 'response' }] } }],
       });
@@ -400,7 +418,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should skip rate-limited URLs but fetch others', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
 
       const tool = new WebFetchTool(mockConfig, bus);
       const params = {
@@ -439,8 +459,8 @@ describe('WebFetchTool', () => {
     });
 
     it('should skip private or local URLs but fetch others and log telemetry', async () => {
-      vi.mocked(fetchUtils.isPrivateIpAsync).mockImplementation(
-        async (url) => url === 'https://private.com/',
+      vi.mocked(fetchUtils.resolveAndValidateDns).mockImplementation(
+        async (url) => (url === 'https://private.com/' ? [] : ['8.8.8.8']),
       );
 
       const tool = new WebFetchTool(mockConfig, bus);
@@ -475,7 +495,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should fallback to all public URLs if primary fails', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
 
       // Primary fetch fails
       mockGenerateContent.mockRejectedValueOnce(new Error('primary fail'));
@@ -511,8 +533,8 @@ describe('WebFetchTool', () => {
     });
 
     it('should NOT include private URLs in fallback', async () => {
-      vi.mocked(fetchUtils.isPrivateIpAsync).mockImplementation(
-        async (url) => url === 'https://private.com/',
+      vi.mocked(fetchUtils.resolveAndValidateDns).mockImplementation(
+        async (url) => (url === 'https://private.com/' ? [] : ['8.8.8.8']),
       );
 
       // Primary fetch fails
@@ -542,7 +564,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should return WEB_FETCH_FALLBACK_FAILED on total failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
       mockGenerateContent.mockRejectedValue(new Error('primary fail'));
       mockFetch('https://public.ip/', new Error('fallback fetch failed'));
       const tool = new WebFetchTool(mockConfig, bus);
@@ -555,7 +579,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should log telemetry when falling back due to primary fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
       // Mock primary fetch to return empty response, triggering fallback
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
@@ -587,7 +613,9 @@ describe('WebFetchTool', () => {
   describe('execute (fallback)', () => {
     beforeEach(() => {
       // Force fallback by mocking primary fetch to fail
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
       });
@@ -925,7 +953,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should execute normally after confirmation approval', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
       mockGenerateContent.mockResolvedValue({
         candidates: [
           {
@@ -959,7 +989,9 @@ describe('WebFetchTool', () => {
   describe('execute (experimental)', () => {
     beforeEach(() => {
       vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+        '8.8.8.8',
+      ]);
     });
 
     it('should perform direct fetch and return text for plain text content', async () => {
@@ -980,7 +1012,7 @@ describe('WebFetchTool', () => {
       expect(result.llmContent).toBe(content);
       expect(result.returnDisplay).toContain('Fetched text/plain content');
       expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
-        'https://example.com/',
+        'https://8.8.8.8/',
         expect.any(Number),
         expect.objectContaining({
           headers: expect.objectContaining({
@@ -1136,7 +1168,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should block private IP (experimental)', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(true);
+      vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([]);
       const tool = new WebFetchTool(mockConfig, bus);
       const invocation = tool['createInvocation'](
         { url: 'http://localhost' },
@@ -1178,7 +1210,7 @@ describe('WebFetchTool', () => {
         {
           label: '127.0.0.1.nip.io (nip.io loopback bypass)',
           url: 'http://127.0.0.1.nip.io',
-          // DNS resolves to 127.0.0.1 — mocked via isPrivateIpAsync
+          // DNS resolves to 127.0.0.1 — mocked via resolveAndValidateDns
           dnsPrivate: true,
         },
         {
@@ -1188,7 +1220,7 @@ describe('WebFetchTool', () => {
         },
       ])('should block $label', async ({ url, dnsPrivate }) => {
         if (dnsPrivate) {
-          vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(true);
+          vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([]);
         }
         const tool = new WebFetchTool(mockConfig, bus);
         const invocation = tool['createInvocation']({ url }, bus);
@@ -1205,7 +1237,9 @@ describe('WebFetchTool', () => {
       });
 
       it('should allow a public URL (https://google.com)', async () => {
-        vi.spyOn(fetchUtils, 'isPrivateIpAsync').mockResolvedValue(false);
+        vi.spyOn(fetchUtils, 'resolveAndValidateDns').mockResolvedValue([
+          '8.8.8.8',
+        ]);
         const content = 'Google homepage';
         mockFetch('https://google.com/', {
           status: 200,
@@ -1227,8 +1261,8 @@ describe('WebFetchTool', () => {
         // Override the outer beforeEach that enables experimental mode
         vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(false);
         // Simulate DNS resolving the hostname to a private IP
-        vi.mocked(fetchUtils.isPrivateIpAsync).mockImplementation(async (url) =>
-          url.includes('127.0.0.1.nip.io'),
+        vi.mocked(fetchUtils.resolveAndValidateDns).mockImplementation(
+          async (url) => (url.includes('127.0.0.1.nip.io') ? [] : ['8.8.8.8']),
         );
 
         const tool = new WebFetchTool(mockConfig, bus);

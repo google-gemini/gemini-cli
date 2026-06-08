@@ -22,7 +22,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import {
   fetchWithTimeout,
   isLoopbackHost,
-  isPrivateIpAsync,
+  resolveAndValidateDns,
 } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
@@ -271,26 +271,34 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private async isBlockedHost(urlStr: string): Promise<boolean> {
+  private async isBlockedHost(urlStr: string): Promise<string | null> {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname.toLowerCase();
       // Block loopback and unspecified addresses by literal name/IP without DNS
-      // (covers localhost, 127.0.0.1, ::1, [::1], 0.0.0.0)
-      if (isLoopbackHost(hostname) || hostname === '0.0.0.0') {
-        return true;
+      // (covers localhost, 127.0.0.1, ::1, [::1], 0.0.0.0, [::])
+      if (
+        isLoopbackHost(hostname) ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::]'
+      ) {
+        return null;
       }
       // Resolve DNS to catch hostname-to-private-IP bypasses such as
       // 127.0.0.1.nip.io, 169.254.169.254.nip.io, or attacker-controlled DNS
       try {
-        return await isPrivateIpAsync(urlStr);
+        const safeIps = await resolveAndValidateDns(urlStr);
+        if (safeIps.length === 0) {
+          return null;
+        }
+        return safeIps[0];
       } catch {
         // DNS resolution failed — deny by default to avoid SSRF via
         // unresolvable or ambiguous hostnames
-        return true;
+        return null;
       }
     } catch {
-      return true;
+      return null;
     }
   }
 
@@ -299,21 +307,31 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (await this.isBlockedHost(url)) {
+    const pinnedIp = await this.isBlockedHost(url);
+    if (!pinnedIp) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
       );
     }
 
+    const urlWithIp = new URL(url);
+    const originalHostname = urlWithIp.hostname;
+    urlWithIp.hostname = pinnedIp;
+
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-          signal,
-          headers: {
-            'User-Agent': USER_AGENT,
+        const res = await fetchWithTimeout(
+          urlWithIp.toString(),
+          URL_FETCH_TIMEOUT_MS,
+          {
+            signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+              Host: originalHostname,
+            },
           },
-        });
+        );
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -373,7 +391,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (await this.isBlockedHost(url)) {
+      if (!(await this.isBlockedHost(url))) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -629,7 +647,8 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (await this.isBlockedHost(url)) {
+    const pinnedIp = await this.isBlockedHost(url);
+    if (!pinnedIp) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -645,16 +664,25 @@ ${aggregatedContent}
     }
 
     try {
+      const urlWithIp = new URL(url);
+      const originalHostname = urlWithIp.hostname;
+      urlWithIp.hostname = pinnedIp;
+
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              Accept:
-                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
-              'User-Agent': USER_AGENT,
+          const res = await fetchWithTimeout(
+            urlWithIp.toString(),
+            URL_FETCH_TIMEOUT_MS,
+            {
+              signal,
+              headers: {
+                Accept:
+                  'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+                'User-Agent': USER_AGENT,
+                Host: originalHostname,
+              },
             },
-          });
+          );
           return res;
         },
         {
