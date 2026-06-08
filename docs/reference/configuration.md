@@ -1042,13 +1042,15 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "hasAccessToPreview": false,
               "useGemini3_5Flash": true
             },
             "target": "gemini-3.5-flash"
           },
           {
             "condition": {
-              "hasAccessToPreview": false
+              "hasAccessToPreview": false,
+              "useGemini3_5Flash": false
             },
             "target": "gemini-2.5-flash"
           }

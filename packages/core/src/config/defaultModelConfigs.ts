@@ -469,9 +469,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3-flash-preview': {
       default: 'gemini-3-flash-preview',
       contexts: [
-        { condition: { useGemini3_5Flash: true }, target: 'gemini-3.5-flash' },
         {
-          condition: { hasAccessToPreview: false },
+          condition: { hasAccessToPreview: false, useGemini3_5Flash: true },
+          target: 'gemini-3.5-flash',
+        },
+        {
+          condition: { hasAccessToPreview: false, useGemini3_5Flash: false },
           target: 'gemini-2.5-flash',
         },
       ],
