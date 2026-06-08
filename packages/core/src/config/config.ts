@@ -3564,7 +3564,7 @@ export class Config implements McpContext, AgentLoopContext {
       // Gemini API key users should have the ability to manually select the
       // old preview flash model.
       if (authType === AuthType.USE_GEMINI) {
-        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+        setFlashModels('gemini-3-flash-preview', 'gemini-3-flash');
       } else {
         setFlashModels('gemini-3-flash', 'gemini-3-flash');
       }

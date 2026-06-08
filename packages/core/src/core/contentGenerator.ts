@@ -30,6 +30,11 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
+import {
+  VERTEX_AI_MODEL_MAPPINGS,
+  GEMINI_API_MODEL_MAPPINGS,
+} from '../config/models.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -375,7 +380,19 @@ export async function createContentGenerator(
           },
         }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      let generator: ContentGenerator = googleGenAI.models;
+      if (config.authType === AuthType.USE_VERTEX_AI) {
+        generator = new ModelMappingContentGenerator(
+          generator,
+          VERTEX_AI_MODEL_MAPPINGS,
+        );
+      } else if (config.authType === AuthType.USE_GEMINI) {
+        generator = new ModelMappingContentGenerator(
+          generator,
+          GEMINI_API_MODEL_MAPPINGS,
+        );
+      }
+      return new LoggingContentGenerator(generator, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
