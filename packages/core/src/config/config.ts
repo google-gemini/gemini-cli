@@ -694,6 +694,7 @@ export interface ConfigParameters {
   fakeResponsesNonStrict?: string;
   recordResponses?: string;
   ptyInfo?: string;
+  promptReplayCache?: { enabled?: boolean; ttl?: number };
   disableYoloMode?: boolean;
   disableAlwaysAllow?: boolean;
   voiceMode?: boolean;
@@ -927,6 +928,8 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly fakeResponsesNonStrict?: string;
   readonly recordResponses?: string;
+  readonly promptReplayCacheEnabled: boolean;
+  readonly promptReplayCacheTtl: number;
   private readonly disableYoloMode: boolean;
   private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
@@ -1308,6 +1311,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.fakeResponses = params.fakeResponses;
     this.fakeResponsesNonStrict = params.fakeResponsesNonStrict;
     this.recordResponses = params.recordResponses;
+    this.promptReplayCacheEnabled = params.promptReplayCache?.enabled ?? false;
+    this.promptReplayCacheTtl = params.promptReplayCache?.ttl ?? 3600;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;

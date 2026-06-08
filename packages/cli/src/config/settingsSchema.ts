@@ -2429,6 +2429,38 @@ const SETTINGS_SCHEMA = {
           'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
         showInDialog: false,
       },
+      promptReplayCache: {
+        type: 'object',
+        label: 'Prompt Replay Cache',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Cache model responses for identical prompts to reduce latency and cost.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Prompt Replay Cache',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: false,
+            description:
+              'When enabled, identical prompts within the same project will return cached responses instead of calling the API.',
+            showInDialog: true,
+          },
+          ttl: {
+            type: 'number',
+            label: 'Cache TTL (seconds)',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 3600,
+            description:
+              'Time-to-live for cache entries in seconds. Default: 3600 (1 hour).',
+            showInDialog: true,
+          },
+        },
+      },
       autoMemory: {
         type: 'boolean',
         label: 'Auto Memory',

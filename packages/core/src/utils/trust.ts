@@ -289,12 +289,19 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
       const content = fs.readFileSync(userPath, 'utf-8');
       const parsed = parseTrustedFoldersJson(content);
 
-      if (!isRecord(parsed)) {
-        errors.push({
-          message: 'Trusted folders file is not a valid JSON object.',
-          path: userPath,
-        });
-      } else {
+      if (Array.isArray(parsed)) {
+        for (const rawPath of parsed) {
+          if (typeof rawPath !== 'string' || rawPath.trim() === '') {
+            errors.push({
+              message: `Invalid entry "${String(rawPath)}" in trusted folders list. Each entry must be a non-empty path string.`,
+              path: userPath,
+            });
+            continue;
+          }
+          const normalizedPath = normalizePath(rawPath);
+          userConfig[normalizedPath] = TrustLevel.TRUST_FOLDER;
+        }
+      } else if (isRecord(parsed)) {
         for (const [rawPath, trustLevel] of Object.entries(parsed)) {
           const normalizedPath = normalizePath(rawPath);
           if (isTrustLevel(trustLevel)) {
@@ -307,6 +314,12 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
             });
           }
         }
+      } else {
+        errors.push({
+          message:
+            'Trusted folders file must be a JSON array of paths or an object mapping paths to trust levels.',
+          path: userPath,
+        });
       }
     }
   } catch (error) {

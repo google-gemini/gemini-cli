@@ -567,6 +567,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
       skipTrust: undefined,
+      promptReplayCache: undefined,
+      promptReplayCacheTtl: undefined,
     });
 
     await act(async () => {
@@ -627,6 +629,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
       skipTrust: undefined,
+      promptReplayCache: undefined,
+      promptReplayCacheTtl: undefined,
     });
 
     await act(async () => {

@@ -318,6 +318,15 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'logs');
   }
 
+  getProjectPromptCacheDir(): string {
+    return path.join(this.getProjectTempDir(), 'prompt-cache');
+  }
+
+  getProjectPromptCacheDirSafe(): string | null {
+    if (!this.projectIdentifier) return null;
+    return path.join(this.getProjectTempDir(), 'prompt-cache');
+  }
+
   getProjectTempPlansDir(): string {
     if (this.sessionId) {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
