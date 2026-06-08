@@ -229,6 +229,62 @@ export async function fetchWithTimeout(
   }
 }
 
+const MAX_SAFE_REDIRECTS = 5;
+
+/**
+ * Throws PrivateIpError if the url targets a private, loopback, link local, or
+ * otherwise non public address. It checks both the literal hostname and the
+ * address the hostname resolves to, so it stops IP literals such as
+ * 169.254.169.254 and hostnames such as metadata.google.internal that resolve
+ * to a private address.
+ */
+export async function assertUrlIsPublic(url: string): Promise<void> {
+  if (isPrivateIp(url)) {
+    throw new PrivateIpError(
+      `Access to private or internal address ${url} is blocked`,
+    );
+  }
+  if (await isPrivateIpAsync(url)) {
+    throw new PrivateIpError(
+      `Host ${url} resolves to a private or internal address and is blocked`,
+    );
+  }
+}
+
+/**
+ * Fetches a url while enforcing the SSRF guard on the initial request and on
+ * every redirect hop. Redirects are followed manually so the resolved target
+ * of each hop is validated before the connection is made. Use this for any
+ * fetch whose url can be influenced by untrusted content.
+ */
+export async function safeFetchFollowingRedirects(
+  url: string,
+  timeout: number,
+  options?: RequestInit,
+): Promise<Response> {
+  let currentUrl = url;
+  for (let hop = 0; hop <= MAX_SAFE_REDIRECTS; hop++) {
+    await assertUrlIsPublic(currentUrl);
+    const response = await fetchWithTimeout(currentUrl, timeout, {
+      ...options,
+      redirect: 'manual',
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) {
+        return response;
+      }
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+    return response;
+  }
+  throw new FetchError(
+    `Too many redirects while fetching ${url}`,
+    'ETOOMANYREDIRECTS',
+  );
+}
+
 export function setGlobalProxy(proxy: string) {
   const trimmedProxy = proxy.trim();
   currentProxy = trimmedProxy;
