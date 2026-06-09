@@ -1458,6 +1458,49 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should refresh with the stored client ID when config has none', async () => {
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        ...mockConfig,
+        clientId: undefined,
+      });
+
+      expect(result).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_id=registered-client-id',
+      );
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.any(Object),
+        'registered-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+      expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+    });
+
     it('should return null when no credentials exist', async () => {
       const tokenStorage = new MCPOAuthTokenStorage();
       vi.mocked(tokenStorage.getCredentials).mockResolvedValue(null);
@@ -1539,6 +1582,51 @@ describe('MCPOAuthProvider', () => {
       );
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getValidTokenWithMetadata', () => {
+    it('should refresh with the stored client ID when config has none', async () => {
+      const expiredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'registered-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        expiredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        { ...mockConfig, clientId: undefined },
+      );
+
+      expect(result?.accessToken).toBe('access_token_123');
+      expect(mockFetch.mock.calls[0][1].body).toContain(
+        'client_id=registered-client-id',
+      );
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.any(Object),
+        'registered-client-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+      expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
     });
   });
 
