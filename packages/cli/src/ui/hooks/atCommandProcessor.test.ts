@@ -1501,6 +1501,57 @@ describe('handleAtCommand', () => {
     }
   });
 
+  it('should scope glob fallback to each workspace directory', async () => {
+    const secondRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'second-root-'),
+    );
+    try {
+      vi.spyOn(
+        mockConfig.getWorkspaceContext(),
+        'getDirectories',
+      ).mockReturnValue([testRootDir, secondRootDir]);
+
+      const buildAndExecute = vi.fn().mockResolvedValue({
+        llmContent: 'No files found',
+        returnDisplay: 'No files found',
+      });
+      vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+        getTool: vi.fn((name: string) =>
+          name === 'glob' ? { buildAndExecute } : undefined,
+        ),
+      } as unknown as ToolRegistry);
+
+      await handleAtCommand({
+        query: '@missing-file.txt',
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 702,
+        signal: abortController.signal,
+      });
+
+      expect(buildAndExecute).toHaveBeenCalledTimes(2);
+      expect(buildAndExecute).toHaveBeenNthCalledWith(
+        1,
+        {
+          pattern: '**/*missing-file.txt*',
+          dir_path: testRootDir,
+        },
+        abortController.signal,
+      );
+      expect(buildAndExecute).toHaveBeenNthCalledWith(
+        2,
+        {
+          pattern: '**/*missing-file.txt*',
+          dir_path: secondRootDir,
+        },
+        abortController.signal,
+      );
+    } finally {
+      await fsPromises.rm(secondRootDir, { recursive: true, force: true });
+    }
+  });
+
   it('should attempt glob fallback if direct resolution is unauthorized', async () => {
     const fileContent = 'Globbed content';
     const filePath = await createTestFile(

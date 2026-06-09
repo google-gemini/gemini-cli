@@ -314,7 +314,7 @@ async function resolveFilePaths(
             const globResult = await globTool.buildAndExecute(
               {
                 pattern: `**/*${pathName}*`,
-                path: dir,
+                dir_path: dir,
               },
               signal,
             );
