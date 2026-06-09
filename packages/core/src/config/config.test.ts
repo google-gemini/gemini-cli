@@ -4357,7 +4357,7 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     cwd: '.',
   };
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
 
@@ -4375,11 +4375,11 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     const result = config.hasGemini35FlashGAAccess();
     expect(result).toBe(true);
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3-flash');
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
 
@@ -4397,7 +4397,7 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     const result = config.hasGemini35FlashGAAccess();
     expect(result).toBe(true);
 
-    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3-flash');
-    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash');
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
   });
 });
