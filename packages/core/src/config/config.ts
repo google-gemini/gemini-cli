@@ -3561,7 +3561,14 @@ export class Config implements McpContext, AgentLoopContext {
     // Used to set default flash models based on access
     // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
     if (hasAccess) {
-      setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+      if (
+        authType === AuthType.USE_GEMINI ||
+        authType === AuthType.USE_VERTEX_AI
+      ) {
+        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+      } else {
+        setFlashModels('gemini-3-flash', 'gemini-3-flash');
+      }
     } else {
       setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
     }
