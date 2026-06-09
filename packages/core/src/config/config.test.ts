@@ -70,6 +70,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  setFlashModels,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -4356,6 +4357,10 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     model: 'test-model',
     cwd: '.',
   };
+
+  afterEach(() => {
+    setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+  });
 
   it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
     const config = new Config(baseParams);
