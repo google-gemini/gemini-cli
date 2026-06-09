@@ -1839,6 +1839,35 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should submit on Enter when @-path completion is loading with no suggestions', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [],
+      activeSuggestionIndex: -1,
+      isLoadingSuggestions: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.setText('review @missing-file');
+
+    const { stdin, unmount } = await renderWithProviders(
+      <TestInputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith('review @missing-file');
+    });
+    expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should add a newline on enter when the line ends with a backslash', async () => {
     // This test simulates multi-line input, not submission
     mockBuffer.text = 'first line\\';

@@ -1093,6 +1093,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
+          const isEnterKey = keyMatchers[Command.SUBMIT](key);
+          if (completion.suggestions.length === 0) {
+            if (
+              isEnterKey &&
+              completion.completionMode === CompletionMode.AT &&
+              buffer.text.trim()
+            ) {
+              completion.resetCompletionState();
+              setExpandedSuggestionIndex(-1);
+              handleSubmit(buffer.text);
+            }
+            return true;
+          }
+
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -1101,8 +1115,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
             if (targetIndex < completion.suggestions.length) {
               const suggestion = completion.suggestions[targetIndex];
-
-              const isEnterKey = key.name === 'enter' && !key.ctrl;
 
               if (isEnterKey && shellModeActive) {
                 if (hasUserNavigatedSuggestions.current) {
