@@ -18,13 +18,13 @@ import { HttpProxyAgent } from 'http-proxy-agent';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
+import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { resetVersionCache } from '../utils/version.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
-import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
-import { GEMINI_API_MODEL_MAPPINGS } from '../config/models.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -153,7 +153,10 @@ describe('createContentGenerator', () => {
     );
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toEqual(
-      new LoggingContentGenerator(mockGenerator, mockConfig),
+      new LoggingContentGenerator(
+        new ModelMappingContentGenerator(mockGenerator, CCPA_AI_MODEL_MAPPINGS),
+        mockConfig,
+      ),
     );
   });
 
@@ -170,7 +173,10 @@ describe('createContentGenerator', () => {
     );
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
     expect(generator).toEqual(
-      new LoggingContentGenerator(mockGenerator, mockConfig),
+      new LoggingContentGenerator(
+        new ModelMappingContentGenerator(mockGenerator, CCPA_AI_MODEL_MAPPINGS),
+        mockConfig,
+      ),
     );
   });
 
@@ -212,13 +218,7 @@ describe('createContentGenerator', () => {
       }),
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        new ModelMappingContentGenerator(
-          mockGenerator.models,
-          GEMINI_API_MODEL_MAPPINGS,
-        ),
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 
@@ -755,13 +755,7 @@ describe('createContentGenerator', () => {
       }),
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        new ModelMappingContentGenerator(
-          mockGenerator.models,
-          GEMINI_API_MODEL_MAPPINGS,
-        ),
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 
@@ -1119,7 +1113,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should apply model mapping for Vertex AI', async () => {
+  it('should not apply model mapping for Vertex AI', async () => {
     const mockModels = {
       generateContent: vi.fn().mockResolvedValue({}),
     };
@@ -1148,14 +1142,14 @@ describe('createContentGenerator', () => {
 
     expect(mockModels.generateContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3-flash',
       }),
       'prompt-id',
       'user',
     );
   });
 
-  it('should apply model mapping for Gemini API', async () => {
+  it('should not apply model mapping for Gemini API', async () => {
     const mockModels = {
       generateContent: vi.fn().mockResolvedValue({}),
     };
@@ -1183,7 +1177,42 @@ describe('createContentGenerator', () => {
 
     expect(mockModels.generateContent).toHaveBeenCalledWith(
       expect.objectContaining({
+        model: 'gemini-3-flash',
+      }),
+      'prompt-id',
+      'user',
+    );
+  });
+
+  it('should apply model mapping for inverse cases (e.g. GATEWAY)', async () => {
+    const mockModels = {
+      generateContent: vi.fn().mockResolvedValue({}),
+    };
+    const mockGenerator = {
+      models: mockModels,
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    const generator = await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.GATEWAY,
+      },
+      mockConfig,
+    );
+
+    await generator.generateContent(
+      {
         model: 'gemini-3.5-flash',
+        contents: [],
+      },
+      'prompt-id',
+      'user' as LlmRole,
+    );
+
+    expect(mockModels.generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-3-flash',
       }),
       'prompt-id',
       'user',
