@@ -3009,6 +3009,45 @@ describe('useGeminiStream', () => {
     );
   });
 
+  it('should show responding state while @-command preprocessing is pending', async () => {
+    const rawQuery = '@missing-file Summarize this.';
+    let resolveAtCommand!: (value: {
+      processedQuery: string;
+      shouldProceed: true;
+    }) => void;
+    handleAtCommandSpy.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAtCommand = resolve;
+        }),
+    );
+
+    const { result } = await renderTestHook();
+    let submitPromise!: ReturnType<typeof result.current.submitQuery>;
+
+    await act(async () => {
+      submitPromise = result.current.submitQuery(rawQuery);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+    });
+    expect(mockSendMessageStream).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveAtCommand({
+        processedQuery: rawQuery,
+        shouldProceed: true,
+      });
+      await submitPromise;
+    });
+
+    await waitFor(() => {
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+  });
+
   it('should display user query, then tool execution, then model response', async () => {
     const userQuery = 'read this @file(test.txt)';
     const toolExecutionMessage = 'Reading file: test.txt';

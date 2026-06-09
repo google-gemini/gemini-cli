@@ -944,6 +944,7 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
       prompt_id: string,
+      onAtCommandStart?: () => void,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -1023,6 +1024,7 @@ export const useGeminiStream = (
             { type: MessageType.USER, text: trimmedQuery },
             userMessageTimestamp,
           );
+          onAtCommandStart?.();
 
           const atCommandResult = await handleAtCommand({
             query: trimmedQuery,
@@ -1629,128 +1631,143 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
-
-            if (!shouldProceed || queryToSend === null) {
-              return;
-            }
-
-            if (!options?.isContinuation) {
-              if (typeof queryToSend === 'string') {
-                // logging the text prompts only for now
-                const promptText = queryToSend;
-                logUserPrompt(
-                  config,
-                  new UserPromptEvent(
-                    promptText.length,
-                    prompt_id!,
-                    config.getContentGeneratorConfig()?.authType,
-                    promptText,
-                  ),
-                );
+            let responseStateStarted = false;
+            const startResponding = () => {
+              if (!responseStateStarted) {
+                setIsResponding(true);
+                responseStateStarted = true;
               }
-              startNewPrompt();
-              setThought(null); // Reset thought when starting a new prompt
-            }
-
-            setIsResponding(true);
-            setInitError(null);
-
-            // Store query and prompt_id for potential retry on loop detection
-            lastQueryRef.current = queryToSend;
-            lastPromptIdRef.current = prompt_id!;
+            };
 
             try {
-              const stream = geminiClient.sendMessageStream(
-                queryToSend,
-                abortSignal,
-                prompt_id!,
-                undefined,
-                query,
-              );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+              const { queryToSend, shouldProceed } =
+                await prepareQueryForGemini(
+                  query,
+                  userMessageTimestamp,
+                  abortSignal,
+                  prompt_id!,
+                  startResponding,
+                );
 
-              if (processingStatus === StreamProcessingStatus.UserCancelled) {
+              if (!shouldProceed || queryToSend === null) {
                 return;
               }
 
-              if (pendingHistoryItemRef.current) {
-                addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-                setPendingHistoryItem(null);
-              }
-              if (loopDetectedRef.current) {
-                loopDetectedRef.current = false;
-                // Show the confirmation dialog to choose whether to disable loop detection
-                setLoopDetectionConfirmationRequest({
-                  onComplete: async (result: {
-                    userSelection: 'disable' | 'keep';
-                  }) => {
-                    setLoopDetectionConfirmationRequest(null);
-
-                    if (result.userSelection === 'disable') {
-                      config
-                        .getGeminiClient()
-                        .getLoopDetectionService()
-                        .disableForSession();
-                      addItem({
-                        type: 'info',
-                        text: `Loop detection has been disabled for this session. Retrying request...`,
-                      });
-
-                      if (lastQueryRef.current && lastPromptIdRef.current) {
-                        await submitQuery(
-                          lastQueryRef.current,
-                          { isContinuation: true },
-                          lastPromptIdRef.current,
-                        );
-                      }
-                    } else {
-                      addItem({
-                        type: 'info',
-                        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-                      });
-                    }
-                  },
-                });
-              }
-            } catch (error: unknown) {
-              spanMetadata.error = error;
-              if (error instanceof UnauthorizedError) {
-                onAuthError('Session expired or is unauthorized.');
-              } else if (
-                // Suppress ValidationRequiredError if it was marked as handled (e.g. user clicked change_auth or cancelled)
-                error instanceof ValidationRequiredError &&
-                error.userHandled
-              ) {
-                // Error was handled by validation dialog, don't display again
-              } else if (!isNodeError(error) || error.name !== 'AbortError') {
-                maybeAddSuppressedToolErrorNote(userMessageTimestamp);
-                addItem(
-                  {
-                    type: MessageType.ERROR,
-                    text: parseAndFormatApiError(
-                      getErrorMessage(error) || 'Unknown error',
+              if (!options?.isContinuation) {
+                if (typeof queryToSend === 'string') {
+                  // logging the text prompts only for now
+                  const promptText = queryToSend;
+                  logUserPrompt(
+                    config,
+                    new UserPromptEvent(
+                      promptText.length,
+                      prompt_id!,
                       config.getContentGeneratorConfig()?.authType,
-                      undefined,
-                      config.getModel(),
-                      DEFAULT_GEMINI_FLASH_MODEL,
+                      promptText,
                     ),
-                  },
-                  userMessageTimestamp,
+                  );
+                }
+                startNewPrompt();
+                setThought(null); // Reset thought when starting a new prompt
+              }
+
+              startResponding();
+              setInitError(null);
+
+              // Store query and prompt_id for potential retry on loop detection
+              lastQueryRef.current = queryToSend;
+              lastPromptIdRef.current = prompt_id!;
+
+              try {
+                const stream = geminiClient.sendMessageStream(
+                  queryToSend,
+                  abortSignal,
+                  prompt_id!,
+                  undefined,
+                  query,
                 );
-                maybeAddLowVerbosityFailureNote(userMessageTimestamp);
+                const processingStatus = await processGeminiStreamEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
+
+                if (processingStatus === StreamProcessingStatus.UserCancelled) {
+                  return;
+                }
+
+                if (pendingHistoryItemRef.current) {
+                  addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+                  setPendingHistoryItem(null);
+                }
+                if (loopDetectedRef.current) {
+                  loopDetectedRef.current = false;
+                  // Show the confirmation dialog to choose whether to disable loop detection
+                  setLoopDetectionConfirmationRequest({
+                    onComplete: async (result: {
+                      userSelection: 'disable' | 'keep';
+                    }) => {
+                      setLoopDetectionConfirmationRequest(null);
+
+                      if (result.userSelection === 'disable') {
+                        config
+                          .getGeminiClient()
+                          .getLoopDetectionService()
+                          .disableForSession();
+                        addItem({
+                          type: 'info',
+                          text: `Loop detection has been disabled for this session. Retrying request...`,
+                        });
+
+                        if (lastQueryRef.current && lastPromptIdRef.current) {
+                          await submitQuery(
+                            lastQueryRef.current,
+                            { isContinuation: true },
+                            lastPromptIdRef.current,
+                          );
+                        }
+                      } else {
+                        addItem({
+                          type: 'info',
+                          text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+                        });
+                      }
+                    },
+                  });
+                }
+              } catch (error: unknown) {
+                spanMetadata.error = error;
+                if (error instanceof UnauthorizedError) {
+                  onAuthError('Session expired or is unauthorized.');
+                } else if (
+                  // Suppress ValidationRequiredError if it was marked as handled (e.g. user clicked change_auth or cancelled)
+                  error instanceof ValidationRequiredError &&
+                  error.userHandled
+                ) {
+                  // Error was handled by validation dialog, don't display again
+                } else if (!isNodeError(error) || error.name !== 'AbortError') {
+                  maybeAddSuppressedToolErrorNote(userMessageTimestamp);
+                  addItem(
+                    {
+                      type: MessageType.ERROR,
+                      text: parseAndFormatApiError(
+                        getErrorMessage(error) || 'Unknown error',
+                        config.getContentGeneratorConfig()?.authType,
+                        undefined,
+                        config.getModel(),
+                        DEFAULT_GEMINI_FLASH_MODEL,
+                      ),
+                    },
+                    userMessageTimestamp,
+                  );
+                  maybeAddLowVerbosityFailureNote(userMessageTimestamp);
+                }
               }
             } finally {
-              if (activeQueryIdRef.current === queryId) {
+              if (
+                responseStateStarted &&
+                activeQueryIdRef.current === queryId
+              ) {
                 setIsResponding(false);
               }
             }
