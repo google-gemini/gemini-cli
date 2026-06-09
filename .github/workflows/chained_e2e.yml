@@ -43,7 +43,21 @@ jobs:
 
   download_repo_name:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.repository == 'google-gemini/gemini-cli' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')"
+    # For `workflow_run`, only consume the repo_name/head_sha artifact when the
+    # triggering run came from this repository. The triggering `Trigger E2E`
+    # run executes on `pull_request` (including forks) and writes the PR head
+    # `repo.full_name` and `sha` into the artifact; without this guard a fork PR
+    # poisons the artifact and the secret-bearing jobs below check out and run
+    # the fork's code (npm ci / postinstall) with GEMINI_API_KEY,
+    # GEMINI_CLI_ROBOT_GITHUB_PAT, and write-all GITHUB_TOKEN in scope.
+    # `github.repository` is always this repo here (workflow_run runs in the base
+    # context), so it does not validate the artifact's origin; check the
+    # triggering run's head_repository instead.
+    if: >-
+      github.repository == 'google-gemini/gemini-cli' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
       head_sha: '${{ steps.output-repo-name.outputs.head_sha }}'
