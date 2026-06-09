@@ -33,6 +33,7 @@ export interface ModelPolicyOptions {
   useGemini31?: boolean;
   useGemini31FlashLite?: boolean;
   useCustomToolModel?: boolean;
+  useGemini3_5Flash?: boolean;
 }
 
 const DEFAULT_ACTIONS: ModelPolicyActionMap = {
@@ -93,8 +94,10 @@ export function getModelPolicyChain(
     const proModel = resolveModel(
       PREVIEW_GEMINI_MODEL,
       options.useGemini31,
-      options.useGemini31FlashLite,
       options.useCustomToolModel,
+      true,
+      undefined,
+      options.useGemini3_5Flash,
     );
     return [
       definePolicy({

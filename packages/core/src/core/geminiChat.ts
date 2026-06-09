@@ -719,19 +719,16 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
-      const useGemini3_1FlashLite =
-        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
       const hasAccessToPreview =
         this.context.config.getHasAccessToPreviewModel?.() ?? true;
-
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
         useGemini3_1,
-        useGemini3_1FlashLite,
         false,
         hasAccessToPreview,
         this.context.config,
+        this.context.config.hasGemini35FlashGAAccess?.() ?? false,
       );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
@@ -740,10 +737,10 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
-          useGemini3_1FlashLite,
           false,
           hasAccessToPreview,
           this.context.config,
+          this.context.config.hasGemini35FlashGAAccess?.() ?? false,
         );
       }
 
@@ -803,10 +800,10 @@ export class GeminiChat {
           modelToUse = resolveModel(
             beforeModelResult.modifiedModel,
             useGemini3_1,
-            useGemini3_1FlashLite,
             false,
             hasAccessToPreview,
             this.context.config,
+            this.context.config.hasGemini35FlashGAAccess?.() ?? false,
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support

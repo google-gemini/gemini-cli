@@ -142,6 +142,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         ? context.request
         : [context.request];
 
+      // Bypass the classifier if the request is a function response and history is empty.
+      // Since we prune leading tool turns, if the history becomes empty, sending a
+      // function response request would result in an invalid payload (starts with function response).
+      if (
+        finalHistory.length === 0 &&
+        isFunctionResponse(createUserContent(context.request))
+      ) {
+        debugLogger.log(
+          '[Routing] Bypassing NumericalClassifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
+
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
           return { text: part };
@@ -167,21 +180,20 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
 
       const { threshold, groupLabel, modelAlias } =
         await this.getRoutingDecision(score, config);
-      const [useGemini3_1, useGemini3_1FlashLite, useCustomToolModel] =
-        await Promise.all([
-          config.getGemini31Launched(),
-          config.getGemini31FlashLiteLaunched(),
-          config.getUseCustomToolModel(),
-        ]);
+      const [useGemini3_1, useCustomToolModel] = await Promise.all([
+        config.getGemini31Launched(),
+        config.getUseCustomToolModel(),
+      ]);
+      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
       const selectedModel = normalizeModelId(
         resolveClassifierModel(
           normalizeModelId(model),
           modelAlias,
           useGemini3_1,
-          useGemini3_1FlashLite,
           useCustomToolModel,
           config.getHasAccessToPreviewModel?.() ?? true,
           config,
+          useGemini3_5Flash,
         ),
       );
 

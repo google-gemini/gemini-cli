@@ -17,7 +17,6 @@ import {
   getShellConfiguration,
   resolveExecutable,
   type ShellType,
-  BASH_HUP_GUARD,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -38,6 +37,7 @@ import {
 } from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -113,32 +113,6 @@ function injectUtf8CodepageForPty(
     return `chcp 65001>nul&${command}`;
   }
   return command;
-}
-
-/**
- * Prepends a POSIX SIGHUP-ignore guard to bash commands on non-Windows platforms.
- *
- * PTY environments such as WSL2, Kitty, and Alacritty aggressively send SIGHUP
- * to process groups that lose their controlling terminal. By prepending
- * `trap '' HUP;` we apply the same mechanism as the POSIX `nohup` utility:
- * SIG_IGN is inherited across exec(), so every child spawned by the command
- * also ignores SIGHUP — making the guard genuinely effective even in subshells.
- *
- * The guard is bash-only and idempotent (won't be doubled if already present).
- * It is stripped back out by stripShellWrapper() / stripHupGuard() before any
- * sandbox or permission-check logic sees the command, so there is no
- * privilege-escalation surface from the preamble itself.
- */
-function ensureHupIgnored(command: string, shell: ShellType): string {
-  if (shell !== 'bash') {
-    return command;
-  }
-  const trimmed = command.trimStart();
-  const prefix = `${BASH_HUP_GUARD} `;
-  if (trimmed.startsWith(prefix) || trimmed === BASH_HUP_GUARD) {
-    return command; // Already guarded — idempotent
-  }
-  return `${BASH_HUP_GUARD} ${command}`;
 }
 
 /** A structured result from a shell command execution. */
@@ -477,16 +451,9 @@ export class ShellExecutionService {
 
     const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
-    const promptGuarded = ensurePromptvarsDisabled(commandToExecute, shell);
-    // Prepend the SIGHUP-ignore guard for bash on non-Windows. This uses the
-    // same mechanism as POSIX `nohup`: SIG_IGN is inherited across exec(), so
-    // child processes spawned by the command also ignore SIGHUP. The guard is
-    // stripped by stripShellWrapper() before any sandbox permission checks.
-    const hupGuarded = !isWindows
-      ? ensureHupIgnored(promptGuarded, shell)
-      : promptGuarded;
+    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
     const finalCommand = injectUtf8CodepageForPty(
-      hupGuarded,
+      guardedCommand,
       shell,
       isWindows,
       usingPty,
@@ -1541,27 +1508,42 @@ export class ShellExecutionService {
     }
 
     const activePty = this.activePtys.get(pid);
-    if (activePty) {
-      try {
-        activePty.ptyProcess.resize(cols, rows);
-        activePty.headlessTerminal.resize(cols, rows);
-      } catch (e) {
-        // Ignore errors if the pty has already exited, which can happen
-        // due to a race condition between the exit event and this call.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const err = e as { code?: string; message?: string };
-        const isEsrch = err.code === 'ESRCH';
-        const isWindowsPtyError = err.message?.includes(
-          'Cannot resize a pty that has already exited',
-        );
+    if (!activePty) {
+      return;
+    }
 
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
-          // On Windows, we get a message-based error.
-          // In both cases, it's safe to ignore.
-        } else {
-          throw e;
+    // Skip Windows: process.kill(pid, 0) is heavy and native errors are catchable there.
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(pid, 0);
+      } catch (e) {
+        // Bail only if the process is explicitly confirmed dead (ESRCH).
+        if (isNodeError(e) && e.code === 'ESRCH') {
+          return;
         }
+      }
+    }
+
+    try {
+      activePty.ptyProcess.resize(cols, rows);
+      activePty.headlessTerminal.resize(cols, rows);
+    } catch (e) {
+      // Ignore errors if the pty has already exited, which can happen
+      // due to a race condition between the exit event and this call.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const err = e as { code?: string; message?: string };
+      const isEsrch = err.code === 'ESRCH';
+      const isEbadf = err.code === 'EBADF' || err.message?.includes('EBADF');
+      const isWindowsPtyError = err.message?.includes(
+        'Cannot resize a pty that has already exited',
+      );
+
+      if (isEsrch || isEbadf || isWindowsPtyError) {
+        // On Unix, we get an ESRCH or EBADF error.
+        // On Windows, we get a message-based error.
+        // In both cases, it's safe to ignore.
+      } else {
+        throw e;
       }
     }
 

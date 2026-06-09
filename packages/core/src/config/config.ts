@@ -86,6 +86,7 @@ import {
   isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
+  setFlashModels,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -2051,10 +2052,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       model,
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
 
     const isPreview = isPreviewModel(primaryModel, this);
@@ -2091,10 +2092,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -2107,10 +2108,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -2123,10 +2124,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
-      this.getGemini31FlashLiteLaunchedSync(),
       this.getUseCustomToolModelSync(),
       this.getHasAccessToPreviewModel(),
       this,
+      this.hasGemini35FlashGAAccess(),
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -3514,15 +3515,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   * This method is async and ensures that experiments are loaded before returning the result.
-   */
-  async getGemini31FlashLiteLaunched(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-    return this.getGemini31FlashLiteLaunchedSync();
-  }
-
-  /**
    * Returns whether the custom tool model should be used.
    */
   async getUseCustomToolModel(): Promise<boolean> {
@@ -3548,6 +3540,38 @@ export class Config implements McpContext, AgentLoopContext {
       authType === AuthType.USE_VERTEX_AI ||
       authType === AuthType.GATEWAY
     );
+  }
+
+  /**
+   * Returns whether Gemini 3.5 Flash GA has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  hasGemini35FlashGAAccess(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    const hasAccess = (() => {
+      if (this.isGemini31LaunchedForAuthType(authType)) {
+        return true;
+      }
+      return (
+        this.experiments?.flags[ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]
+          ?.boolValue ?? false
+      );
+    })();
+    // Used to set default flash models based on access
+    // TODO: Remove once the experiment for 3_5 flash rollut can be cleaned up.
+    if (hasAccess) {
+      // Gemini API key users should have the ability to manually select the
+      // old preview flash model.
+      if (authType === AuthType.USE_GEMINI) {
+        setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
+      } else {
+        setFlashModels('gemini-3-flash', 'gemini-3-flash');
+      }
+    } else {
+      setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');
+    }
+    return hasAccess;
   }
 
   /**
@@ -3581,24 +3605,6 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     return undefined;
-  }
-
-  /**
-   * Returns whether Gemini 3.1 Flash Lite has been launched.
-   *
-   * Note: This method should only be called after startup, once experiments have been loaded.
-   * If you need to call this during startup or from an async context, use
-   * getGemini31FlashLiteLaunched instead.
-   */
-  getGemini31FlashLiteLaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    if (this.isGemini31LaunchedForAuthType(authType)) {
-      return true;
-    }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
-        ?.boolValue ?? false
-    );
   }
 
   /**

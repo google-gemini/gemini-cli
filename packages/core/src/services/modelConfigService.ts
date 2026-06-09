@@ -9,7 +9,6 @@ import type { ModelPolicy } from '../availability/modelPolicy.js';
 import {
   getDisplayString,
   PREVIEW_GEMINI_3_1_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   isProModel,
   getAutoModelDescription,
 } from '../config/models.js';
@@ -98,6 +97,7 @@ export interface ModelResolution {
 export interface ResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -108,6 +108,7 @@ export interface ResolutionContext {
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
+  useGemini3_5Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -156,7 +157,7 @@ export class ModelConfigService {
     const definitions = this.config.modelDefinitions ?? {};
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
-    const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
+    const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
 
     const mainOptions = Object.entries(definitions)
       .filter(([_, m]) => {
@@ -171,6 +172,7 @@ export class ModelConfigService {
           description = getAutoModelDescription(
             shouldShowPreviewModels,
             useGemini31,
+            useGemini3_5Flash,
           );
         } else if (id === 'auto-gemini-3' && useGemini31) {
           description = description.replace('gemini-3-pro', 'gemini-3.1-pro');
@@ -192,15 +194,12 @@ export class ModelConfigService {
         if (context.hasAccessToProModel === false && isProModel(id))
           return false;
         if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
-        if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31FlashLite)
-          return false;
         return true;
       })
       .map(([id, m]) => {
         const resolvedId = this.resolveModelId(id, context);
         const titleId = this.resolveModelId(id, {
           useGemini3_1: useGemini31,
-          useGemini3_1FlashLite: useGemini31FlashLite,
         });
         return {
           modelId: resolvedId,
@@ -255,6 +254,8 @@ export class ModelConfigService {
           return value === context.useGemini3_1;
         case 'useGemini3_1FlashLite':
           return value === context.useGemini3_1FlashLite;
+        case 'useGemini3_5Flash':
+          return value === context.useGemini3_5Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
