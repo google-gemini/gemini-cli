@@ -56,6 +56,7 @@ import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
 } from '../sandbox/utils/proactivePermissions.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
@@ -1025,7 +1026,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
         );
         return {
-          llmContent: summary,
+          llmContent: wrapUntrusted(summary),
           returnDisplay,
           ...executionError,
         };
@@ -1038,7 +1039,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           : undefined;
 
       return {
-        llmContent,
+        llmContent: wrapUntrusted(llmContent),
         display: {
           name: 'Shell',
           description: this.getDescription(),
