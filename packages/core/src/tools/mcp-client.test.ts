@@ -1244,9 +1244,15 @@ describe('mcp-client', () => {
       await client.disconnect();
 
       expect(mockedClient.close).toHaveBeenCalledOnce();
-      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledOnce();
-      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledOnce();
-      expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledOnce();
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
     });
   });
 
@@ -1570,8 +1576,8 @@ describe('mcp-client', () => {
       // Trigger notification - should fail internally but catch the error
       await notificationCallback();
 
-      // Should try to remove tools
-      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalled();
+      // Should NOT try to remove tools because discovery failed (atomic refresh)
+      expect(mockedToolRegistry.removeMcpToolsByServer).not.toHaveBeenCalled();
 
       // Should NOT emit success feedback
       expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
