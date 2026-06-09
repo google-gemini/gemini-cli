@@ -13,7 +13,6 @@ import {
   type ConversationRecord,
   type MessageRecord,
   loadConversationRecord,
-  hasResumableConversationContent,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -139,18 +138,6 @@ export interface SessionSelectionResult {
   sessionData: ConversationRecord;
   displayInfo: string;
 }
-
-/**
- * Checks if a session has at least one user or assistant (gemini) message.
- * Sessions with only system messages (info, error, warning) are considered empty.
- * @param messages - The array of message records to check
- * @returns true if the session has meaningful content
- */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
-
-export const hasResumableContent = (messages: MessageRecord[]): boolean =>
-  hasResumableConversationContent(messages);
 
 /**
  * Cleans and sanitizes message content for display by:

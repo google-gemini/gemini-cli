@@ -40,6 +40,7 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  hasResumableConversationContent,
   isResumableMessageRecord,
   loadConversationRecord,
   type ConversationRecord,
@@ -136,6 +137,63 @@ describe('ChatRecordingService', () => {
 
       expect(() => isResumableMessageRecord(message)).not.toThrow();
       expect(isResumableMessageRecord(message)).toBe(false);
+    });
+
+    it('should return false for command-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '?help',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return false for internal context-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '<session_context>previous state</session_context>',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '<hook_context>hook data</hook_context>',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return true for real user or assistant content', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'gemini',
+          content: 'I can help with that.',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(true);
     });
   });
 

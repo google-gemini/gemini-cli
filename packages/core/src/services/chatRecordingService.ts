@@ -24,6 +24,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+import { isIgnoredUserContent } from '../utils/sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
   type TokensSummary,
@@ -99,16 +100,6 @@ function isTextPart(part: unknown): part is { text: string } {
   return isStringProperty(part, 'text');
 }
 
-function isIgnoredUserContent(trimmedContent: string): boolean {
-  return (
-    trimmedContent.length === 0 ||
-    trimmedContent.startsWith('/') ||
-    trimmedContent.startsWith('?') ||
-    trimmedContent.startsWith('<session_context>') ||
-    trimmedContent.startsWith('<hook_context>')
-  );
-}
-
 /**
  * Returns true when a stored message represents conversation content worth
  * surfacing in resume flows.
@@ -147,7 +138,6 @@ export async function loadConversationRecord(
       messageCount?: number;
       userMessageCount?: number;
       firstUserMessage?: string;
-      hasUserOrAssistantMessage?: boolean;
       hasResumableContent?: boolean;
       memoryScratchpadIsStale?: boolean;
     })
@@ -169,7 +159,7 @@ export async function loadConversationRecord(
     const messageIds: string[] = [];
     const messageKinds = new Map<
       string,
-      { isUser: boolean; isUserOrAssistant: boolean; isResumable: boolean }
+      { isUser: boolean; isResumable: boolean }
     >();
     let isTrackingMemoryScratchpadFreshness = false;
     let memoryScratchpadIsStale = false;
@@ -216,14 +206,11 @@ export async function loadConversationRecord(
           }
           const id = record.id;
           const isUser = hasProperty(record, 'type') && record.type === 'user';
-          const isUserOrAssistant =
-            hasProperty(record, 'type') &&
-            (record.type === 'user' || record.type === 'gemini');
           const isResumable = isResumableMessageRecord(record);
           // Track message count and first user message
           if (options?.metadataOnly) {
             messageIds.push(id);
-            messageKinds.set(id, { isUser, isUserOrAssistant, isResumable });
+            messageKinds.set(id, { isUser, isResumable });
           }
           if (
             !firstUserMessageStr &&
@@ -274,15 +261,12 @@ export async function loadConversationRecord(
               if (isMessageRecord(msg)) {
                 const id = msg.id;
                 const isUser = msg.type === 'user';
-                const isUserOrAssistant =
-                  msg.type === 'user' || msg.type === 'gemini';
                 const isResumable = isResumableMessageRecord(msg);
 
                 if (options?.metadataOnly) {
                   messageIds.push(id);
                   messageKinds.set(id, {
                     isUser,
-                    isUserOrAssistant,
                     isResumable,
                   });
                 } else {
@@ -324,15 +308,12 @@ export async function loadConversationRecord(
               if (isMessageRecord(msg)) {
                 const id = msg.id;
                 const isUser = msg.type === 'user';
-                const isUserOrAssistant =
-                  msg.type === 'user' || msg.type === 'gemini';
                 const isResumable = isResumableMessageRecord(msg);
 
                 if (options?.metadataOnly) {
                   messageIds.push(id);
                   messageKinds.set(id, {
                     isUser,
-                    isUserOrAssistant,
                     isResumable,
                   });
                 } else {
@@ -388,9 +369,6 @@ export async function loadConversationRecord(
     const userMessageCount = options?.metadataOnly
       ? Array.from(messageKinds.values()).filter((m) => m.isUser).length
       : loadedMessages.filter((m) => m.type === 'user').length;
-    const hasUserOrAssistant = options?.metadataOnly
-      ? Array.from(messageKinds.values()).some((m) => m.isUserOrAssistant)
-      : loadedMessages.some((m) => m.type === 'user' || m.type === 'gemini');
     const hasResumableContent = options?.metadataOnly
       ? Array.from(messageKinds.values()).some((m) => m.isResumable)
       : hasResumableConversationContent(loadedMessages);
@@ -413,7 +391,6 @@ export async function loadConversationRecord(
         ? memoryScratchpadIsStale
         : undefined,
       firstUserMessage: fallbackFirstUserMessage,
-      hasUserOrAssistantMessage: hasUserOrAssistant,
       hasResumableContent,
     };
   } catch (error) {
@@ -993,7 +970,6 @@ async function parseLegacyRecordFallback(
       messageCount?: number;
       userMessageCount?: number;
       firstUserMessage?: string;
-      hasUserOrAssistantMessage?: boolean;
       hasResumableContent?: boolean;
     })
   | null
@@ -1029,10 +1005,6 @@ async function parseLegacyRecordFallback(
           userMessageCount:
             legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
           firstUserMessage: fallbackFirstUserMessageStr,
-          hasUserOrAssistantMessage:
-            legacyRecord.messages?.some(
-              (m) => m.type === 'user' || m.type === 'gemini',
-            ) || false,
           hasResumableContent:
             legacyRecord.messages?.some((m) => isResumableMessageRecord(m)) ||
             false,
@@ -1042,10 +1014,6 @@ async function parseLegacyRecordFallback(
         ...legacyRecord,
         userMessageCount:
           legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
-        hasUserOrAssistantMessage:
-          legacyRecord.messages?.some(
-            (m) => m.type === 'user' || m.type === 'gemini',
-          ) || false,
         hasResumableContent:
           legacyRecord.messages?.some((m) => isResumableMessageRecord(m)) ||
           false,
