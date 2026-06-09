@@ -6,6 +6,9 @@
 
 import process from 'node:process';
 
+const ANTIGRAVITY_SH_INSTALL =
+  'curl -fsSL https://antigravity.google/cli/install.sh | bash';
+
 export interface AntigravityInstallInfo {
   platformName: string;
   installCmd: string;
@@ -32,12 +35,12 @@ export function getAntigravityInstallInfo(): AntigravityInstallInfo | null {
   } else if (process.platform === 'darwin') {
     return {
       platformName: 'macOS',
-      installCmd: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+      installCmd: ANTIGRAVITY_SH_INSTALL,
     };
   } else if (process.platform === 'linux') {
     return {
       platformName: 'Linux',
-      installCmd: 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+      installCmd: ANTIGRAVITY_SH_INSTALL,
     };
   }
   return null;
