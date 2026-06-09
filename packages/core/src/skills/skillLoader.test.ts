@@ -271,4 +271,19 @@ description: Test sanitization
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
+
+  it('should load real built-in antigravity-support skill successfully', async () => {
+    const { fileURLToPath } = await import('node:url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const builtinDir = path.resolve(__dirname, 'builtin');
+    const skills = await loadSkillsFromDir(builtinDir);
+    const antigravitySkill = skills.find(
+      (s) => s.name === 'antigravity-support',
+    );
+    expect(antigravitySkill).toBeDefined();
+    expect(antigravitySkill!.description).toContain('Antigravity CLI');
+    expect(antigravitySkill!.body).toContain(
+      'https://antigravity.google/docs/cli-getting-started',
+    );
+  });
 });
