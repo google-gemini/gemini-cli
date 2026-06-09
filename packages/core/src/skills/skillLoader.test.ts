@@ -271,4 +271,100 @@ description: Test sanitization
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
+
+  it('should handle UTF-8 BOM in SKILL.md', async () => {
+    const skillDir = path.join(testRootDir, 'bom-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `\uFEFF---\nname: bom-skill\ndescription: A skill with a BOM\n---\n# Instructions\nBody\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('bom-skill');
+  });
+
+  it('should handle trailing spaces after frontmatter markers', async () => {
+    const skillDir = path.join(testRootDir, 'space-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---  \nname: space-skill\ndescription: A skill with trailing spaces\n--- \n# Instructions\nBody\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('space-skill');
+  });
+
+  it('should handle space before colon and case-insensitivity in simple parser', async () => {
+    const skillDir = path.join(testRootDir, 'simple-parser-robustness');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    // Forces YAML failure with unquoted colon, triggers simple parser
+    await fs.writeFile(
+      skillFile,
+      `---
+Name : robust-name
+DESCRIPTION : robust:description
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('robust-name');
+    expect(skills[0].description).toBe('robust:description');
+  });
+
+  it('should not swallow other keys into description in simple parser', async () => {
+    const skillDir = path.join(testRootDir, 'simple-parser-swallow');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    // Forces YAML failure, triggers simple parser
+    await fs.writeFile(
+      skillFile,
+      `---
+description: A long description: with a colon
+  name: my-skill
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('my-skill');
+    expect(skills[0].description).toBe('A long description: with a colon');
+  });
+
+  it('should not treat "Note:" as a new key in multi-line description in simple parser', async () => {
+    const skillDir = path.join(testRootDir, 'simple-parser-note');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    // Forces YAML failure, triggers simple parser
+    await fs.writeFile(
+      skillFile,
+      `---
+name: note-skill
+description: This is a description
+  Note: This should be part of the description
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('note-skill');
+    expect(skills[0].description).toBe(
+      'This is a description Note: This should be part of the description',
+    );
+  });
 });
