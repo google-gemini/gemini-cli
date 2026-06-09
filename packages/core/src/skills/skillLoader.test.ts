@@ -271,4 +271,44 @@ description: Test sanitization
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
+
+  it('should parse skill with long single-line description and punctuation', async () => {
+    const skillFile = path.join(testRootDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: test-skill
+description: A single line description that is relatively long and contains some punctuation.
+---
+# Test Skill
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('test-skill');
+    expect(skills[0].description).toBe(
+      'A single line description that is relatively long and contains some punctuation.',
+    );
+  });
+
+  it('should parse skill with BOM and leading whitespace', async () => {
+    const skillFile = path.join(testRootDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `\uFEFF
+---
+name: bom-skill
+description: A skill with BOM
+---
+# Body
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('bom-skill');
+  });
 });

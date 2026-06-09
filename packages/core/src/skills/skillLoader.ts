@@ -32,7 +32,7 @@ export interface SkillDefinition {
 }
 
 export const FRONTMATTER_REGEX =
-  /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?/;
+  /^[\s\uFEFF]*---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
 
 /**
  * Parses frontmatter content using YAML with a fallback to simple key-value parsing.
@@ -84,7 +84,17 @@ function parseSimpleFrontmatter(
     // Match "description:" at the start of the line (optional whitespace)
     const descMatch = line.match(/^\s*description:\s*(.*)$/);
     if (descMatch) {
-      const descLines = [descMatch[1].trim()];
+      let descValue = descMatch[1].trim();
+
+      // Strip outer quotes if present (e.g. "value" or 'value')
+      if (
+        (descValue.startsWith('"') && descValue.endsWith('"')) ||
+        (descValue.startsWith("'") && descValue.endsWith("'"))
+      ) {
+        descValue = descValue.substring(1, descValue.length - 1);
+      }
+
+      const descLines = [descValue];
 
       // Check for multi-line description (indented continuation lines)
       while (i + 1 < lines.length) {
@@ -104,7 +114,16 @@ function parseSimpleFrontmatter(
   }
 
   if (name !== undefined && description !== undefined) {
-    return { name, description };
+    // Also strip quotes from name if present
+    let finalName = name;
+    if (
+      (finalName.startsWith('"') && finalName.endsWith('"')) ||
+      (finalName.startsWith("'") && finalName.endsWith("'"))
+    ) {
+      finalName = finalName.substring(1, finalName.length - 1);
+    }
+
+    return { name: finalName, description };
   }
   return null;
 }
