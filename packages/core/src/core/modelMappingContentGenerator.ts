@@ -15,12 +15,17 @@ import {
 import { type ContentGenerator } from './contentGenerator.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
+import { normalizeModelId } from '../utils/modelUtils.js';
 
 export class ModelMappingContentGenerator implements ContentGenerator {
   constructor(
     private readonly wrapped: ContentGenerator,
     private readonly mappings: Record<string, string>,
   ) {}
+
+  getWrapped(): ContentGenerator {
+    return this.wrapped;
+  }
 
   get userTier(): UserTierId | undefined {
     return this.wrapped.userTier;
@@ -35,11 +40,16 @@ export class ModelMappingContentGenerator implements ContentGenerator {
   }
 
   private mapModel<T extends { model?: string }>(req: T): T {
-    if (req.model && this.mappings[req.model]) {
-      return {
-        ...req,
-        model: this.mappings[req.model],
-      };
+    if (req.model) {
+      const normalizedModel = normalizeModelId(req.model);
+      if (this.mappings[normalizedModel]) {
+        return {
+          ...req,
+          model: req.model.startsWith('models/')
+            ? `models/${this.mappings[normalizedModel]}`
+            : this.mappings[normalizedModel],
+        };
+      }
     }
     return req;
   }
