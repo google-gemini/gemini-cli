@@ -30,7 +30,7 @@ This script downloads, verifies, and installs the latest version of Antigravity,
 ### Windows (PowerShell)
 For Windows environments, install via the official PowerShell setup command:
 ```powershell
-iwr -useb https://antigravity.google/cli/install.ps1 | iex
+irm https://antigravity.google/cli/install.ps1 | iex
 ```
 
 ## Initial Setup & Configuration

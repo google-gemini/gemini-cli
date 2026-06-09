@@ -12,7 +12,6 @@ import { MessageType } from '../types.js';
 
 describe('helpCommand', () => {
   let mockContext: CommandContext;
-  const originalEnv = { ...process.env };
   const originalPlatform = process.platform;
   const action = helpCommand.action;
 
@@ -29,7 +28,6 @@ describe('helpCommand', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
     Object.defineProperty(process, 'platform', { value: originalPlatform });
     vi.unstubAllEnvs();
     vi.clearAllMocks();
