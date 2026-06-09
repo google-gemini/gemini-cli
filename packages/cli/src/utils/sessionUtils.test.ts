@@ -10,6 +10,7 @@ import {
   extractFirstUserMessage,
   formatRelativeTime,
   hasUserOrAssistantMessage,
+  hasResumableContent,
   SessionError,
   convertSessionToHistoryFormats,
 } from './sessionUtils.js';
@@ -512,6 +513,80 @@ describe('SessionSelector', () => {
     expect(sessions[0].id).toBe(sessionIdWithUser);
   });
 
+  it('should not list command-only sessions', async () => {
+    const commandOnlySessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId: commandOnlySessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:01:00.000Z',
+    };
+    const commandMessage = {
+      type: 'user',
+      content: '/resume',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${commandOnlySessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(commandMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toEqual([]);
+  });
+
+  it('should use the first non-command user message for display', async () => {
+    const sessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:02:00.000Z',
+    };
+    const commandMessage = {
+      type: 'user',
+      content: '/resume',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+    const realMessage = {
+      type: 'user',
+      content: 'Help me fix resume history',
+      id: 'msg2',
+      timestamp: '2024-01-01T10:01:00.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(commandMessage)}\n${JSON.stringify(realMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].firstUserMessage).toBe('Help me fix resume history');
+    expect(sessions[0].displayName).toBe('Help me fix resume history');
+  });
+
   it('should list session with gemini message even without user message', async () => {
     const sessionIdGeminiOnly = randomUUID();
 
@@ -919,6 +994,65 @@ describe('hasUserOrAssistantMessage', () => {
   it('should return false for empty messages array', () => {
     const messages: MessageRecord[] = [];
     expect(hasUserOrAssistantMessage(messages)).toBe(false);
+  });
+});
+
+describe('hasResumableContent', () => {
+  it('should return false for command-only messages', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: '/resume',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'user',
+        content: '?help',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasResumableContent(messages)).toBe(false);
+  });
+
+  it('should return false for internal context-only messages', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: '<session_context>previous state</session_context>',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'user',
+        content: '<hook_context>hook data</hook_context>',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasResumableContent(messages)).toBe(false);
+  });
+
+  it('should return true for real user or assistant content', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: '/resume',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'gemini',
+        content: 'I can help with that.',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasResumableContent(messages)).toBe(true);
   });
 });
 

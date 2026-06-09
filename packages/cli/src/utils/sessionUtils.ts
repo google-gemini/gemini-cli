@@ -13,6 +13,7 @@ import {
   type ConversationRecord,
   type MessageRecord,
   loadConversationRecord,
+  hasResumableConversationContent,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -147,6 +148,9 @@ export interface SessionSelectionResult {
  */
 export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
   messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
+
+export const hasResumableContent = (messages: MessageRecord[]): boolean =>
+  hasResumableConversationContent(messages);
 
 /**
  * Cleans and sanitizes message content for display by:
@@ -287,8 +291,10 @@ export const getAllSessionFiles = async (
           const lastUpdated =
             content.lastUpdated || content.startTime || fallbackTimestamp;
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
+          // Skip sessions with no resumable conversation content, including
+          // startup-only, system-only, command-only, and internal-context-only
+          // sessions.
+          if (!content.hasResumableContent) {
             return { fileName: file, sessionInfo: null };
           }
 

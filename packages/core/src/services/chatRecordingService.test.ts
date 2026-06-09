@@ -838,6 +838,49 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('deleteCurrentSessionIfNotResumableAsync', () => {
+    it('should delete a startup-only session', async () => {
+      await chatRecordingService.initialize();
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should delete a command-only session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: '/resume',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should keep a session with a real user message', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Help me debug this test',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+    });
+  });
+
   describe('recordDirectories', () => {
     beforeEach(async () => {
       await chatRecordingService.initialize();
