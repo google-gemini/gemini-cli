@@ -114,13 +114,17 @@ function isIgnoredUserContent(trimmedContent: string): boolean {
  * surfacing in resume flows.
  */
 export function isResumableMessageRecord(message: MessageRecord): boolean {
+  const contentString = message.content
+    ? partListUnionToString(message.content)
+    : '';
+
   if (message.type === 'user') {
-    return !isIgnoredUserContent(partListUnionToString(message.content).trim());
+    return !isIgnoredUserContent(contentString.trim());
   }
 
   if (message.type === 'gemini') {
     return (
-      partListUnionToString(message.content).trim().length > 0 ||
+      contentString.trim().length > 0 ||
       (message.toolCalls?.length ?? 0) > 0 ||
       (message.thoughts?.length ?? 0) > 0
     );

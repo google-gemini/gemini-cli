@@ -40,6 +40,7 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  isResumableMessageRecord,
   loadConversationRecord,
   type ConversationRecord,
   type ToolCallRecord,
@@ -123,6 +124,19 @@ describe('ChatRecordingService', () => {
     if (testTempDir) {
       await fs.promises.rm(testTempDir, { recursive: true, force: true });
     }
+  });
+
+  describe('isResumableMessageRecord', () => {
+    it('should treat malformed messages without content as non-resumable', () => {
+      const message = {
+        id: 'malformed-message',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        type: 'user',
+      } as MessageRecord;
+
+      expect(() => isResumableMessageRecord(message)).not.toThrow();
+      expect(isResumableMessageRecord(message)).toBe(false);
+    });
   });
 
   describe('initialize', () => {

@@ -225,6 +225,7 @@ export async function startInteractiveUI(
 
     try {
       removeCleanup(cleanupNonResumableCurrentSession);
+      await cleanupNonResumableCurrentSession();
     } catch (e: unknown) {
       debugLogger.error('Error removing non-resumable session cleanup:', e);
     }
