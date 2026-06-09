@@ -10,6 +10,7 @@ import { setupUser } from './setup.js';
 import { CodeAssistServer, type HttpOptions } from './server.js';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
+import { ModelMappingContentGenerator } from '../core/modelMappingContentGenerator.js';
 
 export async function createCodeAssistContentGenerator(
   httpOptions: HttpOptions,
@@ -43,9 +44,15 @@ export function getCodeAssistServer(
 ): CodeAssistServer | undefined {
   let server = config.getContentGenerator();
 
-  // Unwrap LoggingContentGenerator if present
-  if (server instanceof LoggingContentGenerator) {
-    server = server.getWrapped();
+  // Recursively unwrap LoggingContentGenerator and ModelMappingContentGenerator
+  while (true) {
+    if (server instanceof LoggingContentGenerator) {
+      server = server.getWrapped();
+    } else if (server instanceof ModelMappingContentGenerator) {
+      server = server.getWrapped();
+    } else {
+      break;
+    }
   }
 
   if (!(server instanceof CodeAssistServer)) {
