@@ -83,6 +83,10 @@ function isPathTraversal(relative: string): boolean {
   );
 }
 
+function isInvalidSubpath(relative: string): boolean {
+  return relative === '' || isPathTraversal(relative);
+}
+
 /**
  * Central logic for installing a skill from a remote URL or local path.
  */
@@ -179,11 +183,11 @@ export async function installSkill(
       const destPath = path.resolve(resolvedTarget, skillName);
 
       const relative = path.relative(resolvedTarget, destPath);
-      if (isPathTraversal(relative) || relative === '') {
+      if (isInvalidSubpath(relative)) {
         throw new Error('Invalid skill name: Path traversal detected.');
       }
 
-      const exists = await fs.stat(destPath).catch(() => null);
+      const exists = await fs.lstat(destPath).catch(() => null);
       if (exists) {
         onLog(`Skill "${skillName}" already exists. Overwriting...`);
         await fs.rm(destPath, { recursive: true, force: true });
@@ -257,7 +261,7 @@ export async function linkSkill(
     const destPath = path.resolve(resolvedTarget, skillName);
 
     const relative = path.relative(resolvedTarget, destPath);
-    if (isPathTraversal(relative) || relative === '') {
+    if (isInvalidSubpath(relative)) {
       throw new Error('Invalid skill name: Path traversal detected.');
     }
 
@@ -310,7 +314,7 @@ export async function uninstallSkill(
 
     // Security check: ensure the resolved path is within the target directory to prevent path traversal
     const relative = path.relative(resolvedTarget, skillPath);
-    if (isPathTraversal(relative) || relative === '') {
+    if (isInvalidSubpath(relative)) {
       return null;
     }
 
@@ -326,7 +330,7 @@ export async function uninstallSkill(
 
   const skillDir = path.resolve(path.dirname(skillToUninstall.location));
   const relative = path.relative(resolvedTarget, skillDir);
-  if (isPathTraversal(relative) || relative === '') {
+  if (isInvalidSubpath(relative)) {
     return null;
   }
 
