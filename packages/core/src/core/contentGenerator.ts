@@ -380,17 +380,7 @@ export async function createContentGenerator(
           },
         }),
       });
-      let generator: ContentGenerator = googleGenAI.models;
-      if (
-        config.authType !== AuthType.USE_VERTEX_AI &&
-        config.authType !== AuthType.USE_GEMINI
-      ) {
-        generator = new ModelMappingContentGenerator(
-          generator,
-          CCPA_AI_MODEL_MAPPINGS,
-        );
-      }
-      return new LoggingContentGenerator(generator, gcConfig);
+      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
