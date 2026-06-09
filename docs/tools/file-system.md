@@ -25,6 +25,10 @@ Reads and returns the content of a specific file. Supports text, images, audio,
 and PDF.
 
 - **Tool name:** `read_file`
+- Note: Files larger than 20 MB are not supported by read_file.
+   Attempting to read a file larger than this limit will result in:
+
+   File size exceeds the 20MB limit.
 - **Arguments:**
   - `file_path` (string, required): Path to the file.
   - `offset` (number, optional): Start line for text files (0-based).
