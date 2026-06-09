@@ -1184,7 +1184,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should apply model mapping for inverse cases (e.g. GATEWAY)', async () => {
+  it('should not apply model mapping for GATEWAY', async () => {
     const mockModels = {
       generateContent: vi.fn().mockResolvedValue({}),
     };
@@ -1211,6 +1211,72 @@ describe('createContentGenerator', () => {
     );
 
     expect(mockModels.generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-3.5-flash',
+      }),
+      'prompt-id',
+      'user',
+    );
+  });
+
+  it('should apply model mapping for LOGIN_WITH_GOOGLE', async () => {
+    const mockInnerGenerator = {
+      generateContent: vi.fn().mockResolvedValue({}),
+    } as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockInnerGenerator as never,
+    );
+
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+      mockConfig,
+    );
+
+    await generator.generateContent(
+      {
+        model: 'gemini-3.5-flash',
+        contents: [],
+      },
+      'prompt-id',
+      'user' as LlmRole,
+    );
+
+    expect(mockInnerGenerator.generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-3-flash',
+      }),
+      'prompt-id',
+      'user',
+    );
+  });
+
+  it('should apply model mapping for COMPUTE_ADC', async () => {
+    const mockInnerGenerator = {
+      generateContent: vi.fn().mockResolvedValue({}),
+    } as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockInnerGenerator as never,
+    );
+
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.COMPUTE_ADC,
+      },
+      mockConfig,
+    );
+
+    await generator.generateContent(
+      {
+        model: 'gemini-3.5-flash',
+        contents: [],
+      },
+      'prompt-id',
+      'user' as LlmRole,
+    );
+
+    expect(mockInnerGenerator.generateContent).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'gemini-3-flash',
       }),
