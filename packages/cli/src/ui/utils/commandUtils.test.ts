@@ -177,9 +177,12 @@ describe('commandUtils', () => {
       // referenced files are pre-loaded before the query is sent to the model.
       expect(isAtCommand('check:@file.py')).toBe(true);
       expect(isAtCommand('analyze(@file.py)')).toBe(true);
-      expect(isAtCommand('hello@file')).toBe(true);
-      expect(isAtCommand('text@path/to/file')).toBe(true);
-      expect(isAtCommand('user@host')).toBe(true);
+    });
+
+    it('should return false when @ is in the middle of a word', () => {
+      expect(isAtCommand('hello@file')).toBe(false);
+      expect(isAtCommand('text@path/to/file')).toBe(false);
+      expect(isAtCommand('user@host')).toBe(false);
     });
 
     it('should return false when query does not contain any @<path> pattern', () => {

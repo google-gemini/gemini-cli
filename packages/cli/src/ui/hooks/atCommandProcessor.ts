@@ -61,6 +61,12 @@ export function unescapeLiteralAt(text: string): string {
 export const AT_COMMAND_PATH_REGEX_SOURCE =
   '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
 
+/**
+ * An @ reference can start at the beginning of input or after punctuation/space,
+ * but not in the middle of a word such as user@host or hello@file.
+ */
+export const AT_COMMAND_START_REGEX_SOURCE = '(?<![\\\\A-Za-z0-9_])@';
+
 interface HandleAtCommandParams {
   query: string;
   config: Config;
@@ -94,7 +100,7 @@ function parseAllAtCommands(
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
   const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `${AT_COMMAND_START_REGEX_SOURCE}${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 
@@ -218,6 +224,19 @@ interface IgnoredFile {
   reason: 'git' | 'gemini' | 'both';
 }
 
+function shouldAttemptGlobFallback(pathName: string): boolean {
+  return (
+    pathName.includes('/') ||
+    pathName.includes('\\') ||
+    pathName.includes('.') ||
+    pathName.includes('*') ||
+    pathName.includes('?') ||
+    pathName.includes('[') ||
+    pathName.includes(']') ||
+    pathName.startsWith('~')
+  );
+}
+
 /**
  * Resolves file paths from @ commands, handling globs, recursion, and ignores.
  */
@@ -304,7 +323,11 @@ async function resolveFilePaths(
       // We also allow glob fallback for "unauthorized" results from resolveAtCommandPath,
       // as they might represent a relative path that matched an unauthorized file in one directory
       // but might have a valid match (via glob) in another.
-      if (config.getEnableRecursiveFileSearch() && globTool) {
+      if (!shouldAttemptGlobFallback(pathName)) {
+        onDebugMessage(
+          `Path ${pathName} not found directly and does not look like a path. Skipping recursive glob search.`,
+        );
+      } else if (config.getEnableRecursiveFileSearch() && globTool) {
         onDebugMessage(
           `Path ${pathName} not found directly, attempting glob search.`,
         );

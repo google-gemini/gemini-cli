@@ -551,6 +551,65 @@ describe('handleAtCommand', () => {
     });
   });
 
+  it('should skip recursive glob fallback for bare @ names', async () => {
+    const buildAndExecute = vi.fn().mockResolvedValue({
+      llmContent: 'No files found',
+      returnDisplay: 'No files found',
+    });
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+      getTool: vi.fn((name: string) =>
+        name === 'glob' ? { buildAndExecute } : undefined,
+      ),
+    } as unknown as ToolRegistry);
+
+    const query = 'Ask @teammate for review';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 134,
+      signal: abortController.signal,
+    });
+
+    expect(buildAndExecute).not.toHaveBeenCalled();
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      'Path teammate not found directly and does not look like a path. Skipping recursive glob search.',
+    );
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should not treat @ in the middle of a word as an @ command', async () => {
+    const buildAndExecute = vi.fn().mockResolvedValue({
+      llmContent: 'No files found',
+      returnDisplay: 'No files found',
+    });
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+      getTool: vi.fn((name: string) =>
+        name === 'glob' ? { buildAndExecute } : undefined,
+      ),
+    } as unknown as ToolRegistry);
+
+    const query = 'Connect to user@host before continuing.';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 135,
+      signal: abortController.signal,
+    });
+
+    expect(buildAndExecute).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
   describe('git-aware filtering', () => {
     beforeEach(async () => {
       await fsPromises.mkdir(path.join(testRootDir, '.git'), {
