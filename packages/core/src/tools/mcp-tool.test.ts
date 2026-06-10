@@ -27,7 +27,6 @@ import {
   createMockMessageBus,
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
-import { wrapUntrusted } from '../utils/textUtils.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -253,7 +252,9 @@ describe('DiscoveredMCPTool', () => {
         mockToolSuccessResultObject,
       );
       expect(toolResult.llmContent).toEqual([
-        { text: wrapUntrusted(stringifiedResponseContent) },
+        {
+          text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+        },
       ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
@@ -436,7 +437,9 @@ describe('DiscoveredMCPTool', () => {
           mockToolSuccessResultObject,
         );
         expect(toolResult.llmContent).toEqual([
-          { text: wrapUntrusted(stringifiedResponseContent) },
+          {
+            text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+          },
         ]);
         expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
       },
@@ -457,7 +460,11 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
-      expect(toolResult.llmContent).toEqual([{ text: wrapUntrusted(successMessage) }]);
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `<untrusted_context>\n${successMessage}\n</untrusted_context>`,
+        },
+      ]);
 
       // 2. Assert that the display output is the simple text message.
       expect(toolResult.returnDisplay).toBe(successMessage);
@@ -551,7 +558,9 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: wrapUntrusted('This is the text content.') },
+        {
+          text: '<untrusted_context>\nThis is the text content.\n</untrusted_context>',
+        },
       ]);
       expect(toolResult.returnDisplay).toBe('This is the text content.');
     });
@@ -614,7 +623,7 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: wrapUntrusted('First part.') },
+        { text: '<untrusted_context>\nFirst part.\n</untrusted_context>' },
         {
           text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
@@ -624,7 +633,7 @@ describe('DiscoveredMCPTool', () => {
             data: 'BASE64_IMAGE_DATA',
           },
         },
-        { text: wrapUntrusted('Second part.') },
+        { text: '<untrusted_context>\nSecond part.\n</untrusted_context>' },
       ]);
       expect(toolResult.returnDisplay).toBe(
         'First part.\n[Image: image/jpeg]\nSecond part.',
@@ -646,7 +655,9 @@ describe('DiscoveredMCPTool', () => {
       const toolResult = await invocation.execute({
         abortSignal: new AbortController().signal,
       });
-      expect(toolResult.llmContent).toEqual([{ text: wrapUntrusted('Valid part.') }]);
+      expect(toolResult.llmContent).toEqual([
+        { text: '<untrusted_context>\nValid part.\n</untrusted_context>' },
+      ]);
       expect(toolResult.returnDisplay).toBe(
         'Valid part.\n[Unknown content type: future_block]',
       );
@@ -686,11 +697,15 @@ describe('DiscoveredMCPTool', () => {
         abortSignal: new AbortController().signal,
       });
       expect(toolResult.llmContent).toEqual([
-        { text: wrapUntrusted('Here is a resource.') },
+        {
+          text: '<untrusted_context>\nHere is a resource.\n</untrusted_context>',
+        },
         {
           text: 'Resource Link: My Resource at file:///path/to/resource',
         },
-        { text: wrapUntrusted('Embedded text content.') },
+        {
+          text: '<untrusted_context>\nEmbedded text content.\n</untrusted_context>',
+        },
         {
           text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
@@ -772,7 +787,9 @@ describe('DiscoveredMCPTool', () => {
           abortSignal: controller.signal,
         });
 
-        expect(result.llmContent).toEqual([{ text: wrapUntrusted('Success') }]);
+        expect(result.llmContent).toEqual([
+          { text: '<untrusted_context>\nSuccess\n</untrusted_context>' },
+        ]);
         expect(result.returnDisplay).toBe('Success');
         expect(mockCallTool).toHaveBeenCalledWith([
           { name: serverToolName, args: params },
@@ -1046,7 +1063,7 @@ describe('DiscoveredMCPTool', () => {
     it('should wrap text output in <untrusted_context> tags', async () => {
       const params = { param: 'testValue' };
       const invocation = tool.build(params);
-      
+
       const mockMcpToolResponseParts: Part[] = [
         {
           functionResponse: {
@@ -1062,7 +1079,7 @@ describe('DiscoveredMCPTool', () => {
       });
 
       expect(result.llmContent).toEqual([
-        { text: wrapUntrusted('Hello from MCP') },
+        { text: '<untrusted_context>\nHello from MCP\n</untrusted_context>' },
       ]);
     });
   });

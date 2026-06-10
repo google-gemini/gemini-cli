@@ -32,7 +32,6 @@ import {
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { convert } from 'html-to-text';
-import { wrapUntrusted } from '../utils/textUtils.js';
 
 const mockGenerateContent = vi.fn();
 const mockGetGeminiClient = vi.fn(() => ({
@@ -505,7 +504,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe(wrapUntrusted('fallback processed response'));
+      expect(result.llmContent).toBe(
+        '<untrusted_context>\nfallback processed response\n</untrusted_context>',
+      );
       expect(result.returnDisplay).toContain(
         'URL(s) processed using fallback fetch',
       );
@@ -538,7 +539,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe(wrapUntrusted('fallback response'));
+      expect(result.llmContent).toBe(
+        '<untrusted_context>\nfallback response\n</untrusted_context>',
+      );
       // Verify private URL was NOT fetched (mockFetch would throw if it was called for private.com)
     });
 
@@ -978,7 +981,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe(wrapUntrusted(content));
+      expect(result.llmContent).toBe(
+        `<untrusted_context>\n${content}\n</untrusted_context>`,
+      );
       expect(result.returnDisplay).toContain('Fetched text/plain content');
       expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
         'https://example.com/',

@@ -187,5 +187,9 @@ export function sanitizeOutput(output: string): string {
  * Wraps text in <untrusted_context> tags to mitigate prompt injection.
  */
 export function wrapUntrusted(text: string): string {
-  return `<untrusted_context>\n${text}\n</untrusted_context>`;
+  const escaped = text.replaceAll(
+    '</untrusted_context>',
+    '&lt;/untrusted_context&gt;',
+  );
+  return `<untrusted_context>\n${escaped}\n</untrusted_context>`;
 }

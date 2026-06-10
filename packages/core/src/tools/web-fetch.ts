@@ -870,7 +870,7 @@ ${toFetch.join('\n')}
       );
 
       return {
-        llmContent: responseText,
+        llmContent: wrapUntrusted(responseText),
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
