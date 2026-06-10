@@ -67,7 +67,7 @@
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
     "http-proxy-agent": "^7.0.2",
-    "https-proxy-agent": "^7.0.6",
+    "https-proxy-agent": "^9.0.0",
     "ignore": "^7.0.0",
     "ipaddr.js": "^1.9.1",
     "isbinaryfile": "^5.0.7",
