@@ -68,7 +68,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Cache Linters'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
+        uses: 'actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae' # ratchet:actions/cache@v5.0.5
         with:
           path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
           key: "${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles('scripts/lint.js') }}"
@@ -77,7 +77,7 @@ jobs:
         run: 'npm ci'
 
       - name: 'Cache ESLint'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
+        uses: 'actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae' # ratchet:actions/cache@v5.0.5
         with:
           path: '.eslintcache'
           key: "${{ runner.os }}-eslint-${{ hashFiles('package-lock.json', 'eslint.config.js') }}"
