@@ -37,7 +37,7 @@
     "@modelcontextprotocol/sdk": "^1.23.0",
     "ansi-escapes": "^7.3.0",
     "ansi-regex": "^6.2.2",
-    "chalk": "^4.1.2",
+    "chalk": "^5.6.2",
     "cli-spinners": "^2.9.2",
     "clipboardy": "~5.2.0",
     "color-convert": "^2.0.1",
