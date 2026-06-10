@@ -90,7 +90,7 @@
     "undici": "^7.10.0",
     "uuid": "^13.0.0",
     "web-tree-sitter": "^0.25.10",
-    "zod": "^3.25.76",
+    "zod": "^4.4.3",
     "zod-to-json-schema": "^3.25.1"
   },
   "optionalDependencies": {
