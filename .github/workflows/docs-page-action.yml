@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: 'Setup Pages'
-        uses: 'actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b' # ratchet:actions/configure-pages@v5
+        uses: 'actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d' # ratchet:actions/configure-pages@v6.0.0
 
       - name: 'Build with Jekyll'
         uses: 'actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697' # ratchet:actions/jekyll-build-pages@v1
