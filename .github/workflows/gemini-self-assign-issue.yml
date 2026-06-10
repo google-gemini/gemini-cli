@@ -39,7 +39,7 @@ jobs:
 
       - name: 'Assign issue to user'
         if: "contains(github.event.comment.body, '/assign')"
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |
@@ -112,7 +112,7 @@ jobs:
 
       - name: 'Unassign issue from user'
         if: "contains(github.event.comment.body, '/unassign')"
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |

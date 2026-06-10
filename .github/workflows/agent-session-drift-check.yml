@@ -25,7 +25,7 @@ jobs:
       pull-requests: 'write'
     steps:
       - name: 'Detect drift and comment'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v8
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v8
         with:
           script: |-
             // === Pair configuration — append here to cover more pairs ===

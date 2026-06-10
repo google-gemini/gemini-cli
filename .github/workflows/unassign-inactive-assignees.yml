@@ -46,7 +46,7 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
 
       - name: 'Unassign inactive assignees'
-        uses: 'actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b' # ratchet:actions/github-script@v7
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
         env:
           DRY_RUN: '${{ inputs.dry_run }}'
         with:

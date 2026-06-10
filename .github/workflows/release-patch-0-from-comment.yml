@@ -42,7 +42,7 @@ jobs:
       - name: 'Dispatch if Merged'
         if: "steps.pr_status.outputs.STATE == 'MERGED'"
         id: 'dispatch_patch'
-        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         env:
           COMMENT_BODY: '${{ github.event.comment.body }}'
         with:
