@@ -156,7 +156,7 @@ jobs:
           npm run test:integration:sandbox:none -- --testTimeout=600000
 
       - name: 'Upload Artifact'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        uses: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: 'gemini-cli-${{ matrix.platform_name }}'
           path: 'dist/${{ matrix.platform_name }}/'

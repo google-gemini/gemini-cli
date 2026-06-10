@@ -55,7 +55,7 @@ jobs:
         run: |
           mkdir -p ./pr
           echo "${REPO_NAME}" > ./pr/repo_name
-      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+      - uses: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: 'repo_name'
           path: 'pr/'
@@ -352,7 +352,7 @@ jobs:
 
       - name: 'Upload Reliability Logs'
         if: "always() && steps.check_evals.outputs.should_run == 'true'"
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        uses: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: 'eval-logs-${{ github.run_id }}-${{ github.run_attempt }}'
           path: 'evals/logs/api-reliability.jsonl'
