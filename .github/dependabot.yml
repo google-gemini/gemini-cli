@@ -8,6 +8,8 @@ updates:
     open-pull-requests-limit: 10
     reviewers:
       - 'joshualitt'
+    cooldown:
+      default-days: 7
     groups:
       npm-dependencies:
         patterns:
