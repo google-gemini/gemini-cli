@@ -57,7 +57,7 @@ jobs:
           fetch-depth: 0
 
       - name: 'Setup Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        uses: 'actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'
         with:
           node-version-file: '.nvmrc'
 
