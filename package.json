@@ -124,7 +124,7 @@
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
     "json": "^11.0.0",
-    "lint-staged": "^16.1.6",
+    "lint-staged": "^17.0.7",
     "memfs": "^4.42.0",
     "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
