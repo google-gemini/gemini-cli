@@ -19,7 +19,11 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithTimeout,
+  isLoopbackHost,
+  resolveAndValidateDns,
+} from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -267,16 +271,34 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private isBlockedHost(urlStr: string): boolean {
+  private async isBlockedHost(urlStr: string): Promise<string | null> {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return true;
+      // Block loopback and unspecified addresses by literal name/IP without DNS
+      // (covers localhost, 127.0.0.1, ::1, [::1], 0.0.0.0, [::])
+      if (
+        isLoopbackHost(hostname) ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::]'
+      ) {
+        return null;
       }
-      return isPrivateIp(urlStr);
+      // Resolve DNS to catch hostname-to-private-IP bypasses such as
+      // 127.0.0.1.nip.io, 169.254.169.254.nip.io, or attacker-controlled DNS
+      try {
+        const safeIps = await resolveAndValidateDns(urlStr);
+        if (safeIps.length === 0) {
+          return null;
+        }
+        return safeIps[0];
+      } catch {
+        // DNS resolution failed — deny by default to avoid SSRF via
+        // unresolvable or ambiguous hostnames
+        return null;
+      }
     } catch {
-      return true;
+      return null;
     }
   }
 
@@ -285,21 +307,31 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (this.isBlockedHost(url)) {
+    const pinnedIp = await this.isBlockedHost(url);
+    if (!pinnedIp) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
       );
     }
 
+    const urlWithIp = new URL(url);
+    const originalHostname = urlWithIp.hostname;
+    urlWithIp.hostname = pinnedIp;
+
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-          signal,
-          headers: {
-            'User-Agent': USER_AGENT,
+        const res = await fetchWithTimeout(
+          urlWithIp.toString(),
+          URL_FETCH_TIMEOUT_MS,
+          {
+            signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+              Host: originalHostname,
+            },
           },
-        });
+        );
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -350,16 +382,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     return textContent;
   }
 
-  private filterAndValidateUrls(urls: string[]): {
+  private async filterAndValidateUrls(urls: string[]): Promise<{
     toFetch: string[];
     skipped: string[];
-  } {
+  }> {
     const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
+      if (!(await this.isBlockedHost(url))) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -615,7 +647,8 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (this.isBlockedHost(url)) {
+    const pinnedIp = await this.isBlockedHost(url);
+    if (!pinnedIp) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -631,16 +664,25 @@ ${aggregatedContent}
     }
 
     try {
+      const urlWithIp = new URL(url);
+      const originalHostname = urlWithIp.hostname;
+      urlWithIp.hostname = pinnedIp;
+
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              Accept:
-                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
-              'User-Agent': USER_AGENT,
+          const res = await fetchWithTimeout(
+            urlWithIp.toString(),
+            URL_FETCH_TIMEOUT_MS,
+            {
+              signal,
+              headers: {
+                Accept:
+                  'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+                'User-Agent': USER_AGENT,
+                Host: originalHostname,
+              },
             },
-          });
+          );
           return res;
         },
         {
@@ -769,7 +811,7 @@ Response: ${rawResponseText}`;
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
+    const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {
