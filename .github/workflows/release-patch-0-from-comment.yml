@@ -128,7 +128,7 @@ jobs:
 
       - name: 'Comment on Failure'
         if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
-        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        uses: 'peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
@@ -137,7 +137,7 @@ jobs:
 
       - name: 'Final Status Comment - Success'
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_urls"
-        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        uses: 'peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
@@ -158,7 +158,7 @@ jobs:
 
       - name: 'Final Status Comment - Dispatch Success (No URL)'
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_urls"
-        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        uses: 'peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
@@ -178,7 +178,7 @@ jobs:
 
       - name: 'Final Status Comment - Failure'
         if: "always() && startsWith(github.event.comment.body, '/patch') && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
-        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        uses: 'peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
