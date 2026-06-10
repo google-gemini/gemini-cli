@@ -229,6 +229,139 @@ export async function fetchWithTimeout(
   }
 }
 
+const MAX_SAFE_REDIRECTS = 5;
+
+/**
+ * Throws PrivateIpError if the url targets a private, loopback, link local, or
+ * otherwise non public address. It checks both the literal hostname and the
+ * address the hostname resolves to, so it stops IP literals such as
+ * 169.254.169.254 and hostnames such as metadata.google.internal that resolve
+ * to a private address.
+ */
+export async function assertUrlIsPublic(url: string): Promise<void> {
+  if (isPrivateIp(url)) {
+    throw new PrivateIpError(
+      `Access to private or internal address ${url} is blocked`,
+    );
+  }
+  if (await isPrivateIpAsync(url)) {
+    throw new PrivateIpError(
+      `Host ${url} resolves to a private or internal address and is blocked`,
+    );
+  }
+}
+
+// Credential carrying headers that must not be forwarded to a different origin
+// during a redirect.
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'cookie2',
+  'proxy-authorization',
+];
+
+/**
+ * Computes the next url and request options for a redirect hop. It rejects any
+ * redirect target that is not http or https, strips credential carrying headers
+ * when the redirect crosses to a different origin, and downgrades the method to
+ * GET while removing the body for 303 responses and for non GET or HEAD 301 and
+ * 302 responses, following RFC 9110.
+ */
+export function applyRedirect(
+  currentUrl: string,
+  status: number,
+  location: string,
+  options: RequestInit,
+): { nextUrl: string; nextOptions: RequestInit } {
+  const nextUrl = new URL(location, currentUrl);
+  if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') {
+    throw new FetchError(
+      `Unsupported redirect protocol ${nextUrl.protocol}`,
+      'EUNSUPPORTEDPROTOCOL',
+    );
+  }
+
+  let nextOptions: RequestInit = { ...options };
+
+  const currentUrlObj = new URL(currentUrl);
+  const isCrossOrigin =
+    currentUrlObj.protocol !== nextUrl.protocol ||
+    currentUrlObj.host !== nextUrl.host;
+  if (isCrossOrigin && nextOptions.headers) {
+    const headers = new Headers(nextOptions.headers);
+    for (const name of SENSITIVE_HEADERS) {
+      headers.delete(name);
+    }
+    nextOptions = { ...nextOptions, headers };
+  }
+
+  const method = (nextOptions.method ?? 'GET').toUpperCase();
+  if (
+    status === 303 ||
+    ((status === 301 || status === 302) &&
+      method !== 'GET' &&
+      method !== 'HEAD')
+  ) {
+    const headers = new Headers(nextOptions.headers ?? {});
+    headers.delete('content-type');
+    headers.delete('content-length');
+    nextOptions = {
+      ...nextOptions,
+      method: 'GET',
+      body: undefined,
+      headers,
+    };
+  }
+
+  return { nextUrl: nextUrl.toString(), nextOptions };
+}
+
+/**
+ * Fetches a url while enforcing the SSRF guard on the initial request and on
+ * every redirect hop. Redirects are followed manually so the resolved target
+ * of each hop is validated before the connection is made. Use this for any
+ * fetch whose url can be influenced by untrusted content.
+ */
+export async function safeFetchFollowingRedirects(
+  url: string,
+  timeout: number,
+  options?: RequestInit,
+): Promise<Response> {
+  let currentUrl = url;
+  let currentOptions: RequestInit = { ...options };
+
+  for (let hop = 0; hop <= MAX_SAFE_REDIRECTS; hop++) {
+    await assertUrlIsPublic(currentUrl);
+    const response = await fetchWithTimeout(currentUrl, timeout, {
+      ...currentOptions,
+      redirect: 'manual',
+    });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      return response;
+    }
+
+    const next = applyRedirect(
+      currentUrl,
+      response.status,
+      location,
+      currentOptions,
+    );
+    currentUrl = next.nextUrl;
+    currentOptions = next.nextOptions;
+  }
+
+  throw new FetchError(
+    `Too many redirects while fetching ${url}`,
+    'ETOOMANYREDIRECTS',
+  );
+}
+
 export function setGlobalProxy(proxy: string) {
   const trimmedProxy = proxy.trim();
   currentProxy = trimmedProxy;
