@@ -34,7 +34,7 @@ jobs:
       STEERING_DETECTED: '${{ steps.detect.outputs.STEERING_DETECTED }}'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10' # ratchet:actions/checkout@v5
         with:
           # Check out the trusted code from main for detection
           fetch-depth: 0
@@ -97,7 +97,7 @@ jobs:
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10' # ratchet:actions/checkout@v5
         with:
           # Check out the fork's PR code for the actual evaluation
           # This only runs AFTER manual approval
