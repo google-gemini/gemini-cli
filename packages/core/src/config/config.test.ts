@@ -4384,7 +4384,7 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
   });
 
-  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_VERTEX_AI', () => {
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is USE_VERTEX_AI', () => {
     const config = new Config(baseParams);
     config['contentGeneratorConfig'] = { authType: AuthType.USE_VERTEX_AI };
 
@@ -4392,7 +4392,7 @@ describe('hasGemini35FlashGAAccess model setting', () => {
     expect(result).toBe(true);
 
     expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
-    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
   });
 
   it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI or USE_VERTEX_AI', () => {
