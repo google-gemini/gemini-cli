@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import {
   BaseDeclarativeTool,
@@ -130,11 +131,15 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     return `Reading output for background process ${this.params.pid}`;
   }
 
-  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal }: ExecuteOptions): Promise<ToolResult> {
     const pid = this.params.pid;
 
     if (this.params.delay_ms && this.params.delay_ms > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.params.delay_ms));
+      // Abort-aware delay: rejects with an AbortError when the user cancels,
+      // which the tool executor converts into a Cancelled result. Without
+      // this, cancellation would leave the scheduler blocked until the
+      // timer fires.
+      await delay(this.params.delay_ms, undefined, { signal: abortSignal });
     }
 
     // Verify process belongs to this session to prevent reading logs of processes from other sessions/users
