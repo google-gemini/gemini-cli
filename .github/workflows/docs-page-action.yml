@@ -37,7 +37,7 @@ jobs:
           destination: './_site'
 
       - name: 'Upload artifact'
-        uses: 'actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa' # ratchet:actions/upload-pages-artifact@v3
+        uses: 'actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9' # ratchet:actions/upload-pages-artifact@v5.0.0
 
   deploy:
     if: "github.repository == 'google-gemini/gemini-cli'"
