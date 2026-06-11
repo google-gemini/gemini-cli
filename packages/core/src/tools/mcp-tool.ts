@@ -451,19 +451,68 @@ function transformTextBlock(block: McpTextBlock): Part {
   return { text: block.text };
 }
 
+function startsWithBytes(buffer: Buffer, bytes: number[]): boolean {
+  if (buffer.length < bytes.length) {
+    return false;
+  }
+
+  return bytes.every((byte, index) => buffer[index] === byte);
+}
+
+function detectImageMimeTypeFromBase64(data: string): string | undefined {
+  const buffer = Buffer.from(data, 'base64');
+
+  if (
+    startsWithBytes(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  ) {
+    return 'image/png';
+  }
+
+  if (startsWithBytes(buffer, [0xff, 0xd8, 0xff])) {
+    return 'image/jpeg';
+  }
+
+  const gifSignature = buffer.subarray(0, 6).toString('ascii');
+  if (gifSignature === 'GIF87a' || gifSignature === 'GIF89a') {
+    return 'image/gif';
+  }
+
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+
+  return undefined;
+}
+
+function getMimeTypeForInlineData(
+  declaredMimeType: string,
+  data: string,
+): string {
+  return detectImageMimeTypeFromBase64(data) ?? declaredMimeType;
+}
+
 function transformImageAudioBlock(
   block: McpMediaBlock,
   toolName: string,
 ): Part[] {
+  const mimeType =
+    block.type === 'image'
+      ? getMimeTypeForInlineData(block.mimeType, block.data)
+      : block.mimeType;
+
   return [
     {
       text: `[Tool '${toolName}' provided the following ${
         block.type
-      } data with mime-type: ${block.mimeType}]`,
+      } data with mime-type: ${mimeType}]`,
     },
     {
       inlineData: {
-        mimeType: block.mimeType,
+        mimeType,
         data: block.data,
       },
     },
@@ -479,7 +528,8 @@ function transformResourceBlock(
     return { text: resource.text };
   }
   if (resource?.blob) {
-    const mimeType = resource.mimeType || 'application/octet-stream';
+    const declaredMimeType = resource.mimeType || 'application/octet-stream';
+    const mimeType = getMimeTypeForInlineData(declaredMimeType, resource.blob);
     return [
       {
         text: `[Tool '${toolName}' provided the following embedded resource with mime-type: ${mimeType}]`,
@@ -561,7 +611,7 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
       case 'text':
         return block.text;
       case 'image':
-        return `[Image: ${block.mimeType}]`;
+        return `[Image: ${getMimeTypeForInlineData(block.mimeType, block.data)}]`;
       case 'audio':
         return `[Audio: ${block.mimeType}]`;
       case 'resource_link':
@@ -570,9 +620,13 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
         if (block.resource?.text) {
           return block.resource.text;
         }
-        return `[Embedded Resource: ${
-          block.resource?.mimeType || 'unknown type'
-        }]`;
+        if (block.resource?.blob) {
+          return `[Embedded Resource: ${getMimeTypeForInlineData(
+            block.resource.mimeType || 'unknown type',
+            block.resource.blob,
+          )}]`;
+        }
+        return `[Embedded Resource: unknown type]`;
       default:
         return `[Unknown content type: ${(block as { type: string }).type}]`;
     }
