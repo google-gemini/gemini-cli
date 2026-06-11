@@ -181,6 +181,7 @@ jobs:
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
           GEMINI_MODEL: 'gemini-3-flash-preview'
         with:
+          upload_artifacts: 'true'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
@@ -303,6 +304,7 @@ jobs:
           GEMINI_STRICT_TELEMETRY_LIMITS: 'true'
           GEMINI_MODEL: 'gemini-3-flash-preview'
         with:
+          upload_artifacts: 'true'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
