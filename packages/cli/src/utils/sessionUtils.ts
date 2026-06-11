@@ -140,15 +140,6 @@ export interface SessionSelectionResult {
 }
 
 /**
- * Checks if a session has at least one user or assistant (gemini) message.
- * Sessions with only system messages (info, error, warning) are considered empty.
- * @param messages - The array of message records to check
- * @returns true if the session has meaningful content
- */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
-
-/**
  * Cleans and sanitizes message content for display by:
  * - Converting newlines to spaces
  * - Collapsing multiple whitespace to single spaces
@@ -287,8 +278,10 @@ export const getAllSessionFiles = async (
           const lastUpdated =
             content.lastUpdated || content.startTime || fallbackTimestamp;
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!content.hasUserOrAssistantMessage) {
+          // Skip sessions with no resumable conversation content, including
+          // startup-only, system-only, command-only, and internal-context-only
+          // sessions.
+          if (!content.hasResumableContent) {
             return { fileName: file, sessionInfo: null };
           }
 
