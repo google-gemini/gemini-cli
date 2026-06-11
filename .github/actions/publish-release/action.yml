@@ -75,7 +75,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
