@@ -1153,8 +1153,18 @@ export class ShellExecutionService {
         }
 
         renderTimeout = setTimeout(() => {
-          renderFn();
-          renderTimeout = null;
+          // A deferred render runs outside any caller's try/catch; a throw
+          // here would surface as an uncaught exception and kill the CLI.
+          try {
+            renderFn();
+          } catch (err) {
+            debugLogger.warn(
+              `Deferred render failed for shell execution (pid ${ptyPid}):`,
+              err,
+            );
+          } finally {
+            renderTimeout = null;
+          }
         }, 68);
       };
 
@@ -1168,54 +1178,75 @@ export class ShellExecutionService {
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolveChunk) => {
-              if (!decoder) {
-                decoder = new TextDecoder('utf-8');
-              }
+              // A chunk that throws must settle rather than poison the
+              // chain: finalize() races against this chain on exit, and an
+              // unsettled link would block the exit result forever.
+              try {
+                if (!decoder) {
+                  decoder = new TextDecoder('utf-8');
+                }
 
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                sniffChunks.push(data);
-              } else if (!isStreamingRawContent) {
-                binaryBytesReceived += data.length;
-              }
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  sniffChunks.push(data);
+                } else if (!isStreamingRawContent) {
+                  binaryBytesReceived += data.length;
+                }
 
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks);
-                sniffedBytes = sniffBuffer.length;
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  const sniffBuffer = Buffer.concat(sniffChunks);
+                  sniffedBytes = sniffBuffer.length;
 
-                if (isBinary(sniffBuffer, 512, true)) {
-                  isStreamingRawContent = false;
-                  binaryBytesReceived = sniffBuffer.length;
-                  const event: ShellOutputEvent = { type: 'binary_detected' };
+                  if (isBinary(sniffBuffer, 512, true)) {
+                    isStreamingRawContent = false;
+                    binaryBytesReceived = sniffBuffer.length;
+                    const event: ShellOutputEvent = { type: 'binary_detected' };
+                    onOutputEvent(event);
+                    ExecutionLifecycleService.emitEvent(ptyPid, event);
+                  }
+                }
+
+                if (isStreamingRawContent) {
+                  const decodedChunk = decoder.decode(data, { stream: true });
+                  if (decodedChunk.length === 0) {
+                    resolveChunk();
+                    return;
+                  }
+
+                  if (ShellExecutionService.backgroundLogPids.has(ptyPid)) {
+                    ShellExecutionService.syncBackgroundLog(
+                      ptyPid,
+                      decodedChunk,
+                    );
+                  }
+
+                  isWriting = true;
+                  headlessTerminal.write(decodedChunk, () => {
+                    // A throw inside render() must not leave this chunk
+                    // unsettled: the exit result is gated on the chain
+                    // draining.
+                    try {
+                      render();
+                    } finally {
+                      isWriting = false;
+                      resolveChunk();
+                    }
+                  });
+                } else {
+                  const totalBytes = binaryBytesReceived;
+                  const event: ShellOutputEvent = {
+                    type: 'binary_progress',
+                    bytesReceived: totalBytes,
+                  };
                   onOutputEvent(event);
                   ExecutionLifecycleService.emitEvent(ptyPid, event);
-                }
-              }
-
-              if (isStreamingRawContent) {
-                const decodedChunk = decoder.decode(data, { stream: true });
-                if (decodedChunk.length === 0) {
                   resolveChunk();
-                  return;
                 }
-
-                if (ShellExecutionService.backgroundLogPids.has(ptyPid)) {
-                  ShellExecutionService.syncBackgroundLog(ptyPid, decodedChunk);
-                }
-
-                isWriting = true;
-                headlessTerminal.write(decodedChunk, () => {
-                  render();
-                  isWriting = false;
-                  resolveChunk();
-                });
-              } else {
-                const totalBytes = binaryBytesReceived;
-                const event: ShellOutputEvent = {
-                  type: 'binary_progress',
-                  bytesReceived: totalBytes,
-                };
-                onOutputEvent(event);
-                ExecutionLifecycleService.emitEvent(ptyPid, event);
+              } catch (err) {
+                debugLogger.warn(
+                  `Error while processing shell output chunk (pid ${ptyPid}):`,
+                  err,
+                );
+                isWriting = false;
                 resolveChunk();
               }
             }),
@@ -1237,8 +1268,27 @@ export class ShellExecutionService {
           // its buffer contents, then disposed to free memory.
           ShellExecutionService.destroyPtyProcess(ptyProcess);
 
+          // finalize() is the only path that resolves the execution result,
+          // so it must run exactly once on every exit, no matter how the
+          // drain race below settles.
+          let finalized = false;
+
           const finalize = () => {
-            render(true);
+            if (finalized) {
+              return;
+            }
+            finalized = true;
+            // Nothing below may prevent the result from reaching the caller:
+            // a failure in the rendering pipeline must degrade output, not
+            // hang the execution.
+            try {
+              render(true);
+            } catch (err) {
+              debugLogger.warn(
+                `Final render failed for shell execution (pid ${ptyPid}):`,
+                err,
+              );
+            }
             cmdCleanup?.();
 
             const event: ShellOutputEvent = {
@@ -1259,17 +1309,33 @@ export class ShellExecutionService {
             }
             onOutputEvent(event);
 
-            const endLine = headlessTerminal.buffer.active.length;
-            const startLine = Math.max(
-              0,
-              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
-            );
-            const ansiOutputSnapshot = serializeTerminalToObject(
-              headlessTerminal,
-              startLine,
-              endLine,
-            );
-            const finalOutput = getFullBufferText(headlessTerminal);
+            let ansiOutputSnapshot: AnsiOutput | undefined;
+            try {
+              const endLine = headlessTerminal.buffer.active.length;
+              const startLine = Math.max(
+                0,
+                endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+              );
+              ansiOutputSnapshot = serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+              );
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to serialize final shell output (pid ${ptyPid}):`,
+                err,
+              );
+            }
+            let finalOutput = '';
+            try {
+              finalOutput = getFullBufferText(headlessTerminal);
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to extract final shell output (pid ${ptyPid}):`,
+                err,
+              );
+            }
 
             // Dispose the headless terminal to free scrollback buffers.
             // This must happen after getFullBufferText() extracts the output.
@@ -1302,7 +1368,12 @@ export class ShellExecutionService {
             return;
           }
 
-          const processingComplete = processingChain.then(() => 'processed');
+          // A rejected chunk counts as drained: the exit result must never
+          // be blocked on the rendering pipeline failing.
+          const processingComplete = processingChain.then(
+            () => 'processed' as const,
+            () => 'processed' as const,
+          );
           const abortFired = new Promise<'aborted'>((res) => {
             if (abortSignal.aborted) {
               res('aborted');
@@ -1313,10 +1384,15 @@ export class ShellExecutionService {
             });
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          Promise.race([processingComplete, abortFired]).then(() => {
-            finalize();
-          });
+           
+          Promise.race([processingComplete, abortFired]).then(
+            () => {
+              finalize();
+            },
+            () => {
+              finalize();
+            },
+          );
         },
       );
 

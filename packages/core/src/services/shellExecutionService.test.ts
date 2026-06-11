@@ -1247,6 +1247,47 @@ describe('ShellExecutionService', () => {
       expect(destroySpy).toHaveBeenCalled();
     });
   });
+
+  describe('Exit finalization resilience', () => {
+    // Regression tests for the "shell stuck in Awaiting input after the
+    // command completes" family (#25166): the exit result is gated on the
+    // output processing chain, so a chunk that throws anywhere in the
+    // rendering pipeline must never leave the execution unresolved.
+
+    it('resolves the result even if rendering throws while processing output', async () => {
+      mockSerializeTerminalToObject.mockImplementation(() => {
+        throw new Error('serializer boom');
+      });
+
+      const { result } = await simulateExecution('echo hello', (pty) => {
+        pty.onData.mock.calls[0][0]('hello\r\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output.trim()).toBe('hello');
+      // The serialized snapshot is lost, but the execution must not hang.
+      expect(result.ansiOutput).toBeUndefined();
+      expect(mockDebugLogger.warn).toHaveBeenCalled();
+    });
+
+    it('resolves the result even if a chunk throws before reaching the terminal', async () => {
+      mockIsBinary.mockImplementation(() => {
+        throw new Error('sniff boom');
+      });
+
+      const { result } = await simulateExecution('echo hello', (pty) => {
+        pty.onData.mock.calls[0][0]('hello\r\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Error while processing shell output chunk'),
+        expect.any(Error),
+      );
+    });
+  });
 });
 
 describe('ShellExecutionService child_process fallback', () => {
