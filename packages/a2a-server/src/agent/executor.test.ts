@@ -22,6 +22,7 @@ vi.mock('../config/config.js', () => ({
     getCheckpointingEnabled: () => false,
   }),
   loadEnvironment: vi.fn(),
+  setIsTrusted: vi.fn().mockReturnValue(false),
   setTargetDir: vi.fn().mockReturnValue('/tmp'),
 }));
 
