@@ -74,6 +74,13 @@ export const SCROLLBACK_LIMIT = 300000;
 export const DRAIN_STALL_TIMEOUT_MS = 2000;
 const DRAIN_STALL_POLL_MS = 250;
 
+// In the child_process fallback the post-exit wait is for the stdio
+// 'close' event, and data may keep arriving from a live grandchild that
+// inherited the pipes rather than from a finite queue — so on top of the
+// idle window there is a hard cap: a process that keeps writing through
+// inherited pipes must not hold the exit result hostage indefinitely.
+export const POST_EXIT_DRAIN_CAP_MS = 10_000;
+
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
@@ -664,12 +671,22 @@ export class ShellExecutionService {
       let stderrDecoder: TextDecoder | null = null;
       let error: Error | null = null;
       let exited = false;
+      let finalized = false;
+      let closeWatchdog: NodeJS.Timeout | undefined;
+      // Updated on every output chunk so the post-exit watchdog only fires
+      // when the streams go silent, not while a grandchild is still
+      // writing through the inherited pipes.
+      let lastDrainActivityAt = performance.now();
+      const markDrainActivity = () => {
+        lastDrainActivityAt = performance.now();
+      };
 
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+        markDrainActivity();
         if (!stdoutDecoder || !stderrDecoder) {
           stdoutDecoder = new TextDecoder('utf-8');
           stderrDecoder = new TextDecoder('utf-8');
@@ -743,6 +760,14 @@ export class ShellExecutionService {
         code: number | null,
         signal: NodeJS.Signals | null,
       ) => {
+        if (finalized) {
+          return;
+        }
+        finalized = true;
+        if (closeWatchdog) {
+          clearInterval(closeWatchdog);
+          closeWatchdog = undefined;
+        }
         cleanup();
         cmdCleanup?.();
 
@@ -824,6 +849,33 @@ export class ShellExecutionService {
 
       child.on('close', (code, signal) => {
         handleExit(code, signal);
+      });
+
+      // 'close' waits for the stdio streams to end, which never happens if
+      // a grandchild inherited the pipes and outlives the shell (common on
+      // Windows). 'exit' still fires, so from there the wait for 'close'
+      // is bounded: stream activity resets an idle window (to capture the
+      // trailing flush), and a hard cap covers grandchildren that keep
+      // writing indefinitely.
+      child.on('exit', (code, signal) => {
+        if (finalized || closeWatchdog) {
+          return;
+        }
+        const exitedAt = performance.now();
+        markDrainActivity();
+        closeWatchdog = setInterval(() => {
+          const now = performance.now();
+          const stalled = now - lastDrainActivityAt >= DRAIN_STALL_TIMEOUT_MS;
+          const capped = now - exitedAt >= POST_EXIT_DRAIN_CAP_MS;
+          if (stalled || capped) {
+            debugLogger.warn(
+              `Shell stdio drain stalled after exit (pid ${child.pid}); ` +
+                `finalizing with the output received so far.`,
+            );
+            handleExit(code, signal);
+          }
+        }, DRAIN_STALL_POLL_MS);
+        closeWatchdog.unref?.();
       });
 
       function cleanup() {
