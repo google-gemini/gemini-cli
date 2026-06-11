@@ -460,7 +460,8 @@ function startsWithBytes(buffer: Buffer, bytes: number[]): boolean {
 }
 
 function detectImageMimeTypeFromBase64(data: string): string | undefined {
-  const buffer = Buffer.from(data, 'base64');
+  const prefix = data.slice(0, 32);
+  const buffer = Buffer.from(prefix, 'base64');
 
   if (
     startsWithBytes(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
