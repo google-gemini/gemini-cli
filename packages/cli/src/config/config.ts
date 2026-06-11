@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
+import { modelsCommand } from '../commands/models.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import { gemmaCommand } from '../commands/gemma.js';
@@ -183,6 +184,7 @@ export async function parseArguments(
       const commandModules = [
         mcpCommand,
         extensionsCommand,
+        modelsCommand,
         skillsCommand,
         hooksCommand,
         gemmaCommand,
@@ -273,6 +275,7 @@ export async function parseArguments(
 
   yargsInstance.command(mcpCommand);
   yargsInstance.command(extensionsCommand);
+  yargsInstance.command(modelsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
   yargsInstance.command(gemmaCommand);
