@@ -100,6 +100,33 @@ Tips for getting started:
 "
 `;
 
+exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_history_no_pending 1`] = `
+"
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
+
+
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool1 Description for tool 1                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool2 Description for tool 2                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
 "
  ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
@@ -120,6 +147,29 @@ Tips for getting started:
 │ o  tool3 Description for tool 3                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_confirming_tool 1`] = `
+"
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
+
+
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
+
+Action Required (was prompted):
+
+?  confirming_tool Confirming tool description
 "
 `;
 

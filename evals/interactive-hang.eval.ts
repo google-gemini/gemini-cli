@@ -54,6 +54,11 @@ describe('interactive_commands', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: 'should use non-interactive flags when scaffolding a new app',
+    params: {
+      settings: {
+        plan: false,
+      },
+    },
     prompt: 'Create a new react application named my-app using vite.',
     assert: async (rig, result) => {
       const logs = rig.readToolLogs();

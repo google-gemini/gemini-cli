@@ -36,3 +36,17 @@ Composer
 ExitWarning
 "
 `;
+
+exports[`<DefaultAppLayout /> > shows BackgroundTaskDisplay when StreamingState is NOT WaitingForConfirmation 2`] = `
+"MainContent
+BackgroundTaskDisplay
+
+
+
+
+Notifications
+CopyModeWarning
+Composer
+ExitWarning
+"
+`;

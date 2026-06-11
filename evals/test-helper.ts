@@ -16,7 +16,6 @@ import {
   Storage,
   getProjectHash,
   SESSION_FILE_PREFIX,
-  PREVIEW_GEMINI_FLASH_MODEL,
   getErrorMessage,
 } from '@google/gemini-cli-core';
 
@@ -26,8 +25,7 @@ export * from '@google/gemini-cli-test-utils';
  * The default model used for all evaluations.
  * Can be overridden by setting the GEMINI_MODEL environment variable.
  */
-export const EVAL_MODEL =
-  process.env['GEMINI_MODEL'] || PREVIEW_GEMINI_FLASH_MODEL;
+export const EVAL_MODEL = process.env['GEMINI_MODEL'] || 'gemini-3.5-flash';
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These

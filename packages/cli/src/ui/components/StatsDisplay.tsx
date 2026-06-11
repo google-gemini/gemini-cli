@@ -24,7 +24,7 @@ import {
 import { computeSessionStats } from '../utils/computeStats.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { QuotaStats } from '../types.js';
-import { LlmRole } from '@google/gemini-cli-core';
+import { LlmRole, getDisplayString } from '@google/gemini-cli-core';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -101,7 +101,7 @@ const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
   Object.entries(models).forEach(([name, metrics]) => {
     rows.push({
       name,
-      displayName: name,
+      displayName: getDisplayString(name),
       requests: metrics.api.totalRequests,
       cachedTokens: metrics.tokens.cached.toLocaleString(),
       inputTokens: metrics.tokens.prompt.toLocaleString(),

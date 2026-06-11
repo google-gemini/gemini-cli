@@ -55,5 +55,9 @@ vi.mock('./src/config/storage.js', async (importOriginal) => {
   (actual.Storage.prototype as any).getProjectIdentifier = vi.fn(
     () => 'project-slug',
   );
+  actual.Storage.getUserPoliciesDir = vi.fn(() => '/tmp/mock-user-policies');
+  actual.Storage.getSystemPoliciesDir = vi.fn(
+    () => '/tmp/mock-system-policies',
+  );
   return actual;
 });

@@ -16,6 +16,22 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 1`] = `
 "
 `;
 
+exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 2`] = `
+"────────────────────────────────────────
+ Shortcuts See /help for more
+ ! shell mode
+ @ select file or folder
+ Double Esc clear & rewind
+ Tab focus UI
+ Ctrl+Y YOLO mode
+ Shift+Tab cycle mode
+ Ctrl+V paste images
+ Alt+M raw markdown mode
+ Ctrl+R reverse-search history
+ Ctrl+G open external editor
+"
+`;
+
 exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
 "────────────────────────────────────────
  Shortcuts See /help for more
