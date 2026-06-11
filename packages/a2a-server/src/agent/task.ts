@@ -137,6 +137,14 @@ export class Task {
     );
   }
 
+  hasPendingTools(): boolean {
+    return this.pendingToolCalls.size > 0;
+  }
+
+  getPendingToolsCount(): number {
+    return this.pendingToolCalls.size;
+  }
+
   static async create(
     id: string,
     contextId: string,

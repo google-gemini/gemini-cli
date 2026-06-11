@@ -62,6 +62,8 @@ vi.mock('./task.js', () => {
     scheduleToolCalls: vi.fn().mockResolvedValue(undefined),
     waitForPendingTools: vi.fn().mockResolvedValue(undefined),
     getAndClearCompletedTools: vi.fn().mockReturnValue([]),
+    hasPendingTools: vi.fn().mockReturnValue(false),
+    getPendingToolsCount: vi.fn().mockReturnValue(0),
     addToolResponsesToHistory: vi.fn(),
     sendCompletedToolsToLlm: vi.fn().mockImplementation(async function* () {}),
     cancelPendingTools: vi.fn(),

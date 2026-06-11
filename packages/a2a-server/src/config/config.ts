@@ -182,6 +182,14 @@ export async function loadConfig(
   return config;
 }
 
+export function setIsTrusted(
+  agentSettings: AgentSettings | undefined,
+): boolean {
+  return (
+    process.env['GEMINI_FOLDER_TRUST'] === 'true' || !!agentSettings?.isTrusted
+  );
+}
+
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {
   const originalCWD = process.cwd();
   const targetDir =

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, setIsTrusted } from './config.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -23,6 +23,7 @@ import {
   PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
 } from '@google/gemini-cli-core';
+import type { AgentSettings } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -610,5 +611,23 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('setIsTrusted', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    expect(setIsTrusted(undefined)).toBe(true);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is not true', () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
+    expect(setIsTrusted(undefined)).toBe(false);
   });
 });

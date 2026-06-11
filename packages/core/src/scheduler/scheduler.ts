@@ -26,7 +26,10 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  UPDATE_TOPIC_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -548,7 +551,10 @@ export class Scheduler {
 
   private _isParallelizable(request: ToolCallRequestInfo): boolean {
     // update_topic tool is forced as sequential call
-    if (request.name === UPDATE_TOPIC_TOOL_NAME) {
+    if (
+      request.name === UPDATE_TOPIC_TOOL_NAME ||
+      request.name === WRITE_FILE_TOOL_NAME
+    ) {
       return false;
     }
     if (request.args) {
