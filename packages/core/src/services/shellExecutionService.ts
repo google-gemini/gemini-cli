@@ -1061,10 +1061,11 @@ export class ShellExecutionService {
 
       // Updated every time an output chunk settles so the post-exit drain
       // watchdog only fires when the chain is stuck, never while it is
-      // slow but advancing.
-      let lastDrainActivityAt = Date.now();
+      // slow but advancing. Uses the monotonic clock: wall-clock (Date.now)
+      // adjustments, e.g. NTP, must not fire or delay the watchdog.
+      let lastDrainActivityAt = performance.now();
       const markDrainActivity = () => {
-        lastDrainActivityAt = Date.now();
+        lastDrainActivityAt = performance.now();
       };
 
       let isStreamingRawContent = true;
@@ -1415,7 +1416,10 @@ export class ShellExecutionService {
           markDrainActivity();
           const drainStalled = new Promise<'drain-stalled'>((res) => {
             drainWatchdog = setInterval(() => {
-              if (Date.now() - lastDrainActivityAt >= DRAIN_STALL_TIMEOUT_MS) {
+              if (
+                performance.now() - lastDrainActivityAt >=
+                DRAIN_STALL_TIMEOUT_MS
+              ) {
                 res('drain-stalled');
               }
             }, DRAIN_STALL_POLL_MS);
