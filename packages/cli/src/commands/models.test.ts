@@ -5,11 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  coreEvents,
-  ModelConfigService,
-  tokenLimit,
-} from '@google/gemini-cli-core';
+import { ModelConfigService, tokenLimit } from '@google/gemini-cli-core';
 import { handleModelsList, modelsCommand } from './models.js';
 import { loadSettings, type LoadedSettings } from '../config/settings.js';
 
@@ -35,12 +31,15 @@ vi.mock('./utils.js', () => ({
 describe('models command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockTokenLimit = vi.mocked(tokenLimit);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let consoleLogSpy: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -74,20 +73,21 @@ describe('models command', () => {
 
       await handleModelsList();
 
-      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
-        'log',
-        'Available Gemini Models:',
-      );
-      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
-        'log',
-        'Model 1 (model-1)',
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('Available Gemini Models:');
+      expect(consoleLogSpy).toHaveBeenCalledWith('Model 1 (model-1)');
+      expect(consoleLogSpy).toHaveBeenCalledWith('  Description: Desc 1');
+      expect(consoleLogSpy).toHaveBeenCalledWith('  Tier: pro');
+      expect(consoleLogSpy).toHaveBeenCalledWith('Model 2 (model-2)');
+      expect(consoleLogSpy).toHaveBeenCalledWith('  Description: Desc 2');
+      expect(consoleLogSpy).toHaveBeenCalledWith('  Tier: flash');
+
       // Depending on locale, this might be 1,000,000 or 1.000.000
       // We can check if it contains "1" and "000" and "000"
-      const call = vi
-        .mocked(coreEvents.emitConsoleLog)
-        .mock.calls.find((c) => String(c[1]).includes('Context Window:'));
-      expect(call?.[1]).toMatch(/Context Window: 1.*000.*000 tokens/);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const call = consoleLogSpy.mock.calls.find((c: any) =>
+        String(c[0]).includes('Context Window:'),
+      );
+      expect(call?.[0]).toMatch(/Context Window: 1.*000.*000 tokens/);
     });
 
     it('should list available models in JSON format', async () => {
@@ -124,18 +124,10 @@ describe('models command', () => {
         2,
       );
 
-      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
-        'log',
-        expectedJson,
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expectedJson);
     });
 
-    it('should log an error and exit on failure', async () => {
-      const mockProcessExit = vi
-        .spyOn(process, 'exit')
-        .mockImplementation((() => {
-          throw new Error('Exit');
-        }) as unknown as (code?: string | number | null | undefined) => never);
+    it('should throw an error on failure', async () => {
       vi.spyOn(
         ModelConfigService.prototype,
         'getAvailableModelOptions',
@@ -143,18 +135,7 @@ describe('models command', () => {
         throw new Error('Test Error');
       });
 
-      try {
-        await handleModelsList();
-      } catch (e) {
-        if ((e as Error).message !== 'Exit') throw e;
-      }
-
-      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
-        'error',
-        'Test Error',
-      );
-      expect(mockProcessExit).toHaveBeenCalledWith(1);
-      mockProcessExit.mockRestore();
+      await expect(handleModelsList()).rejects.toThrow('Test Error');
     });
   });
 

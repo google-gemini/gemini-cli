@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable no-console */
+
 import type { CommandModule } from 'yargs';
 import {
   debugLogger,
-  getErrorMessage,
   ModelConfigService,
   DEFAULT_MODEL_CONFIGS,
   tokenLimit,
@@ -46,25 +47,25 @@ export async function handleModelsList(options?: {
       }));
 
     if (options?.outputFormat === 'json') {
-      debugLogger.log(JSON.stringify(models, null, 2));
+      console.log(JSON.stringify(models, null, 2));
     } else {
-      debugLogger.log('Available Gemini Models:');
-      debugLogger.log('');
+      console.log('Available Gemini Models:');
+      console.log('');
       for (const m of models) {
-        debugLogger.log(`${m.displayName} (${m.modelId})`);
+        console.log(`${m.displayName} (${m.modelId})`);
         if (m.description) {
-          debugLogger.log(`  Description: ${m.description}`);
+          console.log(`  Description: ${m.description}`);
         }
-        debugLogger.log(
+        console.log(
           `  Context Window: ${m.contextWindow.toLocaleString()} tokens`,
         );
-        debugLogger.log(`  Tier: ${m.tier}`);
-        debugLogger.log('');
+        console.log(`  Tier: ${m.tier}`);
+        console.log('');
       }
     }
   } catch (error) {
-    debugLogger.error(getErrorMessage(error));
-    process.exit(1);
+    debugLogger.error('Failed to list models', error);
+    throw error;
   }
 }
 
@@ -80,10 +81,13 @@ export const modelsCommand: CommandModule = {
       default: 'text',
     }),
   handler: async (argv) => {
-    await handleModelsList({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      outputFormat: argv['output-format'] as 'text' | 'json',
-    });
-    await exitCli();
+    try {
+      await handleModelsList({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        outputFormat: argv['output-format'] as 'text' | 'json',
+      });
+    } finally {
+      await exitCli();
+    }
   },
 };
