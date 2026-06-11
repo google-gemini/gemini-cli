@@ -65,6 +65,15 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 // we capture significant output from long-running commands.
 export const SCROLLBACK_LIMIT = 300000;
 
+// After the process exits, the result still waits for queued output to
+// drain through the headless terminal. That drain is bounded by an idle
+// watchdog: if no chunk settles for a full window, the chain is considered
+// stuck (e.g. a swallowed terminal write callback) and the execution
+// finalizes with the output buffered so far. Progress resets the window,
+// so a slow but advancing drain is never cut short.
+export const DRAIN_STALL_TIMEOUT_MS = 2000;
+const DRAIN_STALL_POLL_MS = 250;
+
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
@@ -1050,6 +1059,14 @@ export class ShellExecutionService {
       const error: Error | null = null;
       let exited = false;
 
+      // Updated every time an output chunk settles so the post-exit drain
+      // watchdog only fires when the chain is stuck, never while it is
+      // slow but advancing.
+      let lastDrainActivityAt = Date.now();
+      const markDrainActivity = () => {
+        lastDrainActivityAt = Date.now();
+      };
+
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
@@ -1251,6 +1268,9 @@ export class ShellExecutionService {
               }
             }),
         );
+        // Feed the post-exit drain watchdog: every settled chunk is
+        // progress, whether it drained cleanly or failed.
+        void processingChain.then(markDrainActivity, markDrainActivity);
       };
 
       ptyProcess.onData((data: string) => {
@@ -1272,12 +1292,17 @@ export class ShellExecutionService {
           // so it must run exactly once on every exit, no matter how the
           // drain race below settles.
           let finalized = false;
+          let drainWatchdog: NodeJS.Timeout | undefined;
 
           const finalize = () => {
             if (finalized) {
               return;
             }
             finalized = true;
+            if (drainWatchdog) {
+              clearInterval(drainWatchdog);
+              drainWatchdog = undefined;
+            }
             // Nothing below may prevent the result from reaching the caller:
             // a failure in the rendering pipeline must degrade output, not
             // hang the execution.
@@ -1384,9 +1409,31 @@ export class ShellExecutionService {
             });
           });
 
-           
-          Promise.race([processingComplete, abortFired]).then(
-            () => {
+          // Bound the drain with an idle watchdog: if no chunk settles for
+          // a full window after exit, the chain is stuck and the exit
+          // result must win. finalize() clears the interval.
+          markDrainActivity();
+          const drainStalled = new Promise<'drain-stalled'>((res) => {
+            drainWatchdog = setInterval(() => {
+              if (Date.now() - lastDrainActivityAt >= DRAIN_STALL_TIMEOUT_MS) {
+                res('drain-stalled');
+              }
+            }, DRAIN_STALL_POLL_MS);
+            drainWatchdog.unref?.();
+          });
+
+          void Promise.race([
+            processingComplete,
+            abortFired,
+            drainStalled,
+          ]).then(
+            (outcome) => {
+              if (outcome === 'drain-stalled') {
+                debugLogger.warn(
+                  `Shell output drain stalled after exit (pid ${ptyPid}); ` +
+                    `finalizing with the output buffered so far.`,
+                );
+              }
               finalize();
             },
             () => {
