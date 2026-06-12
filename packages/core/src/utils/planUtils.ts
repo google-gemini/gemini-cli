@@ -40,38 +40,59 @@ export function resolveAndValidatePlanPath(
     throw new Error('Plan file path must be non-empty.');
   }
 
-  // 1. Handle case where agent provided an absolute path
-  if (path.isAbsolute(trimmedPath)) {
-    if (
-      isSubpath(resolveToRealPath(plansDir), resolveToRealPath(trimmedPath))
-    ) {
-      return trimmedPath;
+  const realPlansDir = resolveToRealPath(plansDir);
+  const plansDirName = path.basename(plansDir);
+
+  let normalizedPlanPath = trimmedPath;
+  if (!path.isAbsolute(trimmedPath)) {
+    const segments = trimmedPath.split(/[\\/]+/);
+    if (segments.length > 1 && segments[0] === plansDirName) {
+      normalizedPlanPath = segments.slice(1).join(path.sep);
     }
   }
 
-  // 2. Handle case where agent provided a path relative to the project root
-  const resolvedFromProjectRoot = path.resolve(projectRoot, trimmedPath);
-  if (
-    isSubpath(
-      resolveToRealPath(plansDir),
-      resolveToRealPath(resolvedFromProjectRoot),
-    )
-  ) {
-    return resolvedFromProjectRoot;
+  // 1. Handle case where agent provided an absolute path
+  if (path.isAbsolute(normalizedPlanPath)) {
+    try {
+      const realResolved = resolveToRealPath(normalizedPlanPath);
+      if (isSubpath(realPlansDir, realResolved)) {
+        return normalizedPlanPath;
+      }
+    } catch {
+      // Fall through if resolveToRealPath fails
+    }
   }
 
-  // 3. Handle default case where agent provided a path relative to the plans directory
-  const resolvedPath = path.resolve(plansDir, trimmedPath);
-  const realPath = resolveToRealPath(resolvedPath);
-  const realPlansDir = resolveToRealPath(plansDir);
-
-  if (!isSubpath(realPlansDir, realPath)) {
-    throw new Error(
-      PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir),
-    );
+  // 2. Try resolving relative to project root
+  const resolvedFromProjectRoot = path.resolve(projectRoot, normalizedPlanPath);
+  try {
+    const realResolved = resolveToRealPath(resolvedFromProjectRoot);
+    if (isSubpath(realPlansDir, realResolved)) {
+      return resolvedFromProjectRoot;
+    }
+  } catch {
+    const directResolved = path.resolve(resolvedFromProjectRoot);
+    if (isSubpath(realPlansDir, directResolved)) {
+      return resolvedFromProjectRoot;
+    }
   }
 
-  return resolvedPath;
+  // 3. Try resolving relative to plansDir
+  const resolvedFromPlansDir = path.resolve(plansDir, normalizedPlanPath);
+  try {
+    const realResolved = resolveToRealPath(resolvedFromPlansDir);
+    if (isSubpath(realPlansDir, realResolved)) {
+      return resolvedFromPlansDir;
+    }
+  } catch {
+    const directResolved = path.resolve(resolvedFromPlansDir);
+    if (isSubpath(realPlansDir, directResolved)) {
+      return resolvedFromPlansDir;
+    }
+  }
+
+  // Fallback boundary check: if still not a subpath, throw PATH_ACCESS_DENIED
+  throw new Error(PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir));
 }
 
 /**

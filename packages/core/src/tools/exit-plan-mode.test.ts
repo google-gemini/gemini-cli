@@ -515,5 +515,28 @@ Ask the user for specific feedback on how to improve the plan.`,
       });
       expect(result).toBeNull();
     });
+
+    it('should accept nested valid path within plans directory', () => {
+      const nestedDir = path.join(mockPlansDir, 'tracks', 'fibsqrt_20260519');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(path.join(nestedDir, 'spec.md'), '# Content');
+
+      const result = tool.validateToolParams({
+        plan_filename: 'tracks/fibsqrt_20260519/spec.md',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should strip the leading plansDir folder name segment if present in path', () => {
+      const plansDirName = path.basename(mockPlansDir);
+      const nestedDir = path.join(mockPlansDir, 'tracks', 'fibsqrt_20260519');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(path.join(nestedDir, 'spec.md'), '# Content');
+
+      const result = tool.validateToolParams({
+        plan_filename: `${plansDirName}/tracks/fibsqrt_20260519/spec.md`,
+      });
+      expect(result).toBeNull();
+    });
   });
 });
