@@ -698,6 +698,17 @@ export class GeminiClient {
 
     await this.tryMaskToolOutputs(this.getHistory());
 
+    const maskedPendingContent = await this.maskPendingToolResponse(request);
+    if (maskedPendingContent) {
+      request = maskedPendingContent.parts || [];
+      if (apiHistoryOverride && apiHistoryOverride.length > 0) {
+        apiHistoryOverride = [
+          ...apiHistoryOverride.slice(0, -1),
+          maskedPendingContent,
+        ];
+      }
+    }
+
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
     const estimatedRequestTokenCount = await calculateRequestTokenCount(
@@ -1262,6 +1273,34 @@ export class GeminiClient {
     if (result.maskedCount > 0) {
       this.getChat().setHistory(result.newHistory);
     }
+  }
+
+  /**
+   * Bounds the tool response that is about to be sent right now.
+   *
+   * History masking intentionally protects the latest turn so the model keeps
+   * recent context. That does not help when the current request is itself a
+   * huge functionResponse; in that case we need to offload it before token
+   * estimation and before Turn.run sends it to the model.
+   */
+  private async maskPendingToolResponse(
+    request: PartListUnion,
+  ): Promise<Content | undefined> {
+    const pendingContent = createUserContent(request);
+    if (!pendingContent.parts?.some((part) => part.functionResponse)) {
+      return undefined;
+    }
+
+    const result = await this.toolOutputMaskingService.mask(
+      [pendingContent],
+      this.config,
+      {
+        protectionThresholdTokens: 0,
+        protectLatestTurn: false,
+      },
+    );
+
+    return result.maskedCount > 0 ? result.newHistory[0] : undefined;
   }
 
   /**
