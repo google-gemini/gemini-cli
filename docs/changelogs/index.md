@@ -18,6 +18,23 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.46.0 - 2026-06-10
+
+- **Model GA Transition:** Transitioned to the Gemini Flash GA model to improve
+  default model routing
+  ([#27570](https://github.com/google-gemini/gemini-cli/pull/27570) by
+  @DavidAPierce).
+- **Terminal Crash Hardening:** Hardened PTY resize operations against native
+  crashes, enhancing terminal session stability
+  ([#27496](https://github.com/google-gemini/gemini-cli/pull/27496) by
+  @scidomino).
+- **CLI & CI Improvements:** Prevented spam loops with invalid editors, added
+  optimized PR size labeling, and secured write access triggers for fork PR
+  contributions
+  ([#25324](https://github.com/google-gemini/gemini-cli/pull/25324) by
+  @Niralisj, [#27637](https://github.com/google-gemini/gemini-cli/pull/27637) by
+  @sripasg).
+
 ## Announcements: v0.45.0 - 2026-06-03
 
 - **Context Simplification:** Completed major architectural work to simplify the
