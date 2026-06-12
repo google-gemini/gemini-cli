@@ -37,6 +37,65 @@ export class GcpTraceExporter extends TraceExporter {
 }
 
 /**
+ * Truncates attribute string values to 1024 characters.
+ */
+function truncateAttributes(
+  attributes: Record<string, unknown>,
+): Record<string, unknown> {
+  let cloned: Record<string, unknown> | undefined;
+  for (const key of Object.keys(attributes)) {
+    const val = attributes[key];
+    if (typeof val === 'string') {
+      const chars = Array.from(val);
+      if (chars.length > 1024) {
+        if (!cloned) {
+          cloned = { ...attributes };
+        }
+        cloned[key] = chars.slice(0, 1024).join('');
+      }
+    }
+  }
+  return cloned ?? attributes;
+}
+
+function processDataPoint(
+  dp: ResourceMetrics['scopeMetrics'][number]['metrics'][number]['dataPoints'][number],
+): void {
+  if (dp?.attributes) {
+    (dp as { attributes: Record<string, unknown> }).attributes =
+      truncateAttributes(dp.attributes as Record<string, unknown>);
+  }
+}
+
+function processMetric(
+  metric: ResourceMetrics['scopeMetrics'][number]['metrics'][number],
+): void {
+  metric?.dataPoints?.forEach(processDataPoint);
+}
+
+function processScopeMetric(
+  scopeMetric: ResourceMetrics['scopeMetrics'][number],
+): void {
+  scopeMetric?.metrics?.forEach(processMetric);
+}
+
+/**
+ * Traverses ResourceMetrics and truncates all attribute values to 1024 characters.
+ */
+function truncateMetricAttributes(metrics: ResourceMetrics): void {
+  if (!metrics) return;
+
+  if (metrics.resource?.attributes) {
+    (metrics.resource as { attributes: Record<string, unknown> }).attributes =
+      truncateAttributes(
+        metrics.resource.attributes as Record<string, unknown>,
+      );
+  }
+
+  metrics.scopeMetrics?.forEach(processScopeMetric);
+}
+
+/**
  * Google Cloud Monitoring exporter that extends the official metrics exporter
  */
 export class GcpMetricExporter extends MetricExporter {
@@ -52,6 +111,7 @@ export class GcpMetricExporter extends MetricExporter {
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
   ): void {
+    truncateMetricAttributes(metrics);
     super.export(metrics, (result: ExportResult) => {
       if (result.code === ExportResultCode.FAILED && result.error) {
         // Suppress errors related to writing too frequently, as they are
