@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import type express from 'express';
 import * as fs from 'node:fs';
@@ -16,6 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
+import { logger } from '../utils/logger.js';
 import { debugLogger, type Config } from '@google/gemini-cli-core';
 
 // Mock the logger to avoid polluting test output
@@ -69,6 +70,19 @@ vi.mock('../config/config.js', async () => {
   };
 });
 
+vi.mock('../persistence/gcs.js', () => ({
+  GCSTaskStore: class {
+    constructor(public bucketName: string) {}
+    load = vi.fn();
+    save = vi.fn();
+  },
+  NoOpTaskStore: class {
+    constructor(public realStore: unknown) {}
+    load = vi.fn();
+    save = vi.fn();
+  },
+}));
+
 describe('Agent Server Endpoints', () => {
   let app: express.Express;
   let server: Server;
@@ -120,6 +134,10 @@ describe('Agent Server Endpoints', () => {
     }
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should create a new task via POST /tasks', async () => {
     const response = await createTask('test-context');
     expect(response.status).toBe(201);
@@ -145,6 +163,21 @@ describe('Agent Server Endpoints', () => {
       (m: TaskMetadata) => m.id === taskId,
     );
     expect(taskMetadata).toBeDefined();
+  });
+
+  it('should return 501 for all task metadata when using a persistent task store', async () => {
+    vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
+    vi.mocked(logger.error).mockClear();
+
+    const persistentStoreApp = await createApp();
+    const response = await request(persistentStoreApp).get('/tasks/metadata');
+
+    expect(response.status).toBe(501);
+    expect(response.body).toEqual({
+      error:
+        'Listing all task metadata is only supported when using InMemoryTaskStore.',
+    });
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('should return 404 for a non-existent task', async () => {
