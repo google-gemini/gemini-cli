@@ -4,27 +4,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import type { FC } from 'react';
+import { useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { Command } from '../key/keyBindings.js';
+import { useMouseClick } from '../hooks/useMouseClick.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
   allowPlanMode?: boolean;
 }
 
-export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
+export const ApprovalModeIndicator: FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
   allowPlanMode,
 }) => {
+  const { mouseMode } = useUIState();
+  const { cycleApprovalMode } = useUIActions();
+  const boxRef = useRef(null);
+
+  /**
+   * Click handler for switching approval modes.
+   * See: https://github.com/google-gemini/gemini-cli/issues/27035
+   */
+  useMouseClick(boxRef, () => {
+    cycleApprovalMode();
+  });
+
   let textColor = '';
   let textContent = '';
   let subText = '';
 
   const cycleHint = formatCommand(Command.CYCLE_APPROVAL_MODE);
+  const clickHint = mouseMode ? 'click or ' : '';
   const yoloHint = formatCommand(Command.TOGGLE_YOLO);
 
   switch (approvalMode) {
@@ -32,13 +49,13 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
       textColor = theme.status.warning;
       textContent = 'auto-accept edits';
       subText = allowPlanMode
-        ? `${cycleHint} to plan`
-        : `${cycleHint} to manual`;
+        ? `${clickHint}${cycleHint} to plan`
+        : `${clickHint}${cycleHint} to manual`;
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
       textContent = 'plan';
-      subText = `${cycleHint} to manual`;
+      subText = `${clickHint}${cycleHint} to manual`;
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
@@ -49,12 +66,12 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
     default:
       textColor = theme.text.accent;
       textContent = '';
-      subText = `${cycleHint} to accept edits`;
+      subText = `${clickHint}${cycleHint} to accept edits`;
       break;
   }
 
   return (
-    <Box>
+    <Box ref={boxRef}>
       <Text color={textColor}>
         {textContent ? textContent : null}
         {subText ? (
