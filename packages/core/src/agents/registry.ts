@@ -24,6 +24,7 @@ import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
+import { normalizePath } from '../utils/paths.js';
 import { isAutoModel } from '../config/models.js';
 import {
   type ModelConfig,
@@ -173,9 +174,22 @@ export class AgentRegistry {
     const folderTrustEnabled = this.config.getFolderTrust();
     const isTrustedFolder = this.config.isTrustedFolder();
 
+    const loadedAgentDirs = new Set<string>();
+    const shouldLoadAgentDir = (dir: string): boolean => {
+      const key = normalizePath(dir);
+      if (loadedAgentDirs.has(key)) {
+        return false;
+      }
+      loadedAgentDirs.add(key);
+      return true;
+    };
+
     if (!folderTrustEnabled || isTrustedFolder) {
       const projectAgentsDir = this.config.storage.getProjectAgentsDir();
-      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
+      const shouldLoadProjectAgents = shouldLoadAgentDir(projectAgentsDir);
+      const projectAgents = shouldLoadProjectAgents
+        ? await loadAgentsFromDirectory(projectAgentsDir)
+        : { agents: [], errors: [] };
       for (const error of projectAgents.errors) {
         const msg = `Agent loading error: ${error.message}`;
         errors?.push(msg);
@@ -233,7 +247,10 @@ export class AgentRegistry {
 
     // Load user-level agents: ~/.gemini/agents/
     const userAgentsDir = Storage.getUserAgentsDir();
-    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+    const shouldLoadUserAgents = shouldLoadAgentDir(userAgentsDir);
+    const userAgents = shouldLoadUserAgents
+      ? await loadAgentsFromDirectory(userAgentsDir)
+      : { agents: [], errors: [] };
     for (const error of userAgents.errors) {
       debugLogger.warn(
         `[AgentRegistry] Error loading user agent: ${error.message}`,

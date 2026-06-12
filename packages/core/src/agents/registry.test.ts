@@ -17,6 +17,7 @@ import type {
   GeminiCLIExtension,
   ConfigParameters,
 } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { A2AClientManager } from './a2a-client-manager.js';
@@ -266,6 +267,39 @@ describe('AgentRegistry', () => {
       expect(
         vi.mocked(tomlLoader.loadAgentsFromDirectory),
       ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not load the same project and user agents directory twice', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      registry = new TestableAgentRegistry(mockConfig);
+
+      const sharedAgentsDir = '/home/tester/.gemini/agents';
+      vi.spyOn(mockConfig.storage, 'getProjectAgentsDir').mockReturnValue(
+        sharedAgentsDir,
+      );
+      vi.spyOn(Storage, 'getUserAgentsDir').mockReturnValue(sharedAgentsDir);
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValueOnce({
+        agents: [{ ...MOCK_AGENT_V1, name: 'home-agent' }],
+        errors: [],
+      });
+
+      await registry.initialize();
+
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledWith(sharedAgentsDir);
+      expect(registry.getDefinition('home-agent')).toBeDefined();
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining("Duplicate agent name 'home-agent' detected"),
+      );
     });
 
     it('should NOT load TOML agents when enableAgents is false', async () => {
