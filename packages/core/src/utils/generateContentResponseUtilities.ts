@@ -148,6 +148,45 @@ export function convertToFunctionResponse(
     }
   }
 
+  // Build an image-grounding hint when the response carries one or more image
+  // attachments. Smaller preview models (e.g. gemini-3-flash-preview) can
+  // anchor on unrelated surrounding context such as the <session_context>
+  // directory listing and describe files that match filenames instead of the
+  // actual pixels (see issue #27710). The hint asks the model to ground the
+  // answer on the attached image only.
+  const inlineImageParts = filteredInlineDataParts.filter(
+    (p) =>
+      typeof p.inlineData?.mimeType === 'string' &&
+      p.inlineData.mimeType.startsWith('image/'),
+  );
+  const fileImageParts = fileDataParts.filter(
+    (p) =>
+      typeof p.fileData?.mimeType === 'string' &&
+      p.fileData.mimeType.startsWith('image/'),
+  );
+  const totalImageAttachments = inlineImageParts.length + fileImageParts.length;
+
+  const mimeTypeRegex = /^[a-zA-Z0-9\-]+\/[a-zA-Z0-9\-.]+$/;
+  const imageMimeTypesList: string[] = [];
+  for (const p of inlineImageParts) {
+    const mime = p.inlineData?.mimeType;
+    if (mime && mimeTypeRegex.test(mime)) {
+      imageMimeTypesList.push(mime);
+    }
+  }
+  for (const p of fileImageParts) {
+    const mime = p.fileData?.mimeType;
+    if (mime && mimeTypeRegex.test(mime)) {
+      imageMimeTypesList.push(mime);
+    }
+  }
+  const imageMimeTypes = Array.from(new Set(imageMimeTypesList));
+
+  const imageHint =
+    totalImageAttachments > 0
+      ? `[Image grounding hint: This function response includes ${totalImageAttachments} image attachment(s) (${imageMimeTypes.join(', ')}). Describe ONLY what is optically present in the attached image(s). Do not infer content from workspace filenames, directory listings, prior conversation, or any other surrounding text context.]`
+      : undefined;
+
   const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
     model,
     config,
@@ -172,7 +211,15 @@ export function convertToFunctionResponse(
     const totalBinaryItems =
       filteredInlineDataParts.length + fileDataParts.length;
     part.functionResponse!.response = {
-      output: `Binary content provided (${totalBinaryItems} item(s)).`,
+      output: imageHint
+        ? `${imageHint}\nBinary content provided (${totalBinaryItems} item(s)).`
+        : `Binary content provided (${totalBinaryItems} item(s)).`,
+    };
+  } else if (imageHint) {
+    // Prepend the hint so it appears before any tool-output text.
+    part.functionResponse!.response = {
+      ...part.functionResponse!.response,
+      output: `${imageHint}\n${textParts.join('\n')}`,
     };
   }
 
