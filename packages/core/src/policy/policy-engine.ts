@@ -288,12 +288,14 @@ export class PolicyEngine {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
 
-    // Do not downgrade (do not ask user) if in AUTO_EDIT or YOLO mode.
-    // These modes trust the agent's actions (YOLO) or specific task (AUTO_EDIT).
-    if (
-      this.approvalMode === ApprovalMode.AUTO_EDIT ||
-      this.approvalMode === ApprovalMode.YOLO
-    ) {
+    // In YOLO mode, never downgrade.
+    if (this.approvalMode === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    // In AUTO_EDIT mode, only bypass downgrade if sandboxing is enabled.
+    const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
+    if (this.approvalMode === ApprovalMode.AUTO_EDIT && sandboxEnabled) {
       return false;
     }
 
