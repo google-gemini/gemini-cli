@@ -415,8 +415,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           `[CoderAgentExecutor] Error creating task ${taskId}:`,
           error,
         );
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        pushTaskStateFailed(error, eventBus, taskId, contextId);
+        void pushTaskStateFailed(error, eventBus, taskId, contextId);
         return;
       }
       const newTaskSDK = wrapper.toSDKTask();
