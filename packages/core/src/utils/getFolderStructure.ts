@@ -41,6 +41,8 @@ interface FolderStructureOptions {
   fileService?: FileDiscoveryService;
   /** File filtering ignore options. */
   fileFilteringOptions?: FileFilteringOptions;
+  /** Whether ignored folders should be shown as truncated entries. */
+  showIgnoredFolders?: boolean;
 }
 // Define a type for the merged options where fileIncludePattern remains optional
 type MergedFolderStructureOptions = Required<
@@ -186,6 +188,9 @@ async function readFullStructure(
           ) ?? false;
 
         if (options.ignoredFolders.has(subFolderName) || isIgnored) {
+          if (!options.showIgnoredFolders) {
+            continue;
+          }
           const ignoredSubFolder: FullFolderInfo = {
             name: subFolderName,
             path: subFolderPath,
@@ -315,6 +320,7 @@ export async function getFolderStructure(
     fileService: options?.fileService,
     fileFilteringOptions:
       options?.fileFilteringOptions ?? DEFAULT_FILE_FILTERING_OPTIONS,
+    showIgnoredFolders: options?.showIgnoredFolders ?? true,
   };
 
   try {

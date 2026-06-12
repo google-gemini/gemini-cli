@@ -121,6 +121,7 @@ describe('getEnvironmentContext', () => {
     expect(context).toContain('</session_context>');
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
       fileService: undefined,
+      showIgnoredFolders: false,
     });
   });
 
