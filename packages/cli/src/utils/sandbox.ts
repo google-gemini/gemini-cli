@@ -509,7 +509,10 @@ export async function start_sandbox(
       'hex',
     )}`;
     debugLogger.log(`ContainerName: ${containerName}`);
-    args.push('--name', containerName, '--hostname', containerName);
+    args.push('--name', containerName);
+    if (config.setHostname !== false) {
+      args.push('--hostname', containerName);
+    }
 
     // copy GEMINI_CLI_TEST_VAR for integration tests
     if (process.env['GEMINI_CLI_TEST_VAR']) {
