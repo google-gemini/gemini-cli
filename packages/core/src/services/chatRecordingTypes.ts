@@ -118,6 +118,8 @@ export interface ResumedSessionData {
 export interface LoadConversationOptions {
   maxMessages?: number;
   metadataOnly?: boolean;
+  /** Optional base directory to enforce for the session file path (prevents traversal) */
+  baseDir?: string;
 }
 
 export interface RewindRecord {
