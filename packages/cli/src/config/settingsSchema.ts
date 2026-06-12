@@ -521,6 +521,21 @@ const SETTINGS_SCHEMA = {
           'Automatically switch between default light and dark themes based on terminal background color.',
         showInDialog: true,
       },
+      mouseEvents: {
+        type: 'enum',
+        label: 'Mouse Events',
+        category: 'UI',
+        requiresRestart: true,
+        default: 'auto',
+        description:
+          'Controls terminal mouse tracking in alternate buffer mode. Auto disables mouse tracking in touch-oriented terminals such as Termux.',
+        showInDialog: true,
+        options: [
+          { value: 'auto', label: 'Auto' },
+          { value: 'enabled', label: 'Enabled' },
+          { value: 'disabled', label: 'Disabled' },
+        ],
+      },
       terminalBackgroundPollingInterval: {
         type: 'number',
         label: 'Terminal Background Polling Interval',

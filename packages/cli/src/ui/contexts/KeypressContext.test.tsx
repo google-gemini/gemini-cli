@@ -9,7 +9,17 @@ import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { vi, afterAll, beforeAll, type Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  afterAll,
+  beforeAll,
+  type Mock,
+} from 'vitest';
 import {
   useKeypressContext,
   ESC_TIMEOUT,
@@ -20,6 +30,7 @@ import {
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -73,6 +84,15 @@ describe('KeypressContext', () => {
       stdin,
       setRawMode: mockSetRawMode,
     });
+  });
+
+  it('should emit emergency abort when raw Ctrl+C is received', async () => {
+    const emitSpy = vi.spyOn(appEvents, 'emit');
+    await setupKeypressTest();
+
+    act(() => stdin.write('\x03'));
+
+    expect(emitSpy).toHaveBeenCalledWith(AppEvent.EmergencyAbort);
   });
 
   describe('Enter key handling', () => {
