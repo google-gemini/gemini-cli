@@ -265,6 +265,11 @@ vi.mock('./deferred.js', () => ({
   defer: vi.fn((m) => m),
 }));
 
+const folderTrustPromptMock = vi.hoisted(() => ({
+  maybePromptForFolderTrust: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('./config/folderTrustPrompt.js', () => folderTrustPromptMock);
+
 vi.mock('./ui/utils/mouse.js', () => ({
   enableMouseEvents: vi.fn(),
   disableMouseEvents: vi.fn(),
@@ -635,6 +640,87 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     expect(resumeSpy).toHaveBeenCalledTimes(1);
     resumeSpy.mockRestore();
+  });
+
+  it('should resolve folder trust before refreshing auth', async () => {
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const refreshAuth = vi.fn().mockResolvedValue(undefined);
+    const partialConfig = createMockConfig({
+      isInteractive: () => true,
+      getQuestion: () => '',
+      getSandbox: () => undefined,
+      refreshAuth,
+    });
+    const finalConfig = createMockConfig({
+      isInteractive: () => false,
+      getQuestion: () => '',
+      getSandbox: () => undefined,
+      getListExtensions: () => true,
+      getExtensions: () => [],
+    });
+    vi.mocked(loadCliConfig)
+      .mockResolvedValueOnce(partialConfig)
+      .mockResolvedValueOnce(finalConfig);
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE } },
+          ui: {},
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      query: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      policy: undefined,
+      adminPolicy: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useWriteTodos: undefined,
+      resume: undefined,
+      sessionId: undefined,
+      listSessions: undefined,
+      deleteSession: undefined,
+      outputFormat: undefined,
+      fakeResponses: undefined,
+      recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
+      isCommand: undefined,
+      skipTrust: undefined,
+    });
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(folderTrustPromptMock.maybePromptForFolderTrust).toHaveBeenCalled();
+    expect(refreshAuth).toHaveBeenCalled();
+    expect(
+      folderTrustPromptMock.maybePromptForFolderTrust.mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(refreshAuth.mock.invocationCallOrder[0]);
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.SUCCESS);
+    processExitSpy.mockRestore();
   });
 
   it.each([

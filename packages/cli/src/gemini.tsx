@@ -95,6 +95,7 @@ import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
+import { maybePromptForFolderTrust } from './config/folderTrustPrompt.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
@@ -463,6 +464,8 @@ export async function main() {
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_INPUT_ERROR);
   }
+
+  await maybePromptForFolderTrust(settings.merged, argv);
 
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
