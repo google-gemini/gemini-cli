@@ -173,6 +173,33 @@ describe('SlashCommandConflictHandler', () => {
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
 
+  it('should re-notify a conflict if it disappears and then reappears', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    // 1. Conflict occurs -> user notified
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    // 2. Conflict disappears (resolved) -> notifier updates state
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    // 3. Conflict occurs again -> user is notified again
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
   it('should display a descriptive message for a skill conflict', () => {
     simulateEvent([
       {
