@@ -56,6 +56,27 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     await fs.mkdir(configDir, { recursive: true });
   }
 
+  private async writeTokenFile(tokenArray: OAuthCredentials[]): Promise<void> {
+    await this.ensureConfigDir();
+
+    const tokenFile = this.getTokenFilePath();
+    const tempFile = `${tokenFile}.${process.pid}.${Date.now()}.tmp`;
+
+    try {
+      await fs.writeFile(tempFile, JSON.stringify(tokenArray, null, 2), {
+        mode: 0o600,
+      });
+      await fs.rename(tempFile, tokenFile);
+    } catch (error) {
+      try {
+        await fs.unlink(tempFile);
+      } catch {
+        // Best-effort cleanup. The real failure is reported by the caller.
+      }
+      throw error;
+    }
+  }
+
   /**
    * Load all stored MCP OAuth tokens.
    *
@@ -107,14 +128,9 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     tokens.set(credentials.serverName, credentials);
 
     const tokenArray = Array.from(tokens.values());
-    const tokenFile = this.getTokenFilePath();
 
     try {
-      await fs.writeFile(
-        tokenFile,
-        JSON.stringify(tokenArray, null, 2),
-        { mode: 0o600 }, // Restrict file permissions
-      );
+      await this.writeTokenFile(tokenArray);
     } catch (error) {
       coreEvents.emitFeedback(
         'error',
@@ -201,9 +217,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
           // Remove file if no tokens left
           await fs.unlink(tokenFile);
         } else {
-          await fs.writeFile(tokenFile, JSON.stringify(tokenArray, null, 2), {
-            mode: 0o600,
-          });
+          await this.writeTokenFile(tokenArray);
         }
       } catch (error) {
         coreEvents.emitFeedback(
