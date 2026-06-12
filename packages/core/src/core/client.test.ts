@@ -1548,6 +1548,90 @@ ${JSON.stringify(
       expect(mockTurnRunFn).not.toHaveBeenCalled();
     });
 
+    it('should mask a pending tool response before the overflow check', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const lastPromptTokenCount = 900;
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      const maskedPart: Part = {
+        functionResponse: {
+          name: 'run_shell_command',
+          id: 'call-1',
+          response: {
+            output:
+              '<tool_output_masked>\nshort preview\n</tool_output_masked>',
+          },
+        },
+      };
+
+      const maskSpy = vi
+        .spyOn(client['toolOutputMaskingService'], 'mask')
+        .mockImplementation(async (history, _config, overrides) => {
+          if (overrides?.protectLatestTurn === false) {
+            return {
+              newHistory: [{ role: 'user', parts: [maskedPart] }],
+              maskedCount: 1,
+              tokensSaved: 250000,
+            };
+          }
+
+          return {
+            newHistory: history,
+            maskedCount: 0,
+            tokensSaved: 0,
+          };
+        });
+
+      mockTurnRunFn.mockImplementation(async function* () {});
+
+      const request: Part[] = [
+        {
+          functionResponse: {
+            name: 'run_shell_command',
+            id: 'call-1',
+            response: { output: 'x'.repeat(1_000_000) },
+          },
+        },
+      ];
+
+      const events = await fromAsync(
+        client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'prompt-id-large-tool-response',
+        ),
+      );
+
+      expect(events).not.toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.ContextWindowWillOverflow,
+        }),
+      );
+      expect(maskSpy).toHaveBeenCalledWith(
+        expect.any(Array),
+        mockConfig,
+        expect.objectContaining({
+          minPrunableThresholdTokens: 0,
+          protectionThresholdTokens: 0,
+          protectLatestTurn: false,
+        }),
+      );
+      expect(mockTurnRunFn).toHaveBeenCalled();
+      expect(mockTurnRunFn.mock.calls[0][1]).toEqual([maskedPart]);
+    });
+
     it("should use the sticky model's token limit for the overflow check", async () => {
       // Arrange
       const STICKY_MODEL = 'gemini-1.5-flash';

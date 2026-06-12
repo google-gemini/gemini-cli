@@ -20,6 +20,7 @@ import {
   EXIT_PLAN_MODE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { ToolOutputMaskingEvent } from '../telemetry/types.js';
+import type { ToolOutputMaskingConfig } from './types.js';
 
 // Tool output masking defaults
 export const DEFAULT_TOOL_PROTECTION_THRESHOLD = 50000;
@@ -68,12 +69,16 @@ export class ToolOutputMaskingService {
   async mask(
     history: readonly Content[],
     config: Config,
+    overrides?: Partial<ToolOutputMaskingConfig>,
   ): Promise<MaskingResult> {
     if (history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
-    const maskingConfig = await config.getToolOutputMaskingConfig();
+    const maskingConfig = {
+      ...(await config.getToolOutputMaskingConfig()),
+      ...overrides,
+    };
     let cumulativeToolTokens = 0;
     let protectionBoundaryReached = false;
     let totalPrunableTokens = 0;
