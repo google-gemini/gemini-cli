@@ -19,7 +19,6 @@ import {
   type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { getUpdateTopicDeclaration } from './definitions/dynamic-declaration-helpers.js';
 import type { Config } from '../config/config.js';
 
@@ -68,10 +67,6 @@ class UpdateTopicInvocation extends BaseToolInvocation<
     const currentTopic = this.config.topicState.getTopic() || '...';
     const currentIntent =
       strategicIntent || this.config.topicState.getIntent() || '...';
-
-    debugLogger.log(
-      `[TopicTool] Update: Topic="${currentTopic}", Intent="${currentIntent}", isNew=${isNewTopic}`,
-    );
 
     let llmContent = '';
     let returnDisplay = '';
