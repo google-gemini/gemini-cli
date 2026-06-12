@@ -1143,7 +1143,7 @@ export class Session {
           // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
           // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
           if (
-            (path.isAbsolute(pathName) ||
+            (path.isAbsolute(absolutePath) ||
               !isWithinRoot(
                 absolutePath,
                 this.context.config.getTargetDir(),
@@ -1216,13 +1216,15 @@ export class Session {
               ? resolved.stats
               : await fs.stat(absolutePath);
             if (stats.isDirectory()) {
-              currentPathSpec = pathName.endsWith('/')
-                ? `${pathName}**`
-                : `${pathName}/**`;
+              const baseSpec = resolved ? resolved.relativePath : pathName;
+              currentPathSpec = baseSpec.endsWith('/')
+                ? `${baseSpec}**`
+                : `${baseSpec}/**`;
               this.debug(
                 `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
               );
             } else {
+              currentPathSpec = resolved ? resolved.relativePath : pathName;
               this.debug(
                 `Path ${pathName} resolved to file: ${currentPathSpec}`,
               );

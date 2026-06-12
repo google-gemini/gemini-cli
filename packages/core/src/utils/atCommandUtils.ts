@@ -17,6 +17,7 @@ export interface ResolvedAtCommandPath {
     isDirectory(): boolean;
     isFile(): boolean;
   };
+  lineSuffix?: string;
 }
 
 /**
@@ -37,20 +38,33 @@ export async function resolveAtCommandPath(
   config: Config,
   onDebugMessage: (msg: string) => void = () => {},
 ): Promise<ResolveAtCommandPathResult> {
-  const pathValidation = validatePath(pathName);
+  // Identify and strip trailing line/range suffix (e.g. :12, :12-20, :12:5, :L12-L20)
+  const suffixRegex = /:(L?\d+(?:-\d+|:\d+)?(?:-L?\d+)?(?::\d+)?)$/i;
+  const match = pathName.match(suffixRegex);
+  const isDriveLetter =
+    /^[a-zA-Z]:/.test(pathName) && match && match.index === 1;
+
+  let cleanPathName = pathName;
+  let lineSuffix: string | undefined = undefined;
+  if (match && match.index !== undefined && !isDriveLetter) {
+    cleanPathName = pathName.substring(0, match.index);
+    lineSuffix = match[0];
+  }
+
+  const pathValidation = validatePath(cleanPathName);
   if (!pathValidation.isValid) {
     // Attempt to extract a real path from the invalid fragment
-    const extractedPath = tryExtractPath(pathName);
-    if (extractedPath && extractedPath !== pathName) {
+    const extractedPath = tryExtractPath(cleanPathName);
+    if (extractedPath && extractedPath !== cleanPathName) {
       onDebugMessage(
-        `Identified invalid path fragment, attempting to extract path: "${extractedPath}" from "${pathName}"`,
+        `Identified invalid path fragment, attempting to extract path: "${extractedPath}" from "${cleanPathName}"`,
       );
       // Recurse once with the extracted path.
       return resolveAtCommandPath(extractedPath, config, onDebugMessage);
     }
 
     onDebugMessage(
-      `Skipping invalid path in @-command: ${pathName}. Reason: ${pathValidation.error}`,
+      `Skipping invalid path in @-command: ${cleanPathName}. Reason: ${pathValidation.error}`,
     );
     return { status: 'invalid', error: pathValidation.error! };
   }
@@ -58,25 +72,25 @@ export async function resolveAtCommandPath(
   const workspaceDirs = config.getWorkspaceContext().getDirectories();
 
   // If it's an absolute path, we only need to check it against authorization once.
-  if (path.isAbsolute(pathName)) {
-    const validationError = config.validatePathAccess(pathName, 'read');
+  if (path.isAbsolute(cleanPathName)) {
+    const validationError = config.validatePathAccess(cleanPathName, 'read');
     if (validationError) {
       onDebugMessage(
-        `Skipping unauthorized absolute path: ${pathName}. Reason: ${validationError}`,
+        `Skipping unauthorized absolute path: ${cleanPathName}. Reason: ${validationError}`,
       );
       return {
         status: 'unauthorized',
-        absolutePath: pathName,
+        absolutePath: cleanPathName,
         error: validationError,
       };
     }
 
     try {
-      const stats = await fs.stat(pathName);
+      const stats = await fs.stat(cleanPathName);
       // Try to find if it's within one of the workspace directories to provide a nice relative path
-      let relativePath = pathName;
+      let relativePath = cleanPathName;
       for (const dir of workspaceDirs) {
-        const rel = path.relative(dir, pathName);
+        const rel = path.relative(dir, cleanPathName);
         if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
           relativePath = rel;
           break;
@@ -86,9 +100,10 @@ export async function resolveAtCommandPath(
       return {
         status: 'resolved',
         resolved: {
-          absolutePath: pathName,
+          absolutePath: cleanPathName,
           relativePath,
           stats,
+          lineSuffix,
         },
       };
     } catch (error) {
@@ -96,7 +111,7 @@ export async function resolveAtCommandPath(
         return { status: 'not_found' };
       }
       onDebugMessage(
-        `Unexpected error stating path ${pathName}: ${getErrorMessage(error)}`,
+        `Unexpected error stating path ${cleanPathName}: ${getErrorMessage(error)}`,
       );
       return { status: 'not_found' };
     }
@@ -106,7 +121,7 @@ export async function resolveAtCommandPath(
   let lastUnauthorized: { absolutePath: string; error: string } | null = null;
 
   for (const dir of workspaceDirs) {
-    const absolutePath = path.resolve(dir, pathName);
+    const absolutePath = path.resolve(dir, cleanPathName);
 
     // Final workspace boundary check using centralized logic
     const validationError = config.validatePathAccess(absolutePath, 'read');
@@ -125,8 +140,9 @@ export async function resolveAtCommandPath(
         status: 'resolved',
         resolved: {
           absolutePath,
-          relativePath: pathName,
+          relativePath: cleanPathName,
           stats,
+          lineSuffix,
         },
       };
     } catch (error) {

@@ -449,4 +449,141 @@ describe('atCommandUtils', () => {
       expect.stringContaining('Reason: FORBIDDEN_ZONE'),
     );
   });
+
+  describe('line and range suffix stripping', () => {
+    const mockStats = {
+      isDirectory: () => false,
+      isFile: () => true,
+    };
+
+    beforeEach(() => {
+      vi.mocked(fsPromises.stat).mockResolvedValue(
+        mockStats as unknown as Stats,
+      );
+    });
+
+    it('should strip line suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:12',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':12');
+      }
+    });
+
+    it('should strip line range suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:12-20',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':12-20');
+      }
+    });
+
+    it('should strip line:column suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:12:5',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':12:5');
+      }
+    });
+
+    it('should strip line:column range suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:12:5-15:20',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':12:5-15:20');
+      }
+    });
+
+    it('should strip L prefix line suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:L12',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':L12');
+      }
+    });
+
+    it('should strip L prefix line range suffix and resolve correctly', async () => {
+      const result = await resolveAtCommandPath(
+        'file.ts:L12-L20',
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':L12-L20');
+      }
+    });
+
+    it('should handle Windows absolute path with suffix correctly', async () => {
+      const absPathWithSuffix = 'C:\\mock\\root\\file.ts:12-20';
+      const cleanAbsPath = 'C:\\mock\\root\\file.ts';
+      (mockConfig['validatePathAccess'] as Mock).mockReturnValue(null);
+      (mockWorkspaceContext['getDirectories'] as Mock).mockReturnValue([
+        'C:\\mock\\root',
+      ]);
+
+      vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+        if (p === cleanAbsPath) {
+          return mockStats as unknown as Stats;
+        }
+        throw new Error('ENOENT');
+      });
+
+      const result = await resolveAtCommandPath(
+        absPathWithSuffix,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(cleanAbsPath);
+        expect(result.resolved.relativePath).toBe('file.ts');
+        expect(result.resolved.lineSuffix).toBe(':12-20');
+      }
+    });
+
+    it('should not confuse a Windows drive letter with a suffix', async () => {
+      const winDrivePath = 'C:\\file.ts';
+      (mockConfig['validatePathAccess'] as Mock).mockReturnValue(null);
+      (mockWorkspaceContext['getDirectories'] as Mock).mockReturnValue([
+        'C:\\',
+      ]);
+
+      vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+        if (p === winDrivePath) {
+          return mockStats as unknown as Stats;
+        }
+        throw new Error('ENOENT');
+      });
+
+      const result = await resolveAtCommandPath(
+        winDrivePath,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(winDrivePath);
+        expect(result.resolved.lineSuffix).toBeUndefined();
+      }
+    });
+  });
 });
