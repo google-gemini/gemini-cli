@@ -13,7 +13,10 @@ import { GeminiEventType } from '../core/turn.js';
 import type { Part } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
-import type { ToolCallRequestInfo } from '../scheduler/types.js';
+import {
+  type ToolCallRequestInfo,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import { recordToolCallInteractions } from '../code_assist/telemetry.js';
 import { ToolErrorType, isFatalToolError } from '../tools/tool-error.js';
@@ -39,7 +42,12 @@ import type {
   ContentPart,
   StreamEndReason,
   Unsubscribe,
+  ToolEventStatus,
 } from './types.js';
+import {
+  MessageBusType,
+  type ToolCallsUpdateMessage,
+} from '../confirmation-bus/types.js';
 
 function isAbortLikeError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
@@ -63,7 +71,9 @@ export class LegacyAgentProtocol implements AgentProtocol {
   private _agentEndEmitted = false;
   private _activeStreamId?: string;
   private _abortController = new AbortController();
+  private _disposalController = new AbortController();
   private _nextStreamIdOverride?: string;
+  private _lastToolStatuses = new Map<string, ToolEventStatus>();
 
   private readonly _client: GeminiClient;
   private readonly _scheduler: Scheduler;
@@ -92,6 +102,19 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
       this._scheduler = scheduler;
     }
+
+    if (this._config.messageBus) {
+      this._config.messageBus.subscribe(
+        MessageBusType.TOOL_CALLS_UPDATE,
+        this._handleToolCallsUpdate.bind(this),
+        { signal: this._disposalController.signal },
+      );
+    }
+  }
+
+  dispose(): void {
+    this._disposalController.abort();
+    void this.abort();
   }
 
   get events(): readonly AgentEvent[] {
@@ -275,6 +298,11 @@ export class LegacyAgentProtocol implements AgentProtocol {
           this._makeToolResponseEvent({
             requestId: request.callId,
             name: request.name,
+            status: response.error
+              ? 'errored'
+              : tc.status === CoreToolCallStatus.Cancelled
+                ? 'aborted'
+                : 'succeeded',
             content,
             isError: response.error !== undefined,
             ...(display ? { display } : {}),
@@ -487,6 +515,87 @@ export class LegacyAgentProtocol implements AgentProtocol {
       type: 'error',
       ...payload,
     } satisfies AgentEvent<'error'>;
+    return event;
+  }
+
+  private _handleToolCallsUpdate(msg: ToolCallsUpdateMessage): void {
+    if (!this._activeStreamId) {
+      return;
+    }
+
+    const eventsToEmit: AgentEvent[] = [];
+
+    for (const tc of msg.toolCalls) {
+      const callId = tc.request.callId;
+
+      if (!this._translationState.pendingToolNames.has(callId)) {
+        continue;
+      }
+
+      let status: ToolEventStatus = 'pending';
+      switch (tc.status) {
+        case CoreToolCallStatus.Validating:
+        case CoreToolCallStatus.Scheduled:
+          status = 'pending';
+          break;
+        case CoreToolCallStatus.AwaitingApproval:
+          status = 'pending_input';
+          break;
+        case CoreToolCallStatus.Executing:
+          status = 'executing';
+          break;
+        case CoreToolCallStatus.Success:
+          status = 'succeeded';
+          break;
+        case CoreToolCallStatus.Error:
+          status = 'errored';
+          break;
+        case CoreToolCallStatus.Cancelled:
+          status = 'aborted';
+          break;
+        default:
+          status = 'pending';
+          break;
+      }
+
+      const lastStatus = this._lastToolStatuses.get(callId);
+
+      if (lastStatus !== status) {
+        this._lastToolStatuses.set(callId, status);
+
+        const display = populateToolDisplay({
+          name: tc.request.name,
+          invocation: 'invocation' in tc ? tc.invocation : undefined,
+          displayName: 'tool' in tc ? tc.tool?.displayName : undefined,
+          display: 'response' in tc ? tc.response?.display : undefined,
+        });
+
+        eventsToEmit.push(
+          this._makeToolUpdateEvent({
+            requestId: callId,
+            status,
+            ...(display ? { display } : {}),
+          }),
+        );
+      }
+    }
+
+    if (eventsToEmit.length > 0) {
+      this._emit(eventsToEmit);
+    }
+  }
+
+  private _makeToolUpdateEvent(
+    payload: Omit<
+      AgentEvent<'tool_update'>,
+      'id' | 'timestamp' | 'streamId' | 'type'
+    >,
+  ): AgentEvent<'tool_update'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'tool_update',
+      ...payload,
+    } satisfies AgentEvent<'tool_update'>;
     return event;
   }
 }

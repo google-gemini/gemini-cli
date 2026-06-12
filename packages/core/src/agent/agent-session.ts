@@ -34,6 +34,10 @@ export class AgentSession implements AgentProtocol {
     return this._protocol.abort();
   }
 
+  dispose(): void {
+    this._protocol.dispose?.();
+  }
+
   get events(): readonly AgentEvent[] {
     return this._protocol.events;
   }
