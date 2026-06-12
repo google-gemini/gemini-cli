@@ -1606,6 +1606,58 @@ describe('oauth2', () => {
         expect(OAuth2Client).toHaveBeenCalledTimes(2);
       });
     });
+
+    describe('File Caching merge scenario', () => {
+      it('should merge existing refresh token when new tokens payload lacks one', async () => {
+        const credsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+        // 1. Write initial credentials containing a refresh token.
+        const initialCreds = {
+          access_token: 'old-access-token',
+          refresh_token: 'persistent-refresh-token',
+        };
+        await fs.promises.writeFile(credsPath, JSON.stringify(initialCreds));
+
+        const mockClient = {
+          setCredentials: vi.fn(),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          getTokenInfo: vi.fn().mockResolvedValue({}),
+          on: vi.fn(),
+        };
+
+        vi.mocked(OAuth2Client).mockImplementation(
+          () => mockClient as unknown as OAuth2Client,
+        );
+
+        // Trigger client init to set up listeners
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        // 2. Simulate the 'tokens' event firing with a payload that lacks a refresh token.
+        const tokensHandler = mockClient.on.mock.calls.find(
+          (call) => call[0] === 'tokens',
+        )?.[1];
+        expect(tokensHandler).toBeDefined();
+
+        const newTokens = {
+          access_token: 'new-access-token',
+          expiry_date: 12345678,
+        };
+
+        await tokensHandler(newTokens);
+
+        // 3. Read the file back and verify the refresh token is merged/preserved.
+        const fileContent = await fs.promises.readFile(credsPath, 'utf-8');
+        const savedCreds = JSON.parse(fileContent);
+
+        expect(savedCreds.access_token).toBe('new-access-token');
+        expect(savedCreds.refresh_token).toBe('persistent-refresh-token');
+        expect(savedCreds.expiry_date).toBe(12345678);
+      });
+    });
   });
 
   describe('with encrypted flag true', () => {
