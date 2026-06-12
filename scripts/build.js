@@ -44,17 +44,26 @@ if (process.env.CI) {
     cwd: root,
   });
 
-  // Build the rest in parallel
-  console.log('Building other workspaces in parallel...');
-  const workspaceInfo = JSON.parse(
-    execSync('npm query .workspace --json', { cwd: root, encoding: 'utf-8' }),
-  );
-  const parallelWorkspaces = workspaceInfo
-    .map((w) => w.name)
-    .filter((name) => name !== '@google/gemini-cli-core');
-
+  // Build the rest in topological groups to prevent race conditions
+  console.log('Building libraries (devtools, sdk, test-utils)...');
+  const libWorkspaces = [
+    '@google/gemini-cli-devtools',
+    '@google/gemini-cli-sdk',
+    '@google/gemini-cli-test-utils'
+  ];
   execSync(
-    `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
+    `npx npm-run-all --parallel ${libWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
+    { stdio: 'inherit', cwd: root },
+  );
+
+  console.log('Building applications (cli, a2a-server, vscode-companion)...');
+  const appWorkspaces = [
+    '@google/gemini-cli',
+    '@google/gemini-cli-a2a-server',
+    'gemini-cli-vscode-ide-companion'
+  ];
+  execSync(
+    `npx npm-run-all --parallel ${appWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
     { stdio: 'inherit', cwd: root },
   );
 }
