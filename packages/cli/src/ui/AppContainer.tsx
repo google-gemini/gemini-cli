@@ -1647,11 +1647,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [config, handleSlashCommand],
   );
 
-  const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
-    useRepeatedKeyPress({
-      windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: handleExitRepeat,
-    });
+  const {
+    pressCount: ctrlCPressCount,
+    handlePress: handleCtrlCPress,
+    resetCount: resetCtrlCPress,
+  } = useRepeatedKeyPress({
+    windowMs: WARNING_PROMPT_DURATION_MS,
+    onRepeat: handleExitRepeat,
+  });
 
   const { pressCount: ctrlDPressCount, handlePress: handleCtrlDPress } =
     useRepeatedKeyPress({
@@ -1806,6 +1809,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
+        return true;
+      }
+
+      if (
+        keyMatchers[Command.QUIT](key) &&
+        isInputActive &&
+        streamingState === StreamingState.Idle &&
+        bufferRef.current.text.length > 0
+      ) {
+        // Prevent quit flow when there is text.
+        resetCtrlCPress();
+
+        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+          // Let InputPrompt handle it as edit.clear.
+          // This preserves documented behavior and allows prompt-level state
+          // (completions/history) to reset correctly.
+          return false;
+        }
+
+        // If QUIT is not also CLEAR_INPUT, we should still clear the buffer
+        // to match user expectations for Ctrl+C (or equivalent).
+        bufferRef.current.setText('');
         return true;
       }
 
@@ -2041,6 +2066,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
+      isInputActive,
+      streamingState,
+      resetCtrlCPress,
     ],
   );
 
