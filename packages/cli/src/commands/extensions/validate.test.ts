@@ -87,7 +87,7 @@ describe('handleValidate', () => {
     });
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Invalid extension name: "INVALID_NAME". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.',
+        'Invalid extension name: "INVALID_NAME". Only letters (a-z, A-Z), numbers (0-9), dashes (-), and dots (.) are allowed. Names must start and end with an alphanumeric character.',
       ),
     );
     expect(processSpy).toHaveBeenCalledWith(1);
