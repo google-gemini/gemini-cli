@@ -101,11 +101,12 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/clear`
 
-- **Description:** Clear the terminal screen, including the visible session
-  history and scrollback within the CLI. The underlying session data (for
-  history recall) might be preserved depending on the exact implementation, but
-  the visual display is cleared.
-- **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
+- **Description:** Clear the terminal screen and reset the active chat context.
+  Running `/clear` starts a new conversation session, clears all message history
+  from the context, clears steering hints, and closes any persistent browser
+  sessions. This is equivalent to `/new`.
+- **Keyboard shortcut:** Press **Ctrl+L** at any time to clear the terminal
+  screen and reset the active chat context.
 
 ### `/commands`
 
