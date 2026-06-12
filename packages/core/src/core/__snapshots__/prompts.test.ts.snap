@@ -148,6 +148,11 @@ ONLY use the built-in \`exit_plan_mode\` tool to present the plan for formal app
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -343,6 +348,11 @@ An approved plan is available for this task at \`../plans/feature-x.md\`.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan".
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -654,6 +664,11 @@ ONLY use the built-in \`exit_plan_mode\` tool to present the plan for formal app
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -828,6 +843,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -988,6 +1008,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -1130,6 +1155,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -1820,6 +1850,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -1993,6 +2028,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -2172,6 +2212,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2350,6 +2395,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2524,6 +2574,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2692,6 +2747,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2833,6 +2893,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 3. **Implementation:** Once the plan is approved, follow the standard **Execution** cycle to build the application, utilizing platform-native primitives to realize the rich aesthetic you planned.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -3007,6 +3072,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -3327,6 +3397,11 @@ You are operating with a persistent file-based task tracking system located at \
 9.  **TURN EFFICIENCY**: Update the tracker immediately when a step is completed. Combine \`tracker_update_task\` calls with other tool calls in the same turn to save turns.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -3757,6 +3832,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -3930,6 +4010,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
@@ -4224,6 +4309,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -4397,6 +4487,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
+
+## Shell tool usage
+
+- The host platform is Unix-like (linux). Use commands and path conventions compatible with this platform.
+- When inspecting large command output, prefer targeted inspection using commands like 'grep', 'tail', 'head'.
 
 ## Tone and Style
 
