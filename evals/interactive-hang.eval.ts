@@ -75,4 +75,30 @@ describe('interactive_commands', () => {
       ).toMatch(/(?:^|\s)(--yes|-y|--template\s+\S+)(?:\s|$|\\|")/);
     },
   });
+
+  /**
+   * Validates that the agent does not hang when creating a vite app.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should not hang when creating a vite app',
+    prompt: 'create a hello world app with vite',
+    files: {
+      //'.npmrc': 'cache=./.npm-cache',
+    },
+    assert: async (rig, result) => {
+      await rig.waitForToolCall('run_shell_command');
+      const logs = rig.readToolLogs();
+      const viteCall = logs.find(
+        (l) =>
+          l.toolRequest.name === 'run_shell_command' &&
+          l.toolRequest.args.toLowerCase().includes('vite'),
+      );
+
+      expect(viteCall, 'Agent should have called vite').toBeDefined();
+      expect(
+        viteCall?.toolRequest.success,
+        'Vite tool call should finish successfully without hanging',
+      ).toBe(true);
+    },
+  });
 });
