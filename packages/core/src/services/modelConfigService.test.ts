@@ -1152,5 +1152,31 @@ describe('ModelConfigService', () => {
         'gemini-3-pro',
       );
     });
+
+    it('should keep Auto visible without preview access', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          auto: {
+            displayName: 'Auto',
+            tier: 'auto',
+            isPreview: false,
+            isVisible: true,
+          },
+          'auto-gemini-3': {
+            tier: 'auto',
+            isPreview: true,
+            isVisible: true,
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: false,
+      });
+
+      expect(options.map((o) => o.modelId)).toContain('auto');
+      expect(options.map((o) => o.modelId)).not.toContain('auto-gemini-3');
+    });
   });
 });
