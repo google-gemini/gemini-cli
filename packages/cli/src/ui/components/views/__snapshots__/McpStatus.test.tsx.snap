@@ -1,5 +1,14 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`McpStatus > filters blocked servers case-insensitively and ignores whitespace 1`] = `
+"Configured MCP servers:
+
+🔴  server-1 (from test-extension) - Blocked
+
+🔴 SERVER-2  (from test-extension) - Blocked
+"
+`;
+
 exports[`McpStatus > renders correctly when discovery is in progress 1`] = `
 "⏳ MCP servers are starting up (0 initializing)...
 Note: First startup may take longer. Tool availability will update automatically.

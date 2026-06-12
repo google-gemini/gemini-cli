@@ -50,7 +50,9 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   const serverNames = Object.keys(servers).filter(
     (serverName) =>
       !blockedServers.some(
-        (blockedServer) => blockedServer.name === serverName,
+        (blockedServer) =>
+          blockedServer.name.trim().toLowerCase() ===
+          serverName.trim().toLowerCase(),
       ),
   );
 
