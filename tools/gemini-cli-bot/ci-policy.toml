@@ -2,15 +2,23 @@
 # This policy guarantees permission for shell commands and file writing in the bot's CI environment.
 
 [[rule]]
-toolName = ["run_shell_command", "write_file", "replace"]
+toolName = ["run_shell_command", "write_file", "replace", "activate_skill"]
 decision = "allow"
 # Max priority to ensure it overrides all default and workspace rules.
 priority = 999
 # Explicitly target the headless environment to match the specificity of default denial rules.
 interactive = false
+# Capture output without triggering a policy downgrade to ASK_USER.
+allowRedirection = true
 
 [[rule]]
 toolName = "invoke_agent"
 decision = "allow"
+priority = 999
+interactive = false
+
+[[rule]]
+toolName = "google_web_search"
+decision = "deny"
 priority = 999
 interactive = false

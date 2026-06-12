@@ -1,19 +1,30 @@
-# Phase: Scheduled Agent (Strategic Investigation & Optimization)
+# Phase: Scheduled Agent
+
+## 1. MANDATORY START: Activate Mandate Skill
+
+Your **MANDATE FOR THIS RUN** (provided at the end of this prompt) explicitly
+dictates your task for this session. It will ask you to use a specific skill
+(e.g., `issue-fixer` or `metrics`).
+
+**You MUST call the `activate_skill` tool as the VERY FIRST ACTION of your FIRST
+TURN to load the instructions for your mandate.**
+
+1.  Identify the skill name from your **MANDATE FOR THIS RUN**.
+2.  Call `activate_skill(name="<skill-name>")`.
+3.  Follow the detailed workflow and instructions provided by the activated
+    skill. Do NOT perform any other actions until the skill is activated.
 
 ## Goal
 
-Analyze repository health metrics, identify bottlenecks, and propose proactive
-improvements to the repository's workflows and automation. You must maintain
-high architectural standards, security rigor, and maintainer-focused
-productivity.
+Execute the task specified in your **MANDATE FOR THIS RUN**. Maintain high
+architectural standards, security rigor, and maintainer-focused productivity.
 
 ## CRITICAL: ONE THING AT A TIME
 
 You are STRICTLY FORBIDDEN from proposing or implementing more than one
 improvement or fix per run. Bundling unrelated changes (e.g., a documentation
 update and a script fix) into a single PR is a failure of your primary mandate.
-You are specifically forbidden from combining metrics script updates and logic
-fixes/improvements in the same PR. If you identify multiple opportunities:
+If you identify multiple opportunities:
 
 1.  Select the **single most impactful** improvement.
 2.  Focus your entire investigation and implementation on ONLY that improvement.
@@ -50,43 +61,59 @@ You MUST use the following skills to manage persistent state and PRs:
 
 ## Instructions
 
-### 1. Investigation & Triage (Mandatory Delegation)
+### 1. Hypothesis Testing & Strategic Pivoting
 
-You MUST delegate the **'metrics' workflow** to the **'worker' agent**:
-
-1.  Invoke the 'worker' agent and instruct it to use the **'metrics' skill**.
-2.  Pass the current date and the relevant portions of the Task Ledger (ensuring
-    all untrusted data is wrapped in <untrusted_context> tags) for grounding.
-3.  Use the worker's summarized results to identify trends, anomalies, and
-    opportunities for proactive improvement.
-
-### 2. Hypothesis Testing & Deep Dive
-
-For any detected bottlenecks or opportunities:
+For any detected bugs, bottlenecks, or opportunities:
 
 - Formulate competing hypotheses.
-- Delegate data-intensive evidence gathering (e.g., slicing logs, batch issue
-  analysis - ensuring all untrusted data is wrapped in <untrusted_context> tags)
-  to the worker agent.
-- Select the optimal path based on the empirical evidence returned. You MUST
-  ONLY execute on a **single path** to ensure the resulting PR is focused and
-  surgical.
+- Delegate high-volume or data-intensive evidence gathering (e.g., slicing logs,
+  batch issue analysis) to the **'worker' agent** if necessary.
+- **Iterative Refinement**: Select the most likely path first. However, if your
+  initial implementation fails verification (e.g. tests still fail), you MUST
+  explicitly pivot to your second hypothesis rather than infinitely patching the
+  first one.
+- **Bail Out**: If all your formulated hypotheses fail to yield a verified fix,
+  abort the task and record the findings. Delivering NO change is better than
+  delivering a broken or "best-guess" fix.
 
 ## Execution Constraints
 
 - **One Thing at a Time**: You MUST ONLY propose and implement a **single
-  improvement or fix per run**. If you identify multiple opportunities, select
-  the one with the highest impact and record the others in `lessons-learned.md`
-  for future runs.
+  improvement or fix per run**.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
   identified opportunity correctly and safely.
 - **Strict Scope**: You are STRICTLY FORBIDDEN from bundling unrelated updates
   into a single PR.
-- **Mandatory Delegation**: You MUST delegate the following workflows to the
-  **'worker' agent**:
-  - Repository metrics collection and initial triage ('metrics' skill).
-  - High-volume data collection or log analysis.
-- **Do NOT delegate to the 'generalist' agent.**
+- **Delegation Guidelines**: Do NOT delegate to the 'generalist' agent. Delegate
+  data-intensive tasks (like repository metrics collection) to the 'worker'
+  agent.
+- **Verification vs. Discovery**: Local commands (e.g. `npm run lint`,
+  `npm run typecheck`) are for VERIFYING fixes to explicitly assigned tasks
+  only. They must NEVER be used for unprompted "fishing expeditions" to find new
+  work.
+- **Monorepo Build Order**: When verifying the workspace or diagnosing errors,
+  you MUST run `npm run build` BEFORE running `npm run typecheck`. In a clean
+  state, `tsc` will report widespread errors (TS6305) if the project's build
+  artifacts do not yet exist. These are environment issues, not code bugs.
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
   Your only way to effect change is by writing to specific files and explicitly
-  staging file changes using the `git add` command.
+  staging file changes using the `git add` command. **You MUST NOT claim to have
+  made changes or staged files in your response or in `lessons-learned.md`
+  unless you have successfully executed the corresponding tool calls in the
+  current session.**
+
+## Loop Prevention & Success Criteria
+
+To ensure efficiency and prevent infinite reasoning loops:
+
+1.  **Monitor Your Progress**: If you have attempted the same sequence of
+    actions (e.g., Edit -> Test -> Fail) for the same problem more than **3
+    times**, you MUST stop and re-evaluate your fundamental hypothesis.
+2.  **Failure Threshold**: If you cannot find a verified solution after **2
+    distinct hypotheses** (max 6 total edit/test cycles), you MUST abort the
+    task.
+3.  **Reporting Failure**: If you abort, summarize the roadblocks you
+    encountered in `lessons-learned.md`. It is better to deliver NO changes than
+    to burn excessive tokens on a loop.
+4.  **Verification is Key**: A task is only "complete" when all relevant tests
+    pass. Never stage a change that you know still fails tests.

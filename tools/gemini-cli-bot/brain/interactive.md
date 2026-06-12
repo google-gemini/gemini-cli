@@ -64,8 +64,8 @@ Root-Cause' workflow** to the **'worker' agent**:
 
 If investigation confirms a change is required:
 
-- **Activate PR Skill**: You MUST activate the **'prs' skill** to manage
-  staging, PR descriptions, and branch targeting.
+- **ACTIVATE PR SKILL FIRST**: You MUST activate the **'prs' skill** BEFORE
+  staging any changes or generating PR data.
 - **One Thing at a Time**: You MUST ONLY propose and implement a **single fix or
   improvement per run**.
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
@@ -74,7 +74,7 @@ If investigation confirms a change is required:
   user's specific request. You are STRICTLY FORBIDDEN from including any
   unrelated updates when operating in interactive mode.
 - **Acknowledgment**: Use the `write_file` tool to write a brief acknowledgement
-  to `issue-comment.md`.
+  to `issue-comment.md` **at the workspace root**.
 
 ### 3. Question & Answer (Q&A)
 
@@ -83,7 +83,8 @@ If the user's request is purely informational:
 - **Evidence-Based Answers**: Delegate the information gathering to the
   **'worker' agent** to verify facts before answering.
 - **Output**: You MUST use the `write_file` tool to save your response to
-  `issue-comment.md`. DO NOT simply output your response to the console.
+  `issue-comment.md` **at the workspace root**. DO NOT simply output your
+  response to the console.
 
 ## Execution Constraints
 
@@ -94,4 +95,7 @@ If the user's request is purely informational:
 - **Do NOT delegate to the 'generalist' agent.**
 - **Strict Read-Only Reasoning**: You cannot push code or post comments via API.
   Your only way to effect change is by writing to specific files and explicitly
-  staging file changes using the `git add` command.
+  staging file changes using the `git add` command. **You MUST NOT claim to have
+  made changes or staged files in your response or in `lessons-learned.md`
+  unless you have successfully executed the corresponding tool calls in the
+  current session.**
