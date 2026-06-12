@@ -20,7 +20,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
-import { truncateString } from '../utils/textUtils.js';
+import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -489,7 +489,7 @@ ${aggregatedContent}
       );
 
       return {
-        llmContent: resultText,
+        llmContent: wrapUntrusted(resultText),
         returnDisplay: `Content for ${urls.length} URL(s) processed using fallback fetch.`,
       };
     } catch (e) {
@@ -694,7 +694,7 @@ Response: ${rawResponseText}`;
           text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
         }
         return {
-          llmContent: text,
+          llmContent: wrapUntrusted(text),
           returnDisplay: `Fetched ${contentType} content from ${url}`,
         };
       }
@@ -715,7 +715,7 @@ Response: ${rawResponseText}`;
           );
         }
         return {
-          llmContent: textContent,
+          llmContent: wrapUntrusted(textContent),
           returnDisplay: `Fetched and converted HTML content from ${url}`,
         };
       }
@@ -743,7 +743,7 @@ Response: ${rawResponseText}`;
         text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
       }
       return {
-        llmContent: text,
+        llmContent: wrapUntrusted(text),
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
       };
     } catch (e) {
@@ -870,7 +870,7 @@ ${toFetch.join('\n')}
       );
 
       return {
-        llmContent: responseText,
+        llmContent: wrapUntrusted(responseText),
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
