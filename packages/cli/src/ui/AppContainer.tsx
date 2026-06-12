@@ -912,7 +912,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const authMethod = settings.merged.security.auth.selectedType;
       void (async () => {
         try {
-          const error = await validateAuthMethod(authMethod);
+          const error = await validateAuthMethod(
+            authMethod,
+            config.isExperimentalByoidEnabled(),
+          );
           if (
             error &&
             authMethod === settings.merged.security.auth.selectedType
@@ -931,6 +934,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     settings.merged.security.auth.enforcedType,
     settings.merged.security.auth.useExternal,
     onAuthError,
+    config,
   ]);
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =

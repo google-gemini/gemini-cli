@@ -6,11 +6,14 @@
 
 import { AuthType, loadApiKey } from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
+import fs from 'node:fs';
 
 export async function validateAuthMethod(
   authMethod: string,
+  experimentalByoid?: boolean,
 ): Promise<string | null> {
-  loadEnvironment(loadSettings().merged, process.cwd());
+  const settings = loadSettings();
+  loadEnvironment(settings.merged, process.cwd());
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
@@ -41,6 +44,26 @@ export async function validateAuthMethod(
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
         'Update your environment and try again (no reload needed if using .env)!'
       );
+    }
+    return null;
+  }
+
+  if (authMethod === AuthType.BYOID) {
+    const isByoidEnabled =
+      experimentalByoid || settings.merged.experimental?.byoid;
+    if (!isByoidEnabled) {
+      return 'BYOID authentication is experimental and must be enabled via experimental.byoid in settings.';
+    }
+    const configPath = settings.merged.security.auth.byoidConfigPath;
+    if (!configPath) {
+      return (
+        'When using BYOID, you must specify the security.auth.byoidConfigPath setting.\n' +
+        'Update your settings and try again!'
+      );
+    }
+
+    if (!fs.existsSync(configPath)) {
+      return `BYOID configuration file not found at: ${configPath}`;
     }
     return null;
   }

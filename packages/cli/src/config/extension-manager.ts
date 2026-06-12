@@ -131,6 +131,7 @@ export class ExtensionManager extends ExtensionLoader {
       cwd: options.workspaceDir,
       model: '',
       debugMode: false,
+      byoidConfigPath: options.settings.security?.auth?.byoidConfigPath,
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;

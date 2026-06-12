@@ -91,6 +91,7 @@ export interface CliArgs {
   allowedTools: string[] | undefined;
   acp?: boolean;
   experimentalAcp?: boolean;
+  experimentalByoid?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -367,6 +368,10 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'Starts the agent in ACP mode (deprecated, use --acp instead)',
+        })
+        .option('experimental-byoid', {
+          type: 'boolean',
+          description: 'Enable experimental support for BYOID authentication',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -1055,6 +1060,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalAutoMemory: settings.experimental?.autoMemory,
     experimentalGemma: settings.experimental?.gemma,
+    experimentalByoid: argv.experimentalByoid || settings.experimental?.byoid,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration:
@@ -1121,6 +1127,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    byoidConfigPath: settings.security?.auth?.byoidConfigPath,
   });
 }
 
