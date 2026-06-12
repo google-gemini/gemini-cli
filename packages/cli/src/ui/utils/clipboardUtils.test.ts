@@ -47,6 +47,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     spawnAsync: vi.fn(),
+    resolveToRealPath: vi.fn((p) => p),
+    isSubpath: vi.fn((parent, child) => child.startsWith(parent)),
     debugLogger: {
       debug: vi.fn(),
       warn: vi.fn(),
@@ -595,6 +597,28 @@ describe('clipboardUtils', () => {
 
         const result = parsePastedPaths('\\\\server\\share\\file.txt');
         expect(result).toBe('@\\\\server\\share\\file.txt ');
+      });
+    });
+
+    describe('with targetDir', () => {
+      it('should resolve path relative to targetDir if within it', () => {
+        const targetDir = '/mock/workspace';
+        const absolutePath = '/mock/workspace/src/image.png';
+        vi.mocked(existsSync).mockImplementation((p) => p === absolutePath);
+        vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
+
+        const result = parsePastedPaths(absolutePath, targetDir);
+        expect(result).toBe('@src/image.png ');
+      });
+
+      it('should keep absolute path if outside of targetDir', () => {
+        const targetDir = '/mock/workspace';
+        const absolutePath = '/mock/image.png';
+        vi.mocked(existsSync).mockImplementation((p) => p === absolutePath);
+        vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
+
+        const result = parsePastedPaths(absolutePath, targetDir);
+        expect(result).toBe('@/mock/image.png ');
       });
     });
   });

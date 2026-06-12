@@ -67,6 +67,8 @@ import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
+  readClipboardText,
+  writeClipboardText,
 } from '../utils/clipboardUtils.js';
 import {
   isAutoExecutableCommand,
@@ -263,6 +265,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       windowMs: DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS,
     });
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+
+  // Background clipboard image watcher to automatically convert copied raw images
+  // into temporary files and write their relative path back to the clipboard.
+  // This allows the user to paste raw images directly into the terminal with Cmd+V!
+  useEffect(() => {
+    if (!focus || shellModeActive) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        if (await clipboardHasImage()) {
+          const currentText = await readClipboardText();
+          // Only process if the clipboard text does not already reference a clipboard image or file path
+          if (
+            !currentText.startsWith('@') ||
+            !currentText.includes('clipboard-')
+          ) {
+            const imagePath = await saveClipboardImage(config.getTargetDir());
+            if (imagePath) {
+              // Clean up old clipboard images
+              cleanupOldClipboardImages(config.getTargetDir()).catch(() => {});
+
+              // Get relative path from current workspace
+              const relativePath = path.relative(
+                config.getTargetDir(),
+                imagePath,
+              );
+              const insertText = `@${relativePath} `;
+
+              // Write the text reference back to the clipboard!
+              await writeClipboardText(insertText);
+            }
+          }
+        }
+      } catch {
+        // Ignore clipboard watcher errors silently
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [focus, shellModeActive, config]);
   const { handlePress: handleEscPress, resetCount: resetEscapeState } =
     useRepeatedKeyPress({
       windowMs: 500,
