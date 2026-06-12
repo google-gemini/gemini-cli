@@ -647,22 +647,15 @@ export class ToolRegistry {
   getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
 
-    const declarations: FunctionDeclaration[] = [];
-    const seenNames = new Set<string>();
-
     const mainAgentTools = this.isMainRegistry
       ? this.config.getMainAgentTools()
       : undefined;
 
-    this.getActiveTools().forEach((tool) => {
+    const activeTools = this.getActiveTools().filter((tool) => {
       const toolName =
         tool instanceof DiscoveredMCPTool
           ? tool.getFullyQualifiedName()
           : tool.name;
-
-      if (seenNames.has(toolName)) {
-        return;
-      }
 
       if (
         mainAgentTools &&
@@ -670,6 +663,30 @@ export class ToolRegistry {
         !mainAgentTools.includes(tool.constructor.name) &&
         !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
       ) {
+        return false;
+      }
+      return true;
+    });
+
+    const MAX_TOOLS = 128;
+    let toolsToInclude = activeTools;
+    if (activeTools.length > MAX_TOOLS) {
+      toolsToInclude = this.smartLimitTools(activeTools, MAX_TOOLS);
+      debugLogger.warn(
+        `More than ${MAX_TOOLS} tools available (${activeTools.length}). Smart-limited to ${MAX_TOOLS}.`,
+      );
+    }
+
+    const declarations: FunctionDeclaration[] = [];
+    const seenNames = new Set<string>();
+
+    toolsToInclude.forEach((tool) => {
+      const toolName =
+        tool instanceof DiscoveredMCPTool
+          ? tool.getFullyQualifiedName()
+          : tool.name;
+
+      if (seenNames.has(toolName)) {
         return;
       }
 
@@ -698,6 +715,62 @@ export class ToolRegistry {
       declarations.push(schema);
     });
     return declarations;
+  }
+
+  /**
+   * Smartly limits the number of tools to fit within the Gemini API limit.
+   * Priority:
+   * 1. Built-in tools.
+   * 2. Discovered tools (non-MCP).
+   * 3. MCP tools (fairly distributed among servers).
+   */
+  private smartLimitTools(
+    tools: AnyDeclarativeTool[],
+    limit: number,
+  ): AnyDeclarativeTool[] {
+    const builtIn = tools.filter(
+      (t) => !(t instanceof DiscoveredTool) && !(t instanceof DiscoveredMCPTool),
+    );
+    const discovered = tools.filter((t) => t instanceof DiscoveredTool);
+    const mcp = tools.filter(
+      (t) => t instanceof DiscoveredMCPTool,
+    ) as DiscoveredMCPTool[];
+
+    const result: AnyDeclarativeTool[] = [...builtIn, ...discovered];
+    if (result.length >= limit) {
+      return result.slice(0, limit);
+    }
+
+    const remaining = limit - result.length;
+    // Distribute remaining slots among MCP servers
+    const mcpByServer = new Map<string, DiscoveredMCPTool[]>();
+    for (const t of mcp) {
+      const list = mcpByServer.get(t.serverName) ?? [];
+      list.push(t);
+      mcpByServer.set(t.serverName, list);
+    }
+
+    const serverNames = Array.from(mcpByServer.keys());
+    if (serverNames.length === 0) return result;
+
+    let added = 0;
+    let index = 0;
+    while (added < remaining) {
+      let anyAddedInThisRound = false;
+      for (const serverName of serverNames) {
+        const serverTools = mcpByServer.get(serverName)!;
+        if (index < serverTools.length) {
+          result.push(serverTools[index]);
+          added++;
+          anyAddedInThisRound = true;
+          if (added >= remaining) break;
+        }
+      }
+      if (!anyAddedInThisRound) break;
+      index++;
+    }
+
+    return result;
   }
 
   /**
