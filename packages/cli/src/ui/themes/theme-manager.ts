@@ -365,11 +365,13 @@ class ThemeManager {
       this.cachedColors = {
         ...colors,
         Background: this.terminalBackground,
-        DarkGray: interpolateColor(
-          this.terminalBackground,
-          colors.Gray,
-          DEFAULT_BORDER_OPACITY,
-        ),
+        DarkGray:
+          colors.BorderDefault ??
+          interpolateColor(
+            this.terminalBackground,
+            colors.Gray,
+            DEFAULT_BORDER_OPACITY,
+          ),
         InputBackground: interpolateColor(
           this.terminalBackground,
           colors.Gray,

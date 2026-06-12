@@ -180,6 +180,8 @@ export interface ColorsTheme {
   MessageBackground?: string;
   FocusBackground?: string;
   FocusColor?: string;
+  BorderDefault?: string;
+  BorderFocused?: string;
   GradientColors?: string[];
 }
 
@@ -392,6 +394,9 @@ export class Theme {
  * @returns A new Theme instance.
  */
 export function createCustomTheme(customTheme: CustomTheme): Theme {
+  const explicitBorderDefault =
+    customTheme.border?.default ?? customTheme.DarkGray;
+  const explicitBorderFocused = customTheme.border?.focused;
   const colors: ColorsTheme = {
     type: 'custom',
     Background: customTheme.background?.primary ?? customTheme.Background ?? '',
@@ -410,7 +415,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
     DarkGray:
-      customTheme.DarkGray ??
+      explicitBorderDefault ??
       interpolateColor(
         customTheme.background?.primary ?? customTheme.Background ?? '',
         customTheme.text?.secondary ?? customTheme.Gray ?? '',
@@ -432,6 +437,8 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       DEFAULT_SELECTION_OPACITY,
     ),
     FocusColor: customTheme.ui?.focus ?? customTheme.AccentGreen,
+    BorderDefault: explicitBorderDefault,
+    BorderFocused: explicitBorderFocused,
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 
@@ -595,7 +602,8 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       },
     },
     border: {
-      default: colors.DarkGray,
+      default: explicitBorderDefault ?? colors.DarkGray,
+      ...(explicitBorderFocused ? { focused: explicitBorderFocused } : {}),
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,

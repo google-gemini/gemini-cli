@@ -46,6 +46,7 @@ const COLOR_DESCRIPTIONS: Record<string, string> = {
   'background.diff.added': 'Background for added lines in diffs',
   'background.diff.removed': 'Background for removed lines in diffs',
   'border.default': 'Standard border color',
+  'border.focused': 'Border color for focused elements',
   'ui.comment': 'Color for code comments and metadata',
   'ui.symbol': 'Color for technical symbols and UI icons',
   'ui.active': 'Border color for active or running elements',

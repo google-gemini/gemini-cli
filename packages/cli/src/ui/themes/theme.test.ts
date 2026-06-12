@@ -52,6 +52,23 @@ describe('createCustomTheme', () => {
     expect(theme.colors.DarkGray).toBe('#123456');
   });
 
+  it('should use custom border colors when provided', () => {
+    const theme = createCustomTheme({
+      ...baseTheme,
+      DarkGray: '#123456',
+      border: {
+        default: '#222222',
+        focused: '#abcdef',
+      },
+    });
+
+    expect(theme.colors.DarkGray).toBe('#222222');
+    expect(theme.colors.BorderDefault).toBe('#222222');
+    expect(theme.colors.BorderFocused).toBe('#abcdef');
+    expect(theme.semanticColors.border.default).toBe('#222222');
+    expect(theme.semanticColors.border.focused).toBe('#abcdef');
+  });
+
   it('should interpolate DarkGray when text.secondary is provided but DarkGray is not', () => {
     const customTheme: CustomTheme = {
       type: 'custom',

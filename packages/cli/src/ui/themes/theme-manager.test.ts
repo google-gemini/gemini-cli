@@ -331,6 +331,31 @@ describe('ThemeManager', () => {
       expect(semanticColors.background.primary).toBe(darkTerminalBg);
     });
 
+    it('should preserve explicit custom border colors when terminal background is set', () => {
+      themeManager.loadCustomThemes({
+        MyDark: {
+          name: 'MyDark',
+          type: 'custom',
+          Background: '#000000',
+          Foreground: '#ffffff',
+          border: {
+            default: '#282c34',
+            focused: '#61afef',
+          },
+        },
+      });
+      themeManager.setActiveTheme('MyDark');
+      themeManager.setTerminalBackground('#1a1a1a');
+
+      const colors = themeManager.getColors();
+      const semanticColors = themeManager.getSemanticColors();
+
+      expect(colors.Background).toBe('#1a1a1a');
+      expect(colors.DarkGray).toBe('#282c34');
+      expect(semanticColors.border.default).toBe('#282c34');
+      expect(semanticColors.border.focused).toBe('#61afef');
+    });
+
     it('should NOT override background for custom theme when incompatible', () => {
       themeManager.loadCustomThemes({
         MyLight: {

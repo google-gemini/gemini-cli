@@ -26,6 +26,7 @@ export interface SemanticColors {
   };
   border: {
     default: string;
+    focused?: string;
   };
   ui: {
     comment: string;
