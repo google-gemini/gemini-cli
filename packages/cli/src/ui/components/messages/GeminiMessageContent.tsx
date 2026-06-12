@@ -11,6 +11,7 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface GeminiMessageContentProps {
   text: string;
+  itemKey?: string;
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -24,6 +25,7 @@ interface GeminiMessageContentProps {
  */
 export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   text,
+  itemKey,
   isPending,
   availableTerminalHeight,
   terminalWidth,
@@ -35,6 +37,7 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   return (
     <Box flexDirection="column" paddingLeft={prefixWidth}>
       <MarkdownDisplay
+        itemKey={itemKey}
         text={text}
         isPending={isPending}
         availableTerminalHeight={

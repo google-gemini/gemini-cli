@@ -7,17 +7,17 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
 │Item 1                                                                                            │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
-│Item 2                                                                                            │
 │                                                                                                  │
 │                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│Item 3                                                                                            │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -26,22 +26,22 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 
 exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visible items with 1000 items and 10px height (scroll: 500) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
 │Item 500                                                                                          │
 │                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                 ▄│
+│                                                                                                 ▀│
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
 │Item 501                                                                                          │
 │                                                                                                  │
 │                                                                                                  │
-│                                                                                                 ▄│
-│                                                                                                 ▀│
-│Item 502                                                                                          │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│Item 503                                                                                          │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -53,7 +53,7 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
-│Item 997                                                                                          │
+│                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

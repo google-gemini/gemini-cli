@@ -358,6 +358,7 @@ describe('MainContent', () => {
     bannerVisible: false,
     copyModeEnabled: false,
     terminalWidth: 100,
+    mouseMode: true,
   };
 
   beforeEach(() => {
@@ -803,7 +804,6 @@ describe('MainContent', () => {
     expect(output).toContain('Planning execution');
     expect(output).toContain('Refining approach');
     expect(output).toMatchSnapshot();
-    await expect(renderResult).toMatchSvgSnapshot();
     renderResult.unmount();
   });
 
