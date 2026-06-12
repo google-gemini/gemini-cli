@@ -3009,6 +3009,13 @@
           "default": 40000,
           "type": "number"
         },
+        "callTimeout": {
+          "title": "Tool Call Timeout",
+          "description": "Maximum time in seconds that a single tool call may run before it is aborted. Set to 0 (the default) or a negative value to disable. Applies to all tool calls; for shell commands it works alongside tools.shell.inactivityTimeout.",
+          "markdownDescription": "Maximum time in seconds that a single tool call may run before it is aborted. Set to 0 (the default) or a negative value to disable. Applies to all tool calls; for shell commands it works alongside tools.shell.inactivityTimeout.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `0`",
+          "default": 0,
+          "type": "number"
+        },
         "disableLLMCorrection": {
           "title": "Disable LLM Correction",
           "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
