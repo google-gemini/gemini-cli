@@ -51,6 +51,8 @@ const createSdkResponse = (
   },
 ];
 
+const WEBP_BASE64_DATA = 'UklGRgAAAABXRUJQ';
+
 describe('generateValidName', () => {
   it('should return a valid name for a simple function', () => {
     expect(generateValidName('myFunction')).toBe('mcp_myFunction');
@@ -507,6 +509,38 @@ describe('DiscoveredMCPTool', () => {
       expect(toolResult.returnDisplay).toBe('[Audio: audio/mp3]');
     });
 
+    it('should correct a mislabeled WebP image block', async () => {
+      const params = { param: 'look' };
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'image',
+              data: WEBP_BASE64_DATA,
+              mimeType: 'image/png',
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: WEBP_BASE64_DATA,
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Image: image/webp]');
+    });
+
     it('should handle a ResourceLinkBlock response', async () => {
       const params = { param: 'get' };
       mockCallTool.mockResolvedValue(
@@ -600,6 +634,41 @@ describe('DiscoveredMCPTool', () => {
       expect(toolResult.returnDisplay).toBe(
         '[Embedded Resource: application/octet-stream]',
       );
+    });
+
+    it('should correct a mislabeled WebP embedded resource block', async () => {
+      const params = { param: 'get' };
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'resource',
+              resource: {
+                uri: 'file:///path/to/image.webp',
+                blob: WEBP_BASE64_DATA,
+                mimeType: 'image/png',
+              },
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: WEBP_BASE64_DATA,
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Embedded Resource: image/webp]');
     });
 
     it('should handle a mix of content block types', async () => {
