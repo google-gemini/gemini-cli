@@ -12,6 +12,10 @@ on:
 
 jobs:
   limit:
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       contents: 'read'
