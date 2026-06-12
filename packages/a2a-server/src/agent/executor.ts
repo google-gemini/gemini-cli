@@ -546,9 +546,9 @@ export class CoderAgentExecutor implements AgentExecutor {
 
         if (abortSignal.aborted) throw new Error('Execution aborted');
 
-        if (currentTask.hasPendingTools()) {
+        if (currentTask.hasPendingTools) {
           logger.info(
-            `[CoderAgentExecutor] Task ${taskId}: There are still ${currentTask.getPendingToolsCount()} pending tools waiting for approval. Yielding to user.`,
+            `[CoderAgentExecutor] Task ${taskId}: There are still ${currentTask.pendingToolsCount} pending tools waiting for approval. Yielding to user.`,
           );
           agentTurnActive = false;
         } else {

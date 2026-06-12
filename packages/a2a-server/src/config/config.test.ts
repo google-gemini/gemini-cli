@@ -622,10 +622,16 @@ describe('setIsTrusted', () => {
   it('should return true when GEMINI_FOLDER_TRUST env var is true', () => {
     vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
     expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
   });
 
-  it('should fallback to agentSettings.isTrusted if env var is not true', () => {
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', () => {
     vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is undefined', () => {
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
     expect(setIsTrusted(undefined)).toBe(false);

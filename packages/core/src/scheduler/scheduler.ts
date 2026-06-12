@@ -27,6 +27,7 @@ import {
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import {
+  EDIT_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -553,7 +554,8 @@ export class Scheduler {
     // update_topic tool is forced as sequential call
     if (
       request.name === UPDATE_TOPIC_TOOL_NAME ||
-      request.name === WRITE_FILE_TOOL_NAME
+      request.name === WRITE_FILE_TOOL_NAME ||
+      request.name === EDIT_TOOL_NAME
     ) {
       return false;
     }

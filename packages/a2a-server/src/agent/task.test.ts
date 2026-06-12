@@ -652,12 +652,12 @@ describe('Task', () => {
           mockEventBus,
         );
 
-        expect(task.hasPendingTools()).toBe(false);
-        expect(task.getPendingToolsCount()).toBe(0);
+        expect(task.hasPendingTools).toBe(false);
+        expect(task.pendingToolsCount).toBe(0);
 
         task['_registerToolCall']('tool-1', 'scheduled');
-        expect(task.hasPendingTools()).toBe(true);
-        expect(task.getPendingToolsCount()).toBe(1);
+        expect(task.hasPendingTools).toBe(true);
+        expect(task.pendingToolsCount).toBe(1);
       });
     });
   });

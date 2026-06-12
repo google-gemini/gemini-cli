@@ -137,11 +137,11 @@ export class Task {
     );
   }
 
-  hasPendingTools(): boolean {
+  get hasPendingTools(): boolean {
     return this.pendingToolCalls.size > 0;
   }
 
-  getPendingToolsCount(): number {
+  get pendingToolsCount(): number {
     return this.pendingToolCalls.size;
   }
 
