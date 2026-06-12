@@ -40,17 +40,22 @@ export class SlashCommandConflictHandler {
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
-    const newConflicts = payload.conflicts.filter((c) => {
+    const currentKeys = new Set<string>();
+    const newConflicts: SlashCommandConflict[] = [];
+
+    for (const c of payload.conflicts) {
       // Use a unique key to prevent duplicate notifications for the same conflict
       const sourceId =
         c.loserExtensionName || c.loserMcpServerName || c.loserKind;
       const key = `${c.name}:${sourceId}:${c.renamedTo}`;
-      if (this.notifiedConflicts.has(key)) {
-        return false;
+      currentKeys.add(key);
+
+      if (!this.notifiedConflicts.has(key)) {
+        newConflicts.push(c);
       }
-      this.notifiedConflicts.add(key);
-      return true;
-    });
+    }
+
+    this.notifiedConflicts = currentKeys;
 
     if (newConflicts.length > 0) {
       this.pendingConflicts.push(...newConflicts);
