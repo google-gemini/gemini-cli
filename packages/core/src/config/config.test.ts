@@ -325,6 +325,38 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('model fallback', () => {
+    it('should fallback to default model when an obsolete model is provided', () => {
+      const config = new Config({
+        ...baseParams,
+        model: 'gemini-pro-latest',
+      });
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should fallback to default model when an invalid gemini model is provided', () => {
+      const config = new Config({
+        ...baseParams,
+        model: 'gemini-invalid-model',
+      });
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should fallback to default model when setModel is called with an invalid gemini model', () => {
+      const config = new Config(baseParams);
+      config.setModel('gemini-invalid-model');
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should allow custom models (non-gemini prefixed)', () => {
+      const config = new Config({
+        ...baseParams,
+        model: 'custom-model',
+      });
+      expect(config.getModel()).toBe('custom-model');
+    });
+  });
+
   describe('setShellExecutionConfig', () => {
     it('should preserve existing shell execution fields that are not being updated', () => {
       const config = new Config({
@@ -2624,7 +2656,7 @@ describe('Config getHooks', () => {
     targetDir: '/path/to/target',
     debugMode: false,
     sessionId: 'test-session-id',
-    model: 'gemini-pro',
+    model: 'gemini-2.5-flash',
     usageStatisticsEnabled: false,
   };
 
@@ -2883,7 +2915,7 @@ describe('Config getExperiments', () => {
     targetDir: '/path/to/target',
     debugMode: false,
     sessionId: 'test-session-id',
-    model: 'gemini-pro',
+    model: 'gemini-2.5-flash',
     usageStatisticsEnabled: false,
   };
 
@@ -2928,7 +2960,7 @@ describe('Config setExperiments logging', () => {
     targetDir: '/path/to/target',
     debugMode: false,
     sessionId: 'test-session-id',
-    model: 'gemini-pro',
+    model: 'gemini-2.5-flash',
     usageStatisticsEnabled: false,
   };
 

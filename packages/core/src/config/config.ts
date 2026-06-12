@@ -80,10 +80,12 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
   isGemini2Model,
+  isValidModel,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
   setFlashModels,
@@ -1121,9 +1123,11 @@ export class Config implements McpContext, AgentLoopContext {
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
-    this.model = params.model;
+    this.model = isValidModel(params.model)
+      ? params.model
+      : DEFAULT_GEMINI_MODEL;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
-    this._activeModel = params.model;
+    this._activeModel = this.model;
     this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
@@ -1915,17 +1919,20 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
-    if (this.model !== newModel || this._activeModel !== newModel) {
-      this.model = newModel;
+    const validatedModel = isValidModel(newModel)
+      ? newModel
+      : DEFAULT_GEMINI_MODEL;
+    if (this.model !== validatedModel || this._activeModel !== validatedModel) {
+      this.model = validatedModel;
       // When the user explicitly sets a model, that becomes the active model.
-      this._activeModel = newModel;
-      coreEvents.emitModelChanged(newModel);
+      this._activeModel = validatedModel;
+      coreEvents.emitModelChanged(validatedModel);
       this.lastEmittedQuotaRemaining = undefined;
       this.lastEmittedQuotaLimit = undefined;
       this.emitQuotaChangedEvent();
     }
     if (this.onModelChange && !isTemporary) {
-      this.onModelChange(newModel);
+      this.onModelChange(validatedModel);
     }
     this.modelAvailabilityService.reset();
   }
