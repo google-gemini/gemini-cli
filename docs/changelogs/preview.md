@@ -1,6 +1,6 @@
-# Preview release: v0.46.0-preview.0
+# Preview release: v0.46.0-preview.1
 
-Released: June 3, 2026
+Released: June 03, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -25,6 +25,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick e4315b3 to release/v0.46.0-preview.0-pr-27645 to patch
+  version v0.46.0-preview.0 and create version 0.46.0-preview.1 by
+  @gemini-cli-robot in
+  [#27655](https://github.com/google-gemini/gemini-cli/pull/27655)
 - fix(core): harden PTY resize against native crashes by @scidomino in
   [#27496](https://github.com/google-gemini/gemini-cli/pull/27496)
 - Changelog for v0.45.0-preview.0 by @gemini-cli-robot in
@@ -43,4 +47,4 @@ npm install -g @google/gemini-cli@preview
   @sripasg in [#27637](https://github.com/google-gemini/gemini-cli/pull/27637)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.45.0-preview.1...v0.46.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.45.0-preview.1...v0.46.0-preview.1
