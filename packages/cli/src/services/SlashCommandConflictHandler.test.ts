@@ -153,7 +153,24 @@ describe('SlashCommandConflictHandler', () => {
     expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(2);
   });
 
-  it('should deduplicate already notified conflicts', () => {
+  it('should deduplicate the same conflict within a single flush window', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(200);
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('should re-notify when a previously-flushed conflict reappears', () => {
     const conflict = {
       name: 'deploy',
       renamedTo: 'firebase.deploy',
@@ -170,7 +187,7 @@ describe('SlashCommandConflictHandler', () => {
 
     simulateEvent([conflict]);
     vi.advanceTimersByTime(600);
-    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
   });
 
   it('should display a descriptive message for a skill conflict', () => {
