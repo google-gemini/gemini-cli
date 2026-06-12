@@ -56,6 +56,7 @@ import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
 } from '../sandbox/utils/proactivePermissions.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
@@ -1025,7 +1026,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
         );
         return {
-          llmContent: summary,
+          llmContent: wrapUntrusted(summary),
           returnDisplay,
           ...executionError,
         };
@@ -1038,7 +1039,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           : undefined;
 
       return {
-        llmContent,
+        llmContent: wrapUntrusted(llmContent),
         display: {
           name: 'Shell',
           description: this.getDescription(),
@@ -1061,18 +1062,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (tempFilePath) {
-        try {
-          await fsPromises.unlink(tempFilePath);
-        } catch {
-          // Ignore errors during unlink
+
+      // Only clean up if NOT running in background.
+      // Background processes need the temp directory and PID file to remain
+      // available until they exit.
+      if (!this.params.is_background) {
+        if (tempFilePath) {
+          try {
+            await fsPromises.unlink(tempFilePath);
+          } catch {
+            // Ignore errors during unlink
+          }
         }
-      }
-      if (tempDir) {
-        try {
-          await fsPromises.rm(tempDir, { recursive: true, force: true });
-        } catch {
-          // Ignore errors during rm
+        if (tempDir) {
+          try {
+            await fsPromises.rm(tempDir, { recursive: true, force: true });
+          } catch {
+            // Ignore errors during rm
+          }
         }
       }
     }

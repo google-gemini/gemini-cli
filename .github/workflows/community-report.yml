@@ -173,6 +173,7 @@ jobs:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
           REPOSITORY: '${{ github.repository }}'
         with:
+          upload_artifacts: 'true'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'

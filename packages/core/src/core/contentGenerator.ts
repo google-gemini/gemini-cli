@@ -30,6 +30,8 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
+import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -221,6 +223,7 @@ export async function createContentGenerator(
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,
+      gcConfig.hasGemini35FlashGAAccess?.() ?? false,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
@@ -281,11 +284,14 @@ export async function createContentGenerator(
     ) {
       const httpOptions = { headers: baseHeaders };
       return new LoggingContentGenerator(
-        await createCodeAssistContentGenerator(
-          httpOptions,
-          config.authType,
-          gcConfig,
-          sessionId,
+        new ModelMappingContentGenerator(
+          await createCodeAssistContentGenerator(
+            httpOptions,
+            config.authType,
+            gcConfig,
+            sessionId,
+          ),
+          CCPA_AI_MODEL_MAPPINGS,
         ),
         gcConfig,
       );

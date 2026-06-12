@@ -1,0 +1,120 @@
+name: 'PR Size Labeler'
+
+on:
+  pull_request_target:
+    types: ['opened', 'synchronize', 'reopened']
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to label manually (for workflow_dispatch)'
+        required: false
+        type: 'string'
+
+permissions:
+  pull-requests: 'write'
+  issues: 'write'
+
+jobs:
+  size-label:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Run size labeler'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_REPO: '${{ github.repository }}'
+        run: |
+          # Determine the target PR number
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          elif [ -n "${{ github.event.inputs.pr_number }}" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            echo "❌ Error: No PR number provided."
+            exit 1
+          fi
+
+          echo "Checking PR #$PR_NUMBER..."
+
+          # 1. Ensure standard premium size labels exist in the repository (self-healing)
+          # size/XS: Light green (#7ee081)
+          # size/S: Yellow-green (#a6d49f)
+          # size/M: Amber/Yellow (#f7d070)
+          # size/L: Orange (#f48c06)
+          # size/XL: Red (#dc2f02)
+          gh label create "size/XS" --color "7ee081" --description "XS: <10 lines changed" 2>/dev/null || true
+          gh label create "size/S"  --color "a6d49f" --description "S: 10-49 lines changed" 2>/dev/null || true
+          gh label create "size/M"  --color "f7d070" --description "M: 50-249 lines changed" 2>/dev/null || true
+          gh label create "size/L"  --color "f48c06" --description "L: 250-999 lines changed" 2>/dev/null || true
+          gh label create "size/XL" --color "dc2f02" --description "XL: >=1000 lines changed" 2>/dev/null || true
+
+          # 2. Fetch PR details in a single efficient API call
+          PR_DATA=$(gh pr view "$PR_NUMBER" --json additions,deletions,changedFiles,labels)
+          if [ -z "$PR_DATA" ]; then
+            echo "❌ Error: Could not fetch PR details."
+            exit 1
+          fi
+
+          ADDITIONS=$(echo "$PR_DATA" | jq '.additions')
+          DELETIONS=$(echo "$PR_DATA" | jq '.deletions')
+          CHANGED_FILES=$(echo "$PR_DATA" | jq '.changedFiles')
+          TOTAL=$((ADDITIONS + DELETIONS))
+
+          echo "PR additions: $ADDITIONS, deletions: $DELETIONS, total changes: $TOTAL, files: $CHANGED_FILES"
+
+          # 3. Calculate new size label
+          if [ $TOTAL -lt 10 ]; then
+            SIZE="size/XS"
+          elif [ $TOTAL -lt 50 ]; then
+            SIZE="size/S"
+          elif [ $TOTAL -lt 250 ]; then
+            SIZE="size/M"
+          elif [ $TOTAL -lt 1000 ]; then
+            SIZE="size/L"
+          else
+            SIZE="size/XL"
+          fi
+
+          # 4. Check existing labels and update only if necessary
+          EXISTING_LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name' 2>/dev/null || echo "")
+
+          LABELS_TO_REMOVE=()
+          for L in size/XS size/S size/M size/L size/XL; do
+            if echo "$EXISTING_LABELS" | grep -Fq "$L" && [ "$L" != "$SIZE" ]; then
+              LABELS_TO_REMOVE+=("--remove-label" "$L")
+            fi
+          done
+
+          LABEL_TO_ADD=()
+          if ! echo "$EXISTING_LABELS" | grep -Fq "$SIZE"; then
+            LABEL_TO_ADD+=("--add-label" "$SIZE")
+          fi
+
+          # Perform a single, highly atomic edit call if changes are needed
+          if [ ${#LABELS_TO_REMOVE[@]} -gt 0 ] || [ ${#LABEL_TO_ADD[@]} -gt 0 ]; then
+            echo "Updating labels: removing ${LABELS_TO_REMOVE[*]}, adding $SIZE"
+            gh pr edit "$PR_NUMBER" "${LABELS_TO_REMOVE[@]}" "${LABEL_TO_ADD[@]}"
+          else
+            echo "✅ PR #$PR_NUMBER already has the correct size label ($SIZE)."
+          fi
+
+          # 5. Premium, anti-spam comment logic (updates previous comment to keep thread clean)
+          COMMENT="📊 PR Size: **$SIZE**
+          - Lines changed: **$TOTAL**
+          - Additions: +$ADDITIONS
+          - Deletions: -$DELETIONS
+          - Files changed: $CHANGED_FILES"
+
+          # Find any existing size labeler comment by the github-actions bot
+          echo "Searching for existing size comment..."
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("📊 PR Size:"))) | .id' | head -n 1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing comment (ID: $COMMENT_ID)..."
+            gh api "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -X PATCH -f body="$COMMENT" > /dev/null
+          else
+            echo "Creating new comment..."
+            gh pr comment "$PR_NUMBER" --body "$COMMENT" > /dev/null
+          fi
+
+          echo "🎉 PR size labeling completed successfully."
