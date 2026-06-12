@@ -155,6 +155,56 @@ describe('Hooks Agent Flow', () => {
       expect(afterAgentLog?.hookCall.stdout).toContain('Hello World');
     });
 
+    it('should run AfterAgent from settings defaults with wildcard matcher', async () => {
+      await rig.setup(
+        'should run AfterAgent from settings defaults with wildcard matcher',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-agent-flow.responses',
+          ),
+        },
+      );
+
+      const markerPath = join(rig.testDir!, 'after-agent-triggered.txt');
+      const escapedMarkerPath = JSON.stringify(markerPath);
+      const hookScript = `
+      const fs = require('fs');
+      fs.writeFileSync(${escapedMarkerPath}, 'Triggered!');
+      console.log('AfterAgent default hook fired');
+      `;
+      const scriptPath = rig.createScript(
+        'after_agent_default_wildcard.cjs',
+        hookScript,
+      );
+
+      rig.setup(
+        'should run AfterAgent from settings defaults with wildcard matcher',
+        {
+          settings: {
+            hooks: {
+              AfterAgent: [
+                {
+                  matcher: '*',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: normalizePath(`node "${scriptPath}"`)!,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      await rig.run({ args: 'Hello validation' });
+
+      expect(rig.readFile('after-agent-triggered.txt')).toBe('Triggered!');
+    });
+
     it('should process clearContext in AfterAgent hook output', async () => {
       rig.setup('should process clearContext in AfterAgent hook output', {
         fakeResponsesPath: join(
