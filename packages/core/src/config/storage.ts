@@ -14,7 +14,6 @@ import {
   GOOGLE_ACCOUNTS_FILENAME,
   isSubpath,
   resolveToRealPath,
-  normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -168,10 +167,32 @@ export class Storage {
    * This handles symlinks and platform-specific path normalization.
    */
   isWorkspaceHomeDir(): boolean {
-    return (
-      normalizePath(resolveToRealPath(this.targetDir)) ===
-      normalizePath(resolveToRealPath(homedir()))
-    );
+    const target = resolveToRealPath(this.targetDir);
+    const home = resolveToRealPath(homedir());
+
+    const platform = process.platform;
+    const isWindows = platform === 'win32';
+    const isDarwin = platform === 'darwin';
+    const pathModule = isWindows ? path.win32 : path;
+
+    // Strip Windows long path prefix (\\?\) if present, as it can cause
+    // discrepancies in string comparisons and path.relative.
+    const stripPrefix = (p: string) =>
+      isWindows && p.startsWith('\\\\?\\') ? p.substring(4) : p;
+
+    let t = stripPrefix(target);
+    let h = stripPrefix(home);
+
+    // Use path.relative to robustly check for path equality.
+    // On Windows, path.win32.relative is case-insensitive.
+    // On macOS (Darwin), we manually lowercase to ensure case-insensitive comparison
+    // to match user expectation and sandbox policy.
+    if (isDarwin) {
+      t = t.toLowerCase();
+      h = h.toLowerCase();
+    }
+
+    return pathModule.relative(t, h) === '';
   }
 
   getAgentsDir(): string {
