@@ -56,6 +56,7 @@ const mockGit = {
   getRemotes: vi.fn(),
   fetch: vi.fn(),
   checkout: vi.fn(),
+  submoduleUpdate: vi.fn(),
   listRemote: vi.fn(),
   revparse: vi.fn(),
   // Not a part of the actual API, but we need to use this to do the correct
