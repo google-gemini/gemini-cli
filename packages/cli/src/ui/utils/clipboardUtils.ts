@@ -13,6 +13,8 @@ import {
   spawnAsync,
   escapePath,
   Storage,
+  isSubpath,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 
 /**
@@ -508,22 +510,141 @@ function isValidFilePath(p: string): boolean {
  * @param text The pasted text
  * @returns Processed string with @ prefixes or null if any paths are invalid
  */
-export function parsePastedPaths(text: string): string | null {
+export function parsePastedPaths(
+  text: string,
+  targetDir?: string,
+): string | null {
   // First, check if the entire text is a single valid path
   if (isValidFilePath(text)) {
-    return `@${escapePath(text)} `;
+    let finalPath = text;
+    if (targetDir) {
+      try {
+        const resolvedPath = resolveToRealPath(text);
+        const resolvedTarget = resolveToRealPath(targetDir);
+        if (isSubpath(resolvedTarget, resolvedPath)) {
+          finalPath = path.relative(resolvedTarget, resolvedPath);
+        }
+      } catch {
+        // Silently fallback if resolution fails
+      }
+    }
+    return `@${escapePath(finalPath)} `;
   }
 
   const validPaths = [];
   for (const segment of splitDragAndDropPaths(text)) {
-    if (isValidFilePath(segment)) {
-      validPaths.push(`@${escapePath(segment)}`);
-    } else {
+    if (!isValidFilePath(segment)) {
       return null; // If any segment is invalid, return null for the whole string
     }
+    let finalSegment = segment;
+    if (targetDir) {
+      try {
+        const resolvedPath = resolveToRealPath(segment);
+        const resolvedTarget = resolveToRealPath(targetDir);
+        if (isSubpath(resolvedTarget, resolvedPath)) {
+          finalSegment = path.relative(resolvedTarget, resolvedPath);
+        }
+      } catch {
+        // Silently fallback if resolution fails
+      }
+    }
+    validPaths.push(`@${escapePath(finalSegment)}`);
   }
   if (validPaths.length === 0) {
     return null;
   }
   return validPaths.join(' ') + ' ';
+}
+
+export async function readClipboardText(): Promise<string> {
+  if (process.platform === 'darwin') {
+    try {
+      const { stdout } = await spawnAsync('pbpaste', []);
+      return stdout.trim();
+    } catch {
+      return '';
+    }
+  }
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-Clipboard',
+      ]);
+      return stdout.trim();
+    } catch {
+      return '';
+    }
+  }
+  if (process.platform === 'linux') {
+    try {
+      const tool = getUserLinuxClipboardTool();
+      if (tool === 'wl-paste') {
+        const { stdout } = await spawnAsync('wl-paste', [
+          '--type',
+          'text/plain',
+        ]);
+        return stdout.trim();
+      }
+      if (tool === 'xclip') {
+        const { stdout } = await spawnAsync('xclip', [
+          '-selection',
+          'clipboard',
+          '-o',
+        ]);
+        return stdout.trim();
+      }
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+export async function writeClipboardText(text: string): Promise<boolean> {
+  if (process.platform === 'darwin') {
+    try {
+      const child = spawn('pbcopy', []);
+      child.stdin?.write(text);
+      child.stdin?.end();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (process.platform === 'win32') {
+    try {
+      const child = spawn('powershell', [
+        '-NoProfile',
+        '-Command',
+        '[Console]::InputEncoding = [System.Text.Encoding]::UTF8; $input | Set-Clipboard',
+      ]);
+      child.stdin?.write(text);
+      child.stdin?.end();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (process.platform === 'linux') {
+    try {
+      const tool = getUserLinuxClipboardTool();
+      if (tool === 'wl-paste') {
+        const child = spawn('wl-copy', []);
+        child.stdin?.write(text);
+        child.stdin?.end();
+        return true;
+      }
+      if (tool === 'xclip') {
+        const child = spawn('xclip', ['-selection', 'clipboard']);
+        child.stdin?.write(text);
+        child.stdin?.end();
+        return true;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }

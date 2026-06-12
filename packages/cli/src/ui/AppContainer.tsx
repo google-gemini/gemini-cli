@@ -619,6 +619,7 @@ export const AppContainer = (props: AppContainerProps) => {
     stdin,
     setRawMode,
     escapePastedPaths: true,
+    targetDir: config.getTargetDir(),
     shellModeActive,
     getPreferredEditor,
   });

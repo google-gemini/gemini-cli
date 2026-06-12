@@ -25,6 +25,11 @@ import {
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../../utils/events.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import { Command } from '../../key/keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
@@ -769,6 +774,7 @@ interface UseTextBufferProps {
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
   escapePastedPaths?: boolean;
+  targetDir?: string;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
@@ -2837,6 +2843,7 @@ export function useTextBuffer({
   setRawMode,
   onChange,
   escapePastedPaths = false,
+  targetDir,
   shellModeActive = false,
   inputFilter,
   singleLine = false,
@@ -2958,9 +2965,24 @@ export function useTextBuffer({
         paste &&
         escapePastedPaths
       ) {
-        const processed = parsePastedPaths(ch.trim());
+        const processed = parsePastedPaths(ch.trim(), targetDir);
         if (processed) {
           textToInsert = processed;
+          // Emit transient toast message for dragging/pasting file
+          const files = (processed.match(/@("[^"]+"|[^ ]+)/g) || []).map((f) =>
+            f.slice(1).replace(/^["']|["']$/g, ''),
+          );
+          if (files.length > 0) {
+            const displayNames = files.map((f) => pathMod.basename(f));
+            const message =
+              displayNames.length === 1
+                ? `Added ${displayNames[0]} to prompt context`
+                : `Added ${displayNames.length} files to prompt context`;
+            appEvents.emit(AppEvent.TransientMessage, {
+              message,
+              type: TransientMessageType.Hint,
+            });
+          }
         }
       }
 
@@ -2980,7 +3002,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [shellModeActive, escapePastedPaths],
+    [shellModeActive, escapePastedPaths, targetDir],
   );
 
   const newline = useCallback((): void => {
