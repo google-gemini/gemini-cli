@@ -271,6 +271,23 @@ ${testRootDir}${path.sep}
       expect(structure).toContain('file1.txt');
     });
 
+    it('should ignore files in subdirectories specified in root .gitignore', async () => {
+      await fsPromises.writeFile(
+        path.join(testRootDir, '.gitignore'),
+        'subfolder/ignored.txt',
+      );
+      await createTestFile('subfolder', 'ignored.txt');
+      await createTestFile('subfolder', 'allowed.txt');
+
+      const fileService = new FileDiscoveryService(testRootDir);
+      const structure = await getFolderStructure(testRootDir, {
+        fileService,
+      });
+
+      expect(structure).not.toContain('ignored.txt');
+      expect(structure).toContain('allowed.txt');
+    });
+
     it('should not ignore files if respectGitIgnore is false', async () => {
       await fsPromises.writeFile(
         path.join(testRootDir, '.gitignore'),
