@@ -69,6 +69,34 @@ describe('McpComplianceTransport', () => {
     );
   });
 
+  it('should NOT use JSON arrays as structuredContent', async () => {
+    const mockTransport = createMockTransport();
+    const complianceTransport = new McpComplianceTransport(mockTransport);
+    const onMessage = vi.fn();
+    complianceTransport.onmessage = onMessage;
+
+    const rawResponse: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify([{ summary: 'standup' }]),
+          },
+        ],
+      },
+    };
+
+    mockTransport.onmessage!(rawResponse);
+
+    const fixedResponse = onMessage.mock.calls[0][0];
+    expect(fixedResponse.result.structuredContent).toBeUndefined();
+    expect(fixedResponse.result.content[0].text).toBe(
+      JSON.stringify([{ summary: 'standup' }]),
+    );
+  });
+
   it('should NOT modify already compliant responses', async () => {
     const mockTransport = createMockTransport();
     const complianceTransport = new McpComplianceTransport(mockTransport);
