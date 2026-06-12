@@ -18,6 +18,7 @@ and parameters.
 | `gemini update`                    | Update to latest version           | `gemini update`                                              |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
+| `gemini models`                    | List available models              | `gemini models`                                              |
 
 ### Positional arguments
 
@@ -73,6 +74,18 @@ These commands are available within the interactive REPL.
 
 The `--model` (or `-m`) flag lets you specify which Gemini model to use. You can
 use either model aliases (user-friendly names) or concrete model names.
+
+To see the full list of available models and their capabilities, run:
+
+```bash
+gemini models
+```
+
+For machine-readable output, use:
+
+```bash
+gemini models --output-format json
+```
 
 ### Model aliases
 
