@@ -330,7 +330,15 @@ export class AcpSessionManager {
       mcpServers: mergedMcpServers,
     };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
+    const config = await loadCliConfig(settings, sessionId, this.argv, {
+      cwd,
+      // Pass the LoadedSettings so loadCliConfig uses the consolidated (union
+      // of excluded / intersection of allowed) MCP server lists across all
+      // settings scopes, matching the interactive path. Without this, the ACP
+      // path fell back to the raw merged settings, where a workspace
+      // mcp.excluded could REPLACE (drop) a user-level block.
+      loadedSettings: currentSettings,
+    });
 
     createPolicyUpdater(
       config.getPolicyEngine(),
