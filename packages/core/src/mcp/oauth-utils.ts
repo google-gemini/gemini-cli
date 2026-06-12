@@ -7,6 +7,7 @@
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { fetchWithPrivateIpBlock } from '../utils/fetch.js';
 
 /**
  * Error thrown when the discovered resource metadata does not match the expected resource.
@@ -97,7 +98,7 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
-      const response = await fetch(resourceMetadataUrl);
+      const response = await fetchWithPrivateIpBlock(resourceMetadataUrl);
       if (!response.ok) {
         return null;
       }
@@ -121,7 +122,7 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
-      const response = await fetch(authServerMetadataUrl);
+      const response = await fetchWithPrivateIpBlock(authServerMetadataUrl);
       if (!response.ok) {
         return null;
       }

@@ -10,14 +10,19 @@ import {
   type OAuthAuthorizationServerMetadata,
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
+import { fetchWithPrivateIpBlock } from '../utils/fetch.js';
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.mock('../utils/fetch.js', () => ({
+  fetchWithPrivateIpBlock: vi.fn(),
+}));
 
 describe('OAuthUtils', () => {
+  const mockFetchWithPrivateIpBlock = vi.mocked(
+    fetchWithPrivateIpBlock,
+  ) as unknown as ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetchWithPrivateIpBlock.mockReset();
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -92,7 +97,7 @@ describe('OAuthUtils', () => {
     };
 
     it('should fetch protected resource metadata successfully', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetchWithPrivateIpBlock.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockResourceMetadata),
       });
@@ -105,7 +110,7 @@ describe('OAuthUtils', () => {
     });
 
     it('should return null when fetch fails', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetchWithPrivateIpBlock.mockResolvedValueOnce({
         ok: false,
       });
 
@@ -114,6 +119,30 @@ describe('OAuthUtils', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should return null when protected resource metadata is blocked by the safe fetch helper', async () => {
+      const url = 'http://169.254.169.254/.well-known/oauth-protected-resource';
+      mockFetchWithPrivateIpBlock.mockRejectedValueOnce(
+        new Error('Access to private network is blocked'),
+      );
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(url);
+
+      expect(result).toBeNull();
+      expect(mockFetchWithPrivateIpBlock).toHaveBeenCalledWith(url);
+    });
+
+    it('should return null when protected resource metadata loopback is blocked by the safe fetch helper', async () => {
+      const url = 'http://127.0.0.1/.well-known/oauth-protected-resource';
+      mockFetchWithPrivateIpBlock.mockRejectedValueOnce(
+        new Error('Access to private network is blocked'),
+      );
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(url);
+
+      expect(result).toBeNull();
+      expect(mockFetchWithPrivateIpBlock).toHaveBeenCalledWith(url);
     });
   });
 
@@ -126,7 +155,7 @@ describe('OAuthUtils', () => {
     };
 
     it('should fetch authorization server metadata successfully', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetchWithPrivateIpBlock.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockAuthServerMetadata),
       });
@@ -139,7 +168,7 @@ describe('OAuthUtils', () => {
     });
 
     it('should return null when fetch fails', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetchWithPrivateIpBlock.mockResolvedValueOnce({
         ok: false,
       });
 
@@ -148,6 +177,31 @@ describe('OAuthUtils', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should return null when authorization server metadata is blocked by the safe fetch helper', async () => {
+      const url =
+        'http://169.254.169.254/.well-known/oauth-authorization-server';
+      mockFetchWithPrivateIpBlock.mockRejectedValueOnce(
+        new Error('Access to private network is blocked'),
+      );
+
+      const result = await OAuthUtils.fetchAuthorizationServerMetadata(url);
+
+      expect(result).toBeNull();
+      expect(mockFetchWithPrivateIpBlock).toHaveBeenCalledWith(url);
+    });
+
+    it('should return null when authorization server metadata loopback is blocked by the safe fetch helper', async () => {
+      const url = 'http://localhost/.well-known/oauth-authorization-server';
+      mockFetchWithPrivateIpBlock.mockRejectedValueOnce(
+        new Error('Access to private network is blocked'),
+      );
+
+      const result = await OAuthUtils.fetchAuthorizationServerMetadata(url);
+
+      expect(result).toBeNull();
+      expect(mockFetchWithPrivateIpBlock).toHaveBeenCalledWith(url);
     });
   });
 
@@ -160,7 +214,7 @@ describe('OAuthUtils', () => {
     };
 
     it('should handle URLs without path components correctly', async () => {
-      mockFetch
+      mockFetchWithPrivateIpBlock
         .mockResolvedValueOnce({
           ok: false,
         })
@@ -175,18 +229,18 @@ describe('OAuthUtils', () => {
 
       expect(result).toEqual(mockAuthServerMetadata);
 
-      expect(mockFetch).nthCalledWith(
+      expect(mockFetchWithPrivateIpBlock).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server',
       );
-      expect(mockFetch).nthCalledWith(
+      expect(mockFetchWithPrivateIpBlock).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration',
       );
     });
 
     it('should handle URLs with path components correctly', async () => {
-      mockFetch
+      mockFetchWithPrivateIpBlock
         .mockResolvedValueOnce({
           ok: false,
         })
@@ -204,15 +258,15 @@ describe('OAuthUtils', () => {
 
       expect(result).toEqual(mockAuthServerMetadata);
 
-      expect(mockFetch).nthCalledWith(
+      expect(mockFetchWithPrivateIpBlock).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server/mcp',
       );
-      expect(mockFetch).nthCalledWith(
+      expect(mockFetchWithPrivateIpBlock).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration/mcp',
       );
-      expect(mockFetch).nthCalledWith(
+      expect(mockFetchWithPrivateIpBlock).nthCalledWith(
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
       );
@@ -234,7 +288,7 @@ describe('OAuthUtils', () => {
     };
 
     it('should succeed when resource metadata matches server URL', async () => {
-      mockFetch
+      mockFetchWithPrivateIpBlock
         // fetchProtectedResourceMetadata
         .mockResolvedValueOnce({
           ok: true,
@@ -259,7 +313,7 @@ describe('OAuthUtils', () => {
     });
 
     it('should throw error when resource metadata does not match server URL', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetchWithPrivateIpBlock.mockResolvedValueOnce({
         ok: true,
         json: () =>
           Promise.resolve({
@@ -274,7 +328,7 @@ describe('OAuthUtils', () => {
     });
 
     it('should accept equivalent root resources with and without trailing slash', async () => {
-      mockFetch
+      mockFetchWithPrivateIpBlock
         // fetchProtectedResourceMetadata
         .mockResolvedValueOnce({
           ok: true,
@@ -299,6 +353,37 @@ describe('OAuthUtils', () => {
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
+    });
+
+    it('should return null when attacker-supplied private authorization server metadata is blocked', async () => {
+      mockFetchWithPrivateIpBlock
+        // fetchProtectedResourceMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://attacker.example.com',
+              authorization_servers: ['http://169.254.169.254/'],
+              bearer_methods_supported: ['header'],
+            }),
+        })
+        // discoverAuthorizationServerMetadata for attacker-supplied private URL.
+        .mockRejectedValueOnce(
+          new Error('Access to private network is blocked'),
+        )
+        // Fallback discovery against the original public server URL.
+        .mockResolvedValue({
+          ok: false,
+        });
+
+      const result = await OAuthUtils.discoverOAuthConfig(
+        'https://attacker.example.com',
+      );
+
+      expect(result).toBeNull();
+      expect(mockFetchWithPrivateIpBlock).toHaveBeenCalledWith(
+        'http://169.254.169.254/.well-known/oauth-authorization-server',
+      );
     });
   });
 
@@ -373,7 +458,7 @@ describe('OAuthUtils', () => {
     };
 
     it('should accept equivalent root resources with and without trailing slash', async () => {
-      mockFetch
+      mockFetchWithPrivateIpBlock
         // fetchProtectedResourceMetadata(resource_metadata URL)
         .mockResolvedValueOnce({
           ok: true,

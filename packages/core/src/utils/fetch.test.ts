@@ -8,18 +8,22 @@ import { updateGlobalFetchTimeouts } from './fetch.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import type { LookupFunction } from 'node:net';
 import ipaddr from 'ipaddr.js';
 
-const { setGlobalDispatcher, Agent, EnvHttpProxyAgent } = vi.hoisted(() => ({
-  setGlobalDispatcher: vi.fn(),
-  Agent: vi.fn(),
-  EnvHttpProxyAgent: vi.fn(),
-}));
+const { setGlobalDispatcher, Agent, EnvHttpProxyAgent, undiciFetch } =
+  vi.hoisted(() => ({
+    setGlobalDispatcher: vi.fn(),
+    Agent: vi.fn(),
+    EnvHttpProxyAgent: vi.fn(),
+    undiciFetch: vi.fn(),
+  }));
 
 vi.mock('undici', () => ({
   setGlobalDispatcher,
   Agent,
   EnvHttpProxyAgent,
+  fetch: undiciFetch,
 }));
 
 vi.mock('node:dns/promises', () => ({
@@ -31,6 +35,9 @@ const {
   isPrivateIp,
   isPrivateIpAsync,
   isAddressPrivate,
+  PrivateIpError,
+  createPrivateIpBlockingDispatcher,
+  fetchWithPrivateIpBlock,
   fetchWithTimeout,
   setGlobalProxy,
   createSafeProxyAgent,
@@ -55,6 +62,7 @@ describe('fetch utils', () => {
       }
       return [{ address: '93.184.216.34', family: 4 }];
     });
+    vi.mocked(undiciFetch).mockReset();
     vi.unstubAllEnvs();
     updateGlobalFetchTimeouts(60000);
   });
@@ -93,6 +101,13 @@ describe('fetch utils', () => {
       expect(isAddressPrivate('fd00::')).toBe(true);
       expect(isAddressPrivate('fe80::')).toBe(true);
       expect(isAddressPrivate('febf::')).toBe(true);
+    });
+
+    it('should identify IPv6 addresses with zone identifiers as private', () => {
+      expect(isAddressPrivate('fe80::1%25eth0')).toBe(true);
+      expect(isAddressPrivate('fe80::1%eth0')).toBe(true);
+      expect(isAddressPrivate('[fe80::1%25eth0]')).toBe(true);
+      expect(isAddressPrivate('[::1%25lo]')).toBe(true);
     });
 
     it('should identify special local addresses', () => {
@@ -172,6 +187,111 @@ describe('fetch utils', () => {
 
     it('should return false for invalid URLs instead of throwing verification error', async () => {
       expect(await isPrivateIpAsync('not-a-url')).toBe(false);
+    });
+  });
+
+  describe('createPrivateIpBlockingDispatcher', () => {
+    type AgentOptionsWithLookup = {
+      connect?: {
+        lookup?: LookupFunction;
+      };
+    };
+
+    function getLastLookup(): LookupFunction {
+      createPrivateIpBlockingDispatcher();
+      const agentOptions = vi.mocked(Agent).mock.calls.at(-1)?.[0] as
+        | AgentOptionsWithLookup
+        | undefined;
+      const safeLookup = agentOptions?.connect?.lookup;
+      expect(safeLookup).toBeDefined();
+      return safeLookup!;
+    }
+
+    function runLookup(
+      safeLookup: LookupFunction,
+      hostname: string,
+    ): Promise<{
+      error: NodeJS.ErrnoException | null;
+      address: string | LookupAddress[];
+      family?: number;
+    }> {
+      return new Promise((resolve) => {
+        safeLookup(hostname, {}, (error, address, family) => {
+          resolve({ error, address, family });
+        });
+      });
+    }
+
+    it('should return public lookup results to undici', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValueOnce({
+        address: '8.8.8.8',
+        family: 4,
+      } as never);
+
+      const result = await runLookup(getLastLookup(), 'example.com');
+
+      expect(result.error).toBeNull();
+      expect(result.address).toBe('8.8.8.8');
+      expect(result.family).toBe(4);
+    });
+
+    it('should block DNS results that resolve to private or link-local IPs', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValueOnce({
+        address: '169.254.169.254',
+        family: 4,
+      } as never);
+
+      const result = await runLookup(getLastLookup(), 'attacker.example.com');
+
+      expect(result.error).toBeInstanceOf(PrivateIpError);
+      expect(result.error?.message).toContain('169.254.169.254');
+      expect(result.address).toBe('');
+      expect(result.family).toBe(0);
+    });
+  });
+
+  describe('fetchWithPrivateIpBlock', () => {
+    it('should call undici fetch with a private-IP blocking dispatcher', async () => {
+      const dispatcher = { dispatch: vi.fn() };
+      vi.mocked(Agent).mockReturnValueOnce(dispatcher as never);
+      const response = new Response('{}');
+      vi.mocked(undiciFetch).mockResolvedValueOnce(response);
+
+      const result = await fetchWithPrivateIpBlock('https://example.com/');
+
+      expect(result).toBe(response);
+      expect(undiciFetch).toHaveBeenCalledWith(
+        'https://example.com/',
+        expect.objectContaining({
+          dispatcher,
+          redirect: 'manual',
+        }),
+      );
+    });
+
+    it('should block loopback and private IP literals before calling undici fetch', async () => {
+      await expect(
+        fetchWithPrivateIpBlock('http://127.0.0.1/'),
+      ).rejects.toThrow(PrivateIpError);
+      await expect(
+        fetchWithPrivateIpBlock('http://169.254.169.254/'),
+      ).rejects.toThrow(PrivateIpError);
+
+      expect(undiciFetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject IPv6 zone identifier URL forms before calling undici fetch', async () => {
+      await expect(
+        fetchWithPrivateIpBlock('http://[fe80::1%25eth0]/'),
+      ).rejects.toThrow(TypeError);
+      await expect(
+        fetchWithPrivateIpBlock('http://[fe80::1%eth0]/'),
+      ).rejects.toThrow(TypeError);
+      await expect(
+        fetchWithPrivateIpBlock('http://[::1%25lo]/'),
+      ).rejects.toThrow(TypeError);
+
+      expect(undiciFetch).not.toHaveBeenCalled();
     });
   });
 

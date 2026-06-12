@@ -6,9 +6,16 @@
 
 import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  Agent,
+  EnvHttpProxyAgent,
+  fetch as undiciFetch,
+  setGlobalDispatcher,
+} from 'undici';
+import type { Dispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
+import type { LookupFunction } from 'node:net';
 
 export class FetchError extends Error {
   constructor(
@@ -31,6 +38,7 @@ export class PrivateIpError extends Error {
 let defaultHeadersTimeout = 60000; // 60 seconds
 const defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
+let privateIpBlockingDispatcher: Dispatcher | undefined = undefined;
 
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
@@ -47,6 +55,7 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
     );
   }
   defaultHeadersTimeout = timeoutMs;
+  privateIpBlockingDispatcher = undefined;
   // We keep body timeout high for LLM streaming responses
   if (currentProxy) {
     setGlobalProxy(currentProxy);
@@ -166,6 +175,104 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
       cause: error,
     });
   }
+}
+
+const privateIpBlockingLookup: LookupFunction = (
+  hostname,
+  options,
+  callback,
+) => {
+  void lookup(hostname, options)
+    .then((result) => {
+      const addresses = Array.isArray(result) ? result : [result];
+      const blockedAddress = addresses.find((addr) =>
+        isAddressPrivate(addr.address),
+      );
+
+      if (blockedAddress) {
+        callback(
+          new PrivateIpError(
+            `Access to private network is blocked: ${hostname} resolved to ${blockedAddress.address}`,
+          ),
+          '',
+          0,
+        );
+        return;
+      }
+
+      if (Array.isArray(result)) {
+        callback(null, result);
+        return;
+      }
+
+      callback(null, result.address, result.family);
+    })
+    .catch((error: unknown) => {
+      callback(
+        error instanceof Error ? error : new Error(String(error)),
+        '',
+        0,
+      );
+    });
+};
+
+export function createPrivateIpBlockingDispatcher(): Dispatcher {
+  return new Agent({
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
+    connect: {
+      lookup: privateIpBlockingLookup,
+    },
+  });
+}
+
+function getPrivateIpBlockingDispatcher(): Dispatcher {
+  privateIpBlockingDispatcher ??= createPrivateIpBlockingDispatcher();
+  return privateIpBlockingDispatcher;
+}
+
+function getLoopbackOrPrivateIp(url: string): string | undefined {
+  const hostname = new URL(url).hostname;
+  if (isLoopbackHost(hostname) || isAddressPrivate(hostname)) {
+    return hostname;
+  }
+  return undefined;
+}
+
+export async function fetchWithPrivateIpBlock(
+  url: string,
+  options?: RequestInit,
+): Promise<Response> {
+  const blockedHost = getLoopbackOrPrivateIp(url);
+  if (blockedHost) {
+    throw new PrivateIpError(
+      `Access to private network is blocked: ${blockedHost}`,
+    );
+  }
+
+  if (currentProxy) {
+    if (await isPrivateIpAsync(url)) {
+      throw new PrivateIpError('Access to private network is blocked');
+    }
+    return fetch(url, {
+      ...options,
+      redirect: 'manual',
+    });
+  }
+
+  const fetchOptions: RequestInit & { dispatcher: Dispatcher } = {
+    ...options,
+    redirect: 'manual',
+    dispatcher: getPrivateIpBlockingDispatcher(),
+  };
+
+  const response = await undiciFetch(
+    url,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    fetchOptions as unknown as import('undici').RequestInit,
+  );
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return response as unknown as Response;
 }
 
 /**
