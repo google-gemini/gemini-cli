@@ -54,7 +54,7 @@ export const TodoTray: React.FC = () => {
 
   return (
     <Checklist
-      title="Todo"
+      title="Tasks"
       items={checklistItems}
       isExpanded={uiState.showFullTodos}
       toggleHint={`${formatCommand(Command.SHOW_FULL_TODOS)} to toggle`}
