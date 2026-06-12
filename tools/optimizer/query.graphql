@@ -1,0 +1,15 @@
+query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(last: 100, states: MERGED) {
+      nodes {
+        number
+        reviews(first: 20) {
+          nodes {
+            authorAssociation
+            author { login, ... on User { name } }
+          }
+        }
+      }
+    }
+  }
+}

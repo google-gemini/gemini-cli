@@ -1,0 +1,54 @@
+name: Optimizer1000 Nightly
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      investigate:
+        type: boolean
+        description: 'Investigate metrics'
+        default: false
+      update_processes:
+        type: boolean
+        description: 'Update processes based on learnings'
+        default: false
+      commit:
+        type: boolean
+        description: 'Run processes and commit'
+        default: false
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Build optimizer
+        run: |
+          cd tools/optimizer
+          npm install
+      - name: Run Optimizer1000
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx tsx tools/optimizer/index.ts \
+            ${{ github.event.inputs.investigate == 'true' && '--investigate' || '' }} \
+            ${{ github.event.inputs.update_processes == 'true' && '--update-processes' || '' }} \
+            ${{ github.event.inputs.commit == 'true' && '--commit' || '' }}
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimizer-results
+          path: "*.csv"
