@@ -9,6 +9,8 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 
 describe('detectOmissionPlaceholders', () => {
   it('detects standalone placeholder lines', () => {
+    expect(detectOmissionPlaceholders('...')).toEqual([' ...']);
+    expect(detectOmissionPlaceholders('// ...')).toEqual([' ...']);
     expect(detectOmissionPlaceholders('(rest of methods ...)')).toEqual([
       'rest of methods ...',
     ]);
