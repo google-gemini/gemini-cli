@@ -721,6 +721,89 @@ describe('DiscoveredMCPTool', () => {
       );
     });
 
+    it('should correct the MIME type of a mismatched image content block', async () => {
+      const params = { param: 'imageMismatch' };
+      const webpData = Buffer.from([
+        0x52, 0x49, 0x46, 0x46,
+        0x00, 0x00, 0x00, 0x00,
+        0x57, 0x45, 0x42, 0x50,
+        0x00, 0x00,
+      ]).toString('base64');
+
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'image',
+              data: webpData,
+              mimeType: 'image/png',
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: webpData,
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Image: image/webp]');
+    });
+
+    it('should correct the MIME type of a mismatched resource block blob', async () => {
+      const params = { param: 'resourceMismatch' };
+      const webpData = Buffer.from([
+        0x52, 0x49, 0x46, 0x46,
+        0x00, 0x00, 0x00, 0x00,
+        0x57, 0x45, 0x42, 0x50,
+        0x00, 0x00,
+      ]).toString('base64');
+
+      mockCallTool.mockResolvedValue(
+        createSdkResponse(serverToolName, {
+          content: [
+            {
+              type: 'resource',
+              resource: {
+                uri: 'file:///path/to/image.png',
+                blob: webpData,
+                mimeType: 'image/png',
+              },
+            },
+          ],
+        }),
+      );
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: image/webp]`,
+        },
+        {
+          inlineData: {
+            mimeType: 'image/webp',
+            data: webpData,
+          },
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe('[Embedded Resource: image/webp]');
+    });
+
     describe('AbortSignal support', () => {
       const MOCK_TOOL_DELAY = 1000;
       const ABORT_DELAY = 50;
