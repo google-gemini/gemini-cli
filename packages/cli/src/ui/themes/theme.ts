@@ -608,7 +608,7 @@ export function createCustomTheme(
       },
     },
     border: {
-      default: customTheme.DarkGray ?? explicitBorderDefault ?? colors.DarkGray,
+      default: explicitBorderDefault ?? customTheme.DarkGray ?? colors.DarkGray,
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,
