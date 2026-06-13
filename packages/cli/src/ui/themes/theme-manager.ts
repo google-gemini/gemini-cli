@@ -52,6 +52,25 @@ export interface ThemeDisplay {
 
 export const DEFAULT_THEME: Theme = DefaultDark;
 
+function hasUserSpecifiedBorderColor(customThemeConfig: CustomTheme): boolean {
+  return (
+    customThemeConfig.border?.default !== undefined ||
+    customThemeConfig.DarkGray !== undefined
+  );
+}
+
+function buildCustomThemeConfig(
+  customThemeConfig: CustomTheme,
+  name: string,
+): CustomTheme {
+  return {
+    ...DEFAULT_THEME.colors,
+    ...customThemeConfig,
+    name,
+    type: 'custom',
+  };
+}
+
 class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
@@ -140,15 +159,16 @@ class ThemeManager {
         if (validation.warning) {
           debugLogger.warn(`Theme "${name}": ${validation.warning}`);
         }
-        const themeWithDefaults: CustomTheme = {
-          ...DEFAULT_THEME.colors,
-          ...customThemeConfig,
-          name: customThemeConfig.name || name,
-          type: 'custom',
-        };
+        const themeWithDefaults = buildCustomThemeConfig(
+          customThemeConfig,
+          customThemeConfig.name || name,
+        );
 
         try {
-          const theme = createCustomTheme(themeWithDefaults);
+          const theme = createCustomTheme(themeWithDefaults, {
+            hasExplicitBorderColor:
+              hasUserSpecifiedBorderColor(customThemeConfig),
+          });
           this.settingsThemes.set(name, theme);
         } catch (error) {
           debugLogger.warn(`Failed to load custom theme "${name}":`, error);
@@ -196,15 +216,16 @@ class ThemeManager {
         if (validation.warning) {
           debugLogger.warn(`Theme "${namespacedName}": ${validation.warning}`);
         }
-        const themeWithDefaults: CustomTheme = {
-          ...DEFAULT_THEME.colors,
-          ...customThemeConfig,
-          name: namespacedName,
-          type: 'custom',
-        };
+        const themeWithDefaults = buildCustomThemeConfig(
+          customThemeConfig,
+          namespacedName,
+        );
 
         try {
-          const theme = createCustomTheme(themeWithDefaults);
+          const theme = createCustomTheme(themeWithDefaults, {
+            hasExplicitBorderColor:
+              hasUserSpecifiedBorderColor(customThemeConfig),
+          });
           this.extensionThemes.set(namespacedName, theme);
         } catch (error) {
           debugLogger.warn(
@@ -365,11 +386,13 @@ class ThemeManager {
       this.cachedColors = {
         ...colors,
         Background: this.terminalBackground,
-        DarkGray: interpolateColor(
-          this.terminalBackground,
-          colors.Gray,
-          DEFAULT_BORDER_OPACITY,
-        ),
+        DarkGray: activeTheme.hasExplicitBorderColor
+          ? colors.DarkGray
+          : interpolateColor(
+              this.terminalBackground,
+              colors.Gray,
+              DEFAULT_BORDER_OPACITY,
+            ),
         InputBackground: interpolateColor(
           this.terminalBackground,
           colors.Gray,
@@ -598,14 +621,14 @@ class ThemeManager {
       }
 
       // 4. Create and cache the theme.
-      const themeWithDefaults: CustomTheme = {
-        ...DEFAULT_THEME.colors,
-        ...customThemeConfig,
-        name: customThemeConfig.name || canonicalPath,
-        type: 'custom',
-      };
+      const themeWithDefaults = buildCustomThemeConfig(
+        customThemeConfig,
+        customThemeConfig.name || canonicalPath,
+      );
 
-      const theme = createCustomTheme(themeWithDefaults);
+      const theme = createCustomTheme(themeWithDefaults, {
+        hasExplicitBorderColor: hasUserSpecifiedBorderColor(customThemeConfig),
+      });
       this.fileThemes.set(canonicalPath, theme); // Cache by canonical path
       return theme;
     } catch (error) {

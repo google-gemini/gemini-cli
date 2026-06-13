@@ -331,6 +331,24 @@ describe('ThemeManager', () => {
       expect(semanticColors.background.primary).toBe(darkTerminalBg);
     });
 
+    it('should preserve explicit custom border colors when terminal background is set', () => {
+      themeManager.loadCustomThemes({
+        ZedClean: {
+          name: 'ZedClean',
+          type: 'custom',
+          background: { primary: '#282c34' },
+          border: { default: '#282c34' },
+          text: { primary: '#abb2bf', secondary: '#5c6370' },
+        },
+      });
+      themeManager.setActiveTheme('ZedClean');
+      themeManager.setTerminalBackground('#282c34');
+
+      const semanticColors = themeManager.getSemanticColors();
+      expect(semanticColors.border.default).toBe('#282c34');
+      expect(themeManager.getColors().DarkGray).toBe('#282c34');
+    });
+
     it('should NOT override background for custom theme when incompatible', () => {
       themeManager.loadCustomThemes({
         MyLight: {

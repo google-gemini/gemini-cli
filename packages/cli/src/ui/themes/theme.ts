@@ -272,6 +272,7 @@ export class Theme {
     rawMappings: Record<string, CSSProperties>,
     readonly colors: ColorsTheme,
     semanticColors?: SemanticColors,
+    readonly hasExplicitBorderColor: boolean = false,
   ) {
     this.semanticColors = semanticColors ?? {
       text: {
@@ -391,7 +392,18 @@ export class Theme {
  * @param customTheme The custom theme configuration.
  * @returns A new Theme instance.
  */
-export function createCustomTheme(customTheme: CustomTheme): Theme {
+export function createCustomTheme(
+  customTheme: CustomTheme,
+  options?: { hasExplicitBorderColor?: boolean },
+): Theme {
+  const explicitBorderDefault = customTheme.border?.default
+    ? (resolveColor(customTheme.border.default) ?? customTheme.border.default)
+    : undefined;
+  const hasExplicitBorderColor =
+    options?.hasExplicitBorderColor ??
+    (customTheme.border?.default !== undefined ||
+      customTheme.DarkGray !== undefined);
+
   const colors: ColorsTheme = {
     type: 'custom',
     Background: customTheme.background?.primary ?? customTheme.Background ?? '',
@@ -410,6 +422,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
     DarkGray:
+      explicitBorderDefault ??
       customTheme.DarkGray ??
       interpolateColor(
         customTheme.background?.primary ?? customTheme.Background ?? '',
@@ -595,7 +608,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       },
     },
     border: {
-      default: colors.DarkGray,
+      default: customTheme.DarkGray ?? explicitBorderDefault ?? colors.DarkGray,
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,
@@ -618,6 +631,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     rawMappings,
     colors,
     semanticColors,
+    hasExplicitBorderColor,
   );
 }
 

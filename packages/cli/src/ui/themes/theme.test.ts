@@ -84,6 +84,26 @@ describe('createCustomTheme', () => {
     // Interpolate between #000000 and #cccccc -> #525252
     expect(theme.colors.DarkGray).toBe('#525252');
   });
+
+  it('should use border.default when DarkGray is not provided', () => {
+    const theme = createCustomTheme({
+      ...baseTheme,
+      border: {
+        default: '#282c34',
+      },
+    });
+    expect(theme.colors.DarkGray).toBe('#282c34');
+    expect(theme.semanticColors.border.default).toBe('#282c34');
+    expect(theme.hasExplicitBorderColor).toBe(true);
+  });
+
+  it('should mark hasExplicitBorderColor when DarkGray is provided', () => {
+    const theme = createCustomTheme({
+      ...baseTheme,
+      DarkGray: '#123456',
+    });
+    expect(theme.hasExplicitBorderColor).toBe(true);
+  });
 });
 
 describe('validateCustomTheme', () => {
