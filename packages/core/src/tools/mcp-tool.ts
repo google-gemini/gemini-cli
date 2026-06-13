@@ -24,6 +24,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { McpContext } from './mcp-client.js';
 
 import { wrapUntrusted } from '../utils/textUtils.js';
+import { normalizeToolSchema } from '../utils/schemaValidator.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
@@ -393,7 +394,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
-      parameterSchema,
+      normalizeToolSchema(parameterSchema),
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput,

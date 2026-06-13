@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SchemaValidator } from './schemaValidator.js';
+import { SchemaValidator, normalizeToolSchema } from './schemaValidator.js';
 
 describe('SchemaValidator', () => {
   it('should allow any params if schema is undefined', () => {
@@ -209,6 +209,53 @@ describe('SchemaValidator', () => {
       expect(
         SchemaValidator.validate(schema, { role: 'InvalidRole' }),
       ).not.toBeNull();
+    });
+  });
+});
+
+describe('normalizeToolSchema', () => {
+  it('returns empty object schema for nullish and non-object inputs', () => {
+    expect(normalizeToolSchema(undefined)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema(null)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema('string')).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema([])).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('preserves valid object schemas', () => {
+    const schema = {
+      type: 'object',
+      properties: { foo: { type: 'string' } },
+    };
+    expect(normalizeToolSchema(schema)).toBe(schema);
+  });
+
+  it('injects type object when missing', () => {
+    expect(
+      normalizeToolSchema({
+        properties: { foo: { type: 'string' } },
+      }),
+    ).toEqual({
+      type: 'object',
+      properties: { foo: { type: 'string' } },
+    });
+  });
+
+  it('wraps non-object root types', () => {
+    expect(normalizeToolSchema({ type: 'string' })).toEqual({
+      type: 'object',
+      properties: {},
     });
   });
 });
