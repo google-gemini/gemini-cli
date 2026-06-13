@@ -140,6 +140,11 @@ describe('activate', () => {
   });
 
   it('should push every activation disposable into context.subscriptions', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      statusText: 'Not Found',
+    } as Response);
+
     const pushedDisposables: vscode.Disposable[] = [];
     const trackDisposable = <T extends vscode.Disposable>(disposable: T): T => {
       pushedDisposables.push(disposable);
