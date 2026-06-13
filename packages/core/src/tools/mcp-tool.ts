@@ -24,6 +24,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { McpContext } from './mcp-client.js';
 
 import { wrapUntrusted } from '../utils/textUtils.js';
+import { validateAndCorrectMimeType } from '../utils/imageMimeDetection.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
@@ -457,15 +458,19 @@ function transformImageAudioBlock(
   block: McpMediaBlock,
   toolName: string,
 ): Part[] {
+  const correctedMimeType =
+    block.type === 'image'
+      ? validateAndCorrectMimeType(block.mimeType, block.data)
+      : block.mimeType;
   return [
     {
       text: `[Tool '${toolName}' provided the following ${
         block.type
-      } data with mime-type: ${block.mimeType}]`,
+      } data with mime-type: ${correctedMimeType}]`,
     },
     {
       inlineData: {
-        mimeType: block.mimeType,
+        mimeType: correctedMimeType,
         data: block.data,
       },
     },
@@ -481,14 +486,18 @@ function transformResourceBlock(
     return { text: wrapUntrusted(resource.text) };
   }
   if (resource?.blob) {
-    const mimeType = resource.mimeType || 'application/octet-stream';
+    const declaredMimeType = resource.mimeType || 'application/octet-stream';
+    const correctedMimeType = validateAndCorrectMimeType(
+      declaredMimeType,
+      resource.blob,
+    );
     return [
       {
-        text: `[Tool '${toolName}' provided the following embedded resource with mime-type: ${mimeType}]`,
+        text: `[Tool '${toolName}' provided the following embedded resource with mime-type: ${correctedMimeType}]`,
       },
       {
         inlineData: {
-          mimeType,
+          mimeType: correctedMimeType,
           data: resource.blob,
         },
       },
@@ -562,19 +571,27 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
     switch (block.type) {
       case 'text':
         return block.text;
-      case 'image':
-        return `[Image: ${block.mimeType}]`;
+      case 'image': {
+        const correctedMimeType = validateAndCorrectMimeType(
+          block.mimeType,
+          block.data,
+        );
+        return `[Image: ${correctedMimeType}]`;
+      }
       case 'audio':
         return `[Audio: ${block.mimeType}]`;
       case 'resource_link':
         return `[Link to ${block.title || block.name}: ${block.uri}]`;
-      case 'resource':
+      case 'resource': {
         if (block.resource?.text) {
           return block.resource.text;
         }
-        return `[Embedded Resource: ${
-          block.resource?.mimeType || 'unknown type'
-        }]`;
+        const declaredMimeType = block.resource?.mimeType || 'unknown type';
+        const correctedMimeType = block.resource?.blob
+          ? validateAndCorrectMimeType(declaredMimeType, block.resource.blob)
+          : declaredMimeType;
+        return `[Embedded Resource: ${correctedMimeType}]`;
+      }
       default:
         return `[Unknown content type: ${(block as { type: string }).type}]`;
     }
