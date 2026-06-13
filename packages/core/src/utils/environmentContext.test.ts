@@ -36,6 +36,11 @@ describe('getDirectoryContextString', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      getFileFilteringOptions: vi.fn().mockReturnValue({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
+      }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
       } as unknown as Storage,
@@ -88,6 +93,11 @@ describe('getEnvironmentContext', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      getFileFilteringOptions: vi.fn().mockReturnValue({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
+      }),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       getEnvironmentMemory: vi.fn().mockReturnValue('Mock Environment Memory'),
       getSessionMemory: vi.fn().mockReturnValue('Mock Session Memory'),
@@ -121,6 +131,11 @@ describe('getEnvironmentContext', () => {
     expect(context).toContain('</session_context>');
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
       fileService: undefined,
+      fileFilteringOptions: {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
+      },
     });
   });
 
