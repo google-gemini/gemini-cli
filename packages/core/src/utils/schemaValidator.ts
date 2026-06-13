@@ -133,3 +133,28 @@ export class SchemaValidator {
     }
   }
 }
+
+/**
+ * Ensures tool parameter schemas sent to providers always declare a root
+ * `type: "object"`, which strict JSON Schema validators require.
+ */
+export function normalizeToolSchema(schema: unknown): Record<string, unknown> {
+  if (schema == null) {
+    return { type: 'object', properties: {} };
+  }
+
+  if (typeof schema !== 'object' || Array.isArray(schema)) {
+    return { type: 'object', properties: {} };
+  }
+
+  const objectSchema: Record<string, unknown> = { ...schema };
+  if (objectSchema['type'] === 'object') {
+    return objectSchema;
+  }
+
+  if (objectSchema['type'] === undefined) {
+    return { ...objectSchema, type: 'object' };
+  }
+
+  return { type: 'object', properties: {} };
+}

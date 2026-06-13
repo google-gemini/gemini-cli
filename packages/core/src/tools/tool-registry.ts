@@ -24,6 +24,7 @@ import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { normalizeToolSchema } from '../utils/schemaValidator.js';
 import { coreEvents } from '../utils/events.js';
 import {
   DISCOVERED_TOOL_PREFIX,
@@ -497,20 +498,20 @@ export class ToolRegistry {
             debugLogger.warn('Discovered a tool with no name. Skipping.');
             continue;
           }
-          const parameters =
+          const parameters = normalizeToolSchema(
             func.parametersJsonSchema &&
-            typeof func.parametersJsonSchema === 'object' &&
-            !Array.isArray(func.parametersJsonSchema)
+              typeof func.parametersJsonSchema === 'object' &&
+              !Array.isArray(func.parametersJsonSchema)
               ? func.parametersJsonSchema
-              : {};
+              : {},
+          );
           this.registerTool(
             new DiscoveredTool(
               this.config,
               func.name,
               DISCOVERED_TOOL_PREFIX + func.name,
               func.description ?? '',
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              parameters as Record<string, unknown>,
+              parameters,
               this.messageBus,
             ),
           );
