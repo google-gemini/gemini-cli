@@ -310,6 +310,40 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('appendRecord file recovery', () => {
+    it('rewrites metadata when the session file was deleted mid-session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'first',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      expect(fs.existsSync(sessionFile)).toBe(true);
+
+      // Simulate session cleanup (or a manual delete) removing the file while
+      // the recorder is still alive.
+      fs.unlinkSync(sessionFile);
+      expect(fs.existsSync(sessionFile)).toBe(false);
+
+      // Recording another message recreates the file.
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'second',
+        model: 'm',
+      });
+
+      // Before the fix the recreated file held only message records and no
+      // metadata line, so loadConversationRecord returned null. It should now
+      // be recoverable as a valid session.
+      const conversation = await loadConversationRecord(sessionFile);
+      expect(conversation).not.toBeNull();
+      expect(conversation?.sessionId).toBe('test-session-id');
+      expect(conversation?.messages.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('recordMessage', () => {
     beforeEach(async () => {
       await chatRecordingService.initialize();
