@@ -144,14 +144,12 @@ export async function setupUser(
     if (/^\d+$/.test(projectId)) {
       throw new InvalidNumericProjectIdError(projectId);
     }
-    // GCP project ID format rules:
-    // - Standard project IDs are 6 to 30 characters, starting with a lowercase letter,
-    //   ending with a lowercase letter or number, containing only lowercase letters, numbers, and hyphens.
-    // - Domain-scoped project IDs can contain domain prefix with dots and colons (e.g. "example.com:project-id")
-    //   and can be up to 100 characters.
-    // - No uppercase letters, spaces, or other special characters are allowed.
-    const validProjectIdRegex = /^[a-z0-9][a-z0-9\-.:]{4,98}[a-z0-9]$/;
-    if (!validProjectIdRegex.test(projectId)) {
+    const isDomainScoped = projectId.includes(':');
+    const isValid = isDomainScoped
+      ? projectId.length <= 100 &&
+        /^[a-z0-9\-.]+:[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)
+      : /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId);
+    if (!isValid) {
       throw new InvalidProjectIdFormatError(projectId);
     }
   }

@@ -266,6 +266,18 @@ describe('setupUser', () => {
       await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
         InvalidProjectIdFormatError,
       );
+
+      // Test standard project ID starting with a number
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '1-project');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+
+      // Test standard project ID exceeding 30 characters
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'a'.repeat(31));
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
     });
 
     it('should allow valid project ID formats', async () => {
