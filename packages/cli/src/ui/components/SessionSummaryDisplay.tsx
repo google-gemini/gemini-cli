@@ -45,10 +45,13 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
     ? 'This session was not saved and cannot be resumed.'
     : `To resume this session: gemini --resume ${footerSessionId}`;
 
-  if (worktreeSettings && !sessionNotSaved) {
-    footer =
-      `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n` +
-      `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+  if (worktreeSettings) {
+    // The worktree exists on disk regardless of whether the session was saved,
+    // so always show how to remove it — but only offer to resume when saved.
+    const removeManually = `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+    footer = sessionNotSaved
+      ? `${footer}\n${removeManually}`
+      : `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n${removeManually}`;
   }
 
   return (

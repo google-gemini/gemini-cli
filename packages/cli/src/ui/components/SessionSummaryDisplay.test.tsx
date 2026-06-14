@@ -261,5 +261,46 @@ describe('<SessionSummaryDisplay />', () => {
       expect(output).toContain('was not saved');
       unmount();
     });
+
+    it('still shows how to remove the worktree when the session was not saved', async () => {
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          metrics: emptyMetrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      } as unknown as ReturnType<typeof SessionContext.useSessionStats>);
+
+      vi.mocked(useConfig).mockReturnValue({
+        getWorktreeSettings: () => ({
+          name: 'foo-bar',
+          path: '/path/to/foo-bar',
+          baseSha: 'base-sha',
+        }),
+        getGeminiClient: () => ({
+          getChatRecordingService: () => ({
+            getConversationFilePath: () => null,
+          }),
+        }),
+      } as never);
+
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+        <SessionSummaryDisplay duration="1h 23m 45s" />,
+        { width: 100 },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      // The worktree exists on disk even though the session wasn't saved, so
+      // the removal instruction must still be shown — but not a resume command.
+      expect(output).not.toContain('gemini --resume');
+      expect(output).toContain('was not saved');
+      expect(output).toContain('git worktree remove /path/to/foo-bar');
+      unmount();
+    });
   });
 });
