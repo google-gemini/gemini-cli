@@ -53,6 +53,7 @@ describe('WebSearchTool', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -149,6 +150,36 @@ describe('WebSearchTool', () => {
       expect(result.llmContent).toContain('Error:');
       expect(result.llmContent).toContain('API Failure');
       expect(result.returnDisplay).toBe('Error performing web search.');
+    });
+
+    it('should abort slow web searches after the tool timeout', async () => {
+      vi.useFakeTimers();
+      const params: WebSearchToolParams = { query: 'slow query' };
+      let receivedSignal: AbortSignal | undefined;
+
+      (mockGeminiClient.generateContent as Mock).mockImplementation(
+        (_modelConfig, _contents, signal: AbortSignal): Promise<never> => {
+          receivedSignal = signal;
+          return new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              const error = new Error('aborted');
+              error.name = 'AbortError';
+              reject(error);
+            });
+          });
+        },
+      );
+
+      const invocation = tool.build(params);
+      const resultPromise = invocation.execute({ abortSignal });
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      const result = await resultPromise;
+
+      expect(receivedSignal?.aborted).toBe(true);
+      expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
+      expect(result.llmContent).toContain('Web search timed out');
+      expect(result.returnDisplay).toBe('Search timed out.');
     });
 
     it('should correctly format results with sources and citations', async () => {

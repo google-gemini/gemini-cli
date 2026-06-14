@@ -25,6 +25,8 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
+const WEB_SEARCH_TIMEOUT_MS = 2 * 60 * 1000;
+
 interface GroundingChunkWeb {
   uri?: string;
   title?: string;
@@ -67,6 +69,40 @@ export interface WebSearchToolResult extends ToolResult {
     : GroundingChunkItem[];
 }
 
+function createTimedSignal(signal: AbortSignal): {
+  signal: AbortSignal;
+  didTimeout: () => boolean;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  let didTimeout = false;
+
+  const abortFromParent = () => {
+    controller.abort(signal.reason);
+  };
+
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort(
+      new Error(`Web search timed out after ${WEB_SEARCH_TIMEOUT_MS / 1000}s`),
+    );
+  }, WEB_SEARCH_TIMEOUT_MS);
+
+  signal.addEventListener('abort', abortFromParent, { once: true });
+  if (signal.aborted) {
+    abortFromParent();
+  }
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => didTimeout,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', abortFromParent);
+    },
+  };
+}
+
 class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolParams,
   WebSearchToolResult
@@ -89,12 +125,13 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     abortSignal: signal,
   }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
+    const timedSignal = createTimedSignal(signal);
 
     try {
       const response = await geminiClient.generateContent(
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        signal,
+        timedSignal.signal,
         LlmRole.UTILITY_TOOL,
       );
 
@@ -178,6 +215,20 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
+      if (timedSignal.didTimeout()) {
+        const errorMessage = `Web search timed out after ${
+          WEB_SEARCH_TIMEOUT_MS / 1000
+        }s for query "${this.params.query}"`;
+        debugLogger.warn(errorMessage, error);
+        return {
+          llmContent: `Error: ${errorMessage}`,
+          returnDisplay: 'Search timed out.',
+          error: {
+            message: errorMessage,
+            type: ToolErrorType.WEB_SEARCH_FAILED,
+          },
+        };
+      }
       if (isAbortError(error)) {
         return {
           llmContent: 'Web search was cancelled.',
@@ -196,6 +247,8 @@ class WebSearchToolInvocation extends BaseToolInvocation<
           type: ToolErrorType.WEB_SEARCH_FAILED,
         },
       };
+    } finally {
+      timedSignal.cleanup();
     }
   }
 }
