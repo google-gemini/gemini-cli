@@ -66,6 +66,11 @@ const renderWithMockedStats = async (
 
   vi.mocked(useConfig).mockReturnValue({
     getWorktreeSettings: () => worktreeSettings,
+    getGeminiClient: () => ({
+      getChatRecordingService: () => ({
+        getConversationFilePath: () => '/tmp/session.jsonl',
+      }),
+    }),
   } as never);
 
   const result = await renderWithProviders(
@@ -217,6 +222,43 @@ describe('<SessionSummaryDisplay />', () => {
       expect(output).toContain(
         'To remove manually: git worktree remove /path/to/foo-bar',
       );
+      unmount();
+    });
+  });
+
+  describe('Recording disabled', () => {
+    it('does not offer to resume when the session was not saved', async () => {
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          metrics: emptyMetrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      } as unknown as ReturnType<typeof SessionContext.useSessionStats>);
+
+      // Recorder is present but has no active file => recording was disabled.
+      vi.mocked(useConfig).mockReturnValue({
+        getWorktreeSettings: () => undefined,
+        getGeminiClient: () => ({
+          getChatRecordingService: () => ({
+            getConversationFilePath: () => null,
+          }),
+        }),
+      } as never);
+
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+        <SessionSummaryDisplay duration="1h 23m 45s" />,
+        { width: 100 },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      expect(output).not.toContain('gemini --resume');
+      expect(output).toContain('was not saved');
       unmount();
     });
   });

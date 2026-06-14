@@ -27,6 +27,13 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 
   const worktreeSettings = config.getWorktreeSettings();
 
+  // If the recorder is present but has no active file (e.g. recording was
+  // disabled by a disk-full error), the session was not saved — don't print a
+  // misleading resume command. If we can't tell, keep the resume hint.
+  const recordingService = config.getGeminiClient()?.getChatRecordingService();
+  const sessionNotSaved =
+    recordingService != null && !recordingService.getConversationFilePath();
+
   const escapedSessionId = escapeShellArg(stats.sessionId, shell);
   const footerSessionId =
     isWindows() &&
@@ -34,9 +41,11 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
     !escapedSessionId.startsWith("'")
       ? `"${escapedSessionId}"`
       : escapedSessionId;
-  let footer = `To resume this session: gemini --resume ${footerSessionId}`;
+  let footer = sessionNotSaved
+    ? 'This session was not saved and cannot be resumed.'
+    : `To resume this session: gemini --resume ${footerSessionId}`;
 
-  if (worktreeSettings) {
+  if (worktreeSettings && !sessionNotSaved) {
     footer =
       `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n` +
       `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
