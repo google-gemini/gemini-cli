@@ -558,14 +558,15 @@ export class ChatRecordingService {
       // Re-write the metadata from the in-memory conversation first so the
       // recreated file remains a valid, loadable session.
       if (this.cachedConversation && !fs.existsSync(this.conversationFile)) {
-        const metadata: Partial<ConversationRecord> = {
-          ...this.cachedConversation,
-        };
-        delete metadata.messages;
-        fs.appendFileSync(
-          this.conversationFile,
-          JSON.stringify(metadata) + '\n',
-        );
+        // Rebuild the full session from memory — the metadata line followed by
+        // every message held in `cachedConversation` — so recreating the file
+        // doesn't silently drop the prior conversation history. The record that
+        // triggered this append is written immediately below.
+        const { messages, ...metadata } = this.cachedConversation;
+        const rebuilt = [metadata, ...messages]
+          .map((entry) => JSON.stringify(entry) + '\n')
+          .join('');
+        fs.appendFileSync(this.conversationFile, rebuilt);
       }
       const line = JSON.stringify(record) + '\n';
       fs.appendFileSync(this.conversationFile, line);

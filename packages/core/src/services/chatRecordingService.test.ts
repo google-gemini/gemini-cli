@@ -336,11 +336,14 @@ describe('ChatRecordingService', () => {
 
       // Before the fix the recreated file held only message records and no
       // metadata line, so loadConversationRecord returned null. It should now
-      // be recoverable as a valid session.
+      // be recoverable as a valid session, and the prior message ("first")
+      // must not be lost when the file is rebuilt.
       const conversation = await loadConversationRecord(sessionFile);
       expect(conversation).not.toBeNull();
       expect(conversation?.sessionId).toBe('test-session-id');
-      expect(conversation?.messages.length).toBeGreaterThan(0);
+      const contents = conversation?.messages.map((m) => m.content);
+      expect(contents).toContain('first');
+      expect(contents).toContain('second');
     });
   });
 
