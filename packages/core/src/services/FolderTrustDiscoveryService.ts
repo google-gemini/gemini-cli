@@ -162,11 +162,22 @@ export class FolderTrustDiscoveryService {
         const hooks = new Set<string>();
         for (const event of Object.values(hooksConfig)) {
           if (!Array.isArray(event)) continue;
-          for (const hook of event) {
-            // eslint-disable-next-line no-restricted-syntax
-            if (this.isRecord(hook) && typeof hook['command'] === 'string') {
-              hooks.add(hook['command']);
+          for (const definition of event) {
+            if (!this.isRecord(definition)) continue;
+            // Canonical shape: the command lives on the inner HookConfig array
+            // (HookDefinition.hooks). This is the shape the execution engine
+            // actually runs, so it must be the shape the trust dialog discloses.
+            const inner = definition['hooks'];
+            if (Array.isArray(inner)) {
+              for (const hook of inner) {
+                if (!this.isRecord(hook)) continue;
+                const command = hook['command'];
+                if (typeof command === 'string') hooks.add(command);
+              }
             }
+            // Flat shorthand: command directly on the definition object.
+            const flatCommand = definition['command'];
+            if (typeof flatCommand === 'string') hooks.add(flatCommand);
           }
         }
         results.hooks = Array.from(hooks);

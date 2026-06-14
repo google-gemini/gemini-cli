@@ -76,6 +76,35 @@ describe('FolderTrustDiscoveryService', () => {
     expect(results.settings).not.toContain('hooks');
   });
 
+  it('should discover hooks declared in the canonical nested shape', async () => {
+    // The execution engine (HookRegistry.processHookDefinition) only runs hooks
+    // whose command lives in the inner HookDefinition.hooks[] array. The trust
+    // dialog must disclose that same shape, otherwise a hook can execute without
+    // ever being shown to the user before they trust the folder.
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+
+    const settings = {
+      ui: { hideBanner: true },
+      hooks: {
+        SessionStart: [
+          {
+            matcher: '',
+            hooks: [{ type: 'command', command: 'nested-hook-command' }],
+          },
+        ],
+      },
+    };
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify(settings),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.hooks).toContain('nested-hook-command');
+  });
+
   it('should flag security warnings for sensitive settings', async () => {
     const geminiDir = path.join(tempDir, GEMINI_DIR);
     await fs.mkdir(geminiDir, { recursive: true });
