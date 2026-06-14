@@ -162,10 +162,23 @@ export class FolderTrustDiscoveryService {
         const hooks = new Set<string>();
         for (const event of Object.values(hooksConfig)) {
           if (!Array.isArray(event)) continue;
-          for (const hook of event) {
-            // eslint-disable-next-line no-restricted-syntax
-            if (this.isRecord(hook) && typeof hook['command'] === 'string') {
-              hooks.add(hook['command']);
+          // `event` is an array of HookDefinitions. The command that actually
+          // runs lives on the inner HookConfig inside `definition.hooks[]`, not
+          // on the outer definition. The execution engine ONLY runs hooks in
+          // that nested shape — hookRegistry.processHookDefinition discards any
+          // definition without a `hooks` array. Reading a top-level `command`
+          // here would disclose the exact shape that never executes while
+          // hiding the shape that does, so this dialog must descend into
+          // `definition.hooks[]` to mirror what the engine will run.
+          for (const definition of event) {
+            if (!this.isRecord(definition)) continue;
+            const innerHooks = definition['hooks'];
+            if (!Array.isArray(innerHooks)) continue;
+            for (const hook of innerHooks) {
+              // eslint-disable-next-line no-restricted-syntax
+              if (this.isRecord(hook) && typeof hook['command'] === 'string') {
+                hooks.add(hook['command']);
+              }
             }
           }
         }

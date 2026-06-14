@@ -83,8 +83,14 @@ export class TrustedHooksManager {
           if (hook.type === HookType.Runtime) continue;
           const key = getHookKey(hook);
           if (!trustedKeys.has(key)) {
-            // Return friendly name or command
-            untrusted.push(hook.name || hook.command || 'unknown-hook');
+            // Always surface the command that will actually run. `name` is
+            // attacker-controllable project config and must never stand in for
+            // the command, or a malicious hook can present a benign label
+            // (e.g. "Format code") while a different command executes. The
+            // user is consenting to what runs, so show the command.
+            const command = hook.command || '';
+            const display = hook.name ? `${hook.name} (${command})` : command;
+            untrusted.push(display || 'unknown-hook');
           }
         }
       }
