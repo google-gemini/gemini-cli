@@ -12,9 +12,14 @@ import { Logger, type Config } from '@google/gemini-cli-core';
  */
 export const useLogger = (config: Config): Logger | null => {
   const [logger, setLogger] = useState<Logger | null>(null);
+  // Depend on the session id value, not just the (stable) config object, so the
+  // logger follows the active session. `/clear` mints a new session id on the
+  // same config instance; without this the logger keeps writing under the old
+  // id and logs disagree with the current chat session.
+  const sessionId = config.getSessionId();
 
   useEffect(() => {
-    const newLogger = new Logger(config.getSessionId(), config.storage);
+    const newLogger = new Logger(sessionId, config.storage);
 
     /**
      * Start async initialization, no need to await. Using await slows down the
@@ -25,7 +30,7 @@ export const useLogger = (config: Config): Logger | null => {
       .initialize()
       .then(() => setLogger(newLogger))
       .catch(() => {});
-  }, [config]);
+  }, [config, sessionId]);
 
   return logger;
 };

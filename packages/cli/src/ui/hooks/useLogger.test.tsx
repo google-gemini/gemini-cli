@@ -53,4 +53,33 @@ describe('useLogger', () => {
     expect(result.current).not.toBeNull();
     expect(Logger).toHaveBeenCalledWith('active-session-id', mockStorage);
   });
+
+  it('should re-create the logger when the session ID changes (e.g. after /clear)', async () => {
+    const getSessionId = vi.fn().mockReturnValue('old-session-id');
+    const config = {
+      getSessionId,
+      storage: mockStorage,
+    } as unknown as Config;
+
+    const { rerender } = await renderHook(() => useLogger(config));
+
+    await act(async () => {
+      deferredInit.resolve();
+    });
+    expect(Logger).toHaveBeenLastCalledWith('old-session-id', mockStorage);
+
+    // Simulate /clear: a new session ID becomes active on the same config
+    // object, followed by a re-render.
+    getSessionId.mockReturnValue('new-session-id');
+    await act(async () => {
+      rerender();
+    });
+    await act(async () => {
+      deferredInit.resolve();
+    });
+
+    // Before the fix the effect only depended on the (unchanged) config object,
+    // so the logger kept the stale session ID.
+    expect(Logger).toHaveBeenLastCalledWith('new-session-id', mockStorage);
+  });
 });
