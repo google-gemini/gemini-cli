@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
-import { activate } from './extension.js';
+import { activate, deactivate } from './extension.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
@@ -26,6 +26,7 @@ vi.mock('vscode', () => ({
   window: {
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
+      dispose: vi.fn(),
     })),
     showInformationMessage: vi.fn(),
     createTerminal: vi.fn(() => ({
@@ -79,6 +80,12 @@ describe('activate', () => {
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(
       undefined,
     );
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{ extensions: [{ versions: [{ version: '1.1.0' }] }] }],
+      }),
+    } as Response);
     context = {
       subscriptions: [],
       environmentVariableCollection: {
@@ -99,7 +106,8 @@ describe('activate', () => {
     } as unknown as vscode.ExtensionContext;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await deactivate();
     vi.restoreAllMocks();
   });
 
@@ -129,6 +137,46 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('should push every activation disposable into context.subscriptions', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      statusText: 'Not Found',
+    } as Response);
+
+    const pushedDisposables: vscode.Disposable[] = [];
+    const trackDisposable = <T extends vscode.Disposable>(disposable: T): T => {
+      pushedDisposables.push(disposable);
+      return disposable;
+    };
+
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(() =>
+      trackDisposable({ dispose: vi.fn() }),
+    );
+    vi.mocked(
+      vscode.workspace.registerTextDocumentContentProvider,
+    ).mockImplementation(() => trackDisposable({ dispose: vi.fn() }));
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(() =>
+      trackDisposable({ dispose: vi.fn() }),
+    );
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockImplementation(
+      () => trackDisposable({ dispose: vi.fn() }),
+    );
+    vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust).mockImplementation(
+      () => trackDisposable({ dispose: vi.fn() }),
+    );
+
+    await activate(context);
+
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      'gemini.diff.accept',
+      expect.any(Function),
+    );
+    expect(vscode.workspace.onDidChangeWorkspaceFolders).toHaveBeenCalled();
+    for (const disposable of pushedDisposables) {
+      expect(context.subscriptions).toContain(disposable);
+    }
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
