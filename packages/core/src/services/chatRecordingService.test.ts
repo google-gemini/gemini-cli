@@ -310,6 +310,39 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('loadConversationRecord projectHash robustness', () => {
+    it('loads a JSONL session whose metadata line is missing projectHash', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-no-project-hash.jsonl');
+
+      // Valid multi-line JSONL: an identity line that omits `projectHash`,
+      // followed by a real user message on its own line.
+      const metadataLine = JSON.stringify({
+        sessionId: 'session-without-hash',
+        startTime: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      });
+      const messageLine = JSON.stringify({
+        id: 'msg-1',
+        type: 'user',
+        content: 'hello world',
+      });
+      fs.writeFileSync(sessionFile, `${metadataLine}\n${messageLine}\n`);
+
+      const conversation = await loadConversationRecord(sessionFile);
+
+      // Before the fix the loader fell back to the legacy whole-file
+      // JSON.parse, which throws on multi-line JSONL and returns null —
+      // hiding a real session just because one metadata field was absent.
+      expect(conversation).not.toBeNull();
+      expect(conversation?.sessionId).toBe('session-without-hash');
+      expect(conversation?.projectHash).toBe('');
+      expect(conversation?.messages).toHaveLength(1);
+      expect(conversation?.messages[0].id).toBe('msg-1');
+    });
+  });
+
   describe('recordMessage', () => {
     beforeEach(async () => {
       await chatRecordingService.initialize();

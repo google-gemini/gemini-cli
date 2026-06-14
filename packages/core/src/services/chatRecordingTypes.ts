@@ -130,7 +130,7 @@ export interface MetadataUpdateRecord {
 
 export interface PartialMetadataRecord {
   sessionId: string;
-  projectHash: string;
+  projectHash?: string;
   startTime?: string;
   lastUpdated?: string;
   summary?: string;

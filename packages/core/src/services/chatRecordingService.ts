@@ -90,10 +90,11 @@ function isMetadataUpdateRecord(
 function isPartialMetadataRecord(
   record: unknown,
 ): record is PartialMetadataRecord {
-  return (
-    isStringProperty(record, 'sessionId') &&
-    isStringProperty(record, 'projectHash')
-  );
+  // The metadata/identity line is identified by its `sessionId`. `projectHash`
+  // is optional here: requiring it would leave a sessionId-only metadata line
+  // unrecognized, dropping the session identity and making the whole session
+  // unloadable (see loadConversationRecord's legacy fallback).
+  return isStringProperty(record, 'sessionId');
 }
 
 function isTextPart(part: unknown): part is { text: string } {
@@ -345,7 +346,13 @@ export async function loadConversationRecord(
       }
     }
 
-    if (!metadata.sessionId || !metadata.projectHash) {
+    // A missing `projectHash` must not make an otherwise-valid JSONL session
+    // unloadable. The legacy fallback parses the entire file with a single
+    // `JSON.parse`, which always throws on multi-line JSONL and returns null —
+    // so requiring `projectHash` here silently hides real sessions. Only fall
+    // back when we recovered no session identity at all; `projectHash` is
+    // useful metadata but optional for loading (defaulted below).
+    if (!metadata.sessionId) {
       return await parseLegacyRecordFallback(filePath, options);
     }
 
@@ -375,7 +382,7 @@ export async function loadConversationRecord(
 
     return {
       sessionId: metadata.sessionId,
-      projectHash: metadata.projectHash,
+      projectHash: metadata.projectHash ?? '',
       startTime: metadata.startTime || new Date().toISOString(),
       lastUpdated: metadata.lastUpdated || new Date().toISOString(),
       summary: metadata.summary,
