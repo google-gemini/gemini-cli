@@ -9,6 +9,7 @@ import {
   setupUser,
   ValidationCancelledError,
   InvalidNumericProjectIdError,
+  InvalidProjectIdFormatError,
   resetUserDataCacheForTesting,
 } from './setup.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
@@ -118,10 +119,10 @@ describe('setupUser', () => {
       });
 
       const client = {} as OAuth2Client;
-      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'p1');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'project-1');
       await setupUser(client, mockConfig);
 
-      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'p2');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'project-2');
       await setupUser(client, mockConfig);
 
       expect(mockLoad).toHaveBeenCalledTimes(2);
@@ -233,6 +234,52 @@ describe('setupUser', () => {
       await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
         InvalidNumericProjectIdError,
       );
+    });
+
+    it('should throw InvalidProjectIdFormatError when GOOGLE_CLOUD_PROJECT has invalid format', async () => {
+      // Test spaces
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my admin project');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+
+      // Test uppercase letters
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'My-Admin-Project');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+
+      // Test too short
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'abcde');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+
+      // Test trailing hyphen
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-project-');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+
+      // Test invalid characters (e.g. underscores)
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my_project_123');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidProjectIdFormatError,
+      );
+    });
+
+    it('should allow valid project ID formats', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-admin-project-123');
+      mockLoad.mockResolvedValue({
+        currentTier: { id: UserTierId.STANDARD, name: 'Standard' },
+      });
+      const result = await setupUser({} as OAuth2Client, mockConfig);
+      expect(result.projectId).toBe('my-admin-project-123');
+
+      // Test domain-scoped format
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'example.com:my-project-123');
+      const resultDomain = await setupUser({} as OAuth2Client, mockConfig);
+      expect(resultDomain.projectId).toBe('example.com:my-project-123');
     });
   });
 
@@ -373,7 +420,7 @@ describe('setupUser', () => {
         })
         .mockResolvedValueOnce({
           currentTier: mockPaidTier,
-          cloudaicompanionProject: 'p1',
+          cloudaicompanionProject: 'project-1',
         });
 
       mockValidationHandler.mockResolvedValue('verify');
@@ -384,7 +431,7 @@ describe('setupUser', () => {
         'Verify please',
       );
       expect(mockLoad).toHaveBeenCalledTimes(2);
-      expect(result.projectId).toBe('p1');
+      expect(result.projectId).toBe('project-1');
     });
 
     it('should throw ValidationCancelledError if handler returns cancel', async () => {

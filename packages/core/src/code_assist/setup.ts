@@ -45,6 +45,15 @@ export class InvalidNumericProjectIdError extends Error {
   }
 }
 
+export class InvalidProjectIdFormatError extends Error {
+  constructor(projectId: string) {
+    super(
+      `Invalid Google Cloud Project ID: "${projectId}". A valid Project ID must be 6 to 30 characters long (or up to 100 characters for domain-scoped IDs), start with a lowercase letter or number, and contain only lowercase letters, numbers, and hyphens (or dots and colons for domain scopes). It cannot start or end with a hyphen. Display names or aliases (e.g. with spaces or uppercase letters) are not valid project IDs.`,
+    );
+    this.name = 'InvalidProjectIdFormatError';
+  }
+}
+
 /**
  * Error thrown when user cancels the validation process.
  * This is a non-recoverable error that should result in auth failure.
@@ -131,8 +140,20 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
 
-  if (projectId && /^\d+$/.test(projectId)) {
-    throw new InvalidNumericProjectIdError(projectId);
+  if (projectId) {
+    if (/^\d+$/.test(projectId)) {
+      throw new InvalidNumericProjectIdError(projectId);
+    }
+    // GCP project ID format rules:
+    // - Standard project IDs are 6 to 30 characters, starting with a lowercase letter,
+    //   ending with a lowercase letter or number, containing only lowercase letters, numbers, and hyphens.
+    // - Domain-scoped project IDs can contain domain prefix with dots and colons (e.g. "example.com:project-id")
+    //   and can be up to 100 characters.
+    // - No uppercase letters, spaces, or other special characters are allowed.
+    const validProjectIdRegex = /^[a-z0-9][a-z0-9\-.:]{4,98}[a-z0-9]$/;
+    if (!validProjectIdRegex.test(projectId)) {
+      throw new InvalidProjectIdFormatError(projectId);
+    }
   }
 
   const projectCache = userDataCache.getOrCreate(client, () =>
