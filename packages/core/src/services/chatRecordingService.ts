@@ -438,7 +438,12 @@ export class ChatRecordingService {
         );
         if (loadedRecord) {
           this.cachedConversation = loadedRecord;
-          this.projectHash = this.cachedConversation.projectHash;
+          // A resumed record may carry an empty/whitespace projectHash (e.g.
+          // older or partial metadata, now tolerated when loading). Don't let
+          // that clobber the active project hash computed in the constructor —
+          // keep the current one so the session stays associated correctly.
+          this.projectHash =
+            this.cachedConversation.projectHash.trim() || this.projectHash;
 
           if (this.conversationFile.endsWith('.json')) {
             this.conversationFile = this.conversationFile + 'l'; // e.g. session-foo.jsonl
