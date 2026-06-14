@@ -341,6 +341,31 @@ describe('ChatRecordingService', () => {
       expect(conversation?.messages).toHaveLength(1);
       expect(conversation?.messages[0].id).toBe('msg-1');
     });
+
+    it('recovers a session whose metadata line is corrupt by deriving the id from the file name', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-corrupt-meta.jsonl');
+
+      // A truncated/corrupt first metadata line (its parse error is swallowed),
+      // followed by a valid user message on its own line.
+      const corruptMetadataLine = '{"sessionId":"abc","projec';
+      const messageLine = JSON.stringify({
+        id: 'msg-1',
+        type: 'user',
+        content: 'hello world',
+      });
+      fs.writeFileSync(sessionFile, `${corruptMetadataLine}\n${messageLine}\n`);
+
+      const conversation = await loadConversationRecord(sessionFile);
+
+      // Before the fix the unparseable metadata line left no session identity,
+      // so the loader returned null and the whole conversation disappeared.
+      expect(conversation).not.toBeNull();
+      expect(conversation?.sessionId).toBe('session-corrupt-meta');
+      expect(conversation?.messages).toHaveLength(1);
+      expect(conversation?.messages[0].id).toBe('msg-1');
+    });
   });
 
   describe('recordMessage', () => {

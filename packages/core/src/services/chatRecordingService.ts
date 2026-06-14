@@ -353,7 +353,19 @@ export async function loadConversationRecord(
     // back when we recovered no session identity at all; `projectHash` is
     // useful metadata but optional for loading (defaulted below).
     if (!metadata.sessionId) {
-      return await parseLegacyRecordFallback(filePath, options);
+      // The metadata/identity line can be missing or corrupt — its per-line
+      // parse error is swallowed in the loop above. Don't discard an entire
+      // conversation just because its first line is unreadable: if we still
+      // recovered message records, derive a stable session id from the file
+      // name so the session stays listable/resumable instead of vanishing.
+      const recoveredMessages = options?.metadataOnly
+        ? messageIds.length
+        : messagesMap.size;
+      if (recoveredMessages > 0) {
+        metadata.sessionId = path.basename(filePath, '.jsonl');
+      } else {
+        return await parseLegacyRecordFallback(filePath, options);
+      }
     }
 
     const loadedMessages = Array.from(messagesMap.values());
