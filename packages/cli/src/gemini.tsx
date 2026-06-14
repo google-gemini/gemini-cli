@@ -666,10 +666,17 @@ export async function main() {
       registerCleanup(consolePatcher.cleanup);
     }
 
-    // Launch cleanup expired sessions as a background task
-    cleanupExpiredSessions(config, settings.merged).catch((e) => {
-      debugLogger.error('Failed to cleanup expired sessions:', e);
-    });
+    // Launch cleanup of expired sessions as a background task. Skip it when the
+    // run only reads or mutates the session list (--list-sessions /
+    // --delete-session): this unawaited cleanup deletes files in the same
+    // directory that listSessions scans, so running both at once makes the
+    // result depend on timing (a file can exist during readdir, then disappear
+    // before readFile).
+    if (!config.getListSessions() && !config.getDeleteSession()) {
+      cleanupExpiredSessions(config, settings.merged).catch((e) => {
+        debugLogger.error('Failed to cleanup expired sessions:', e);
+      });
+    }
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');

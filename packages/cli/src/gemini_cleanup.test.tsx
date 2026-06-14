@@ -169,6 +169,11 @@ vi.mock('./utils/readStdin.js', () => ({
   readStdin: vi.fn().mockResolvedValue(''),
 }));
 
+vi.mock('./utils/sessions.js', () => ({
+  listSessions: vi.fn().mockResolvedValue(undefined),
+  deleteSession: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { cleanupMockState } = vi.hoisted(() => ({
   cleanupMockState: { shouldThrow: false, called: false },
 }));
@@ -419,6 +424,61 @@ describe('gemini.tsx main function cleanup', () => {
       .mocked(registerCleanup)
       .mock.calls.map((call) => call[0]);
     expect(registeredFunctions).toContain(capturedCleanup!);
+  });
+
+  it('should not run background session cleanup when listing sessions', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const { listSessions } = await import('./utils/sessions.js');
+    const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
+
+    cleanupMockState.called = false;
+    cleanupMockState.shouldThrow = false;
+
+    vi.mocked(ConsolePatcher).mockImplementation(
+      () =>
+        ({
+          patch: vi.fn(),
+          cleanup: vi.fn(),
+        }) as unknown as InstanceType<typeof ConsolePatcher>,
+    );
+
+    class ExitError extends Error {}
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new ExitError();
+    });
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      errors: [],
+    } as unknown as ReturnType<typeof loadSettings>);
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getListSessions: vi.fn(() => true),
+      }),
+    );
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof ExitError)) throw e;
+    }
+
+    // --list-sessions reads the session directory; the background cleanup task
+    // deletes files in that same directory, so running both concurrently makes
+    // the printed list depend on timing. Cleanup must be skipped while listing.
+    expect(cleanupMockState.called).toBe(false);
+    expect(vi.mocked(listSessions)).toHaveBeenCalled();
   });
 
   function buildMockConfig(overrides: Partial<Config> = {}): Config {
