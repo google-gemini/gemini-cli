@@ -68,7 +68,7 @@
     "tinygradient": "^1.1.5",
     "undici": "^7.10.0",
     "ws": "^8.16.0",
-    "yargs": "^17.7.2",
+    "yargs": "^18.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
