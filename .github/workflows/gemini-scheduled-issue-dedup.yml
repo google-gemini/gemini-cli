@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: 'Log in to GitHub Container Registry'
-        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+        uses: 'docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee' # ratchet:docker/login-action@v3
         with:
           registry: 'ghcr.io'
           username: '${{ github.actor }}'
