@@ -23,6 +23,7 @@ import {
   PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
 } from '@google/gemini-cli-core';
+import type { AgentSettings } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -610,5 +611,36 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('setIsTrusted', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
+    expect(setIsTrusted(undefined)).toBe(false);
   });
 });
