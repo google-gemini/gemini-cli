@@ -79,7 +79,7 @@
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
     "proper-lockfile": "^4.1.2",
-    "puppeteer-core": "^24.0.0",
+    "puppeteer-core": "^25.1.0",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
