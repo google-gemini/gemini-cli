@@ -375,4 +375,89 @@ describe('hardenHistory', () => {
     expect(hardened[0].content.parts![0]).not.toHaveProperty('extraProp');
     expect(hardened[0].content.parts![0]).toHaveProperty('text', 'hello');
   });
+
+  it('should completely filter out thought parts from the scrubbed history', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User prompt' }],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              text: 'Previous model thought...',
+              thought: true,
+            } as unknown as Part,
+            { text: 'Actual conversational text response' },
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User follow-up prompt' }],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    // Model turn (Turn 2, index 1 in hardened) should only contain the actual conversational text part
+    const modelTurn = hardened[1];
+    expect(modelTurn.content.parts).toHaveLength(1);
+    expect(modelTurn.content.parts![0]).toHaveProperty(
+      'text',
+      'Actual conversational text response',
+    );
+    expect(modelTurn.content.parts![0]).not.toHaveProperty('thought');
+  });
+
+  it('should remove the entire turn if it only contained thought parts and is now empty', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User prompt' }],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              text: 'Model is just thinking internally...',
+              thought: true,
+            } as unknown as Part,
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User follow-up prompt' }],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    // After scrubbing, Turn 2 should have 0 parts.
+    // The history mapping filters out empty turns, so the total turns should coalesce and reduce to 1 coalesced user turn.
+    // Let's inspect the hardened array:
+    // User prompt (Turn 1) + User follow-up prompt (Turn 3) will be coalesced into 1 User turn.
+    expect(hardened).toHaveLength(1);
+    expect(hardened[0].content.role).toBe('user');
+    expect(hardened[0].content.parts).toEqual([
+      { text: 'User prompt' },
+      { text: 'User follow-up prompt' },
+    ]);
+  });
 });

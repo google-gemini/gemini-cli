@@ -44,8 +44,11 @@ export function hardenHistory(
 
   const sentinels = { ...DEFAULT_SENTINELS, ...options.sentinels };
 
+  // Pass 0: Strip internal thoughts and remove empty turns
+  const processed = stripThoughts(history);
+
   // Pass 1: Initial Coalesce & Empty Turn Removal
-  let coalesced = coalesce(history);
+  let coalesced = coalesce(processed);
 
   // Pass 2: Tool Pairing & Signatures (The semantic layer)
   coalesced = pairToolsAndEnforceSignatures(coalesced, sentinels);
@@ -60,6 +63,28 @@ export function hardenHistory(
   final = scrubHistory(final);
 
   return final;
+}
+
+/**
+ * Removes parts that represent thoughts (where part.thought === true)
+ * and filters out turns that become empty as a result.
+ */
+function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
+  return history
+    .map((turn) => {
+      if (!turn.content.parts) return turn;
+      const nonThoughtParts = turn.content.parts.filter(
+        (p) => !('thought' in p && p.thought === true),
+      );
+      return {
+        id: turn.id,
+        content: {
+          ...turn.content,
+          parts: nonThoughtParts,
+        },
+      };
+    })
+    .filter((turn) => turn.content.parts && turn.content.parts.length > 0);
 }
 
 /**
