@@ -139,6 +139,17 @@ topics on:
     installation or update will complete successfully and function properly
     without any action required.
 
+- **Gemini CLI hangs on "Initializing..." on Linux**
+  - **Symptom:** On startup, the CLI freezes at `Initializing...` for several
+    minutes before either erroring or proceeding, most often inside Docker
+    containers, minimal Linux images, or proxied/offline environments.
+  - **Cause:** The CLI relies on a bundled `ripgrep` binary for file search.
+    When that binary is missing or not on `PATH`, the lookup falls back to a
+    network path that only fails after a long socket timeout, which presents
+    as a hang rather than an error.
+  - **Fix:** Confirm `ripgrep` is available to the CLI.
+  - **Related:** See issue #20433 for the original report and discussion.
+
 ## Exit codes
 
 Gemini CLI uses specific exit codes to indicate the reason for termination. This
