@@ -67,7 +67,7 @@ export async function loadConfig(
   const policySettings: PolicySettings = {
     mcpServers: settings.mcpServers,
     tools: {
-      core: settings.coreTools || settings.tools?.core,
+      core: settings.tools?.core,
       exclude: settings.excludeTools || settings.tools?.exclude,
       allowed: settings.allowedTools || settings.tools?.allowed,
     },
