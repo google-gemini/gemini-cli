@@ -94,7 +94,9 @@ describe('loadSettings', () => {
   it('should load other top-level settings correctly', () => {
     const settings = {
       showMemoryUsage: true,
-      coreTools: ['tool1', 'tool2'],
+      tools: {
+        core: ['tool1', 'tool2'],
+      },
       mcpServers: {
         server1: {
           command: 'cmd',

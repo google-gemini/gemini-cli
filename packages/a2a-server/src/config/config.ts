@@ -92,7 +92,7 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || settings.tools?.core || undefined,
+    coreTools: settings.tools?.core || undefined,
     excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
     allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
