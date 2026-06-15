@@ -68,8 +68,8 @@ export async function loadConfig(
     mcpServers: settings.mcpServers,
     tools: {
       core: settings.tools?.core,
-      exclude: settings.excludeTools || settings.tools?.exclude,
-      allowed: settings.allowedTools || settings.tools?.allowed,
+      exclude: settings.tools?.exclude,
+      allowed: settings.tools?.allowed,
     },
     policyPaths: settings.policyPaths,
     adminPolicyPaths: settings.adminPolicyPaths,
@@ -93,8 +93,8 @@ export async function loadConfig(
     question: '', // Not used in server mode directly like CLI
 
     coreTools: settings.tools?.core || undefined,
-    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
-    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    allowedTools: settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
