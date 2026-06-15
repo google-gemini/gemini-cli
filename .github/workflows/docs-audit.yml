@@ -46,7 +46,7 @@ jobs:
           echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - name: 'Create Pull Request with Audit Results'
-        uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
+        uses: 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1'
         with:
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           commit-message: 'docs: weekly audit results for ${{ github.run_id }}'

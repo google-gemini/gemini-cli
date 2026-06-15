@@ -90,7 +90,7 @@ jobs:
 
       - name: 'Create Pull Request'
         if: "steps.validate_version.outputs.CONTINUE == 'true'"
-        uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c' # ratchet:peter-evans/create-pull-request@v6
+        uses: 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1' # ratchet:peter-evans/create-pull-request@v8.1.1
         with:
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           commit-message: 'docs(changelog): update for ${{ steps.release_info.outputs.VERSION }}'
