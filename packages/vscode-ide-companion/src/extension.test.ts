@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
-import { activate } from './extension.js';
+import { activate, deactivate } from './extension.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
@@ -26,6 +26,7 @@ vi.mock('vscode', () => ({
   window: {
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
+      dispose: vi.fn(),
     })),
     showInformationMessage: vi.fn(),
     createTerminal: vi.fn(() => ({
@@ -114,7 +115,8 @@ describe('activate', () => {
     } as unknown as vscode.ExtensionContext;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await deactivate();
     vi.restoreAllMocks();
   });
 
