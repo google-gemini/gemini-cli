@@ -219,11 +219,10 @@ function classifyValidationRequiredError(
 export function classifyGoogleError(error: unknown): unknown {
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
+  const errorMessage = googleApiError?.message || extractErrorMessage(error);
 
   if (status === 404) {
-    const message =
-      googleApiError?.message ||
-      (error instanceof Error ? error.message : 'Model not found');
+    const message = errorMessage.trim() || 'Model not found';
     return new ModelNotFoundError(message, status);
   }
 
@@ -235,6 +234,20 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
+  // Universal limit: 0 check (moved outside and before the fallback block)
+  const lowerMessage = errorMessage.toLowerCase();
+  if (
+    (status === 429 || status === 499 || status === 503) &&
+    /limit:\s*0(?!\d|\.\d)/.test(lowerMessage)
+  ) {
+    const cause = googleApiError ?? {
+      code: status ?? 429,
+      message: errorMessage,
+      details: [],
+    };
+    return new TerminalQuotaError(errorMessage, cause);
+  }
+
   if (
     !googleApiError ||
     (googleApiError.code !== 429 &&
@@ -243,9 +256,6 @@ export function classifyGoogleError(error: unknown): unknown {
     googleApiError.details.length === 0
   ) {
     // Fallback: try to parse the error message for a retry delay
-    const errorMessage =
-      googleApiError?.message ||
-      (error instanceof Error ? error.message : String(error));
     const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
@@ -394,8 +404,18 @@ export function classifyGoogleError(error: unknown): unknown {
 
   // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
-  const errorMessage =
-    googleApiError.message ||
-    (error instanceof Error ? error.message : String(error));
   return new RetryableQuotaError(errorMessage, googleApiError);
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const msg = (error as { message: unknown }).message;
+    if (typeof msg === 'string') {
+      return msg;
+    }
+  }
+  return '';
 }
