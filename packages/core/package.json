@@ -73,7 +73,7 @@
     "isbinaryfile": "^5.0.7",
     "js-yaml": "^4.1.1",
     "json-stable-stringify": "^1.3.0",
-    "marked": "^15.0.12",
+    "marked": "^18.0.5",
     "mime": "4.0.7",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
