@@ -29,6 +29,13 @@ describe('markdownUtils', () => {
       );
     });
 
+    it('should not add a leading space for keys starting with an uppercase letter', () => {
+      const data = { Id: 1, HTTPStatus: 'OK' };
+      expect(jsonToMarkdown(data)).toBe(
+        '- **Id**: 1\n- **H T T P Status**: OK',
+      );
+    });
+
     it('should handle empty structures', () => {
       expect(jsonToMarkdown([])).toBe('[]');
       expect(jsonToMarkdown({})).toBe('{}');
