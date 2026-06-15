@@ -491,13 +491,13 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        googleAuthOptions: {
-          clientOptions: {
-            transporterOptions: {
+        googleAuthOptions: expect.objectContaining({
+          clientOptions: expect.objectContaining({
+            transporterOptions: expect.objectContaining({
               agent: expect.any(HttpsProxyAgent),
-            },
-          },
-        },
+            }),
+          }),
+        }),
       }),
     );
   });
@@ -527,13 +527,13 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        googleAuthOptions: {
-          clientOptions: {
-            transporterOptions: {
+        googleAuthOptions: expect.objectContaining({
+          clientOptions: expect.objectContaining({
+            transporterOptions: expect.objectContaining({
               agent: expect.any(HttpsProxyAgent),
-            },
-          },
-        },
+            }),
+          }),
+        }),
       }),
     );
   });
@@ -565,13 +565,13 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        googleAuthOptions: {
-          clientOptions: {
-            transporterOptions: {
+        googleAuthOptions: expect.objectContaining({
+          clientOptions: expect.objectContaining({
+            transporterOptions: expect.objectContaining({
               agent: expect.any(HttpProxyAgent),
-            },
-          },
-        },
+            }),
+          }),
+        }),
       }),
     );
   });
@@ -601,13 +601,13 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        googleAuthOptions: {
-          clientOptions: {
-            transporterOptions: {
+        googleAuthOptions: expect.objectContaining({
+          clientOptions: expect.objectContaining({
+            transporterOptions: expect.objectContaining({
               agent: expect.any(HttpsProxyAgent),
-            },
-          },
-        },
+            }),
+          }),
+        }),
       }),
     );
   });
@@ -981,6 +981,38 @@ describe('createContentGenerator', () => {
         vertexai: true,
         httpOptions: expect.objectContaining({
           baseUrl: 'https://vertex.test.local',
+        }),
+      }),
+    );
+  });
+
+  it('should inject apiEndpoint into googleAuthOptions.clientOptions when GOOGLE_VERTEX_BASE_URL is set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://vertex.test.local');
+
+    await createContentGenerator(
+      {
+        authType: AuthType.USE_VERTEX_AI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googleAuthOptions: expect.objectContaining({
+          clientOptions: expect.objectContaining({
+            apiEndpoint: 'https://vertex.test.local',
+          }),
         }),
       }),
     );
