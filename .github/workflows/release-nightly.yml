@@ -39,7 +39,7 @@ jobs:
   release:
     if: "github.repository == 'google-gemini/gemini-cli'"
     needs: ['build-mac']
-    environment: "${{ github.event.inputs.environment || 'prod' }}"
+    environment: "${{ github.event_name == 'schedule' && 'internal' || github.event.inputs.environment || 'prod' }}"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
