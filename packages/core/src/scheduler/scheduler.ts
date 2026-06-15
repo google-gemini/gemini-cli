@@ -31,6 +31,7 @@ import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
+  MUTATOR_KINDS,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -457,12 +458,21 @@ export class Scheduler {
         return true;
       }
 
-      // If the first tool is parallelizable, batch all contiguous parallelizable tools.
+      // If the first tool is parallelizable, batch all contiguous parallelizable tools
+      // that do not conflict with already batched tools.
       if (this._isParallelizable(next.request)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
           if (peeked && this._isParallelizable(peeked.request)) {
-            this.state.dequeue();
+            const activeCalls = this.state.allActiveCalls;
+            const hasConflict = activeCalls.some((c) =>
+              this._hasConflict(c, peeked),
+            );
+            if (!hasConflict) {
+              this.state.dequeue();
+            } else {
+              break;
+            }
           } else {
             break;
           }
@@ -560,6 +570,38 @@ export class Scheduler {
 
     // Default to parallel if the flag is omitted.
     return true;
+  }
+
+  private _hasConflict(call1: ToolCall, call2: ToolCall): boolean {
+    if (
+      !('tool' in call1) ||
+      !call1.tool ||
+      !('tool' in call2) ||
+      !call2.tool ||
+      !('invocation' in call1) ||
+      !call1.invocation ||
+      !('invocation' in call2) ||
+      !call2.invocation
+    ) {
+      return false;
+    }
+    const isMutator1 = MUTATOR_KINDS.includes(call1.tool.kind);
+    const isMutator2 = MUTATOR_KINDS.includes(call2.tool.kind);
+    if (!isMutator1 && !isMutator2) {
+      return false;
+    }
+
+    const locs1 = call1.invocation.toolLocations();
+    const locs2 = call2.invocation.toolLocations();
+
+    for (const l1 of locs1) {
+      for (const l2 of locs2) {
+        if (l1.path === l2.path) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private async _processValidatingCall(
