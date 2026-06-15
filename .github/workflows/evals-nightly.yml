@@ -111,7 +111,7 @@ jobs:
           persist-credentials: false
 
       - name: 'Download Logs'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
+        uses: 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' # ratchet:actions/download-artifact@v4
         with:
           path: 'artifacts'
 
