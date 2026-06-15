@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig, setIsTrusted } from './config.js';
+import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -615,23 +615,30 @@ describe('loadConfig', () => {
 });
 
 describe('setIsTrusted', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('should return true when GEMINI_FOLDER_TRUST env var is true', () => {
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
     vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(true);
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
   });
 
-  it('should return false when GEMINI_FOLDER_TRUST env var is false', () => {
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
     vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted(undefined)).toBe(false);
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
   });
 
-  it('should fallback to agentSettings.isTrusted if env var is undefined', () => {
+  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+    const { setIsTrusted } = await import('./config.js');
     expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
     expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
     expect(setIsTrusted(undefined)).toBe(false);

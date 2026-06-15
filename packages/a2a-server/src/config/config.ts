@@ -34,6 +34,8 @@ import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
+const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
+
 export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
@@ -185,8 +187,8 @@ export async function loadConfig(
 export function setIsTrusted(
   agentSettings: AgentSettings | undefined,
 ): boolean {
-  if (process.env['GEMINI_FOLDER_TRUST'] !== undefined) {
-    return process.env['GEMINI_FOLDER_TRUST'] === 'true';
+  if (INITIAL_FOLDER_TRUST !== undefined) {
+    return INITIAL_FOLDER_TRUST === 'true';
   }
   return !!agentSettings?.isTrusted;
 }
