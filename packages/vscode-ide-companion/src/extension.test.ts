@@ -43,16 +43,31 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
+    onDidCloseTextDocument: vi.fn(() => ({
+      __id: 'onDidCloseTextDocument',
+      dispose: vi.fn(),
+    })),
+    registerTextDocumentContentProvider: vi.fn(() => ({
+      __id: 'registerTextDocumentContentProvider',
+      dispose: vi.fn(),
+    })),
+    onDidChangeWorkspaceFolders: vi.fn(() => ({
+      __id: 'onDidChangeWorkspaceFolders',
+      dispose: vi.fn(),
+    })),
+    onDidGrantWorkspaceTrust: vi.fn(() => ({
+      __id: 'onDidGrantWorkspaceTrust',
+      dispose: vi.fn(),
+    })),
     getConfiguration: vi.fn(() => ({
       get: vi.fn(),
     })),
   },
   commands: {
-    registerCommand: vi.fn(),
+    registerCommand: vi.fn((command: string) => ({
+      __id: command,
+      dispose: vi.fn(),
+    })),
     executeCommand: vi.fn(),
   },
   Uri: {
@@ -129,6 +144,17 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('adds every registered disposable to context.subscriptions', async () => {
+    await activate(context);
+    const ids = context.subscriptions.map(
+      (d) => (d as unknown as { __id?: string }).__id,
+    );
+    expect(ids).toContain('gemini.diff.accept');
+    expect(ids).toContain('gemini.diff.cancel');
+    expect(ids).toContain('onDidChangeWorkspaceFolders');
+    expect(ids).toContain('onDidGrantWorkspaceTrust');
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
