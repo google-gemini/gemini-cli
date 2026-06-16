@@ -181,10 +181,23 @@ export class McpClientManager {
       return qualifiedMatch;
     }
 
-    // Try direct URI match
-    return this.mainResourceRegistry
+    // Try direct URI match. Only resolve if exactly one server exposes this
+    // URI - if multiple servers collide on the same URI, resolving silently
+    // to the first match would let one server shadow another's resource, so
+    // fail closed instead.
+    const directMatches = this.mainResourceRegistry
       .getAllResources()
-      .find((r) => r.uri === uri);
+      .filter((r) => r.uri === uri);
+    if (directMatches.length > 1) {
+      const servers = directMatches.map((r) => r.serverName).join(', ');
+      this.emitDiagnostic(
+        'warning',
+        `Resource URI collision detected for "${uri}" across multiple servers (${servers}). ` +
+          `Resolution disabled to prevent cross-server shadowing.`,
+      );
+      return undefined;
+    }
+    return directMatches.length === 1 ? directMatches[0] : undefined;
   }
 
   getAllResources(): MCPResource[] {

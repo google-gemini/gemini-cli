@@ -10,6 +10,8 @@ import {
   Kind,
   type ToolResult,
   type ExecuteOptions,
+  type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { READ_MCP_RESOURCE_TOOL_NAME } from './tool-names.js';
@@ -78,6 +80,14 @@ class ReadMcpResourceToolInvocation extends BaseToolInvocation<
     return `Read MCP resource: ${this.params.uri}`;
   }
 
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return this.resource?.serverName
+      ? { mcpName: this.resource.serverName }
+      : undefined;
+  }
+
   async execute({
     abortSignal: _abortSignal,
   }: ExecuteOptions): Promise<ToolResult> {
@@ -105,7 +115,12 @@ class ReadMcpResourceToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const resource = mcpManager.findResourceByUri(uri);
+    // Use the resource resolved at construction time (this.resource) rather than
+    // re-resolving via findResourceByUri(). Re-resolving could return a different
+    // server's resource if the registry state changed between construction and
+    // execution, which would bypass the server-scoped policy set by
+    // getPolicyUpdateOptions() and create a TOCTOU scoping inconsistency.
+    const resource = this.resource;
     if (!resource) {
       const errorMessage = `Resource not found for URI: ${uri}`;
       return {

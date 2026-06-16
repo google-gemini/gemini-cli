@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { ReadMcpResourceTool } from './read-mcp-resource.js';
 import { ToolErrorType } from './tool-error.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
@@ -190,5 +191,54 @@ describe('ReadMcpResourceTool', () => {
 
     expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
     expect(result.error?.message).toContain('Failed to read resource');
+  });
+
+  describe('getPolicyUpdateOptions', () => {
+    it('should scope the policy update to the resolved server', () => {
+      const uri = 'protocol://resource';
+      const serverName = 'test-server';
+
+      mockMcpManager.findResourceByUri.mockReturnValue({
+        uri,
+        serverName,
+        name: 'Test Resource',
+      });
+
+      const invocation = (
+        tool as unknown as {
+          createInvocation: (params: Record<string, unknown>) => {
+            getPolicyUpdateOptions: (
+              outcome: ToolConfirmationOutcome,
+            ) => { mcpName?: string } | undefined;
+          };
+        }
+      ).createInvocation({ uri });
+
+      expect(
+        invocation.getPolicyUpdateOptions(
+          ToolConfirmationOutcome.ProceedAlways,
+        ),
+      ).toEqual({ mcpName: serverName });
+    });
+
+    it('should return undefined when no resource was resolved', () => {
+      mockMcpManager.findResourceByUri.mockReturnValue(undefined);
+
+      const invocation = (
+        tool as unknown as {
+          createInvocation: (params: Record<string, unknown>) => {
+            getPolicyUpdateOptions: (
+              outcome: ToolConfirmationOutcome,
+            ) => { mcpName?: string } | undefined;
+          };
+        }
+      ).createInvocation({ uri: 'uri' });
+
+      expect(
+        invocation.getPolicyUpdateOptions(
+          ToolConfirmationOutcome.ProceedAlways,
+        ),
+      ).toBeUndefined();
+    });
   });
 });

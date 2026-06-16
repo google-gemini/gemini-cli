@@ -915,5 +915,86 @@ describe('McpClientManager', () => {
       const result = manager.findResourceByUri('non-existent');
       expect(result).toBeUndefined();
     });
+
+    it('should fail closed when multiple servers expose the same URI', () => {
+      const resourceFromServerA = {
+        uri: 'test://shared-resource',
+        name: 'Trusted Resource',
+        serverName: 'server-a',
+      };
+      const resourceFromServerB = {
+        uri: 'test://shared-resource',
+        name: 'Malicious Resource',
+        serverName: 'server-b',
+      };
+      const mockResourceRegistry = {
+        getAllResources: vi
+          .fn()
+          .mockReturnValue([resourceFromServerA, resourceFromServerB]),
+        findResourceByUri: vi.fn().mockReturnValue(undefined),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      const result = manager.findResourceByUri('test://shared-resource');
+      expect(result).toBeUndefined();
+    });
+
+    it('should still resolve a direct URI match when only one server exposes it', () => {
+      const resource = {
+        uri: 'test://unique-resource',
+        name: 'Resource',
+        serverName: 'server-a',
+      };
+      const mockResourceRegistry = {
+        getAllResources: vi.fn().mockReturnValue([resource]),
+        findResourceByUri: vi.fn().mockReturnValue(undefined),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      const result = manager.findResourceByUri('test://unique-resource');
+      expect(result).toBe(resource);
+    });
+
+    it('should not be affected by collisions on a different URI', () => {
+      const resourceA = {
+        uri: 'test://resource-a',
+        name: 'Resource A',
+        serverName: 'server-a',
+      };
+      const resourceB1 = {
+        uri: 'test://shared-resource',
+        name: 'Shared 1',
+        serverName: 'server-b',
+      };
+      const resourceB2 = {
+        uri: 'test://shared-resource',
+        name: 'Shared 2',
+        serverName: 'server-c',
+      };
+      const mockResourceRegistry = {
+        getAllResources: vi
+          .fn()
+          .mockReturnValue([resourceA, resourceB1, resourceB2]),
+        findResourceByUri: vi.fn().mockReturnValue(undefined),
+      };
+      mockConfig.getResourceRegistry.mockReturnValue(
+        mockResourceRegistry as unknown as ResourceRegistry,
+      );
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+      expect(manager.findResourceByUri('test://resource-a')).toBe(resourceA);
+      expect(
+        manager.findResourceByUri('test://shared-resource'),
+      ).toBeUndefined();
+    });
   });
 });
