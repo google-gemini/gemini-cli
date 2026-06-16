@@ -27,9 +27,6 @@ export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 // similar to how packages/cli/src/config/settings.ts handles it.
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
-  coreTools?: string[];
-  excludeTools?: string[];
-  allowedTools?: string[];
   tools?: {
     allowed?: string[];
     exclude?: string[];
