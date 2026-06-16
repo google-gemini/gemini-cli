@@ -22,7 +22,7 @@ const DEFAULT_HEADER_NAME = 'X-API-Key';
  * - A shell command (!command)
  */
 export class ApiKeyAuthProvider extends BaseA2AAuthProvider {
-  readonly type = 'apiKey' as const;
+  readonly type = 'apiKey';
 
   private resolvedKey: string | undefined;
   private readonly headerName: string;
