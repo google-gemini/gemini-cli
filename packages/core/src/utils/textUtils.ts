@@ -115,8 +115,10 @@ export function truncateString(
   // This regex matches a "Grapheme Cluster" manually:
   // 1. A surrogate pair OR a single character...
   // 2. Followed by any number of "Combining Marks" (\p{M})
-  // 'u' flag is required for Unicode property escapes
-  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gu;
+  // 'u' flag is required for Unicode property escapes.
+  // 's' (dotAll) flag lets '.' match line terminators so newlines are
+  // treated as their own grapheme and preserved instead of being dropped.
+  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gsu;
 
   let truncatedStr = '';
   let match: RegExpExecArray | null;

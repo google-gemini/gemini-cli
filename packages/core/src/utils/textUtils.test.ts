@@ -143,6 +143,11 @@ describe('truncateString', () => {
     // Truncating combinedChar (len 2) at maxLength 2: fits perfectly.
     expect(truncateString(combinedChar, 2, '')).toBe(combinedChar);
   });
+
+  it('preserves newlines in multi-line input', () => {
+    const str = 'line1\nline2\nline3\nline4\nline5';
+    expect(truncateString(str, 12, '')).toBe('line1\nline2\n');
+  });
 });
 
 describe('safeTemplateReplace', () => {
