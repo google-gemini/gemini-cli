@@ -322,12 +322,9 @@ describe('loadConfig', () => {
         true,
       );
     });
-
-
   });
 
   describe('tool configuration', () => {
-
     it('should pass V2 tools.allowed to Config properly', async () => {
       const settings: Settings = {
         tools: {
@@ -341,7 +338,6 @@ describe('loadConfig', () => {
         }),
       );
     });
-
 
     it('should pass enableAgents to Config constructor', async () => {
       const settings: Settings = {
