@@ -381,8 +381,8 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
  */
 export function scrubContents(contents: Content[]): Content[] {
   return contents.map((content) => {
-    const nonThoughtParts = (content.parts || []).filter(
-      (p) => !('thought' in p && p.thought),
+    const nonThoughtParts = (content.parts ?? []).filter(
+      (p) => !(p && typeof p === 'object' && 'thought' in p && p.thought),
     );
     return {
       role: content.role,
