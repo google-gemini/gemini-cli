@@ -1,0 +1,15 @@
+# Triage Worker Security Policy
+#
+# To ensure safety and prevent accidental or malicious side effects (such as 
+# prompt injection attacks from issue bodies), this policy enforces strict 
+# read-only access.
+
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "*"
+decision = "deny"
+priority = 10

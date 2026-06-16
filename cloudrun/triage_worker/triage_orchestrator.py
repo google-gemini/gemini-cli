@@ -4,39 +4,56 @@ import json
 
 def process_issue_triage(payload):
     """
-    Placeholder for LLM inference via Gemini CLI.
+    LLM inference via Gemini CLI.
     """
     issue_num = payload.get("issue_number")
+    title = payload.get("title", "")
+    body = payload.get("body", "")
+    repo_name = payload.get("repository", "")
+    
     print(f"[LOGIC] Starting LLM Triage for Issue #{issue_num}...")
     
-    # [DEBUG]: This is where LLM inference will happen. 
-    # Placeholder return mimicking a successful Gemini CLI response.
-    mock_response = {
-        "triage_metadata": {
-            "quality": "OK",
-            "reasoning": "Issue is well-defined and reproducible."
-        },
-        "workable_spec": {
-            "issue_id": str(issue_num),
-            "summary": {
-                "problem": "Example problem",
-                "root_cause": "TBD",
-                "context": "Context details"
-            },
-            "implementation_plan": {
-                "files_to_modify": ["main.py"],
-                "steps": ["Step 1"]
-            },
-            "testing_strategy": {
-                "test_file": "test_main.py",
-                "expected_behavior": "Pass",
-                "verification_steps": "Run pytest",
-                "framework": "pytest"
-            }
-        }
-    }
-    
-    # In production, would run the 'gemini' command here
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    policy_path = os.path.join(current_dir, "policy.toml")
+    system_prompt_path = os.path.join(current_dir, ".gemini", "triage_orchestrator.md")
+    target_cwd = "/opt/gemini-cli"
 
+    env = os.environ.copy()
+    # Makes GCLI use the skills defined inside our .gemini folder.
+    env["GEMINI_SYSTEM_MD"] = str(system_prompt_path) 
+    # Force non interactive mode
+    env["TERM"] = "dumb"
+    env["COLORTERM"] = ""
 
-    return True, json.dumps(mock_response)
+    prompt = f"Repository: {repo_name}\nIssue Number: {issue_num}\nTitle: {title}\nDescription: {body}"
+
+    try:
+        print(f"[LOGIC] Running gemini-cli inside: {target_cwd}")
+        result = subprocess.run(
+            [
+                "gemini",
+                "-p", prompt,
+                "--policy", str(policy_path),
+                "--skip-trust",
+                "--approval-mode", "yolo"
+            ],
+            cwd=target_cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        print(f"[LOGIC] Gemini CLI Output:\n{result.stdout}")
+        if result.stderr:
+            print(f"[LOGIC] Gemini CLI Warnings/Stderr:\n{result.stderr}")
+            
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"[LOGIC] Error: gemini-cli failed with code {e.returncode}")
+        print(f"[LOGIC] Stderr:\n{e.stderr}")
+        print(f"[LOGIC] Stdout:\n{e.stdout}")
+        return False, e.stderr
+    except FileNotFoundError:
+        print("[LOGIC] Error: 'gemini' command not found in the container path!")
+        return False, "gemini command not found"
