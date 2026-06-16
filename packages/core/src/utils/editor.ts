@@ -251,7 +251,8 @@ export function getEditorExtraArgs(
   editor: EditorType,
   options?: { newWindow?: boolean },
 ): string[] {
-  const args = editorExtraArgs[editor] ? [...editorExtraArgs[editor]] : [];
+  const extraArgs = editorExtraArgs[editor];
+  const args = extraArgs ? [...extraArgs] : [];
   if (options?.newWindow && NEW_WINDOW_EDITORS.has(editor)) {
     args.push('--new-window');
   }

@@ -805,7 +805,7 @@ export async function start_sandbox(
     });
 
     return await new Promise<number>((resolve, reject) => {
-      sandboxProcess.on('error', (err) => {
+      sandboxProcess?.on('error', (err) => {
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
       });
