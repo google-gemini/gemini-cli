@@ -37,7 +37,7 @@ def _acquire_lock_tx(transaction, doc_ref, lock_holder: str, lock_duration_sec: 
     Returns:
     - A dictionary containing the recommended action:
       - {"action": "PROCEED"}: Lock successfully acquired; start processing.
-      - {"action": "ACK"}: Already processed, or locked by another active worker; ignore.
+      - {"action": "ACK"}: Already processed, doesn't exist, or locked by another active worker; ignore.
       - {"action": "NEEDS_HUMAN"}: Lock count exceeded; transition state and ignore.
     """
     snapshot = doc_ref.get(transaction=transaction)

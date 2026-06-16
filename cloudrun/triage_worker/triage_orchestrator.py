@@ -11,8 +11,6 @@ def process_issue_triage(payload):
     body = payload.get("body", "")
     repo_name = payload.get("repository", "")
     
-    print(f"[LOGIC] Starting LLM Triage for Issue #{issue_num}...")
-    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     policy_path = os.path.join(current_dir, "policy.toml")
     system_prompt_path = os.path.join(current_dir, ".gemini", "triage_orchestrator.md")
