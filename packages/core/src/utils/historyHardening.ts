@@ -74,7 +74,7 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
     .map((turn) => {
       if (!turn.content.parts) return turn;
       const nonThoughtParts = turn.content.parts.filter(
-        (p) => !('thought' in p && p.thought === true),
+        (p) => !('thought' in p && p.thought),
       );
       return {
         id: turn.id,
