@@ -631,6 +631,35 @@ describe('Task', () => {
 
       expect(handleEventDrivenToolCallSpy).toHaveBeenCalled();
     });
+
+    describe('Pending Tools state', () => {
+      it('should correctly report pending tools presence and count', () => {
+        const mockConfig = createMockConfig();
+        const mockEventBus: ExecutionEventBus = {
+          publish: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeAllListeners: vi.fn(),
+          finished: vi.fn(),
+        };
+
+        // @ts-expect-error - Calling private constructor
+        const task = new Task(
+          'task-id',
+          'context-id',
+          mockConfig as Config,
+          mockEventBus,
+        );
+
+        expect(task.hasPendingTools).toBe(false);
+        expect(task.pendingToolsCount).toBe(0);
+
+        task['_registerToolCall']('tool-1', 'scheduled');
+        expect(task.hasPendingTools).toBe(true);
+        expect(task.pendingToolsCount).toBe(1);
+      });
+    });
   });
 
   describe('Serialization and Mapping', () => {
