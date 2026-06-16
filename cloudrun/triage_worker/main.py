@@ -2,7 +2,7 @@ import os
 import json
 import base64
 import sys
-
+    
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
 from db.issues_store import acquire_lock, release_lock
