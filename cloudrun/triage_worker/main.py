@@ -25,7 +25,9 @@ def main():
     repository = payload.get("repository", "unknown/unknown")
     owner, repo = repository.split("/")
     
-    lock_holder = os.environ.get("CLOUD_RUN_TASK_INDEX", "local-worker")
+    execution_id = os.environ.get("CLOUD_RUN_EXECUTION", "local-exec")
+    task_index = os.environ.get("CLOUD_RUN_TASK_INDEX", "0")
+    lock_holder = f"{execution_id}-{task_index}"
     
     # Claim the lock
     claim = acquire_lock(owner, repo, issue_number, lock_holder)
