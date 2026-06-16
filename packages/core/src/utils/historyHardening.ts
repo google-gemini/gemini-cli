@@ -369,20 +369,26 @@ function enforceRoleConstraints(
  * This ensures compatibility with strict APIs (like Vertex AI) that reject unknown fields.
  */
 export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
-  return history.map((turn) => ({
+  const scrubbed = history.map((turn) => ({
     id: turn.id,
     content: scrubContents([turn.content])[0],
   }));
+  return coalesce(scrubbed);
 }
 
 /**
  * Deep-scrubs an array of Content objects to remove non-standard properties.
  */
 export function scrubContents(contents: Content[]): Content[] {
-  return contents.map((content) => ({
-    role: content.role,
-    parts: (content.parts || []).map((p) => scrubPart(p)),
-  }));
+  return contents.map((content) => {
+    const nonThoughtParts = (content.parts || []).filter(
+      (p) => !('thought' in p && p.thought),
+    );
+    return {
+      role: content.role,
+      parts: nonThoughtParts.map((p) => scrubPart(p)),
+    };
+  });
 }
 
 interface ThoughtPart extends Part {
