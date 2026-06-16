@@ -223,7 +223,9 @@ directory.
 By default, Gemini CLI stores configuration and history in `~/.gemini`. You can
 use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
-specified path.
+specified path. When you provide your own settings file, place it in that
+generated directory, for example `$GEMINI_CLI_HOME/.gemini/settings.json` on
+macOS/Linux or `%GEMINI_CLI_HOME%\.gemini\settings.json` on Windows.
 
 **macOS/Linux**
 
