@@ -56,8 +56,9 @@ const hostRequestHistory = new LRUCache<string, number[]>(1000);
  * charset is not recognised by the platform's TextDecoder.
  */
 function decodeBody(buffer: Buffer, contentType: string): string {
-  const charsetMatch = contentType.match(/charset=([^\s;]+)/i);
-  const charset = charsetMatch?.[1] ?? 'utf-8';
+  const charsetMatch = contentType.match(/charset\s*=\s*([^\s;]+)/i);
+  let charset = charsetMatch?.[1] ?? 'utf-8';
+  charset = charset.replace(/^['"]|['"]$/g, '');
   try {
     return new TextDecoder(charset).decode(buffer);
   } catch {
