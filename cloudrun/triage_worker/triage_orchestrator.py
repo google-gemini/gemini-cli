@@ -1,6 +1,7 @@
 import subprocess
 import os
 import json
+from utils.gemini import upload_debug_log, log_token_usage
 
 def process_issue_triage(payload):
     """
@@ -34,7 +35,8 @@ def process_issue_triage(payload):
                 "-p", prompt,
                 "--policy", str(policy_path),
                 "--skip-trust",
-                "--approval-mode", "yolo"
+                "--approval-mode", "yolo",
+                "--debug"
             ],
             cwd=target_cwd,
             env=env,
@@ -45,12 +47,15 @@ def process_issue_triage(payload):
         
         print(f"[LOGIC] Gemini CLI Output:\n{result.stdout}")
         if result.stderr:
-            print(f"[LOGIC] Gemini CLI Warnings/Stderr:\n{result.stderr}")
+            log_token_usage(result.stderr)
+            print("[LOGIC] Gemini CLI Output End")
+            upload_debug_log(repo_name, issue_num, result.stderr)
             
         return True, result.stdout
     except subprocess.CalledProcessError as e:
         print(f"[LOGIC] Error: gemini-cli failed with code {e.returncode}")
-        print(f"[LOGIC] Stderr:\n{e.stderr}")
+        if e.stderr:
+            upload_debug_log(repo_name, issue_num, e.stderr)
         print(f"[LOGIC] Stdout:\n{e.stdout}")
         return False, e.stderr
     except FileNotFoundError:
