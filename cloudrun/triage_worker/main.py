@@ -48,7 +48,7 @@ def main():
             triage_result = json.loads(raw_output)
             validate_triage_result(triage_result)
 
-            quality = triage_result.get("triage_metadata", {}).get("quality")
+            quality = triage_result.get("triage_metadata", {}).get("quality"           )
             workable_spec = triage_result.get("workable_spec", {})
             
             if quality in ["SPAM", "EMPTY", "NEEDS_INFO"]:

@@ -1,5 +1,5 @@
 ---
-name: spec
+name: spec_generator
 description: Generates a structured Workable Spec JSON to guide a Developer Worker.
 ---
 

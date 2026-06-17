@@ -10,6 +10,11 @@ decision = "allow"
 priority = 100
 
 [[rule]]
+toolName = "activate_skill"
+decision = "allow"
+priority = 100
+
+[[rule]]
 toolName = "*"
 decision = "deny"
 priority = 10
