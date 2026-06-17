@@ -78,6 +78,25 @@ If you installed it globally via `npm`, update it using the command
 the latest changes from the repository, and then rebuild using the command
 `npm run build`.
 
+### How do I fix Linux install errors about native build tools or D-Bus?
+
+On some Linux distributions, installing from npm or running from source may need
+system packages used by native dependencies. If installation fails with errors
+about `pkg-config`, `dbus`, or missing compiler tools, install the matching
+packages for your distribution and retry the install:
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt-get install -y build-essential pkg-config libdbus-1-dev
+```
+
+**Fedora / RHEL**
+
+```bash
+sudo dnf install -y gcc make pkgconf-pkg-config dbus-devel
+```
+
 ## Platform-specific issues
 
 ### Why does the CLI crash on Windows when I run a command like `chmod +x`?
