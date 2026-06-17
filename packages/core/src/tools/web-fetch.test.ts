@@ -1225,6 +1225,33 @@ describe('WebFetchTool', () => {
       expect(result.llmContent).toContain('Hello é');
     });
 
+    it('should strip quotes from charset value (charset="iso-8859-1")', async () => {
+      const latin1Bytes = Buffer.from([0x63, 0x61, 0x66, 0xe9]); // "café" in Latin-1
+      mockFetch('https://example.com/quoted-charset', {
+        status: 200,
+        headers: new Headers({
+          'content-type': 'text/plain; charset="iso-8859-1"',
+        }),
+        arrayBuffer: () =>
+          Promise.resolve(
+            latin1Bytes.buffer.slice(
+              latin1Bytes.byteOffset,
+              latin1Bytes.byteOffset + latin1Bytes.byteLength,
+            ),
+          ),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({
+        url: 'https://example.com/quoted-charset',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toContain('café');
+    });
+
     it('should fall back to UTF-8 for unrecognised charset', async () => {
       const utf8Bytes = Buffer.from('Hello', 'utf8');
       mockFetch('https://example.com/unknown-charset', {

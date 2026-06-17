@@ -57,7 +57,8 @@ const hostRequestHistory = new LRUCache<string, number[]>(1000);
  */
 function decodeBody(buffer: Buffer, contentType: string): string {
   const charsetMatch = contentType.match(/charset=([^\s;]+)/i);
-  const charset = charsetMatch?.[1] ?? 'utf-8';
+  // Strip optional surrounding quotes per RFC 7231 (charset="gbk" or charset='utf-8')
+  const charset = charsetMatch?.[1].replace(/^["']|["']$/g, '') ?? 'utf-8';
   try {
     return new TextDecoder(charset).decode(buffer);
   } catch {
