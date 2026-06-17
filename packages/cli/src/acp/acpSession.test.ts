@@ -274,14 +274,14 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: 'Hi' }],
     });
 
-    // cachedReadTokens is a subset of inputTokens, so totalTokens sums
-    // input + output + thought (1000 + 200 + 50).
+    // cachedReadTokens is a subset of inputTokens, and thoughtTokens is a subset of outputTokens,
+    // so totalTokens is input + output (1000 + 200).
     expect(result.usage).toEqual({
       inputTokens: 1000,
       outputTokens: 200,
       cachedReadTokens: 800,
       thoughtTokens: 50,
-      totalTokens: 1250,
+      totalTokens: 1200,
     });
   });
 
