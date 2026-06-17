@@ -1196,5 +1196,60 @@ describe('WebFetchTool', () => {
         '[Content truncated due to size limit]',
       );
     });
+
+    it('should decode response using charset from Content-Type header', async () => {
+      // 0xE9 is 'é' in ISO-8859-1/Latin-1 but is invalid UTF-8 on its own.
+      const latin1Bytes = Buffer.from([
+        0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xe9,
+      ]); // "Hello é" in Latin-1
+      mockFetch('https://example.com/latin1', {
+        status: 200,
+        headers: new Headers({
+          'content-type': 'text/plain; charset=iso-8859-1',
+        }),
+        arrayBuffer: () =>
+          Promise.resolve(
+            latin1Bytes.buffer.slice(
+              latin1Bytes.byteOffset,
+              latin1Bytes.byteOffset + latin1Bytes.byteLength,
+            ),
+          ),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/latin1' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toContain('Hello é');
+    });
+
+    it('should fall back to UTF-8 for unrecognised charset', async () => {
+      const utf8Bytes = Buffer.from('Hello', 'utf8');
+      mockFetch('https://example.com/unknown-charset', {
+        status: 200,
+        headers: new Headers({
+          'content-type': 'text/plain; charset=x-not-a-real-charset',
+        }),
+        arrayBuffer: () =>
+          Promise.resolve(
+            utf8Bytes.buffer.slice(
+              utf8Bytes.byteOffset,
+              utf8Bytes.byteOffset + utf8Bytes.byteLength,
+            ),
+          ),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({
+        url: 'https://example.com/unknown-charset',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toContain('Hello');
+    });
   });
 });

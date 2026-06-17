@@ -50,6 +50,21 @@ const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
 const hostRequestHistory = new LRUCache<string, number[]>(1000);
 
+/**
+ * Decodes a response buffer using the charset declared in the Content-Type
+ * header, falling back to UTF-8 when none is specified or the declared
+ * charset is not recognised by the platform's TextDecoder.
+ */
+function decodeBody(buffer: Buffer, contentType: string): string {
+  const charsetMatch = contentType.match(/charset=([^\s;]+)/i);
+  const charset = charsetMatch?.[1] ?? 'utf-8';
+  try {
+    return new TextDecoder(charset).decode(buffer);
+  } catch {
+    return new TextDecoder('utf-8').decode(buffer);
+  }
+}
+
 function checkRateLimit(url: string): {
   allowed: boolean;
   waitTimeMs?: number;
@@ -321,8 +336,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       response,
       MAX_EXPERIMENTAL_FETCH_SIZE,
     );
-    const rawContent = bodyBuffer.toString('utf8');
     const contentType = response.headers.get('content-type') || '';
+    const rawContent = decodeBody(bodyBuffer, contentType);
     let textContent: string;
 
     // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
@@ -659,7 +674,7 @@ ${aggregatedContent}
       );
 
       if (status >= 400) {
-        let rawResponseText = bodyBuffer.toString('utf8');
+        let rawResponseText = decodeBody(bodyBuffer, contentType);
         if (!this.context.config.isContextManagementEnabled()) {
           rawResponseText = truncateString(
             rawResponseText,
@@ -689,7 +704,7 @@ Response: ${rawResponseText}`;
         lowContentType.includes('text/plain') ||
         lowContentType.includes('application/json')
       ) {
-        let text = bodyBuffer.toString('utf8');
+        let text = decodeBody(bodyBuffer, contentType);
         if (!this.context.config.isContextManagementEnabled()) {
           text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
         }
@@ -700,7 +715,7 @@ Response: ${rawResponseText}`;
       }
 
       if (lowContentType.includes('text/html')) {
-        const html = bodyBuffer.toString('utf8');
+        const html = decodeBody(bodyBuffer, contentType);
         let textContent = convert(html, {
           wordwrap: false,
           selectors: [
@@ -738,7 +753,7 @@ Response: ${rawResponseText}`;
       }
 
       // Fallback for unknown types - try as text
-      let text = bodyBuffer.toString('utf8');
+      let text = decodeBody(bodyBuffer, contentType);
       if (!this.context.config.isContextManagementEnabled()) {
         text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
       }
