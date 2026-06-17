@@ -162,7 +162,7 @@ const _loadableSettingScopes = [
 export function isLoadableSettingScope(
   scope: SettingScope,
 ): scope is LoadableSettingScope {
-  return (_loadableSettingScopes).includes(scope);
+  return _loadableSettingScopes.includes(scope);
 }
 
 export interface CheckpointingSettings {
