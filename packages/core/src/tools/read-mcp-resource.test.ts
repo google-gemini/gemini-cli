@@ -9,6 +9,7 @@ import { ReadMcpResourceTool } from './read-mcp-resource.js';
 import { ToolErrorType } from './tool-error.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 describe('ReadMcpResourceTool', () => {
   let tool: ReadMcpResourceTool;
@@ -83,7 +84,7 @@ describe('ReadMcpResourceTool', () => {
     expect(mockMcpManager.getClient).toHaveBeenCalledWith(serverName);
     expect(mockClient.readResource).toHaveBeenCalledWith(uri);
     expect(result).toEqual({
-      llmContent: resourceContent + '\n',
+      llmContent: wrapUntrusted(resourceContent + '\n'),
       returnDisplay: `Successfully read resource "${resourceName}" from server "${serverName}"`,
     });
   });
@@ -124,7 +125,7 @@ describe('ReadMcpResourceTool', () => {
     expect(mockMcpManager.findResourceByUri).toHaveBeenCalledWith(qualifiedUri);
     expect(mockMcpManager.getClient).toHaveBeenCalledWith(serverName);
     expect(mockClient.readResource).toHaveBeenCalledWith(rawUri);
-    expect(result.llmContent).toBe(resourceContent + '\n');
+    expect(result.llmContent).toBe(wrapUntrusted(resourceContent + '\n'));
   });
 
   it('should return error if MCP Client Manager not available', async () => {
