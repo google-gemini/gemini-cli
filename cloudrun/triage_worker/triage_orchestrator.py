@@ -1,7 +1,7 @@
 import subprocess
 import os
 import json
-from utils.gemini import upload_debug_log, log_token_usage
+from utils.gemini import upload_debug_log
 
 def process_issue_triage(payload):
     """
@@ -47,7 +47,6 @@ def process_issue_triage(payload):
         
         print(f"[LOGIC] Gemini CLI Output:\n{result.stdout}")
         if result.stderr:
-            log_token_usage(result.stderr)
             print("[LOGIC] Gemini CLI Output End")
             upload_debug_log(repo_name, issue_num, result.stderr)
             
