@@ -84,7 +84,10 @@ describe('EditTool', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    const rawTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'edit-tool-test-'),
+    );
+    tempDir = fs.realpathSync(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 

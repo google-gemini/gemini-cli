@@ -572,6 +572,99 @@ describe('Consolidated At-Reference Path Resolution Tests (b-495551283)', () => 
     expect(createdContent).toContain('nested_brand_new_edit_file = true');
   });
 
+  it('EditTool successfully creates a new file in a nested subdirectory when the path is prefixed with @/ and the first segment does NOT exist', async () => {
+    const editTool = new EditTool(mockConfigInstance, createMockMessageBus());
+    const invocation = editTool.build({
+      file_path: '@/new-policies-edit-alias/sub/brand-new-file.txt',
+      instruction: 'create new file in nested subdirectory',
+      old_string: '',
+      new_string: '[[rule]]\nnested_brand_new_edit_file_alias = true\n',
+    });
+
+    const result = await invocation.execute({ abortSignal });
+
+    // The tool should succeed and create the correct file
+    expect(result.error).toBeUndefined();
+
+    const literalAtFilePath = path.join(
+      tempRootDir,
+      '@',
+      'new-policies-edit-alias',
+      'sub',
+      'brand-new-file.txt',
+    );
+    const correctFilePath = path.join(
+      tempRootDir,
+      'new-policies-edit-alias',
+      'sub',
+      'brand-new-file.txt',
+    );
+
+    // It should NOT have created a literal "@" directory
+    expect(fs.existsSync(literalAtFilePath)).toBe(false);
+    expect(fs.existsSync(path.join(tempRootDir, '@'))).toBe(false);
+
+    // It should have created the file under "new-policies-edit-alias/sub"
+    expect(fs.existsSync(correctFilePath)).toBe(true);
+
+    // Verify the content of the created file
+    const createdContent = await fsp.readFile(correctFilePath, 'utf8');
+    expect(createdContent).toContain('nested_brand_new_edit_file_alias = true');
+  });
+
+  it('EditTool successfully creates a new file in a nested subdirectory when the path is prefixed with @\\ and the first segment does NOT exist', async () => {
+    const editTool = new EditTool(mockConfigInstance, createMockMessageBus());
+    const invocation = editTool.build({
+      file_path: '@\\new-policies-edit-alias-win\\sub\\brand-new-file.txt',
+      instruction: 'create new file in nested subdirectory',
+      old_string: '',
+      new_string: '[[rule]]\nnested_brand_new_edit_file_alias_win = true\n',
+    });
+
+    const result = await invocation.execute({ abortSignal });
+
+    // The tool should succeed and create the correct file
+    expect(result.error).toBeUndefined();
+
+    const isWindows = process.platform === 'win32';
+    const literalAtFilePath = isWindows
+      ? path.join(
+          tempRootDir,
+          '@',
+          'new-policies-edit-alias-win',
+          'sub',
+          'brand-new-file.txt',
+        )
+      : path.join(
+          tempRootDir,
+          '@\\new-policies-edit-alias-win\\sub\\brand-new-file.txt',
+        );
+    const correctFilePath = isWindows
+      ? path.join(
+          tempRootDir,
+          'new-policies-edit-alias-win',
+          'sub',
+          'brand-new-file.txt',
+        )
+      : path.join(
+          tempRootDir,
+          'new-policies-edit-alias-win\\sub\\brand-new-file.txt',
+        );
+
+    // It should NOT have created a literal "@" directory
+    expect(fs.existsSync(literalAtFilePath)).toBe(false);
+    expect(fs.existsSync(path.join(tempRootDir, '@'))).toBe(false);
+
+    // It should have created the file under "new-policies-edit-alias-win/sub"
+    expect(fs.existsSync(correctFilePath)).toBe(true);
+
+    // Verify the content of the created file
+    const createdContent = await fsp.readFile(correctFilePath, 'utf8');
+    expect(createdContent).toContain(
+      'nested_brand_new_edit_file_alias_win = true',
+    );
+  });
+
   it('correctPath successfully resolves a path prefixed with @ to its clean counterpart', () => {
     const result = correctPath(
       '@policies/new-policies.txt',

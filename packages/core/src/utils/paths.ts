@@ -581,25 +581,23 @@ export function resolveDefensiveToolPath(
   filePath: string,
   targetDir: string,
 ): string {
-  if (filePath.includes('\0')) {
-    return filePath;
-  }
+  const cleanPath = filePath.replace(/\0/g, '');
 
   try {
-    const literalPath = path.resolve(targetDir, filePath);
+    const literalPath = path.resolve(targetDir, cleanPath);
 
     // If the file literally exists on disk as-is, return the resolved literal path immediately
     if (fs.existsSync(literalPath)) {
-      return filePath;
+      return cleanPath;
     }
 
     // If the model supplied a leading @ prefix and the literal path doesn't exist:
-    if (filePath.startsWith('@') && filePath.length > 1) {
-      if (filePath.startsWith('@/') || filePath.startsWith('@\\')) {
-        return filePath.substring(1).replace(/^[\\/]+/, '');
+    if (cleanPath.startsWith('@') && cleanPath.length > 1) {
+      if (cleanPath.startsWith('@/') || cleanPath.startsWith('@\\')) {
+        return cleanPath.substring(1).replace(/^[\\/]+/, '');
       }
 
-      const strippedPath = filePath.substring(1).replace(/^[\\/]+/, '');
+      const strippedPath = cleanPath.substring(1).replace(/^[\\/]+/, '');
 
       // Check if a literal directory/file starting with '@' exists for the first segment.
       // If it does, we should preserve the '@' prefix.
@@ -608,7 +606,7 @@ export function resolveDefensiveToolPath(
       if (firstSegment) {
         const literalFirstSegment = path.resolve(targetDir, '@' + firstSegment);
         if (fs.existsSync(literalFirstSegment)) {
-          return filePath;
+          return cleanPath;
         }
 
         // Only strip the '@' prefix if the stripped path's first segment actually exists
@@ -619,12 +617,12 @@ export function resolveDefensiveToolPath(
       }
 
       // Otherwise, preserve the '@' prefix to allow creating new files/directories starting with '@'
-      return filePath;
+      return cleanPath;
     }
   } catch {
     // Fallback to original path if any filesystem or resolution error occurs
   }
 
   // Fallback: return the original path
-  return filePath;
+  return cleanPath;
 }
