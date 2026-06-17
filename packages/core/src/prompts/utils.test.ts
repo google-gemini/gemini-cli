@@ -312,4 +312,33 @@ describe('applySubstitutions', () => {
     );
     expect(result).toBe('A plain prompt with no variables.');
   });
+
+  it('should insert ${AgentSkills} content literally when it contains $ sequences', () => {
+    const skills = "Run: echo $'a' ; cost $$5 ; use $&";
+    const result = applySubstitutions(
+      'Header.\n${AgentSkills}\nTAIL.',
+      mockConfig,
+      skills,
+    );
+    expect(result).toBe(`Header.\n${skills}\nTAIL.`);
+  });
+
+  it('should insert ${SubAgents} content literally when it contains $ sequences', async () => {
+    const legacySnippets = await import('./snippets.legacy.js');
+    vi.mocked(legacySnippets.renderSubAgents).mockReturnValueOnce(
+      "see $' here",
+    );
+    const result = applySubstitutions('A:${SubAgents}:B', mockConfig, '');
+    expect(result).toBe("A:see $' here:B");
+  });
+
+  it('should insert ${AvailableTools} list literally even with $ in tool names', () => {
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue(['weird$&tool']),
+      getAllTools: vi.fn().mockReturnValue([]),
+    } as unknown as ToolRegistry;
+
+    const result = applySubstitutions('T: ${AvailableTools}', mockConfig, '');
+    expect(result).toBe('T: - weird$&tool');
+  });
 });
