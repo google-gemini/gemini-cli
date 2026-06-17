@@ -501,8 +501,6 @@ on GitHub.
 
 ## Announcements: v0.22.0 - 2025-12-22
 
-- 🎉**Free Tier + Gemini 3:** Free tier users now all have access to Gemini 3
-  Pro & Flash. Enable in `/settings` by toggling "Preview Features" to `true`.
 - 🎉**Gemini CLI + Colab:** Gemini CLI is now pre-installed. Can be used
   headlessly in notebook cells or interactively in the built-in terminal
   ([pic](https://imgur.com/a/G0Tn7vi))
@@ -524,8 +522,8 @@ on GitHub.
 ## Announcements: v0.21.0 - 2025-12-15
 
 - **⚡️⚡️⚡️ Gemini 3 Flash + Gemini CLI:** Better, faster and cheaper than 2.5
-  Pro - and in some scenarios better than 3 Pro! For paid tiers + free tier
-  users who were on the wait list enable **Preview Features** in `/settings.`
+  Pro - and in some scenarios better than 3 Pro! For paid tiers, enable
+  **Preview Features** in `/settings.`
 - For more information:
   [Gemini 3 Flash is now available in Gemini CLI](https://developers.googleblog.com/gemini-3-flash-is-now-available-in-gemini-cli/).
 - 🎉 Gemini CLI Extensions:
@@ -596,10 +594,6 @@ on GitHub.
   information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
-- **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API
-  key, Google AI Pro or Google AI Ultra (for individuals, not businesses) and
-  Gemini Code Assist Enterprise users. Enable it via `/settings` and toggling on
-  **Preview Features**.
 - **Updated UI rollback:** We’ve temporarily rolled back our updated UI to give
   it more time to bake. This means for a time you won’t have embedded scrolling
   or mouse support. You can re-enable with `/settings` -> **Use Alternate Screen

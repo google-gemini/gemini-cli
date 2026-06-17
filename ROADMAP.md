@@ -67,8 +67,7 @@ To better organize our efforts, we categorize our work into several key feature
 areas. These labels are used on our GitHub Issues to help you filter and find
 initiatives that interest you.
 
-- **Authentication:** Secure user access via API keys, Gemini Code Assist login,
-  etc.
+- **Authentication:** Secure user access via API keys, Vertex AI, etc.
 - **Model:** Support new Gemini models, multi-modality, local execution, and
   performance tuning.
 - **User Experience:** Improve the CLI's usability, performance, interactive

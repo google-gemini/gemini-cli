@@ -537,9 +537,6 @@ HTTP header.
 This policy prevents users from logging in with personal Gmail accounts or other
 non-corporate Google accounts.
 
-For detailed instructions, see the Google Workspace Admin Help article on
-[blocking access to consumer accounts](https://support.google.com/a/answer/1668854?hl=en#zippy=%2Cstep-choose-a-web-proxy-server%2Cstep-configure-the-network-to-block-certain-accounts).
-
 The general steps are as follows:
 
 1.  **Intercept Requests**: Configure your web proxy to intercept all requests

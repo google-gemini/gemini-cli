@@ -16,8 +16,6 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 🚀 Why Gemini CLI?
 
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
-  account.
 - **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
   context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
@@ -149,14 +147,13 @@ Choose the authentication method that best fits your needs:
 
 ### Option 1: Sign in with Google (OAuth login using your Google Account)
 
-**✨ Best for:** Individual developers as well as anyone who has a Gemini Code
-Assist License. (see
+**✨ Best for:** Teams who have a Gemini Code Assist Standard or Enterprise
+License. (see
 [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas)
 for details)
 
 **Benefits:**
 
-- **Free tier**: 60 requests/min and 1,000 requests/day
 - **Gemini 3 models** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
@@ -181,7 +178,6 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 

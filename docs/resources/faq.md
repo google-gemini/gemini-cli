@@ -141,45 +141,6 @@ Gemini CLI configuration is stored in two `settings.json` files:
 Refer to [Gemini CLI Configuration](../reference/configuration.md) for more
 details.
 
-## Google AI Pro/Ultra and subscription FAQs
-
-### Where can I learn more about my Google AI Pro or Google AI Ultra subscription?
-
-To learn more about your Google AI Pro or Google AI Ultra subscription, visit
-**Manage subscription** in your [subscription settings](https://one.google.com).
-
-### How do I know if I have higher limits for Google AI Pro or Ultra?
-
-If you're subscribed to Google AI Pro or Ultra, you automatically have higher
-limits to Gemini Code Assist and Gemini CLI. These are shared across Gemini CLI
-and agent mode in the IDE. You can confirm you have higher limits by checking if
-you are still subscribed to Google AI Pro or Ultra in your
-[subscription settings](https://one.google.com).
-
-### What is the privacy policy for using Gemini Code Assist or Gemini CLI if I've subscribed to Google AI Pro or Ultra?
-
-To learn more about your privacy policy and terms of service governed by your
-subscription, visit
-[Gemini Code Assist: Terms of Service and Privacy Policies](https://developers.google.com/gemini-code-assist/resources/privacy-notices).
-
-### I've upgraded to Google AI Pro or Ultra but it still says I am hitting quota limits. Is this a bug?
-
-The higher limits in your Google AI Pro or Ultra subscription are for Gemini 2.5
-across both Gemini 2.5 Pro and Flash. They are shared quota across Gemini CLI
-and agent mode in Gemini Code Assist IDE extensions. You can learn more about
-quota limits for Gemini CLI, Gemini Code Assist and agent mode in Gemini Code
-Assist at
-[Quotas and limits](https://developers.google.com/gemini-code-assist/resources/quotas).
-
-### If I upgrade to higher limits for Gemini CLI and Gemini Code Assist by purchasing a Google AI Pro or Ultra subscription, will Gemini start using my data to improve its machine learning models?
-
-Google does not use your data to improve Google's machine learning models if you
-purchase a paid plan. Note: If you decide to remain on the free version of
-Gemini Code Assist, Gemini Code Assist for individuals, you can also opt out of
-using your data to improve Google's machine learning models. See the
-[Gemini Code Assist for individuals privacy notice](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals)
-for more information.
-
 ## Not seeing your question?
 
 Search the
