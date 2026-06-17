@@ -29,6 +29,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import * as tomlLoader from './agentLoader.js';
+import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
@@ -266,6 +267,38 @@ describe('AgentRegistry', () => {
       expect(
         vi.mocked(tomlLoader.loadAgentsFromDirectory),
       ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should load agents only once when project dir and user dir resolve to the same path', async () => {
+      // Simulate running the CLI from the home directory: both the project
+      // agents dir and the user agents dir point to ~/.gemini/agents/.
+      const sharedDir = '/mock/home/.gemini/agents';
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      registry = new TestableAgentRegistry(mockConfig);
+
+      vi.spyOn(mockConfig.storage, 'getProjectAgentsDir').mockReturnValue(
+        sharedDir,
+      );
+      vi.spyOn(Storage, 'getUserAgentsDir').mockReturnValue(sharedDir);
+
+      const agent = { ...MOCK_AGENT_V1, name: 'home-agent' };
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [agent],
+        errors: [],
+      });
+
+      await registry.initialize();
+
+      // loadAgentsFromDirectory should be called exactly once — not twice —
+      // even though both dirs resolve to the same path.
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledWith(sharedDir);
+      // The agent should be registered without a duplicate warning.
+      expect(registry.getDefinition('home-agent')).toBeDefined();
     });
 
     it('should NOT load TOML agents when enableAgents is false', async () => {
