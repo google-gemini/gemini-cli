@@ -1,0 +1,2 @@
+google-cloud-firestore==2.13.0
+python-dotenv
