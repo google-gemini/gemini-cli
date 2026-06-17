@@ -1,5 +1,8 @@
-FROM python:3.13-slim
+FROM node:20-slim
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 COPY . .
-RUN pip install --no-cache-dir -r requirements.txt
-CMD ["gunicorn", "--bind", ":8080", "--workers", "1", "--threads", "8", "--timeout", "0", "main:app"]
+EXPOSE 8080
+CMD ["npx", "tsx", "server.ts"]
+

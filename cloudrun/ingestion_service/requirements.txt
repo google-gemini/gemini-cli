@@ -1,5 +1,0 @@
-Flask>=3.0.0
-gunicorn>=22.0.0
-google-cloud-pubsub==2.18.0
-google-cloud-firestore==2.13.0
-python-dotenv==1.0.0
