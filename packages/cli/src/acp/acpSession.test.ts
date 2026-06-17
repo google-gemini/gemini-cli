@@ -249,6 +249,42 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('reports token usage in the standard ACP usage field (incl. cached and thought tokens)', async () => {
+    mockSendMessageStream.mockImplementation(() => {
+      async function* gen(): AsyncGenerator<ServerGeminiStreamEvent> {
+        yield { type: GeminiEventType.Content, value: 'Hello' };
+        yield {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: FinishReason.STOP,
+            usageMetadata: {
+              promptTokenCount: 1000,
+              candidatesTokenCount: 200,
+              cachedContentTokenCount: 800,
+              thoughtsTokenCount: 50,
+            },
+          },
+        };
+      }
+      return gen();
+    });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    // cachedReadTokens is a subset of inputTokens, so totalTokens sums
+    // input + output + thought (1000 + 200 + 50).
+    expect(result.usage).toEqual({
+      inputTokens: 1000,
+      outputTokens: 200,
+      cachedReadTokens: 800,
+      thoughtTokens: 50,
+      totalTokens: 1250,
+    });
+  });
+
   it('should pass current session information directly onto geminiClient.sendMessageStream', async () => {
     const stream = createMockStream([
       {

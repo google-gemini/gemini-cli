@@ -361,7 +361,21 @@ export class Session {
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCachedTokens = 0;
+    let totalThoughtTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
+
+    // Populate the standard ACP `PromptResponse.usage` field so any ACP client
+    // (Zed, OpenHands, etc.) can read token usage — including cached and thought
+    // tokens — without Gemini-specific parsing of `_meta.quota`. This mirrors
+    // the behaviour of Claude Agent ACP and Codex ACP.
+    const buildUsage = (): acp.Usage => ({
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      cachedReadTokens: totalCachedTokens,
+      thoughtTokens: totalThoughtTokens,
+      totalTokens: totalInputTokens + totalOutputTokens + totalThoughtTokens,
+    });
 
     let currentParts: Part[] = parts;
     let turnCount = 0;
@@ -372,6 +386,7 @@ export class Session {
       if (maxTurns >= 0 && turnCount > maxTurns) {
         return {
           stopReason: 'max_turn_requests',
+          usage: buildUsage(),
           _meta: {
             quota: {
               token_count: {
@@ -401,6 +416,8 @@ export class Session {
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
       let turnOutputTokens = 0;
+      let turnCachedTokens = 0;
+      let turnThoughtTokens = 0;
 
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
@@ -447,6 +464,10 @@ export class Session {
                 turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
                 turnOutputTokens =
                   usage.candidatesTokenCount ?? turnOutputTokens;
+                turnCachedTokens =
+                  usage.cachedContentTokenCount ?? turnCachedTokens;
+                turnThoughtTokens =
+                  usage.thoughtsTokenCount ?? turnThoughtTokens;
               }
               break;
             }
@@ -516,6 +537,7 @@ export class Session {
           // Treat this as a graceful end to the model's turn rather than a crash.
           return {
             stopReason: 'end_turn',
+            usage: buildUsage(),
             _meta: {
               quota: {
                 token_count: {
@@ -544,6 +566,8 @@ export class Session {
 
       totalInputTokens += turnInputTokens;
       totalOutputTokens += turnOutputTokens;
+      totalCachedTokens += turnCachedTokens;
+      totalThoughtTokens += turnThoughtTokens;
 
       if (turnInputTokens > 0 || turnOutputTokens > 0) {
         const existing = modelUsageMap.get(turnModelId) ?? {
@@ -558,6 +582,7 @@ export class Session {
       if (stopReason !== 'end_turn') {
         return {
           stopReason,
+          usage: buildUsage(),
           _meta: {
             quota: {
               token_count: {
@@ -609,6 +634,7 @@ export class Session {
 
     return {
       stopReason: 'end_turn',
+      usage: buildUsage(),
       _meta: {
         quota: {
           token_count: {
