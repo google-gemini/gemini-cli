@@ -132,7 +132,10 @@ export async function getCorrectedFileContent(
   }
 
   const fileExtension = path.extname(filePath).toLowerCase();
-  const isJsonLike = fileExtension === '.json' || fileExtension === '.ipynb';
+  const isJsonLike =
+    fileExtension.startsWith('.json') ||
+    fileExtension === '.ipynb' ||
+    fileExtension === '.map';
 
   const aggressiveUnescape =
     !isJsonLike && !isGemini3Model(config.getActiveModel());
