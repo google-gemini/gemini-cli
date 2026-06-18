@@ -134,7 +134,7 @@ The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
 rule with the highest priority wins**.
 
-To provide a clear hierarchy, policies are organized into three tiers. Each tier
+To provide a clear hierarchy, policies are organized into five tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
 | Tier      | Base | Description                                                                                   |
@@ -161,9 +161,9 @@ This system guarantees that:
 For example:
 
 - A `priority: 50` rule in a Default policy TOML becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy TOML becomes `2.010`.
-- A `priority: 100` rule in a User policy TOML becomes `3.100`.
-- A `priority: 20` rule in an Admin policy TOML becomes `4.020`.
+- A `priority: 10` rule in a Workspace policy TOML becomes `3.010`.
+- A `priority: 100` rule in a User policy TOML becomes `4.100`.
+- A `priority: 20` rule in an Admin policy TOML becomes `5.020`.
 
 ### Approval modes
 
@@ -232,7 +232,7 @@ User, and (if configured) Admin directories.
 
 #### System-wide policies (Admin)
 
-Administrators can enforce system-wide policies (Tier 4) that override all user
+Administrators can enforce system-wide policies (Tier 5) that override all user
 and default settings. These policies can be loaded from standard system
 locations or supplemental paths.
 
@@ -253,7 +253,7 @@ Administrators can also specify supplemental policy paths using:
 - The `--admin-policy` command-line flag.
 - The `adminPolicyPaths` setting in a system settings file.
 
-These supplemental policies are assigned the same **Admin** tier (Base 4) as
+These supplemental policies are assigned the same **Admin** tier (Base 5) as
 policies in standard locations.
 
 **Security Guard**: Supplemental admin policies are **ignored** if any `.toml`
