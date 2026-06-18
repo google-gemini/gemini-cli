@@ -133,7 +133,7 @@ export async function getCorrectedFileContent(
 
   const fileExtension = path.extname(filePath).toLowerCase();
   const isJsonLike =
-    fileExtension.startsWith('.json') ||
+    fileExtension.includes('json') ||
     fileExtension === '.ipynb' ||
     fileExtension === '.map';
 
