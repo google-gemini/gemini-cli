@@ -114,8 +114,8 @@ export function useGitBranchName(cwd: string): string | undefined {
         clearTimeout(timeoutRef.current);
       }
       watcher?.close();
-      if (watchedHeadPath) {
-        fs.unwatchFile(watchedHeadPath);
+      if (watchedHeadPath && watchedHeadListener) {
+        fs.unwatchFile(watchedHeadPath, watchedHeadListener);
       }
     };
   }, [cwd, fetchBranchName]);
