@@ -5,6 +5,21 @@ import { Firestore } from '@google-cloud/firestore';
 import { verifyGithubSignature } from './auth/github.js';
 import { IssuesStore } from './db/issuesStore.js';
 
+interface GitHubWebhookPayload {
+  action?: string;
+  issue?: {
+    body?: string;
+    number?: number;
+    title?: string;
+  };
+  repository?: {
+    full_name?: string;
+  };
+  sender?: {
+    login?: string;
+  };
+}
+
 dotenv.config();
 
 const app = express();
@@ -15,7 +30,13 @@ const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
 const databaseId = process.env.FIRESTORE_DATABASE;
 const collectionName = process.env.FIRESTORE_COLLECTION;
 
-if (!projectId || !topicId || !githubWebhookSecret || !databaseId || !collectionName) {
+if (
+  !projectId ||
+  !topicId ||
+  !githubWebhookSecret ||
+  !databaseId ||
+  !collectionName
+) {
   throw new Error('Missing required environment variables');
 }
 
@@ -32,21 +53,28 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-app.post('/webhook', async (req: any, res: any) => {
+app.post('/webhook', async (req, res) => {
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
 
   // Github Authentication
-  if (!req.body || !verifyGithubSignature(req.body, signature, githubWebhookSecret)) {
+  if (
+    !req.body ||
+    !verifyGithubSignature(req.body, signature, githubWebhookSecret)
+  ) {
     console.error('Unauthorized: HMAC signature mismatch.');
-    return res.status(401).json({ status: 'error', message: 'Invalid Signature' });
+    return res
+      .status(401)
+      .json({ status: 'error', message: 'Invalid Signature' });
   }
 
   // Parse JSON payload
-  let payload: any;
+  let payload: GitHubWebhookPayload;
   try {
-    payload = JSON.parse(req.body.toString());
-  } catch (error) {
-    return res.status(400).json({ status: 'error', message: 'Invalid JSON payload' });
+    payload = JSON.parse(req.body.toString()) as GitHubWebhookPayload;
+  } catch {
+    return res
+      .status(400)
+      .json({ status: 'error', message: 'Invalid JSON payload' });
   }
 
   const eventType = req.headers['x-github-event'];
@@ -74,7 +102,9 @@ app.post('/webhook', async (req: any, res: any) => {
   const repository = processedData.repository;
 
   if (!issueNumber || !repository) {
-    return res.status(400).json({ status: 'error', message: 'Missing issue_number or repository' });
+    return res
+      .status(400)
+      .json({ status: 'error', message: 'Missing issue_number or repository' });
   }
 
   const [owner, repo] = repository.split('/');
@@ -88,9 +118,10 @@ app.post('/webhook', async (req: any, res: any) => {
     const messageId = await topic.publishMessage({ data: dataBuffer });
 
     return res.status(202).json({ status: 'accepted', message_id: messageId });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error processing webhook:', error);
-    return res.status(500).json({ status: 'error', message: error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ status: 'error', message });
   }
 });
 

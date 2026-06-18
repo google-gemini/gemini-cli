@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { IssuesStore } from './issuesStore.js';
-import { Firestore } from '@google-cloud/firestore';
+import { Firestore, Transaction } from '@google-cloud/firestore';
 
 describe('IssuesStore', () => {
-  let mockTransaction: any;
+  let mockTransaction: {
+    get: Mock;
+    set: Mock;
+  };
   let mockDb: Firestore;
   let store: IssuesStore;
 
   beforeEach(() => {
-    // Mock read/write methods for transaction
+    // Assign mock read/write methods for transaction
     mockTransaction = {
       get: vi.fn(),
       set: vi.fn(),
@@ -18,9 +22,13 @@ describe('IssuesStore', () => {
     mockDb = {
       collection: vi.fn().mockReturnThis(),
       doc: vi.fn().mockReturnValue({}),
-      runTransaction: vi.fn().mockImplementation((callback: (tx: any) => Promise<any>) => {
-        return callback(mockTransaction);
-      }),
+      runTransaction: vi
+        .fn()
+        .mockImplementation(
+          (callback: (tx: Transaction) => Promise<unknown>) => {
+            return callback(mockTransaction as unknown as Transaction);
+          },
+        ),
     } as unknown as Firestore;
 
     store = new IssuesStore(mockDb, 'issues-collection');
@@ -30,7 +38,12 @@ describe('IssuesStore', () => {
     // The transaction should mock that the document does not exist
     mockTransaction.get.mockResolvedValue({ exists: false });
 
-    const result = await store.createIssue('google', 'gemini-cli', 123, 'Test Title');
+    const result = await store.createIssue(
+      'google',
+      'gemini-cli',
+      123,
+      'Test Title',
+    );
 
     expect(result).toBe(true);
     expect(mockTransaction.get).toHaveBeenCalled();
@@ -44,7 +57,7 @@ describe('IssuesStore', () => {
           issue_number: 123,
           title: 'Test Title',
         }),
-      })
+      }),
     );
   });
 
@@ -52,7 +65,12 @@ describe('IssuesStore', () => {
     // The transaction should mock that the document already exists
     mockTransaction.get.mockResolvedValue({ exists: true });
 
-    const result = await store.createIssue('google', 'gemini-cli', 123, 'Test Title');
+    const result = await store.createIssue(
+      'google',
+      'gemini-cli',
+      123,
+      'Test Title',
+    );
 
     expect(result).toBe(false);
     expect(mockTransaction.get).toHaveBeenCalled();
