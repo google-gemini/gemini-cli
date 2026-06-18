@@ -21,6 +21,7 @@ def process_issue_triage(payload):
     # Makes GCLI use the skills defined inside our .gemini folder.
     env["GEMINI_SYSTEM_MD"] = str(system_prompt_path) 
     env["GEMINI_CLI_HOME"] = current_dir
+    env["GEMINI_TELEMETRY_ENABLED"] = "false"
     # Force non interactive mode
     env["TERM"] = "dumb"
     env["COLORTERM"] = ""

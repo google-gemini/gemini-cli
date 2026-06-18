@@ -10,6 +10,21 @@ decision = "allow"
 priority = 100
 
 [[rule]]
+toolName = "list_dir"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "find_by_name"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "grep_search"
+decision = "allow"
+priority = 100
+
+[[rule]]
 toolName = "activate_skill"
 decision = "allow"
 priority = 100

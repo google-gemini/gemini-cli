@@ -6,6 +6,9 @@ description: Generates a structured Workable Spec JSON to guide a Developer Work
 # Spec Generator Instructions
 Extract key technical details from the issue and organize them according to the following strict JSON schema.
 
+### Critical Rules:
+1. **Codebase Verification:** Rely on file paths and locations found during your codebase exploration. Ensure all files mentioned in `files_to_modify` and `test_file` actually exist in the repository. Do not make up file paths.
+
 > [!IMPORTANT]
 > The output MUST strictly adhere to this schema. Deviations (like putting objects inside arrays instead of strings) will break the downstream automated code generation pipeline.
 

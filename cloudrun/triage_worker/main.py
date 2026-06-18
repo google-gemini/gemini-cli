@@ -55,6 +55,10 @@ def main():
                 print(f"[WORKER] Quality: {quality}. Transitioning status.")
                 release_lock(owner, repo, issue_number, lock_holder, success=False, status_override=quality)
                 sys.exit(0)
+            elif quality == "FEATURE":
+                print(f"[WORKER] Quality: FEATURE. Transitioning status to TRIAGED.")
+                release_lock(owner, repo, issue_number, lock_holder, success=True, workable_spec={})
+                sys.exit(0)
             else:
                 release_lock(owner, repo, issue_number, lock_holder, success=True, workable_spec=workable_spec)
                 print(f"[WORKER] Triage success.")
