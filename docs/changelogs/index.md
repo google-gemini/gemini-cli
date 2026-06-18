@@ -18,6 +18,23 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.47.0 - 2026-06-18
+
+- **Gemini 3.5 Flash Support:** Auto Mode now supports Gemini 3.5 Flash backend
+  definitions and can automatically use the new model when enabled
+  ([#27645](https://github.com/google-gemini/gemini-cli/pull/27645) by
+  @DavidAPierce).
+- **Antigravity CLI Migration:** Added documentation and helper commands to
+  facilitate migration to the Antigravity CLI
+  ([#27765](https://github.com/google-gemini/gemini-cli/pull/27765) by
+  @DavidAPierce).
+- **Core Reliability Improvements:** Enhanced MCP tool discovery with atomic
+  updates and avoided saving empty resume sessions
+  ([#27619](https://github.com/google-gemini/gemini-cli/pull/27619) by
+  @luisfelipe-alt,
+  [#27770](https://github.com/google-gemini/gemini-cli/pull/27770) by
+  @SandyTao520).
+
 ## Announcements: v0.45.0 - 2026-06-03
 
 - **Context Simplification:** Completed major architectural work to simplify the
