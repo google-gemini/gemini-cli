@@ -111,8 +111,8 @@
     "@types/picomatch": "4.0.1",
     "chrome-devtools-mcp": "0.19.0",
     "msw": "2.3.4",
-    "typescript": "5.3.3",
-    "vitest": "3.1.1"
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": ">=20"
