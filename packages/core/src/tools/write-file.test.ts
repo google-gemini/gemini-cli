@@ -394,28 +394,40 @@ describe('WriteFileTool', () => {
       );
     });
 
-    it('should set isJsonLike to true and aggressiveUnescape to false for .ipynb and .json files', async () => {
-      const filePath = path.join(rootDir, 'notebook_file.ipynb');
-      const proposedContent = '{"cells": []}';
+    it('should set isJsonLike to true and aggressiveUnescape to false for .ipynb, .json, map, yaml, toml, and common JSON-based dotfiles', async () => {
       const abortSignal = new AbortController().signal;
+      const filesToTest = [
+        'notebook.ipynb',
+        'data.json',
+        'bundle.js.map',
+        'workflow.yaml',
+        'config.yml',
+        'Cargo.toml',
+        '.eslintrc',
+        '.prettierrc',
+      ];
 
-      mockEnsureCorrectFileContent.mockResolvedValue('{"cells": []}');
+      for (const file of filesToTest) {
+        mockEnsureCorrectFileContent.mockClear();
+        mockEnsureCorrectFileContent.mockResolvedValue('content');
 
-      await getCorrectedFileContent(
-        mockConfig,
-        filePath,
-        proposedContent,
-        abortSignal,
-      );
+        const filePath = path.join(rootDir, file);
+        await getCorrectedFileContent(
+          mockConfig,
+          filePath,
+          'content',
+          abortSignal,
+        );
 
-      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
-        proposedContent,
-        mockBaseLlmClientInstance,
-        abortSignal,
-        true,
-        false, // aggressiveUnescape
-        true, // isJsonLike
-      );
+        expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+          'content',
+          mockBaseLlmClientInstance,
+          abortSignal,
+          true,
+          false, // aggressiveUnescape
+          true, // isJsonLike
+        );
+      }
     });
 
     it('should call ensureCorrectFileContent for an existing file', async () => {

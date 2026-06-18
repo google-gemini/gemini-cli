@@ -132,10 +132,22 @@ export async function getCorrectedFileContent(
   }
 
   const fileExtension = path.extname(filePath).toLowerCase();
+  const fileName = path.basename(filePath).toLowerCase();
+
   const isJsonLike =
     fileExtension.includes('json') ||
     fileExtension === '.ipynb' ||
-    fileExtension === '.map';
+    fileExtension === '.map' ||
+    fileExtension === '.yaml' ||
+    fileExtension === '.yml' ||
+    fileExtension === '.toml' ||
+    [
+      '.eslintrc',
+      '.babelrc',
+      '.prettierrc',
+      '.stylelintrc',
+      '.watchmanconfig',
+    ].includes(fileName);
 
   const aggressiveUnescape =
     !isJsonLike && !isGemini3Model(config.getActiveModel());
