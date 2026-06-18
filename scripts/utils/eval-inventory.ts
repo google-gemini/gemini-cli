@@ -113,6 +113,7 @@ export function formatInventoryReport(result: InventoryResult): string {
 
   const bySuite = groupBy(result.cases, (c) => c.suiteName ?? '(no suite)');
   const suiteNames = [...bySuite.keys()].sort((a, b) => {
+    if (a === b) return 0;
     if (a === '(no suite)') return 1;
     if (b === '(no suite)') return -1;
     return a.localeCompare(b, 'en');
