@@ -255,6 +255,67 @@ describe('useGitBranchName', () => {
     expect(result.current).toBe('feature-x');
   });
 
+  it('should update branch name via HEAD polling when fs.watch delivers no events', async () => {
+    vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+    // Simulate a filesystem where fs.watch never delivers events
+    // (e.g. a WSL mount of a Windows drive, or a network share).
+    const watchSpy = vi.spyOn(fs, 'watch').mockImplementation((() => ({
+      close: vi.fn(),
+    })) as unknown as typeof fs.watch);
+
+    let watchFileCallback:
+      | ((curr: { mtimeMs: number }, prev: { mtimeMs: number }) => void)
+      | undefined;
+    const watchFileSpy = vi.spyOn(fs, 'watchFile').mockImplementation(((
+      _path: string,
+      _options: unknown,
+      callback: (curr: { mtimeMs: number }, prev: { mtimeMs: number }) => void,
+    ) => {
+      watchFileCallback = callback;
+      return undefined as unknown as ReturnType<typeof fs.watchFile>;
+    }) as unknown as typeof fs.watchFile);
+
+    const { result } = await renderGitBranchNameHook(CWD);
+
+    await resolveInitialSpawns('main');
+    expect(result.current).toBe('main');
+
+    // The polling fallback should be registered on the HEAD file.
+    await waitFor(() => {
+      expect(watchFileSpy).toHaveBeenCalledWith(
+        GIT_HEAD_PATH,
+        expect.any(Object),
+        expect.any(Function),
+      );
+    });
+    // The directory watcher is registered too, but we never fire it here.
+    expect(watchSpy).toHaveBeenCalled();
+
+    // Simulate HEAD changing on disk: the poll observes a new mtime.
+    await act(async () => {
+      watchFileCallback?.({ mtimeMs: 2 }, { mtimeMs: 1 });
+      await vi.advanceTimersByTimeAsync(150); // triggers debounce
+    });
+
+    await act(async () => {
+      const spawn = deferredSpawn.find((s) => s.args.includes('--abbrev-ref'))!;
+      deferredSpawn.splice(deferredSpawn.indexOf(spawn), 1);
+      spawn.resolve({ stdout: 'develop\n', stderr: '', code: 0 });
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(result.current).toBe('develop');
+
+    // An unchanged mtime (spurious poll) should not trigger a refetch.
+    await act(async () => {
+      watchFileCallback?.({ mtimeMs: 2 }, { mtimeMs: 2 });
+      await vi.advanceTimersByTimeAsync(150);
+    });
+    expect(
+      deferredSpawn.filter((s) => s.args.includes('--abbrev-ref')).length,
+    ).toBe(0);
+  });
+
   it('should handle watcher setup error silently', async () => {
     // Cause an error in absolute git dir setup
     vi.mocked(mockGetAbsoluteGitDir).mockRejectedValueOnce(
@@ -291,6 +352,14 @@ describe('useGitBranchName', () => {
     const watchMock = vi.spyOn(fs, 'watch').mockReturnValue({
       close: closeMock,
     } as unknown as ReturnType<typeof fs.watch>);
+    vi.spyOn(fs, 'watchFile').mockReturnValue(
+      undefined as unknown as ReturnType<typeof fs.watchFile>,
+    );
+    const unwatchMock = vi
+      .spyOn(fs, 'unwatchFile')
+      .mockImplementation(
+        (() => undefined) as unknown as typeof fs.unwatchFile,
+      );
 
     const { unmount } = await renderGitBranchNameHook(CWD);
 
@@ -303,5 +372,7 @@ describe('useGitBranchName', () => {
 
     unmount();
     expect(closeMock).toHaveBeenCalled();
+    // The HEAD poll fallback must also be torn down on unmount.
+    expect(unwatchMock).toHaveBeenCalledWith(GIT_HEAD_PATH);
   });
 });
