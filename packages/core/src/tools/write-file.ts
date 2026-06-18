@@ -131,7 +131,11 @@ export async function getCorrectedFileContent(
     }
   }
 
-  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
+  const fileExtension = path.extname(filePath).toLowerCase();
+  const isJsonLike = fileExtension === '.json' || fileExtension === '.ipynb';
+
+  const aggressiveUnescape =
+    !isJsonLike && !isGemini3Model(config.getActiveModel());
 
   correctedContent = await ensureCorrectFileContent(
     proposedContent,
@@ -139,6 +143,7 @@ export async function getCorrectedFileContent(
     abortSignal,
     config.getDisableLLMCorrection(),
     aggressiveUnescape,
+    isJsonLike,
   );
 
   return { originalContent, correctedContent, fileExists };

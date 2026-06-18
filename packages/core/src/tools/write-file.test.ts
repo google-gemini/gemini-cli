@@ -356,6 +356,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.correctedContent).toBe(correctedContent);
       expect(result.originalContent).toBe('');
@@ -389,6 +390,31 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         false, // aggressiveUnescape
+        false, // isJsonLike
+      );
+    });
+
+    it('should set isJsonLike to true and aggressiveUnescape to false for .ipynb and .json files', async () => {
+      const filePath = path.join(rootDir, 'notebook_file.ipynb');
+      const proposedContent = '{"cells": []}';
+      const abortSignal = new AbortController().signal;
+
+      mockEnsureCorrectFileContent.mockResolvedValue('{"cells": []}');
+
+      await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+        false, // aggressiveUnescape
+        true, // isJsonLike
       );
     });
 
@@ -416,6 +442,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.correctedContent).toBe(correctedProposedContent);
       expect(result.originalContent).toBe(originalContent);
@@ -493,6 +520,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -531,6 +559,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -737,6 +766,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
@@ -782,6 +812,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
       const writtenContent = await fsService.readTextFile(filePath);
@@ -1052,6 +1083,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.correctedContent).toBe(proposedContent);
       expect(result.fileExists).toBe(false);
@@ -1080,6 +1112,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         true,
         true, // aggressiveUnescape
+        false, // isJsonLike
       );
       expect(result.correctedContent).toBe(proposedContent);
       expect(result.originalContent).toBe(originalContent);

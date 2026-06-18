@@ -34,7 +34,12 @@ export async function ensureCorrectFileContent(
   abortSignal: AbortSignal,
   disableLLMCorrection: boolean = true,
   aggressiveUnescape: boolean = false,
+  isJsonLike: boolean = false,
 ): Promise<string> {
+  if (isJsonLike) {
+    return content;
+  }
+
   const cachedResult = fileContentCorrectionCache.get(content);
   if (cachedResult) {
     return cachedResult;

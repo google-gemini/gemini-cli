@@ -92,6 +92,26 @@ describe('editCorrector', () => {
         'quote"text\nline',
       );
     });
+
+    it('should document that unescapeStringForGeminiBug corrupts raw JSON/Jupyter strings containing escaped sequences', () => {
+      const validJson = JSON.stringify(
+        {
+          cells: [
+            {
+              cell_type: 'code',
+              source: ['print("hello\\n")'],
+            },
+          ],
+        },
+        null,
+        2,
+      );
+
+      const result = unescapeStringForGeminiBug(validJson);
+
+      // Assert that it DOES throw (demonstrating corruption of raw unescaped JSON)
+      expect(() => JSON.parse(result)).toThrow();
+    });
   });
 
   describe('ensureCorrectFileContent', () => {
@@ -243,6 +263,35 @@ describe('editCorrector', () => {
       );
 
       expect(result).toBe(content);
+      expect(mockGenerateJson).not.toHaveBeenCalled();
+    });
+
+    it('should bypass all unescaping and correction when isJsonLike is true', async () => {
+      const validJson = JSON.stringify(
+        {
+          cells: [
+            {
+              cell_type: 'code',
+              source: ['print("hello\\n")'],
+            },
+          ],
+        },
+        null,
+        2,
+      );
+
+      const result = await ensureCorrectFileContent(
+        validJson,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        true, // aggressiveUnescape
+        true, // isJsonLike
+      );
+
+      // Verify that the JSON content is returned completely untouched and remains valid JSON
+      expect(result).toBe(validJson);
+      expect(() => JSON.parse(result)).not.toThrow();
       expect(mockGenerateJson).not.toHaveBeenCalled();
     });
   });
