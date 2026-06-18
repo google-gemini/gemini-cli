@@ -45,7 +45,9 @@ export function useGitBranchName(cwd: string): string | undefined {
 
     let watcher: fs.FSWatcher | undefined;
     let watchedHeadPath: string | undefined;
-    let watchedHeadListener: ((curr: fs.Stats, prev: fs.Stats) => void) | undefined;
+    let watchedHeadListener:
+      | ((curr: fs.Stats, prev: fs.Stats) => void)
+      | undefined;
     let cancelled = false;
 
     const scheduleRefresh = () => {
@@ -82,22 +84,24 @@ export function useGitBranchName(cwd: string): string | undefined {
         // mounts of Windows drives and network shares. Poll HEAD with stat as
         // a reliable fallback so the branch still updates in those setups.
         const headPath = path.join(gitDir, 'HEAD');
+        const headListener = (curr: fs.Stats, prev: fs.Stats) => {
+          if (curr.mtimeMs !== prev.mtimeMs) {
+            scheduleRefresh();
+          }
+        };
         fs.watchFile(
           headPath,
           { interval: HEAD_POLL_INTERVAL_MS },
-          (curr, prev) => {
-            if (curr.mtimeMs !== prev.mtimeMs) {
-              scheduleRefresh();
-            }
-          },
+          headListener,
         );
 
         if (cancelled) {
           w.close();
-          fs.unwatchFile(headPath);
+          fs.unwatchFile(headPath, headListener);
         } else {
           watcher = w;
           watchedHeadPath = headPath;
+          watchedHeadListener = headListener;
         }
       } catch {
         // Silently ignore watcher errors (e.g. permissions or file not existing),
