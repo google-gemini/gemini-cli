@@ -475,6 +475,7 @@ This stage happens _after_ the NPM publish and creates the single-file
 executable that enables `npx` usage directly from the GitHub repository.
 
 1.  **The JavaScript bundle is created:**
+
     - **What happens:** The built JavaScript from both `packages/core/dist` and
       `packages/cli/dist`, along with all third-party JavaScript dependencies,
       are bundled by `esbuild` into a single, executable JavaScript file (for
@@ -486,6 +487,7 @@ executable that enables `npx` usage directly from the GitHub repository.
       the `core` package) are included directly.
 
 2.  **The `bundle` directory is assembled:**
+
     - **What happens:** A temporary `bundle` folder is created at the project
       root. The single `gemini.js` executable is placed inside it, along with
       other essential files.

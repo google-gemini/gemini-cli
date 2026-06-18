@@ -12,12 +12,12 @@
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
     "@lydell/node-pty": "1.1.0",
-    "asciichart": "^1.5.25",
-    "strip-ansi": "^7.1.2",
-    "vitest": "^3.2.4"
+    "asciichart": "1.5.25",
+    "strip-ansi": "7.1.2",
+    "vitest": "3.2.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "5.8.3"
   },
   "engines": {
     "node": ">=20"
