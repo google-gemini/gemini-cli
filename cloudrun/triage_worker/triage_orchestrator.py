@@ -1,11 +1,12 @@
-import subprocess
 import os
-import json
-from utils.gemini import upload_debug_log
+import asyncio
+from utils.agent_logger import upload_to_bucket, upload_agent_run_logs, extract_final_output
+from google.antigravity import Agent, LocalAgentConfig
+from google.antigravity.hooks.policy import allow, deny
 
 def process_issue_triage(payload):
     """
-    LLM inference via Gemini CLI.
+    LLM inference via Antigravity SDK.
     """
     issue_num = payload.get("issue_number")
     title = payload.get("title", "")
@@ -13,51 +14,61 @@ def process_issue_triage(payload):
     repo_name = payload.get("repository", "")
     
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    policy_path = os.path.join(current_dir, "policy.toml")
     system_prompt_path = os.path.join(current_dir, ".gemini", "triage_orchestrator.md")
     target_cwd = "/opt/gemini-cli"
 
-    env = os.environ.copy()
-    # Makes GCLI use the skills defined inside our .gemini folder.
-    env["GEMINI_SYSTEM_MD"] = str(system_prompt_path) 
-    env["GEMINI_CLI_HOME"] = current_dir
-    env["GEMINI_TELEMETRY_ENABLED"] = "false"
-    # Force non interactive mode
-    env["TERM"] = "dumb"
-    env["COLORTERM"] = ""
+
+    policies = [
+        # Deny all tools by default
+        deny("*"), 
+        
+        # Whitelist specific read-only and skill tools
+        allow("view_file"),
+        allow("list_directory"),
+        allow("find_file"),
+        allow("search_directory"),
+        allow("activate_skill"),
+        allow("finish")
+    ]
+    
+    with open(system_prompt_path, "r") as f:
+        system_instructions = f.read()
+
+    skills_dir = os.path.join(current_dir, ".gemini", "skills")
 
     prompt = f"Repository: {repo_name}\nIssue Number: {issue_num}\nTitle: {title}\nDescription: {body}"
 
-    try:
-        print(f"[LOGIC] Running gemini-cli inside: {target_cwd}")
-        result = subprocess.run(
-            [
-                "gemini",
-                "-p", prompt,
-                "--policy", str(policy_path),
-                "--skip-trust",
-                "--approval-mode", "yolo",
-                "--debug"
-            ],
-            cwd=target_cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=True
+    async def run_triage():
+        config = LocalAgentConfig(
+            system_instructions=system_instructions,
+            skills_paths=[skills_dir],
+            api_key=os.environ.get("GEMINI_API_KEY"),
+            workspaces=[target_cwd, current_dir],
+            policies=policies,
         )
-        
-        print(f"[LOGIC] Gemini CLI Output:\n{result.stdout}")
-        if result.stderr:
-            print("[LOGIC] Gemini CLI Output End")
-            upload_debug_log(repo_name, issue_num, result.stderr)
+
+        print("[LOGIC] Initializing Antigravity Agent...")
+        async with Agent(config) as agent:
+            print("[LOGIC] Sending triage request to Agent...")
+            response = await agent.chat(prompt)
             
-        return True, result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"[LOGIC] Error: gemini-cli failed with code {e.returncode}")
-        if e.stderr:
-            upload_debug_log(repo_name, issue_num, e.stderr)
-        print(f"[LOGIC] Stdout:\n{e.stdout}")
-        return False, e.stderr
-    except FileNotFoundError:
-        print("[LOGIC] Error: 'gemini' command not found in the container path!")
-        return False, "gemini command not found"
+            # Resolve all execution chunks (thoughts, tool calls, and tool results)
+            resolved_chunks = await response.resolve()
+            
+            # Extract the final step's output
+            text_output = extract_final_output(resolved_chunks)
+
+            upload_agent_run_logs(repo_name, issue_num, resolved_chunks)
+
+            print(f"[LOGIC] Agent Response:\n{text_output}")
+                
+            return True, text_output
+
+    try:
+        success, raw_output = asyncio.run(run_triage())
+        return success, raw_output
+    except Exception as e:
+        error_msg = f"Error during Antigravity Agent run: {e}"
+        print(f"[LOGIC] {error_msg}")
+        upload_to_bucket(repo_name, issue_num, error_msg)
+        return False, error_msg
