@@ -117,7 +117,19 @@ app.post('/webhook', async (req, res) => {
   const title = processedData.title || '';
 
   try {
-    await issuesStore.createIssue(owner, repo, issueNumber, title);
+    const created = await issuesStore.createIssue(
+      owner,
+      repo,
+      issueNumber,
+      title,
+    );
+
+    if (!created) {
+      return res.status(200).json({
+        status: 'ignored',
+        reason: `issue already exists: ${repository}#${issueNumber}`,
+      });
+    }
 
     // Publish to Pub/Sub
     const dataBuffer = Buffer.from(JSON.stringify(processedData));
