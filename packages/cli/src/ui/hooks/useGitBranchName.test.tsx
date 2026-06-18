@@ -373,6 +373,6 @@ describe('useGitBranchName', () => {
     unmount();
     expect(closeMock).toHaveBeenCalled();
     // The HEAD poll fallback must also be torn down on unmount.
-    expect(unwatchMock).toHaveBeenCalledWith(GIT_HEAD_PATH);
+    expect(unwatchMock).toHaveBeenCalledWith(GIT_HEAD_PATH, expect.any(Function));
   });
 });
