@@ -26,6 +26,14 @@ policies.
     the CLI will use an available fallback model for the current turn or the
     remainder of the session.
 
+### Authentication-specific model variants
+
+When Gemini 3.1 Pro Preview is available, model routing can use the
+`gemini-3.1-pro-preview-customtools` variant only for Gemini API key
+authentication with a key from Google AI Studio. Other authentication methods,
+including Vertex AI, use `gemini-3.1-pro-preview` for Gemini 3.1 Pro Preview
+routing.
+
 ### Local Model Routing (Experimental)
 
 Gemini CLI supports using a local model for routing decisions. When configured,
