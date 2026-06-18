@@ -14,6 +14,8 @@ most direct path from your prompt to our model.
 
 Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
+Testing ReptileBot on this fork.
+
 ## 🚀 Why Gemini CLI?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
