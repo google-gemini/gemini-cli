@@ -45,6 +45,7 @@ export function useGitBranchName(cwd: string): string | undefined {
 
     let watcher: fs.FSWatcher | undefined;
     let watchedHeadPath: string | undefined;
+    let watchedHeadListener: ((curr: fs.Stats, prev: fs.Stats) => void) | undefined;
     let cancelled = false;
 
     const scheduleRefresh = () => {
