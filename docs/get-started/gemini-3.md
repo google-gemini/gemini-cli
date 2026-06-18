@@ -16,6 +16,11 @@ Learn about how you can use Gemini 3 Pro and Gemini 3 Flash on Gemini CLI.
 > gemini -m gemini-3.1-pro-preview
 > ```
 >
+> When using a Gemini API key from Google AI Studio, Gemini CLI may route Gemini
+> 3.1 Pro Preview requests to the
+> `gemini-3.1-pro-preview-customtools` variant. Other authentication methods use
+> `gemini-3.1-pro-preview`.
+>
 > Learn more about [models](../cli/model.md) and
 > [model routing](../cli/model-routing.md).
 

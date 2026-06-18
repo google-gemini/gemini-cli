@@ -26,6 +26,10 @@ Select the authentication method that matches your situation in the table below:
 | Google Cloud Vertex AI user                                            | [Vertex AI](#vertex-ai)                                          | [Yes](#set-gcp)                                             |
 | [Headless mode](#headless)                                             | [Use Gemini API Key](#gemini-api) or<br /> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br /> [Yes](#set-gcp) (for Vertex AI) |
 
+Authentication method can also affect model availability. The
+`gemini-3.1-pro-preview-customtools` model variant is available only when
+Gemini CLI is authenticated with a Gemini API key from Google AI Studio.
+
 ### What is my Google account type?
 
 - **Individual Google accounts:** Includes all
@@ -77,6 +81,10 @@ For instructions, see [Set your Google Cloud Project](#set-gcp).
 
 If you don't want to authenticate using your Google account, you can use an API
 key from Google AI Studio.
+
+When Gemini 3.1 Pro Preview is available, this authentication method can use the
+`gemini-3.1-pro-preview-customtools` model variant. Other authentication methods
+use `gemini-3.1-pro-preview` instead.
 
 To authenticate and use Gemini CLI with a Gemini API key:
 

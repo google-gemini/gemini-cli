@@ -34,6 +34,11 @@ You can also use the `--model` flag to specify a particular Gemini model on
 startup. For more details, refer to the
 [configuration documentation](../reference/configuration.md).
 
+When Gemini 3.1 Pro Preview is available, the
+`gemini-3.1-pro-preview-customtools` variant is shown only for Gemini API key
+authentication with a key from Google AI Studio. Other authentication methods
+show and resolve to `gemini-3.1-pro-preview`.
+
 Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
 
