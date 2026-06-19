@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/google-gemini-gemini-cli-badge.png)](https://mseep.ai/app/google-gemini-gemini-cli)
+
 # Gemini CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
