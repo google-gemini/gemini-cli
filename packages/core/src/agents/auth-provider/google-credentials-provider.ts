@@ -20,7 +20,7 @@ const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, CLOUD_RUN_HOST_REGEX];
  * based on the target endpoint URL.
  */
 export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
-  readonly type = 'google-credentials' as const;
+  readonly type = 'google-credentials';
 
   private readonly auth: GoogleAuth;
   private readonly useIdToken: boolean = false;

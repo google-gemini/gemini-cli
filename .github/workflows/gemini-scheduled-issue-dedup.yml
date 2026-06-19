@@ -88,9 +88,11 @@ jobs:
                 }
               },
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)"
-              ],
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)"
+                ]
+              },
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"

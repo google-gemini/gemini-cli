@@ -109,10 +109,12 @@ jobs:
                 }
               },
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)",
-                "run_shell_command(gh issue view)"
-              ],
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)",
+                  "run_shell_command(gh issue view)"
+                ]
+              },
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"

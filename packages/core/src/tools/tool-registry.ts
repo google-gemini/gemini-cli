@@ -634,7 +634,7 @@ export class ToolRegistry {
         possibleNames.push(`${tool.getFullyQualifiedPrefix()}${tool.name}`);
       }
     }
-    return !possibleNames.some((name) => excludeTools.has(name));
+    return !possibleNames.some((name) => excludeTools?.has(name));
   }
 
   /**
