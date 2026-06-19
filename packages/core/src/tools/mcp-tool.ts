@@ -47,21 +47,47 @@ export function isMcpToolName(name: string): boolean {
 /**
  * Extracts the server name and tool name from a fully qualified MCP tool name.
  * Expected format: `mcp_{server_name}_{tool_name}`
+ *
+ * When `knownServerNames` is supplied the function uses longest-prefix matching
+ * so that server names containing underscores (e.g. `my_server`) are resolved
+ * correctly.  Without a list it falls back to splitting at the first underscore,
+ * which is correct for servers whose names do not contain underscores.
+ *
  * @param name The fully qualified tool name.
+ * @param knownServerNames Optional list of registered server names used for
+ *   unambiguous longest-prefix matching.
  * @returns An object containing the extracted `serverName` and `toolName`, or
  *          `undefined` properties if the name doesn't match the expected format.
  */
-export function parseMcpToolName(name: string): {
+export function parseMcpToolName(
+  name: string,
+  knownServerNames?: string[],
+): {
   serverName?: string;
   toolName?: string;
 } {
   if (!isMcpToolName(name)) {
     return {};
   }
-  // Remove the prefix
   const withoutPrefix = name.slice(MCP_TOOL_PREFIX.length);
-  // The first segment is the server name, the rest is the tool name
-  // Must be strictly `server_tool` where neither are empty
+
+  // When the caller provides a registry of server names, use longest-prefix
+  // matching so that underscores inside server names are handled correctly.
+  if (knownServerNames && knownServerNames.length > 0) {
+    const sorted = [...knownServerNames].sort((a, b) => b.length - a.length);
+    for (const server of sorted) {
+      const prefix = `${server}_`;
+      if (withoutPrefix.startsWith(prefix)) {
+        const toolName = withoutPrefix.slice(prefix.length);
+        if (toolName) {
+          return { serverName: server, toolName };
+        }
+      }
+    }
+  }
+
+  // Fallback: split at the first underscore (original behaviour, correct for
+  // server names that do not contain underscores).
   const match = withoutPrefix.match(/^([^_]+)_(.+)$/);
   if (match) {
     return {

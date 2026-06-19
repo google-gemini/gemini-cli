@@ -19,6 +19,7 @@ import {
   DiscoveredMCPTool,
   generateValidName,
   formatMcpToolName,
+  parseMcpToolName,
 } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
@@ -109,6 +110,67 @@ describe('formatMcpToolName', () => {
 
   it('should format explicitly global wildcard with specific tool', () => {
     expect(formatMcpToolName('*', 'list_repos')).toBe('mcp_*_list_repos');
+  });
+});
+
+describe('parseMcpToolName', () => {
+  it('returns empty object for non-MCP tool names', () => {
+    expect(parseMcpToolName('glob')).toEqual({});
+    expect(parseMcpToolName('read_file')).toEqual({});
+    expect(parseMcpToolName('')).toEqual({});
+  });
+
+  it('parses simple server and tool names without underscores', () => {
+    expect(parseMcpToolName('mcp_github_list_repos')).toEqual({
+      serverName: 'github',
+      toolName: 'list_repos',
+    });
+  });
+
+  it('falls back to first-underscore split when no server names provided', () => {
+    // Without knownServerNames the regex splits at the first '_' after the prefix,
+    // so a server name of 'my_server' is incorrectly identified as 'my'.
+    expect(parseMcpToolName('mcp_my_server_my_tool')).toEqual({
+      serverName: 'my',
+      toolName: 'server_my_tool',
+    });
+  });
+
+  it('correctly resolves server names with underscores using knownServerNames', () => {
+    const known = ['my_server'];
+    expect(parseMcpToolName('mcp_my_server_my_tool', known)).toEqual({
+      serverName: 'my_server',
+      toolName: 'my_tool',
+    });
+  });
+
+  it('handles wildcard tool names when server contains underscores', () => {
+    const known = ['my_server'];
+    expect(parseMcpToolName('mcp_my_server_*', known)).toEqual({
+      serverName: 'my_server',
+      toolName: '*',
+    });
+  });
+
+  it('picks the longest matching server prefix when names share a common prefix', () => {
+    const known = ['my', 'my_server'];
+    // 'my_server' (longer) must win over 'my'
+    expect(parseMcpToolName('mcp_my_server_my_tool', known)).toEqual({
+      serverName: 'my_server',
+      toolName: 'my_tool',
+    });
+  });
+
+  it('falls back to first-underscore split when no registered server matches', () => {
+    const known = ['other_server'];
+    expect(parseMcpToolName('mcp_github_list_repos', known)).toEqual({
+      serverName: 'github',
+      toolName: 'list_repos',
+    });
+  });
+
+  it('returns empty object when name has no tool component', () => {
+    expect(parseMcpToolName('mcp_onlyserver')).toEqual({});
   });
 });
 
