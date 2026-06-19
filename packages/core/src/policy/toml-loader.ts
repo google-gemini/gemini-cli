@@ -732,7 +732,7 @@ export function validateMcpPolicyToolNames(
     if (discoveredToolNames.length === 0) continue;
 
     const minDistance = Math.min(
-      ...discoveredToolNames.map((n) => levenshtein.get(toolPart, n)),
+      ...discoveredToolNames.map((n) => levenshtein.get(toolPart ?? '', n)),
     );
 
     if (minDistance > MAX_TYPO_DISTANCE) continue;

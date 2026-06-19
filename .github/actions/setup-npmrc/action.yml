@@ -19,6 +19,6 @@ runs:
       run: |-
         echo ""@google-gemini:registry=https://npm.pkg.github.com"" > ~/.npmrc
         echo ""//npm.pkg.github.com/:_authToken=${INPUTS_GITHUB_TOKEN}"" >> ~/.npmrc
-        echo ""@google:registry=https://wombat-dressing-room.appspot.com"" >> ~/.npmrc
+        echo ""@google:registry=https://wombat-dressing-room.appspot.com/"" >> ~/.npmrc
       env:
         INPUTS_GITHUB_TOKEN: '${{ inputs.github-token }}'

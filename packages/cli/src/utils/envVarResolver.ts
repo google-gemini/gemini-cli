@@ -44,8 +44,11 @@ export function resolveEnvVarsInString(
       if (customEnv && typeof customEnv[varName] === 'string') {
         return customEnv[varName];
       }
-      if (process && process.env && typeof process.env[varName] === 'string') {
-        return process.env[varName];
+      if (process && process.env) {
+        const val = process.env[varName];
+        if (typeof val === 'string') {
+          return val;
+        }
       }
       if (defaultValue !== undefined) {
         return defaultValue;
