@@ -64,6 +64,12 @@ describe('markdownUtils', () => {
       );
     });
 
+    it('does not prefix table headers with a stray space for PascalCase keys', () => {
+      const data = [{ UserId: 1, Name: 'Alice' }];
+      const result = jsonToMarkdown(data);
+      expect(result).toBe('| User Id | Name |\n| --- | --- |\n| 1 | Alice |');
+    });
+
     it('should handle pipe characters, backslashes, and newlines in table data', () => {
       const data = [
         { colInfo: 'val|ue', otherInfo: 'line\nbreak', pathInfo: 'C:\\test' },
