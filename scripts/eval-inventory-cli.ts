@@ -10,16 +10,18 @@
  * @fileoverview CLI entry point for the eval inventory command.
  *
  * Scans all eval source files, runs the static analyzer on each,
- * and prints a human-readable inventory report grouped by policy,
- * file, and suite.
+ * and prints an inventory report grouped by policy, file, and suite.
  *
  * Usage:
  *   npm run eval:inventory
+ *   npm run eval:inventory -- --json
  *   npm run eval:inventory -- --root /path/to/repo
+ *   npm run eval:inventory -- --root /path/to/repo --json
  */
 
 import {
   collectInventory,
+  formatInventoryJson,
   formatInventoryReport,
 } from './utils/eval-inventory.js';
 
@@ -30,6 +32,8 @@ async function main() {
       ? process.argv[rootFlagIndex + 1]
       : process.cwd();
 
+  const jsonMode = process.argv.includes('--json');
+
   const result = await collectInventory(repoRoot);
 
   if (result.totalFiles === 0) {
@@ -37,7 +41,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(formatInventoryReport(result));
+  console.log(
+    jsonMode ? formatInventoryJson(result) : formatInventoryReport(result),
+  );
 }
 
 main().catch((error) => {
