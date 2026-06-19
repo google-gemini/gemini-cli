@@ -84,7 +84,10 @@ describe('EditTool', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    const rawTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'edit-tool-test-'),
+    );
+    tempDir = fs.realpathSync(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
@@ -700,6 +703,30 @@ function doIt() {
         new_string: 'const msg = "(rest of methods ...)";',
       };
       expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should sanitize null bytes in absolute path during validation', () => {
+      const badPath = path.resolve(rootDir, 'test\0.txt');
+      const params: EditToolParams = {
+        file_path: badPath,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should sanitize null bytes in absolute path during invocation setup', () => {
+      const badPath = path.resolve(rootDir, 'test\0.txt');
+      const invocation = tool.build({
+        file_path: badPath,
+        instruction: 'test',
+        old_string: 'old',
+        new_string: 'new',
+      });
+      expect((invocation as any).resolvedPath).toBe(
+        path.resolve(rootDir, 'test.txt'),
+      );
     });
   });
 
