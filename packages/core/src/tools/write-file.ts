@@ -141,12 +141,15 @@ export async function getCorrectedFileContent(
     fileExtension === '.yaml' ||
     fileExtension === '.yml' ||
     fileExtension === '.toml' ||
+    fileExtension === '.lock' ||
     [
       '.eslintrc',
       '.babelrc',
       '.prettierrc',
       '.stylelintrc',
       '.watchmanconfig',
+      '.nycrc',
+      '.releaserc',
     ].includes(fileName);
 
   const aggressiveUnescape =
