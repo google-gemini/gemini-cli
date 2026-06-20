@@ -30,6 +30,8 @@ const POLICY_ORDER: EvalPolicy[] = [
 export interface InventoryResult {
   totalFiles: number;
   totalCases: number;
+  /** Absolute path to the repository root used when scanning. */
+  repoRoot: string;
   files: EvalFileAnalysis[];
   cases: readonly EvalCaseRecord[];
   diagnostics: readonly EvalAnalysisDiagnostic[];
@@ -38,11 +40,29 @@ export interface InventoryResult {
 /**
  * Discovers all eval files under the given repo root and runs
  * the static analyzer on each, returning the aggregated results.
+ *
+ * @throws {Error} if the evals directory does not exist under repoRoot.
  */
 export async function collectInventory(
   repoRoot: string,
 ): Promise<InventoryResult> {
   const evalsDir = path.join(repoRoot, 'evals');
+
+  try {
+    const stat = await fs.promises.stat(evalsDir);
+    if (!stat.isDirectory()) {
+      throw new Error(`evals path exists but is not a directory: ${evalsDir}`);
+    }
+  } catch (err: unknown) {
+    if (isNodeError(err) && err.code === 'ENOENT') {
+      throw new Error(
+        `evals directory not found under repo root: ${evalsDir}\n` +
+          `Make sure --root points to the repository root.`,
+      );
+    }
+    throw err;
+  }
+
   const pattern = '**/*.eval.{ts,tsx}';
 
   const evalFiles = await glob(pattern, {
@@ -68,6 +88,7 @@ export async function collectInventory(
   return {
     totalFiles: files.length,
     totalCases: allCases.length,
+    repoRoot,
     files,
     cases: allCases,
     diagnostics: allDiagnostics,
@@ -92,15 +113,33 @@ export function formatInventoryReport(result: InventoryResult): string {
   lines.push('By Policy');
   lines.push('─────────');
 
-  const byPolicy = groupBy(result.cases, (c) => c.policy);
-  const policyOrder = POLICY_ORDER;
+  const byPolicyMap = groupBy(result.cases, (c) => c.policy);
 
-  for (const policy of policyOrder) {
-    const cases = byPolicy.get(policy);
+  // Render known policies first in canonical order, then any unknown policies.
+  const renderedPolicies = new Set<string>();
+  for (const policy of POLICY_ORDER) {
+    const cases = byPolicyMap.get(policy);
     if (!cases || cases.length === 0) {
       continue;
     }
+    renderedPolicies.add(policy);
+    lines.push(`${policy} (${cases.length} cases)`);
 
+    const byFile = groupBy(cases, (c) => c.relativePath);
+    for (const [filePath, fileCases] of byFile) {
+      lines.push(`  ${filePath}`);
+      for (const evalCase of fileCases) {
+        lines.push(`    • ${evalCase.name} [${evalCase.helperName}]`);
+      }
+    }
+    lines.push('');
+  }
+  // Render any policies not listed in POLICY_ORDER so they are never silently
+  // dropped when EvalPolicy gains new values.
+  for (const [policy, cases] of byPolicyMap) {
+    if (renderedPolicies.has(policy) || !cases || cases.length === 0) {
+      continue;
+    }
     lines.push(`${policy} (${cases.length} cases)`);
 
     const byFile = groupBy(cases, (c) => c.relativePath);
@@ -147,10 +186,11 @@ export function formatInventoryReport(result: InventoryResult): string {
     lines.push('Diagnostics');
     lines.push('───────────');
     for (const diagnostic of result.diagnostics) {
-      const displayPath =
-        diagnostic.filePath === '<inline>'
-          ? diagnostic.filePath
-          : (filePaths.get(diagnostic.filePath) ?? diagnostic.filePath);
+      const displayPath = resolveRelativePath(
+        diagnostic.filePath,
+        filePaths,
+        result.repoRoot,
+      );
       lines.push(
         `⚠ ${displayPath}:${diagnostic.location.line}:${diagnostic.location.column} — ${diagnostic.message}`,
       );
@@ -223,18 +263,42 @@ export function formatInventoryJson(
     );
   }
 
-  const policyOrder = POLICY_ORDER;
   const byPolicy: Record<string, number> = {};
-  for (const policy of policyOrder) {
+  for (const policy of POLICY_ORDER) {
     const count = policyCounts.get(policy);
     if (count !== undefined) {
       byPolicy[policy] = count;
     }
   }
+  // Include any policies not listed in POLICY_ORDER so new values
+  // are never silently dropped from the JSON output.
+  for (const [policy, count] of policyCounts) {
+    if (!(policy in byPolicy)) {
+      byPolicy[policy] = count;
+    }
+  }
+
+  let generatedDate = now;
+  if (!generatedDate && process.env.SOURCE_DATE_EPOCH) {
+    const epoch = parseInt(process.env.SOURCE_DATE_EPOCH, 10);
+    if (!isNaN(epoch)) {
+      generatedDate = new Date(epoch * 1000);
+    }
+  }
+  if (
+    !generatedDate &&
+    (process.env.EVAL_INVENTORY_STABLE_DATE ||
+      process.env.EVAL_INVENTORY_DETERMINISTIC)
+  ) {
+    generatedDate = new Date(0);
+  }
+  if (!generatedDate) {
+    generatedDate = new Date();
+  }
 
   const output: InventoryJsonOutput = {
     version: 1,
-    generated: (now ?? new Date()).toISOString(),
+    generated: generatedDate.toISOString(),
     summary: {
       totalFiles: result.totalFiles,
       totalCases: result.totalCases,
@@ -255,10 +319,11 @@ export function formatInventoryJson(
       location: { line: c.location.line, column: c.location.column },
     })),
     diagnostics: result.diagnostics.map((d) => {
-      const relativePath =
-        d.filePath === '<inline>'
-          ? d.filePath
-          : (filePathLookup.get(d.filePath) ?? d.filePath);
+      const relativePath = resolveRelativePath(
+        d.filePath,
+        filePathLookup,
+        result.repoRoot,
+      );
       return {
         severity: d.severity,
         message: d.message,
@@ -286,4 +351,36 @@ function groupBy<T>(
     }
   }
   return groups;
+}
+
+/**
+ * Resolves a file path to its relative form using the provided lookup map.
+ * Falls back to computing a relative path from baseDir for absolute paths
+ * that aren't in the lookup, preventing absolute paths from leaking into
+ * output.
+ *
+ * @param filePath - The file path to resolve.
+ * @param lookup - Map from absolute path to already-computed relative path.
+ * @param baseDir - The base directory to relativize against when the lookup
+ *   misses. Should be the repoRoot used when scanning, not process.cwd().
+ */
+function resolveRelativePath(
+  filePath: string,
+  lookup: Map<string, string>,
+  baseDir: string,
+): string {
+  if (filePath === '<inline>') {
+    return filePath;
+  }
+  const mapped = lookup.get(filePath);
+  if (mapped !== undefined) {
+    return mapped;
+  }
+  return path.isAbsolute(filePath)
+    ? path.relative(baseDir, filePath).replace(/\\/g, '/')
+    : filePath;
+}
+
+function isNodeError(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && 'code' in err;
 }

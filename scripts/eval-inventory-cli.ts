@@ -29,15 +29,19 @@ async function main() {
   const rootFlagIndex = process.argv.indexOf('--root');
   const rootFlagValue =
     rootFlagIndex !== -1 ? process.argv[rootFlagIndex + 1] : undefined;
+  if (rootFlagIndex !== -1 && rootFlagValue === undefined) {
+    console.error(
+      'Error: --root requires a directory path argument but none was provided.',
+    );
+    process.exit(1);
+  }
   if (rootFlagValue && rootFlagValue.startsWith('--')) {
     console.error(
-      `Warning: --root value "${rootFlagValue}" looks like a flag; using current directory instead.`,
+      `Error: --root value "${rootFlagValue}" looks like a flag. Provide a valid directory path.`,
     );
+    process.exit(1);
   }
-  const repoRoot =
-    rootFlagValue && !rootFlagValue.startsWith('--')
-      ? rootFlagValue
-      : process.cwd();
+  const repoRoot = rootFlagValue ?? process.cwd();
 
   const jsonMode = process.argv.includes('--json');
 
