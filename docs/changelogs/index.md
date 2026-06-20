@@ -507,6 +507,7 @@ on GitHub.
   headlessly in notebook cells or interactively in the built-in terminal
   ([pic](https://imgur.com/a/G0Tn7vi))
 - 🎉**Gemini CLI Extensions:**
+
   - **Conductor:** Planning++, Gemini works with you to build out a detailed
     plan, pull in extra details as needed, ultimately to give the LLM guardrails
     with artifacts. Measure twice, implement once!
@@ -635,6 +636,7 @@ on GitHub.
   - **Announcement:**
     [https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/](https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/)
 - **🎉 New partner extensions:**
+
   - **Arize:** Seamlessly instrument AI applications with Arize AX and grant
     direct access to Arize support:
 
@@ -674,6 +676,7 @@ on GitHub.
 ![Codebase investigator subagent in Gemini CLI.](https://i.imgur.com/4J1njsx.png)
 
 - **🎉 New partner extensions:**
+
   - **🤗 Hugging Face extension:** Access the Hugging Face hub.
     ([gif](https://drive.google.com/file/d/1LEzIuSH6_igFXq96_tWev11svBNyPJEB/view?usp=sharing&resourcekey=0-LtPTzR1woh-rxGtfPzjjfg))
 

@@ -34,6 +34,8 @@ import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
+const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
+
 export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
@@ -67,9 +69,9 @@ export async function loadConfig(
   const policySettings: PolicySettings = {
     mcpServers: settings.mcpServers,
     tools: {
-      core: settings.coreTools || settings.tools?.core,
-      exclude: settings.excludeTools || settings.tools?.exclude,
-      allowed: settings.allowedTools || settings.tools?.allowed,
+      core: settings.tools?.core,
+      exclude: settings.tools?.exclude,
+      allowed: settings.tools?.allowed,
     },
     policyPaths: settings.policyPaths,
     adminPolicyPaths: settings.adminPolicyPaths,
@@ -92,9 +94,9 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || settings.tools?.core || undefined,
-    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
-    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
+    coreTools: settings.tools?.core || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    allowedTools: settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
     policyEngineConfig,
@@ -180,6 +182,15 @@ export async function loadConfig(
   await refreshAuthentication(config, 'Config');
 
   return config;
+}
+
+export function setIsTrusted(
+  agentSettings: AgentSettings | undefined,
+): boolean {
+  if (INITIAL_FOLDER_TRUST !== undefined) {
+    return INITIAL_FOLDER_TRUST === 'true';
+  }
+  return !!agentSettings?.isTrusted;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {
