@@ -632,14 +632,20 @@ export function setUpCloudShellEnvironment(
   }
 
   if (envFilePath && fs.existsSync(envFilePath)) {
-    const envFileContent = fs.readFileSync(envFilePath);
-    const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
-      // .env file takes precedence in Cloud Shell
-      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-      if (!isTrusted && isSandboxed) {
-        value = sanitizeEnvVar(value);
+    try {
+      const envFileContent = fs.readFileSync(envFilePath);
+      const parsedEnv = dotenv.parse(envFileContent);
+      if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
+        // .env file takes precedence in Cloud Shell
+        value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+        if (!isTrusted && isSandboxed) {
+          value = sanitizeEnvVar(value);
+        }
       }
+    } catch {
+      // The .env file may exist but be unreadable (e.g. EACCES under a
+      // sandbox). Ignore read/parse errors and fall back to the default,
+      // matching the resilient handling in `loadEnvironment`.
     }
   }
 

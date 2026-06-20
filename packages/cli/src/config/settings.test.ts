@@ -3429,6 +3429,36 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('env-vertex-project');
       });
 
+      it('should not crash in Cloud Shell when the .env file exists but is unreadable (EACCES)', () => {
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: true,
+          source: 'file',
+        });
+
+        // The .env file exists, but reading it fails with EACCES (e.g. a
+        // sandbox that denies read access). This must not crash startup.
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.readFileSync).mockImplementation(() => {
+          const err = new Error(
+            'EACCES: permission denied',
+          ) as NodeJS.ErrnoException;
+          err.code = 'EACCES';
+          throw err;
+        });
+
+        expect(() =>
+          loadEnvironment(
+            createMockSettings({ tools: { sandbox: false } }).merged,
+            MOCK_WORKSPACE_DIR,
+          ),
+        ).not.toThrow();
+
+        // Falls back to the Cloud Shell default instead of crashing.
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
+      });
+
       it('should clear cloudshell-gca when switching to Vertex AI without an original project', () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
