@@ -349,4 +349,18 @@ describe('applySubstitutions', () => {
     );
     expect(result).toContain("- echo $'a\\nb'\n- $$\n- $& | Tail");
   });
+
+  it('should replace tool-specific ${toolName_ToolName} variables containing special characters', () => {
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue(["echo $'a\\nb'"]),
+      getAllTools: vi.fn().mockReturnValue([]),
+    } as unknown as ToolRegistry;
+
+    const result = applySubstitutions(
+      "Use ${echo $'a\\nb'_ToolName} to run",
+      mockConfig,
+      '',
+    );
+    expect(result).toBe("Use echo $'a\\nb' to run");
+  });
 });

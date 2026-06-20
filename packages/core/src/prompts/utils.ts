@@ -94,8 +94,9 @@ export function applySubstitutions(
 
   for (const toolName of allToolNames) {
     const varName = `${toolName}_ToolName`;
+    const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     result = result.replace(
-      new RegExp(`\\\${\\b${varName}\\b}`, 'g'),
+      new RegExp(`\\$\\{${escapedVarName}\\}`, 'g'),
       () => toolName,
     );
   }
