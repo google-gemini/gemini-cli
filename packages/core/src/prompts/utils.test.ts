@@ -13,6 +13,7 @@ import {
 } from './utils.js';
 import type { Config } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import * as snippets from './snippets.js';
 
 vi.mock('../utils/paths.js', () => ({
   homedir: vi.fn().mockReturnValue('/mock/home'),
@@ -311,5 +312,41 @@ describe('applySubstitutions', () => {
       '',
     );
     expect(result).toBe('A plain prompt with no variables.');
+  });
+
+  it('should preserve dollar sequences in ${AgentSkills} verbatim', () => {
+    const result = applySubstitutions(
+      'Skills: ${AgentSkills} | Tail',
+      mockConfig,
+      "echo $'a\\nb' and $$ and $& and $VAR",
+    );
+    expect(result).toBe("Skills: echo $'a\\nb' and $$ and $& and $VAR | Tail");
+  });
+
+  it('should preserve dollar sequences in ${SubAgents} verbatim', () => {
+    vi.mocked(snippets.renderSubAgents).mockReturnValueOnce(
+      "echo $'a\\nb' and $$ and $&",
+    );
+    const result = applySubstitutions(
+      'Agents: ${SubAgents} | Tail',
+      mockConfig,
+      '',
+      true,
+    );
+    expect(result).toBe("Agents: echo $'a\\nb' and $$ and $& | Tail");
+  });
+
+  it('should preserve dollar sequences in ${AvailableTools} verbatim', () => {
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue(["echo $'a\\nb'", '$$', '$&']),
+      getAllTools: vi.fn().mockReturnValue([]),
+    } as unknown as ToolRegistry;
+
+    const result = applySubstitutions(
+      'Tools: ${AvailableTools} | Tail',
+      mockConfig,
+      '',
+    );
+    expect(result).toContain("- echo $'a\\nb'\n- $$\n- $& | Tail");
   });
 });
