@@ -63,14 +63,14 @@ All hooks receive these common fields via `stdin`:
 
 Most hooks support these fields in their `stdout` JSON:
 
-| Field            | Type      | Description                                                                    |
-| :--------------- | :-------- | :----------------------------------------------------------------------------- |
-| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.                             |
-| `suppressOutput` | `boolean` | If `true`, hides internal hook metadata from logs/telemetry.                   |
-| `continue`       | `boolean` | If `false`, stops the entire agent loop immediately.                           |
-| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.                              |
-| `decision`       | `string`  | `"allow"` or `"deny"` (alias `"block"`). Specific impact depends on the event. |
-| `reason`         | `string`  | The feedback/error message provided when a `decision` is `"deny"`.             |
+| Field            | Type      | Description                                                                                               |
+| :--------------- | :-------- | :-------------------------------------------------------------------------------------------------------- |
+| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.                                                        |
+| `suppressOutput` | `boolean` | If `true`, hides internal hook metadata from logs/telemetry.                                              |
+| `continue`       | `boolean` | If `false`, stops the entire agent loop immediately.                                                      |
+| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.                                                         |
+| `decision`       | `string`  | `"allow"`, `"deny"` (alias `"block"`), or `"ask"` for `BeforeTool`. Specific impact depends on the event. |
+| `reason`         | `string`  | The feedback/error message provided when a `decision` is `"deny"`.                                        |
 
 ---
 
@@ -101,8 +101,8 @@ and parameter rewriting.
   - `original_request_name`: (`string`) The original name of the tool being
     called, if this is a tail tool call.
 - **Relevant Output Fields**:
-  - `decision`: Set to `"deny"` (or `"block"`) to prevent the tool from
-    executing.
+  - `decision`: Set to `"ask"` to force the normal user confirmation flow before
+    the tool executes, or `"deny"` (or `"block"`) to prevent execution.
   - `reason`: Required if denied. This text is sent **to the agent** as a tool
     error, allowing it to respond or retry.
   - `hookSpecificOutput.tool_input`: An object that **merges with and
