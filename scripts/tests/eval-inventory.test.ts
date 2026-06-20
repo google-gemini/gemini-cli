@@ -32,7 +32,6 @@ function makeCaseRecord(
   };
 }
 
-/** Minimal valid InventoryResult with no files/cases/diagnostics. */
 function makeEmptyResult(repoRoot = '/repo'): InventoryResult {
   return {
     totalFiles: 0,
@@ -44,7 +43,6 @@ function makeEmptyResult(repoRoot = '/repo'): InventoryResult {
   };
 }
 
-/** Fixed timestamp for deterministic snapshot tests. */
 const FIXED_NOW = new Date('2026-06-03T12:00:00.000Z');
 
 describe('eval-inventory', () => {
@@ -67,13 +65,6 @@ describe('eval-inventory', () => {
     });
 
     it('returns zero file counts for an evals directory with no matching files', async () => {
-      // The real repo root has an evals/ directory, but this test exercises
-      // the code path where glob finds no .eval.ts files inside it. That only
-      // happens in CI when no eval files exist, which is unlikely. The important
-      // contract — that collectInventory throws when evals/ is absent — is
-      // tested separately. Here we verify the zero-files path via a repoRoot
-      // whose evals/ dir exists but may have files (totalFiles can be >= 0).
-      // We just confirm the shape of the result is correct.
       const repoRoot = path.resolve(import.meta.dirname, '../../');
       const result = await collectInventory(repoRoot);
 
@@ -136,7 +127,6 @@ describe('eval-inventory', () => {
       expect(report).toContain('USUALLY_PASSES (1 cases)');
       expect(report).toContain('• stable test');
       expect(report).toContain('• flaky test');
-      // ALWAYS_PASSES must appear before USUALLY_PASSES
       expect(report.indexOf('ALWAYS_PASSES')).toBeLessThan(
         report.indexOf('USUALLY_PASSES'),
       );
@@ -150,7 +140,6 @@ describe('eval-inventory', () => {
         files: [],
         cases: [
           makeCaseRecord({ policy: 'ALWAYS_PASSES', name: 'known policy' }),
-          // 'FUTURE_POLICY' is not in POLICY_ORDER
           makeCaseRecord({
             policy: 'FUTURE_POLICY' as never,
             name: 'future policy',
@@ -526,7 +515,6 @@ describe('eval-inventory', () => {
             hasFiles: true,
             hasPrompt: true,
             location: { line: 42, column: 3 },
-            // suiteName, suiteType, timeout intentionally omitted
           }),
         ],
         diagnostics: [],
@@ -611,7 +599,6 @@ describe('eval-inventory', () => {
           {
             severity: 'warning',
             message: 'cross-file diagnostic',
-            // This path is NOT in the files array
             filePath: '/repo/evals/other.eval.ts',
             location: { line: 1, column: 1 },
           },
@@ -621,9 +608,7 @@ describe('eval-inventory', () => {
       const json = formatInventoryJson(result, FIXED_NOW);
       const parsed: InventoryJsonOutput = JSON.parse(json);
 
-      // Should be relativized against repoRoot, not process.cwd()
       expect(parsed.diagnostics[0].filePath).toBe('evals/other.eval.ts');
-      // Should not be the raw absolute input
       expect(parsed.diagnostics[0].filePath).not.toMatch(/^\//);
     });
 
@@ -649,7 +634,6 @@ describe('eval-inventory', () => {
         unknown: 1,
       });
 
-      // Verify sum matches totalCases
       const sum = Object.values(parsed.summary.byPolicy).reduce(
         (a, b) => a + b,
         0,

@@ -16,10 +16,6 @@ import {
   type EvalPolicy,
 } from './eval-analysis.js';
 
-/**
- * Canonical policy ordering used by both text and JSON formatters.
- * Defined once to ensure consistency and avoid silent omissions.
- */
 const POLICY_ORDER: EvalPolicy[] = [
   'ALWAYS_PASSES',
   'USUALLY_PASSES',
@@ -30,7 +26,6 @@ const POLICY_ORDER: EvalPolicy[] = [
 export interface InventoryResult {
   totalFiles: number;
   totalCases: number;
-  /** Absolute path to the repository root used when scanning. */
   repoRoot: string;
   files: EvalFileAnalysis[];
   cases: readonly EvalCaseRecord[];
@@ -40,8 +35,6 @@ export interface InventoryResult {
 /**
  * Discovers all eval files under the given repo root and runs
  * the static analyzer on each, returning the aggregated results.
- *
- * @throws {Error} if the evals directory does not exist under repoRoot.
  */
 export async function collectInventory(
   repoRoot: string,
@@ -115,7 +108,6 @@ export function formatInventoryReport(result: InventoryResult): string {
 
   const byPolicyMap = groupBy(result.cases, (c) => c.policy);
 
-  // Render known policies first in canonical order, then any unknown policies.
   const renderedPolicies = new Set<string>();
   for (const policy of POLICY_ORDER) {
     const cases = byPolicyMap.get(policy);
@@ -134,8 +126,6 @@ export function formatInventoryReport(result: InventoryResult): string {
     }
     lines.push('');
   }
-  // Render any policies not listed in POLICY_ORDER so they are never silently
-  // dropped when EvalPolicy gains new values.
   for (const [policy, cases] of byPolicyMap) {
     if (renderedPolicies.has(policy) || !cases || cases.length === 0) {
       continue;
@@ -201,10 +191,6 @@ export function formatInventoryReport(result: InventoryResult): string {
   return lines.join('\n');
 }
 
-/**
- * JSON output schema for machine-readable inventory data.
- * Version field allows future schema evolution without breaking consumers.
- */
 export interface InventoryJsonOutput {
   version: 1;
   generated: string;
@@ -239,13 +225,6 @@ interface InventoryJsonDiagnostic {
   location: { line: number; column: number };
 }
 
-/**
- * Formats an InventoryResult as a stable, machine-readable JSON string.
- *
- * @param result - The inventory result to format.
- * @param now - Optional override for the generated timestamp (for test determinism).
- * @returns Pretty-printed JSON string.
- */
 export function formatInventoryJson(
   result: InventoryResult,
   now?: Date,
@@ -270,8 +249,6 @@ export function formatInventoryJson(
       byPolicy[policy] = count;
     }
   }
-  // Include any policies not listed in POLICY_ORDER so new values
-  // are never silently dropped from the JSON output.
   for (const [policy, count] of policyCounts) {
     if (!(policy in byPolicy)) {
       byPolicy[policy] = count;
@@ -353,17 +330,6 @@ function groupBy<T>(
   return groups;
 }
 
-/**
- * Resolves a file path to its relative form using the provided lookup map.
- * Falls back to computing a relative path from baseDir for absolute paths
- * that aren't in the lookup, preventing absolute paths from leaking into
- * output.
- *
- * @param filePath - The file path to resolve.
- * @param lookup - Map from absolute path to already-computed relative path.
- * @param baseDir - The base directory to relativize against when the lookup
- *   misses. Should be the repoRoot used when scanning, not process.cwd().
- */
 function resolveRelativePath(
   filePath: string,
   lookup: Map<string, string>,
