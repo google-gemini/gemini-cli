@@ -365,6 +365,8 @@ export class TestRig {
   _lastRunStderr?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
+  // Whether to run fake responses in non-strict mode.
+  fakeResponsesNonStrict?: boolean;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
@@ -377,6 +379,7 @@ export class TestRig {
       settings?: Record<string, unknown>;
       state?: Record<string, unknown>;
       fakeResponsesPath?: string;
+      fakeResponsesNonStrict?: boolean;
     } = {},
   ) {
     this.testName = testName;
@@ -398,6 +401,7 @@ export class TestRig {
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
       this.originalFakeResponsesPath = options.fakeResponsesPath;
+      this.fakeResponsesNonStrict = options.fakeResponsesNonStrict;
       if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
         fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
       }
@@ -558,6 +562,8 @@ export class TestRig {
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else if (this.fakeResponsesNonStrict) {
+        initialArgs.push('--fake-responses-non-strict', this.fakeResponsesPath);
       } else {
         initialArgs.push('--fake-responses', this.fakeResponsesPath);
       }

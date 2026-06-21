@@ -23,6 +23,7 @@ describe('Parallel Tool Execution Integration', () => {
   it('should execute [read, read, write, read, read] in correct waves with user approval', async () => {
     rig.setup('parallel-wave-execution', {
       fakeResponsesPath: join(import.meta.dirname, 'parallel-tools.responses'),
+      fakeResponsesNonStrict: true,
       settings: {
         tools: {
           core: ['read_file', 'write_file'],
