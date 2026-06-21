@@ -64,7 +64,7 @@
     "string-width": "^8.2.1",
     "strip-ansi": "^7.2.0",
     "strip-json-comments": "^3.1.1",
-    "tar": "^7.5.15",
+    "tar": "^7.5.16",
     "tinygradient": "^1.1.5",
     "undici": "^7.28.0",
     "ws": "^8.20.1",
