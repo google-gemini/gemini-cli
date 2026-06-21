@@ -89,7 +89,7 @@
     "systeminformation": "^5.25.11",
     "tree-sitter-bash": "^0.25.1",
     "undici": "^7.28.0",
-    "uuid": "^14.0.0",
+    "uuid": "^14.0.1",
     "web-tree-sitter": "^0.26.8",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"
