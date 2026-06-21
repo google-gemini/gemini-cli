@@ -10,6 +10,7 @@ export function isFunctionResponse(content: Content): boolean {
   return (
     content.role === 'user' &&
     !!content.parts &&
+    content.parts.length > 0 &&
     content.parts.every((part) => !!part.functionResponse)
   );
 }
@@ -18,6 +19,7 @@ export function isFunctionCall(content: Content): boolean {
   return (
     content.role === 'model' &&
     !!content.parts &&
+    content.parts.length > 0 &&
     content.parts.every((part) => !!part.functionCall)
   );
 }
