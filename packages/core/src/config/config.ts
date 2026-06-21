@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
+import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
 import type {
@@ -2192,7 +2193,20 @@ export class Config implements McpContext, AgentLoopContext {
    * Checks if ripgrep is available.
    */
   async canUseRipgrep(): Promise<boolean> {
-    return (await this.getRipgrepPath()) !== null;
+    const rgPath = await this.getRipgrepPath();
+    if (rgPath === null) {
+      return false;
+    }
+    try {
+      execFileSync(rgPath, ['--version'], { stdio: 'ignore', timeout: 1000 });
+      return true;
+    } catch (error: unknown) {
+      debugLogger.warn(
+        `Ripgrep binary execution check failed at "${rgPath}":`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**

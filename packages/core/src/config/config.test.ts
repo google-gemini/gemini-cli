@@ -25,6 +25,7 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 import { ApprovalMode } from '../policy/types.js';
+import { execFileSync } from 'node:child_process';
 import {
   HookType,
   HookEventName,
@@ -153,6 +154,14 @@ vi.mock('../tools/memoryTool', async (importOriginal) => {
 });
 
 vi.mock('../core/contentGenerator.js');
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    execFileSync: vi.fn(),
+  };
+});
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
@@ -2356,6 +2365,33 @@ describe('setApprovalMode with folder trust', () => {
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
       const error = new Error('ripGrep check failed');
       vi.mocked(resolveRipgrepPath).mockRejectedValue(error);
+      const config = new Config({ ...baseParams, useRipgrep: true });
+      await config.initialize();
+
+      const calls = vi.mocked(ToolRegistry.prototype.registerTool).mock.calls;
+      const wasRipGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(RipGrepTool),
+      );
+      const wasGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(GrepTool),
+      );
+
+      expect(wasRipGrepRegistered).toBe(false);
+      expect(wasGrepRegistered).toBe(true);
+      expect(logRipgrepFallback).toHaveBeenCalledWith(
+        config,
+        expect.any(RipgrepFallbackEvent),
+      );
+      const event = vi.mocked(logRipgrepFallback).mock.calls[0][1];
+      expect(event.error).toBe(String(error));
+    });
+
+    it('should register GrepTool as a fallback when the ripgrep binary execution check throws an error', async () => {
+      vi.mocked(resolveRipgrepPath).mockResolvedValue('/mock/rg');
+      const error = new Error('spawn EFTYPE');
+      vi.mocked(execFileSync).mockImplementation(() => {
+        throw error;
+      });
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
