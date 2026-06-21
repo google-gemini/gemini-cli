@@ -638,7 +638,7 @@ export function setUpCloudShellEnvironment(
       if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
         // .env file takes precedence in Cloud Shell
         value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-        if (!isTrusted && isSandboxed) {
+        if (!isTrusted) {
           value = sanitizeEnvVar(value);
         }
       }
