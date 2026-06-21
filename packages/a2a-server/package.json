@@ -31,8 +31,8 @@
     "express": "^5.1.0",
     "fs-extra": "^11.3.5",
     "strip-json-comments": "^3.1.1",
-    "tar": "^7.5.15",
-    "uuid": "^13.0.0",
+    "tar": "^7.5.16",
+    "uuid": "^14.0.1",
     "winston": "^3.19.0"
   },
   "devDependencies": {
