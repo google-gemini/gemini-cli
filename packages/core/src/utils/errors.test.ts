@@ -47,6 +47,30 @@ describe('getErrorMessage', () => {
     };
     expect(getErrorMessage(error)).toBe('Bad Request Message');
   });
+
+  it('should remove a trailing period from URLs in error messages', () => {
+    const error = new Error('Migrate to https://antigravity.google.');
+
+    expect(getErrorMessage(error)).toBe(
+      'Migrate to https://antigravity.google',
+    );
+  });
+
+  it('should preserve periods that do not trail a URL', () => {
+    expect(getErrorMessage(new Error('Authentication failed.'))).toBe(
+      'Authentication failed.',
+    );
+  });
+
+  it.each([null, undefined])(
+    'should handle an Error with a nullish message',
+    (message) => {
+      const error = new Error('original');
+      Object.defineProperty(error, 'message', { value: message });
+
+      expect(getErrorMessage(error)).toBe('');
+    },
+  );
 });
 
 describe('isAbortError', () => {

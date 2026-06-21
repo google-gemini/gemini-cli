@@ -33,10 +33,16 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+function stripTrailingPeriodsFromUrls(
+  message: string | null | undefined,
+): string {
+  return message?.replace(/(https?:\/\/\S+)\.(?=\s|$)/g, '$1') ?? '';
+}
+
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
   if (friendlyError instanceof Error) {
-    return friendlyError.message;
+    return stripTrailingPeriodsFromUrls(friendlyError.message);
   }
   if (
     typeof friendlyError === 'object' &&
@@ -45,10 +51,11 @@ export function getErrorMessage(error: unknown): string {
     typeof (friendlyError as { message: unknown }).message === 'string'
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (friendlyError as { message: string }).message;
+    const message = (friendlyError as { message: string }).message;
+    return stripTrailingPeriodsFromUrls(message);
   }
   try {
-    return String(friendlyError);
+    return stripTrailingPeriodsFromUrls(String(friendlyError));
   } catch {
     return 'Failed to get error details';
   }
