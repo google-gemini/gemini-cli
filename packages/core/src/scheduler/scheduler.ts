@@ -540,7 +540,7 @@ export class Scheduler {
 
     if (isWaitingForExternal && this.state.isActive) {
       // Yield to the event loop to allow external events (tool completion, user input) to progress.
-      await new Promise((resolve) => queueMicrotask(() => resolve(true)));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return true;
     }
 
