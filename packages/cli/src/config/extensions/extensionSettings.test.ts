@@ -613,6 +613,46 @@ describe('extensionSettings', () => {
         SENSITIVE_VAR: 'workspace-secret',
       });
     });
+
+    it('should skip an unreadable .env (EACCES) instead of throwing', async () => {
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      await fsPromises.writeFile(workspaceEnvPath, 'VAR1=workspace-value1');
+      // Make the file exist but be unreadable, simulating EACCES under a
+      // sandbox. chmod has no effect on Windows or when running as root, so we
+      // only assert the strict EACCES outcome when the file is truly unreadable.
+      await fsPromises.chmod(workspaceEnvPath, 0o000);
+      let unreadable = false;
+      try {
+        fs.readFileSync(workspaceEnvPath, 'utf-8');
+      } catch {
+        unreadable = true;
+      }
+
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345 ${tempWorkspaceDir}`,
+      );
+      await workspaceKeychain.setSecret('SENSITIVE_VAR', 'workspace-secret');
+
+      // Must not throw, regardless of whether the .env could be read.
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
+      );
+      await fsPromises.chmod(workspaceEnvPath, 0o644); // restore for cleanup
+
+      if (unreadable) {
+        // The .env read failed and was skipped; keychain secret still resolves.
+        expect(contents).toEqual({ SENSITIVE_VAR: 'workspace-secret' });
+      } else {
+        // Could not simulate EACCES (root/Windows): just ensure no crash.
+        expect(contents).toHaveProperty('SENSITIVE_VAR', 'workspace-secret');
+      }
+    });
   });
 
   describe('getEnvContents (merged)', () => {

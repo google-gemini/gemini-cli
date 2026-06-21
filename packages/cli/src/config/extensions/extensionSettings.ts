@@ -183,10 +183,20 @@ export async function getScopedEnvContents(
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let customEnv: Record<string, string> = {};
   if (fsSync.existsSync(envFilePath)) {
-    const stat = fsSync.statSync(envFilePath);
-    if (!stat.isDirectory()) {
-      const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
-      customEnv = dotenv.parse(envFile);
+    try {
+      const stat = fsSync.statSync(envFilePath);
+      if (!stat.isDirectory()) {
+        const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
+        customEnv = dotenv.parse(envFile);
+      }
+    } catch (error) {
+      // The settings file may exist but be unreadable (e.g. EACCES under a
+      // sandbox where the workspace .env has restricted access). Don't let
+      // that abort extension loading — skip it and continue with whatever
+      // else we can resolve (e.g. keychain secrets below).
+      debugLogger.log(
+        `Skipping unreadable extension settings at ${envFilePath}: ${error}`,
+      );
     }
   }
 
