@@ -142,6 +142,11 @@ export async function getCorrectedFileContent(
     fileExtension === '.yml' ||
     fileExtension === '.toml' ||
     fileExtension === '.lock' ||
+    fileExtension === '.ini' ||
+    fileExtension === '.cfg' ||
+    fileExtension === '.conf' ||
+    fileExtension === '.config' ||
+    fileName.startsWith('.env') ||
     [
       '.eslintrc',
       '.babelrc',
@@ -150,6 +155,12 @@ export async function getCorrectedFileContent(
       '.watchmanconfig',
       '.nycrc',
       '.releaserc',
+      '.gitconfig',
+      '.editorconfig',
+      '.npmrc',
+      '.yarnrc',
+      '.jshintrc',
+      '.markdownlintrc',
     ].includes(fileName);
 
   const aggressiveUnescape =

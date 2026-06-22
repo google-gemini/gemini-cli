@@ -405,6 +405,10 @@ describe('WriteFileTool', () => {
         'Cargo.toml',
         '.eslintrc',
         '.prettierrc',
+        '.env',
+        '.env.local',
+        'config.ini',
+        '.gitconfig',
       ];
 
       for (const file of filesToTest) {
