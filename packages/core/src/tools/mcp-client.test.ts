@@ -3235,3 +3235,75 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });
 });
+
+describe('connectToMcpServer - elicitation', () => {
+  let mockedClient: ClientLib.Client;
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+  let localContext: McpContext;
+
+  beforeEach(() => {
+    mockedClient = {
+      connect: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn(),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      onclose: vi.fn(),
+      notification: vi.fn(),
+    } as unknown as ClientLib.Client;
+    vi.mocked(ClientLib.Client).mockImplementation(() => mockedClient);
+    vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+      {} as SdkClientStdioLib.StdioClientTransport,
+    );
+
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-elicitation-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+    localContext = {
+      sanitizationConfig: EMPTY_CONFIG,
+      emitMcpDiagnostic: vi.fn(),
+      setUserInteractedWithMcp: vi.fn(),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+    };
+  });
+
+  afterEach(async () => {
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
+    vi.clearAllMocks();
+  });
+
+  it('advertises the elicitation { form, url } capability at connect', async () => {
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+    );
+
+    expect(mockedClient.registerCapabilities).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elicitation: { form: {}, url: {} },
+      }),
+    );
+  });
+
+  it('registers an elicitation/create request handler', async () => {
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    // The first registered handler is for `ListRootsRequestSchema`; the
+    // elicitation handler is registered in addition to it.
+    expect(setRequestHandler).toHaveBeenCalledTimes(2);
+  });
+});

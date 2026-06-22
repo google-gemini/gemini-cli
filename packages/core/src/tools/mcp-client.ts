@@ -24,6 +24,7 @@ import {
 import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
+  ElicitRequestSchema,
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -33,6 +34,10 @@ import {
   McpError,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  UrlElicitationRequiredError,
+  type ElicitRequestFormParams,
+  type ElicitRequestURLParams,
+  type ElicitResult,
   type GetPromptResult,
   type Prompt,
   type ReadResourceResult,
@@ -75,6 +80,11 @@ import { getToolCallContext } from '../utils/toolCallContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  MessageBusType,
+  type McpElicitationRequest,
+  type McpElicitationResponse,
+} from '../confirmation-bus/types.js';
 import { coreEvents } from '../utils/events.js';
 import {
   type ResourceRegistry,
@@ -168,6 +178,12 @@ export class McpClient implements McpProgressReporter {
    */
   private readonly progressTokenToCallId = new Map<string | number, string>();
 
+  /**
+   * Message bus used to forward `elicitation/create` requests from the server
+   * to the UI. Resolved lazily from the first registered tool registry.
+   */
+  private messageBus: MessageBus | undefined;
+
   constructor(
     private readonly serverName: string,
     private readonly serverConfig: MCPServerConfig,
@@ -176,7 +192,14 @@ export class McpClient implements McpProgressReporter {
     private readonly debugMode: boolean,
     private readonly clientVersion: string,
     private readonly onContextUpdated?: (signal?: AbortSignal) => Promise<void>,
-  ) {}
+    messageBus?: MessageBus,
+  ) {
+    this.messageBus = messageBus;
+  }
+
+  setMessageBus(messageBus: MessageBus | undefined): void {
+    this.messageBus = messageBus;
+  }
 
   getServerName(): string {
     return this.serverName;
@@ -200,6 +223,7 @@ export class McpClient implements McpProgressReporter {
         this.debugMode,
         this.workspaceContext,
         this.cliConfig,
+        this.messageBus,
       );
 
       this.registerNotificationHandlers();
@@ -235,11 +259,9 @@ export class McpClient implements McpProgressReporter {
     this.assertConnected();
     this.registeredRegistries.add(registries);
 
+    const messageBus = registries.toolRegistry.getMessageBus();
     const prompts = await this.fetchPrompts();
-    const tools = await this.discoverTools(
-      cliConfig,
-      registries.toolRegistry.getMessageBus(),
-    );
+    const tools = await this.discoverTools(cliConfig, messageBus);
     const resources = await this.discoverResources();
     this.updateResourceRegistry(resources, registries.resourceRegistry);
 
@@ -1359,7 +1381,9 @@ export async function discoverTools(
           mcpClient,
           toolDef,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+          mcpServerName,
           options?.progressReporter,
+          messageBus,
         );
 
         // Extract annotations from the tool definition
@@ -1412,12 +1436,20 @@ export async function discoverTools(
   }
 }
 
+/**
+ * Max number of URL-elicitation retry rounds for a single MCP tool call.
+ * Bounded to prevent an unbounded loop if the server keeps re-requesting.
+ */
+const MAX_URL_ELICITATION_ROUNDS = 3;
+
 class McpCallableTool implements CallableTool {
   constructor(
     private readonly client: Client,
     private readonly toolDef: McpTool,
     private readonly timeout: number,
+    private readonly serverName: string,
     private readonly progressReporter?: McpProgressReporter,
+    private readonly messageBus?: MessageBus,
   ) {}
 
   async tool(): Promise<Tool> {
@@ -1449,16 +1481,12 @@ class McpCallableTool implements CallableTool {
     }
 
     try {
-      const result = await this.client.callTool(
-        {
-          name: call.name!,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          arguments: call.args as Record<string, unknown>,
-          _meta: { progressToken },
-        },
-        undefined,
-        { timeout: this.timeout },
-      );
+      const result = await this.invokeWithUrlElicitationRetry(call, {
+        name: call.name!,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        arguments: call.args as Record<string, unknown>,
+        _meta: { progressToken },
+      });
 
       return [
         {
@@ -1487,6 +1515,64 @@ class McpCallableTool implements CallableTool {
       if (this.progressReporter) {
         this.progressReporter.unregisterProgressToken(progressToken);
       }
+    }
+  }
+
+  /**
+   * Invokes the tool and, when the server responds with the URL-elicitation
+   * required error (code -32042), routes the elicitation to the UI via the
+   * message bus and retries the call. Bounded by MAX_URL_ELICITATION_ROUNDS.
+   */
+  private async invokeWithUrlElicitationRetry(
+    call: FunctionCall,
+    request: {
+      name: string;
+      arguments: Record<string, unknown>;
+      _meta: { progressToken: string };
+    },
+  ): Promise<Record<string, unknown>> {
+    for (let attempt = 0; attempt < MAX_URL_ELICITATION_ROUNDS; attempt++) {
+      try {
+        return (await this.client.callTool(request, undefined, {
+          timeout: this.timeout,
+        })) as Record<string, unknown>;
+      } catch (error) {
+        if (
+          !(error instanceof UrlElicitationRequiredError) ||
+          !this.messageBus
+        ) {
+          throw error;
+        }
+        await this.runUrlElicitations(error.elicitations);
+        // Retry the tool call now that the elicitations have been resolved.
+      }
+    }
+    throw new Error(
+      `MCP tool '${call.name}' on server '${this.serverName}' exceeded ` +
+        `the URL elicitation retry limit (${MAX_URL_ELICITATION_ROUNDS}).`,
+    );
+  }
+
+  private async runUrlElicitations(
+    elicitations: ElicitRequestURLParams[],
+  ): Promise<void> {
+    if (!this.messageBus) return;
+    for (const elicitation of elicitations) {
+      await this.messageBus.request<
+        McpElicitationRequest,
+        McpElicitationResponse
+      >(
+        {
+          type: MessageBusType.MCP_ELICITATION_REQUEST,
+          serverName: this.serverName,
+          mode: 'url',
+          message: elicitation.message,
+          elicitationId: elicitation.elicitationId,
+          url: elicitation.url,
+        },
+        MessageBusType.MCP_ELICITATION_RESPONSE,
+        this.timeout,
+      );
     }
   }
 }
@@ -1842,6 +1928,7 @@ export async function connectToMcpServer(
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
   cliConfig: McpContext,
+  messageBus?: MessageBus,
 ): Promise<Client> {
   const mcpClient = new Client(
     {
@@ -1858,6 +1945,10 @@ export async function connectToMcpServer(
     roots: {
       listChanged: true,
     },
+    elicitation: {
+      form: {},
+      url: {},
+    },
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
@@ -1871,6 +1962,51 @@ export async function connectToMcpServer(
     return {
       roots,
     };
+  });
+
+  mcpClient.setRequestHandler(ElicitRequestSchema, async (request) => {
+    if (!messageBus) {
+      // Without a message bus we cannot route the request to the UI, so
+      // decline rather than silently hanging the server.
+      return { action: 'decline' } as ElicitResult;
+    }
+
+    const params = request.params;
+    const isUrlMode = params.mode === 'url';
+
+    const elicitationRequest: Omit<McpElicitationRequest, 'correlationId'> =
+      isUrlMode
+        ? {
+            type: MessageBusType.MCP_ELICITATION_REQUEST,
+            serverName: mcpServerName,
+            mode: 'url',
+            message: params.message,
+            elicitationId: (params as ElicitRequestURLParams).elicitationId,
+            url: (params as ElicitRequestURLParams).url,
+          }
+        : {
+            type: MessageBusType.MCP_ELICITATION_REQUEST,
+            serverName: mcpServerName,
+            mode: 'form',
+            message: params.message,
+            requestedSchema: (params as ElicitRequestFormParams)
+              .requestedSchema,
+          };
+
+    const response = await messageBus.request<
+      McpElicitationRequest,
+      McpElicitationResponse
+    >(
+      elicitationRequest,
+      MessageBusType.MCP_ELICITATION_RESPONSE,
+      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    );
+
+    const result: ElicitResult = { action: response.action };
+    if (response.action === 'accept' && response.content) {
+      result.content = response.content;
+    }
+    return result;
   });
 
   let unlistenDirectories: Unsubscribe | undefined =

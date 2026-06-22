@@ -483,6 +483,7 @@ export class McpClientManager {
                 );
                 await this.scheduleMcpContextRefresh();
               },
+              this.mainToolRegistry?.getMessageBus(),
             );
             this.clients.set(clientKey, client);
             this.eventEmitter?.emit('mcp-client-update', this.clients);

@@ -26,6 +26,8 @@ export enum MessageBusType {
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
   SUBAGENT_ACTIVITY = 'subagent-activity',
+  MCP_ELICITATION_REQUEST = 'mcp-elicitation-request',
+  MCP_ELICITATION_RESPONSE = 'mcp-elicitation-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -217,6 +219,37 @@ export interface SubagentActivityMessage {
   activity: SubagentActivityItem;
 }
 
+/**
+ * Request to elicit information from the user on behalf of an MCP server,
+ * per the MCP `elicitation/create` request (spec 2025-11-25).
+ *
+ * Two modes are supported:
+ * - `form`: render a structured form built from the requested JSON schema.
+ * - `url`: open a URL out-of-band (e.g. third-party OAuth, secure credential
+ *   collection) and wait for the server to signal completion.
+ */
+export interface McpElicitationRequest {
+  type: MessageBusType.MCP_ELICITATION_REQUEST;
+  correlationId: string;
+  serverName: string;
+  mode: 'form' | 'url';
+  message: string;
+  /** Present when `mode === 'form'`. JSON Schema describing requested fields. */
+  requestedSchema?: unknown;
+  /** Present when `mode === 'url'`. Opaque server-issued id used to correlate completion. */
+  elicitationId?: string;
+  /** Present when `mode === 'url'`. URL the user should open. */
+  url?: string;
+}
+
+export interface McpElicitationResponse {
+  type: MessageBusType.MCP_ELICITATION_RESPONSE;
+  correlationId: string;
+  action: 'accept' | 'decline' | 'cancel';
+  /** Form values when `action === 'accept'` for form-mode requests. */
+  content?: Record<string, string | number | boolean | string[]>;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -227,4 +260,6 @@ export type Message =
   | AskUserRequest
   | AskUserResponse
   | ToolCallsUpdateMessage
-  | SubagentActivityMessage;
+  | SubagentActivityMessage
+  | McpElicitationRequest
+  | McpElicitationResponse;
