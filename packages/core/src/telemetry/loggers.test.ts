@@ -199,6 +199,26 @@ describe('loggers', () => {
         { tokens_before: 9001, tokens_after: 9000 },
       );
     });
+
+    it('defers the OTEL emit and metrics through bufferTelemetryEvent', () => {
+      const mockConfig = makeFakeConfig();
+      // Simulate the SDK not yet being initialized: the buffered callback is
+      // held rather than executed. The OTEL emit and metrics must not run
+      // directly, otherwise the event is dropped against a no-op provider.
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(sdk.bufferTelemetryEvent).toHaveBeenCalledOnce();
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordChatCompressionMetrics).not.toHaveBeenCalled();
+    });
   });
 
   describe('logCliConfiguration', () => {
