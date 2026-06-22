@@ -143,6 +143,7 @@ export async function getCorrectedFileContent(
     fileExtension === '.toml' ||
     fileExtension === '.lock' ||
     fileExtension === '.ini' ||
+    fileExtension === '.properties' ||
     fileExtension === '.cfg' ||
     fileExtension === '.conf' ||
     fileExtension === '.config' ||
