@@ -1578,41 +1578,51 @@ class McpCallableTool implements CallableTool {
   /**
    * Drives each URL elicitation past the UI.
    * Returns `true` only if every elicitation was accepted; if any was
-   * declined or cancelled, returns `false` so the caller can abort the
-   * retry loop rather than re-prompting the user.
+   * declined, cancelled, malformed, or the message bus failed, returns
+   * `false` so the caller can abort the retry loop rather than
+   * re-prompting the user.
    */
   private async runUrlElicitations(
-    elicitations: ElicitRequestURLParams[],
+    elicitations: ElicitRequestURLParams[] | undefined,
   ): Promise<boolean> {
-    if (!this.messageBus) return false;
-    for (const elicitation of elicitations) {
-      if (!isSafeElicitationUrl(elicitation.url)) {
-        // Untrusted MCP server sent an unsafe URL; treat as declined so
-        // we don't surface `javascript:`/`file:`/etc. to the UI and don't
-        // retry in a loop.
-        return false;
-      }
-      const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
-        type: MessageBusType.MCP_ELICITATION_REQUEST,
-        serverName: this.serverName,
-        mode: 'url',
-        message: elicitation.message,
-        elicitationId: elicitation.elicitationId,
-        url: elicitation.url,
-      };
-      const response = await this.messageBus.request<
-        McpElicitationRequest,
-        McpElicitationResponse
-      >(
-        elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
-        MessageBusType.MCP_ELICITATION_RESPONSE,
-        this.timeout,
-      );
-      if (response.action !== 'accept') {
-        return false;
-      }
+    if (!this.messageBus || !elicitations || elicitations.length === 0) {
+      return false;
     }
-    return true;
+    try {
+      for (const elicitation of elicitations) {
+        if (!isSafeElicitationUrl(elicitation.url)) {
+          // Untrusted MCP server sent an unsafe URL; treat as declined so
+          // we don't surface `javascript:`/`file:`/etc. to the UI and don't
+          // retry in a loop.
+          return false;
+        }
+        const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
+          type: MessageBusType.MCP_ELICITATION_REQUEST,
+          serverName: this.serverName,
+          mode: 'url',
+          message: elicitation.message,
+          elicitationId: elicitation.elicitationId,
+          url: elicitation.url,
+        };
+        const response = await this.messageBus.request<
+          McpElicitationRequest,
+          McpElicitationResponse
+        >(
+          elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
+          MessageBusType.MCP_ELICITATION_RESPONSE,
+          this.timeout,
+        );
+        if (response.action !== 'accept') {
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      debugLogger.error(
+        `URL elicitation request for server '${this.serverName}' failed: ${getErrorMessage(error)}`,
+      );
+      return false;
+    }
   }
 }
 
@@ -2010,8 +2020,21 @@ export async function connectToMcpServer(
       return { action: 'decline' } as ElicitResult;
     }
 
-    const params = request.params;
+    // Defensively guard against malformed payloads. The MCP SDK should
+    // validate these via the Zod schema, but a misbehaving server can
+    // still slip through if validation is ever relaxed.
+    const params = request?.params;
+    if (!params || typeof params !== 'object') {
+      return { action: 'decline' } as ElicitResult;
+    }
+
     const isUrlMode = params.mode === 'url';
+    const isFormMode = params.mode === 'form' || params.mode === undefined;
+    if (!isUrlMode && !isFormMode) {
+      // Unknown / future mode; decline rather than forwarding something
+      // we don't know how to render.
+      return { action: 'decline' } as ElicitResult;
+    }
 
     if (isUrlMode) {
       const urlStr = (params as ElicitRequestURLParams).url;
@@ -2042,20 +2065,27 @@ export async function connectToMcpServer(
               .requestedSchema,
           };
 
-    const response = await messageBus.request<
-      McpElicitationRequest,
-      McpElicitationResponse
-    >(
-      elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
-      MessageBusType.MCP_ELICITATION_RESPONSE,
-      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-    );
+    try {
+      const response = await messageBus.request<
+        McpElicitationRequest,
+        McpElicitationResponse
+      >(
+        elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
+        MessageBusType.MCP_ELICITATION_RESPONSE,
+        mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      );
 
-    const result: ElicitResult = { action: response.action };
-    if (response.action === 'accept' && response.content) {
-      result.content = response.content;
+      const result: ElicitResult = { action: response.action };
+      if (response.action === 'accept' && response.content) {
+        result.content = response.content;
+      }
+      return result;
+    } catch (error) {
+      debugLogger.error(
+        `Elicitation request for server '${mcpServerName}' failed: ${getErrorMessage(error)}`,
+      );
+      return { action: 'decline' } as ElicitResult;
     }
-    return result;
   });
 
   let unlistenDirectories: Unsubscribe | undefined =

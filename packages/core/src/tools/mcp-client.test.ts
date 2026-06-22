@@ -3347,4 +3347,90 @@ describe('connectToMcpServer - elicitation', () => {
     expect(result).toEqual({ action: 'decline' });
     expect(messageBus.request).not.toHaveBeenCalled();
   });
+
+  it('declines when params payload is missing', async () => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({});
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
+  });
+
+  it('declines when mode is unknown', async () => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: { mode: 'something-new', message: 'hi' },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
+  });
+
+  it('declines when messageBus.request throws', async () => {
+    const messageBus = {
+      request: vi.fn().mockRejectedValue(new Error('bus exploded')),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: {
+        mode: 'form',
+        message: 'fill this in',
+        requestedSchema: { type: 'object', properties: {} },
+      },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).toHaveBeenCalledTimes(1);
+  });
 });
