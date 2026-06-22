@@ -33,10 +33,6 @@ export interface ToolRegistry {
   aliasLookup: ReadonlyMap<string, string>;
 }
 
-/**
- * Exhaustive category mapping for every built-in tool.
- * TypeScript enforces that every tool in ALL_BUILTIN_TOOL_NAMES has an entry.
- */
 const TOOL_CATEGORIES: Record<
   (typeof ALL_BUILTIN_TOOL_NAMES)[number],
   ToolCategory
@@ -70,7 +66,13 @@ const TOOL_CATEGORIES: Record<
   list_mcp_resources: 'mcp',
 };
 
+let registryCache: ToolRegistry | undefined;
+
 export function buildToolRegistry(): ToolRegistry {
+  if (registryCache) {
+    return registryCache;
+  }
+
   const tools = new Map<string, ToolRegistryEntry>();
   const aliasLookup = new Map<string, string>();
   const categoryGroups = new Map<ToolCategory, ToolRegistryEntry[]>();
@@ -114,12 +116,13 @@ export function buildToolRegistry(): ToolRegistry {
     frozenCategories.set(cat, Object.freeze(entries));
   }
 
-  return {
+  registryCache = {
     tools,
     totalTools: tools.size,
     byCategory: frozenCategories,
     aliasLookup,
   };
+  return registryCache;
 }
 
 export function resolveToolName(
