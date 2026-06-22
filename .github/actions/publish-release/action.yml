@@ -167,6 +167,7 @@ runs:
       shell: 'bash'
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
           --tag staging-tmp
@@ -215,6 +216,7 @@ runs:
       shell: 'bash'
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
           --tag staging-tmp
@@ -242,6 +244,7 @@ runs:
       # Tag staging for initial release
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
           --tag staging-tmp
