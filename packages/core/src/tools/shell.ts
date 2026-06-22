@@ -61,6 +61,13 @@ import { wrapUntrusted } from '../utils/textUtils.js';
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
 
+// Maximum bytes of command output forwarded to the model in a tool result when
+// output summarization (getSummarizeToolOutputConfig) is not enabled. Without
+// this bound a single command can send an arbitrarily large payload back to the
+// provider (issue #28090). Tunable; enable tool-output summarization for a
+// smarter, model-driven bound.
+export const MAX_LLM_OUTPUT_BYTES = 32 * 1024;
+
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
 const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
@@ -81,6 +88,55 @@ function trimLiveOutputBuffer(output: string): string {
     startIndex += 1;
   }
   return output.slice(startIndex);
+}
+
+// Takes at most `maxBytes` of UTF-8 output from the start (or end) of a string
+// without splitting a multi-byte character.
+function takeBytes(output: string, maxBytes: number, fromEnd: boolean): string {
+  if (maxBytes <= 0) {
+    return '';
+  }
+  const chars = Array.from(output);
+  if (fromEnd) {
+    chars.reverse();
+  }
+  let bytes = 0;
+  const kept: string[] = [];
+  for (const ch of chars) {
+    const size = Buffer.byteLength(ch, 'utf8');
+    if (bytes + size > maxBytes) {
+      break;
+    }
+    bytes += size;
+    kept.push(ch);
+  }
+  if (fromEnd) {
+    kept.reverse();
+  }
+  return kept.join('');
+}
+
+/**
+ * Bounds command output sent to the model. If the output exceeds `maxBytes`
+ * (UTF-8), keeps the head and tail — where command context and trailing errors
+ * usually live — and replaces the middle with a truncation marker. Returns the
+ * output unchanged when it is already within the bound.
+ */
+export function truncateLlmOutput(
+  output: string,
+  maxBytes: number = MAX_LLM_OUTPUT_BYTES,
+): string {
+  const totalBytes = Buffer.byteLength(output, 'utf8');
+  if (totalBytes <= maxBytes) {
+    return output;
+  }
+  const marker = `\n\n[... shell output truncated: showing ~${maxBytes} of ${totalBytes} bytes. Re-run with a narrower command (e.g. grep/head/tail) or enable tool-output summarization. ...]\n\n`;
+  const budget = Math.max(0, maxBytes - Buffer.byteLength(marker, 'utf8'));
+  const headBudget = Math.ceil(budget * 0.75);
+  const tailBudget = budget - headBudget;
+  const head = takeBytes(output, headBudget, false);
+  const tail = takeBytes(output, tailBudget, true);
+  return `${head}${marker}${tail}`;
 }
 
 export interface ShellToolParams {
@@ -784,7 +840,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             'Command was cancelled by user before it could complete.';
         }
         if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:\n${truncateLlmOutput(result.output)}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -798,7 +854,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
+        const llmContentParts = [
+          `Output: ${truncateLlmOutput(result.output) || '(empty)'}`,
+        ];
 
         if (result.error) {
           const finalError = result.error.message.replaceAll(
