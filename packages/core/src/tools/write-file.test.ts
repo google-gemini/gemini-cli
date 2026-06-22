@@ -409,6 +409,15 @@ describe('WriteFileTool', () => {
         '.env.local',
         'config.ini',
         '.gitconfig',
+        'data.xml',
+        'image.svg',
+        'data.csv',
+        'data.tsv',
+        'main.tf',
+        'terraform.tfvars',
+        'config.hcl',
+        'terraform.tfstate',
+        'manifest.webmanifest',
       ];
 
       for (const file of filesToTest) {

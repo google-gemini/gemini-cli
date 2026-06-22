@@ -147,6 +147,15 @@ export async function getCorrectedFileContent(
     fileExtension === '.cfg' ||
     fileExtension === '.conf' ||
     fileExtension === '.config' ||
+    fileExtension === '.xml' ||
+    fileExtension === '.svg' ||
+    fileExtension === '.csv' ||
+    fileExtension === '.tsv' ||
+    fileExtension === '.tf' ||
+    fileExtension === '.tfvars' ||
+    fileExtension === '.hcl' ||
+    fileExtension === '.tfstate' ||
+    fileExtension === '.webmanifest' ||
     fileName.startsWith('.env') ||
     [
       '.eslintrc',
