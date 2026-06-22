@@ -45,6 +45,7 @@ export interface EvalCaseRecord {
   timeout?: number;
   hasFiles: boolean;
   hasPrompt: boolean;
+  toolReferences: readonly string[];
   location: EvalSourceLocation;
 }
 
@@ -53,6 +54,7 @@ export interface EvalFileAnalysis {
   relativePath: string;
   helpers: Record<string, BaseEvalHelper | 'unknown'>;
   cases: readonly EvalCaseRecord[];
+  toolReferences: readonly string[];
   diagnostics: readonly EvalAnalysisDiagnostic[];
 }
 
@@ -76,6 +78,7 @@ export function analyzeEvalSource(
   );
 
   const helpers = collectHelperMappings(sourceFile);
+  const importedConstants = collectImportedToolNameConstants(sourceFile);
   const diagnostics: EvalAnalysisDiagnostic[] = [];
   const cases: EvalCaseRecord[] = [];
 
@@ -118,6 +121,14 @@ export function analyzeEvalSource(
       });
     }
 
+    const assertProp = getPropertyAssignment(evalCase, 'assert');
+    const assertBody = assertProp
+      ? getFunctionBody(assertProp.initializer)
+      : undefined;
+    const toolRefs = assertBody
+      ? collectToolReferences(assertBody, sourceFile, importedConstants)
+      : [];
+
     cases.push({
       filePath,
       relativePath,
@@ -130,17 +141,23 @@ export function analyzeEvalSource(
       timeout: getStaticNumberProperty(evalCase, 'timeout'),
       hasFiles: hasProperty(evalCase, 'files'),
       hasPrompt: hasProperty(evalCase, 'prompt'),
+      toolReferences: Object.freeze([...new Set(toolRefs)].sort()),
       location: getLocation(sourceFile, callExpression),
     });
   });
 
   cases.sort(compareEvalCases);
 
+  const fileToolRefs = [
+    ...new Set(cases.flatMap((c) => [...c.toolReferences])),
+  ].sort();
+
   return {
     filePath,
     relativePath,
     helpers,
     cases,
+    toolReferences: Object.freeze(fileToolRefs),
     diagnostics: diagnostics.sort(compareDiagnostics),
   };
 }
@@ -438,4 +455,193 @@ function compareDiagnostics(
 
 function compareStrings(left: string, right: string) {
   return left.localeCompare(right, 'en');
+}
+
+/**
+ * Well-known constant names exported from @google/gemini-cli-core that
+ * map to tool name string values. Used to resolve identifier references
+ * like `waitForToolCall(TRACKER_CREATE_TASK_TOOL_NAME)`.
+ */
+const WELL_KNOWN_TOOL_CONSTANTS: Record<string, string> = {
+  GLOB_TOOL_NAME: 'glob',
+  GREP_TOOL_NAME: 'grep_search',
+  LS_TOOL_NAME: 'list_directory',
+  READ_FILE_TOOL_NAME: 'read_file',
+  SHELL_TOOL_NAME: 'run_shell_command',
+  WRITE_FILE_TOOL_NAME: 'write_file',
+  EDIT_TOOL_NAME: 'replace',
+  WEB_SEARCH_TOOL_NAME: 'google_web_search',
+  WRITE_TODOS_TOOL_NAME: 'write_todos',
+  WEB_FETCH_TOOL_NAME: 'web_fetch',
+  READ_MANY_FILES_TOOL_NAME: 'read_many_files',
+  GET_INTERNAL_DOCS_TOOL_NAME: 'get_internal_docs',
+  ACTIVATE_SKILL_TOOL_NAME: 'activate_skill',
+  ASK_USER_TOOL_NAME: 'ask_user',
+  EXIT_PLAN_MODE_TOOL_NAME: 'exit_plan_mode',
+  ENTER_PLAN_MODE_TOOL_NAME: 'enter_plan_mode',
+  UPDATE_TOPIC_TOOL_NAME: 'update_topic',
+  COMPLETE_TASK_TOOL_NAME: 'complete_task',
+  READ_MCP_RESOURCE_TOOL_NAME: 'read_mcp_resource',
+  LIST_MCP_RESOURCES_TOOL_NAME: 'list_mcp_resources',
+  TRACKER_CREATE_TASK_TOOL_NAME: 'tracker_create_task',
+  TRACKER_UPDATE_TASK_TOOL_NAME: 'tracker_update_task',
+  TRACKER_GET_TASK_TOOL_NAME: 'tracker_get_task',
+  TRACKER_LIST_TASKS_TOOL_NAME: 'tracker_list_tasks',
+  TRACKER_ADD_DEPENDENCY_TOOL_NAME: 'tracker_add_dependency',
+  TRACKER_VISUALIZE_TOOL_NAME: 'tracker_visualize',
+  AGENT_TOOL_NAME: 'invoke_agent',
+};
+
+function collectImportedToolNameConstants(
+  sourceFile: ts.SourceFile,
+): Map<string, string> {
+  const constants = new Map<string, string>();
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause?.namedBindings ||
+      !ts.isNamedImports(statement.importClause.namedBindings)
+    ) {
+      continue;
+    }
+
+    for (const element of statement.importClause.namedBindings.elements) {
+      const importedName = element.propertyName?.text ?? element.name.text;
+      const localName = element.name.text;
+      const resolvedValue = WELL_KNOWN_TOOL_CONSTANTS[importedName];
+      if (resolvedValue !== undefined) {
+        constants.set(localName, resolvedValue);
+      }
+    }
+  }
+
+  return constants;
+}
+
+function getFunctionBody(
+  node: ts.Expression,
+): ts.ConciseBody | ts.Block | undefined {
+  if (ts.isArrowFunction(node)) {
+    return node.body;
+  }
+  if (ts.isFunctionExpression(node)) {
+    return node.body;
+  }
+  return undefined;
+}
+
+function collectToolReferences(
+  body: ts.ConciseBody | ts.Block,
+  sourceFile: ts.SourceFile,
+  importedConstants: Map<string, string>,
+): string[] {
+  const refs: string[] = [];
+
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      extractFromWaitForToolCall(node, importedConstants, refs);
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      extractFromToolRequestNameComparison(node, importedConstants, refs);
+    }
+
+    if (ts.isCallExpression(node)) {
+      extractFromArrayIncludes(node, importedConstants, refs);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(body);
+  return refs;
+}
+
+function extractFromWaitForToolCall(
+  call: ts.CallExpression,
+  importedConstants: Map<string, string>,
+  refs: string[],
+) {
+  const expr = call.expression;
+  if (
+    !ts.isPropertyAccessExpression(expr) ||
+    expr.name.text !== 'waitForToolCall'
+  ) {
+    return;
+  }
+  const firstArg = call.arguments[0];
+  if (!firstArg) {
+    return;
+  }
+  const resolved = resolveStringValue(firstArg, importedConstants);
+  if (resolved) {
+    refs.push(resolved);
+  }
+}
+
+function extractFromToolRequestNameComparison(
+  binary: ts.BinaryExpression,
+  importedConstants: Map<string, string>,
+  refs: string[],
+) {
+  const isToolRequestName = (node: ts.Expression) =>
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'name' &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'toolRequest';
+
+  let valueNode: ts.Expression | undefined;
+  if (isToolRequestName(binary.left)) {
+    valueNode = binary.right;
+  } else if (isToolRequestName(binary.right)) {
+    valueNode = binary.left;
+  }
+
+  if (valueNode) {
+    const resolved = resolveStringValue(valueNode, importedConstants);
+    if (resolved) {
+      refs.push(resolved);
+    }
+  }
+}
+
+function extractFromArrayIncludes(
+  call: ts.CallExpression,
+  importedConstants: Map<string, string>,
+  refs: string[],
+) {
+  const expr = call.expression;
+  if (!ts.isPropertyAccessExpression(expr) || expr.name.text !== 'includes') {
+    return;
+  }
+
+  const arrayExpr = expr.expression;
+  if (!ts.isArrayLiteralExpression(arrayExpr)) {
+    return;
+  }
+
+  for (const element of arrayExpr.elements) {
+    const resolved = resolveStringValue(element, importedConstants);
+    if (resolved) {
+      refs.push(resolved);
+    }
+  }
+}
+
+function resolveStringValue(
+  node: ts.Expression,
+  importedConstants: Map<string, string>,
+): string | undefined {
+  const literal = getStringLiteralValue(node);
+  if (literal !== undefined) {
+    return literal;
+  }
+  if (ts.isIdentifier(node)) {
+    return importedConstants.get(node.text);
+  }
+  return undefined;
 }
