@@ -266,7 +266,7 @@ describe('editCorrector', () => {
       expect(mockGenerateJson).not.toHaveBeenCalled();
     });
 
-    it('should bypass all unescaping and correction when isJsonLike is true', async () => {
+    it('should bypass all unescaping and correction when isJsonLike is true and disableLLMCorrection is true', async () => {
       const validJson = JSON.stringify(
         {
           cells: [
@@ -293,6 +293,26 @@ describe('editCorrector', () => {
       expect(result).toBe(validJson);
       expect(() => JSON.parse(result)).not.toThrow();
       expect(mockGenerateJson).not.toHaveBeenCalled();
+    });
+
+    it('should skip unescapeStringForGeminiBug but still call correctStringEscaping when isJsonLike is true and disableLLMCorrection is false', async () => {
+      const content = 'json content';
+      const corrected = 'corrected json';
+      mockResponses.push({
+        corrected_string_escaping: corrected,
+      });
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        false, // disableLLMCorrection is false
+        true, // aggressiveUnescape is true
+        true, // isJsonLike is true
+      );
+
+      expect(result).toBe(corrected);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
     });
   });
 });

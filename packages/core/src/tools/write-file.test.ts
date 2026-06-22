@@ -407,6 +407,7 @@ describe('WriteFileTool', () => {
         '.prettierrc',
         '.env',
         '.env.local',
+        'production.env',
         'config.ini',
         '.gitconfig',
         'data.xml',

@@ -37,7 +37,16 @@ export async function ensureCorrectFileContent(
   isJsonLike: boolean = false,
 ): Promise<string> {
   if (isJsonLike) {
-    return content;
+    if (disableLLMCorrection) {
+      return content;
+    }
+    const correctedContent = await correctStringEscaping(
+      content,
+      baseLlmClient,
+      abortSignal,
+    );
+    fileContentCorrectionCache.set(content, correctedContent);
+    return correctedContent;
   }
 
   const cachedResult = fileContentCorrectionCache.get(content);

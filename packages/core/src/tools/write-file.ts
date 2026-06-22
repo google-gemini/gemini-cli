@@ -156,6 +156,7 @@ export async function getCorrectedFileContent(
     fileExtension === '.hcl' ||
     fileExtension === '.tfstate' ||
     fileExtension === '.webmanifest' ||
+    fileExtension === '.env' ||
     fileName.startsWith('.env') ||
     [
       '.eslintrc',
