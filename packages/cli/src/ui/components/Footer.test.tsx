@@ -351,7 +351,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('should display "current process" for custom sandbox when SANDBOX env is set', async () => {
+    it('should display the sandbox name when a custom SANDBOX env is set', async () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
@@ -361,12 +361,12 @@ describe('<Footer />', () => {
           sessionStats: mockSessionStats,
         },
       });
-      expect(lastFrame()).toContain('current process');
+      expect(lastFrame()).toContain('gemini-cli-test-sandbox');
       vi.unstubAllEnvs();
       unmount();
     });
 
-    it('should display "current process" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
+    it('should display "sandbox-exec (<profile>)" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
@@ -374,7 +374,7 @@ describe('<Footer />', () => {
         width: 120,
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
-      expect(lastFrame()).toContain('current process');
+      expect(lastFrame()).toContain('sandbox-exec (test-profile)');
       vi.unstubAllEnvs();
       unmount();
     });
