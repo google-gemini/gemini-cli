@@ -131,19 +131,6 @@ jobs:
             core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
             return labelNames;
 
-      - name: 'Prepare Issue Data'
-        id: 'prepare_issue_data'
-        env:
-          ISSUE_TITLE: >-
-            ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.title || github.event.issue.title }}
-          ISSUE_BODY: >-
-            ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}
-        run: |
-          set -euo pipefail
-          echo "Title: ${ISSUE_TITLE}" > issue_context.md
-          echo "Body:" >> issue_context.md
-          echo "${ISSUE_BODY}" >> issue_context.md
-
       - name: 'Run Gemini Issue Analysis'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
@@ -153,7 +140,6 @@ jobs:
             ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.issue_number || inputs.issue_number) || github.event.issue.number }}
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
-          GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
           upload_artifacts: 'true'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
@@ -171,10 +157,7 @@ jobs:
                 "target": "gcp"
               },
               "tools": {
-                "core": [
-                  "run_shell_command(echo)",
-                  "read_file"
-                ]
+                "core": []
               }
             }
           prompt: |-
@@ -182,8 +165,15 @@ jobs:
 
             You are an issue triage assistant. Your role is to analyze a GitHub issue and determine the single most appropriate area/ label based on the definitions provided.
 
+            ## Issue Context
+            Title: ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.title || github.event.issue.title }}
+            Body:
+            --- START OF ISSUE BODY ---
+            ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}
+            --- END OF ISSUE BODY ---
+
             ## Steps
-            1. Use the read_file tool to read the file "issue_context.md" which contains the issue title and body.
+            1. Analyze the issue context above.
             2. Review the available labels: ${{ env.AVAILABLE_LABELS }}.
             3. Select exactly one area/ label that best matches the issue based on Reference 1: Area Definitions.
             4. Fallback Logic:

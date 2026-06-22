@@ -143,6 +143,16 @@ Integrate Gemini CLI directly into your GitHub workflows with
 - **Custom Workflows**: Build automated, scheduled and on-demand workflows
   tailored to your team's needs
 
+<!-- prettier-ignore -->
+> [!WARNING]
+> **Security best practice for public repositories:** Never set
+> `GEMINI_CLI_TRUST_WORKSPACE=true` or use `--skip-trust` in CI/CD workflows
+> that process untrusted public inputs (like issue titles/bodies or PR comments).
+> Doing so can expose dynamically generated runner secrets (such as GCP OIDC
+> service account credentials) to prompt injection attacks. See the
+> [Trusted Folders documentation](https://www.geminicli.com/docs/cli/trusted-folders)
+> for more information.
+
 ## 🔐 Authentication Options
 
 Choose the authentication method that best fits your needs:

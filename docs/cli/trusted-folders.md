@@ -117,6 +117,16 @@ the following methods:
 These methods will trust the current workspace for the duration of the session
 without prompting.
 
+<!-- prettier-ignore -->
+> [!WARNING]
+> **Never set `GEMINI_CLI_TRUST_WORKSPACE=true` or use `--skip-trust` in CI/CD
+> workflows that process untrusted public inputs** (such as GitHub issues, pull
+> requests, or comments). Doing so allows a malicious contributor to commit a
+> crafted `.gemini/settings.json` file in their pull request, register
+> arbitrary tools (including shell execution), and exfiltrate dynamically
+> generated runner secrets (such as GCP service account credentials or AWS keys)
+> via prompt injection.
+
 For detailed instructions on managing folder trust within CI/CD workflows,
 review the
 [Gemini CLI trust guidance for GitHub Actions](https://github.com/google-github-actions/run-gemini-cli/blob/main/docs/trust-guidance.md).

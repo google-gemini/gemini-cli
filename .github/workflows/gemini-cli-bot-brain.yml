@@ -48,8 +48,6 @@ jobs:
       contents: 'read'
       issues: 'read'
       actions: 'read'
-    env:
-      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
       - name: 'Determine Checkout Ref'
         id: 'determine_ref'

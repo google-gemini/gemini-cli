@@ -64,7 +64,6 @@ and Cloud Logging.
 You must complete several setup steps before enabling Google Cloud telemetry.
 
 1.  Set your Google Cloud project ID:
-
     - To send telemetry to a separate project:
 
       **macOS/Linux**
@@ -94,10 +93,8 @@ You must complete several setup steps before enabling Google Cloud telemetry.
       ```
 
 2.  Authenticate with Google Cloud using one of these methods:
-
     - **Method A: Application Default Credentials (ADC)**: Use this method for
       service accounts or standard `gcloud` authentication.
-
       - For user accounts:
         ```bash
         gcloud auth application-default login
@@ -115,7 +112,6 @@ You must complete several setup steps before enabling Google Cloud telemetry.
         ```powershell
         $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account.json"
         ```
-
     * **Method B: CLI Auth** (Direct export only): Simplest method for local
       users. Gemini CLI uses the same OAuth credentials you used for login. To
       enable this, set `useCliAuth: true` in your `.gemini/settings.json`:
@@ -137,7 +133,6 @@ You must complete several setup steps before enabling Google Cloud telemetry.
 > telemetry will be disabled.
 
 3.  Ensure your account or service account has these IAM roles:
-
     - Cloud Trace Agent
     - Monitoring Metric Writer
     - Logs Writer

@@ -56,7 +56,6 @@ creating a "discovery file."
     }
   }
   ```
-
   - `port` (number, required): The port of the MCP server.
   - `workspacePath` (string, required): A list of all open workspace root paths,
     delimited by the OS-specific path separator (`:` for Linux/macOS, `;` for
@@ -188,7 +187,6 @@ The plugin **MUST** register an `openDiff` tool on its MCP server.
 - **Response (`CallToolResult`):** The tool **MUST** immediately return a
   `CallToolResult` to acknowledge the request and report whether the diff view
   was successfully opened.
-
   - On Success: If the diff view was opened successfully, the response **MUST**
     contain empty content (that is, `content: []`).
   - On Failure: If an error prevented the diff view from opening, the response
