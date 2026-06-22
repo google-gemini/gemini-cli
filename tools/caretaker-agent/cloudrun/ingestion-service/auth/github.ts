@@ -19,7 +19,11 @@ export function verifyGithubSignature(
   signatureHeader: string | undefined,
   secret: string,
 ): boolean {
-  if (!signatureHeader) {
+  if (!signatureHeader || signatureHeader.length !== 71) {
+    return false;
+  }
+
+  if (!Buffer.isBuffer(payloadBody) && typeof payloadBody !== 'string') {
     return false;
   }
 
