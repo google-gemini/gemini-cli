@@ -1557,7 +1557,15 @@ class McpCallableTool implements CallableTool {
         ) {
           throw error;
         }
-        await this.runUrlElicitations(error.elicitations);
+        const accepted = await this.runUrlElicitations(error.elicitations);
+        if (!accepted) {
+          // The user declined or cancelled; surface a clean error rather
+          // than re-prompting them on every retry round.
+          throw new Error(
+            `MCP tool '${call.name}' on server '${this.serverName}' was ` +
+              `cancelled: user declined the URL elicitation request.`,
+          );
+        }
         // Retry the tool call now that the elicitations have been resolved.
       }
     }
@@ -1567,15 +1575,22 @@ class McpCallableTool implements CallableTool {
     );
   }
 
+  /**
+   * Drives each URL elicitation past the UI.
+   * Returns `true` only if every elicitation was accepted; if any was
+   * declined or cancelled, returns `false` so the caller can abort the
+   * retry loop rather than re-prompting the user.
+   */
   private async runUrlElicitations(
     elicitations: ElicitRequestURLParams[],
-  ): Promise<void> {
-    if (!this.messageBus) return;
+  ): Promise<boolean> {
+    if (!this.messageBus) return false;
     for (const elicitation of elicitations) {
       if (!isSafeElicitationUrl(elicitation.url)) {
-        // Untrusted MCP server sent an unsafe URL; skip it rather than
-        // surfacing `javascript:`/`file:`/etc. to the UI.
-        continue;
+        // Untrusted MCP server sent an unsafe URL; treat as declined so
+        // we don't surface `javascript:`/`file:`/etc. to the UI and don't
+        // retry in a loop.
+        return false;
       }
       const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
         type: MessageBusType.MCP_ELICITATION_REQUEST,
@@ -1585,7 +1600,7 @@ class McpCallableTool implements CallableTool {
         elicitationId: elicitation.elicitationId,
         url: elicitation.url,
       };
-      await this.messageBus.request<
+      const response = await this.messageBus.request<
         McpElicitationRequest,
         McpElicitationResponse
       >(
@@ -1593,7 +1608,11 @@ class McpCallableTool implements CallableTool {
         MessageBusType.MCP_ELICITATION_RESPONSE,
         this.timeout,
       );
+      if (response.action !== 'accept') {
+        return false;
+      }
     }
+    return true;
   }
 }
 
