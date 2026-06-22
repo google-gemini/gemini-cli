@@ -291,9 +291,8 @@ describe('loadConfig', () => {
   });
 
   describe('policy engine configuration', () => {
-    it('should merge V1 and V2 tool settings into policySettings', async () => {
+    it('should map tool settings into policySettings', async () => {
       const settings: Settings = {
-        allowedTools: ['v1-allowed'],
         tools: {
           allowed: ['v2-allowed'],
           exclude: ['v2-exclude'],
@@ -313,7 +312,7 @@ describe('loadConfig', () => {
           tools: {
             core: ['v2-core'],
             exclude: ['v2-exclude'],
-            allowed: ['v1-allowed'],
+            allowed: ['v2-allowed'],
           },
           mcpServers: settings.mcpServers,
           policyPaths: settings.policyPaths,
@@ -324,64 +323,9 @@ describe('loadConfig', () => {
         true,
       );
     });
-
-    it('should use V2 tool settings when V1 is missing', async () => {
-      const settings: Settings = {
-        tools: {
-          allowed: ['v2-allowed'],
-        },
-      };
-
-      await loadConfig(settings, mockExtensionLoader, taskId);
-
-      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            allowed: ['v2-allowed'],
-          }),
-        }),
-        ApprovalMode.DEFAULT,
-        undefined,
-        true,
-      );
-    });
-
-    it('should use V1 tool settings when V2 is also present', async () => {
-      const settings: Settings = {
-        allowedTools: ['v1-allowed'],
-        tools: {
-          allowed: ['v2-allowed'],
-        },
-      };
-
-      await loadConfig(settings, mockExtensionLoader, taskId);
-
-      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            allowed: ['v1-allowed'],
-          }),
-        }),
-        ApprovalMode.DEFAULT,
-        undefined,
-        true,
-      );
-    });
   });
 
   describe('tool configuration', () => {
-    it('should pass V1 allowedTools to Config properly', async () => {
-      const settings: Settings = {
-        allowedTools: ['shell', 'edit'],
-      };
-      await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowedTools: ['shell', 'edit'],
-        }),
-      );
-    });
-
     it('should pass V2 tools.allowed to Config properly', async () => {
       const settings: Settings = {
         tools: {
@@ -392,21 +336,6 @@ describe('loadConfig', () => {
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],
-        }),
-      );
-    });
-
-    it('should prefer V1 allowedTools over V2 tools.allowed if both present', async () => {
-      const settings: Settings = {
-        allowedTools: ['v1-tool'],
-        tools: {
-          allowed: ['v2-tool'],
-        },
-      };
-      await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowedTools: ['v1-tool'],
         }),
       );
     });

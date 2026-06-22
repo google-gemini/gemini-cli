@@ -69,7 +69,13 @@ export const getLatestGitHubRelease = async (
         'X-GitHub-Api-Version': '2022-11-28',
       },
       dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
-      signal: AbortSignal.any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      signal: (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
     } as RequestInit);
 
     if (!response.ok) {
