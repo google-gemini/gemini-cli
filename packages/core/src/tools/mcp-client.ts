@@ -1590,10 +1590,14 @@ class McpCallableTool implements CallableTool {
     }
     try {
       for (const elicitation of elicitations) {
-        if (!isSafeElicitationUrl(elicitation.url)) {
-          // Untrusted MCP server sent an unsafe URL; treat as declined so
-          // we don't surface `javascript:`/`file:`/etc. to the UI and don't
-          // retry in a loop.
+        if (
+          typeof elicitation.url !== 'string' ||
+          typeof elicitation.elicitationId !== 'string' ||
+          !isSafeElicitationUrl(elicitation.url)
+        ) {
+          // Untrusted MCP server sent a malformed payload or an unsafe
+          // URL; treat as declined so we don't surface
+          // `javascript:`/`file:`/etc. to the UI and don't retry in a loop.
           return false;
         }
         const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
@@ -2038,10 +2042,16 @@ export async function connectToMcpServer(
 
     if (isUrlMode) {
       const urlStr = (params as ElicitRequestURLParams).url;
-      if (!isSafeElicitationUrl(urlStr)) {
-        // Untrusted MCP server tried to coerce the UI into opening a
-        // dangerous URL (e.g. `javascript:`/`file:`/`data:`). Decline
-        // rather than forward it.
+      const elicitationId = (params as ElicitRequestURLParams).elicitationId;
+      if (
+        typeof urlStr !== 'string' ||
+        typeof elicitationId !== 'string' ||
+        !isSafeElicitationUrl(urlStr)
+      ) {
+        // Untrusted or misbehaving MCP server: malformed payload, or
+        // tried to coerce the UI into opening a dangerous URL
+        // (e.g. `javascript:`/`file:`/`data:`). Decline rather than
+        // forward it.
         return { action: 'decline' } as ElicitResult;
       }
     }

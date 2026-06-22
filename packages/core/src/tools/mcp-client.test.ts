@@ -3402,6 +3402,53 @@ describe('connectToMcpServer - elicitation', () => {
     expect(messageBus.request).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [
+      'url is not a string',
+      { mode: 'url', message: 'm', elicitationId: 'eid', url: 42 },
+    ],
+    [
+      'elicitationId is missing',
+      { mode: 'url', message: 'm', url: 'https://example.com' },
+    ],
+    [
+      'elicitationId is a number',
+      {
+        mode: 'url',
+        message: 'm',
+        elicitationId: 7,
+        url: 'https://example.com',
+      },
+    ],
+  ])(
+    'declines url-mode when payload is malformed (%s)',
+    async (_label, badParams) => {
+      const messageBus = {
+        request: vi.fn(),
+      } as unknown as MessageBus;
+
+      await connectToMcpServer(
+        '0.0.1',
+        'test-server',
+        { command: 'test-command' },
+        false,
+        workspaceContext,
+        localContext,
+        messageBus,
+      );
+
+      const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+      const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+        req: unknown,
+      ) => Promise<{ action: string }>;
+
+      const result = await elicitationHandler({ params: badParams });
+
+      expect(result).toEqual({ action: 'decline' });
+      expect(messageBus.request).not.toHaveBeenCalled();
+    },
+  );
+
   it('declines when messageBus.request throws', async () => {
     const messageBus = {
       request: vi.fn().mockRejectedValue(new Error('bus exploded')),
