@@ -140,11 +140,11 @@ export function loadSettings(
   }
 
   // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  const mergedSettings = {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // override values from userSettings. Nested objects are merged recursively
+  // so workspace settings override only the specific keys they define, instead
+  // of replacing an entire nested section and silently dropping unrelated
+  // user-level configuration.
+  const mergedSettings = deepMergeSettings(userSettings, workspaceSettings);
 
   // Security: ensure policyPaths and adminPolicyPaths are only loaded from trusted, user-level
   // configuration and cannot be overridden by workspace-level settings, even if the
@@ -201,4 +201,40 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   return obj;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deeply merges two settings objects. Nested plain objects are merged
+ * recursively so that the `source` settings override only the specific keys
+ * they define, instead of replacing an entire nested section. Arrays and
+ * primitive values in `source` replace those in `target`, and `undefined`
+ * values in `source` are ignored so they never clobber an existing value.
+ */
+function deepMergeSettings<T extends object>(target: T, source: T): T {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const output = { ...target } as Record<string, unknown>;
+
+  for (const [key, sourceValue] of Object.entries(source)) {
+    // Skip dangerous keys that JSON.parse can create as own properties, to
+    // prevent prototype pollution.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+    if (sourceValue === undefined) {
+      continue;
+    }
+    const targetValue = output[key];
+    if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+      output[key] = deepMergeSettings(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return output as T;
 }

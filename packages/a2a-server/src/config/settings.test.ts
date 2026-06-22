@@ -128,7 +128,7 @@ describe('loadSettings', () => {
     expect(result.experimental?.enableAgents).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should deep-merge nested settings from workspace', () => {
     const userSettings = {
       showMemoryUsage: false,
       fileFiltering: {
@@ -154,9 +154,65 @@ describe('loadSettings', () => {
     // Primitive value overwritten
     expect(result.showMemoryUsage).toBe(true);
 
-    // Object value completely replaced (shallow merge behavior)
+    // Nested object is deep-merged: the workspace overrides only the key it
+    // defines, and the user's unrelated nested key is preserved.
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+  });
+
+  it('deep-merges multiple nested sections independently', () => {
+    const userSettings = {
+      tools: { core: ['core-tool'], allowed: ['user-tool'] },
+      fileFiltering: {
+        respectGitIgnore: true,
+        enableRecursiveFileSearch: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      tools: { allowed: ['workspace-tool'] },
+      fileFiltering: { respectGitIgnore: false },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir, true);
+
+    // User-only nested keys are preserved across both sections.
+    expect(result.tools?.core).toEqual(['core-tool']);
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+    // Workspace overrides only the specific key it defines.
+    expect(result.fileFiltering?.respectGitIgnore).toBe(false);
+    // Arrays are replaced wholesale, not concatenated.
+    expect(result.tools?.allowed).toEqual(['workspace-tool']);
+  });
+
+  it('does not allow prototype pollution through merged settings', () => {
+    fs.writeFileSync(
+      USER_SETTINGS_PATH,
+      JSON.stringify({ showMemoryUsage: true }),
+    );
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    // Raw JSON: JSON.parse turns __proto__ into an own property.
+    fs.writeFileSync(
+      workspaceSettingsPath,
+      '{ "__proto__": { "polluted": true } }',
+    );
+
+    const result = loadSettings(mockWorkspaceDir, true);
+
+    expect(
+      (Object.prototype as Record<string, unknown>)['polluted'],
+    ).toBeUndefined();
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(result.showMemoryUsage).toBe(true);
   });
 
   describe('security', () => {
