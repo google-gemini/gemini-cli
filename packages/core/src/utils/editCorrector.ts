@@ -36,6 +36,11 @@ export async function ensureCorrectFileContent(
   aggressiveUnescape: boolean = false,
   isJsonLike: boolean = false,
 ): Promise<string> {
+  const cachedResult = cache.get(content);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   if (isJsonLike) {
     if (disableLLMCorrection) {
       return content;
@@ -45,13 +50,9 @@ export async function ensureCorrectFileContent(
       baseLlmClient,
       abortSignal,
     );
-    fileContentCorrectionCache.set(content, correctedContent);
+    cache.set(content, correctedContent);
     return correctedContent;
   }
-
-  const cachedResult = fileContentCorrectionCache.get(content);
-  if (cachedResult) {
-    return cachedResult;
   }
 
   const unescapedContent = unescapeStringForGeminiBug(content);
