@@ -306,6 +306,18 @@ export class Scheduler {
     this.isProcessing = true;
     this.isCancelling = false;
     this.state.clearBatch();
+
+    // Guard against late-arriving requests scheduled after cancellation:
+    // if the caller's signal is already aborted, short-circuit instead of
+    // validating + enqueuing tool calls that would then execute their
+    // local side effects before the queue processor sees the abort.
+    // Match the cancellation pattern used by `_processNextItem`.
+    if (signal.aborted) {
+      this.state.cancelAllQueued('Operation cancelled');
+      this.isProcessing = false;
+      return this.state.completedBatch;
+    }
+
     const currentApprovalMode = this.config.getApprovalMode();
 
     // Sort requests to ensure Topic changes happen before actions in the same batch.

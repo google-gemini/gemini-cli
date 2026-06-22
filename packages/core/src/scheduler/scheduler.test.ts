@@ -612,6 +612,21 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.dequeue).not.toHaveBeenCalled(); // Loop broke
     });
 
+    it('should not enqueue or validate tool calls when scheduled with an already-aborted signal (regression #28091)', async () => {
+      // If a delayed tool-call chunk reaches the scheduler after the user
+      // cancelled, we must not invoke the tool registry / validators or
+      // enqueue the call — the late side effect would run before the queue
+      // processor's own abort check kicked in.
+      abortController.abort();
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.enqueue).not.toHaveBeenCalled();
+      expect(mockStateManager.cancelAllQueued).toHaveBeenCalledWith(
+        'Operation cancelled',
+      );
+    });
+
     it('cancelAll() should cancel active call and clear queue', () => {
       const activeCall: ValidatingToolCall = {
         status: CoreToolCallStatus.Validating,

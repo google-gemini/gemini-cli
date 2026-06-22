@@ -237,6 +237,54 @@ describe('Turn', () => {
       expect(turn.getDebugResponses().length).toBe(1);
     });
 
+    it('should not yield tool_call_request when signal is aborted before a function-call chunk is materialized', async () => {
+      // Regression test for #28091: a SIGINT can fire after the top-of-loop
+      // abort check but before we materialize tool calls from a chunk that
+      // arrived after cancellation. Without the extra guard the side effect
+      // runs after the user cancelled.
+      const abortController = new AbortController();
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{ content: { parts: [{ text: 'First part' }] } }],
+          } as GenerateContentResponse,
+        };
+        abortController.abort();
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [
+              {
+                id: 'late-call',
+                name: 'late_after_cancel',
+                args: {},
+                isClientInitiated: false,
+              },
+            ],
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Test late tool call' }];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        reqParts,
+        abortController.signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'First part' },
+        { type: GeminiEventType.UserCancelled },
+      ]);
+      // No tool call should have been queued for the scheduler.
+      expect(turn.pendingToolCalls).toEqual([]);
+    });
+
     it('should yield InvalidStream event if sendMessageStream throws InvalidStreamError', async () => {
       const error = new InvalidStreamError(
         'Test invalid stream',
