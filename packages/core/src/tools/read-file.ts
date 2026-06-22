@@ -6,12 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
-import {
-  makeRelative,
-  shortenPath,
-  resolveDefensiveToolPath,
-  resolveToRealPath,
-} from '../utils/paths.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -79,20 +74,10 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    const sanitizedPath = resolveDefensiveToolPath(
-      this.params.file_path,
+    this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
+      this.params.file_path,
     );
-    try {
-      this.resolvedPath = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
-      );
-    } catch {
-      this.resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        sanitizedPath,
-      );
-    }
   }
 
   getDescription(): string {
@@ -257,19 +242,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const sanitizedPath = resolveDefensiveToolPath(
-      params.file_path,
+    const resolvedPath = path.resolve(
       this.config.getTargetDir(),
+      params.file_path,
     );
-
-    let resolvedPath: string;
-    try {
-      resolvedPath = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), sanitizedPath),
-      );
-    } catch (err) {
-      return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
-    }
 
     const validationError = this.config.validatePathAccess(
       resolvedPath,
