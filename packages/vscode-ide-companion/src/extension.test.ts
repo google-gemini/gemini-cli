@@ -131,6 +131,35 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  it('should register the onDidChangeWorkspaceFolders disposable in subscriptions', async () => {
+    // Regression test for #27790: a comma operator previously wrapped the two
+    // workspace-event Disposables as `(A, B)`, evaluating to only B. That leaked
+    // the onDidChangeWorkspaceFolders Disposable (A), which was never added to
+    // context.subscriptions and so never disposed on deactivate.
+    const workspaceFoldersDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockReturnValue(
+      workspaceFoldersDisposable as unknown as vscode.Disposable,
+    );
+    await activate(context);
+    expect(context.subscriptions).toContain(workspaceFoldersDisposable);
+  });
+
+  it('should register the gemini.diff.accept disposable in subscriptions', async () => {
+    // Regression test for #27790: a comma operator previously wrapped the
+    // gemini.diff.accept and gemini.diff.cancel command registrations as
+    // `(A, B)`, evaluating to only B. That leaked the gemini.diff.accept
+    // Disposable (A), which was never added to context.subscriptions.
+    const acceptDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string) =>
+        (command === 'gemini.diff.accept'
+          ? acceptDisposable
+          : { dispose: vi.fn() }) as unknown as vscode.Disposable,
+    );
+    await activate(context);
+    expect(context.subscriptions).toContain(acceptDisposable);
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
