@@ -63,7 +63,7 @@
     "fast-levenshtein": "2.0.6",
     "fdir": "6.4.6",
     "fzf": "0.5.2",
-    "glob": "12.0.0",
+    "glob": "13.0.6",
     "google-auth-library": "9.11.0",
     "html-to-text": "9.0.5",
     "http-proxy-agent": "7.0.2",

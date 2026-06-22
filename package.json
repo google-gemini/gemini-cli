@@ -79,7 +79,7 @@
     "cliui": {
       "wrap-ansi": "7.0.0"
     },
-    "glob": "12.0.0",
+    "glob": "13.0.6",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
     "cross-spawn": "7.0.6"
@@ -120,7 +120,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
-    "glob": "12.0.0",
+    "glob": "13.0.6",
     "globals": "16.0.0",
     "google-artifactregistry-auth": "3.4.0",
     "husky": "9.1.7",
