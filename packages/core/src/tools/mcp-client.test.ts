@@ -43,6 +43,7 @@ import {
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -3305,5 +3306,45 @@ describe('connectToMcpServer - elicitation', () => {
     // The first registered handler is for `ListRootsRequestSchema`; the
     // elicitation handler is registered in addition to it.
     expect(setRequestHandler).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['javascript:alert(1)'],
+    ['file:///etc/passwd'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['not a url at all'],
+  ])('declines url-mode elicitation for unsafe URL %s', async (badUrl) => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    // Second registered handler is the elicitation handler. First arg is the
+    // schema, second is the async handler callback.
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: {
+        mode: 'url',
+        message: 'log in please',
+        elicitationId: 'eid-1',
+        url: badUrl,
+      },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
   });
 });

@@ -83,6 +83,7 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
   type McpElicitationRequest,
+  type McpElicitationRequestWithoutCorrelationId,
   type McpElicitationResponse,
 } from '../confirmation-bus/types.js';
 import { coreEvents } from '../utils/events.js';
@@ -1442,6 +1443,19 @@ export async function discoverTools(
  */
 const MAX_URL_ELICITATION_ROUNDS = 3;
 
+/**
+ * MCP servers are not trusted; reject any URL that does not use a benign
+ * protocol so the UI never opens `javascript:`, `file:`, `data:` etc.
+ */
+function isSafeElicitationUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 class McpCallableTool implements CallableTool {
   constructor(
     private readonly client: Client,
@@ -1558,18 +1572,24 @@ class McpCallableTool implements CallableTool {
   ): Promise<void> {
     if (!this.messageBus) return;
     for (const elicitation of elicitations) {
+      if (!isSafeElicitationUrl(elicitation.url)) {
+        // Untrusted MCP server sent an unsafe URL; skip it rather than
+        // surfacing `javascript:`/`file:`/etc. to the UI.
+        continue;
+      }
+      const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
+        type: MessageBusType.MCP_ELICITATION_REQUEST,
+        serverName: this.serverName,
+        mode: 'url',
+        message: elicitation.message,
+        elicitationId: elicitation.elicitationId,
+        url: elicitation.url,
+      };
       await this.messageBus.request<
         McpElicitationRequest,
         McpElicitationResponse
       >(
-        {
-          type: MessageBusType.MCP_ELICITATION_REQUEST,
-          serverName: this.serverName,
-          mode: 'url',
-          message: elicitation.message,
-          elicitationId: elicitation.elicitationId,
-          url: elicitation.url,
-        },
+        elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
         MessageBusType.MCP_ELICITATION_RESPONSE,
         this.timeout,
       );
@@ -1974,7 +1994,17 @@ export async function connectToMcpServer(
     const params = request.params;
     const isUrlMode = params.mode === 'url';
 
-    const elicitationRequest: Omit<McpElicitationRequest, 'correlationId'> =
+    if (isUrlMode) {
+      const urlStr = (params as ElicitRequestURLParams).url;
+      if (!isSafeElicitationUrl(urlStr)) {
+        // Untrusted MCP server tried to coerce the UI into opening a
+        // dangerous URL (e.g. `javascript:`/`file:`/`data:`). Decline
+        // rather than forward it.
+        return { action: 'decline' } as ElicitResult;
+      }
+    }
+
+    const elicitationRequest: McpElicitationRequestWithoutCorrelationId =
       isUrlMode
         ? {
             type: MessageBusType.MCP_ELICITATION_REQUEST,
@@ -1997,7 +2027,7 @@ export async function connectToMcpServer(
       McpElicitationRequest,
       McpElicitationResponse
     >(
-      elicitationRequest,
+      elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
       MessageBusType.MCP_ELICITATION_RESPONSE,
       mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
     );

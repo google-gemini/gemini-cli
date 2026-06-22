@@ -228,27 +228,50 @@ export interface SubagentActivityMessage {
  * - `url`: open a URL out-of-band (e.g. third-party OAuth, secure credential
  *   collection) and wait for the server to signal completion.
  */
-export interface McpElicitationRequest {
+export type McpElicitationRequest = {
   type: MessageBusType.MCP_ELICITATION_REQUEST;
   correlationId: string;
   serverName: string;
-  mode: 'form' | 'url';
   message: string;
-  /** Present when `mode === 'form'`. JSON Schema describing requested fields. */
-  requestedSchema?: unknown;
-  /** Present when `mode === 'url'`. Opaque server-issued id used to correlate completion. */
-  elicitationId?: string;
-  /** Present when `mode === 'url'`. URL the user should open. */
-  url?: string;
-}
+} & (
+  | {
+      mode: 'form';
+      /** JSON Schema describing requested fields. */
+      requestedSchema: unknown;
+    }
+  | {
+      mode: 'url';
+      /** Opaque server-issued id used to correlate completion. */
+      elicitationId: string;
+      /** URL the user should open. Always validated to be http(s) before publish. */
+      url: string;
+    }
+);
 
-export interface McpElicitationResponse {
+export type McpElicitationResponse = {
   type: MessageBusType.MCP_ELICITATION_RESPONSE;
   correlationId: string;
-  action: 'accept' | 'decline' | 'cancel';
-  /** Form values when `action === 'accept'` for form-mode requests. */
-  content?: Record<string, string | number | boolean | string[]>;
-}
+} & (
+  | {
+      action: 'accept';
+      /** Form values when `action === 'accept'` for form-mode requests. */
+      content?: Record<string, string | number | boolean | string[]>;
+    }
+  | {
+      action: 'decline' | 'cancel';
+    }
+);
+
+/**
+ * Distributive `Omit` so that omitting a key from a discriminated union
+ * preserves the union shape (rather than collapsing it).
+ */
+export type McpElicitationRequestWithoutCorrelationId =
+  McpElicitationRequest extends infer T
+    ? T extends { type: MessageBusType.MCP_ELICITATION_REQUEST }
+      ? Omit<T, 'correlationId'>
+      : never
+    : never;
 
 export type Message =
   | ToolConfirmationRequest
