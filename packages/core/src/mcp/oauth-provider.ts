@@ -14,6 +14,8 @@ import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
+import { isLoopbackHost, resolveAndValidateDns } from '../utils/fetch.js';
+import { Agent, type Dispatcher } from 'undici';
 import {
   generatePKCEParams,
   startCallbackServer,
@@ -111,13 +113,44 @@ export class MCPOAuthProvider {
       scope: config.scopes?.join(' ') || '',
     };
 
+    const parsedRegUrl = new URL(registrationUrl);
+    if (isLoopbackHost(parsedRegUrl.hostname)) {
+      throw new Error(
+        `Client registration blocked: loopback address not allowed: ${registrationUrl}`,
+      );
+    }
+    const resolvedAddrs = await resolveAndValidateDns(registrationUrl);
+    if (resolvedAddrs.length === 0) {
+      throw new Error(
+        `Client registration blocked: private/reserved IP not allowed: ${registrationUrl}`,
+      );
+    }
+    const pinnedIp = resolvedAddrs[0];
+    const dispatcher = new Agent({
+      connect: {
+        lookup: (
+          _hostname: string,
+          _options: unknown,
+          callback: (
+            err: NodeJS.ErrnoException | null,
+            addresses: Array<{ address: string; family: number }>,
+          ) => void,
+        ) => {
+          callback(null, [
+            { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+          ]);
+        },
+      },
+    });
+     
     const response = await fetch(registrationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(registrationRequest),
-    });
+      dispatcher: dispatcher as Dispatcher,
+    } as RequestInit & { dispatcher: Dispatcher });
 
     if (!response.ok) {
       const errorText = await response.text();

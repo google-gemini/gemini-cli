@@ -70,16 +70,9 @@ const mockFetch = (url: string, response: Partial<Response> | Error) =>
   vi
     .spyOn(fetchUtils, 'fetchWithTimeout')
     .mockImplementation(async (actualUrl) => {
-      let pinnedUrlStr = url;
-      try {
-        const u = new URL(url);
-        u.hostname = '8.8.8.8';
-        pinnedUrlStr = u.toString();
-      } catch {
-        // ignore error
-      }
-
-      if (actualUrl !== url && actualUrl !== pinnedUrlStr) {
+      // With the undici Agent dispatcher pattern, the original URL is
+      // always passed unchanged; DNS pinning happens inside the Agent.
+      if (actualUrl !== url) {
         throw new Error(
           `Unexpected fetch URL: expected "${url}", got "${actualUrl}"`,
         );
@@ -1018,9 +1011,10 @@ describe('WebFetchTool', () => {
       );
       expect(result.returnDisplay).toContain('Fetched text/plain content');
       expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
-        'https://8.8.8.8/',
+        'https://example.com/',
         expect.any(Number),
         expect.objectContaining({
+          dispatcher: expect.any(Object),
           headers: expect.objectContaining({
             Accept: expect.stringContaining('text/plain'),
           }),

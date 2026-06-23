@@ -24,6 +24,7 @@ import {
   isLoopbackHost,
   resolveAndValidateDns,
 } from '../utils/fetch.js';
+import { Agent, type Dispatcher } from 'undici';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -315,23 +316,32 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       );
     }
 
-    const urlWithIp = new URL(url);
-    const originalHostname = urlWithIp.hostname;
-    urlWithIp.hostname = pinnedIp;
+    const dispatcher = new Agent({
+      connect: {
+        lookup: (
+          _hostname: string,
+          _options: unknown,
+          callback: (
+            err: NodeJS.ErrnoException | null,
+            addresses: Array<{ address: string; family: number }>,
+          ) => void,
+        ) => {
+          callback(null, [
+            { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+          ]);
+        },
+      },
+    }) as Dispatcher;
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(
-          urlWithIp.toString(),
-          URL_FETCH_TIMEOUT_MS,
-          {
-            signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-              Host: originalHostname,
-            },
+        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+          signal,
+          dispatcher,
+          headers: {
+            'User-Agent': USER_AGENT,
           },
-        );
+        });
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -664,25 +674,34 @@ ${aggregatedContent}
     }
 
     try {
-      const urlWithIp = new URL(url);
-      const originalHostname = urlWithIp.hostname;
-      urlWithIp.hostname = pinnedIp;
+      const dispatcher = new Agent({
+        connect: {
+          lookup: (
+            _hostname: string,
+            _options: unknown,
+            callback: (
+              err: NodeJS.ErrnoException | null,
+              addresses: Array<{ address: string; family: number }>,
+            ) => void,
+          ) => {
+            callback(null, [
+              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+            ]);
+          },
+        },
+      }) as Dispatcher;
 
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(
-            urlWithIp.toString(),
-            URL_FETCH_TIMEOUT_MS,
-            {
-              signal,
-              headers: {
-                Accept:
-                  'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
-                'User-Agent': USER_AGENT,
-                Host: originalHostname,
-              },
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            signal,
+            dispatcher,
+            headers: {
+              Accept:
+                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+              'User-Agent': USER_AGENT,
             },
-          );
+          });
           return res;
         },
         {

@@ -6,7 +6,13 @@
 
 import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import type {
+  Dispatcher} from 'undici';
+import {
+  Agent,
+  EnvHttpProxyAgent,
+  setGlobalDispatcher,
+} from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -188,7 +194,7 @@ export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
 export async function fetchWithTimeout(
   url: string,
   timeout: number,
-  options?: RequestInit,
+  options?: RequestInit & { dispatcher?: Dispatcher },
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
