@@ -12,8 +12,8 @@ import {
 } from '@google-cloud/firestore';
 
 export class IssuesStore {
-  private db: Firestore;
-  private collectionName: string;
+  private readonly db: Firestore;
+  private readonly collectionName: string;
 
   constructor(db: Firestore, collectionName: string) {
     this.db = db;

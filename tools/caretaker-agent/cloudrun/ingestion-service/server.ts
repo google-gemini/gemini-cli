@@ -53,7 +53,7 @@ const db = new Firestore({ projectId, databaseId });
 const issuesStore = new IssuesStore(db, collectionName);
 
 // Middleware: read incoming JSON payloads as raw Buffer bytes
-app.use(express.raw({ type: 'application/json' }));
+app.use(express.raw({ type: 'application/json', limit: '1mb' }));
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
