@@ -307,27 +307,28 @@ export class Scheduler {
     this.isCancelling = false;
     this.state.clearBatch();
 
-    // Guard against late-arriving requests scheduled after cancellation:
-    // if the caller's signal is already aborted, short-circuit instead of
-    // validating + enqueuing tool calls that would then execute their
-    // local side effects before the queue processor sees the abort.
-    // Match the cancellation pattern used by `_processNextItem`.
-    if (signal.aborted) {
-      this.state.cancelAllQueued('Operation cancelled');
-      this.isProcessing = false;
-      return this.state.completedBatch;
-    }
-
-    const currentApprovalMode = this.config.getApprovalMode();
-
-    // Sort requests to ensure Topic changes happen before actions in the same batch.
-    const sortedRequests = [...requests].sort((a, b) => {
-      if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
-      if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
-      return 0;
-    });
-
     try {
+      // Guard against late-arriving requests scheduled after cancellation:
+      // if the caller's signal is already aborted, short-circuit instead of
+      // validating + enqueuing tool calls that would then execute their
+      // local side effects before the queue processor sees the abort.
+      // Match the cancellation pattern used by `_processNextItem`.
+      // Inside the `try` so the `finally` still drains the request queue —
+      // otherwise concurrent batches waiting in `requestQueue` would hang.
+      if (signal.aborted) {
+        this.state.cancelAllQueued('Operation cancelled');
+        return this.state.completedBatch;
+      }
+
+      const currentApprovalMode = this.config.getApprovalMode();
+
+      // Sort requests to ensure Topic changes happen before actions in the same batch.
+      const sortedRequests = [...requests].sort((a, b) => {
+        if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
+        if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
+        return 0;
+      });
+
       const toolRegistry = this.context.toolRegistry;
       const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {

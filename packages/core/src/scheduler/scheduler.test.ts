@@ -627,6 +627,24 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should not leak queued batches when scheduled with an already-aborted signal (regression #28091)', async () => {
+      // The aborted-signal short-circuit must still drain the request
+      // queue via the `finally` block — otherwise a follow-up batch
+      // queued behind it would never resolve and hang the caller.
+      abortController.abort();
+
+      // First batch is rejected by the abort guard.
+      await scheduler.schedule(req1, signal);
+
+      // A second batch scheduled with a fresh, non-aborted signal must
+      // still make progress (i.e. the scheduler must not be stuck in the
+      // "busy" state after the early-return path).
+      const fresh = new AbortController();
+      await expect(
+        scheduler.schedule(req2, fresh.signal),
+      ).resolves.toBeDefined();
+    });
+
     it('cancelAll() should cancel active call and clear queue', () => {
       const activeCall: ValidatingToolCall = {
         status: CoreToolCallStatus.Validating,
