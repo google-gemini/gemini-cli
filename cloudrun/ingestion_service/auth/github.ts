@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 /**
  * Verify that the payload was sent from GitHub using HMAC SHA256.
@@ -11,9 +11,13 @@ import * as crypto from 'crypto';
 export function verifyGithubSignature(
   payloadBody: Buffer | string,
   signatureHeader: string | undefined,
-  secret: string
+  secret: string,
 ): boolean {
-  if (!signatureHeader) {
+  if (!signatureHeader || signatureHeader.length !== 71) {
+    return false;
+  }
+
+  if (!Buffer.isBuffer(payloadBody) && typeof payloadBody !== 'string') {
     return false;
   }
 
@@ -24,9 +28,9 @@ export function verifyGithubSignature(
   try {
     return crypto.timingSafeEqual(
       Buffer.from(expectedSignature),
-      Buffer.from(signatureHeader)
+      Buffer.from(signatureHeader),
     );
-  } catch (error) {
+  } catch {
     return false;
   }
 }

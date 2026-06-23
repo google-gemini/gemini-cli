@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import express from 'express';
 import { PubSub } from '@google-cloud/pubsub';
 import dotenv from 'dotenv';
@@ -47,14 +53,15 @@ const db = new Firestore({ projectId, databaseId });
 const issuesStore = new IssuesStore(db, collectionName);
 
 // Middleware: read incoming JSON payloads as raw Buffer bytes
-app.use(express.raw({ type: 'application/json' }));
+app.use(express.raw({ type: 'application/json', limit: '1mb' }));
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
 app.post('/webhook', async (req, res) => {
-  const signature = req.headers['x-hub-signature-256'] as string | undefined;
+  const header = req.headers['x-hub-signature-256'];
+  const signature = Array.isArray(header) ? header[0] : header;
 
   // Github Authentication
   if (
@@ -70,7 +77,11 @@ app.post('/webhook', async (req, res) => {
   // Parse JSON payload
   let payload: GitHubWebhookPayload;
   try {
-    payload = JSON.parse(req.body.toString()) as GitHubWebhookPayload;
+    const parsed = JSON.parse(req.body.toString());
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('Payload is not an object');
+    }
+    payload = parsed as GitHubWebhookPayload;
   } catch {
     return res
       .status(400)
@@ -78,7 +89,7 @@ app.post('/webhook', async (req, res) => {
   }
 
   const eventType = req.headers['x-github-event'];
-  const action = payload?.action;
+  const action = payload.action;
 
   // Only process issues.opened events
   if (eventType !== 'issues' || action !== 'opened') {
@@ -88,30 +99,56 @@ app.post('/webhook', async (req, res) => {
     });
   }
 
+  const issueNumber = payload.issue?.number;
+  const repository = payload.repository?.full_name;
+
+  if (!issueNumber || !repository) {
+    return res
+      .status(400)
+      .json({ status: 'error', message: 'Missing issue number or repository' });
+  }
+
   // Payload preprocessing
-  const sanitizedBody = `<untrusted_context>\n${payload.issue?.body || ''}\n</untrusted_context>`;
+  const rawBody = payload.issue?.body || '';
+  const escapedBody = rawBody.replace(
+    /<\/untrusted_context>/g,
+    '\\</untrusted_context>',
+  );
+  const sanitizedBody = `<untrusted_context>\n${escapedBody}\n</untrusted_context>`;
+
   const processedData = {
-    issue_number: payload.issue?.number,
-    repository: payload.repository?.full_name,
+    issue_number: issueNumber,
+    repository: repository,
     sender: payload.sender?.login,
     body: sanitizedBody,
     title: payload.issue?.title,
   };
 
-  const issueNumber = processedData.issue_number;
-  const repository = processedData.repository;
-
-  if (!issueNumber || !repository) {
-    return res
-      .status(400)
-      .json({ status: 'error', message: 'Missing issue_number or repository' });
-  }
-
   const [owner, repo] = repository.split('/');
   const title = processedData.title || '';
 
   try {
-    await issuesStore.createIssue(owner, repo, issueNumber, title);
+    const created = await issuesStore.createIssue(
+      owner,
+      repo,
+      issueNumber,
+      title,
+    );
+
+    if (!created) {
+      // If the Firestore document already exists, check its status.
+      // If it is 'UNTRIAGED', we continue to publish to Pub/Sub
+      // to recover from previous publish failures.
+      const issueRef = issuesStore.getIssueRef(owner, repo, issueNumber);
+      const snapshot = await issueRef.get();
+      const status = snapshot.exists ? snapshot.data()?.status : null;
+      if (status !== 'UNTRIAGED') {
+        return res.status(200).json({
+          status: 'ignored',
+          reason: `issue already exists: ${repository}#${issueNumber}`,
+        });
+      }
+    }
 
     // Publish to Pub/Sub
     const dataBuffer = Buffer.from(JSON.stringify(processedData));
