@@ -838,7 +838,7 @@ class EditToolInvocation
     }
 
     const getSnippet = (str: string): string => {
-      const normalized = str.replace(/\r\n/g, '\n');
+      const normalized = (str ?? '').replace(/\r\n/g, '\n');
       const newlineIdx = normalized.indexOf('\n');
       const firstLine =
         newlineIdx !== -1 ? normalized.substring(0, newlineIdx) : normalized;
