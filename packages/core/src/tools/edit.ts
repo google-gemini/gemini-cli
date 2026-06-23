@@ -838,13 +838,24 @@ class EditToolInvocation
     }
 
     const getSnippet = (str: string): string => {
-      const normalized = (str ?? '').replace(/\r\n/g, '\n');
-      const newlineIdx = normalized.indexOf('\n');
-      const firstLine =
-        newlineIdx !== -1 ? normalized.substring(0, newlineIdx) : normalized;
-      const chars = Array.from(firstLine);
-      if (chars.length > 30) {
-        return chars.slice(0, 30).join('') + '...';
+      const safeStr = str ?? '';
+      const newlineIdx = safeStr.indexOf('\n');
+      let firstLine =
+        newlineIdx !== -1 ? safeStr.substring(0, newlineIdx) : safeStr;
+      if (firstLine.endsWith('\r')) {
+        firstLine = firstLine.slice(0, -1);
+      }
+
+      const segments: string[] = [];
+      for (const s of new Intl.Segmenter().segment(firstLine)) {
+        segments.push(s.segment);
+        if (segments.length > 30) {
+          break;
+        }
+      }
+
+      if (segments.length > 30) {
+        return segments.slice(0, 30).join('') + '...';
       }
       return firstLine + (newlineIdx !== -1 ? '...' : '');
     };
