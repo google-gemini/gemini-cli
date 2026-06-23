@@ -703,6 +703,94 @@ function doIt() {
     });
   });
 
+  describe('getDescription', () => {
+    it('should return "Create <path>" for new file (empty old_string)', () => {
+      const filePath = path.join(rootDir, 'new.ts');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Create new file',
+        old_string: '',
+        new_string: 'content',
+      };
+      const invocation = tool.build(params);
+      expect(invocation.getDescription()).toMatch(/^Create /);
+    });
+
+    it('should NOT append "..." to a short single-line old_string and new_string', () => {
+      const filePath = path.join(rootDir, 'test.ts');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace short old with short new',
+        old_string: 'short old',
+        new_string: 'short new',
+      };
+      const invocation = tool.build(params);
+      const description = invocation.getDescription();
+      expect(description).toContain('short old');
+      expect(description).toContain('short new');
+      expect(description).not.toMatch(/short old\.\.\./);
+      expect(description).not.toMatch(/short new\.\.\./);
+    });
+
+    it('should append "..." when old_string or new_string is multi-line, even if first line is short', () => {
+      const filePath = path.join(rootDir, 'test.ts');
+      // old_string first line is only 17 chars (< 30), but the full string is multi-line
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace function foo with bar',
+        old_string: 'function foo() {\n  return 1;\n}',
+        new_string: 'function bar() {\n  return 2;\n}',
+      };
+      const invocation = tool.build(params);
+      const description = invocation.getDescription();
+      // First lines are short, but since strings are multi-line, '...' should appear
+      // The full first line 'function foo() {' is kept (17 chars < 30) and '...' is appended
+      expect(description).toContain('function foo() {...');
+      expect(description).toContain('function bar() {...');
+    });
+
+    it('should append "..." when the first line of old_string exceeds 30 characters', () => {
+      const filePath = path.join(rootDir, 'test.ts');
+      const longFirstLine = 'a'.repeat(35); // 35 chars, exceeds 30
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace long line',
+        old_string: longFirstLine,
+        new_string: 'short',
+      };
+      const invocation = tool.build(params);
+      const description = invocation.getDescription();
+      expect(description).toContain('...');
+    });
+
+    it('should return "No file changes" when old_string equals new_string', () => {
+      const filePath = path.join(rootDir, 'test.ts');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'No-op edit',
+        old_string: 'same content',
+        new_string: 'same content',
+      };
+      const invocation = tool.build(params);
+      expect(invocation.getDescription()).toMatch(/No file changes/);
+    });
+
+    it('should normalize Windows-style line endings (\\r\\n) and not include \\r in the output snippet', () => {
+      const filePath = path.join(rootDir, 'test.ts');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Handle CRLF',
+        old_string: 'hello\r\nworld',
+        new_string: 'short',
+      };
+      const invocation = tool.build(params);
+      const description = invocation.getDescription();
+      // Ensure the '\r' is stripped from the 'hello' portion and '...' is appended due to multi-line
+      expect(description).toContain('hello...');
+      expect(description).not.toContain('hello\r...');
+    });
+  });
+
   describe('execute', () => {
     const testFile = 'execute_me.txt';
     let filePath: string;
