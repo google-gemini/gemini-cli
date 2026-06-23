@@ -491,12 +491,12 @@ describe('AppContainer State Management', () => {
     vi.spyOn(mockConfig, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getDebugMode').mockReturnValue(false);
 
-    mockExtensionManager = vi.mockObject({
+    mockExtensionManager = {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
       start: vi.fn(),
-    } as unknown as ExtensionManager);
+    } as unknown as MockedObject<ExtensionManager>;
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,
     );

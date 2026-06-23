@@ -27,11 +27,13 @@ via a `.gemini/.env` file. See
 [Persisting Environment Variables](../get-started/authentication.mdx#persisting-environment-variables).
 
 - Use the project default path (`.gemini/system.md`):
+
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
   - The CLI reads `./.gemini/system.md` (relative to your current project
     directory).
 
 - Use a custom file path:
+
   - `GEMINI_SYSTEM_MD=/absolute/path/to/my-system.md`
   - Relative paths are supported and resolved from the current working
     directory.

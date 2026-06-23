@@ -657,7 +657,7 @@ export async function main() {
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
     registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+      await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
     // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks
