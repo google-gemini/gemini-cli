@@ -227,14 +227,16 @@ describe('handleInstall', () => {
   });
 
   it('throws an error from an unknown source', async () => {
-    mockInferInstallMetadata.mockRejectedValue(
-      new Error('Install source not found.'),
-    );
+    const errorMessage =
+      'Install source not found: "test://google.com". If you are installing ' +
+      'from GitHub, provide the full repository URL ' +
+      '(e.g. "https://github.com/owner/repo").';
+    mockInferInstallMetadata.mockRejectedValue(new Error(errorMessage));
     await handleInstall({
       source: 'test://google.com',
     });
 
-    expect(debugErrorSpy).toHaveBeenCalledWith('Install source not found.');
+    expect(debugErrorSpy).toHaveBeenCalledWith(errorMessage);
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 

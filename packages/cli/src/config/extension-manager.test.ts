@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ExtensionManager } from './extension-manager.js';
+import { ExtensionManager, inferInstallMetadata } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
@@ -635,6 +635,33 @@ describe('ExtensionManager', () => {
       expect(themeManager.getCustomThemeNames()).not.toContain(
         'MyTheme (disabled-ext)',
       );
+    });
+  });
+
+  describe('inferInstallMetadata', () => {
+    it('throws a helpful error when a local install source is not found', async () => {
+      const missingSource = path.join(tempHomeDir, 'does-not-exist');
+
+      await expect(inferInstallMetadata(missingSource)).rejects.toThrow(
+        /Install source not found/,
+      );
+    });
+
+    it('suggests the GitHub URL form and an auth hint in the error', async () => {
+      const missingSource = path.join(tempHomeDir, 'does-not-exist');
+
+      let thrown: Error | undefined;
+      try {
+        await inferInstallMetadata(missingSource);
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown).toBeDefined();
+      expect(thrown!.message).toContain(missingSource);
+      expect(thrown!.message).toContain('https://github.com/owner/repo');
+      expect(thrown!.message.toLowerCase()).toContain('authenticated');
+      expect(thrown!.message).toContain('sso://');
     });
   });
 });

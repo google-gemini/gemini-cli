@@ -1325,7 +1325,14 @@ export async function inferInstallMetadata(
         type: 'local',
       };
     } catch {
-      throw new Error('Install source not found.');
+      throw new Error(
+        `Install source not found: "${source}". ` +
+          `If you are installing from GitHub, provide the full repository URL ` +
+          `(e.g. "https://github.com/owner/repo"). ` +
+          `For private or SSO-protected repositories, make sure you are ` +
+          `authenticated (e.g. via an SSH key with the appropriate SSO ` +
+          `authorization, or by using an "sso://" URL).`,
+      );
     }
   }
 }
