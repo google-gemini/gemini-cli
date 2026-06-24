@@ -1,4 +1,7 @@
 def validate_triage_result(data: dict) -> None:
+    """
+    This can be fleshed out more to not only validate structure
+    """
     if "triage_metadata" not in data:
         raise ValueError("Missing 'triage_metadata'")
         

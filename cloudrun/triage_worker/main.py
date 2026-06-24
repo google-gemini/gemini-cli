@@ -5,6 +5,7 @@ import sys
     
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
+from utils.egress import publish_egress_action
 from db.issues_store import acquire_lock, release_lock, ClaimAction, ReleaseAction
 
 def main():
@@ -52,10 +53,30 @@ def main():
             
             if quality in ["SPAM", "EMPTY", "FEATURE"]:
                 print(f"[WORKER] Quality: {quality}. Publishing to egress to apply low_quality label.")
+                publish_egress_action({
+                    "action": "LABEL",
+                    "payload": {
+                        "owner": owner,
+                        "repo": repo,
+                        "issueNumber": issue_number,
+                        "labels": ["low_quality"]
+                    }
+                })
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="LOW_QUALITY")
                 sys.exit(0)
             elif quality == "NEEDS_INFO":
                 print(f"[WORKER] Quality: NEEDS_INFO. Publishing to egress to leave a comment.")
+                missing_info = triage_result.get("triage_metadata", {}).get("missing_info", "")
+                comment_body = f"Please provide more information regarding this issue.\n\n{missing_info}".strip()
+                publish_egress_action({
+                    "action": "COMMENT",
+                    "payload": {
+                        "owner": owner,
+                        "repo": repo,
+                        "issueNumber": issue_number,
+                        "commentBody": comment_body
+                    }
+                })
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="NEEDS_INFO")
                 sys.exit(0)
             else:
