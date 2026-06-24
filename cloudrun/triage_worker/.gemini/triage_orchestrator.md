@@ -20,7 +20,7 @@ You are a triage coordinator agent. When presented with a GitHub issue:
   "triage_metadata": {
     "quality": "SPAM" | "EMPTY" | "NEEDS_INFO" | "FEATURE" | "OK",
     "reasoning": "Explanation from quality skill.",
-    "missing_info": "Explanation of what's missing (only if quality is NEEDS_INFO, otherwise empty string)",
+    "comment": "Draft comment from quality skill (only if quality is NEEDS_INFO, otherwise empty string)",
     "effort_estimate": "SMALL" | "MEDIUM" | "LARGE" (if quality is OK, otherwise empty string),
     "effort_reasoning": "Reasoning from effort skill" (if quality is OK, otherwise empty string)
   },

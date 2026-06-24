@@ -12,7 +12,7 @@ Determine the quality status of the issue and output your assessment as a single
 {
   "quality": "SPAM" | "EMPTY" | "NEEDS_INFO" | "FEATURE" | "OK",
   "reasoning": "Detailed explanation of your assessment.",
-  "missing_info": "Specific details that are missing (only if quality is NEEDS_INFO)."
+  "comment": "Draft comment starting with 'Hi! Thanks for commenting on this issue, we need more information to triage the bug...' followed by the specific missing details that are needed to triage the issue (only if quality is NEEDS_INFO)."
 }
 ```
 
