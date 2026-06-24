@@ -86,7 +86,7 @@ runs:
     - name: 'Install dependencies for integration tests'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
-      run: 'npm ci'
+      run: 'npm ci --ignore-scripts'
 
     - name: '🔬 Run integration tests against NPM release'
       working-directory: '${{ inputs.working-directory }}'
