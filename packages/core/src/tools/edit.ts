@@ -863,12 +863,15 @@ class EditToolInvocation
       return `Create ${shortenPath(relativePath)}`;
     }
 
-    const oldStringSnippet =
-      this.params.old_string.split('\n')[0].substring(0, 30) +
-      (this.params.old_string.length > 30 ? '...' : '');
-    const newStringSnippet =
-      this.params.new_string.split('\n')[0].substring(0, 30) +
-      (this.params.new_string.length > 30 ? '...' : '');
+    // Append `...` when the snippet hides content from the user: the first
+    // line was truncated, or there are additional lines below it.
+    const snippet = (s: string) => {
+      const firstLine = s.split('\n')[0];
+      const hasHiddenContent = firstLine.length > 30 || s.includes('\n');
+      return firstLine.substring(0, 30) + (hasHiddenContent ? '...' : '');
+    };
+    const oldStringSnippet = snippet(this.params.old_string);
+    const newStringSnippet = snippet(this.params.new_string);
 
     if (this.params.old_string === this.params.new_string) {
       return `No file changes to ${shortenPath(relativePath)}`;

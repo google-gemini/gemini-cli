@@ -1436,4 +1436,112 @@ function doIt() {
       fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
+
+  describe('getDescription', () => {
+    const testFile = 'describe_me.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it("returns 'Create <path>' when old_string is empty", () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Create file',
+        old_string: '',
+        new_string: 'hello',
+      };
+      expect(tool.build(params).getDescription()).toBe(`Create ${testFile}`);
+    });
+
+    it('returns no-change message when old_string equals new_string', () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'No-op',
+        old_string: 'same',
+        new_string: 'same',
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `No file changes to ${testFile}`,
+      );
+    });
+
+    it('does not append ellipsis to single-line strings within the snippet limit', () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Short replace',
+        old_string: 'short old',
+        new_string: 'short new',
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: short old => short new`,
+      );
+    });
+
+    it('does not append ellipsis when the first line is exactly the snippet limit', () => {
+      const exact = 'a'.repeat(30);
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Boundary replace',
+        old_string: exact,
+        new_string: exact + 'b',
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: ${exact} => ${exact}...`,
+      );
+    });
+
+    it('appends ellipsis when a single-line string exceeds the snippet limit', () => {
+      const longOld = 'a'.repeat(35);
+      const longNew = 'b'.repeat(40);
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Long replace',
+        old_string: longOld,
+        new_string: longNew,
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: ${'a'.repeat(30)}... => ${'b'.repeat(30)}...`,
+      );
+    });
+
+    // Regression for #28110 and #28109: when an edit spans multiple lines but the
+    // first line is short, the snippet should still signal hidden content with `...`.
+    it('appends ellipsis to multi-line edits whose first line is short', () => {
+      const oldStr = 'function foo() {\n  return 1;\n}';
+      const newStr = 'function foo() {\n  return 2;\n}';
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Multi-line replace with short first line',
+        old_string: oldStr,
+        new_string: newStr,
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: function foo() {... => function foo() {...`,
+      );
+    });
+
+    it('appends ellipsis to multi-line edits with very short first lines', () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Tiny multi-line',
+        old_string: 'a\nb\nc',
+        new_string: 'x\ny\nz',
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: a... => x...`,
+      );
+    });
+
+    it('emits an empty snippet without ellipsis when deleting to empty', () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Delete content',
+        old_string: 'a\nb\nc',
+        new_string: '',
+      };
+      expect(tool.build(params).getDescription()).toBe(`${testFile}: a... => `);
+    });
+  });
 });
