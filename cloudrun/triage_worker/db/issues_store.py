@@ -19,7 +19,7 @@ db = firestore.Client(project=PROJECT_ID, database=DATABASE_NAME)
 
 def _get_issue_ref(owner: str, repo: str, issue_number: int):
     """
-    [Internal] Generates the standardized Firestore DocumentReference for an issue.
+    Generates the standardized Firestore DocumentReference for an issue.
     """
     doc_id = f"github_{owner}_{repo}_{issue_number}"
     return db.collection(COLLECTION_NAME).document(doc_id)
