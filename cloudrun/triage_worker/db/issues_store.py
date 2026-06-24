@@ -17,9 +17,9 @@ DATABASE_NAME = os.environ.get("FIRESTORE_DATABASE")
 COLLECTION_NAME = os.environ.get("FIRESTORE_COLLECTION")
 db = firestore.Client(project=PROJECT_ID, database=DATABASE_NAME)
 
-def get_issue_ref(owner: str, repo: str, issue_number: int):
+def _get_issue_ref(owner: str, repo: str, issue_number: int):
     """
-    Generates the standardized Firestore DocumentReference for an issue.
+    [Internal] Generates the standardized Firestore DocumentReference for an issue.
     """
     doc_id = f"github_{owner}_{repo}_{issue_number}"
     return db.collection(COLLECTION_NAME).document(doc_id)
@@ -78,7 +78,7 @@ def acquire_lock(owner: str, repo: str, issue_number: int, lock_holder: str, loc
     """
     Attempts to acquire the processing lock for an issue.
     """
-    doc_ref = get_issue_ref(owner, repo, issue_number)
+    doc_ref = _get_issue_ref(owner, repo, issue_number)
     transaction = db.transaction()
     return _acquire_lock_tx(transaction, doc_ref, lock_holder, lock_duration_sec)
 
@@ -124,6 +124,6 @@ def release_lock(owner: str, repo: str, issue_number: int, lock_holder: str, suc
     """
     Releases the processing lock for an issue and updates its status.
     """
-    doc_ref = get_issue_ref(owner, repo, issue_number)
+    doc_ref = _get_issue_ref(owner, repo, issue_number)
     transaction = db.transaction()
     return _release_lock_tx(transaction, doc_ref, lock_holder, success, workable_spec, status)

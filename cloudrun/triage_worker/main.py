@@ -5,7 +5,7 @@ import sys
     
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
-from utils.egress import publish_egress_action
+from utils.egress import send_label_action, send_comment_action
 from db.issues_store import acquire_lock, release_lock, ClaimAction, ReleaseAction
 
 def main():
@@ -52,33 +52,20 @@ def main():
             workable_spec = triage_result.get("workable_spec", {})
             
             if quality in ["SPAM", "EMPTY", "FEATURE"]:
-                print(f"[WORKER] Quality: {quality}. Publishing to egress to apply low_quality label.")
-                publish_egress_action({
-                    "action": "LABEL",
-                    "payload": {
-                        "owner": owner,
-                        "repo": repo,
-                        "issueNumber": issue_number,
-                        "labels": ["low_quality"]
-                    }
-                })
+                print(f"[WORKER] Quality: {quality}. Applying low_quality label.")
+                send_label_action(owner, repo, issue_number, ["low_quality"])
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="LOW_QUALITY")
                 sys.exit(0)
             elif quality == "NEEDS_INFO":
-                print(f"[WORKER] Quality: NEEDS_INFO. Publishing to egress to leave a comment.")
+                print(f"[WORKER] Quality: NEEDS_INFO. Leaving comment.")
                 comment_body = triage_result.get("triage_metadata", {}).get("comment", "").strip()
-                publish_egress_action({
-                    "action": "COMMENT",
-                    "payload": {
-                        "owner": owner,
-                        "repo": repo,
-                        "issueNumber": issue_number,
-                        "commentBody": comment_body
-                    }
-                })
+                send_comment_action(owner, repo, issue_number, comment_body)
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="NEEDS_INFO")
                 sys.exit(0)
             else:
+                effort = triage_result.get("triage_metadata", {}).get("effort_estimate")
+                print(f"[WORKER] Quality: OK. Effort: {effort}. Applying effort label.")
+                send_label_action(owner, repo, issue_number, [f"effort/{effort.lower()}"])
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="TRIAGED", workable_spec=workable_spec)
                 print(f"[WORKER] Triage success.")
                 sys.exit(0)
