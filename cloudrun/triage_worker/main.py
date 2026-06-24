@@ -5,7 +5,7 @@ import sys
     
 from triage_orchestrator import process_issue_triage
 from utils.validator import validate_triage_result
-from db.issues_store import acquire_lock, release_lock
+from db.issues_store import acquire_lock, release_lock, ClaimAction, ReleaseAction
 
 def main():
     # Cloud Run Jobs inject data via environment variables
@@ -23,20 +23,19 @@ def main():
     
     issue_number = payload.get("issue_number", "unknown")
     repository = payload.get("repository", "unknown/unknown")
+    if "/" not in repository:
+        print(f"[PROD] Error: Malformed repository format '{repository}'. Exiting.")
+        sys.exit(1)
     owner, repo = repository.split("/")
-    
-    execution_id = os.environ.get("CLOUD_RUN_EXECUTION", "local-exec")
-    task_index = os.environ.get("CLOUD_RUN_TASK_INDEX", "0")
-    lock_holder = f"{execution_id}-{task_index}"
+    lock_holder = os.environ.get("WORKFLOW_EXECUTION_ID", "local-exec")
     
     # Claim the lock
-    claim = acquire_lock(owner, repo, issue_number, lock_holder)
-    action = claim.get("action")
+    claim_action = acquire_lock(owner, repo, issue_number, lock_holder)
     
-    if action == "ACK":
-        print(f"[WORKER] Issue #{issue_number} already handled. Exiting.")
+    if claim_action == ClaimAction.SKIP:
+        print(f"[WORKER] Issue #{issue_number} already handled or active lock present. Exiting.")
         sys.exit(0)
-    elif action == "NEEDS_HUMAN":
+    elif claim_action == ClaimAction.NEEDS_HUMAN:
         print(f"[WORKER] Issue #{issue_number} requires human review. Exiting.")
         sys.exit(0)
         
@@ -48,29 +47,31 @@ def main():
             triage_result = json.loads(raw_output)
             validate_triage_result(triage_result)
 
-            quality = triage_result.get("triage_metadata", {}).get("quality"           )
+            quality = triage_result.get("triage_metadata", {}).get("quality")
             workable_spec = triage_result.get("workable_spec", {})
             
-            if quality in ["SPAM", "EMPTY", "NEEDS_INFO"]:
-                print(f"[WORKER] Quality: {quality}. Transitioning status.")
-                release_lock(owner, repo, issue_number, lock_holder, success=False, status_override=quality)
+            if quality in ["SPAM", "EMPTY", "FEATURE"]:
+                print(f"[WORKER] Quality: {quality}. Publishing to egress to apply low_quality label.")
+                release_lock(owner, repo, issue_number, lock_holder, success=True, status="LOW_QUALITY")
                 sys.exit(0)
-            elif quality == "FEATURE":
-                print(f"[WORKER] Quality: FEATURE. Transitioning status to TRIAGED.")
-                release_lock(owner, repo, issue_number, lock_holder, success=True, workable_spec={})
+            elif quality == "NEEDS_INFO":
+                print(f"[WORKER] Quality: NEEDS_INFO. Publishing to egress to leave a comment.")
+                release_lock(owner, repo, issue_number, lock_holder, success=True, status="NEEDS_INFO")
                 sys.exit(0)
             else:
-                release_lock(owner, repo, issue_number, lock_holder, success=True, workable_spec=workable_spec)
+                release_lock(owner, repo, issue_number, lock_holder, success=True, status="TRIAGED", workable_spec=workable_spec)
                 print(f"[WORKER] Triage success.")
                 sys.exit(0)
                 
         except Exception as e:
             print(f"[WORKER] Validation failed: {e}")
             success = False
-            
+    
+    # If an exception happens in json.loads or validate_triage_result 
+    # If LLM inference itself fails inside process_issue_triage
     if not success:
-        release = release_lock(owner, repo, issue_number, lock_holder, success=False)
-        sys.exit(1 if release.get("action") == "NACK" else 0)
+        release_action = release_lock(owner, repo, issue_number, lock_holder, success=False)
+        sys.exit(1 if release_action == ReleaseAction.RETRY else 0)
 
 if __name__ == "__main__":
     main()
