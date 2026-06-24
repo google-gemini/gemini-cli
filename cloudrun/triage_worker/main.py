@@ -67,7 +67,7 @@ def main():
             elif quality == "NEEDS_INFO":
                 print(f"[WORKER] Quality: NEEDS_INFO. Publishing to egress to leave a comment.")
                 missing_info = triage_result.get("triage_metadata", {}).get("missing_info", "")
-                comment_body = f"Please provide more information regarding this issue.\n\n{missing_info}".strip()
+                comment_body = f"Hi! Thanks for commenting on this issue, we need more information to triage the bug.\n\n{missing_info}".strip()
                 publish_egress_action({
                     "action": "COMMENT",
                     "payload": {

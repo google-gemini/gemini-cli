@@ -9,8 +9,8 @@ def publish_egress_action(egress_event: dict) -> None:
     """
     Publishes an EgressEvent JSON payload to the egress-actions Pub/Sub topic.
     """
-    if not PROJECT_ID:
-        print("[WORKER] Warning: PROJECT_ID not set, skipping egress publishing.")
+    if not PROJECT_ID or not EGRESS_TOPIC_ID:
+        print(f"[WORKER] Warning: Missing PROJECT_ID or EGRESS_TOPIC_ID (PROJECT_ID={PROJECT_ID}, EGRESS_TOPIC_ID={EGRESS_TOPIC_ID}), skipping egress publishing.")
         return
     try:
         publisher = pubsub_v1.PublisherClient()
