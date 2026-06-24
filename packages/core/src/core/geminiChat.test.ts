@@ -10,6 +10,7 @@ import {
   ThinkingLevel,
   type Content,
   type GenerateContentResponse,
+  type Part,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -2265,7 +2266,7 @@ describe('GeminiChat', () => {
         {
           role: 'model',
           parts: [
-            { text: 'internal monologue', thought: true },
+            { text: 'internal monologue', thought: true } as unknown as Part,
             { text: 'actual conversational response' },
           ],
         },

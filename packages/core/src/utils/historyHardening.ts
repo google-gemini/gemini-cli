@@ -66,25 +66,33 @@ export function hardenHistory(
 }
 
 /**
- * Removes parts that represent thoughts (where part.thought === true)
- * and filters out turns that become empty as a result.
+ * Helper to check if a Part object represents an internal thought.
+ */
+function isInternalThought(part: Part): boolean {
+  return part.thought === true;
+}
+
+/**
+ * Removes parts that represent thoughts (where part.thought === true).
+ * Empty turns resulting from thought removal are handled in subsequent coalescing passes.
  */
 function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
-  return history
-    .map((turn) => {
-      if (!turn.content.parts) return turn;
-      const nonThoughtParts = turn.content.parts.filter(
-        (p) => !(p && typeof p === 'object' && 'thought' in p && p.thought),
-      );
-      return {
-        id: turn.id,
-        content: {
-          ...turn.content,
-          parts: nonThoughtParts,
-        },
-      };
-    })
-    .filter((turn) => turn.content.parts && turn.content.parts.length > 0);
+  return history.map((turn) => {
+    if (!turn.content.parts) return turn;
+    const hasThought = turn.content.parts.some(isInternalThought);
+    if (!hasThought) return turn;
+
+    const nonThoughtParts = turn.content.parts.filter(
+      (p) => !isInternalThought(p),
+    );
+    return {
+      id: turn.id,
+      content: {
+        ...turn.content,
+        parts: nonThoughtParts,
+      },
+    };
+  });
 }
 
 /**
@@ -95,12 +103,16 @@ function coalesce(history: HistoryTurn[]): HistoryTurn[] {
   for (const turn of history) {
     if (!turn.content.parts || turn.content.parts.length === 0) continue;
 
-    const last = result[result.length - 1];
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
     if (last && last.content.role === turn.content.role) {
-      last.content.parts = [
-        ...(last.content.parts || []),
-        ...(turn.content.parts || []),
-      ];
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: [...(last.content.parts || []), ...(turn.content.parts || [])],
+        },
+      };
     } else {
       // Shallow clone the turn and content so we don't mutate the original history array structure
       result.push({ id: turn.id, content: { ...turn.content } });
@@ -369,11 +381,37 @@ function enforceRoleConstraints(
  * This ensures compatibility with strict APIs (like Vertex AI) that reject unknown fields.
  */
 export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
-  const scrubbed = history.map((turn) => ({
-    id: turn.id,
-    content: scrubContents([turn.content])[0],
-  }));
-  return coalesce(scrubbed);
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    const nonThoughtParts = (turn.content.parts ?? []).filter(
+      (p) => !isInternalThought(p),
+    );
+    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
+
+    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.content.role === turn.content.role) {
+      // Coalesce inline with strict immutability
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: [...(last.content.parts || []), ...scrubbedParts],
+        },
+      };
+    } else {
+      result.push({
+        id: turn.id,
+        content: {
+          role: turn.content.role,
+          parts: scrubbedParts,
+        },
+      });
+    }
+  }
+  return result;
 }
 
 /**
@@ -382,7 +420,7 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
 export function scrubContents(contents: Content[]): Content[] {
   return contents.map((content) => {
     const nonThoughtParts = (content.parts ?? []).filter(
-      (p) => !(p && typeof p === 'object' && 'thought' in p && p.thought),
+      (p) => !isInternalThought(p),
     );
     return {
       role: content.role,
