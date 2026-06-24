@@ -98,4 +98,6 @@ runs:
         # See https://github.com/google-gemini/gemini-cli/issues/10517
         CI: 'false'
       shell: 'bash'
-      run: 'npm run test:integration:sandbox:none'
+      run: |
+        export INTEGRATION_TEST_GEMINI_BINARY_PATH=$(which gemini)
+        npm run test:integration:sandbox:none
