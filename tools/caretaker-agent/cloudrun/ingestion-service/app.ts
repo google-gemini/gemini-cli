@@ -10,9 +10,9 @@ import dotenv from 'dotenv';
 import { Firestore } from '@google-cloud/firestore';
 import {
   verifyGithubSignature,
-  GitHubWebhookPayload,
   isGitHubWebhookPayload,
 } from './auth/github.js';
+import type { GitHubWebhookPayload } from './auth/github.js';
 import { IssuesStore } from './db/issuesStore.js';
 
 dotenv.config();
@@ -75,7 +75,7 @@ app.post('/webhook', async (req, res) => {
 
   let payload: GitHubWebhookPayload;
   try {
-    const parsed = JSON.parse(req.body.toString());
+    const parsed: unknown = JSON.parse(req.body.toString());
     if (!isGitHubWebhookPayload(parsed)) {
       return res
         .status(400)
@@ -109,7 +109,7 @@ app.post('/webhook', async (req, res) => {
 
   const processedData = {
     issue_number: issueNumber,
-    repository: repository,
+    repository,
     sender: payload.sender?.login,
     body: sanitizedBody,
     title: payload.issue.title,
@@ -132,7 +132,7 @@ app.post('/webhook', async (req, res) => {
       // to recover from previous publish failures.
       const issueRef = issuesStore.getIssueRef(owner, repo, issueNumber);
       const snapshot = await issueRef.get();
-      const status = snapshot.exists ? snapshot.data()?.status : null;
+      const status = snapshot.data()?.status || null;
       if (status !== 'UNTRIAGED') {
         return res.status(200).json({
           status: 'ignored',
@@ -160,6 +160,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction,
   ) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const error = err as { status?: number; message?: string };
     if (error && error.status === 413) {
       console.error(`Payload too large: ${error.message}. Limit is 1mb.`);

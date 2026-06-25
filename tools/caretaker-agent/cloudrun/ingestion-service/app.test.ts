@@ -21,39 +21,27 @@ const mockTopic = vi.fn().mockReturnValue({
   publishMessage: mockPublishMessage,
 });
 
-vi.mock('@google-cloud/pubsub', () => {
-  return {
-    PubSub: vi.fn().mockImplementation(() => {
-      return {
-        // Bind method to mock version
-        topic: mockTopic,
-      };
-    }),
-  };
-});
+vi.mock('@google-cloud/pubsub', () => ({
+  PubSub: vi.fn().mockImplementation(() => ({
+    // Bind method to mock version
+    topic: mockTopic,
+  })),
+}));
 
-vi.mock('@google-cloud/firestore', () => {
-  return {
-    Firestore: vi.fn().mockImplementation(() => {
-      return {};
-    }),
-  };
-});
+vi.mock('@google-cloud/firestore', () => ({
+  Firestore: vi.fn().mockImplementation(() => ({})),
+}));
 
 const mockCreateIssue = vi.fn();
 const mockGetIssueRef = vi.fn();
 const mockGetDoc = vi.fn();
 
-vi.mock('./db/issuesStore.js', () => {
-  return {
-    IssuesStore: vi.fn().mockImplementation(() => {
-      return {
-        createIssue: mockCreateIssue,
-        getIssueRef: mockGetIssueRef,
-      };
-    }),
-  };
-});
+vi.mock('./db/issuesStore.js', () => ({
+  IssuesStore: vi.fn().mockImplementation(() => ({
+    createIssue: mockCreateIssue,
+    getIssueRef: mockGetIssueRef,
+  })),
+}));
 
 const mockVerifyGithubSignature = vi.fn();
 

@@ -84,6 +84,7 @@ export function isGitHubWebhookPayload(
     return false;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const o = obj as GitHubWebhookPayload;
 
   // 1. Validate 'action'

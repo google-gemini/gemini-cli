@@ -56,6 +56,7 @@ export default tseslint.config(
       'eslint.config.js',
       '**/coverage/**',
       'packages/**/dist/**',
+      'tools/**/dist/**',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
@@ -80,8 +81,8 @@ export default tseslint.config(
     },
   },
   {
-    // Rules for packages/*/src (TS/TSX)
-    files: ['packages/*/src/**/*.{ts,tsx}'],
+    // Rules for packages/*/src and tools (TS/TSX)
+    files: ['packages/*/src/**/*.{ts,tsx}', 'tools/**/*.{ts,tsx}'],
     plugins: {
       import: importPlugin,
     },
@@ -210,7 +211,7 @@ export default tseslint.config(
   },
   {
     // Rules that only apply to product code
-    files: ['packages/*/src/**/*.{ts,tsx}'],
+    files: ['packages/*/src/**/*.{ts,tsx}', 'tools/**/*.{ts,tsx}'],
     ignores: ['**/*.test.ts', '**/*.test.tsx', 'packages/*/src/test-utils/**'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
@@ -284,7 +285,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/*/src/**/*.test.{ts,tsx}'],
+    files: ['packages/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     plugins: {
       vitest,
     },
@@ -408,6 +409,13 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // Allow console logging for backend services (Cloud Logging)
+  {
+    files: ['tools/**/*.ts', 'tools/**/*.test.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
   // Prettier config must be last
