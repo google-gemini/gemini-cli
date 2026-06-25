@@ -244,7 +244,7 @@ runs:
         else
           PUBLISH_TARGET="--workspace=${INPUTS_CLI_PACKAGE_NAME}"
         fi
-        
+
         npm publish \
           --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
@@ -281,8 +281,6 @@ runs:
           if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
             npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} staging-tmp
           fi
-
-
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
