@@ -8,7 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
+import {
+  deepMergeSettings,
+  loadSettings,
+  USER_SETTINGS_PATH,
+} from './settings.js';
 import { debugLogger, checkPathTrust } from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
@@ -215,6 +219,35 @@ describe('loadSettings', () => {
     expect(result.showMemoryUsage).toBe(true);
   });
 
+  it('does not crash when the user settings file contains null', () => {
+    // JSON.parse("null") returns null, which would otherwise crash downstream
+    // property access and the deep merge.
+    fs.writeFileSync(USER_SETTINGS_PATH, 'null');
+
+    expect(() => loadSettings(mockWorkspaceDir)).not.toThrow();
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result).toEqual({
+      policyPaths: undefined,
+      adminPolicyPaths: undefined,
+    });
+  });
+
+  it('does not crash when the workspace settings file contains null', () => {
+    fs.writeFileSync(
+      USER_SETTINGS_PATH,
+      JSON.stringify({ showMemoryUsage: true }),
+    );
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, 'null');
+
+    expect(() => loadSettings(mockWorkspaceDir, true)).not.toThrow();
+    const result = loadSettings(mockWorkspaceDir, true);
+    expect(result.showMemoryUsage).toBe(true);
+  });
+
   describe('security', () => {
     it('should NOT load workspace settings if workspace is NOT trusted', () => {
       const userSettings = { showMemoryUsage: false };
@@ -287,5 +320,44 @@ describe('loadSettings', () => {
       expect(result.adminPolicyPaths).toEqual(['/trusted/admin']);
       expect(result.policyPaths).toEqual(['/trusted/user']);
     });
+  });
+});
+
+describe('deepMergeSettings', () => {
+  it('does not throw when either side is null', () => {
+    const nullValue = null as unknown as Record<string, unknown>;
+    expect(() => deepMergeSettings(nullValue, { a: 1 })).not.toThrow();
+    expect(() => deepMergeSettings({ a: 1 }, nullValue)).not.toThrow();
+    expect(() => deepMergeSettings(nullValue, nullValue)).not.toThrow();
+
+    expect(deepMergeSettings(nullValue, { a: 1 })).toEqual({ a: 1 });
+    expect(deepMergeSettings({ a: 1 }, nullValue)).toEqual({ a: 1 });
+    expect(deepMergeSettings(nullValue, nullValue)).toEqual({});
+  });
+
+  it('deep-clones nested source objects so the result does not share references', () => {
+    // `target` has no `nested` key, so `source.nested` would previously be
+    // assigned by reference, letting later mutations of the result leak back
+    // into the source object.
+    const source = { nested: { keep: true } };
+    const result = deepMergeSettings<Record<string, unknown>>({}, source);
+
+    expect(result['nested']).toEqual({ keep: true });
+    expect(result['nested']).not.toBe(source.nested);
+
+    // Mutating the merged result must not affect the original source object.
+    (result['nested'] as Record<string, unknown>)['keep'] = false;
+    expect(source.nested.keep).toBe(true);
+  });
+
+  it('deep-clones nested objects even when the target value is a primitive', () => {
+    const source = { section: { value: 1 } };
+    const result = deepMergeSettings<Record<string, unknown>>(
+      { section: 'not-an-object' },
+      source,
+    );
+
+    expect(result['section']).toEqual({ value: 1 });
+    expect(result['section']).not.toBe(source.section);
   });
 });
