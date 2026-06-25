@@ -8,43 +8,30 @@ import express from 'express';
 import { PubSub } from '@google-cloud/pubsub';
 import dotenv from 'dotenv';
 import { Firestore } from '@google-cloud/firestore';
-import { verifyGithubSignature } from './auth/github.js';
+import {
+  verifyGithubSignature,
+  isGitHubWebhookPayload,
+} from './auth/github.js';
+import type { GitHubWebhookPayload } from './auth/github.js';
 import { IssuesStore } from './db/issuesStore.js';
-
-interface GitHubWebhookPayload {
-  action?: string;
-  issue?: {
-    body?: string;
-    number?: number;
-    title?: string;
-  };
-  repository?: {
-    full_name?: string;
-  };
-  sender?: {
-    login?: string;
-  };
-}
 
 dotenv.config();
 
 const app = express();
 
-const projectId = process.env.PROJECT_ID;
-const topicId = process.env.TOPIC_ID;
-const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
-const databaseId = process.env.FIRESTORE_DATABASE;
-const collectionName = process.env.FIRESTORE_COLLECTION;
-
-if (
-  !projectId ||
-  !topicId ||
-  !githubWebhookSecret ||
-  !databaseId ||
-  !collectionName
-) {
-  throw new Error('Missing required environment variables');
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
 }
+
+const projectId = getRequiredEnvVar('PROJECT_ID');
+const topicId = getRequiredEnvVar('TOPIC_ID');
+const githubWebhookSecret = getRequiredEnvVar('GITHUB_WEBHOOK_SECRET');
+const databaseId = getRequiredEnvVar('FIRESTORE_DATABASE');
+const collectionName = getRequiredEnvVar('FIRESTORE_COLLECTION');
 
 const pubSubClient = new PubSub({ projectId });
 const topic = pubSubClient.topic(topicId);
@@ -56,7 +43,11 @@ const issuesStore = new IssuesStore(db, collectionName);
 app.use(express.raw({ type: 'application/json', limit: '1mb' }));
 
 app.get('/', (req, res) => {
-  res.send('Hello World!');
+  res.json({
+    status: 'healthy',
+    service: process.env.K_SERVICE || 'caretaker-ingestion-service',
+    revision: process.env.K_REVISION || 'local',
+  });
 });
 
 app.post('/webhook', async (req, res) => {
@@ -74,42 +65,42 @@ app.post('/webhook', async (req, res) => {
       .json({ status: 'error', message: 'Invalid Signature' });
   }
 
-  // Parse JSON payload
+  const eventType = req.headers['x-github-event'];
+  if (eventType !== 'issues') {
+    return res.status(200).json({
+      status: 'ignored',
+      reason: `unsupported event type: ${eventType}`,
+    });
+  }
+
   let payload: GitHubWebhookPayload;
   try {
-    const parsed = JSON.parse(req.body.toString());
-    if (typeof parsed !== 'object' || parsed === null) {
-      throw new Error('Payload is not an object');
+    const parsed: unknown = JSON.parse(req.body.toString());
+    if (!isGitHubWebhookPayload(parsed)) {
+      return res
+        .status(400)
+        .json({ status: 'error', message: 'Invalid payload structure' });
     }
-    payload = parsed as GitHubWebhookPayload;
+    payload = parsed;
   } catch {
     return res
       .status(400)
       .json({ status: 'error', message: 'Invalid JSON payload' });
   }
 
-  const eventType = req.headers['x-github-event'];
   const action = payload.action;
-
-  // Only process issues.opened events
-  if (eventType !== 'issues' || action !== 'opened') {
+  if (action !== 'opened') {
     return res.status(200).json({
       status: 'ignored',
-      reason: `unsupported event/action combo: ${eventType}.${action}`,
+      reason: `unsupported action: ${action}`,
     });
   }
 
-  const issueNumber = payload.issue?.number;
-  const repository = payload.repository?.full_name;
-
-  if (!issueNumber || !repository) {
-    return res
-      .status(400)
-      .json({ status: 'error', message: 'Missing issue number or repository' });
-  }
+  const issueNumber = payload.issue.number;
+  const repository = payload.repository.full_name;
 
   // Payload preprocessing
-  const rawBody = payload.issue?.body || '';
+  const rawBody = payload.issue.body || '';
   const escapedBody = rawBody.replace(
     /<\/untrusted_context>/g,
     '\\</untrusted_context>',
@@ -118,10 +109,10 @@ app.post('/webhook', async (req, res) => {
 
   const processedData = {
     issue_number: issueNumber,
-    repository: repository,
+    repository,
     sender: payload.sender?.login,
     body: sanitizedBody,
-    title: payload.issue?.title,
+    title: payload.issue.title,
   };
 
   const [owner, repo] = repository.split('/');
@@ -141,7 +132,7 @@ app.post('/webhook', async (req, res) => {
       // to recover from previous publish failures.
       const issueRef = issuesStore.getIssueRef(owner, repo, issueNumber);
       const snapshot = await issueRef.get();
-      const status = snapshot.exists ? snapshot.data()?.status : null;
+      const status = snapshot.data()?.status || null;
       if (status !== 'UNTRIAGED') {
         return res.status(200).json({
           status: 'ignored',
@@ -161,5 +152,24 @@ app.post('/webhook', async (req, res) => {
     return res.status(500).json({ status: 'error', message });
   }
 });
+
+app.use(
+  (
+    err: unknown,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const error = err as { status?: number; message?: string };
+    if (error && error.status === 413) {
+      console.error(`Payload too large: ${error.message}. Limit is 1mb.`);
+      return res
+        .status(413)
+        .json({ status: 'error', message: 'Payload too large' });
+    }
+    next(err);
+  },
+);
 
 export { app };

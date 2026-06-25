@@ -1,7 +1,13 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { IssuesStore } from './issuesStore.js';
-import { Firestore, Transaction } from '@google-cloud/firestore';
+import type { Firestore, Transaction } from '@google-cloud/firestore';
 
 describe('IssuesStore', () => {
   let mockTransaction: {
@@ -24,10 +30,8 @@ describe('IssuesStore', () => {
       doc: vi.fn().mockReturnValue({}),
       runTransaction: vi
         .fn()
-        .mockImplementation(
-          (callback: (tx: Transaction) => Promise<unknown>) => {
-            return callback(mockTransaction as unknown as Transaction);
-          },
+        .mockImplementation((callback: (tx: Transaction) => Promise<unknown>) =>
+          callback(mockTransaction as unknown as Transaction),
         ),
     } as unknown as Firestore;
 

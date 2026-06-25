@@ -23,5 +23,5 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Experimental Folders
 experimental/
+dist/
