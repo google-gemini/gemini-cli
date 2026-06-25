@@ -8,23 +8,12 @@ import express from 'express';
 import { PubSub } from '@google-cloud/pubsub';
 import dotenv from 'dotenv';
 import { Firestore } from '@google-cloud/firestore';
-import { verifyGithubSignature } from './auth/github.js';
+import {
+  verifyGithubSignature,
+  GitHubWebhookPayload,
+  isGitHubWebhookPayload,
+} from './auth/github.js';
 import { IssuesStore } from './db/issuesStore.js';
-
-interface GitHubWebhookPayload {
-  action?: string;
-  issue?: {
-    body?: string;
-    number?: number;
-    title?: string;
-  };
-  repository?: {
-    full_name?: string;
-  };
-  sender?: {
-    login?: string;
-  };
-}
 
 dotenv.config();
 
@@ -74,42 +63,42 @@ app.post('/webhook', async (req, res) => {
       .json({ status: 'error', message: 'Invalid Signature' });
   }
 
-  // Parse JSON payload
+  const eventType = req.headers['x-github-event'];
+  if (eventType !== 'issues') {
+    return res.status(200).json({
+      status: 'ignored',
+      reason: `unsupported event type: ${eventType}`,
+    });
+  }
+
   let payload: GitHubWebhookPayload;
   try {
     const parsed = JSON.parse(req.body.toString());
-    if (typeof parsed !== 'object' || parsed === null) {
-      throw new Error('Payload is not an object');
+    if (!isGitHubWebhookPayload(parsed)) {
+      return res
+        .status(400)
+        .json({ status: 'error', message: 'Invalid payload structure' });
     }
-    payload = parsed as GitHubWebhookPayload;
+    payload = parsed;
   } catch {
     return res
       .status(400)
       .json({ status: 'error', message: 'Invalid JSON payload' });
   }
 
-  const eventType = req.headers['x-github-event'];
   const action = payload.action;
-
-  // Only process issues.opened events
-  if (eventType !== 'issues' || action !== 'opened') {
+  if (action !== 'opened') {
     return res.status(200).json({
       status: 'ignored',
-      reason: `unsupported event/action combo: ${eventType}.${action}`,
+      reason: `unsupported action: ${action}`,
     });
   }
 
-  const issueNumber = payload.issue?.number;
-  const repository = payload.repository?.full_name;
-
-  if (!issueNumber || !repository) {
-    return res
-      .status(400)
-      .json({ status: 'error', message: 'Missing issue number or repository' });
-  }
+  const issueNumber = payload.issue.number;
+  const repository = payload.repository.full_name;
 
   // Payload preprocessing
-  const rawBody = payload.issue?.body || '';
+  const rawBody = payload.issue.body || '';
   const escapedBody = rawBody.replace(
     /<\/untrusted_context>/g,
     '\\</untrusted_context>',
@@ -121,7 +110,7 @@ app.post('/webhook', async (req, res) => {
     repository: repository,
     sender: payload.sender?.login,
     body: sanitizedBody,
-    title: payload.issue?.title,
+    title: payload.issue.title,
   };
 
   const [owner, repo] = repository.split('/');

@@ -57,8 +57,10 @@ vi.mock('./db/issuesStore.js', () => {
 
 const mockVerifyGithubSignature = vi.fn();
 
-vi.mock('./auth/github.js', () => {
+vi.mock('./auth/github.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./auth/github.js')>();
   return {
+    ...actual,
     verifyGithubSignature: mockVerifyGithubSignature,
   };
 });
@@ -108,6 +110,7 @@ describe('Webhook Server Endpoint', () => {
     const res = await request(app)
       .post('/webhook')
       .set('x-hub-signature-256', 'valid-sig')
+      .set('x-github-event', 'issues')
       .set('Content-Type', 'application/json')
       .send('invalid json');
 
@@ -124,13 +127,14 @@ describe('Webhook Server Endpoint', () => {
     const res = await request(app)
       .post('/webhook')
       .set('x-hub-signature-256', 'valid-sig')
+      .set('x-github-event', 'issues')
       .set('Content-Type', 'application/json')
       .send('null');
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
       status: 'error',
-      message: 'Invalid JSON payload',
+      message: 'Invalid payload structure',
     });
   });
 
@@ -145,7 +149,7 @@ describe('Webhook Server Endpoint', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ignored');
-    expect(res.body.reason).toContain('unsupported event/action combo');
+    expect(res.body.reason).toContain('unsupported event type');
   });
 
   it('should return 400 if required payload fields are missing', async () => {
@@ -160,7 +164,27 @@ describe('Webhook Server Endpoint', () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
       status: 'error',
-      message: 'Missing issue number or repository',
+      message: 'Invalid payload structure',
+    });
+  });
+
+  it('should return 400 if repository format is invalid', async () => {
+    mockVerifyGithubSignature.mockReturnValue(true);
+
+    const res = await request(app)
+      .post('/webhook')
+      .set('x-hub-signature-256', 'valid-sig')
+      .set('x-github-event', 'issues')
+      .send({
+        action: 'opened',
+        issue: { number: 1 },
+        repository: { full_name: 'invalid-repo-format' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      status: 'error',
+      message: 'Invalid payload structure',
     });
   });
 
