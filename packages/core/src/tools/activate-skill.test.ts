@@ -9,6 +9,8 @@ import { ActivateSkillTool } from './activate-skill.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { getFolderStructure } from '../utils/getFolderStructure.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 vi.mock('../utils/getFolderStructure.js', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock folder structure'),
@@ -18,9 +20,14 @@ describe('ActivateSkillTool', () => {
   let mockConfig: Config;
   let tool: ActivateSkillTool;
   let mockMessageBus: MessageBus;
+  let mockFileService: FileDiscoveryService;
 
   beforeEach(() => {
     mockMessageBus = createMockMessageBus();
+    mockFileService = {
+      shouldIgnoreFile: vi.fn(),
+      shouldIgnoreDirectory: vi.fn(),
+    } as unknown as FileDiscoveryService;
     const skills = [
       {
         name: 'test-skill',
@@ -48,8 +55,10 @@ describe('ActivateSkillTool', () => {
         }),
         activateSkill: vi.fn(),
       }),
+      getFileService: vi.fn().mockReturnValue(mockFileService),
     } as unknown as Config;
     tool = new ActivateSkillTool(mockConfig, mockMessageBus);
+    vi.mocked(getFolderStructure).mockClear();
   });
 
   it('should return enhanced description', () => {
@@ -74,6 +83,24 @@ describe('ActivateSkillTool', () => {
     expect(details.prompt).toContain('enable the specialized agent skill');
     expect(details.prompt).toContain('A test skill');
     expect(details.prompt).toContain('Mock folder structure');
+  });
+
+  it('builds the resource list with the file service so ignored paths (e.g. .venv) are honored', async () => {
+    const params = { name: 'test-skill' };
+    const invocation = tool.build(params);
+    await (
+      invocation as unknown as {
+        getConfirmationDetails: (signal: AbortSignal) => Promise<unknown>;
+      }
+    ).getConfirmationDetails(new AbortController().signal);
+
+    // The skill's folder structure must be built with the file service, so
+    // that .gitignore/.geminiignore are respected (issue #27205). Without it,
+    // ignored directories are shared with the model.
+    expect(getFolderStructure).toHaveBeenCalledWith(
+      '/path/to/test-skill',
+      expect.objectContaining({ fileService: mockFileService }),
+    );
   });
 
   it('should skip confirmation for built-in skills', async () => {

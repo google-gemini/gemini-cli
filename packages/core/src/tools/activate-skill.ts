@@ -64,6 +64,11 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     if (this.cachedFolderStructure === undefined) {
       this.cachedFolderStructure = await getFolderStructure(
         path.dirname(skillLocation),
+        // Pass the file service so the skill's folder structure honors
+        // .gitignore/.geminiignore (matching how the workspace structure is
+        // built). Without it, ignored directories such as a Python `.venv`
+        // are shared with the model, wasting context. See issue #27205.
+        { fileService: this.config.getFileService() },
       );
     }
     return this.cachedFolderStructure;
