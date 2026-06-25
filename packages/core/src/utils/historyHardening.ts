@@ -69,7 +69,7 @@ export function hardenHistory(
  * Helper to check if a Part object represents an internal thought.
  */
 function isInternalThought(part: Part): boolean {
-  return !!part.thought;
+  return !!(part as ThoughtPart).thought;
 }
 
 /**
@@ -432,6 +432,7 @@ export function scrubContents(contents: Content[]): Content[] {
 }
 
 interface ThoughtPart extends Part {
+  thought?: boolean;
   thoughtSignature?: string;
 }
 
