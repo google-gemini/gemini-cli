@@ -183,12 +183,14 @@ jobs:
           use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
           settings: |-
             {
-              "coreTools": [
-                "run_shell_command(gh issue list)",
-                "run_shell_command(gh pr list)",
-                "run_shell_command(gh search issues)",
-                "run_shell_command(gh search prs)"
-              ]
+              "tools": {
+                "core": [
+                  "run_shell_command(gh issue list)",
+                  "run_shell_command(gh pr list)",
+                  "run_shell_command(gh search issues)",
+                  "run_shell_command(gh search prs)"
+                ]
+              }
             }
           prompt: |-
             You are a helpful assistant that analyzes community contribution reports.
