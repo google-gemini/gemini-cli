@@ -46,16 +46,71 @@ export class ResourceRegistry {
 
   /**
    * Find a resource by its identifier.
-   * Format: serverName:uri (e.g., "myserver:file:///data.txt")
+   *
+   * The identifier may be either:
+   *   - a server-qualified identifier, as advertised by `list_mcp_resources`
+   *     (`serverName:uri`, e.g. `myserver:file:///data.txt`), which always
+   *     resolves to that specific server, or
+   *   - a bare resource URI (e.g. `file:///data.txt`), which only resolves
+   *     when exactly one connected server exposes it.
+   *
+   * If several servers expose the same bare URI the reference is ambiguous and
+   * `undefined` is returned, so callers can ask for a server-qualified
+   * identifier instead of silently reading from an arbitrary server. Use
+   * {@link findResourcesByUri} to detect that case.
    */
   findResourceByUri(identifier: string): MCPResource | undefined {
-    const colonIndex = identifier.indexOf(':');
-    if (colonIndex <= 0) {
-      return undefined;
+    const qualified = this.findResourceByQualifiedId(identifier);
+    if (qualified) {
+      return qualified;
     }
-    const serverName = identifier.substring(0, colonIndex);
-    const uri = identifier.substring(colonIndex + 1);
-    return this.resources.get(resourceKey(serverName, uri));
+
+    // Bare URI: only resolve when unambiguous (exactly one server exposes it).
+    const matches = this.findResourcesByUri(identifier);
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  /**
+   * Returns every resource whose bare URI matches, across all servers. A length
+   * greater than one means the URI is exposed by multiple servers and is
+   * therefore ambiguous on its own.
+   */
+  findResourcesByUri(uri: string): MCPResource[] {
+    const matches: MCPResource[] = [];
+    for (const resource of this.resources.values()) {
+      if (resource.uri === uri) {
+        matches.push(resource);
+      }
+    }
+    return matches;
+  }
+
+  /**
+   * Resolves a server-qualified identifier (`serverName:uri`) to a resource.
+   *
+   * Known server names are matched explicitly as a prefix, rather than naively
+   * splitting on the first colon, so a URI scheme (for example the `file` in
+   * `file:///x`) is never mistaken for a server name and server names may
+   * themselves contain colons or underscores.
+   */
+  private findResourceByQualifiedId(
+    identifier: string,
+  ): MCPResource | undefined {
+    const serverNames = new Set<string>();
+    for (const resource of this.resources.values()) {
+      serverNames.add(resource.serverName);
+    }
+    for (const serverName of serverNames) {
+      const prefix = `${serverName}:`;
+      if (identifier.startsWith(prefix)) {
+        const uri = identifier.slice(prefix.length);
+        const hit = this.resources.get(resourceKey(serverName, uri));
+        if (hit) {
+          return hit;
+        }
+      }
+    }
+    return undefined;
   }
 
   removeResourcesByServer(serverName: string): void {

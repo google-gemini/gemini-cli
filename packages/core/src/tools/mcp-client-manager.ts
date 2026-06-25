@@ -172,19 +172,26 @@ export class McpClientManager {
     return undefined;
   }
 
+  /**
+   * Resolves a resource identifier to a single resource. The identifier may be
+   * a server-qualified `serverName:uri` (recommended for disambiguation) or a
+   * bare URI. A bare URI only resolves when exactly one server exposes it; if
+   * multiple servers expose the same URI the reference is ambiguous and
+   * `undefined` is returned rather than silently picking an arbitrary server.
+   */
   findResourceByUri(uri: string): MCPResource | undefined {
     if (!this.mainResourceRegistry) return undefined;
+    return this.mainResourceRegistry.findResourceByUri(uri);
+  }
 
-    // Try serverName:uri format first
-    const qualifiedMatch = this.mainResourceRegistry.findResourceByUri(uri);
-    if (qualifiedMatch) {
-      return qualifiedMatch;
-    }
-
-    // Try direct URI match
-    return this.mainResourceRegistry
-      .getAllResources()
-      .find((r) => r.uri === uri);
+  /**
+   * Returns every resource whose bare URI matches, across all connected
+   * servers. Used to surface ambiguous references (the same URI exposed by
+   * more than one server).
+   */
+  findResourcesByUri(uri: string): MCPResource[] {
+    if (!this.mainResourceRegistry) return [];
+    return this.mainResourceRegistry.findResourcesByUri(uri);
   }
 
   getAllResources(): MCPResource[] {
