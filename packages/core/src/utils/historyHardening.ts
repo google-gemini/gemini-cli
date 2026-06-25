@@ -69,7 +69,7 @@ export function hardenHistory(
  * Helper to check if a Part object represents an internal thought.
  */
 function isInternalThought(part: Part): boolean {
-  return part.thought === true;
+  return !!part.thought;
 }
 
 /**
