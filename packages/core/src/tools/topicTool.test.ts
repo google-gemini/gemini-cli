@@ -61,12 +61,15 @@ describe('UpdateTopicTool', () => {
   let tool: UpdateTopicTool;
   let mockMessageBus: MessageBus;
   let mockConfig: Config;
+  let currentSessionId: string;
 
   beforeEach(() => {
     mockMessageBus = new MessageBus(vi.mocked({} as PolicyEngine));
+    currentSessionId = 'session-a';
     // Mock enough of Config to satisfy the tool
     mockConfig = {
       topicState: new TopicState(),
+      getSessionId: vi.fn(() => currentSessionId),
     } as unknown as Config;
     tool = new UpdateTopicTool(mockConfig, mockMessageBus);
   });
@@ -116,6 +119,41 @@ describe('UpdateTopicTool', () => {
       '> [!STRATEGY]\n> **Intent:** Subsequent Move',
     );
     expect(result.llmContent).toBe('Strategic Intent: Subsequent Move');
+  });
+
+  it('does not write topic state when the session was reset after scheduling (e.g. /clear)', async () => {
+    // Tool call is scheduled in session-a.
+    const invocation = tool.build({
+      [TOPIC_PARAM_TITLE]: 'Stale Topic',
+      [TOPIC_PARAM_STRATEGIC_INTENT]: 'Stale Intent',
+    });
+
+    // Session is reset (new id) before the orphaned call executes.
+    currentSessionId = 'session-b';
+
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    // The shared topic state must not be poisoned with the previous session's
+    // topic (issue #26402).
+    expect(mockConfig.topicState.getTopic()).toBeUndefined();
+    expect(mockConfig.topicState.getIntent()).toBeUndefined();
+    expect(result.llmContent).toContain('Topic update skipped');
+  });
+
+  it('does not write topic state when the call was aborted', async () => {
+    const invocation = tool.build({
+      [TOPIC_PARAM_TITLE]: 'Aborted Topic',
+      [TOPIC_PARAM_STRATEGIC_INTENT]: 'Aborted Intent',
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    const result = await invocation.execute({ abortSignal: controller.signal });
+
+    expect(mockConfig.topicState.getTopic()).toBeUndefined();
+    expect(result.llmContent).toContain('Topic update skipped');
   });
 
   it('should return error if strategic_intent is missing', async () => {
