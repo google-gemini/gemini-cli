@@ -418,15 +418,17 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
  * Deep-scrubs an array of Content objects to remove non-standard properties.
  */
 export function scrubContents(contents: Content[]): Content[] {
-  return contents.map((content) => {
-    const nonThoughtParts = (content.parts ?? []).filter(
-      (p) => !isInternalThought(p),
-    );
-    return {
-      role: content.role,
-      parts: nonThoughtParts.map((p) => scrubPart(p)),
-    };
-  });
+  return contents
+    .map((content) => {
+      const nonThoughtParts = (content.parts ?? []).filter(
+        (p) => !isInternalThought(p),
+      );
+      return {
+        role: content.role,
+        parts: nonThoughtParts.map((p) => scrubPart(p)),
+      };
+    })
+    .filter((content) => content.parts.length > 0);
 }
 
 interface ThoughtPart extends Part {

@@ -8,10 +8,12 @@ import { describe, it, expect } from 'vitest';
 import {
   hardenHistory,
   SYNTHETIC_THOUGHT_SIGNATURE,
+  scrubContents,
+  scrubHistory,
 } from './historyHardening.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 import { deriveStableId } from './cryptoUtils.js';
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
 
 describe('hardenHistory', () => {
   it('should return an empty array if input is empty', () => {
@@ -458,6 +460,106 @@ describe('hardenHistory', () => {
     expect(hardened[0].content.parts).toEqual([
       { text: 'User prompt' },
       { text: 'User follow-up prompt' },
+    ]);
+  });
+});
+
+describe('scrubContents', () => {
+  it('should scrub non-standard fields from parts', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Hello', customField: 'ignored' } as unknown as Part],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }],
+      },
+    ]);
+  });
+
+  it('should filter out internal thought parts', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          { text: 'thought', thought: true } as unknown as Part,
+          { text: 'response' },
+        ],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'model',
+        parts: [{ text: 'response' }],
+      },
+    ]);
+  });
+
+  it('should completely filter out Content objects that have no parts left after thought scrubbing', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'thought', thought: true } as unknown as Part],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'How are you?' }],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'How are you?' }],
+      },
+    ]);
+  });
+});
+
+describe('scrubHistory', () => {
+  it('should scrub non-standard fields and filter empty turns in history', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Hello', customField: 'ignored' } as unknown as Part],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [{ text: 'thought', thought: true } as unknown as Part],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'World' }],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed.length).toBe(1); // Since user turns are coalesced (Turn 1 + Turn 3) and Turn 2 is removed because it has 0 parts
+    expect(scrubbed[0].content.parts).toEqual([
+      { text: 'Hello' },
+      { text: 'World' },
     ]);
   });
 });
