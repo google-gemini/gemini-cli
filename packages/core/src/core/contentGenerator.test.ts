@@ -93,6 +93,7 @@ describe('createContentGenerator', () => {
     resetVersionCache();
     vi.clearAllMocks();
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
   });
 
   afterEach(() => {
