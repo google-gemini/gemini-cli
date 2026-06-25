@@ -19,21 +19,19 @@ dotenv.config();
 
 const app = express();
 
-const projectId = process.env.PROJECT_ID;
-const topicId = process.env.TOPIC_ID;
-const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
-const databaseId = process.env.FIRESTORE_DATABASE;
-const collectionName = process.env.FIRESTORE_COLLECTION;
-
-if (
-  !projectId ||
-  !topicId ||
-  !githubWebhookSecret ||
-  !databaseId ||
-  !collectionName
-) {
-  throw new Error('Missing required environment variables');
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
 }
+
+const projectId = getRequiredEnvVar('PROJECT_ID');
+const topicId = getRequiredEnvVar('TOPIC_ID');
+const githubWebhookSecret = getRequiredEnvVar('GITHUB_WEBHOOK_SECRET');
+const databaseId = getRequiredEnvVar('FIRESTORE_DATABASE');
+const collectionName = getRequiredEnvVar('FIRESTORE_COLLECTION');
 
 const pubSubClient = new PubSub({ projectId });
 const topic = pubSubClient.topic(topicId);
@@ -45,7 +43,11 @@ const issuesStore = new IssuesStore(db, collectionName);
 app.use(express.raw({ type: 'application/json', limit: '1mb' }));
 
 app.get('/', (req, res) => {
-  res.send('Hello World!');
+  res.json({
+    status: 'healthy',
+    service: process.env.K_SERVICE || 'caretaker-ingestion-service',
+    revision: process.env.K_REVISION || 'local',
+  });
 });
 
 app.post('/webhook', async (req, res) => {
@@ -150,5 +152,23 @@ app.post('/webhook', async (req, res) => {
     return res.status(500).json({ status: 'error', message });
   }
 });
+
+app.use(
+  (
+    err: unknown,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    const error = err as { status?: number; message?: string };
+    if (error && error.status === 413) {
+      console.error(`Payload too large: ${error.message}. Limit is 1mb.`);
+      return res
+        .status(413)
+        .json({ status: 'error', message: 'Payload too large' });
+    }
+    next(err);
+  },
+);
 
 export { app };

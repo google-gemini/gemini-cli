@@ -92,6 +92,17 @@ describe('Webhook Server Endpoint', () => {
     vi.clearAllMocks();
   });
 
+  it('should return 200 and health status on root endpoint', async () => {
+    const res = await request(app).get('/');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      status: 'healthy',
+      service: 'caretaker-ingestion-service',
+      revision: 'local',
+    });
+  });
+
   it('should return 401 if signature validation fails', async () => {
     mockVerifyGithubSignature.mockReturnValue(false);
 
@@ -118,6 +129,25 @@ describe('Webhook Server Endpoint', () => {
     expect(res.body).toEqual({
       status: 'error',
       message: 'Invalid JSON payload',
+    });
+  });
+
+  it('should return 413 if payload is too large', async () => {
+    mockVerifyGithubSignature.mockReturnValue(true);
+
+    const largeBody = 'a'.repeat(1024 * 1024 + 1);
+
+    const res = await request(app)
+      .post('/webhook')
+      .set('x-hub-signature-256', 'valid-sig')
+      .set('x-github-event', 'issues')
+      .set('Content-Type', 'application/json')
+      .send(largeBody);
+
+    expect(res.status).toBe(413);
+    expect(res.body).toEqual({
+      status: 'error',
+      message: 'Payload too large',
     });
   });
 

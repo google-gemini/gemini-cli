@@ -39,7 +39,7 @@ export class IssuesStore {
   ): Promise<boolean> {
     const docRef = this.getIssueRef(owner, repo, issueNumber);
 
-    return this.db.runTransaction(async (transaction: Transaction) => {
+    return await this.db.runTransaction(async (transaction: Transaction) => {
       const snapshot = await transaction.get(docRef);
 
       if (!snapshot.exists) {
