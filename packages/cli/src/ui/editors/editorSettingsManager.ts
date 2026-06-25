@@ -17,15 +17,23 @@ export interface EditorDisplay {
   disabled: boolean;
 }
 
-class EditorSettingsManager {
-  private readonly availableEditors: EditorDisplay[];
+export class EditorSettingsManager {
+  private availableEditors: EditorDisplay[] | null = null;
 
-  constructor() {
+  /**
+   * Computes the list of available editors. This shells out (synchronous
+   * `execSync`) once per known editor to probe whether its command exists.
+   * Process creation can be slow on some systems (notably Windows with
+   * endpoint security intercepting every spawn), so this work is deferred
+   * until first access rather than run during module evaluation, where it
+   * would block startup for tens of seconds. See issue #28106.
+   */
+  private computeAvailableEditors(): EditorDisplay[] {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const editorTypes = Object.keys(
       EDITOR_DISPLAY_NAMES,
     ).sort() as EditorType[];
-    this.availableEditors = [
+    return [
       {
         name: 'None',
         type: 'not_set',
@@ -50,6 +58,9 @@ class EditorSettingsManager {
   }
 
   getAvailableEditorDisplays(): EditorDisplay[] {
+    if (this.availableEditors === null) {
+      this.availableEditors = this.computeAvailableEditors();
+    }
     return this.availableEditors;
   }
 }
