@@ -290,6 +290,7 @@ describe('Webhook Server Endpoint', () => {
     mockGetDoc.mockResolvedValue({
       exists: true,
       data: () => ({ status: 'UNTRIAGED' }),
+      get: (field: string) => (field === 'status' ? 'UNTRIAGED' : undefined),
     });
     mockPublishMessage.mockResolvedValue('mock-msg-789');
 
@@ -324,6 +325,7 @@ describe('Webhook Server Endpoint', () => {
     mockGetDoc.mockResolvedValue({
       exists: true,
       data: () => ({ status: 'TRIAGED' }),
+      get: (field: string) => (field === 'status' ? 'TRIAGED' : undefined),
     });
 
     const payload = {

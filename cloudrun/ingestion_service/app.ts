@@ -132,8 +132,7 @@ app.post('/webhook', async (req, res) => {
       // to recover from previous publish failures.
       const issueRef = issuesStore.getIssueRef(owner, repo, issueNumber);
       const snapshot = await issueRef.get();
-      const status = snapshot.data()?.status || null;
-      if (status !== 'UNTRIAGED') {
+      if (snapshot.get('status') !== 'UNTRIAGED') {
         return res.status(200).json({
           status: 'ignored',
           reason: `issue already exists: ${repository}#${issueNumber}`,
@@ -160,10 +159,13 @@ app.use(
     res: express.Response,
     next: express.NextFunction,
   ) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const error = err as { status?: number; message?: string };
-    if (error && error.status === 413) {
-      console.error(`Payload too large: ${error.message}. Limit is 1mb.`);
+    if (
+      err &&
+      typeof err === 'object' &&
+      'status' in err &&
+      err.status === 413
+    ) {
+      console.error('Payload too large. Limit is 1mb.');
       return res
         .status(413)
         .json({ status: 'error', message: 'Payload too large' });

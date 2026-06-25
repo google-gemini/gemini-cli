@@ -53,12 +53,9 @@ export class IssuesStore {
     owner: string,
     repo: string,
     issueNumber: number,
-  ): DocumentReference<IssueDocument> {
+  ): DocumentReference {
     const docId = `github_${owner}_${repo}_${issueNumber}`;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return this.db
-      .collection(this.collectionName)
-      .doc(docId) as DocumentReference<IssueDocument>;
+    return this.db.collection(this.collectionName).doc(docId);
   }
 
   // Initializes a new issue document in a transaction
@@ -75,7 +72,7 @@ export class IssuesStore {
         const snapshot = await transaction.get(docRef);
 
         if (!snapshot.exists) {
-          transaction.set(docRef, {
+          const newIssue: IssueDocument = {
             status: 'UNTRIAGED',
             triage_attempts: 0,
             workable_spec: {},
@@ -91,7 +88,9 @@ export class IssuesStore {
               issue_number: issueNumber,
               title,
             },
-          });
+          };
+
+          transaction.set(docRef, newIssue);
           return true;
         }
         return false;
