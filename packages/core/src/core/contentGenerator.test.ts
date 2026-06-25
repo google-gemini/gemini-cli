@@ -483,6 +483,110 @@ describe('createContentGenerator', () => {
     );
   });
 
+  describe('Vertex AI regional endpoint with API key', () => {
+    const vertexConfig = {
+      apiKey: 'test-api-key',
+      vertexai: true,
+      authType: AuthType.USE_VERTEX_AI,
+    } as const;
+
+    function mockVertexGenerator(): void {
+      const mockGenerator = {
+        models: {},
+      } as unknown as GoogleGenAI;
+      vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    }
+
+    it('derives the regional endpoint from GOOGLE_CLOUD_LOCATION', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'europe-west3');
+
+      await createContentGenerator({ ...vertexConfig }, mockConfig);
+
+      const regionalUrl = 'https://europe-west3-aiplatform.googleapis.com/';
+      expect(GoogleGenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          httpOptions: expect.objectContaining({ baseUrl: regionalUrl }),
+          googleAuthOptions: expect.objectContaining({
+            clientOptions: expect.objectContaining({
+              apiEndpoint: regionalUrl,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('trims whitespace around the configured location', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', '  us-central1  ');
+
+      await createContentGenerator({ ...vertexConfig }, mockConfig);
+
+      expect(GoogleGenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          httpOptions: expect.objectContaining({
+            baseUrl: 'https://us-central1-aiplatform.googleapis.com/',
+          }),
+        }),
+      );
+    });
+
+    it('uses the global endpoint (no baseUrl) when location is "global"', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'global');
+
+      await createContentGenerator({ ...vertexConfig }, mockConfig);
+
+      const callArg = vi.mocked(GoogleGenAI).mock.calls[0][0] as {
+        httpOptions?: { baseUrl?: string };
+      };
+      expect(callArg.httpOptions).not.toHaveProperty('baseUrl');
+    });
+
+    it('does not derive a baseUrl when no location is configured', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
+
+      await createContentGenerator({ ...vertexConfig }, mockConfig);
+
+      const callArg = vi.mocked(GoogleGenAI).mock.calls[0][0] as {
+        httpOptions?: { baseUrl?: string };
+      };
+      expect(callArg.httpOptions).not.toHaveProperty('baseUrl');
+    });
+
+    it('lets GOOGLE_VERTEX_BASE_URL take precedence over the derived endpoint', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'europe-west3');
+      vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://custom.example.com/');
+
+      await createContentGenerator({ ...vertexConfig }, mockConfig);
+
+      expect(GoogleGenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          httpOptions: expect.objectContaining({
+            baseUrl: 'https://custom.example.com/',
+          }),
+        }),
+      );
+    });
+
+    it('does not derive a regional endpoint when no API key is used', async () => {
+      mockVertexGenerator();
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'europe-west3');
+
+      await createContentGenerator(
+        { vertexai: true, authType: AuthType.USE_VERTEX_AI },
+        mockConfig,
+      );
+
+      const callArg = vi.mocked(GoogleGenAI).mock.calls[0][0] as {
+        httpOptions?: { baseUrl?: string };
+      };
+      expect(callArg.httpOptions).not.toHaveProperty('baseUrl');
+    });
+  });
+
   it('should inject HttpsProxyAgent into googleAuthOptions when proxy URL uses https://', async () => {
     const mockConfigWithProxy = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),

@@ -346,6 +346,24 @@ export async function createContentGenerator(
         validateBaseUrl(baseUrl);
       }
 
+      // When using Vertex AI with an API key, @google/genai forces the global
+      // endpoint (`aiplatform.googleapis.com`) and silently ignores
+      // GOOGLE_CLOUD_LOCATION, because it clears project/location whenever an
+      // API key is present. Derive the regional endpoint ourselves so a
+      // configured non-global location is honored (e.g. for data residency).
+      // Explicit base URL overrides (config.baseUrl, GOOGLE_VERTEX_BASE_URL)
+      // take precedence and are left untouched.
+      if (
+        !baseUrl &&
+        config.authType === AuthType.USE_VERTEX_AI &&
+        config.apiKey
+      ) {
+        const location = process.env['GOOGLE_CLOUD_LOCATION']?.trim();
+        if (location && location !== 'global') {
+          baseUrl = `https://${location}-aiplatform.googleapis.com/`;
+        }
+      }
+
       const httpOptions: {
         baseUrl?: string;
         headers: Record<string, string>;
