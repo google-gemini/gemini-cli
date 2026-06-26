@@ -131,7 +131,10 @@ class TestIssuesStore(unittest.TestCase):
     def test_release_lock_failure_triggers_retry(self):
         """release lock on failed triage with attempts < 2 should reset to UNTRIAGED and retry"""
         self.snapshot.exists = True
-        self.snapshot.to_dict.return_value = {"lock": {"holder": self.lock_holder}, "triage_attempts": 1}
+        self.snapshot.to_dict.return_value = {
+            "lock": {"holder": self.lock_holder},
+            "triage_attempts": 1,
+        }
         
         action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=False)
         
@@ -144,7 +147,10 @@ class TestIssuesStore(unittest.TestCase):
     def test_release_lock_failure_max_attempts_needs_human(self):
         """release lock on failed triage with attempts >= 2 should escalate to NEEDS_HUMAN"""
         self.snapshot.exists = True
-        self.snapshot.to_dict.return_value = {"lock": {"holder": self.lock_holder}, "triage_attempts": 2}
+        self.snapshot.to_dict.return_value = {
+            "lock": {"holder": self.lock_holder},
+            "triage_attempts": 2,
+        }
         
         action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=False)
         

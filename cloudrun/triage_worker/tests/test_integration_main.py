@@ -71,8 +71,9 @@ class TestIntegrationMain(unittest.TestCase):
         self.env_patcher.start()
 
         # Mock the Firestore database client at the network boundary
-        self.db_patcher = patch("db.issues_store.db")
-        self.mock_db = self.db_patcher.start()
+        self.mock_db = MagicMock()
+        self.db_patcher = patch("db.issues_store.get_firestore_client", return_value=self.mock_db)
+        self.db_patcher.start()
 
         self.mock_doc_ref = MagicMock()
         self.mock_snapshot = MagicMock()
