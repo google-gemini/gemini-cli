@@ -13,7 +13,8 @@
     "@google-cloud/firestore": "^7.7.0",
     "@google-cloud/pubsub": "^4.4.0",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

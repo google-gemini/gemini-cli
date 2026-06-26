@@ -5,6 +5,7 @@
  */
 
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { PubSub } from '@google-cloud/pubsub';
 import dotenv from 'dotenv';
 import { Firestore } from '@google-cloud/firestore';
@@ -42,6 +43,17 @@ const issuesStore = new IssuesStore(db, collectionName);
 // Middleware: read incoming JSON payloads as raw Buffer bytes
 app.use(express.raw({ type: 'application/json', limit: '1mb' }));
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: 'Too many requests, please try again later.',
+  },
+});
+
 app.get('/', (req, res) => {
   res.json({
     status: 'healthy',
@@ -50,7 +62,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', limiter, async (req, res) => {
   const header = req.headers['x-hub-signature-256'];
   const signature = Array.isArray(header) ? header[0] : header;
 

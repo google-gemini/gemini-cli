@@ -97,7 +97,8 @@ export class IssuesStore {
       });
     } catch (error) {
       console.error(
-        `Firestore transaction failed for ${owner}/${repo}#${issueNumber}:`,
+        'Firestore transaction failed for issue:',
+        `${owner}/${repo}#${issueNumber}`,
         error,
       );
       throw error;
