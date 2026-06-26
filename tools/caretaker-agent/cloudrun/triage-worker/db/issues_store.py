@@ -15,14 +15,24 @@ class ReleaseAction(Enum):
 PROJECT_ID = os.environ.get("PROJECT_ID")
 DATABASE_NAME = os.environ.get("FIRESTORE_DATABASE")
 COLLECTION_NAME = os.environ.get("FIRESTORE_COLLECTION")
-db = firestore.Client(project=PROJECT_ID, database=DATABASE_NAME)
+
+_db_client = None
+
+def get_firestore_client() -> firestore.Client:
+    """
+    Lazily initializes and returns the Firestore client.
+    """
+    global _db_client
+    if _db_client is None:
+        _db_client = firestore.Client(project=PROJECT_ID, database=DATABASE_NAME)
+    return _db_client
 
 def _get_issue_ref(owner: str, repo: str, issue_number: int | str):
     """
     Generates the standardized Firestore DocumentReference for an issue.
     """
     doc_id = f"github_{owner}_{repo}_{issue_number}"
-    return db.collection(COLLECTION_NAME).document(doc_id)
+    return get_firestore_client().collection(COLLECTION_NAME).document(doc_id)
 
 @firestore.transactional
 def _acquire_lock_tx(transaction, doc_ref, lock_holder: str, lock_duration_sec: int) -> ClaimAction:
@@ -49,7 +59,7 @@ def _acquire_lock_tx(transaction, doc_ref, lock_holder: str, lock_duration_sec: 
             })
         return ClaimAction.NEEDS_HUMAN
 
-    lock = data.get("lock", {})
+    lock = data.get("lock") or {}
     now = datetime.now(timezone.utc)
     holder = lock.get("holder")
     expires_at = lock.get("expires_at")
@@ -74,16 +84,29 @@ def _acquire_lock_tx(transaction, doc_ref, lock_holder: str, lock_duration_sec: 
     })
     return ClaimAction.PROCEED
 
-def acquire_lock(owner: str, repo: str, issue_number: int, lock_holder: str, lock_duration_sec: int = 900) -> ClaimAction:
+def acquire_lock(
+    owner: str,
+    repo: str,
+    issue_number: int,
+    lock_holder: str,
+    lock_duration_sec: int = 900,
+) -> ClaimAction:
     """
     Attempts to acquire the processing lock for an issue.
     """
     doc_ref = _get_issue_ref(owner, repo, issue_number)
-    transaction = db.transaction()
+    transaction = get_firestore_client().transaction()
     return _acquire_lock_tx(transaction, doc_ref, lock_holder, lock_duration_sec)
 
 @firestore.transactional
-def _release_lock_tx(transaction, doc_ref, lock_holder: str, success: bool, workable_spec: dict = None, status: str = None) -> ReleaseAction:
+def _release_lock_tx(
+    transaction,
+    doc_ref,
+    lock_holder: str,
+    success: bool,
+    workable_spec: dict = None,
+    status: str = None,
+) -> ReleaseAction:
     """
     Transactional logic to release the lock and update status or retry counters.
     """
@@ -92,7 +115,7 @@ def _release_lock_tx(transaction, doc_ref, lock_holder: str, success: bool, work
         return ReleaseAction.COMPLETE
         
     data = snapshot.to_dict()
-    lock = data.get("lock", {})
+    lock = data.get("lock") or {}
 
     if lock.get("holder") != lock_holder:
         return ReleaseAction.COMPLETE
@@ -120,10 +143,18 @@ def _release_lock_tx(transaction, doc_ref, lock_holder: str, success: bool, work
             transaction.update(doc_ref, updates)
             return ReleaseAction.COMPLETE
 
-def release_lock(owner: str, repo: str, issue_number: int, lock_holder: str, success: bool, workable_spec: dict = None, status: str = None) -> ReleaseAction:
+def release_lock(
+    owner: str,
+    repo: str,
+    issue_number: int,
+    lock_holder: str,
+    success: bool,
+    workable_spec: dict = None,
+    status: str = None,
+) -> ReleaseAction:
     """
     Releases the processing lock for an issue and updates its status.
     """
     doc_ref = _get_issue_ref(owner, repo, issue_number)
-    transaction = db.transaction()
+    transaction = get_firestore_client().transaction()
     return _release_lock_tx(transaction, doc_ref, lock_holder, success, workable_spec, status)

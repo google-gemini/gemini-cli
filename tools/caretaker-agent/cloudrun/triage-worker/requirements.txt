@@ -1,5 +1,1 @@
 google-cloud-firestore>=2.15.0, <3.0.0
-google-cloud-storage
-google-cloud-pubsub
-google-antigravity>=0.1.0
-python-dotenv

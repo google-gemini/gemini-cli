@@ -80,8 +80,7 @@ The final `workable_spec` object must conform strictly to this JSON Schema speci
         },
         "framework": {
           "type": "string",
-          "description": "Testing framework used.",
-          "enum": ["Vitest"]
+          "description": "Testing framework used (e.g., 'Vitest', 'Pytest', etc.)."
         }
       }
     }
