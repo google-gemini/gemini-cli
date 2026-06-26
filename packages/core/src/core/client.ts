@@ -93,6 +93,7 @@ type BeforeAgentHookReturn =
 export class GeminiClient {
   private chat?: GeminiChat;
   private sessionTurnCount = 0;
+  private promptTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
@@ -925,6 +926,19 @@ export class GeminiClient {
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
+      this.promptTurnCount = 0;
+    }
+
+    this.promptTurnCount++;
+
+    const maxAllowedTurns =
+      this.config.getMaxSessionTurns() > 0
+        ? this.config.getMaxSessionTurns()
+        : 15; // default to 15 recursive turns per single user request
+
+    if (this.promptTurnCount > maxAllowedTurns) {
+      yield { type: GeminiEventType.MaxSessionTurns };
+      return new Turn(this.getChat(), prompt_id);
     }
 
     if (hooksEnabled && messageBus) {
