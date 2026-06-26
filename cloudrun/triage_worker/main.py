@@ -8,7 +8,7 @@ from utils.validator import validate_triage_result
 from utils.egress import send_label_action, send_comment_action
 from db.issues_store import acquire_lock, release_lock, ClaimAction, ReleaseAction
 
-def main():
+def main() -> None:
     # Cloud Run Jobs inject data via environment variables
     encoded_data = os.environ.get("ISSUE_DETAILS")
     

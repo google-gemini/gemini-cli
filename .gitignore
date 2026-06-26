@@ -25,3 +25,5 @@ Thumbs.db
 
 experimental/
 dist/
+iam_policy.yaml
+DESIGN.md

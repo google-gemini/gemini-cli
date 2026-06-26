@@ -4,7 +4,7 @@ from utils.agent_logger import upload_to_bucket, upload_agent_run_logs, extract_
 from google.antigravity import Agent, LocalAgentConfig
 from google.antigravity.hooks.policy import allow, deny
 
-def process_issue_triage(payload):
+def process_issue_triage(payload: dict) -> tuple[bool, str]:
     """
     LLM inference via Antigravity SDK.
     """

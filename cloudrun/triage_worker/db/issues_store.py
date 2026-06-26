@@ -17,7 +17,7 @@ DATABASE_NAME = os.environ.get("FIRESTORE_DATABASE")
 COLLECTION_NAME = os.environ.get("FIRESTORE_COLLECTION")
 db = firestore.Client(project=PROJECT_ID, database=DATABASE_NAME)
 
-def _get_issue_ref(owner: str, repo: str, issue_number: int):
+def _get_issue_ref(owner: str, repo: str, issue_number: int | str):
     """
     Generates the standardized Firestore DocumentReference for an issue.
     """
