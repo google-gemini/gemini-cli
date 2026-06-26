@@ -183,16 +183,29 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
     });
 
-    it('records the chat compression event to OTEL', () => {
+    it('buffers the chat compression OTEL event and metrics', () => {
+      const bufferTelemetryEvent = vi
+        .spyOn(sdk, 'bufferTelemetryEvent')
+        .mockImplementation(() => {});
       const mockConfig = makeFakeConfig();
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
 
-      logChatCompression(
-        mockConfig,
-        makeChatCompressionEvent({
-          tokens_before: 9001,
-          tokens_after: 9000,
-        }),
-      );
+      logChatCompression(mockConfig, event);
+
+      expect(bufferTelemetryEvent).toHaveBeenCalledTimes(1);
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordChatCompressionMetrics).not.toHaveBeenCalled();
+
+      const bufferedCallback = bufferTelemetryEvent.mock.calls[0]![0];
+      bufferedCallback();
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: event.toLogBody(),
+        attributes: event.toOpenTelemetryAttributes(mockConfig),
+      });
 
       expect(metrics.recordChatCompressionMetrics).toHaveBeenCalledWith(
         mockConfig,
