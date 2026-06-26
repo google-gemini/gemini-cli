@@ -398,7 +398,7 @@ describe('ReadManyFilesTool', () => {
     });
 
     it('should NOT use default excludes if useDefaultExcludes is false', async () => {
-      createFile('node_modules/some-lib/index.js', 'lib code');
+      createFile('dist/some-lib/index.js', 'lib code');
       createFile('src/app.js', 'app code');
       const params = { include: ['**/*.js'], useDefaultExcludes: false };
       const invocation = tool.build(params);
@@ -406,10 +406,7 @@ describe('ReadManyFilesTool', () => {
         abortSignal: new AbortController().signal,
       });
       const content = result.llmContent as string[];
-      const expectedPath1 = path.join(
-        tempRootDir,
-        'node_modules/some-lib/index.js',
-      );
+      const expectedPath1 = path.join(tempRootDir, 'dist/some-lib/index.js');
       const expectedPath2 = path.join(tempRootDir, 'src/app.js');
       expect(
         content.some((c) =>
