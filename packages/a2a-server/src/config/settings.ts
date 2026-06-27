@@ -257,6 +257,11 @@ export function deepMergeSettings<T extends object>(target: T, source: T): T {
       // merged result share references with the original `source` object,
       // allowing later mutations to leak back into it.
       output[key] = deepMergeSettings({}, sourceValue);
+    } else if (Array.isArray(sourceValue)) {
+      // Arrays replace the target value wholesale, but clone them so the merged
+      // result does not share references with the original `source` object
+      // (same reasoning as nested objects above).
+      output[key] = structuredClone(sourceValue);
     } else {
       output[key] = sourceValue;
     }

@@ -360,4 +360,23 @@ describe('deepMergeSettings', () => {
     expect(result['section']).toEqual({ value: 1 });
     expect(result['section']).not.toBe(source.section);
   });
+
+  it('clones arrays so the result does not share references with the source', () => {
+    // Arrays replace the target value wholesale, but the merged result must not
+    // share the array reference with the original source object.
+    const source = { customIgnoreFilePaths: ['a', 'b'] };
+    const result = deepMergeSettings<Record<string, unknown>>(
+      { customIgnoreFilePaths: ['old'] },
+      source,
+    );
+
+    expect(result['customIgnoreFilePaths']).toEqual(['a', 'b']);
+    expect(result['customIgnoreFilePaths']).not.toBe(
+      source.customIgnoreFilePaths,
+    );
+
+    // Mutating the merged array must not affect the original source array.
+    (result['customIgnoreFilePaths'] as string[]).push('c');
+    expect(source.customIgnoreFilePaths).toEqual(['a', 'b']);
+  });
 });
