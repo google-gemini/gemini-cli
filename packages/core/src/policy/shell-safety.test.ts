@@ -270,6 +270,36 @@ describe('Shell Safety Policy', () => {
         undefined,
       ),
     ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: `echo "hello '$SIMULATED_GEMINI_API_KEY'"` },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "$1"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "$$ $-"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
   });
 
   it('SHOULD deny shell parameter expansion in YOLO non-interactive mode', async () => {

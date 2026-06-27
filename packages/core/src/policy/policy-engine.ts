@@ -84,6 +84,7 @@ function matchesWildcard(
 
 function hasShellExpansion(command: string): boolean {
   let inSingleQuote = false;
+  let inDoubleQuote = false;
   let escaped = false;
 
   for (let i = 0; i < command.length; i++) {
@@ -94,12 +95,17 @@ function hasShellExpansion(command: string): boolean {
       continue;
     }
 
-    if (char === '\\') {
+    if (char === '\\' && !inSingleQuote) {
       escaped = true;
       continue;
     }
 
-    if (char === "'") {
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
       continue;
     }
@@ -116,7 +122,9 @@ function hasShellExpansion(command: string): boolean {
       next === '!' ||
       next === '@' ||
       next === '*' ||
-      /^[A-Za-z_]$/.test(next ?? '')
+      next === '$' ||
+      next === '-' ||
+      /^[0-9A-Za-z_]$/.test(next ?? '')
     ) {
       return true;
     }
