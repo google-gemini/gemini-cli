@@ -194,12 +194,16 @@ jobs:
       - name: 'Generate Patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         run: |
-          touch bot-changes.patch
+          rm -f bot-changes.patch bot-changes.approved
           touch pr-description.md
           if [ -f critique_result.txt ] && grep -q "\[APPROVED\]" critique_result.txt && ! grep -q "\[REJECTED\]" critique_result.txt; then
              git diff --staged > bot-changes.patch
+             if [ -s bot-changes.patch ]; then
+               echo "approved" > bot-changes.approved
+             fi
           else
              echo "Critique did not approve. Skipping patch generation."
+             rm -f bot-changes.patch pr-description.md branch-name.txt
           fi
 
       - name: 'Archive Brain Data'
@@ -210,6 +214,7 @@ jobs:
             tools/gemini-cli-bot/lessons-learned.md
             tools/gemini-cli-bot/history/*.csv
             bot-changes.patch
+            bot-changes.approved
             pr-description.md
             branch-name.txt
             pr-comment.md
@@ -275,7 +280,7 @@ jobs:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
           FALLBACK_PAT: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |
-          if [ -s "${{ runner.temp }}/brain-data/bot-changes.patch" ]; then
+          if [ -s "${{ runner.temp }}/brain-data/bot-changes.patch" ] && [ -f "${{ runner.temp }}/brain-data/bot-changes.approved" ] && grep -qx "approved" "${{ runner.temp }}/brain-data/bot-changes.approved"; then
             git config user.name "gemini-cli[bot]"
             git config user.email "gemini-cli[bot]@users.noreply.github.com"
             git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
