@@ -1,7 +1,0 @@
-# Policy for non-interactive mode.
-# ASK_USER is strictly forbidden here.
-[[rule]]
-toolName = "ask_user"
-decision = "deny"
-priority = 999
-interactive = false

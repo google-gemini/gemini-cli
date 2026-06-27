@@ -651,8 +651,8 @@ An approved plan is available for this task at \`${approvedPlanPath}\`.
 
 function mandateConfirm(interactive: boolean): string {
   return interactive
-    ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it."
-    : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
+    ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it. **Do not change approach silently:** If your initial approach fails, tell the user what you tried and ask before switching to a broader strategy. **Stay within stated boundaries:** If asked to review N lines, only read those N lines — do not read the full file or run scripts unless explicitly asked. **Escalation requires confirmation:** Before running any shell command to investigate further, ask the user first."
+    : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically. Do not silently switch to a broader investigation strategy; instead report what was tried and stop.';
 }
 
 function mandateTopicUpdateModel(): string {
