@@ -79,7 +79,7 @@ export async function toMatchSvgSnapshot(
 }
 
 function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { isNot } = this as any;
   let pass = true;
   const invalidLines: Array<{ line: number; content: string }> = [];
@@ -108,7 +108,6 @@ function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 expect.extend({
   toHaveOnlyValidCharacters,
   toMatchSvgSnapshot,

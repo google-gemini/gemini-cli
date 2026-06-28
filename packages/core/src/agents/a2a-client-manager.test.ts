@@ -66,11 +66,13 @@ describe('A2AClientManager', () => {
   };
 
   const authFetchMock = vi.fn();
+  const mockConfig = {
+    getProxy: vi.fn(),
+  } as unknown as Config;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    A2AClientManager.resetInstanceForTesting();
-    manager = A2AClientManager.getInstance();
+    manager = new A2AClientManager(mockConfig);
 
     // Re-create the instances as plain objects that can be spied on
     const factoryInstance = {
@@ -124,15 +126,12 @@ describe('A2AClientManager', () => {
     vi.unstubAllGlobals();
   });
 
-  it('should enforce the singleton pattern', () => {
-    const instance1 = A2AClientManager.getInstance();
-    const instance2 = A2AClientManager.getInstance();
-    expect(instance1).toBe(instance2);
-  });
-
   describe('getInstance / dispatcher initialization', () => {
     it('should use UndiciAgent when no proxy is configured', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
 
       const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
         .calls[0][0];
@@ -152,13 +151,15 @@ describe('A2AClientManager', () => {
     });
 
     it('should use ProxyAgent when a proxy is configured via Config', async () => {
-      A2AClientManager.resetInstanceForTesting();
-      const mockConfig = {
+      const mockConfigWithProxy = {
         getProxy: () => 'http://my-proxy:8080',
       } as Config;
 
-      manager = A2AClientManager.getInstance(mockConfig);
-      await manager.loadAgent('TestProxyAgent', 'http://test.proxy.agent/card');
+      manager = new A2AClientManager(mockConfigWithProxy);
+      await manager.loadAgent('TestProxyAgent', {
+        type: 'url',
+        url: 'http://test.proxy.agent/card',
+      });
 
       const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
         .calls[0][0];
@@ -177,28 +178,40 @@ describe('A2AClientManager', () => {
 
   describe('loadAgent', () => {
     it('should create and cache an A2AClient', async () => {
-      const agentCard = await manager.loadAgent(
-        'TestAgent',
-        'http://test.agent/card',
-      );
+      const agentCard = await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       expect(manager.getAgentCard('TestAgent')).toBe(agentCard);
       expect(manager.getClient('TestAgent')).toBeDefined();
     });
 
     it('should configure ClientFactory with REST, JSON-RPC, and gRPC transports', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       expect(ClientFactoryOptions.createFrom).toHaveBeenCalled();
     });
 
     it('should throw an error if an agent with the same name is already loaded', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       await expect(
-        manager.loadAgent('TestAgent', 'http://test.agent/card'),
+        manager.loadAgent('TestAgent', {
+          type: 'url',
+          url: 'http://test.agent/card',
+        }),
       ).rejects.toThrow("Agent with name 'TestAgent' is already loaded.");
     });
 
     it('should use native fetch by default', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       expect(createAuthenticatingFetchWithRetry).not.toHaveBeenCalled();
     });
 
@@ -209,7 +222,7 @@ describe('A2AClientManager', () => {
       };
       await manager.loadAgent(
         'TestAgent',
-        'http://test.agent/card',
+        { type: 'url', url: 'http://test.agent/card' },
         customAuthHandler as unknown as AuthenticationHandler,
       );
 
@@ -226,7 +239,7 @@ describe('A2AClientManager', () => {
       };
       await manager.loadAgent(
         'AuthCardAgent',
-        'http://authcard.agent/card',
+        { type: 'url', url: 'http://authcard.agent/card' },
         customAuthHandler as unknown as AuthenticationHandler,
       );
 
@@ -257,7 +270,7 @@ describe('A2AClientManager', () => {
 
       await manager.loadAgent(
         'AuthCardAgent401',
-        'http://authcard.agent/card',
+        { type: 'url', url: 'http://authcard.agent/card' },
         customAuthHandler as unknown as AuthenticationHandler,
       );
 
@@ -272,17 +285,63 @@ describe('A2AClientManager', () => {
     });
 
     it('should log a debug message upon loading an agent', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("Loaded agent 'TestAgent'"),
       );
     });
 
     it('should clear the cache', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
       manager.clearCache();
       expect(manager.getAgentCard('TestAgent')).toBeUndefined();
       expect(manager.getClient('TestAgent')).toBeUndefined();
+    });
+
+    it('should load an agent from inline JSON without calling resolver', async () => {
+      const inlineJson = JSON.stringify(mockAgentCard);
+      const agentCard = await manager.loadAgent('JsonAgent', {
+        type: 'json',
+        json: inlineJson,
+      });
+      expect(agentCard).toBeDefined();
+      expect(agentCard.name).toBe('test-agent');
+      expect(manager.getAgentCard('JsonAgent')).toBe(agentCard);
+      expect(manager.getClient('JsonAgent')).toBeDefined();
+      // Resolver should not have been called for inline JSON
+      const resolverInstance = vi.mocked(DefaultAgentCardResolver).mock
+        .results[0]?.value;
+      if (resolverInstance) {
+        expect(resolverInstance.resolve).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should throw a descriptive error for invalid inline JSON', async () => {
+      await expect(
+        manager.loadAgent('BadJsonAgent', {
+          type: 'json',
+          json: 'not valid json {{',
+        }),
+      ).rejects.toThrow(
+        /Failed to parse inline agent card JSON for agent 'BadJsonAgent'/,
+      );
+    });
+
+    it('should log "inline JSON" for JSON-loaded agents', async () => {
+      const inlineJson = JSON.stringify(mockAgentCard);
+      await manager.loadAgent('JsonLogAgent', {
+        type: 'json',
+        json: inlineJson,
+      });
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('inline JSON'),
+      );
     });
 
     it('should throw if resolveAgentCard fails', async () => {
@@ -294,7 +353,10 @@ describe('A2AClientManager', () => {
       );
 
       await expect(
-        manager.loadAgent('FailAgent', 'http://fail.agent'),
+        manager.loadAgent('FailAgent', {
+          type: 'url',
+          url: 'http://fail.agent',
+        }),
       ).rejects.toThrow('Resolution failed');
     });
 
@@ -309,7 +371,10 @@ describe('A2AClientManager', () => {
       );
 
       await expect(
-        manager.loadAgent('FailAgent', 'http://fail.agent'),
+        manager.loadAgent('FailAgent', {
+          type: 'url',
+          url: 'http://fail.agent',
+        }),
       ).rejects.toThrow('Factory failed');
     });
   });
@@ -323,7 +388,10 @@ describe('A2AClientManager', () => {
 
   describe('sendMessageStream', () => {
     beforeEach(async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
     });
 
     it('should send a message and return a stream', async () => {
@@ -438,7 +506,10 @@ describe('A2AClientManager', () => {
 
   describe('getTask', () => {
     beforeEach(async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
     });
 
     it('should get a task from the correct agent', async () => {
@@ -467,7 +538,10 @@ describe('A2AClientManager', () => {
 
   describe('cancelTask', () => {
     beforeEach(async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      await manager.loadAgent('TestAgent', {
+        type: 'url',
+        url: 'http://test.agent/card',
+      });
     });
 
     it('should cancel a task on the correct agent', async () => {

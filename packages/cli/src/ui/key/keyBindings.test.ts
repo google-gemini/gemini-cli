@@ -22,7 +22,7 @@ describe('KeyBinding', () => {
   describe('constructor', () => {
     it('should parse a simple key', () => {
       const binding = new KeyBinding('a');
-      expect(binding.key).toBe('a');
+      expect(binding.name).toBe('a');
       expect(binding.ctrl).toBe(false);
       expect(binding.shift).toBe(false);
       expect(binding.alt).toBe(false);
@@ -31,45 +31,45 @@ describe('KeyBinding', () => {
 
     it('should parse ctrl+key', () => {
       const binding = new KeyBinding('ctrl+c');
-      expect(binding.key).toBe('c');
+      expect(binding.name).toBe('c');
       expect(binding.ctrl).toBe(true);
     });
 
     it('should parse shift+key', () => {
       const binding = new KeyBinding('shift+z');
-      expect(binding.key).toBe('z');
+      expect(binding.name).toBe('z');
       expect(binding.shift).toBe(true);
     });
 
     it('should parse alt+key', () => {
       const binding = new KeyBinding('alt+left');
-      expect(binding.key).toBe('left');
+      expect(binding.name).toBe('left');
       expect(binding.alt).toBe(true);
     });
 
     it('should parse cmd+key', () => {
       const binding = new KeyBinding('cmd+f');
-      expect(binding.key).toBe('f');
+      expect(binding.name).toBe('f');
       expect(binding.cmd).toBe(true);
     });
 
     it('should handle aliases (option/opt/meta)', () => {
       const optionBinding = new KeyBinding('option+b');
-      expect(optionBinding.key).toBe('b');
+      expect(optionBinding.name).toBe('b');
       expect(optionBinding.alt).toBe(true);
 
       const optBinding = new KeyBinding('opt+b');
-      expect(optBinding.key).toBe('b');
+      expect(optBinding.name).toBe('b');
       expect(optBinding.alt).toBe(true);
 
       const metaBinding = new KeyBinding('meta+enter');
-      expect(metaBinding.key).toBe('enter');
+      expect(metaBinding.name).toBe('enter');
       expect(metaBinding.cmd).toBe(true);
     });
 
     it('should parse multiple modifiers', () => {
       const binding = new KeyBinding('ctrl+shift+alt+cmd+x');
-      expect(binding.key).toBe('x');
+      expect(binding.name).toBe('x');
       expect(binding.ctrl).toBe(true);
       expect(binding.shift).toBe(true);
       expect(binding.alt).toBe(true);
@@ -78,14 +78,14 @@ describe('KeyBinding', () => {
 
     it('should be case-insensitive', () => {
       const binding = new KeyBinding('CTRL+Shift+F');
-      expect(binding.key).toBe('f');
+      expect(binding.name).toBe('f');
       expect(binding.ctrl).toBe(true);
       expect(binding.shift).toBe(true);
     });
 
     it('should handle named keys with modifiers', () => {
       const binding = new KeyBinding('ctrl+enter');
-      expect(binding.key).toBe('enter');
+      expect(binding.name).toBe('enter');
       expect(binding.ctrl).toBe(true);
     });
 
@@ -106,6 +106,30 @@ describe('keyBindings config', () => {
       expect(defaultKeyBindingConfig.has(command)).toBe(true);
       expect(defaultKeyBindingConfig.get(command)?.length).toBeGreaterThan(0);
     }
+  });
+
+  it('should have platform-specific UNDO bindings', () => {
+    const undoBindings = defaultKeyBindingConfig.get(Command.UNDO);
+    if (process.platform === 'win32') {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].ctrl).toBe(true);
+    } else if (process.platform === 'darwin') {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].cmd).toBe(true);
+    } else {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].alt).toBe(true);
+      // Ensure ctrl+z is also present for smart bubbling
+      expect(undoBindings?.some((b) => b.name === 'z' && b.ctrl)).toBe(true);
+    }
+  });
+
+  it('should have platform-specific REDO bindings', () => {
+    const redoBindings = defaultKeyBindingConfig.get(Command.REDO);
+    // Ctrl+Shift+Z is now the universal primary to avoid conflict with YOLO (Ctrl+Y)
+    expect(redoBindings?.[0].name).toBe('z');
+    expect(redoBindings?.[0].shift).toBe(true);
+    expect(redoBindings?.[0].ctrl).toBe(true);
   });
 
   describe('command metadata', () => {

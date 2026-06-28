@@ -4,11 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
+import chalk from 'chalk';
+import { getAntigravityInstallInfo } from '../utils/antigravityUtils.js';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
+
+// Track banners incremented during this session to prevent multiple increments
+// on React unmounts/remounts
+const sessionIncrementedBanners = new Set<string>();
+
+// For testing purposes
+export function _clearSessionBannersForTest() {
+  sessionIncrementedBanners.clear();
+}
 
 interface BannerData {
   defaultText: string;
@@ -22,25 +33,34 @@ export function useBanner(bannerData: BannerData) {
     () => persistentState.get('defaultBannerShownCount') || {},
   );
 
+  const activeText = warningText ? warningText : defaultText;
+
   const hashedText = crypto
     .createHash('sha256')
-    .update(defaultText)
+    .update(activeText)
     .digest('hex');
 
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
-  const showDefaultBanner =
-    warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
+  const showBanner =
+    activeText !== '' &&
+    (currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT ||
+      activeText.includes('Antigravity'));
 
-  const rawBannerText = showDefaultBanner ? defaultText : warningText;
-  const bannerText = rawBannerText.replace(/\\n/g, '\n');
+  const rawBannerText = showBanner ? activeText : '';
+  let bannerText = rawBannerText.replace(/\\n/g, '\n');
 
-  const lastIncrementedKey = useRef<string | null>(null);
+  if (showBanner && activeText.includes('Antigravity')) {
+    const info = getAntigravityInstallInfo();
+    if (info) {
+      bannerText += `\n \nTo install run "${chalk.bold(info.installCmd)}"`;
+    }
+  }
 
   useEffect(() => {
-    if (showDefaultBanner && defaultText) {
-      if (lastIncrementedKey.current !== defaultText) {
-        lastIncrementedKey.current = defaultText;
+    if (showBanner && activeText) {
+      if (!sessionIncrementedBanners.has(activeText)) {
+        sessionIncrementedBanners.add(activeText);
 
         const allCounts = persistentState.get('defaultBannerShownCount') || {};
         const current = allCounts[hashedText] || 0;
@@ -51,7 +71,7 @@ export function useBanner(bannerData: BannerData) {
         });
       }
     }
-  }, [showDefaultBanner, defaultText, hashedText]);
+  }, [showBanner, activeText, hashedText]);
 
   return {
     bannerText,

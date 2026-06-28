@@ -18,6 +18,221 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.45.0 - 2026-06-03
+
+- **Context Simplification:** Completed major architectural work to simplify the
+  `ContextManager`, improving system robustness and performance
+  ([#27345](https://github.com/google-gemini/gemini-cli/pull/27345) by
+  @joshualitt).
+- **A2A Usage Metadata:** Exposed critical usage metadata in the Agent-to-Agent
+  (A2A) protocol for better resource tracking
+  ([#27288](https://github.com/google-gemini/gemini-cli/pull/27288) by
+  @jvargassanchez-dot).
+- **Reliability Fixes:** Addressed Termux relaunch loops, PTY resize errors, and
+  forced sequential execution for topic updates
+  ([#27110](https://github.com/google-gemini/gemini-cli/pull/27110) by @saymanq,
+  [#27357](https://github.com/google-gemini/gemini-cli/pull/27357) by
+  @jvargassanchez-dot,
+  [#27461](https://github.com/google-gemini/gemini-cli/pull/27461) by
+  @scidomino).
+
+## Announcements: v0.44.0 - 2026-05-27
+
+- **Unified Auto Mode:** Streamlined the automation experience by merging
+  specialized Auto modes into a single, unified mode
+  ([#26714](https://github.com/google-gemini/gemini-cli/pull/26714) by
+  @DavidAPierce).
+- **New Editor Integrations:** Added native support for Sublime Text and Emacs
+  Client ([#21090](https://github.com/google-gemini/gemini-cli/pull/21090) by
+  @alberti42).
+- **Enhanced TUI Testing:** Introduced `agent-tui` and `tui-tester` skills for
+  programmatic testing and automation of terminal UI applications
+  ([#27121](https://github.com/google-gemini/gemini-cli/pull/27121) by
+  @adamfweidman).
+
+## Announcements: v0.43.0 - 2026-05-22
+
+- **Surgical Code Edits:** Steered Gemini models to prefer the `edit` tool for
+  surgical modifications, improving speed and precision
+  ([#26480](https://github.com/google-gemini/gemini-cli/pull/26480) by
+  @aishaneeshah).
+- **Session Export and Import:** Added the ability to export sessions to files
+  and import them via a new flag, facilitating session portability
+  ([#26514](https://github.com/google-gemini/gemini-cli/pull/26514) by
+  @cocosheng-g).
+- **Adaptive Token Estimation:** Introduced an adaptive token calculator for
+  more accurate content size estimation, enhancing context management efficiency
+  ([#26888](https://github.com/google-gemini/gemini-cli/pull/26888) by
+  @joshualitt).
+
+## Announcements: v0.42.0 - 2026-05-12
+
+- **Auto Memory Inbox:** Introduced a new inbox flow for Auto Memory with a
+  canonical-patch contract for seamless skill management
+  ([#26338](https://github.com/google-gemini/gemini-cli/pull/26338) by
+  @SandyTao520).
+- **Gemma 4 by Default:** Enabled Gemma 4 models by default via the Gemini API
+  for all users
+  ([#26307](https://github.com/google-gemini/gemini-cli/pull/26307) by
+  @Abhijit-2592).
+- **Voice Mode Enhancements:** Added wave animations and privacy/compliance UX
+  warnings for the Gemini Live backend
+  ([#26284](https://github.com/google-gemini/gemini-cli/pull/26284) by
+  @devr0306, [#26454](https://github.com/google-gemini/gemini-cli/pull/26454) by
+  @cocosheng-g).
+
+## Announcements: v0.41.0 - 2026-05-05
+
+- **Real-time Voice Mode:** Implemented real-time voice mode with cloud and
+  local backends
+  ([#24174](https://github.com/google-gemini/gemini-cli/pull/24174) by
+  @Abhijit-2592).
+- **Secure Environment Loading:** Enforced workspace trust and secured .env
+  loading in headless mode
+  ([#25814](https://github.com/google-gemini/gemini-cli/pull/25814) by
+  @ehedlund).
+- **Advanced Shell Validation:** Enhanced shell command validation and added
+  core tools allowlist for improved security
+  ([#25720](https://github.com/google-gemini/gemini-cli/pull/25720) by @galz10).
+
+## Announcements: v0.40.0 - 2026-04-28
+
+- **Offline Search and Themes:** Bundled ripgrep for offline search support and
+  added GitHub-style colorblind themes
+  ([#25342](https://github.com/google-gemini/gemini-cli/pull/25342) by
+  @scidomino, [#15504](https://github.com/google-gemini/gemini-cli/pull/15504)
+  by @Z1xus).
+- **Advanced Resource and Memory Management:** Introduced MCP resource tools and
+  transitioned to a prompt-driven, four-tier memory management system
+  ([#25395](https://github.com/google-gemini/gemini-cli/pull/25395) by
+  @ruomengz, [#25716](https://github.com/google-gemini/gemini-cli/pull/25716) by
+  @SandyTao520).
+- **UX and Local Models:** Enabled topic update narrations by default and
+  streamlined Gemma local model setup with `gemini gemma`
+  ([#25586](https://github.com/google-gemini/gemini-cli/pull/25586) by
+  @gundermanc, [#25498](https://github.com/google-gemini/gemini-cli/pull/25498)
+  by @Samee24).
+
+## Announcements: v0.39.0 - 2026-04-23
+
+- **Skill Management:** Added a new `/memory` inbox command for reviewing and
+  patching skills extracted during sessions
+  ([#24544](https://github.com/google-gemini/gemini-cli/pull/24544) by
+  @SandyTao520, [#25148](https://github.com/google-gemini/gemini-cli/pull/25148)
+  by @SandyTao520).
+- **Improved Transparency:** Plan Mode now requires confirmation for skill
+  activation and allows plan inspection
+  ([#24946](https://github.com/google-gemini/gemini-cli/pull/24946),
+  [#25058](https://github.com/google-gemini/gemini-cli/pull/25058) by
+  @ruomengz).
+- **Architecture & Reliability:** Introduced a decoupled `ContextManager`
+  architecture and resolved several critical memory leaks and PTY exhaustion
+  issues ([#24752](https://github.com/google-gemini/gemini-cli/pull/24752) by
+  @joshualitt, [#25079](https://github.com/google-gemini/gemini-cli/pull/25079)
+  by @spencer426).
+
+## Announcements: v0.38.0 - 2026-04-14
+
+- **Chapters Narrative Flow:** Group agent interactions into "Chapters" based on
+  intent and tool usage for better session structure
+  ([#23150](https://github.com/google-gemini/gemini-cli/pull/23150) by
+  @Abhijit-2592,
+  [#24079](https://github.com/google-gemini/gemini-cli/pull/24079) by
+  @gundermanc).
+- **Context Compression Service:** Advanced context management to efficiently
+  distill conversation history
+  ([#24483](https://github.com/google-gemini/gemini-cli/pull/24483) by
+  @joshualitt).
+- **UI Flicker & UX Enhancements:** Solved rendering flicker with "Terminal
+  Buffer" mode and introduced selective topic expansion
+  ([#24512](https://github.com/google-gemini/gemini-cli/pull/24512) by
+  @jacob314, [#24793](https://github.com/google-gemini/gemini-cli/pull/24793) by
+  @Abhijit-2592).
+- **Persistent Policy Approvals:** Implemented context-aware persistent
+  approvals for tool execution
+  ([#23257](https://github.com/google-gemini/gemini-cli/pull/23257) by @jerop).
+
+## Announcements: v0.37.0 - 2026-04-08
+
+- **Dynamic Sandbox Expansion:** Implemented dynamic sandbox expansion and
+  worktree support for Linux and Windows, improving developer workflows in
+  isolated environments
+  ([#23692](https://github.com/google-gemini/gemini-cli/pull/23692) by @galz10,
+  [#23691](https://github.com/google-gemini/gemini-cli/pull/23691) by
+  @scidomino).
+- **Chapters Narrative Flow:** Introduced tool-based topic grouping ("Chapters")
+  to provide better session structure and narrative continuity
+  ([#23150](https://github.com/google-gemini/gemini-cli/pull/23150) by
+  @Abhijit-2592,
+  [#24079](https://github.com/google-gemini/gemini-cli/pull/24079) by
+  @gundermanc).
+- **Advanced Browser Capabilities:** Enhanced the browser agent with persistent
+  sessions and dynamic tool discovery
+  ([#21306](https://github.com/google-gemini/gemini-cli/pull/21306) by
+  @kunal-10-cloud,
+  [#23805](https://github.com/google-gemini/gemini-cli/pull/23805) by
+  @cynthialong0-0).
+
+## Announcements: v0.36.0 - 2026-04-01
+
+- **Multi-Registry Architecture and Sandboxing:** Introduced a multi-registry
+  architecture and implemented native macOS Seatbelt and Windows sandboxing for
+  enhanced subagent security
+  ([#22712](https://github.com/google-gemini/gemini-cli/pull/22712),
+  [#22718](https://github.com/google-gemini/gemini-cli/pull/22718) by @akh64bit,
+  [#22832](https://github.com/google-gemini/gemini-cli/pull/22832) by @ehedlund,
+  [#21807](https://github.com/google-gemini/gemini-cli/pull/21807) by
+  @mattKorwel).
+- **Refreshed Composer UX:** Implemented a refreshed user experience for the
+  Composer layout and improved terminal interaction robustness
+  ([#21212](https://github.com/google-gemini/gemini-cli/pull/21212),
+  [#23286](https://github.com/google-gemini/gemini-cli/pull/23286) by
+  @jwhelangoog).
+- **Git Worktree Support:** Added native support for Git worktrees, allowing for
+  isolated parallel sessions
+  ([#22973](https://github.com/google-gemini/gemini-cli/pull/22973),
+  [#23265](https://github.com/google-gemini/gemini-cli/pull/23265) by @jerop).
+- **Subagent Context and Feedback:** Enhanced subagents with JIT context
+  injection and resilient tool rejection with contextual feedback
+  ([#23032](https://github.com/google-gemini/gemini-cli/pull/23032),
+  [#22951](https://github.com/google-gemini/gemini-cli/pull/22951) by
+  @abhipatel12).
+
+## Announcements: v0.35.0 - 2026-03-24
+
+- **Customizable Keyboard Shortcuts:** Users can now customize their keyboard
+  shortcuts, including support for literal character keybindings and the
+  extended Kitty protocol
+  ([#21945](https://github.com/google-gemini/gemini-cli/pull/21945),
+  [#21972](https://github.com/google-gemini/gemini-cli/pull/21972) by
+  @scidomino).
+- **Vim Mode Improvements:** Added missing motions (X, ~, r, f/F/t/T) and
+  yank/paste support with the unnamed register
+  ([#21932](https://github.com/google-gemini/gemini-cli/pull/21932),
+  [#22026](https://github.com/google-gemini/gemini-cli/pull/22026) by @aanari).
+- **Tool Isolation and Sandboxing:** Introduced `SandboxManager` to isolate
+  process-spawning tools and added Linux bubblewrap/seccomp sandboxing support
+  ([#21774](https://github.com/google-gemini/gemini-cli/pull/21774),
+  [#22231](https://github.com/google-gemini/gemini-cli/pull/22231) by @galz10,
+  [#22680](https://github.com/google-gemini/gemini-cli/pull/22680) by
+  @DavidAPierce).
+- **JIT Context Discovery:** Implemented Just-In-Time context discovery for file
+  system tools to improve model performance and accuracy
+  ([#22082](https://github.com/google-gemini/gemini-cli/pull/22082),
+  [#22736](https://github.com/google-gemini/gemini-cli/pull/22736) by
+  @SandyTao520).
+
+## Announcements: v0.34.0 - 2026-03-17
+
+- **Plan Mode Enabled by Default:** Plan Mode is now enabled by default to help
+  you break down complex tasks and execute them systematically
+  ([#21713](https://github.com/google-gemini/gemini-cli/pull/21713) by @jerop).
+- **Sandboxing Enhancements:** We've added native gVisor (runsc) and
+  experimental LXC container sandboxing support for safer execution environments
+  ([#21062](https://github.com/google-gemini/gemini-cli/pull/21062) by
+  @Zheyuan-Lin, [#20735](https://github.com/google-gemini/gemini-cli/pull/20735)
+  by @h30s).
+
 ## Announcements: v0.33.0 - 2026-03-11
 
 - **Agent Architecture Enhancements:** Introduced HTTP authentication for A2A
@@ -125,10 +340,6 @@ on GitHub.
 
 ## Announcements: v0.28.0 - 2026-02-10
 
-- **Slash Command:** We've added a new `/prompt-suggest` slash command to help
-  you generate prompt suggestions
-  ([#17264](https://github.com/google-gemini/gemini-cli/pull/17264) by
-  @NTaylorMullen).
 - **IDE Support:** Gemini CLI now supports the Positron IDE
   ([#15047](https://github.com/google-gemini/gemini-cli/pull/15047) by
   @kapsner).
@@ -168,8 +379,8 @@ on GitHub.
   ([#16638](https://github.com/google-gemini/gemini-cli/pull/16638) by
   @joshualitt).
 - **UI/UX Improvements:** You can now "Rewind" through your conversation history
-  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by @Adib234)
-  and use a new `/introspect` command for debugging.
+  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by
+  @Adib234).
 - **Core and Scheduler Refactoring:** The core scheduler has been significantly
   refactored to improve performance and reliability
   ([#16895](https://github.com/google-gemini/gemini-cli/pull/16895) by
@@ -296,6 +507,7 @@ on GitHub.
   headlessly in notebook cells or interactively in the built-in terminal
   ([pic](https://imgur.com/a/G0Tn7vi))
 - 🎉**Gemini CLI Extensions:**
+
   - **Conductor:** Planning++, Gemini works with you to build out a detailed
     plan, pull in extra details as needed, ultimately to give the LLM guardrails
     with artifacts. Measure twice, implement once!
@@ -424,6 +636,7 @@ on GitHub.
   - **Announcement:**
     [https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/](https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/)
 - **🎉 New partner extensions:**
+
   - **Arize:** Seamlessly instrument AI applications with Arize AX and grant
     direct access to Arize support:
 
@@ -463,6 +676,7 @@ on GitHub.
 ![Codebase investigator subagent in Gemini CLI.](https://i.imgur.com/4J1njsx.png)
 
 - **🎉 New partner extensions:**
+
   - **🤗 Hugging Face extension:** Access the Hugging Face hub.
     ([gif](https://drive.google.com/file/d/1LEzIuSH6_igFXq96_tWev11svBNyPJEB/view?usp=sharing&resourcekey=0-LtPTzR1woh-rxGtfPzjjfg))
 

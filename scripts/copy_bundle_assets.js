@@ -54,6 +54,18 @@ for (const file of policyFiles) {
 
 console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 
+// Also copy policies to a2a-server dist directory for bundled execution
+const a2aPolicyDir = join(root, 'packages/a2a-server/dist/policies');
+if (!existsSync(a2aPolicyDir)) {
+  mkdirSync(a2aPolicyDir, { recursive: true });
+}
+for (const file of policyFiles) {
+  copyFileSync(join(root, file), join(a2aPolicyDir, basename(file)));
+}
+console.log(
+  `Copied ${policyFiles.length} policy files to packages/a2a-server/dist/policies/`,
+);
+
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
@@ -73,26 +85,34 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
-// 5. Copy DevTools package so the external dynamic import resolves at runtime
-const devtoolsSrc = join(root, 'packages/devtools');
-const devtoolsDest = join(
-  bundleDir,
-  'node_modules',
-  '@google',
-  'gemini-cli-devtools',
+// 5. Copy bundled chrome-devtools-mcp
+const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
+const bundleMcpDest = join(bundleDir, 'bundled');
+if (!existsSync(bundleMcpSrc)) {
+  console.error(
+    `Error: chrome-devtools-mcp bundle not found at ${bundleMcpSrc}.\n` +
+      `Run "npm run bundle:browser-mcp -w @google/gemini-cli-core" first.`,
+  );
+  process.exit(1);
+}
+cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
+console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
+
+// 6. Copy Extension Examples
+const extensionExamplesSrc = join(
+  root,
+  'packages/cli/src/commands/extensions/examples',
 );
-const devtoolsDistSrc = join(devtoolsSrc, 'dist');
-if (existsSync(devtoolsDistSrc)) {
-  mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
+const extensionExamplesDest = join(bundleDir, 'examples');
+const EXCLUDED_EXAMPLE_DIRS = ['node_modules', 'dist'];
+
+if (existsSync(extensionExamplesSrc)) {
+  cpSync(extensionExamplesSrc, extensionExamplesDest, {
     recursive: true,
     dereference: true,
+    filter: (src) => !EXCLUDED_EXAMPLE_DIRS.some((dir) => src.includes(dir)),
   });
-  copyFileSync(
-    join(devtoolsSrc, 'package.json'),
-    join(devtoolsDest, 'package.json'),
-  );
-  console.log('Copied devtools package to bundle/node_modules/');
+  console.log('Copied extension examples to bundle/examples/');
 }
 
 console.log('Assets copied to bundle/');

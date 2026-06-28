@@ -161,14 +161,16 @@ describe('extensionsCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getExtensions: mockGetExtensions,
-          getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
-          getWorkingDir: () => '/test/dir',
-          reloadSkills: mockReloadSkills,
-          getAgentRegistry: vi.fn().mockReturnValue({
-            reload: mockReloadAgents,
-          }),
+        agentContext: {
+          config: {
+            getExtensions: mockGetExtensions,
+            getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
+            getWorkingDir: () => '/test/dir',
+            reloadSkills: mockReloadSkills,
+            getAgentRegistry: vi.fn().mockReturnValue({
+              reload: mockReloadAgents,
+            }),
+          },
         },
       },
       ui: {
@@ -437,7 +439,8 @@ describe('extensionsCommand', () => {
     }
 
     it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
-      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+      mockContext.services.settings.merged.experimental.extensionRegistry =
+        true;
 
       const result = await exploreAction(mockContext, '');
 
@@ -453,7 +456,8 @@ describe('extensionsCommand', () => {
     });
 
     it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
-      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+      mockContext.services.settings.merged.experimental.extensionRegistry =
+        true;
 
       const result = await exploreAction(mockContext, '');
       if (result?.type !== 'custom_dialog') {
@@ -708,10 +712,14 @@ describe('extensionsCommand', () => {
         size: 100,
       } as Stats);
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
         text: `Linking extension from "${packageName}"...`,
@@ -731,10 +739,14 @@ describe('extensionsCommand', () => {
       } as Stats);
 
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Failed to link extension from "${packageName}": ${errorMessage}`,
@@ -770,6 +782,13 @@ describe('extensionsCommand', () => {
         text: 'Usage: /extensions uninstall <extension-names...>|--all',
       });
       expect(mockUninstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should expose "delete" as an alias', () => {
+      const uninstallCmd = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'uninstall',
+      );
+      expect(uninstallCmd?.altNames).toContain('delete');
     });
 
     it('should call uninstallExtension and show success message', async () => {
@@ -917,7 +936,7 @@ describe('extensionsCommand', () => {
       expect(restartAction).not.toBeNull();
 
       mockRestartExtension = vi.fn();
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: mockGetExtensions,
@@ -927,7 +946,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show a message if no extensions are installed', async () => {
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: () => [],
@@ -1017,7 +1036,7 @@ describe('extensionsCommand', () => {
     });
 
     it('shows an error if no extension loader is available', async () => {
-      mockContext.services.config!.getExtensionLoader = vi.fn();
+      mockContext.services.agentContext!.config.getExtensionLoader = vi.fn();
 
       await restartAction!(mockContext, '--all');
 

@@ -35,6 +35,15 @@ import type {
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
 
+/**
+ * Represents an interactive conversation session with a Gemini CLI agent.
+ *
+ * A session manages the conversation lifecycle: initialization, sending messages
+ * via streaming, handling tool calls, and maintaining conversation history.
+ *
+ * Create a session via {@link GeminiCliAgent.session} or resume one with
+ * {@link GeminiCliAgent.resumeSession}.
+ */
 export class GeminiCliSession {
   private readonly config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,10 +95,20 @@ export class GeminiCliSession {
     this.config = new Config(configParams);
   }
 
+  /**
+   * The unique identifier for this session.
+   */
   get id(): string {
     return this.sessionId;
   }
 
+  /**
+   * Initialize the session by setting up authentication, loading skills,
+   * and registering tools. Must be called before {@link sendStream}.
+   *
+   * This method is idempotent — calling it multiple times has no effect
+   * after the first successful initialization.
+   */
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -168,6 +187,27 @@ export class GeminiCliSession {
     this.initialized = true;
   }
 
+  /**
+   * Send a prompt to the model and yield streaming events as they arrive.
+   *
+   * Handles the full agentic loop: sends the user prompt, streams model
+   * responses, executes any tool calls the model requests, and continues
+   * the loop until the model produces a final response with no tool calls.
+   *
+   * @param prompt - The user message to send.
+   * @param signal - Optional {@link AbortSignal} to cancel the stream.
+   * @yields {@link ServerGeminiStreamEvent} events as they are received from
+   *   the model.
+   *
+   * @example
+   * ```typescript
+   * for await (const event of session.sendStream('Explain this code')) {
+   *   if (event.type === GeminiEventType.ModelResponse) {
+   *     process.stdout.write(event.value);
+   *   }
+   * }
+   * ```
+   */
   async *sendStream(
     prompt: string,
     signal?: AbortSignal,
@@ -243,10 +283,10 @@ export class GeminiCliSession {
 
       const loopContext: AgentLoopContext = this.config;
       const originalRegistry = loopContext.toolRegistry;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
+      const scopedRegistry: ToolRegistry = originalRegistry.clone();
+      const originalGetTool = scopedRegistry.getTool.bind(scopedRegistry);
       scopedRegistry.getTool = (name: string) => {
-        const tool = originalRegistry.getTool(name);
+        const tool = originalGetTool(name);
         if (tool instanceof SdkTool) {
           return tool.bindContext(context);
         }

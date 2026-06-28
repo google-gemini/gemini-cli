@@ -118,7 +118,7 @@ async function main() {
   try {
     execSync('pkill -f "otelcol-contrib"');
     console.log('✅ Stopped existing otelcol-contrib process.');
-  } catch (_e) {
+  } catch {
     /* no-op */
   }
   try {

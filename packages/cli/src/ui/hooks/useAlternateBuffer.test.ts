@@ -25,32 +25,35 @@ describe('useAlternateBuffer', () => {
     vi.clearAllMocks();
   });
 
-  it('should return false when config.getUseAlternateBuffer returns false', () => {
+  it('should return false when config.getUseAlternateBuffer returns false', async () => {
     mockUseConfig.mockReturnValue({
       getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>);
 
-    const { result } = renderHook(() => useAlternateBuffer());
+    const { result } = await renderHook(() => useAlternateBuffer());
     expect(result.current).toBe(false);
   });
 
-  it('should return true when config.getUseAlternateBuffer returns true', () => {
+  it('should return true when config.getUseAlternateBuffer returns true', async () => {
     mockUseConfig.mockReturnValue({
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>);
 
-    const { result } = renderHook(() => useAlternateBuffer());
+    const { result } = await renderHook(() => useAlternateBuffer());
     expect(result.current).toBe(true);
   });
 
-  it('should return the immutable config value, not react to settings changes', () => {
+  it('should return the immutable config value, not react to settings changes', async () => {
     const mockConfig = {
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as ReturnType<typeof mockUseConfig>;
 
     mockUseConfig.mockReturnValue(mockConfig);
 
-    const { result, rerender } = renderHook(() => useAlternateBuffer());
+    const { result, rerender } = await renderHook(() => useAlternateBuffer());
 
     // Value should remain true even after rerender
     expect(result.current).toBe(true);
@@ -65,6 +68,7 @@ describe('isAlternateBufferEnabled', () => {
   it('should return true when config.getUseAlternateBuffer returns true', () => {
     const config = {
       getUseAlternateBuffer: () => true,
+      getUseTerminalBuffer: () => false,
     } as unknown as Config;
 
     expect(isAlternateBufferEnabled(config)).toBe(true);
@@ -73,6 +77,7 @@ describe('isAlternateBufferEnabled', () => {
   it('should return false when config.getUseAlternateBuffer returns false', () => {
     const config = {
       getUseAlternateBuffer: () => false,
+      getUseTerminalBuffer: () => false,
     } as unknown as Config;
 
     expect(isAlternateBufferEnabled(config)).toBe(false);

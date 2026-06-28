@@ -8,10 +8,12 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
-  getShellConfiguration,
+  isWindows,
+  type WorktreeSettings,
 } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -19,24 +21,35 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    getShellConfiguration: vi.fn(),
+    isWindows: vi.fn(),
   };
 });
 
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof SessionContext>();
+  const actual =
+    await importOriginal<typeof import('../contexts/SessionContext.js')>();
   return {
     ...actual,
     useSessionStats: vi.fn(),
   };
 });
 
-const getShellConfigurationMock = vi.mocked(getShellConfiguration);
+vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/ConfigContext.js')>();
+  return {
+    ...actual,
+    useConfig: vi.fn(),
+  };
+});
+
+const isWindowsMock = vi.mocked(isWindows);
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
 const renderWithMockedStats = async (
   metrics: SessionMetrics,
   sessionId = 'test-session',
+  worktreeSettings?: WorktreeSettings,
 ) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
@@ -49,9 +62,13 @@ const renderWithMockedStats = async (
 
     getPromptCount: () => 5,
     startNewPrompt: vi.fn(),
-  });
+  } as unknown as ReturnType<typeof SessionContext.useSessionStats>);
 
-  const result = renderWithProviders(
+  vi.mocked(useConfig).mockReturnValue({
+    getWorktreeSettings: () => worktreeSettings,
+  } as never);
+
+  const result = await renderWithProviders(
     <SessionSummaryDisplay duration="1h 23m 45s" />,
     {
       width: 100,
@@ -84,11 +101,7 @@ describe('<SessionSummaryDisplay />', () => {
   };
 
   beforeEach(() => {
-    getShellConfigurationMock.mockReturnValue({
-      executable: 'bash',
-      argsPrefix: ['-c'],
-      shell: 'bash',
-    });
+    isWindowsMock.mockReturnValue(false);
   });
 
   it('renders the summary display with a title', async () => {
@@ -132,7 +145,7 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // Standard UUID characters should not be escaped/quoted by default for bash.
+      // Standard UUID characters are NOT wrapped in double quotes on non-Windows.
       expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
@@ -150,12 +163,8 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
-    it('renders a standard UUID-formatted session ID in the footer (powershell)', async () => {
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
+    it('renders a standard UUID-formatted session ID in the footer (powershell) on Windows', async () => {
+      isWindowsMock.mockReturnValue(true);
 
       const uuidSessionId = '1234-abcd-5678-efgh';
       const { lastFrame, unmount } = await renderWithMockedStats(
@@ -164,17 +173,13 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps strings in single quotes
-      expect(output).toContain("gemini --resume '1234-abcd-5678-efgh'");
+      // PowerShell doesn't wrap UUID in quotes by default, but we wrap it in double quotes on Windows.
+      expect(output).toContain('gemini --resume "1234-abcd-5678-efgh"');
       unmount();
     });
 
     it('sanitizes a malicious session ID in the footer (powershell)', async () => {
-      getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      });
+      isWindowsMock.mockReturnValue(true);
 
       const maliciousSessionId = "'; rm -rf / #";
       const { lastFrame, unmount } = await renderWithMockedStats(
@@ -183,8 +188,35 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them
+      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them.
+      // Since it's already quoted, we don't add redundant double quotes.
       expect(output).toContain("gemini --resume '''; rm -rf / #'");
+      unmount();
+    });
+  });
+
+  describe('Worktree status', () => {
+    it('renders worktree instructions when worktreeSettings are present', async () => {
+      const worktreeSettings: WorktreeSettings = {
+        name: 'foo-bar',
+        path: '/path/to/foo-bar',
+        baseSha: 'base-sha',
+      };
+
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        'test-session',
+        worktreeSettings,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('To resume work in this worktree:');
+      expect(output).toContain(
+        'cd /path/to/foo-bar && gemini --resume test-session',
+      );
+      expect(output).toContain(
+        'To remove manually: git worktree remove /path/to/foo-bar',
+      );
       unmount();
     });
   });

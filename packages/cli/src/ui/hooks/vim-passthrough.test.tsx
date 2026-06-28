@@ -70,9 +70,9 @@ describe('useVim passthrough', () => {
       name: 'Ctrl-X',
       key: createKey({ name: 'x', ctrl: true, sequence: '\x18' }),
     },
-  ])('should pass through $name in $mode mode', ({ mode, key }) => {
+  ])('should pass through $name in $mode mode', async ({ mode, key }) => {
     mockVimContext.vimMode = mode;
-    const { result } = renderHook(() => useVim(mockBuffer as TextBuffer));
+    const { result } = await renderHook(() => useVim(mockBuffer as TextBuffer));
 
     let handled = true;
     act(() => {
@@ -81,4 +81,24 @@ describe('useVim passthrough', () => {
 
     expect(handled).toBe(false);
   });
+
+  it.each(['H', 'M', 'Q', 'm'])(
+    'should ignore unmapped printable key %s in NORMAL mode',
+    async (sequence) => {
+      mockVimContext.vimMode = 'NORMAL';
+      const { result } = await renderHook(() =>
+        useVim(mockBuffer as TextBuffer),
+      );
+
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput(
+          createKey({ name: sequence, sequence, insertable: true }),
+        );
+      });
+
+      expect(handled).toBe(true);
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+    },
+  );
 });

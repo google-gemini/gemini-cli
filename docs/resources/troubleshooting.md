@@ -12,6 +12,7 @@ topics on:
 
 - **Error:
   `You must be a named user on your organization's Gemini Code Assist Standard edition subscription to use this service. Please contact your administrator to request an entitlement to Gemini Code Assist Standard edition.`**
+
   - **Cause:** This error might occur if Gemini CLI detects the
     `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` environment variable is
     defined. Setting these variables forces an organization subscription check.
@@ -19,6 +20,7 @@ topics on:
     linked to an organizational subscription.
 
   - **Solution:**
+
     - **Individual Users:** Unset the `GOOGLE_CLOUD_PROJECT` and
       `GOOGLE_CLOUD_PROJECT_ID` environment variables. Check and remove these
       variables from your shell configuration files (for example, `.bashrc`,
@@ -30,12 +32,14 @@ topics on:
 
 - **Error:
   `Failed to sign in. Message: Your current account is not eligible... because it is not currently available in your location.`**
+
   - **Cause:** Gemini CLI does not currently support your location. For a full
     list of supported locations, see the following pages:
     - Gemini Code Assist for individuals:
       [Available locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
 
 - **Error: `Failed to sign in. Message: Request contains an invalid argument`**
+
   - **Cause:** Users with Google Workspace accounts or Google Cloud accounts
     associated with their Gmail accounts may not be able to activate the free
     tier of the Google Code Assist plan.
@@ -66,6 +70,7 @@ topics on:
 ## Common error messages and solutions
 
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
+
   - **Cause:** Another process is already using the port that the MCP server is
     trying to bind to.
   - **Solution:** Either stop the other process that is using the port or
@@ -73,6 +78,7 @@ topics on:
 
 - **Error: Command not found (when attempting to run Gemini CLI with
   `gemini`).**
+
   - **Cause:** Gemini CLI is not correctly installed or it is not in your
     system's `PATH`.
   - **Solution:** The update depends on how you installed Gemini CLI:
@@ -80,11 +86,12 @@ topics on:
       directory is in your `PATH`. You can update Gemini CLI using the command
       `npm install -g @google/gemini-cli@latest`.
     - If you are running `gemini` from source, ensure you are using the correct
-      command to invoke it (e.g., `node packages/cli/dist/index.js ...`). To
-      update Gemini CLI, pull the latest changes from the repository, and then
-      rebuild using the command `npm run build`.
+      command to invoke it (for example, `node packages/cli/dist/index.js ...`).
+      To update Gemini CLI, pull the latest changes from the repository, and
+      then rebuild using the command `npm run build`.
 
 - **Error: `MODULE_NOT_FOUND` or import errors.**
+
   - **Cause:** Dependencies are not installed correctly, or the project hasn't
     been built.
   - **Solution:**
@@ -93,6 +100,7 @@ topics on:
     3.  Verify that the build completed successfully with `npm run start`.
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
+
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations
     that are restricted by your sandbox configuration, such as writing outside
     the project directory or system temp directory.
@@ -101,21 +109,23 @@ topics on:
     configuration.
 
 - **Gemini CLI is not running in interactive mode in "CI" environments**
-  - **Issue:** The Gemini CLI does not enter interactive mode (no prompt
-    appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`)
-    is set. This is because the `is-in-ci` package, used by the underlying UI
+
+  - **Issue:** Gemini CLI does not enter interactive mode (no prompt appears) if
+    an environment variable starting with `CI_` (for example, `CI_TOKEN`) is
+    set. This is because the `is-in-ci` package, used by the underlying UI
     framework, detects these variables and assumes a non-interactive CI
     environment.
   - **Cause:** The `is-in-ci` package checks for the presence of `CI`,
     `CONTINUOUS_INTEGRATION`, or any environment variable with a `CI_` prefix.
     When any of these are found, it signals that the environment is
-    non-interactive, which prevents the Gemini CLI from starting in its
-    interactive mode.
+    non-interactive, which prevents Gemini CLI from starting in its interactive
+    mode.
   - **Solution:** If the `CI_` prefixed variable is not needed for the CLI to
-    function, you can temporarily unset it for the command. e.g.,
+    function, you can temporarily unset it for the command. For example,
     `env -u CI_TOKEN gemini`
 
 - **DEBUG mode not working from project .env file**
+
   - **Issue:** Setting `DEBUG=true` in a project's `.env` file doesn't enable
     debug mode for gemini-cli.
   - **Cause:** The `DEBUG` and `DEBUG_MODE` variables are automatically excluded
@@ -126,7 +136,7 @@ topics on:
 
 - **Warning: `npm WARN deprecated node-domexception@1.0.0` or
   `npm WARN deprecated glob` during install/update**
-  - **Issue:** When installing or updating the Gemini CLI globally via
+  - **Issue:** When installing or updating Gemini CLI globally via
     `npm install -g @google/gemini-cli` or `npm update -g @google/gemini-cli`,
     you might see deprecation warnings regarding `node-domexception` or old
     versions of `glob`.
@@ -141,33 +151,36 @@ topics on:
 
 ## Exit codes
 
-The Gemini CLI uses specific exit codes to indicate the reason for termination.
-This is especially useful for scripting and automation.
+Gemini CLI uses specific exit codes to indicate the reason for termination. This
+is especially useful for scripting and automation.
 
 | Exit Code | Error Type                 | Description                                                                                         |
 | --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
 | 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
 | 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
-| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
+| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (for example, Docker, Podman, or Seatbelt).       |
 | 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
 | 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
 
 ## Debugging tips
 
 - **CLI debugging:**
+
   - Use the `--debug` flag for more detailed output. In interactive mode, press
     F12 to view the debug console.
   - Check the CLI logs, often found in a user-specific configuration or cache
     directory.
 
 - **Core debugging:**
+
   - Check the server console output for error messages or stack traces.
   - Increase log verbosity if configurable. For example, set the `DEBUG_MODE`
     environment variable to `true` or `1`.
-  - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step
-    through server-side code.
+  - Use Node.js debugging tools (for example, `node --inspect`) if you need to
+    step through server-side code.
 
 - **Tool issues:**
+
   - If a specific tool is failing, try to isolate the issue by running the
     simplest possible version of the command or operation the tool performs.
   - For `run_shell_command`, check that the command works directly in your shell
@@ -182,10 +195,12 @@ This is especially useful for scripting and automation.
 ## Existing GitHub issues similar to yours or creating new issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting
-guide_, consider searching the Gemini CLI
+guide_, consider searching Gemini CLI
 [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues).
 If you can't find an issue similar to yours, consider creating a new GitHub
 Issue with a detailed description. Pull requests are also welcome!
 
-> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+<!-- prettier-ignore -->
+> [!NOTE]
+> Issues tagged as "🔒Maintainers only" are reserved for project
 > maintainers. We will not accept pull requests related to these issues.

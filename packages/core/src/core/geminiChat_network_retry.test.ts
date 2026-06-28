@@ -83,6 +83,7 @@ describe('GeminiChat Network Retries', () => {
     const testMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       get config() {
         return this;
       },
@@ -95,7 +96,9 @@ describe('GeminiChat Network Retries', () => {
       promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
+      hasGemini35FlashGAAccess: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'oauth-personal',
@@ -119,6 +122,7 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getModelAvailabilityService: vi
         .fn()
@@ -515,6 +519,134 @@ describe('GeminiChat Network Retries', () => {
       expect.anything(),
       expect.objectContaining({
         error_type: 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+      }),
+    );
+  });
+
+  it('should retry on OpenSSL 3.x SSL error during stream iteration (ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC)', async () => {
+    // OpenSSL 3.x produces a different error code format than OpenSSL 1.x
+    const sslError = new Error(
+      'request to https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent failed',
+    ) as NodeJS.ErrnoException & { type?: string };
+    sslError.type = 'system';
+    sslError.errno =
+      'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC' as unknown as number;
+    sslError.code = 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC';
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              { content: { parts: [{ text: 'Partial response...' }] } },
+            ],
+          } as unknown as GenerateContentResponse;
+          throw sslError;
+        })(),
+      )
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Complete response after retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-ssl3-mid-stream',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
+    expect(retryEvent).toBeDefined();
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Complete response after retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC',
+      }),
+    );
+  });
+
+  it('should retry on premature stream closure (ERR_STREAM_PREMATURE_CLOSE)', async () => {
+    mockConfig.getRetryFetchErrors = vi.fn().mockReturnValue(true);
+
+    const prematureCloseError = new Error('Premature close');
+    Object.defineProperty(prematureCloseError, 'code', {
+      value: 'ERR_STREAM_PREMATURE_CLOSE',
+    });
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'Incomplete part' }] } }],
+          } as unknown as GenerateContentResponse;
+          throw prematureCloseError;
+        })(),
+      )
+      .mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Complete response after retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-premature-close',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
+    expect(retryEvent).toBeDefined();
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Complete response after retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_STREAM_PREMATURE_CLOSE',
       }),
     );
   });

@@ -159,12 +159,37 @@ function detectRollbackAndGetBaseline({ args, npmDistTag } = {}) {
   // Sort by semver to get a list from highest to lowest
   matchingVersions.sort((a, b) => semver.rcompare(a, b));
 
-  // Find the highest non-deprecated version
+  // Find the highest non-deprecated version with a git tag
   let highestExistingVersion = '';
   for (const version of matchingVersions) {
     if (!isVersionDeprecated({ version, args })) {
-      highestExistingVersion = version;
-      break; // Found the one we want
+      try {
+        // Only consider versions that have a corresponding git tag.
+        // This prevents picking up versions that were published to NPM but failed before the github release/tag.
+        let tagExists = false;
+        try {
+          execSync(`git rev-parse v${version}^{commit} 2>/dev/null`);
+          tagExists = true;
+        } catch {
+          const remoteTag = execSync(
+            `git ls-remote --tags origin refs/tags/v${version} 2>/dev/null`,
+          )
+            .toString()
+            .trim();
+          if (remoteTag) {
+            tagExists = true;
+          }
+        }
+        if (!tagExists) {
+          throw new Error(`Tag v${version} not found`);
+        }
+        highestExistingVersion = version;
+        break; // Found the one we want
+      } catch {
+        console.error(
+          `Ignoring version ${version} because it lacks a git tag (likely a failed release).`,
+        );
+      }
     } else {
       console.error(`Ignoring deprecated version: ${version}`);
     }
@@ -195,7 +220,7 @@ function doesVersionExist({ args, version } = {}) {
       console.error(`Version ${version} already exists on NPM.`);
       return true;
     }
-  } catch (_error) {
+  } catch {
     // This is expected if the version doesn't exist.
   }
 
@@ -285,7 +310,7 @@ function promoteNightlyVersion({ args } = {}) {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
   return {
-    releaseVersion: `${major}.${nextMinor}.0-nightly.${date}.${gitShortHash}`,
+    releaseVersion: `${major}.${nextMinor}.0-nightly.${date}.g${gitShortHash}`,
     npmTag: TAG_NIGHTLY,
     previousReleaseTag: previousNightlyTag,
   };
@@ -296,7 +321,7 @@ function getNightlyVersion() {
   const baseVersion = packageJson.version.split('-')[0];
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
-  const releaseVersion = `${baseVersion}-nightly.${date}.${gitShortHash}`;
+  const releaseVersion = `${baseVersion}-nightly.${date}.g${gitShortHash}`;
   const previousReleaseTag = getLatestTag('v*-nightly*');
 
   return {

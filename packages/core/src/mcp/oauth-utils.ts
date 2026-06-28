@@ -257,7 +257,12 @@ export class OAuthUtils {
         // it is using as the prefix for the metadata request exactly matches the value
         // of the resource metadata parameter in the protected resource metadata document.
         const expectedResource = this.buildResourceParameter(serverUrl);
-        if (resourceMetadata.resource !== expectedResource) {
+        if (
+          !this.isEquivalentResourceIdentifier(
+            resourceMetadata.resource,
+            expectedResource,
+          )
+        ) {
           throw new ResourceMismatchError(
             `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
           );
@@ -348,7 +353,12 @@ export class OAuthUtils {
     if (resourceMetadata && mcpServerUrl) {
       // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
-      if (resourceMetadata.resource !== expectedResource) {
+      if (
+        !this.isEquivalentResourceIdentifier(
+          resourceMetadata.resource,
+          expectedResource,
+        )
+      ) {
         throw new ResourceMismatchError(
           `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
         );
@@ -400,6 +410,21 @@ export class OAuthUtils {
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
     return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  private static isEquivalentResourceIdentifier(
+    discoveredResource: string,
+    expectedResource: string,
+  ): boolean {
+    const normalize = (resource: string): string => {
+      try {
+        return this.buildResourceParameter(resource);
+      } catch {
+        return resource;
+      }
+    };
+
+    return normalize(discoveredResource) === normalize(expectedResource);
   }
 
   /**

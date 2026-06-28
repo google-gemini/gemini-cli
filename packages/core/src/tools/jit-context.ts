@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Part, PartListUnion, PartUnion } from '@google/genai';
 import type { Config } from '../config/config.js';
 
 /**
@@ -14,25 +15,24 @@ import type { Config } from '../config/config.js';
  *
  * @param config - The runtime configuration.
  * @param accessedPath - The absolute path being accessed by the tool.
- * @returns The discovered context string, or empty string if none found or JIT is disabled.
+ * @returns The discovered context string, or empty string if none found.
  */
 export async function discoverJitContext(
   config: Config,
   accessedPath: string,
 ): Promise<string> {
-  if (!config.isJitContextEnabled?.()) {
-    return '';
-  }
-
-  const contextManager = config.getContextManager();
-  if (!contextManager) {
+  const memoryContextManager = config.getMemoryContextManager();
+  if (!memoryContextManager) {
     return '';
   }
 
   const trustedRoots = [...config.getWorkspaceContext().getDirectories()];
 
   try {
-    return await contextManager.discoverContext(accessedPath, trustedRoots);
+    return await memoryContextManager.discoverContext(
+      accessedPath,
+      trustedRoots,
+    );
   } catch {
     // JIT context is supplementary — never fail the tool's primary operation.
     return '';
@@ -62,4 +62,25 @@ export function appendJitContext(
     return llmContent;
   }
   return `${llmContent}${JIT_CONTEXT_PREFIX}${jitContext}${JIT_CONTEXT_SUFFIX}`;
+}
+
+/**
+ * Appends JIT context to non-string tool content (e.g., images, PDFs) by
+ * wrapping both the original content and the JIT context into a Part array.
+ *
+ * @param llmContent - The original non-string tool output content.
+ * @param jitContext - The discovered JIT context string.
+ * @returns A Part array containing the original content and JIT context.
+ */
+export function appendJitContextToParts(
+  llmContent: PartListUnion,
+  jitContext: string,
+): PartUnion[] {
+  const jitPart: Part = {
+    text: `${JIT_CONTEXT_PREFIX}${jitContext}${JIT_CONTEXT_SUFFIX}`,
+  };
+  const existingParts: PartUnion[] = Array.isArray(llmContent)
+    ? llmContent
+    : [llmContent];
+  return [...existingParts, jitPart];
 }

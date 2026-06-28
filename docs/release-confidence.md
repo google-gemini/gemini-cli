@@ -1,7 +1,7 @@
 # Release confidence strategy
 
 This document outlines the strategy for gaining confidence in every release of
-the Gemini CLI. It serves as a checklist and quality gate for release manager to
+Gemini CLI. It serves as a checklist and quality gate for release manager to
 ensure we are shipping a high-quality product.
 
 ## The goal
@@ -21,9 +21,7 @@ All workflows in `.github/workflows/ci.yml` must pass on the `main` branch (for
 nightly) or the release branch (for preview/stable).
 
 - **Platforms:** Tests must pass on **Linux and macOS**.
-  - _Note:_ Windows tests currently run with `continue-on-error: true`. While a
-    failure here doesn't block the release technically, it should be
-    investigated.
+
 - **Checks:**
   - **Linting:** No linting errors (ESLint, Prettier, etc.).
   - **Typechecking:** No TypeScript errors.
@@ -72,6 +70,7 @@ Before promoting a `preview` release to `stable`, a release manager must
 manually run through this checklist.
 
 - **Setup:**
+
   - [ ] Uninstall any existing global version:
         `npm uninstall -g @google/gemini-cli`
   - [ ] Clear npx cache (optional but recommended): `npm cache clean --force`
@@ -79,24 +78,29 @@ manually run through this checklist.
   - [ ] Verify version: `gemini --version`
 
 - **Authentication:**
+
   - [ ] In interactive mode run `/auth` and verify all sign in flows work:
     - [ ] Sign in with Google
     - [ ] API Key
     - [ ] Vertex AI
 
 - **Basic prompting:**
+
   - [ ] Run `gemini "Tell me a joke"` and verify a sensible response.
   - [ ] Run in interactive mode: `gemini`. Ask a follow-up question to test
         context.
 
 - **Piped input:**
+
   - [ ] Run `echo "Summarize this" | gemini` and verify it processes stdin.
 
 - **Context management:**
+
   - [ ] In interactive mode, use `@file` to add a local file to context. Ask a
         question about it.
 
 - **Settings:**
+
   - [ ] In interactive mode run `/settings` and make modifications
   - [ ] Validate that setting is changed
 

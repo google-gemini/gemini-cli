@@ -221,7 +221,7 @@ describe('FileDiscoveryService', () => {
     });
   });
 
-  describe('shouldGitIgnoreFile & shouldGeminiIgnoreFile', () => {
+  describe('shouldIgnoreFile & shouldIgnoreDirectory', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
@@ -235,6 +235,13 @@ describe('FileDiscoveryService', () => {
         service.shouldIgnoreFile(
           path.join(projectRoot, 'node_modules/package/index.js'),
         ),
+      ).toBe(true);
+    });
+
+    it('should return true for git-ignored directories', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'node_modules')),
       ).toBe(true);
     });
 
@@ -293,6 +300,7 @@ describe('FileDiscoveryService', () => {
       ]);
     });
   });
+
   describe('precedence (.geminiignore over .gitignore)', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
@@ -493,6 +501,145 @@ describe('FileDiscoveryService', () => {
       const service = new FileDiscoveryService(projectRoot);
       const paths = service.getAllIgnoreFilePaths();
       expect(paths[0]).toBe(path.join(projectRoot, '.gitignore'));
+    });
+
+    it('should exclude directories from getIgnoreFilePaths (#19868)', async () => {
+      // Create a directory that shares a name with a customIgnoreFilePaths entry
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: ['node_modules'],
+      });
+      const paths = service.getIgnoreFilePaths();
+
+      // node_modules/ is a directory, not a file — it should be excluded
+      expect(paths).not.toContain(path.join(projectRoot, 'node_modules'));
+    });
+
+    it('should exclude directories from getAllIgnoreFilePaths (#19868)', async () => {
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: ['node_modules'],
+      });
+      const paths = service.getAllIgnoreFilePaths();
+
+      expect(paths).not.toContain(path.join(projectRoot, 'node_modules'));
+      // .gitignore should still be present
+      expect(paths).toContain(path.join(projectRoot, '.gitignore'));
+    });
+
+    it('should not crash when customIgnoreFilePaths contains directory names (#19868)', async () => {
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+      await fs.mkdir(path.join(projectRoot, 'temp'), { recursive: true });
+
+      // This is the exact user scenario from issue #19868
+      expect(() => {
+        new FileDiscoveryService(projectRoot, {
+          customIgnoreFilePaths: ['node_modules/', 'temp/', 'cache/'],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe('getIgnoredPaths', () => {
+    beforeEach(async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+    });
+
+    it('should return all ignored paths that exist on disk', async () => {
+      await createTestFile(
+        '.gitignore',
+        'ignored-dir/\nignored-file.txt\n*.log',
+      );
+      await createTestFile('ignored-dir/inside.txt');
+      await createTestFile('ignored-file.txt');
+      await createTestFile('keep.log');
+      await createTestFile('src/index.ts');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'secrets/');
+      await createTestFile('secrets/passwords.txt');
+
+      const service = new FileDiscoveryService(projectRoot);
+      const ignoredPaths = await service.getIgnoredPaths();
+
+      const expectedPaths = [
+        path.join(projectRoot, '.git'),
+        path.join(projectRoot, 'ignored-dir'),
+        path.join(projectRoot, 'ignored-file.txt'),
+        path.join(projectRoot, 'keep.log'),
+        path.join(projectRoot, 'secrets'),
+      ].sort();
+
+      expect(ignoredPaths.sort()).toEqual(expectedPaths);
+    });
+
+    it('should optimize by not traversing into ignored directories', async () => {
+      await createTestFile('.gitignore', 'ignored-dir/');
+      const ignoredDir = path.join(projectRoot, 'ignored-dir');
+      await fs.mkdir(ignoredDir);
+      await createTestFile('ignored-dir/large-file-1.txt');
+
+      const service = new FileDiscoveryService(projectRoot);
+      const ignoredPaths = await service.getIgnoredPaths();
+
+      expect(ignoredPaths.sort()).toEqual(
+        [path.join(projectRoot, '.git'), ignoredDir].sort(),
+      );
+    });
+
+    it('should handle un-ignore patterns correctly', async () => {
+      await createTestFile(
+        '.gitignore',
+        'ignored-dir/*\n!ignored-dir/keep.txt',
+      );
+      await createTestFile('ignored-dir/ignored.txt');
+      await createTestFile('ignored-dir/keep.txt');
+
+      const service = new FileDiscoveryService(projectRoot);
+      const ignoredPaths = await service.getIgnoredPaths();
+
+      expect(ignoredPaths).toContain(
+        path.join(projectRoot, 'ignored-dir/ignored.txt'),
+      );
+      expect(ignoredPaths).not.toContain(
+        path.join(projectRoot, 'ignored-dir/keep.txt'),
+      );
+      expect(ignoredPaths).not.toContain(path.join(projectRoot, 'ignored-dir'));
+    });
+
+    it('should respect FilterFilesOptions when provided', async () => {
+      await createTestFile('.gitignore', 'ignored-by-git.txt');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'ignored-by-gemini.txt');
+      await createTestFile('ignored-by-git.txt');
+      await createTestFile('ignored-by-gemini.txt');
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      const onlyGemini = await service.getIgnoredPaths({
+        respectGitIgnore: false,
+        respectGeminiIgnore: true,
+      });
+      expect(onlyGemini).toContain(
+        path.join(projectRoot, 'ignored-by-gemini.txt'),
+      );
+      expect(onlyGemini).not.toContain(
+        path.join(projectRoot, 'ignored-by-git.txt'),
+      );
+
+      const onlyGit = await service.getIgnoredPaths({
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      });
+      expect(onlyGit).toContain(path.join(projectRoot, 'ignored-by-git.txt'));
+      expect(onlyGit).not.toContain(
+        path.join(projectRoot, 'ignored-by-gemini.txt'),
+      );
     });
   });
 });

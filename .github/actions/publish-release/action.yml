@@ -75,12 +75,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      env:
-        JSON_INPUTS: '${{ toJSON(inputs) }}'
-      run: 'echo "$JSON_INPUTS"'
-
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
@@ -114,13 +108,14 @@ runs:
         BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
+        GIT_PUSH_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
       run: |-
         set -e
         git add package.json package-lock.json packages/*/package.json
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
-          git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
+          git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
         else
           echo "Dry run enabled. Skipping push."
         fi
@@ -172,10 +167,13 @@ runs:
       shell: 'bash'
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
-          --no-tag
-        npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false --silent
+          --tag staging-tmp
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} staging-tmp
+        fi
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -193,11 +191,34 @@ runs:
         INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
 
     - name: '📦 Prepare bundled CLI for npm release'
-      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/' && inputs.npm-tag != 'latest'"
+      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/'"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
         node ${{ github.workspace }}/scripts/prepare-npm-release.js
+
+    - name: '📦 Pack CLI for verification'
+      if: "inputs.dry-run != 'true' && inputs.force-skip-tests != 'true'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm pack --workspace="${INPUTS_CLI_PACKAGE_NAME}"
+        # We restore the package.json so that `npm ci` in verify-release doesn't fail due to deleted dependencies
+        git checkout packages/cli/package.json
+      env:
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
+      with:
+        npm-package: './google-gemini-cli-${{ inputs.release-version }}.tgz'
+        expected-version: '${{ inputs.release-version }}'
+        working-directory: '${{ inputs.working-directory }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
+        github-token: '${{ inputs.github-token }}'
+        npm-registry-url: '${{ inputs.npm-registry-url }}'
+        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
 
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
@@ -215,13 +236,23 @@ runs:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
         INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
         INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
       shell: 'bash'
       run: |
+        if [ -f "google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz" ]; then
+          PUBLISH_TARGET="google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz"
+        else
+          PUBLISH_TARGET="--workspace=${INPUTS_CLI_PACKAGE_NAME}"
+        fi
+
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
-          --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
-          --no-tag
-        npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false --silent
+          ${PUBLISH_TARGET} \
+          --tag staging-tmp
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} staging-tmp
+        fi
 
     - name: 'Get a2a-server Token'
       uses: './.github/actions/npm-auth-token'
@@ -243,22 +274,13 @@ runs:
       # Tag staging for initial release
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
-          --no-tag
-        npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false --silent
-
-    - name: '🔬 Verify NPM release by version'
-      uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
-      with:
-        npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
-        expected-version: '${{ inputs.release-version }}'
-        working-directory: '${{ inputs.working-directory }}'
-        gemini_api_key: '${{ inputs.gemini_api_key }}'
-        github-token: '${{ inputs.github-token }}'
-        npm-registry-url: '${{ inputs.npm-registry-url }}'
-        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
+          --tag staging-tmp
+          if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+            npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} staging-tmp
+          fi
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
@@ -285,8 +307,38 @@ runs:
         INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
       shell: 'bash'
       run: |
+        rm -f gemini-cli-bundle.zip
+        (cd bundle && chmod +x gemini.js && zip -r ../gemini-cli-bundle.zip .)
+
+        echo "Testing the generated bundle archive..."
+        rm -rf test-bundle
+        mkdir -p test-bundle
+        unzip -q gemini-cli-bundle.zip -d test-bundle
+
+        # Verify it runs and outputs a version
+        BUNDLE_VERSION=$(node test-bundle/gemini.js --version | xargs)
+        echo "Bundle version output: ${BUNDLE_VERSION}"
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo "Error: Bundle failed to execute or return version."
+          exit 1
+        fi
+        rm -rf test-bundle
+
+        RELEASE_ASSETS=("gemini-cli-bundle.zip")
+
+        # Check for and prepare macOS binaries if they exist
+        for arch in arm64 x64; do
+          BINARY_PATH="dist/darwin-${arch}/gemini"
+          if [[ -f "$BINARY_PATH" ]]; then
+            chmod +x "$BINARY_PATH"
+            ZIP_NAME="gemini-darwin-${arch}-unsigned.zip"
+            zip -j "$ZIP_NAME" "$BINARY_PATH"
+            RELEASE_ASSETS+=("$ZIP_NAME")
+          fi
+        done
+
         gh release create "${INPUTS_RELEASE_TAG}" \
-          bundle/gemini.js \
+          "${RELEASE_ASSETS[@]}" \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
@@ -300,7 +352,8 @@ runs:
       shell: 'bash'
       run: |
         echo "Cleaning up release branch ${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}..."
-        git push origin --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
+        git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
 
       env:
+        GIT_PUSH_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
         STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'

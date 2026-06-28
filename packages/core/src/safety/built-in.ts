@@ -5,13 +5,13 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import {
   SafetyCheckDecision,
   type SafetyCheckInput,
   type SafetyCheckResult,
 } from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
+import { resolveToRealPath } from '../utils/paths.js';
 
 /**
  * Interface for all in-process safety checkers.
@@ -45,6 +45,11 @@ export class AllowedPathChecker implements InProcessChecker {
       excludedArgs,
     );
 
+    // Resolve allowed directories once outside the loop to avoid redundant filesystem calls
+    const resolvedAllowedDirs = allowedDirs
+      .map((dir) => this.safelyResolvePath(dir, context.environment.cwd))
+      .filter((resolvedDir): resolvedDir is string => resolvedDir !== null);
+
     // Check each path
     for (const { path: p, argName } of pathsToCheck) {
       const resolvedPath = this.safelyResolvePath(p, context.environment.cwd);
@@ -57,15 +62,52 @@ export class AllowedPathChecker implements InProcessChecker {
         };
       }
 
-      const isAllowed = allowedDirs.some((dir) => {
-        // Also resolve allowed directories to handle symlinks
-        const resolvedDir = this.safelyResolvePath(
-          dir,
-          context.environment.cwd,
-        );
-        if (!resolvedDir) return false;
-        return this.isPathAllowed(resolvedPath, resolvedDir);
-      });
+      // Check for blocked segments case-insensitively
+      let hasBlockedSegment = false;
+      let isVscodePath = false;
+
+      for (const resolvedDir of resolvedAllowedDirs) {
+        if (!this.isPathAllowed(resolvedPath, resolvedDir)) continue;
+        const relative = path.relative(resolvedDir, resolvedPath);
+        const segments = relative.split(path.sep);
+        for (const segment of segments) {
+          const clean = trimTrailingSpacesAndDots(
+            segment.split(':')[0],
+          ).toLowerCase();
+          if (
+            clean === '.git' ||
+            clean === '.env' ||
+            clean === 'node_modules'
+          ) {
+            hasBlockedSegment = true;
+          }
+          if (clean === '.vscode') {
+            isVscodePath = true;
+          }
+        }
+      }
+
+      if (hasBlockedSegment) {
+        return {
+          decision: SafetyCheckDecision.DENY,
+          reason: `Access to sensitive path "${p}" in argument "${argName}" is blocked.`,
+        };
+      }
+
+      if (isVscodePath) {
+        return {
+          decision: SafetyCheckDecision.ASK_USER,
+          reason: `Modifying .vscode configuration files requires explicit user confirmation.`,
+        };
+      }
+
+      let isAllowed = false;
+      for (const resolvedDir of resolvedAllowedDirs) {
+        if (this.isPathAllowed(resolvedPath, resolvedDir)) {
+          isAllowed = true;
+          break;
+        }
+      }
 
       if (!isAllowed) {
         return {
@@ -84,21 +126,22 @@ export class AllowedPathChecker implements InProcessChecker {
 
       // Walk up the directory tree until we find a path that exists
       let current = resolved;
-      // Stop at root (dirname(root) === root on many systems, or it becomes empty/'.' depending on implementation)
       while (current && current !== path.dirname(current)) {
-        if (fs.existsSync(current)) {
-          const canonical = fs.realpathSync(current);
+        try {
+          const canonical = resolveToRealPath(current);
           // Re-construct the full path from this canonical base
           const relative = path.relative(current, resolved);
           // path.join handles empty relative paths correctly (returns canonical)
           return path.join(canonical, relative);
+        } catch {
+          // Path does not exist, continue walking up
         }
         current = path.dirname(current);
       }
 
       // Fallback if nothing exists (unlikely if root exists)
       return resolved;
-    } catch (_error) {
+    } catch {
       return null;
     }
   }
@@ -155,4 +198,16 @@ export class AllowedPathChecker implements InProcessChecker {
 
     return paths;
   }
+}
+
+/**
+ * Trims trailing spaces and dots from a string without using regular expressions
+ * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
+ */
+function trimTrailingSpacesAndDots(str: string): string {
+  let end = str.length - 1;
+  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
+    end--;
+  }
+  return str.slice(0, end + 1);
 }

@@ -1,0 +1,22 @@
+{
+  "description": "Explicitly promoted tools from chrome-devtools-mcp for the gemini-cli browser agent.",
+  "targetVersion": "0.19.0",
+  "exclude": [
+    {
+      "name": "lighthouse",
+      "reason": "3.5 MB pre-built bundle — not needed for gemini-cli browser agent's core tasks."
+    },
+    {
+      "name": "performance",
+      "reason": "Depends on chrome-devtools-frontend TraceEngine (~800 KB) — not needed for core tasks."
+    },
+    {
+      "name": "screencast",
+      "reason": "Requires ffmpeg at runtime — not a common browser agent use case and adds external dependency."
+    },
+    {
+      "name": "extensions",
+      "reason": "Extension management not relevant for the gemini-cli browser agent's current scope."
+    }
+  ]
+}

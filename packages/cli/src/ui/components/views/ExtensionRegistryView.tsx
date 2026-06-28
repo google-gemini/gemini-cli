@@ -29,6 +29,10 @@ export interface ExtensionRegistryViewProps {
     extension: RegistryExtension,
     requestConsentOverride?: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
+  onLink?: (
+    extension: RegistryExtension,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
+  ) => void | Promise<void>;
   onClose?: () => void;
   extensionManager: ExtensionManager;
 }
@@ -39,6 +43,7 @@ interface ExtensionItem extends GenericListItem {
 
 export function ExtensionRegistryView({
   onSelect,
+  onLink,
   onClose,
   extensionManager,
 }: ExtensionRegistryViewProps): React.JSX.Element {
@@ -47,15 +52,16 @@ export function ExtensionRegistryView({
     '',
     config.getExtensionRegistryURI(),
   );
-  const { terminalHeight, staticExtraHeight } = useUIState();
+  const { terminalHeight, staticExtraHeight, historyManager } = useUIState();
   const [selectedExtension, setSelectedExtension] =
     useState<RegistryExtension | null>(null);
 
-  const { extensionsUpdateState } = useExtensionUpdates(
-    extensionManager,
-    () => 0,
-    config.getEnableExtensionReloading(),
-  );
+  const { extensionsUpdateState, dispatchExtensionStateUpdate } =
+    useExtensionUpdates(
+      extensionManager,
+      historyManager.addItem,
+      config.getEnableExtensionReloading(),
+    );
 
   const [installedExtensions, setInstalledExtensions] = useState(() =>
     extensionManager.getExtensions(),
@@ -96,6 +102,39 @@ export function ExtensionRegistryView({
     [onSelect, extensionManager],
   );
 
+  const handleLink = useCallback(
+    async (
+      extension: RegistryExtension,
+      requestConsentOverride?: (consent: string) => Promise<boolean>,
+    ) => {
+      await onLink?.(extension, requestConsentOverride);
+
+      // Refresh installed extensions list
+      setInstalledExtensions(extensionManager.getExtensions());
+
+      // Go back to the search page (list view)
+      setSelectedExtension(null);
+    },
+    [onLink, extensionManager],
+  );
+
+  const handleUpdate = useCallback(
+    async (extension: RegistryExtension) => {
+      dispatchExtensionStateUpdate({
+        type: 'SCHEDULE_UPDATE',
+        payload: {
+          all: false,
+          names: [extension.extensionName],
+          onComplete: () => {
+            // Refresh installed extensions list if needed
+            setInstalledExtensions(extensionManager.getExtensions());
+          },
+        },
+      });
+    },
+    [dispatchExtensionStateUpdate, extensionManager],
+  );
+
   const renderItem = useCallback(
     (item: ExtensionItem, isActive: boolean, _labelWidth: number) => {
       const isInstalled = installedExtensions.some(
@@ -104,7 +143,6 @@ export function ExtensionRegistryView({
       const updateState = extensionsUpdateState.get(
         item.extension.extensionName,
       );
-      const hasUpdate = updateState === ExtensionUpdateState.UPDATE_AVAILABLE;
 
       return (
         <Box flexDirection="row" width="100%" justifyContent="space-between">
@@ -127,15 +165,20 @@ export function ExtensionRegistryView({
             <Box flexShrink={0} marginX={1}>
               <Text color={theme.text.secondary}>|</Text>
             </Box>
-            {isInstalled && (
-              <Box marginRight={1} flexShrink={0}>
-                <Text color={theme.status.success}>[Installed]</Text>
-              </Box>
-            )}
-            {hasUpdate && (
+            {updateState === ExtensionUpdateState.UPDATE_AVAILABLE ? (
               <Box marginRight={1} flexShrink={0}>
                 <Text color={theme.status.warning}>[Update available]</Text>
               </Box>
+            ) : updateState === ExtensionUpdateState.UPDATING ? (
+              <Box marginRight={1} flexShrink={0}>
+                <Text color={theme.text.secondary}>[Updating...]</Text>
+              </Box>
+            ) : (
+              isInstalled && (
+                <Box marginRight={1} flexShrink={0}>
+                  <Text color={theme.status.success}>[Installed]</Text>
+                </Box>
+              )
             )}
             <Box flexShrink={1} minWidth={0}>
               <Text color={theme.text.secondary} wrap="truncate-end">
@@ -260,9 +303,18 @@ export function ExtensionRegistryView({
           onInstall={async (requestConsentOverride) => {
             await handleInstall(selectedExtension, requestConsentOverride);
           }}
+          onLink={async (requestConsentOverride) => {
+            await handleLink(selectedExtension, requestConsentOverride);
+          }}
           isInstalled={installedExtensions.some(
             (e) => e.name === selectedExtension.extensionName,
           )}
+          updateState={extensionsUpdateState.get(
+            selectedExtension.extensionName,
+          )}
+          onUpdate={async () => {
+            await handleUpdate(selectedExtension);
+          }}
         />
       )}
     </>

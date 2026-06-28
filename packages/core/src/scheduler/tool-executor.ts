@@ -12,6 +12,7 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
   type ToolResult,
+  type ToolDisplay,
   type Config,
   type AgentLoopContext,
   type ToolLiveOutput,
@@ -19,6 +20,7 @@ import {
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
@@ -82,6 +84,9 @@ export class ToolExecutor {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.ToolCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,
@@ -112,13 +117,27 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            shellExecutionConfig,
-            setExecutionIdCallback,
+            { shellExecutionConfig, setExecutionIdCallback },
             this.config,
             request.originalRequestName,
+            true, // skipBeforeHook
           );
 
           const toolResult: ToolResult = await promise;
+
+          if (call.request.inputModifiedByHook) {
+            const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
+            if (typeof toolResult.llmContent === 'string') {
+              toolResult.llmContent += modificationMsg;
+            } else if (Array.isArray(toolResult.llmContent)) {
+              toolResult.llmContent.push({ text: modificationMsg });
+            } else if (toolResult.llmContent) {
+              toolResult.llmContent = [
+                toolResult.llmContent,
+                { text: modificationMsg },
+              ];
+            }
+          }
 
           if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
@@ -142,6 +161,7 @@ export class ToolExecutor {
               toolResult.error.type,
               displayText,
               toolResult.tailToolCallRequest,
+              toolResult.display,
             );
           }
         } catch (executionError: unknown) {
@@ -181,6 +201,15 @@ export class ToolExecutor {
     call: ToolCall,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    if (this.config.isContextManagementEnabled()) {
+      const distiller = new ToolOutputDistillationService(
+        this.config,
+        this.context.geminiClient,
+        this.context.promptId,
+      );
+      return distiller.distill(call.request.name, call.request.callId, content);
+    }
+
     const toolName = call.request.name;
     const callId = call.request.callId;
     let outputFile: string | undefined;
@@ -292,10 +321,11 @@ export class ToolExecutor {
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
-        call.request.name,
+        call.request.originalRequestName ?? call.request.name,
         call.request.callId,
         output,
         this.config.getActiveModel(),
+        this.config,
       );
 
       // Inject the cancellation error into the response object
@@ -309,7 +339,7 @@ export class ToolExecutor {
         {
           functionResponse: {
             id: call.request.callId,
-            name: call.request.name,
+            name: call.request.originalRequestName ?? call.request.name,
             response: { error: errorMessage },
           },
         },
@@ -322,6 +352,7 @@ export class ToolExecutor {
       response: {
         callId: call.request.callId,
         responseParts,
+        display: toolResult?.display,
         resultDisplay: toolResult?.returnDisplay,
         error: undefined,
         errorType: undefined,
@@ -352,11 +383,13 @@ export class ToolExecutor {
       callId,
       content,
       this.config.getActiveModel(),
+      this.config,
     );
 
     const successResponse: ToolCallResponseInfo = {
       callId,
       responseParts: response,
+      display: toolResult.display,
       resultDisplay: toolResult.returnDisplay,
       error: undefined,
       errorType: undefined,
@@ -391,12 +424,14 @@ export class ToolExecutor {
     errorType?: ToolErrorType,
     returnDisplay?: string,
     tailToolCallRequest?: { name: string; args: Record<string, unknown> },
+    display?: ToolDisplay,
   ): ErroredToolCall {
     const response = this.createErrorResponse(
       call.request,
       error,
       errorType,
       returnDisplay,
+      display,
     );
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -418,11 +453,13 @@ export class ToolExecutor {
     error: Error,
     errorType: ToolErrorType | undefined,
     returnDisplay?: string,
+    display?: ToolDisplay,
   ): ToolCallResponseInfo {
     const displayText = returnDisplay ?? error.message;
     return {
       callId: request.callId,
       error,
+      display,
       responseParts: [
         {
           functionResponse: {

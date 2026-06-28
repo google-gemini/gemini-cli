@@ -19,7 +19,7 @@ import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { Command } from '../../key/keyMatchers.js';
+import { Command, type KeyMatchers } from '../../key/keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
@@ -73,6 +73,11 @@ export interface BaseSettingsDialogProps {
   // Scope selector
   /** Whether to show the scope selector. Default: true */
   showScopeSelector?: boolean;
+  /** Editable scope items to display. Defaults to all loadable scopes. */
+  scopeItems?: Array<{
+    label: string;
+    value: LoadableSettingScope;
+  }>;
   /** Currently selected scope */
   selectedScope: LoadableSettingScope;
   /** Callback when scope changes */
@@ -103,6 +108,9 @@ export interface BaseSettingsDialogProps {
     currentItem: SettingsDialogItem | undefined,
   ) => boolean;
 
+  /** Optional override for key matchers used for navigation. */
+  keyMatchers?: KeyMatchers;
+
   /** Available terminal height for dynamic windowing */
   availableHeight?: number;
 
@@ -125,6 +133,7 @@ export function BaseSettingsDialog({
   searchBuffer,
   items,
   showScopeSelector = true,
+  scopeItems: providedScopeItems,
   selectedScope,
   onScopeChange,
   maxItemsToShow,
@@ -134,13 +143,25 @@ export function BaseSettingsDialog({
   onItemClear,
   onClose,
   onKeyPress,
+  keyMatchers: customKeyMatchers,
   availableHeight,
   footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
-  const keyMatchers = useKeyMatchers();
+  const globalKeyMatchers = useKeyMatchers();
+  const keyMatchers = customKeyMatchers ?? globalKeyMatchers;
+  const scopeItems = useMemo(
+    () =>
+      (providedScopeItems ?? getScopeItems()).map((item) => ({
+        ...item,
+        key: item.value,
+      })),
+    [providedScopeItems],
+  );
+  const showAvailableScopes = showScopeSelector && scopeItems.length > 1;
+
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
-    const initialShowScope = showScopeSelector;
+    const initialShowScope = showAvailableScopes;
     const initialMaxItems = maxItemsToShow;
 
     if (!availableHeight) {
@@ -209,7 +230,7 @@ export function BaseSettingsDialog({
     maxItemsToShow,
     items.length,
     searchEnabled,
-    showScopeSelector,
+    showAvailableScopes,
     footer,
   ]);
 
@@ -242,12 +263,6 @@ export function BaseSettingsDialog({
     !finalShowScopeSelector && focusSection === 'scope'
       ? 'settings'
       : focusSection;
-
-  // Scope selector items
-  const scopeItems = getScopeItems().map((item) => ({
-    ...item,
-    key: item.value,
-  }));
 
   // Calculate visible items based on scroll offset
   const visibleItems = items.slice(
@@ -325,13 +340,18 @@ export function BaseSettingsDialog({
           return;
         }
 
-        // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        // Up/Down in edit mode - commit and navigate.
+        // Only trigger on non-insertable keys (arrow keys) so that typing
+        // j/k characters into the edit buffer is not intercepted.
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
           moveUp();
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !key.insertable
+        ) {
           commitEdit();
           moveDown();
           return;
@@ -415,7 +435,7 @@ export function BaseSettingsDialog({
       flexDirection="row"
       padding={1}
       width="100%"
-      height="100%"
+      maxHeight={availableHeight}
     >
       <Box flexDirection="column" flexGrow={1}>
         {/* Title */}

@@ -24,14 +24,16 @@ import {
 } from '@google/genai';
 import * as codeAssist from './codeAssist.js';
 import type { CodeAssistServer } from './server.js';
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type {
+  CompletedToolCall,
+  ToolCallResponseInfo,
+} from '../scheduler/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
-import type { ToolCallResponseInfo } from '../scheduler/types.js';
 
 function createMockResponse(
   candidates: GenerateContentResponse['candidates'] = [],

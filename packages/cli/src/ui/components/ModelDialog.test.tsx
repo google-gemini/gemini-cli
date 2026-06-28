@@ -12,13 +12,14 @@ import { waitFor } from '../../test-utils/async.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import {
   DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_FLASH_LITE_MODEL,
   AuthType,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
@@ -28,10 +29,16 @@ const mockGetDisplayString = vi.fn();
 const mockLogModelSlashCommand = vi.fn();
 const mockModelSlashCommandEvent = vi.fn();
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    getAutoModelDescription: (
+      hasAccessToPreview: boolean,
+      useGemini3_1?: boolean,
+    ) =>
+      `Auto Model Description (preview: ${hasAccessToPreview}, 3.1: ${useGemini3_1})`,
     getDisplayString: (val: string) => mockGetDisplayString(val),
     logModelSlashCommand: (config: Config, event: ModelSlashCommandEvent) =>
       mockLogModelSlashCommand(config, event),
@@ -40,6 +47,7 @@ vi.mock('@google/gemini-cli-core', async () => {
         mockModelSlashCommandEvent(model);
       }
     },
+    PREVIEW_GEMINI_FLASH_LITE_MODEL: 'none',
   };
 });
 
@@ -49,6 +57,9 @@ describe('<ModelDialog />', () => {
   const mockOnClose = vi.fn();
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
+  const mockGetGemini31FlashLiteLaunchedSync = vi.fn();
+  const mockGetProModelNoAccess = vi.fn();
+  const mockGetProModelNoAccessSync = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -56,6 +67,18 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
+    getProModelNoAccess: () => Promise<boolean>;
+    getProModelNoAccessSync: () => boolean;
+    getExperimentalGemma: () => boolean;
+    getLastRetrievedQuota: () =>
+      | {
+          buckets: Array<{
+            modelId?: string;
+            remainingFraction?: number;
+            resetTime?: string;
+          }>;
+        }
+      | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -64,18 +87,24 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
+    getProModelNoAccess: mockGetProModelNoAccess,
+    getProModelNoAccessSync: mockGetProModelNoAccessSync,
+    getExperimentalGemma: () => false,
+    getLastRetrievedQuota: () => ({ buckets: [] }),
+    getSessionId: () => 'test-session-id',
   };
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
+    mockGetProModelNoAccess.mockResolvedValue(false);
+    mockGetProModelNoAccessSync.mockReturnValue(false);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
-      if (val === 'auto-gemini-2.5') return 'Auto (Gemini 2.5)';
-      if (val === 'auto-gemini-3') return 'Auto (Preview)';
+      if (val === 'auto') return 'Auto';
       return val;
     });
   });
@@ -92,11 +121,13 @@ describe('<ModelDialog />', () => {
       },
     });
 
-    const result = renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
-      config: configValue,
-      settings,
-    });
-    await result.waitUntilReady();
+    const result = await renderWithProviders(
+      <ModelDialog onClose={mockOnClose} />,
+      {
+        config: configValue,
+        settings,
+      },
+    );
     return result;
   };
 
@@ -106,6 +137,51 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Remember model for future sessions: false');
     expect(lastFrame()).toContain('Auto');
     expect(lastFrame()).toContain('Manual');
+    unmount();
+  });
+
+  it('renders the "manual" view initially for users with no pro access and filters Pro models with correct order', async () => {
+    mockGetProModelNoAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(true);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(true);
+    mockGetDisplayString.mockImplementation((val: string) => val);
+
+    const { lastFrame, unmount } = await renderComponent();
+
+    const output = lastFrame();
+    expect(output).toContain('Select Model');
+    expect(output).not.toContain(DEFAULT_GEMINI_MODEL);
+    expect(output).not.toContain(PREVIEW_GEMINI_MODEL);
+
+    // Verify order: Flash Preview -> Flash Lite (Preview/Default) -> Flash
+    const flashPreviewIdx = output.indexOf(PREVIEW_GEMINI_FLASH_MODEL);
+    const flashLiteIdx = output.indexOf(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    const flashIdx = output.indexOf(DEFAULT_GEMINI_FLASH_MODEL);
+
+    expect(flashPreviewIdx).toBeLessThan(flashLiteIdx);
+    expect(flashLiteIdx).toBeLessThan(flashIdx);
+
+    expect(output).not.toContain('Auto');
+    unmount();
+  });
+
+  it('closes dialog on escape in "manual" view for users with no pro access', async () => {
+    mockGetProModelNoAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(true);
+    const { stdin, waitUntilReady, unmount } = await renderComponent();
+
+    // Already in manual view
+    await act(async () => {
+      stdin.write('\u001B'); // Escape
+    });
+    await act(async () => {
+      await waitUntilReady();
+    });
+
+    await waitFor(() => {
+      expect(mockOnClose).toHaveBeenCalled();
+    });
     unmount();
   });
 
@@ -155,7 +231,7 @@ describe('<ModelDialog />', () => {
 
     await waitFor(() => {
       expect(mockSetModel).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_MODEL_AUTO,
+        GEMINI_MODEL_ALIAS_AUTO,
         true, // Session only by default
       );
       expect(mockOnClose).toHaveBeenCalled();
@@ -213,7 +289,7 @@ describe('<ModelDialog />', () => {
 
     await waitFor(() => {
       expect(mockSetModel).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_MODEL_AUTO,
+        GEMINI_MODEL_ALIAS_AUTO,
         false, // Persist enabled
       );
       expect(mockOnClose).toHaveBeenCalled();
@@ -276,7 +352,7 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL);
     mockGetDisplayString.mockImplementation((val: string) => {
       if (val === DEFAULT_GEMINI_MODEL) return 'My Custom Model Display';
-      if (val === 'auto-gemini-2.5') return 'Auto (Gemini 2.5)';
+      if (val === 'auto') return 'Auto';
       return val;
     });
     const { lastFrame, unmount } = await renderComponent();
@@ -290,9 +366,9 @@ describe('<ModelDialog />', () => {
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
     });
 
-    it('shows Auto (Preview) in main view when access is granted', async () => {
+    it('shows Auto in main view when access is granted', async () => {
       const { lastFrame, unmount } = await renderComponent();
-      expect(lastFrame()).toContain('Auto (Preview)');
+      expect(lastFrame()).toContain('Auto');
       unmount();
     });
 
@@ -367,6 +443,30 @@ describe('<ModelDialog />', () => {
           true,
         );
       });
+      unmount();
+    });
+
+    it('does not show Flash Lite Preview model when it is retired (none) even if flag is enabled', async () => {
+      mockGetProModelNoAccessSync.mockReturnValue(false);
+      mockGetProModelNoAccess.mockResolvedValue(false);
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(true);
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderComponent();
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).not.toContain(PREVIEW_GEMINI_FLASH_LITE_MODEL);
+      expect(output).toContain(DEFAULT_GEMINI_FLASH_LITE_MODEL);
       unmount();
     });
   });

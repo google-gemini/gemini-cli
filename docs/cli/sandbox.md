@@ -1,11 +1,11 @@
-# Sandboxing in the Gemini CLI
+# Sandboxing in Gemini CLI
 
-This document provides a guide to sandboxing in the Gemini CLI, including
+This document provides a guide to sandboxing in Gemini CLI, including
 prerequisites, quickstart, and configuration.
 
 ## Prerequisites
 
-Before using sandboxing, you need to install and set up the Gemini CLI:
+Before using sandboxing, you need to install and set up Gemini CLI:
 
 ```bash
 npm install -g @google/gemini-cli
@@ -31,6 +31,53 @@ The benefits of sandboxing include:
 - **Safety**: Reduce risk when working with untrusted code or experimental
   commands.
 
+## Quickstart
+
+You can enable sandboxing using a command flag, environment variable, or
+configuration file.
+
+### Using the command flag
+
+```bash
+gemini -s -p "analyze the code structure"
+```
+
+### Using an environment variable
+
+**macOS/Linux**
+
+```bash
+export GEMINI_SANDBOX=true
+gemini -p "run the test suite"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_SANDBOX="true"
+gemini -p "run the test suite"
+```
+
+### Configuring via settings.json
+
+```json
+{
+  "tools": {
+    "sandbox": "docker"
+  }
+}
+```
+
+## Configuration
+
+Enable sandboxing using one of the following methods (in order of precedence):
+
+1. **Command flag**: `-s` or `--sandbox`
+2. **Environment variable**:
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
+3. **Settings file**: `"sandbox": true` in the `tools` object of your
+   `settings.json` file (for example, `{"tools": {"sandbox": true}}`).
+
 ## Sandboxing methods
 
 Your ideal method of sandboxing may differ depending on your platform and your
@@ -43,14 +90,112 @@ Lightweight, built-in sandboxing using `sandbox-exec`.
 **Default profile**: `permissive-open` - restricts writes outside project
 directory but allows most other operations.
 
+Built-in profiles (set via `SEATBELT_PROFILE` env var):
+
+- `permissive-open` (default): Write restrictions, network allowed
+- `permissive-proxied`: Write restrictions, network via proxy
+- `restrictive-open`: Strict restrictions, network allowed
+- `restrictive-proxied`: Strict restrictions, network via proxy
+- `strict-open`: Read and write restrictions, network allowed
+- `strict-proxied`: Read and write restrictions, network via proxy
+
 ### 2. Container-based (Docker/Podman)
 
-Cross-platform sandboxing with complete process isolation.
+Cross-platform sandboxing with complete process isolation using container
+technology. By default, it uses the `ghcr.io/google/gemini-cli:latest` image.
 
-**Note**: Requires building the sandbox image locally or using a published image
-from your organization's registry.
+**Prerequisites:**
 
-### 3. gVisor / runsc (Linux only)
+- Docker or Podman must be installed and running on your system.
+
+**How it works (Workspace directory):**
+
+Inside the sandbox container, your current working directory is mounted at the
+**exact same absolute path** as it is on your host machine. For example, if you
+run the CLI from `/Users/you/project` on your host machine, the sandbox will
+mount your local project folder and operate within `/Users/you/project` inside
+the container. This allows the AI to seamlessly read and modify your project
+files while remaining isolated from the rest of your system.
+
+**Quick setup:**
+
+To enable Docker sandboxing, run Gemini CLI with the sandbox flag and specify
+Docker as the provider:
+
+```bash
+# Using the environment variable (Recommended)
+export GEMINI_SANDBOX=docker
+gemini -p "build the project"
+
+# Or configure it permanently in your settings.json
+# {"tools": {"sandbox": "docker"}}
+```
+
+**Customizing the Sandbox Image:**
+
+If your project requires specific dependencies, you can specify a custom image
+name or have Gemini CLI build one for you automatically. You can use any Docker
+or Podman image as your sandbox, provided it has standard shell utilities (like
+`bash`) available.
+
+**Option A: Using an existing custom image (e.g., Artifact Registry)**
+
+To configure a custom image that is hosted on a registry (or built locally),
+update your `settings.json` to use an object for the sandbox configuration, or
+set the `GEMINI_SANDBOX_IMAGE` environment variable.
+
+_Example: Configuring via `settings.json`_
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "command": "docker",
+      "image": "us-central1-docker.pkg.dev/my-project/my-repo/my-custom-sandbox:latest"
+    }
+  }
+}
+```
+
+_Example: Configuring via environment variable_
+
+```bash
+export GEMINI_SANDBOX_IMAGE="us-central1-docker.pkg.dev/my-project/my-repo/my-custom-sandbox:latest"
+```
+
+**Option B: Building a local custom image automatically**
+
+If you prefer to define your environment as code, you can provide a Dockerfile
+and Gemini CLI will build the image automatically.
+
+1.  Create a `.gemini/sandbox.Dockerfile` in your project root.
+2.  Ensure you have the `gh` CLI installed and authenticated (if you are using
+    the default `ghcr.io/google/gemini-cli` image as a base).
+3.  Run your command with the `BUILD_SANDBOX` environment variable set:
+
+```bash
+BUILD_SANDBOX=1 GEMINI_SANDBOX=docker gemini -p "run my custom build"
+```
+
+### 3. Windows Native Sandbox (Windows only)
+
+... **Troubleshooting and Side Effects:**
+
+The Windows Native sandbox uses the `icacls` command to set a "Low Mandatory
+Level" on files and directories it needs to write to.
+
+- **Persistence**: These integrity level changes are persistent on the
+  filesystem. Even after the sandbox session ends, files created or modified by
+  the sandbox will retain their "Low" integrity level.
+- **Manual Reset**: If you need to reset the integrity level of a file or
+  directory, you can use:
+  ```powershell
+  icacls "C:\path\to\dir" /setintegritylevel Medium
+  ```
+- **System Folders**: The sandbox manager automatically skips setting integrity
+  levels on system folders (like `C:\Windows`) for safety.
+
+### 4. gVisor / runsc (Linux only)
 
 Strongest isolation available: runs containers inside a user-space kernel via
 [gVisor](https://github.com/google/gvisor). gVisor intercepts all container
@@ -74,7 +219,7 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
-### 4. LXC/LXD (Linux only, experimental)
+### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
 containers run a complete Linux system with `systemd`, `snapd`, and other system
@@ -118,59 +263,101 @@ gemini -p "build the snap"
   absolute path — the path must be writable inside the container.
 - Used with tools like Snapcraft or Rockcraft that require a full system.
 
-## Quickstart
+## Tool sandboxing
 
-```bash
-# Enable sandboxing with command flag
-gemini -s -p "analyze the code structure"
-```
+Tool-level sandboxing provides granular isolation for individual tool executions
+(like `shell_exec` and `write_file`) instead of sandboxing the entire Gemini CLI
+process.
 
-**Use environment variable**
+This approach offers better integration with your local environment for non-tool
+tasks (like UI rendering and configuration loading) while still providing
+security for tool-driven operations.
 
-**macOS/Linux**
+### How to turn off tool sandboxing
 
-```bash
-export GEMINI_SANDBOX=true
-gemini -p "run the test suite"
-```
-
-**Windows (PowerShell)**
-
-```powershell
-$env:GEMINI_SANDBOX="true"
-gemini -p "run the test suite"
-```
-
-**Configure in settings.json**
+If you experience issues with tool sandboxing or prefer full-process isolation,
+you can disable it by setting `security.toolSandboxing` to `false` in your
+`settings.json` file.
 
 ```json
 {
-  "tools": {
-    "sandbox": "docker"
+  "security": {
+    "toolSandboxing": false
   }
 }
 ```
 
-## Configuration
+<!-- prettier-ignore -->
+> [!NOTE]
+> Changing the `security.toolSandboxing` setting requires a restart of Gemini
+> CLI to take effect.
 
-### Enable sandboxing (in order of precedence)
+## Sandbox expansion
 
-1. **Command flag**: `-s` or `--sandbox`
-2. **Environment variable**:
-   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
-3. **Settings file**: `"sandbox": true` in the `tools` object of your
-   `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
+Sandbox expansion is a dynamic permission system that lets Gemini CLI request
+additional permissions for a command when needed.
 
-### macOS Seatbelt profiles
+When a sandboxed command fails due to permission restrictions (like restricted
+file paths or network access), or when a command is proactively identified as
+requiring extra permissions (like `npm install`), Gemini CLI will present you
+with a "Sandbox Expansion Request."
 
-Built-in profiles (set via `SEATBELT_PROFILE` env var):
+### How sandbox expansion works
 
-- `permissive-open` (default): Write restrictions, network allowed
-- `permissive-proxied`: Write restrictions, network via proxy
-- `restrictive-open`: Strict restrictions, network allowed
-- `restrictive-proxied`: Strict restrictions, network via proxy
-- `strict-open`: Read and write restrictions, network allowed
-- `strict-proxied`: Read and write restrictions, network via proxy
+1.  **Detection**: Gemini CLI detects a sandbox denial or proactively identifies
+    a command that requires extra permissions.
+2.  **Request**: A modal dialog is shown, explaining which additional
+    permissions (e.g., specific directories or network access) are required.
+3.  **Approval**: If you approve the expansion, the command is executed with the
+    extended permissions for that specific run.
+
+This mechanism ensures you don't have to manually re-run commands with more
+permissive sandbox settings, while still maintaining control over what the AI
+can access.
+
+### Including files outside the workspace
+
+By default, the sandbox only has access to the current project workspace. If you
+need the sandbox to have permission to operate on certain files or directories
+from the local file system outside of the project workspace, you can mount them
+using the `SANDBOX_MOUNTS` environment variable.
+
+Provide a comma-separated list of mount definitions in the format
+`from:to:opts`. If `to` is omitted, it defaults to the same path as `from`. If
+`opts` is omitted, it defaults to `ro` (read-only). Note that the `from` path
+must be an absolute path.
+
+**Example**:
+
+```bash
+export SANDBOX_MOUNTS="/path/on/host:/path/in/container:rw,/another/path:ro"
+```
+
+## Running inside a Docker container
+
+If you are running Gemini CLI itself from within an official or custom Docker
+container and want to enable sandboxing, you must share the host's Docker socket
+and ensure your workspace paths align.
+
+1.  **Mount the Docker socket**: Map `/var/run/docker.sock` so the CLI can spawn
+    sibling sandbox containers via the host's Docker daemon.
+2.  **Align workspace paths**: The path to your workspace inside the container
+    must exactly match the absolute path on the host. Because the sandbox
+    container is spawned by the host's Docker daemon, it resolves volume mounts
+    against the host file system.
+
+**Example**:
+
+```bash
+docker run -it \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /absolute/path/on/host/project:/absolute/path/on/host/project \
+  -w /absolute/path/on/host/project \
+  -e GEMINI_SANDBOX=docker \
+  ghcr.io/google/gemini-cli:latest
+```
+
+## Advanced settings
 
 ### Custom sandbox flags
 
@@ -209,7 +396,7 @@ export SANDBOX_FLAGS="--flag1 --flag2=value"
 $env:SANDBOX_FLAGS="--flag1 --flag2=value"
 ```
 
-## Linux UID/GID handling
+### Linux UID/GID handling
 
 The sandbox automatically handles user permissions on Linux. Override these
 permissions with:
@@ -239,7 +426,9 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 
 **Missing commands**
 
-- Add to custom Dockerfile.
+- Add to a custom Dockerfile. Automatic `BUILD_SANDBOX` builds are only
+  available when running Gemini CLI from source; npm installs need a prebuilt
+  image instead.
 - Install via `sandbox.bashrc`.
 
 **Network issues**
@@ -253,9 +442,11 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 DEBUG=1 gemini -s -p "debug command"
 ```
 
-**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect
-gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli
-specific debug settings.
+<!-- prettier-ignore -->
+> [!NOTE]
+> If you have `DEBUG=true` in a project's `.env` file, it won't affect
+> gemini-cli due to automatic exclusion. Use `.gemini/.env` files for
+> gemini-cli specific debug settings.
 
 ### Inspect sandbox
 

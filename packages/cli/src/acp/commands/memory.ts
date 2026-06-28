@@ -1,11 +1,13 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
-  addMemory,
+  listInboxMemoryPatches,
+  listInboxSkills,
+  listInboxPatches,
   listMemoryFiles,
   refreshMemory,
   showMemory,
@@ -16,12 +18,6 @@ import type {
   CommandExecutionResponse,
 } from './types.js';
 
-const DEFAULT_SANITIZATION_CONFIG = {
-  allowedEnvironmentVariables: [],
-  blockedEnvironmentVariables: [],
-  enableEnvironmentVariableRedaction: false,
-};
-
 export class MemoryCommand implements Command {
   readonly name = 'memory';
   readonly description = 'Manage memory.';
@@ -29,7 +25,7 @@ export class MemoryCommand implements Command {
     new ShowMemoryCommand(),
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
-    new AddMemoryCommand(),
+    new InboxMemoryCommand(),
   ];
   readonly requiresWorkspace = true;
 
@@ -49,7 +45,7 @@ export class ShowMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = showMemory(context.config);
+    const result = showMemory(context.agentContext.config);
     return { name: this.name, data: result.content };
   }
 }
@@ -63,7 +59,7 @@ export class RefreshMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = await refreshMemory(context.config);
+    const result = await refreshMemory(context.agentContext.config);
     return { name: this.name, data: result.content };
   }
 }
@@ -76,46 +72,71 @@ export class ListMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = listMemoryFiles(context.config);
+    const result = listMemoryFiles(context.agentContext.config);
     return { name: this.name, data: result.content };
   }
 }
 
-export class AddMemoryCommand implements Command {
-  readonly name = 'memory add';
-  readonly description = 'Add content to the memory.';
+export class InboxMemoryCommand implements Command {
+  readonly name = 'memory inbox';
+  readonly description =
+    'Lists memory items extracted from past sessions that are pending review.';
 
   async execute(
     context: CommandContext,
-    args: string[],
+    _: string[],
   ): Promise<CommandExecutionResponse> {
-    const textToAdd = args.join(' ').trim();
-    const result = addMemory(textToAdd);
-    if (result.type === 'message') {
-      return { name: this.name, data: result.content };
-    }
-
-    const toolRegistry = context.config.getToolRegistry();
-    const tool = toolRegistry.getTool(result.toolName);
-    if (tool) {
-      const abortController = new AbortController();
-      const signal = abortController.signal;
-
-      await context.sendMessage(`Saving memory via ${result.toolName}...`);
-
-      await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-      });
-      await refreshMemory(context.config);
+    if (!context.agentContext.config.isAutoMemoryEnabled()) {
       return {
         name: this.name,
-        data: `Added memory: "${textToAdd}"`,
-      };
-    } else {
-      return {
-        name: this.name,
-        data: `Error: Tool ${result.toolName} not found.`,
+        data: 'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
       };
     }
+
+    const [skills, patches, memoryPatches] = await Promise.all([
+      listInboxSkills(context.agentContext.config),
+      listInboxPatches(context.agentContext.config),
+      listInboxMemoryPatches(context.agentContext.config),
+    ]);
+
+    if (
+      skills.length === 0 &&
+      patches.length === 0 &&
+      memoryPatches.length === 0
+    ) {
+      return { name: this.name, data: 'No items in inbox.' };
+    }
+
+    const lines: string[] = [];
+    for (const s of skills) {
+      const date = s.extractedAt
+        ? ` (extracted: ${new Date(s.extractedAt).toLocaleDateString()})`
+        : '';
+      lines.push(`- **${s.name}**: ${s.description}${date}`);
+    }
+    for (const p of patches) {
+      const targets = p.entries.map((e) => e.targetPath).join(', ');
+      const date = p.extractedAt
+        ? ` (extracted: ${new Date(p.extractedAt).toLocaleDateString()})`
+        : '';
+      lines.push(`- **${p.name}** (update): patches ${targets}${date}`);
+    }
+    for (const memoryPatch of memoryPatches) {
+      const targets = memoryPatch.entries.map((e) => e.targetPath).join(', ');
+      const date = memoryPatch.extractedAt
+        ? ` (latest extract: ${new Date(memoryPatch.extractedAt).toLocaleDateString()})`
+        : '';
+      const sourceCount = memoryPatch.sourceFiles.length;
+      const sourceLabel = sourceCount === 1 ? 'patch' : 'patches';
+      lines.push(
+        `- **${memoryPatch.name}** (${sourceCount} source ${sourceLabel}, ${memoryPatch.entries.length} hunks): targets ${targets}${date}`,
+      );
+    }
+
+    const total = skills.length + patches.length + memoryPatches.length;
+    return {
+      name: this.name,
+      data: `Memory inbox (${total}):\n${lines.join('\n')}`,
+    };
   }
 }

@@ -1,14 +1,14 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config, GitService } from '@google/gemini-cli-core';
+import type { AgentLoopContext, GitService } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 
 export interface CommandContext {
-  config: Config;
+  agentContext: AgentLoopContext;
   settings: LoadedSettings;
   git?: GitService;
   sendMessage: (text: string) => Promise<void>;

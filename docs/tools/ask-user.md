@@ -11,11 +11,12 @@ confirmation.
 - **Display name:** Ask User
 - **File:** `ask-user.ts`
 - **Parameters:**
+
   - `questions` (array of objects, required): A list of 1 to 4 questions to ask.
     Each question object has the following properties:
     - `question` (string, required): The complete question text.
     - `header` (string, required): A short label (max 16 chars) displayed as a
-      chip/tag (e.g., "Auth", "Database").
+      chip/tag (for example, "Auth", "Database").
     - `type` (string, optional): The type of question. Defaults to `'choice'`.
       - `'choice'`: Multiple-choice with options (supports multi-select).
       - `'text'`: Free-form text input.
@@ -25,16 +26,18 @@ confirmation.
       - `label` (string, required): Display text (1-5 words).
       - `description` (string, required): Brief explanation.
     - `multiSelect` (boolean, optional): For `'choice'` type, allows selecting
-      multiple options.
+      multiple options. Automatically adds an "All the above" option if there
+      are multiple standard options.
     - `placeholder` (string, optional): Hint text for input fields.
 
 - **Behavior:**
+
   - Presents an interactive dialog to the user with the specified questions.
   - Pauses execution until the user provides answers or dismisses the dialog.
   - Returns the user's answers to the model.
 
 - **Output (`llmContent`):** A JSON string containing the user's answers,
-  indexed by question position (e.g.,
+  indexed by question position (for example,
   `{"answers":{"0": "Option A", "1": "Some text"}}`).
 
 - **Confirmation:** Yes. The tool inherently involves user interaction.
@@ -74,7 +77,7 @@ confirmation.
       "header": "Project Name",
       "question": "What is the name of your new project?",
       "type": "text",
-      "placeholder": "e.g., my-awesome-app"
+      "placeholder": "for example, my-awesome-app"
     }
   ]
 }

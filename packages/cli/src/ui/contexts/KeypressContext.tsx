@@ -13,6 +13,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 
@@ -21,6 +22,7 @@ import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+import { useSettingsStore } from './SettingsContext.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
@@ -39,6 +41,7 @@ const KEY_INFO_MAP: Record<
   string,
   { name: string; shift?: boolean; ctrl?: boolean }
 > = {
+  OM: { name: 'enter' },
   '[200~': { name: 'paste-start' },
   '[201~': { name: 'paste-end' },
   '[[A': { name: 'f1' },
@@ -448,7 +451,7 @@ function* emitKeys(
               insertable: true,
               sequence: decoded,
             });
-          } catch (_e) {
+          } catch {
             debugLogger.log('Failed to decode OSC 52 clipboard data');
           }
         }
@@ -610,20 +613,28 @@ function* emitKeys(
           if (code.endsWith('u') || code.endsWith('~')) {
             // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
             const codeNumber = parseInt(code.slice(1, -1), 10);
-            if (codeNumber >= 33 && codeNumber <= 126) {
-              const char = String.fromCharCode(codeNumber);
+            const mapped = KITTY_CODE_MAP[codeNumber];
+            if (mapped) {
+              name = mapped.name;
+              if (mapped.sequence && !ctrl && !cmd && !alt) {
+                sequence = mapped.sequence;
+                insertable = true;
+              }
+            } else if (
+              codeNumber >= 33 && // Printable characters start after space (32),
+              codeNumber <= 0x10ffff && // Valid Unicode scalar values (excluding control characters)
+              (codeNumber < 0xd800 || codeNumber > 0xdfff) // Exclude UTF-16 surrogate halves
+            ) {
+              // Valid printable Unicode scalar values (up to Unicode maximum)
+              // Note: Kitty maps its special keys to the PUA (57344+), which are handled by KITTY_CODE_MAP above.
+              const char = String.fromCodePoint(codeNumber);
               name = char.toLowerCase();
-              if (char >= 'A' && char <= 'Z') {
+              if (char !== name) {
                 shift = true;
               }
-            } else {
-              const mapped = KITTY_CODE_MAP[codeNumber];
-              if (mapped) {
-                name = mapped.name;
-                if (mapped.sequence && !ctrl && !cmd && !alt) {
-                  sequence = mapped.sequence;
-                  insertable = true;
-                }
+              if (!ctrl && !cmd && !alt) {
+                sequence = char;
+                insertable = true;
               }
             }
           }
@@ -696,6 +707,10 @@ function* emitKeys(
       alt = ch.length > 0;
     } else {
       // Any other character is considered printable.
+      name = ch.toLowerCase();
+      if (ch !== name) {
+        shift = true;
+      }
       insertable = true;
     }
 
@@ -754,12 +769,13 @@ export function useKeypressContext() {
 export function KeypressProvider({
   children,
   config,
-  debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   config?: Config;
-  debugKeystrokeLogging?: boolean;
 }) {
+  const { settings } = useSettingsStore();
+  const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
+
   const { stdin, setRawMode } = useStdin();
 
   const subscribersToPriority = useRef<Map<KeypressHandler, number>>(
@@ -816,6 +832,9 @@ export function KeypressProvider({
 
   const broadcast = useCallback(
     (key: Key) => {
+      if (debugKeystrokeLogging) {
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
       // Use cached sorted priorities to avoid sorting on every keypress
       for (const p of sortedPriorities.current) {
         const set = subscribers.get(p);
@@ -830,7 +849,7 @@ export function KeypressProvider({
         }
       }
     },
-    [subscribers],
+    [subscribers, debugKeystrokeLogging],
   );
 
   useEffect(() => {
@@ -870,8 +889,13 @@ export function KeypressProvider({
     };
   }, [stdin, setRawMode, config, debugKeystrokeLogging, broadcast]);
 
+  const contextValue = useMemo(
+    () => ({ subscribe, unsubscribe }),
+    [subscribe, unsubscribe],
+  );
+
   return (
-    <KeypressContext.Provider value={{ subscribe, unsubscribe }}>
+    <KeypressContext.Provider value={contextValue}>
       {children}
     </KeypressContext.Provider>
   );

@@ -11,9 +11,7 @@ import * as dotenv from 'dotenv';
 import {
   AuthType,
   Config,
-  FileDiscoveryService,
   ApprovalMode,
-  loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   startupProfiler,
@@ -25,7 +23,8 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
-  isCloudShell,
+  createPolicyEngineConfig,
+  type PolicySettings,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -35,13 +34,15 @@ import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
+const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
+
 export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  trusted: boolean = false,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
-  const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const folderTrust =
     settings.folderTrust === true ||
@@ -60,6 +61,29 @@ export async function loadConfig(
     }
   }
 
+  const approvalMode =
+    process.env['GEMINI_YOLO_MODE'] === 'true'
+      ? ApprovalMode.YOLO
+      : ApprovalMode.DEFAULT;
+
+  const policySettings: PolicySettings = {
+    mcpServers: settings.mcpServers,
+    tools: {
+      core: settings.tools?.core,
+      exclude: settings.tools?.exclude,
+      allowed: settings.tools?.allowed,
+    },
+    policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    true,
+  );
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -70,14 +94,12 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || settings.tools?.core || undefined,
-    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
-    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
+    coreTools: settings.tools?.core || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    allowedTools: settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
-    approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'true'
-        ? ApprovalMode.YOLO
-        : ApprovalMode.DEFAULT,
+    approvalMode,
+    policyEngineConfig,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
@@ -104,30 +126,14 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust,
-    trustedFolder: true,
+    trustedFolder: trusted,
     extensionLoader,
     checkpointing,
-    interactive: !isHeadlessMode(),
+    interactive: true,
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
+    enableAgents: settings.experimental?.enableAgents ?? true,
   };
-
-  const fileService = new FileDiscoveryService(workspaceDir, {
-    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
-    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
-    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
-  });
-  const { memoryContent, fileCount, filePaths } =
-    await loadServerHierarchicalMemory(
-      workspaceDir,
-      [workspaceDir],
-      fileService,
-      extensionLoader,
-      folderTrust,
-    );
-  configParams.userMemory = memoryContent;
-  configParams.geminiMdFileCount = fileCount;
-  configParams.geminiMdFilePaths = filePaths;
 
   // Set an initial config to use to get a code assist server.
   // This is needed to fetch admin controls.
@@ -173,9 +179,18 @@ export async function loadConfig(
   await config.waitForMcpInit();
   startupProfiler.flush(config);
 
-  await refreshAuthentication(config, adcFilePath, 'Config');
+  await refreshAuthentication(config, 'Config');
 
   return config;
+}
+
+export function setIsTrusted(
+  agentSettings: AgentSettings | undefined,
+): boolean {
+  if (INITIAL_FOLDER_TRUST !== undefined) {
+    return INITIAL_FOLDER_TRUST === 'true';
+  }
+  return !!agentSettings?.isTrusted;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {
@@ -244,75 +259,51 @@ function findEnvFile(startDir: string): string | null {
 
 async function refreshAuthentication(
   config: Config,
-  adcFilePath: string | undefined,
   logPrefix: string,
 ): Promise<void> {
   if (process.env['USE_CCPA']) {
     logger.info(`[${logPrefix}] Using CCPA Auth:`);
+
+    logger.info(`[${logPrefix}] Attempting COMPUTE_ADC first.`);
     try {
-      if (adcFilePath) {
-        path.resolve(adcFilePath);
-      }
-    } catch (e) {
-      logger.error(
-        `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
+      await config.refreshAuth(AuthType.COMPUTE_ADC);
+      logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
+    } catch (adcError) {
+      const adcMessage =
+        adcError instanceof Error ? adcError.message : String(adcError);
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed or not available: ${adcMessage}`,
       );
-    }
 
-    const useComputeAdc = process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
-    const isHeadless = isHeadlessMode();
-    const shouldSkipOauth = isHeadless || useComputeAdc;
+      const useComputeAdc =
+        process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
+      const isHeadless = isHeadlessMode();
 
-    if (shouldSkipOauth) {
-      if (isCloudShell() || useComputeAdc) {
-        logger.info(
-          `[${logPrefix}] Skipping LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'}. Attempting COMPUTE_ADC.`,
-        );
-        try {
-          await config.refreshAuth(AuthType.COMPUTE_ADC);
-          logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
-        } catch (adcError) {
-          const adcMessage =
-            adcError instanceof Error ? adcError.message : String(adcError);
-          throw new FatalAuthenticationError(
-            `COMPUTE_ADC failed: ${adcMessage}. (Skipped LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'})`,
-          );
-        }
-      } else {
+      if (isHeadless || useComputeAdc) {
+        const reason = isHeadless
+          ? 'headless mode'
+          : 'GEMINI_CLI_USE_COMPUTE_ADC=true';
         throw new FatalAuthenticationError(
-          `Interactive terminal required for LOGIN_WITH_GOOGLE. Run in an interactive terminal or set GEMINI_CLI_USE_COMPUTE_ADC=true to use Application Default Credentials.`,
+          `COMPUTE_ADC failed: ${adcMessage}. (LOGIN_WITH_GOOGLE fallback skipped due to ${reason}. Run in an interactive terminal to use OAuth.)`,
         );
       }
-    } else {
+
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed, falling back to LOGIN_WITH_GOOGLE.`,
+      );
       try {
         await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       } catch (e) {
-        if (
-          e instanceof FatalAuthenticationError &&
-          (isCloudShell() || useComputeAdc)
-        ) {
-          logger.warn(
-            `[${logPrefix}] LOGIN_WITH_GOOGLE failed. Attempting COMPUTE_ADC fallback.`,
+        if (e instanceof FatalAuthenticationError) {
+          const originalMessage = e instanceof Error ? e.message : String(e);
+          throw new FatalAuthenticationError(
+            `${originalMessage}. The initial COMPUTE_ADC attempt also failed: ${adcMessage}`,
           );
-          try {
-            await config.refreshAuth(AuthType.COMPUTE_ADC);
-            logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
-          } catch (adcError) {
-            logger.error(
-              `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
-            );
-            const originalMessage = e instanceof Error ? e.message : String(e);
-            const adcMessage =
-              adcError instanceof Error ? adcError.message : String(adcError);
-            throw new FatalAuthenticationError(
-              `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
-            );
-          }
-        } else {
-          throw e;
         }
+        throw e;
       }
     }
+
     logger.info(
       `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
     );

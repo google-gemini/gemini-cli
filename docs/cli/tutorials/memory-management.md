@@ -11,8 +11,8 @@ persistent facts, and inspect the active context.
 
 ## Why manage context?
 
-Out of the box, Gemini CLI is smart but generic. It doesn't know your preferred
-testing framework, your indentation style, or that you hate using `any` in
+Gemini CLI is powerful but general. It doesn't know your preferred testing
+framework, your indentation style, or your preference against `any` in
 TypeScript. Context management solves this by giving the agent persistent
 memory.
 
@@ -50,7 +50,7 @@ loaded into every conversation.
 
 ### Scenario: Using the hierarchy
 
-Context is loaded hierarchically. This allows you to have general rules for
+Context is loaded hierarchically. This lets you have general rules for
 everything and specific rules for sub-projects.
 
 1.  **Global:** `~/.gemini/GEMINI.md` (Rules for _every_ project you work on).
@@ -71,8 +71,8 @@ Just tell the agent to remember something.
 
 **Prompt:** `Remember that I prefer using 'const' over 'let' wherever possible.`
 
-The agent will use the `save_memory` tool to store this fact in your global
-memory file.
+The agent will edit the appropriate memory Markdown file, so the fact is loaded
+in future sessions.
 
 **Prompt:** `Save the fact that the staging server IP is 10.0.0.5.`
 
@@ -109,11 +109,11 @@ immediately. Force a reload with:
 
 ## Best practices
 
-- **Keep it focused:** Don't dump your entire internal wiki into `GEMINI.md`.
-  Keep instructions actionable and relevant to code generation.
+- **Keep it focused:** Avoid adding excessive content to `GEMINI.md`. Keep
+  instructions actionable and relevant to code generation.
 - **Use negative constraints:** Explicitly telling the agent what _not_ to do
-  (e.g., "Do not use class components") is often more effective than vague
-  positive instructions.
+  (for example, "Do not use class components") is often more effective than
+  vague positive instructions.
 - **Review often:** Periodically check your `GEMINI.md` files to remove outdated
   rules.
 
@@ -124,3 +124,5 @@ immediately. Force a reload with:
 - Explore the [Command reference](../../reference/commands.md) for more
   `/memory` options.
 - Read the technical spec for [Project context](../../cli/gemini-md.md).
+- Try the experimental [Auto Memory](../auto-memory.md) feature to extract
+  memory updates and reusable skills from your past sessions automatically.

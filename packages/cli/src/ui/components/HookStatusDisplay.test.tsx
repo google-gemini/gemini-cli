@@ -18,7 +18,7 @@ describe('<HookStatusDisplay />', () => {
     const props = {
       activeHooks: [{ name: 'test-hook', eventName: 'BeforeAgent' }],
     };
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = await render(
       <HookStatusDisplay {...props} />,
     );
     await waitUntilReady();
@@ -33,7 +33,7 @@ describe('<HookStatusDisplay />', () => {
         { name: 'h2', eventName: 'BeforeAgent' },
       ],
     };
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = await render(
       <HookStatusDisplay {...props} />,
     );
     await waitUntilReady();
@@ -47,7 +47,7 @@ describe('<HookStatusDisplay />', () => {
         { name: 'step', eventName: 'BeforeAgent', index: 1, total: 3 },
       ],
     };
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = await render(
       <HookStatusDisplay {...props} />,
     );
     await waitUntilReady();
@@ -57,11 +57,37 @@ describe('<HookStatusDisplay />', () => {
 
   it('should return empty string if no active hooks', async () => {
     const props = { activeHooks: [] };
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount, waitUntilReady } = await render(
       <HookStatusDisplay {...props} />,
     );
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
+  });
+
+  it('should show generic message when only system hooks are active', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'sys-hook', eventName: 'BeforeAgent', source: 'system' },
+      ],
+    };
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Working...');
+    unmount();
+  });
+
+  it('matches SVG snapshot for single hook', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'test-hook', eventName: 'BeforeAgent', source: 'user' },
+      ],
+    };
+    const result = await render(<HookStatusDisplay {...props} />);
+    await result.waitUntilReady();
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
   });
 });

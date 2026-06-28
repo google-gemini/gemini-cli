@@ -83,7 +83,7 @@ describe('useAtCompletion with Agents', () => {
   it('should include agent suggestions', async () => {
     testRootDir = await createTmpDir({});
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
     );
 
@@ -101,7 +101,7 @@ describe('useAtCompletion with Agents', () => {
   it('should filter agent suggestions', async () => {
     testRootDir = await createTmpDir({});
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useTestHarnessForAtCompletion(true, 'Code', mockConfig, testRootDir),
     );
 

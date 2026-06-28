@@ -15,12 +15,17 @@ import type {
 import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { normalizeModelId } from '../../utils/modelUtils.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 
 // The number of recent history turns to provide to the router for context.
-const HISTORY_TURNS_FOR_CONTEXT = 8;
+export const HISTORY_TURNS_FOR_CONTEXT = 8;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
@@ -109,18 +114,46 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return null;
       }
 
-      if (!isGemini3Model(model)) {
+      if (!isGemini3Model(model, config)) {
         return null;
       }
 
       const promptId = getPromptIdWithFallback('classifier-router');
 
-      const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+      const candidateSlice = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
+      // Find the first non-tool turn. The server cannot always handle tool-related
+      // turns in the first slots of the contents array, so we strip them if they appear at the start.
+      let firstTextIndex = -1;
+      for (let i = 0; i < candidateSlice.length; i++) {
+        if (
+          !isFunctionCall(candidateSlice[i]) &&
+          !isFunctionResponse(candidateSlice[i])
+        ) {
+          firstTextIndex = i;
+          break;
+        }
+      }
+      const finalHistory =
+        firstTextIndex === -1 ? [] : candidateSlice.slice(firstTextIndex);
 
       // Wrap the user's request in tags to prevent prompt injection
       const requestParts = Array.isArray(context.request)
         ? context.request
         : [context.request];
+
+      // Bypass the classifier if the request is a function response and history is empty.
+      // Since we prune leading tool turns, if the history becomes empty, sending a
+      // function response request would result in an invalid payload (starts with function response).
+      if (
+        finalHistory.length === 0 &&
+        isFunctionResponse(createUserContent(context.request))
+      ) {
+        debugLogger.log(
+          '[Routing] Bypassing NumericalClassifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
 
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
@@ -151,12 +184,28 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         config.getGemini31Launched(),
         config.getUseCustomToolModel(),
       ]);
-      const selectedModel = resolveClassifierModel(
-        model,
-        modelAlias,
-        useGemini3_1,
-        useCustomToolModel,
+      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+      const selectedModel = normalizeModelId(
+        resolveClassifierModel(
+          normalizeModelId(model),
+          modelAlias,
+          useGemini3_1,
+          useCustomToolModel,
+          config.getHasAccessToPreviewModel?.() ?? true,
+          config,
+          useGemini3_5Flash,
+        ),
       );
+
+      const service = config.getModelAvailabilityService();
+      const snapshot = service.snapshot(selectedModel);
+
+      if (!snapshot.available) {
+        debugLogger.warn(
+          `[Routing] Numerical classifier selected unavailable model ${selectedModel} (${snapshot.reason}). Bypassing.`,
+        );
+        return null;
+      }
 
       const latencyMs = Date.now() - startTime;
 

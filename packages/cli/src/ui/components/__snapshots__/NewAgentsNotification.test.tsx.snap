@@ -10,6 +10,8 @@ exports[`NewAgentsNotification > renders agent list 1`] = `
  │ │                                                                                            │ │
  │ │ - Agent A:  Description A                                                                  │ │
  │ │ - Agent B:  Description B                                                                  │ │
+ │ │   (Includes MCP servers: github, postgres)                                                 │ │
+ │ │ - Agent C:  Description C                                                                  │ │
  │ │                                                                                            │ │
  │ └────────────────────────────────────────────────────────────────────────────────────────────┘ │
  │                                                                                                │

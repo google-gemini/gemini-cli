@@ -14,7 +14,9 @@ feature), while the PR is the "how" (the implementation). This separation helps
 us track work, prioritize features, and maintain clear historical context. Our
 automation is built around this principle.
 
-> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+<!-- prettier-ignore -->
+> [!NOTE]
+> Issues tagged as "🔒Maintainers only" are reserved for project
 > maintainers. We will not accept pull requests related to these issues.
 
 ---
@@ -35,8 +37,8 @@ is to perform an initial analysis and apply the correct labels.
   - It uses a Gemini model to analyze the issue's title and body against a
     detailed set of guidelines.
   - **Applies one `area/*` label**: Categorizes the issue into a functional area
-    of the project (e.g., `area/ux`, `area/models`, `area/platform`).
-  - **Applies one `kind/*` label**: Identifies the type of issue (e.g.,
+    of the project (for example, `area/ux`, `area/models`, `area/platform`).
+  - **Applies one `kind/*` label**: Identifies the type of issue (for example,
     `kind/bug`, `kind/enhancement`, `kind/question`).
   - **Applies one `priority/*` label**: Assigns a priority from P0 (critical) to
     P3 (low) based on the described impact.
@@ -48,8 +50,8 @@ is to perform an initial analysis and apply the correct labels.
 - **What you should do**:
   - Fill out the issue template as completely as possible. The more detail you
     provide, the more accurate the triage will be.
-  - If the `status/need-information` label is added, please provide the
-    requested details in a comment.
+  - If the `status/need-information` label is added, provide the requested
+    details in a comment.
 
 ### 2. When you open a pull request: `Continuous Integration (CI)`
 
@@ -82,7 +84,8 @@ issues and have consistent labels.
 - **When it runs**: Every 15 minutes on all open pull requests.
 - **What it does**:
   - **Checks for a linked issue**: The bot scans your PR description for a
-    keyword that links it to an issue (e.g., `Fixes #123`, `Closes #456`).
+    keyword that links it to an issue (for example, `Fixes #123`,
+    `Closes #456`).
   - **Adds `status/need-issue`**: If no linked issue is found, the bot will add
     the `status/need-issue` label to your PR. This is a clear signal that an
     issue needs to be created and linked.
@@ -151,10 +154,38 @@ and will never be auto-unassigned.
   - **Unassign yourself** if you can no longer work on the issue by commenting
     `/unassign`, so other contributors can pick it up right away.
 
-### 6. Release automation
+### 6. Automatically label PRs by size: `PR Size Labeler`
+
+To help maintainers estimate review effort and keep the PR history clean, this
+workflow automatically tags every pull request with a size label representing
+the total volume of line changes.
+
+- **Workflow File**: `.github/workflows/pr-size-labeler.yml`
+- **When it runs**: Immediately after a pull request is created, synchronized
+  (new commits pushed), or reopened. It can also be triggered manually via
+  `workflow_dispatch` with a PR number.
+- **What it does**:
+  - **Calculates total changes**: Summarizes additions and deletions across all
+    changed files in a single consolidated API request.
+  - **Applies standard size labels**:
+    - `size/XS`: < 10 lines changed
+    - `size/S`: 10-49 lines changed
+    - `size/M`: 50-249 lines changed
+    - `size/L`: 250-999 lines changed
+    - `size/XL`: >= 1000 lines changed
+  - **Updates size tag atomically**: Adds the new correct size label and removes
+    any obsolete size labels in one atomic step.
+  - **Updates/Posts PR size info comment**: Instead of spamming a new comment on
+    every commit push, it updates the existing size labeler status comment
+    inline to keep the PR conversation timeline perfectly neat and clean.
+- **What you should do**:
+  - You do not need to take any actions. The workflow runs automatically and
+    updates the label and comment seamlessly as you push new updates.
+
+### 7. Release automation
 
 This workflow handles the process of packaging and publishing new versions of
-the Gemini CLI.
+Gemini CLI.
 
 - **Workflow File**: `.github/workflows/release-manual.yml`
 - **When it runs**: On a daily schedule for "nightly" releases, and manually for
@@ -169,4 +200,4 @@ the Gemini CLI.
     will be included in the very next nightly release.
 
 We hope this detailed overview is helpful. If you have any questions about our
-automation or processes, please don't hesitate to ask!
+automation or processes, don't hesitate to ask!

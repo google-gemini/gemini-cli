@@ -10,6 +10,8 @@ import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
 import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
+import { GitHubDarkColorblind } from './builtin/dark/github-dark-colorblind.js';
+import { GitHubLightColorblind } from './builtin/light/github-light-colorblind.js';
 import { GoogleCode } from './builtin/light/googlecode-light.js';
 import { Holiday } from './builtin/dark/holiday-dark.js';
 import { DefaultLight } from './builtin/light/default-light.js';
@@ -18,6 +20,7 @@ import { ShadesOfPurple } from './builtin/dark/shades-of-purple-dark.js';
 import { SolarizedDark } from './builtin/dark/solarized-dark.js';
 import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
+import { TokyoNight } from './builtin/dark/tokyonight-dark.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
@@ -78,12 +81,15 @@ class ThemeManager {
       DefaultDark,
       GitHubDark,
       GitHubLight,
+      GitHubDarkColorblind,
+      GitHubLightColorblind,
       GoogleCode,
       Holiday,
       ShadesOfPurple,
       SolarizedDark,
       SolarizedLight,
       XCode,
+      TokyoNight,
       ANSI,
       ANSILight,
     ];
@@ -200,7 +206,6 @@ class ThemeManager {
         try {
           const theme = createCustomTheme(themeWithDefaults);
           this.extensionThemes.set(namespacedName, theme);
-          debugLogger.log(`Registered theme: ${namespacedName}`);
         } catch (error) {
           debugLogger.warn(
             `Failed to load custom theme "${namespacedName}":`,
@@ -231,7 +236,6 @@ class ThemeManager {
     for (const theme of customThemes) {
       const namespacedName = `${theme.name} (${extensionName})`;
       this.extensionThemes.delete(namespacedName);
-      debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
   }
 

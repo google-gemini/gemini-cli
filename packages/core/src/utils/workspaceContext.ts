@@ -184,11 +184,25 @@ export class WorkspaceContext {
 
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+          // Check for blocked segments case-insensitively
+          const relative = path.relative(dir, fullyResolvedPath);
+          const segments = relative.split(path.sep);
+          const hasBlockedSegment = segments.some((segment) => {
+            const clean = trimTrailingSpacesAndDots(
+              segment.split(':')[0],
+            ).toLowerCase();
+            return (
+              clean === '.git' || clean === '.env' || clean === 'node_modules'
+            );
+          });
+          if (hasBlockedSegment) {
+            return false;
+          }
           return true;
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -216,7 +230,7 @@ export class WorkspaceContext {
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -247,4 +261,16 @@ export class WorkspaceContext {
       !path.isAbsolute(relative)
     );
   }
+}
+
+/**
+ * Trims trailing spaces and dots from a string without using regular expressions
+ * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
+ */
+function trimTrailingSpacesAndDots(str: string): string {
+  let end = str.length - 1;
+  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
+    end--;
+  }
+  return str.slice(0, end + 1);
 }

@@ -9,13 +9,14 @@ import {
   SessionSelector,
   extractFirstUserMessage,
   formatRelativeTime,
-  hasUserOrAssistantMessage,
   SessionError,
+  convertSessionToHistoryFormats,
 } from './sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
-  type Config,
+  type Storage,
   type MessageRecord,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -23,29 +24,67 @@ import { randomUUID } from 'node:crypto';
 
 describe('SessionSelector', () => {
   let tmpDir: string;
-  let config: Config;
+  let storage: Storage;
 
   beforeEach(async () => {
     // Create a temporary directory for testing
     tmpDir = path.join(process.cwd(), '.tmp-test-sessions');
     await fs.mkdir(tmpDir, { recursive: true });
 
-    // Mock config
-    config = {
-      storage: {
-        getProjectTempDir: () => tmpDir,
-      },
-      getSessionId: () => 'current-session-id',
-    } as Partial<Config> as Config;
+    // Mock storage
+    storage = {
+      getProjectTempDir: () => tmpDir,
+    } as Partial<Storage> as Storage;
   });
 
   afterEach(async () => {
     // Clean up test files
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch (_error) {
+    } catch {
       // Ignore cleanup errors
     }
+  });
+
+  describe('sessionExists', () => {
+    it('should return true if a session file with the exact UUID exists', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `session-20240101T000000-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify({ sessionId }),
+      );
+
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(true);
+    });
+
+    it('should return false if no session file matches the UUID', async () => {
+      const sessionId = randomUUID();
+      const chatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(chatsDir, `session-different-uuid-20240101.jsonl`),
+        '{}',
+      );
+
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(false);
+    });
+
+    it('should return false if the chats directory does not exist', async () => {
+      const sessionId = randomUUID();
+      // Notice we do NOT create chatsDir here.
+      const selector = new SessionSelector(storage);
+      const exists = await selector.sessionExists(sessionId);
+      expect(exists).toBe(false);
+    });
   });
 
   it('should resolve session by UUID', async () => {
@@ -102,7 +141,7 @@ describe('SessionSelector', () => {
       JSON.stringify(session2, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
 
     // Test resolving by UUID
     const result1 = await sessionSelector.resolveSession(sessionId1);
@@ -168,7 +207,7 @@ describe('SessionSelector', () => {
       JSON.stringify(session2, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
 
     // Test resolving by index (1-based)
     const result1 = await sessionSelector.resolveSession('1');
@@ -232,11 +271,49 @@ describe('SessionSelector', () => {
       JSON.stringify(session2, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
 
     // Test resolving latest
     const result = await sessionSelector.resolveSession('latest');
     expect(result.sessionData.messages[0].content).toBe('Latest session');
+  });
+
+  it('should resolve session by UUID with whitespace (trimming)', async () => {
+    const sessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    // Test resolving by UUID with leading/trailing spaces
+    const result = await sessionSelector.resolveSession(`  ${sessionId}  `);
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.messages[0].content).toBe('Test message');
   });
 
   it('should deduplicate sessions by ID', async () => {
@@ -294,7 +371,7 @@ describe('SessionSelector', () => {
       JSON.stringify(sessionDuplicate, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
     const sessions = await sessionSelector.listSessions();
 
     expect(sessions.length).toBe(1);
@@ -333,7 +410,7 @@ describe('SessionSelector', () => {
       JSON.stringify(session1, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
 
     await expect(
       sessionSelector.resolveSession('invalid-uuid'),
@@ -349,14 +426,11 @@ describe('SessionSelector', () => {
     const chatsDir = path.join(tmpDir, 'chats');
     await fs.mkdir(chatsDir, { recursive: true });
 
-    const emptyConfig = {
-      storage: {
-        getProjectTempDir: () => tmpDir,
-      },
-      getSessionId: () => 'current-session-id',
-    } as Partial<Config> as Config;
+    const emptyStorage = {
+      getProjectTempDir: () => tmpDir,
+    } as Partial<Storage> as Storage;
 
-    const sessionSelector = new SessionSelector(emptyConfig);
+    const sessionSelector = new SessionSelector(emptyStorage);
 
     await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
       (error) => {
@@ -429,12 +503,86 @@ describe('SessionSelector', () => {
       JSON.stringify(sessionSystemOnly, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
     const sessions = await sessionSelector.listSessions();
 
     // Should only list the session with user message
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(sessionIdWithUser);
+  });
+
+  it('should not list command-only sessions', async () => {
+    const commandOnlySessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId: commandOnlySessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:01:00.000Z',
+    };
+    const commandMessage = {
+      type: 'user',
+      content: '/resume',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${commandOnlySessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(commandMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toEqual([]);
+  });
+
+  it('should use the first non-command user message for display', async () => {
+    const sessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:02:00.000Z',
+    };
+    const commandMessage = {
+      type: 'user',
+      content: '/resume',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+    const realMessage = {
+      type: 'user',
+      content: 'Help me fix resume history',
+      id: 'msg2',
+      timestamp: '2024-01-01T10:01:00.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(commandMessage)}\n${JSON.stringify(realMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].firstUserMessage).toBe('Help me fix resume history');
+    expect(sessions[0].displayName).toBe('Help me fix resume history');
   });
 
   it('should list session with gemini message even without user message', async () => {
@@ -468,7 +616,7 @@ describe('SessionSelector', () => {
       JSON.stringify(sessionGeminiOnly, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
     const sessions = await sessionSelector.listSessions();
 
     // Should list the session with gemini message
@@ -534,12 +682,126 @@ describe('SessionSelector', () => {
       JSON.stringify(subagentSession, null, 2),
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(storage);
     const sessions = await sessionSelector.listSessions();
 
     // Should only list the main session
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(mainSessionId);
+  });
+
+  it('should list legacy session JSON without timestamps (regression #18593)', async () => {
+    const sessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      messages: [
+        {
+          type: 'user',
+          content: 'Legacy session message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const filePath = path.join(
+      chatsDir,
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+    );
+    await fs.writeFile(filePath, JSON.stringify(session, null, 2));
+    const fallbackTimestamp = new Date('2024-01-01T10:30:00.000Z');
+    await fs.utimes(filePath, fallbackTimestamp, fallbackTimestamp);
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].id).toBe(sessionId);
+    expect(sessions[0].startTime).toBe(fallbackTimestamp.toISOString());
+    expect(sessions[0].lastUpdated).toBe(fallbackTimestamp.toISOString());
+  });
+
+  it('should resolve legacy session JSON without timestamps by UUID (regression #18593)', async () => {
+    const sessionId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      messages: [
+        {
+          type: 'user',
+          content: 'Legacy session message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const filePath = path.join(
+      chatsDir,
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+    );
+    await fs.writeFile(filePath, JSON.stringify(session, null, 2));
+    const fallbackTimestamp = new Date('2024-01-01T10:30:00.000Z');
+    await fs.utimes(filePath, fallbackTimestamp, fallbackTimestamp);
+
+    const sessionSelector = new SessionSelector(storage);
+    const result = await sessionSelector.resolveSession(sessionId);
+
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.startTime).toBe(fallbackTimestamp.toISOString());
+    expect(result.sessionData.lastUpdated).toBe(
+      fallbackTimestamp.toISOString(),
+    );
+  });
+
+  it('should throw INVALID_SESSION_IDENTIFIER for a UUID that does not exist on disk at all', async () => {
+    const existingSessionId = randomUUID();
+    const nonExistentId = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId: existingSessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Hello',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${existingSessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    await expect(sessionSelector.findSession(nonExistentId)).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('INVALID_SESSION_IDENTIFIER');
+        return true;
+      },
+    );
   });
 });
 
@@ -592,147 +854,6 @@ describe('extractFirstUserMessage', () => {
   });
 });
 
-describe('hasUserOrAssistantMessage', () => {
-  it('should return true when session has user message', () => {
-    const messages = [
-      {
-        type: 'user',
-        content: 'Hello',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(true);
-  });
-
-  it('should return true when session has gemini message', () => {
-    const messages = [
-      {
-        type: 'gemini',
-        content: 'Hello, how can I help?',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(true);
-  });
-
-  it('should return true when session has both user and gemini messages', () => {
-    const messages = [
-      {
-        type: 'user',
-        content: 'Hello',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-      {
-        type: 'gemini',
-        content: 'Hi there!',
-        id: 'msg2',
-        timestamp: '2024-01-01T10:01:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(true);
-  });
-
-  it('should return false when session only has info messages', () => {
-    const messages = [
-      {
-        type: 'info',
-        content: 'Session started',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(false);
-  });
-
-  it('should return false when session only has error messages', () => {
-    const messages = [
-      {
-        type: 'error',
-        content: 'An error occurred',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(false);
-  });
-
-  it('should return false when session only has warning messages', () => {
-    const messages = [
-      {
-        type: 'warning',
-        content: 'Warning message',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(false);
-  });
-
-  it('should return false when session only has system messages (mixed)', () => {
-    const messages = [
-      {
-        type: 'info',
-        content: 'Session started',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-      {
-        type: 'error',
-        content: 'An error occurred',
-        id: 'msg2',
-        timestamp: '2024-01-01T10:01:00.000Z',
-      },
-      {
-        type: 'warning',
-        content: 'Warning message',
-        id: 'msg3',
-        timestamp: '2024-01-01T10:02:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(false);
-  });
-
-  it('should return true when session has user message among system messages', () => {
-    const messages = [
-      {
-        type: 'info',
-        content: 'Session started',
-        id: 'msg1',
-        timestamp: '2024-01-01T10:00:00.000Z',
-      },
-      {
-        type: 'user',
-        content: 'Hello',
-        id: 'msg2',
-        timestamp: '2024-01-01T10:01:00.000Z',
-      },
-      {
-        type: 'error',
-        content: 'An error occurred',
-        id: 'msg3',
-        timestamp: '2024-01-01T10:02:00.000Z',
-      },
-    ] as MessageRecord[];
-
-    expect(hasUserOrAssistantMessage(messages)).toBe(true);
-  });
-
-  it('should return false for empty messages array', () => {
-    const messages: MessageRecord[] = [];
-    expect(hasUserOrAssistantMessage(messages)).toBe(false);
-  });
-});
-
 describe('formatRelativeTime', () => {
   it('should format time correctly', () => {
     const now = new Date();
@@ -766,5 +887,212 @@ describe('formatRelativeTime', () => {
     // Just now (within 60 seconds)
     const thirtySecondsAgo = new Date(now.getTime() - 30 * 1000);
     expect(formatRelativeTime(thirtySecondsAgo.toISOString())).toBe('Just now');
+  });
+});
+
+describe('convertSessionToHistoryFormats', () => {
+  it('should preserve tool call arguments', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'update_topic',
+            args: {
+              title: 'Researching bug',
+              summary: 'I am looking into the issue.',
+            },
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+            displayName: 'Update Topic Context',
+            description: 'Updating the topic',
+            renderOutputAsMarkdown: true,
+            resultDisplay: 'Topic updated',
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools).toHaveLength(1);
+      const tool = toolGroup.tools[0];
+      expect(tool.callId).toBe('call_1');
+      expect(tool.name).toBe('Update Topic Context');
+      expect(tool.description).toBe('Updating the topic');
+      expect(tool.renderOutputAsMarkdown).toBe(true);
+      expect(tool.status).toBe(CoreToolCallStatus.Success);
+      expect(tool.resultDisplay).toBe('Topic updated');
+      expect(tool.args).toEqual({
+        title: 'Researching bug',
+        summary: 'I am looking into the issue.',
+      });
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
+  });
+
+  it('should map tool call status correctly when not success', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            status: CoreToolCallStatus.Error,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+          {
+            id: 'call_2',
+            name: 'test_tool_2',
+            status: CoreToolCallStatus.Cancelled,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools).toHaveLength(2);
+      expect(toolGroup.tools[0].status).toBe(CoreToolCallStatus.Error);
+      expect(toolGroup.tools[1].status).toBe(CoreToolCallStatus.Error); // Cancelled maps to error in this older format projection
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
+  });
+
+  it('should convert various message types', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content: 'Hello user',
+      },
+      {
+        id: '2',
+        timestamp: new Date().toISOString(),
+        type: 'info',
+        content: 'System info',
+      },
+      {
+        id: '3',
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        content: 'System error',
+      },
+      {
+        id: '4',
+        timestamp: new Date().toISOString(),
+        type: 'warning',
+        content: 'System warning',
+      },
+      {
+        id: '5',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: 'Hello gemini',
+        thoughts: [
+          {
+            subject: 'Thinking',
+            description: 'about things',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    // thoughts become a separate item
+    expect(result.uiHistory).toHaveLength(6);
+    expect(result.uiHistory[0]).toEqual({ type: 'user', text: 'Hello user' });
+    expect(result.uiHistory[1]).toEqual({ type: 'info', text: 'System info' });
+    expect(result.uiHistory[2]).toEqual({
+      type: 'error',
+      text: 'System error',
+    });
+    expect(result.uiHistory[3]).toEqual({
+      type: 'warning',
+      text: 'System warning',
+    });
+    expect(result.uiHistory[4]).toEqual({
+      type: 'thinking',
+      thought: { subject: 'Thinking', description: 'about things' },
+    });
+    expect(result.uiHistory[5]).toEqual({
+      type: 'gemini',
+      text: 'Hello gemini',
+    });
+  });
+
+  it('should filter out <session_context> from UI history', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content:
+          '<session_context>\nThis is the Gemini CLI\n</session_context>',
+      },
+      {
+        id: '2',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content: 'Real message',
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0].text).toBe('Real message');
+  });
+
+  it('should handle missing tool descriptions and displayNames', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools[0].name).toBe('test_tool'); // Fallback to name
+      expect(toolGroup.tools[0].description).toBe(''); // Fallback to empty string
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
   });
 });

@@ -24,10 +24,7 @@ describe('RawMarkdownIndicator', () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
-    const { lastFrame, waitUntilReady, unmount } = render(
-      <RawMarkdownIndicator />,
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<RawMarkdownIndicator />);
     expect(lastFrame()).toContain('raw markdown mode');
     expect(lastFrame()).toContain('Option+M to toggle');
     unmount();
@@ -37,10 +34,7 @@ describe('RawMarkdownIndicator', () => {
     Object.defineProperty(process, 'platform', {
       value: 'linux',
     });
-    const { lastFrame, waitUntilReady, unmount } = render(
-      <RawMarkdownIndicator />,
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<RawMarkdownIndicator />);
     expect(lastFrame()).toContain('raw markdown mode');
     expect(lastFrame()).toContain('Alt+M to toggle');
     unmount();

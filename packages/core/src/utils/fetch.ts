@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage, isNodeError } from './errors.js';
+import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
-
-const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
-const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+import { lookup } from 'node:dns/promises';
 
 export class FetchError extends Error {
   constructor(
@@ -23,13 +21,44 @@ export class FetchError extends Error {
   }
 }
 
+export class PrivateIpError extends Error {
+  constructor(message = 'Access to private network is blocked') {
+    super(message);
+    this.name = 'PrivateIpError';
+  }
+}
+
+let defaultHeadersTimeout = 60000; // 60 seconds
+const defaultBodyTimeout = 300000; // 5 minutes
+let currentProxy: string | undefined = undefined;
+
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
   new Agent({
-    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
   }),
 );
+
+export function updateGlobalFetchTimeouts(timeoutMs: number) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError(
+      `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
+    );
+  }
+  defaultHeadersTimeout = timeoutMs;
+  // We keep body timeout high for LLM streaming responses
+  if (currentProxy) {
+    setGlobalProxy(currentProxy);
+  } else {
+    setGlobalDispatcher(
+      new Agent({
+        headersTimeout: defaultHeadersTimeout,
+        bodyTimeout: defaultBodyTimeout,
+      }),
+    );
+  }
+}
 
 /**
  * Sanitizes a hostname by stripping IPv6 brackets if present.
@@ -116,11 +145,45 @@ export function isAddressPrivate(address: string): boolean {
 }
 
 /**
- * Creates an undici ProxyAgent that incorporates safe DNS lookup.
+ * Checks if a URL resolves to a private IP address.
  */
-export function createSafeProxyAgent(proxyUrl: string): ProxyAgent {
-  return new ProxyAgent({
-    uri: proxyUrl,
+export async function isPrivateIpAsync(url: string): Promise<boolean> {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname;
+
+    if (isLoopbackHost(hostname)) {
+      return false;
+    }
+
+    const addresses = await lookup(hostname, { all: true });
+    return addresses.some((addr) => isAddressPrivate(addr.address));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw new Error('Failed to verify if URL resolves to private IP', {
+      cause: error,
+    });
+  }
+}
+
+/**
+ * Creates an undici EnvHttpProxyAgent that incorporates safe DNS lookup.
+ */
+export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
+  const trimmedProxy = proxyUrl.trim();
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
+  return new EnvHttpProxyAgent({
+    httpProxy: trimmedProxy,
+    httpsProxy: trimmedProxy,
+    noProxy,
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
   });
 }
 
@@ -149,7 +212,15 @@ export async function fetchWithTimeout(
     });
     return response;
   } catch (error) {
-    if (isNodeError(error) && error.code === 'ABORT_ERR') {
+    if (isAbortError(error)) {
+      // If the caller's own signal was already aborted, this is a user-initiated
+      // cancellation (e.g. Ctrl+C), not an internal timeout. Re-throw as a plain
+      // AbortError so the retry layer does NOT treat it as a retryable ETIMEDOUT.
+      if (options?.signal?.aborted) {
+        // Rethrow the original abort reason or the caught error to preserve
+        // the stack trace and any custom abort reason (e.g. from Ctrl+C).
+        throw options.signal.reason ?? error;
+      }
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
     }
     throw new FetchError(getErrorMessage(error), undefined, { cause: error });
@@ -159,11 +230,20 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
+  const trimmedProxy = proxy.trim();
+  currentProxy = trimmedProxy;
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
   setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxy,
-      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    new EnvHttpProxyAgent({
+      httpProxy: trimmedProxy,
+      httpsProxy: trimmedProxy,
+      noProxy,
+      headersTimeout: defaultHeadersTimeout,
+      bodyTimeout: defaultBodyTimeout,
     }),
   );
 }

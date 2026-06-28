@@ -26,11 +26,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actual,
-    loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
-      memoryContent: '',
-      fileCount: 0,
-      filePaths: [],
-    }),
     createPolicyEngineConfig: vi.fn().mockResolvedValue({
       rules: [],
       checkers: [],
@@ -88,6 +83,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -106,6 +103,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -130,6 +129,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -162,6 +163,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
           path.join('.gemini', 'policies'),
         ),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -201,6 +204,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -236,6 +241,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
           path.join('.gemini', 'policies'),
         ),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -277,6 +284,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         expect.objectContaining({
           workspacePoliciesDir: undefined,
         }),
+        expect.anything(),
+        undefined,
         expect.anything(),
       );
     } finally {

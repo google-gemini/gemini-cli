@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, checkPathTrust } from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
@@ -40,6 +40,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     getErrorMessage: (error: unknown) => String(error),
     homedir: () => path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`),
+    checkPathTrust: vi.fn(() => ({ isTrusted: false })),
+    isHeadlessMode: vi.fn(() => true),
   };
 });
 
@@ -92,7 +94,9 @@ describe('loadSettings', () => {
   it('should load other top-level settings correctly', () => {
     const settings = {
       showMemoryUsage: true,
-      coreTools: ['tool1', 'tool2'],
+      tools: {
+        core: ['tool1', 'tool2'],
+      },
       mcpServers: {
         server1: {
           command: 'cmd',
@@ -107,9 +111,21 @@ describe('loadSettings', () => {
 
     const result = loadSettings(mockWorkspaceDir);
     expect(result.showMemoryUsage).toBe(true);
-    expect(result.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.tools?.core).toEqual(['tool1', 'tool2']);
     expect(result.mcpServers).toHaveProperty('server1');
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
+  });
+
+  it('should load experimental settings correctly', () => {
+    const settings = {
+      experimental: {
+        enableAgents: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.experimental?.enableAgents).toBe(true);
   });
 
   it('should overwrite top-level settings from workspace (shallow merge)', () => {
@@ -134,12 +150,86 @@ describe('loadSettings', () => {
     );
     fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
 
-    const result = loadSettings(mockWorkspaceDir);
+    const result = loadSettings(mockWorkspaceDir, true);
     // Primitive value overwritten
     expect(result.showMemoryUsage).toBe(true);
 
     // Object value completely replaced (shallow merge behavior)
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+  });
+
+  describe('security', () => {
+    it('should NOT load workspace settings if workspace is NOT trusted', () => {
+      const userSettings = { showMemoryUsage: false };
+      fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+      const workspaceSettings = { showMemoryUsage: true };
+      const workspaceSettingsPath = path.join(
+        mockGeminiWorkspaceDir,
+        'settings.json',
+      );
+      fs.writeFileSync(
+        workspaceSettingsPath,
+        JSON.stringify(workspaceSettings),
+      );
+
+      // checkPathTrust is mocked to return isTrusted: false by default
+      const result = loadSettings(mockWorkspaceDir);
+      expect(result.showMemoryUsage).toBe(false);
+    });
+
+    it('should load workspace settings if workspace IS trusted', () => {
+      vi.mocked(checkPathTrust).mockReturnValueOnce({
+        isTrusted: true,
+        source: 'file',
+      });
+      const userSettings = { showMemoryUsage: false };
+      fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+      const workspaceSettings = { showMemoryUsage: true };
+      const workspaceSettingsPath = path.join(
+        mockGeminiWorkspaceDir,
+        'settings.json',
+      );
+      fs.writeFileSync(
+        workspaceSettingsPath,
+        JSON.stringify(workspaceSettings),
+      );
+
+      const result = loadSettings(mockWorkspaceDir);
+      expect(result.showMemoryUsage).toBe(true);
+    });
+
+    it('should NOT allow workspace settings to override adminPolicyPaths or policyPaths even if trusted', () => {
+      vi.mocked(checkPathTrust).mockReturnValueOnce({
+        isTrusted: true,
+        source: 'file',
+      });
+      const userSettings = {
+        adminPolicyPaths: ['/trusted/admin'],
+        policyPaths: ['/trusted/user'],
+      };
+      fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+      const workspaceSettings = {
+        adminPolicyPaths: ['./malicious/admin'],
+        policyPaths: ['./malicious/user'],
+        showMemoryUsage: true,
+      };
+      const workspaceSettingsPath = path.join(
+        mockGeminiWorkspaceDir,
+        'settings.json',
+      );
+      fs.writeFileSync(
+        workspaceSettingsPath,
+        JSON.stringify(workspaceSettings),
+      );
+
+      const result = loadSettings(mockWorkspaceDir);
+      expect(result.showMemoryUsage).toBe(true);
+      expect(result.adminPolicyPaths).toEqual(['/trusted/admin']);
+      expect(result.policyPaths).toEqual(['/trusted/user']);
+    });
   });
 });

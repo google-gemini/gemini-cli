@@ -470,5 +470,5 @@ console.error('Consolidating memories for session end...');
 
 While project-level hooks are great for specific repositories, you can share
 your hooks across multiple projects by packaging them as a
-[Gemini CLI extension](https://www.google.com/search?q=../extensions/index.md).
-This provides version control, easy distribution, and centralized management.
+[Gemini CLI extension](../extensions/index.md). This provides version control,
+easy distribution, and centralized management.

@@ -60,10 +60,12 @@ describe('ideCommand', () => {
         settings: {
           setValue: vi.fn(),
         },
-        config: {
-          getIdeMode: vi.fn(),
-          setIdeMode: vi.fn(),
-          getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+        agentContext: {
+          config: {
+            getIdeMode: vi.fn(),
+            setIdeMode: vi.fn(),
+            getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+          },
         },
       },
     } as unknown as CommandContext;

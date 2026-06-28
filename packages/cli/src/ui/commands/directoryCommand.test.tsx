@@ -80,16 +80,20 @@ describe('directoryCommand', () => {
       }),
       getWorkingDir: () => path.resolve('/test/dir'),
       shouldLoadMemoryFromIncludeDirectories: () => false,
+      getMemoryContextManager: vi.fn(),
       getDebugMode: () => false,
       getFileService: () => ({}),
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     mockContext = {
       services: {
-        config: mockConfig,
+        agentContext: mockConfig,
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,

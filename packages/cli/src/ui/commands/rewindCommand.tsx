@@ -14,7 +14,6 @@ import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
-import type { Content } from '@google/genai';
 import {
   checkExhaustive,
   coreEvents,
@@ -58,10 +57,12 @@ async function rewindConversation(
     const { uiHistory } = convertSessionToHistoryFormats(conversation.messages);
     const clientHistory = convertSessionToClientHistory(conversation.messages);
 
-    client.setHistory(clientHistory as Content[]);
+    client.setHistory(clientHistory);
 
     // Reset context manager as we are rewinding history
-    await context.services.config?.getContextManager()?.refresh();
+    await context.services.agentContext?.config
+      .getMemoryContextManager()
+      ?.refresh();
 
     // Update UI History
     // We generate IDs based on index for the rewind history
@@ -94,7 +95,8 @@ export const rewindCommand: SlashCommand = {
   description: 'Jump back to a specific message and restart the conversation',
   kind: CommandKind.BUILT_IN,
   action: (context) => {
-    const config = context.services.config;
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     if (!config)
       return {
         type: 'message',
@@ -102,7 +104,7 @@ export const rewindCommand: SlashCommand = {
         content: 'Config not found',
       };
 
-    const client = config.getGeminiClient();
+    const client = agentContext.geminiClient;
     if (!client)
       return {
         type: 'message',

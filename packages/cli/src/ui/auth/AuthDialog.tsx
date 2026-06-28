@@ -83,7 +83,7 @@ export function AuthDialog({
     );
   }
 
-  let defaultAuthType = null;
+  let defaultAuthType: AuthType | null = null;
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   if (
     defaultAuthTypeEnv &&
@@ -119,7 +119,12 @@ export function AuthDialog({
         return;
       }
       if (authType) {
-        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+        const needsRestart =
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          (authType === AuthType.USE_VERTEX_AI &&
+            process.env['CLOUD_SHELL'] === 'true');
+
+        if (needsRestart) {
           setAuthContext({ requiresRestart: true });
         } else {
           setAuthContext({});
@@ -137,13 +142,11 @@ export function AuthDialog({
         }
 
         if (authType === AuthType.USE_GEMINI) {
-          if (process.env['GEMINI_API_KEY'] !== undefined) {
-            setAuthState(AuthState.Unauthenticated);
-            return;
-          } else {
-            setAuthState(AuthState.AwaitingApiKeyInput);
-            return;
-          }
+          // Always show the API key input dialog so the user can
+          // explicitly enter or confirm their key, regardless of
+          // whether GEMINI_API_KEY env var or a stored key exists.
+          setAuthState(AuthState.AwaitingApiKeyInput);
+          return;
         }
       }
       setAuthState(AuthState.Unauthenticated);
@@ -151,8 +154,11 @@ export function AuthDialog({
     [settings, config, setAuthState, exiting, setAuthContext],
   );
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethodWithSettings(authMethod, settings);
+  const handleAuthSelect = async (authMethod: AuthType) => {
+    const error = await validateAuthMethodWithSettings(
+      authMethod,
+      settings,
+    ).catch((e) => (e instanceof Error ? e.message : String(e)));
     if (error) {
       onAuthError(error);
     } else {

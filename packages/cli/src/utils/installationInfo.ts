@@ -21,6 +21,8 @@ export enum PackageManager {
   BUNX = 'bunx',
   HOMEBREW = 'homebrew',
   NPX = 'npx',
+  BINARY = 'binary',
+  VOLTA = 'volta',
   UNKNOWN = 'unknown',
 }
 
@@ -41,6 +43,16 @@ export function getInstallationInfo(
   }
 
   try {
+    // Check for standalone binary first
+    if (process.env['IS_BINARY'] === 'true') {
+      return {
+        packageManager: PackageManager.BINARY,
+        isGlobal: true,
+        updateMessage:
+          'Running as a standalone binary. Please update by downloading the latest version from GitHub.',
+      };
+    }
+
     // Normalize path separators to forward slashes for consistent matching.
     const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
     const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
@@ -99,16 +111,31 @@ export function getInstallationInfo(
               'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
           };
         }
-      } catch (_error) {
+      } catch {
         // Brew is not installed or gemini-cli is not installed via brew.
         // Continue to the next check.
       }
     }
 
+    // Check for Volta
+    if (realPath.includes('/.volta/') || realPath.includes('/Volta/')) {
+      const updateCommand = 'volta install @google/gemini-cli@latest';
+      return {
+        packageManager: PackageManager.VOLTA,
+        isGlobal: true,
+        updateCommand,
+        updateMessage: isAutoUpdateEnabled
+          ? 'Installed with Volta. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
+      };
+    }
+
     // Check for pnpm
     if (
       realPath.includes('/.pnpm/global') ||
-      realPath.includes('/.local/share/pnpm')
+      realPath.includes('/.local/share/pnpm') ||
+      realPath.includes('/Library/pnpm/global/') ||
+      realPath.includes('/AppData/Local/pnpm/global/')
     ) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {

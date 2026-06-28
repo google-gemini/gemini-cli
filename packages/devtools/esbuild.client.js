@@ -17,6 +17,9 @@ await esbuild.build({
   target: 'es2020',
   jsx: 'automatic',
   outfile: 'dist/client/main.js',
+  define: {
+    'process.env.NODE_ENV': '"production"',
+  },
 });
 
 // Embed client assets as string constants so the devtools server can be

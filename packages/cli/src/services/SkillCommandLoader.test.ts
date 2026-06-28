@@ -88,7 +88,7 @@ describe('SkillCommandLoader', () => {
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
       toolArgs: { name: 'test-skill' },
-      postSubmitPrompt: undefined,
+      postSubmitPrompt: 'Use the skill test-skill',
     });
   });
 
@@ -121,5 +121,17 @@ describe('SkillCommandLoader', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const actionResult = (await commands[0].action!({} as any, '')) as any;
     expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
+  });
+
+  it('should propagate extensionName to the generated slash command', async () => {
+    const mockSkills = [
+      { name: 'skill1', description: 'desc', extensionName: 'ext1' },
+    ];
+    mockSkillManager.getDisplayableSkills.mockReturnValue(mockSkills);
+
+    const loader = new SkillCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+
+    expect(commands[0].extensionName).toBe('ext1');
   });
 });

@@ -5,18 +5,19 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
-import { assertModelHasOutput } from '../integration-tests/test-helper.js';
+import { evalTest, assertModelHasOutput } from './test-helper.js';
 
 describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
     'Agent follows hierarchy for contradictory instructions';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: conflictResolutionTest,
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },
@@ -48,11 +49,13 @@ What is my favorite fruit? Tell me just the name of the fruit.`,
 
   const provenanceAwarenessTest = 'Agent is aware of memory provenance';
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: provenanceAwarenessTest,
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },
@@ -87,11 +90,13 @@ Provide the answer as an XML block like this:
 
   const extensionVsGlobalTest = 'Extension memory wins over Global memory';
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: extensionVsGlobalTest,
     params: {
       settings: {
         security: {
-          folderTrust: { enabled: true },
+          folderTrust: { enabled: false },
         },
       },
     },
