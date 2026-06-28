@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-sdk",
-  "version": "0.47.0-nightly.20260602.gcfcecebe8",
+  "version": "0.51.0-nightly.20260625.g3fbf93e26",
   "description": "Gemini CLI SDK",
   "license": "Apache-2.0",
   "repository": {
@@ -23,12 +23,12 @@
   ],
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.1"
+    "zod": "3.25.76",
+    "zod-to-json-schema": "3.25.1"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": ">=20"

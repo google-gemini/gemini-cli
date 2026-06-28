@@ -504,7 +504,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe('fallback processed response');
+      expect(result.llmContent).toBe(
+        '<untrusted_context>\nfallback processed response\n</untrusted_context>',
+      );
       expect(result.returnDisplay).toContain(
         'URL(s) processed using fallback fetch',
       );
@@ -537,7 +539,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe('fallback response');
+      expect(result.llmContent).toBe(
+        '<untrusted_context>\nfallback response\n</untrusted_context>',
+      );
       // Verify private URL was NOT fetched (mockFetch would throw if it was called for private.com)
     });
 
@@ -977,7 +981,9 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.llmContent).toBe(content);
+      expect(result.llmContent).toBe(
+        `<untrusted_context>\n${content}\n</untrusted_context>`,
+      );
       expect(result.returnDisplay).toContain('Fetched text/plain content');
       expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
         'https://example.com/',
@@ -1167,7 +1173,7 @@ describe('WebFetchTool', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect((result.llmContent as string).length).toBe(300000); // No truncation
+      expect((result.llmContent as string).length).toBe(300041); // No truncation
     });
 
     it('should truncate if isContextManagementEnabled is false', async () => {

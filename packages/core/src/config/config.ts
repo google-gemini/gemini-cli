@@ -3566,7 +3566,7 @@ export class Config implements McpContext, AgentLoopContext {
       if (authType === AuthType.USE_GEMINI) {
         setFlashModels('gemini-3-flash-preview', 'gemini-3.5-flash');
       } else {
-        setFlashModels('gemini-3-flash', 'gemini-3-flash');
+        setFlashModels('gemini-3.5-flash', 'gemini-3.5-flash');
       }
     } else {
       setFlashModels('gemini-3-flash-preview', 'gemini-2.5-flash');

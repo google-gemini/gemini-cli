@@ -40,6 +40,8 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  hasResumableConversationContent,
+  isResumableMessageRecord,
   loadConversationRecord,
   type ConversationRecord,
   type ToolCallRecord,
@@ -123,6 +125,76 @@ describe('ChatRecordingService', () => {
     if (testTempDir) {
       await fs.promises.rm(testTempDir, { recursive: true, force: true });
     }
+  });
+
+  describe('isResumableMessageRecord', () => {
+    it('should treat malformed messages without content as non-resumable', () => {
+      const message = {
+        id: 'malformed-message',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        type: 'user',
+      } as MessageRecord;
+
+      expect(() => isResumableMessageRecord(message)).not.toThrow();
+      expect(isResumableMessageRecord(message)).toBe(false);
+    });
+
+    it('should return false for command-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '?help',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return false for internal context-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '<session_context>previous state</session_context>',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '<hook_context>hook data</hook_context>',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return true for real user or assistant content', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'gemini',
+          content: 'I can help with that.',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(true);
+    });
   });
 
   describe('initialize', () => {
@@ -835,6 +907,49 @@ describe('ChatRecordingService', () => {
       await expect(
         chatRecordingService.deleteCurrentSessionAsync(),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('deleteCurrentSessionIfNotResumableAsync', () => {
+    it('should delete a startup-only session', async () => {
+      await chatRecordingService.initialize();
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should delete a command-only session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: '/resume',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should keep a session with a real user message', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Help me debug this test',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(true);
     });
   });
 

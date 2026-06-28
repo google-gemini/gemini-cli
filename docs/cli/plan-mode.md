@@ -64,6 +64,7 @@ Gemini CLI takes action.
     reach an informal agreement on the approach before proceeding.
 3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
     a detailed implementation plan as a Markdown file in your plans directory.
+
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
