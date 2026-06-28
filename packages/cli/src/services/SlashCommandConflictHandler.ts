@@ -58,8 +58,20 @@ export class SlashCommandConflictHandler {
     this.notifiedConflicts = currentKeys;
 
     if (newConflicts.length > 0) {
-      this.pendingConflicts.push(...newConflicts);
-      this.scheduleFlush();
+      const filtered = newConflicts.filter((c) => {
+        const sourceId =
+          c.loserExtensionName || c.loserMcpServerName || c.loserKind;
+        const key = `${c.name}:${sourceId}:${c.renamedTo}`;
+        return !this.pendingConflicts.some((pc) => {
+          const pcSourceId =
+            pc.loserExtensionName || pc.loserMcpServerName || pc.loserKind;
+          return `${pc.name}:${pcSourceId}:${pc.renamedTo}` === key;
+        });
+      });
+      if (filtered.length > 0) {
+        this.pendingConflicts.push(...filtered);
+        this.scheduleFlush();
+      }
     }
   }
 
