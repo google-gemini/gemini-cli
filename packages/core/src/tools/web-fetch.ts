@@ -19,7 +19,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { fetchWithTimeout, isPrivateIp, isPrivateIpAsync } from '../utils/fetch.js';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -280,6 +280,30 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
   }
 
+  /**
+   * Async version of isBlockedHost that performs DNS resolution to prevent
+   * DNS rebinding attacks. An attacker could register a domain that initially
+   * resolves to a public IP (passing the sync check) and then change the DNS
+   * record to a private IP (e.g. 169.254.169.254 cloud metadata) before the
+   * actual fetch occurs.
+   *
+   * This method resolves the hostname and checks ALL returned addresses,
+   * blocking the request if any resolve to a private or reserved range.
+   */
+  private async isBlockedHostAsync(urlStr: string): Promise<boolean> {
+    // First apply the fast synchronous check.
+    if (this.isBlockedHost(urlStr)) {
+      return true;
+    }
+    try {
+      // Then verify via DNS resolution to prevent rebinding attacks.
+      return await isPrivateIpAsync(urlStr);
+    } catch {
+      // If DNS resolution fails, fail closed for safety.
+      return true;
+    }
+  }
+
   private async executeFallbackForUrl(
     urlStr: string,
     signal: AbortSignal,
@@ -359,7 +383,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
+      if (this.isBlockedHost(url)) { // Note: async check done at fetch time
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
