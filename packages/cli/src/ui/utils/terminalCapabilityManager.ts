@@ -161,9 +161,21 @@ export class TerminalCapabilityManager {
               match[2],
               match[3],
             );
-            debugLogger.log(
-              `Detected terminal background color: ${this.terminalBackgroundColor}`,
-            );
+
+            // Heuristic: tmux 3.5+ may report #ffffff when it doesn't know the
+            // actual host terminal color (e.g. over mosh). We ignore this specific
+            // fallback value to prevent blinding the user with a light theme in a
+            // likely dark terminal.
+            if (this.terminalBackgroundColor === '#ffffff' && this.isTmux()) {
+              debugLogger.log(
+                'Ignored #ffffff background in tmux (common false positive over mosh).',
+              );
+              this.terminalBackgroundColor = undefined;
+            } else {
+              debugLogger.log(
+                `Detected terminal background color: ${this.terminalBackgroundColor}`,
+              );
+            }
           }
         }
 

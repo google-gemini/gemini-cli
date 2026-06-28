@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-devtools",
-  "version": "0.48.0-nightly.20260609.g3a13b8eeb",
+  "version": "0.51.0-nightly.20260625.g3fbf93e26",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/src/index.js",
@@ -23,10 +23,10 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "dependencies": {
-    "ws": "^8.16.0"
+    "ws": "8.16.0"
   }
 }

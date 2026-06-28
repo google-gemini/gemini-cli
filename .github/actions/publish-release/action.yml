@@ -167,6 +167,7 @@ runs:
       shell: 'bash'
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
           --tag staging-tmp
@@ -196,6 +197,29 @@ runs:
       run: |
         node ${{ github.workspace }}/scripts/prepare-npm-release.js
 
+    - name: '📦 Pack CLI for verification'
+      if: "inputs.dry-run != 'true' && inputs.force-skip-tests != 'true'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm pack --workspace="${INPUTS_CLI_PACKAGE_NAME}"
+        # We restore the package.json so that `npm ci` in verify-release doesn't fail due to deleted dependencies
+        git checkout packages/cli/package.json
+      env:
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
+      with:
+        npm-package: './google-gemini-cli-${{ inputs.release-version }}.tgz'
+        expected-version: '${{ inputs.release-version }}'
+        working-directory: '${{ inputs.working-directory }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
+        github-token: '${{ inputs.github-token }}'
+        npm-registry-url: '${{ inputs.npm-registry-url }}'
+        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
+
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
       id: 'cli-token'
@@ -212,11 +236,19 @@ runs:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
         INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
         INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
       shell: 'bash'
       run: |
+        if [ -f "google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz" ]; then
+          PUBLISH_TARGET="google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz"
+        else
+          PUBLISH_TARGET="--workspace=${INPUTS_CLI_PACKAGE_NAME}"
+        fi
+
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
-          --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
+          ${PUBLISH_TARGET} \
           --tag staging-tmp
         if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
           npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} staging-tmp
@@ -242,24 +274,13 @@ runs:
       # Tag staging for initial release
       run: |
         npm publish \
+          --ignore-scripts \
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
           --tag staging-tmp
           if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
             npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} staging-tmp
           fi
-
-    - name: '🔬 Verify NPM release by version'
-      uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
-      with:
-        npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
-        expected-version: '${{ inputs.release-version }}'
-        working-directory: '${{ inputs.working-directory }}'
-        gemini_api_key: '${{ inputs.gemini_api_key }}'
-        github-token: '${{ inputs.github-token }}'
-        npm-registry-url: '${{ inputs.npm-registry-url }}'
-        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'

@@ -27,9 +27,6 @@ export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 // similar to how packages/cli/src/config/settings.ts handles it.
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
-  coreTools?: string[];
-  excludeTools?: string[];
-  allowedTools?: string[];
   tools?: {
     allowed?: string[];
     exclude?: string[];
@@ -160,14 +157,17 @@ export function loadSettings(
 
 function resolveEnvVarsInString(value: string): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName];
-    }
-    return match;
-  });
+  return value.replace(
+    envVarRegex,
+    (match: string, varName1: string, varName2: string) => {
+      const varName = varName1 || varName2;
+      const envValue = process?.env?.[varName];
+      if (typeof envValue === 'string') {
+        return envValue;
+      }
+      return match;
+    },
+  );
 }
 
 function resolveEnvVarsInObject<T>(obj: T): T {

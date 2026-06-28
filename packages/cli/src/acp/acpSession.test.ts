@@ -278,7 +278,8 @@ describe('Session', () => {
         void,
         unknown
       > {
-        yield* [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        yield* [] as any;
         throw error;
       }
       return errorGen();
@@ -303,7 +304,8 @@ describe('Session', () => {
         void,
         unknown
       > {
-        yield* [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        yield* [] as any;
         throw error;
       }
       return errorGen();
@@ -473,7 +475,8 @@ describe('Session', () => {
         void,
         unknown
       > {
-        yield* [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        yield* [] as any;
         throw customError;
       }
       return errorGen();
