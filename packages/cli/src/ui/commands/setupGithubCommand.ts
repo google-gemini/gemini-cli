@@ -126,10 +126,13 @@ async function downloadFiles({
         const response = await fetch(endpoint, {
           method: 'GET',
           dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
-          signal: AbortSignal.any([
-            AbortSignal.timeout(30_000),
-            abortController.signal,
-          ]),
+          /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+          signal: (
+            AbortSignal as unknown as {
+              any: (signals: AbortSignal[]) => AbortSignal;
+            }
+          ).any([AbortSignal.timeout(30_000), abortController.signal]),
+          /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
         } as RequestInit);
 
         if (!response.ok) {

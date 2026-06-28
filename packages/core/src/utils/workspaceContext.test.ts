@@ -492,4 +492,50 @@ describe('WorkspaceContext with optional directories', () => {
     expect(directories).toEqual([cwd, existingDir1]);
     expect(debugLogger.warn).not.toHaveBeenCalled();
   });
+
+  describe('Security Regression: Case-Insensitive Sensitive Path Blocklist', () => {
+    it('should reject sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const sensitivePaths = [
+        path.join(cwd, '.git', 'config'),
+        path.join(cwd, '.GIT', 'config'),
+        path.join(cwd, '.Git', 'config'),
+        path.join(cwd, '.env'),
+        path.join(cwd, '.Env'),
+        path.join(cwd, '.ENV'),
+        path.join(cwd, 'node_modules', 'package', 'index.js'),
+        path.join(cwd, 'NODE_MODULES', 'package', 'index.js'),
+        // Windows trailing character bypasses
+        path.join(cwd, '.git ', 'config'),
+        path.join(cwd, '.git.', 'config'),
+        path.join(cwd, '.env ', 'config'),
+        path.join(cwd, '.env.', 'config'),
+        path.join(cwd, 'node_modules ', 'package', 'index.js'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(cwd, '.git::$DATA', 'config'),
+        path.join(cwd, '.env::$DATA'),
+        path.join(cwd, 'node_modules::$DATA', 'package', 'index.js'),
+      ];
+
+      for (const p of sensitivePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(false);
+      }
+    });
+
+    it('should allow standard non-sensitive paths', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      const safePaths = [
+        path.join(cwd, 'src', 'index.ts'),
+        path.join(cwd, '.gitignore'),
+        path.join(cwd, '.env.example'),
+        path.join(cwd, 'package.json'),
+      ];
+
+      for (const p of safePaths) {
+        expect(workspaceContext.isPathWithinWorkspace(p)).toBe(true);
+      }
+    });
+  });
 });

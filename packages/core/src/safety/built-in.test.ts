@@ -240,4 +240,72 @@ describe('AllowedPathChecker', () => {
     const result = await checker.check(input);
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
+
+  describe('Security Regression: Case-Insensitive Blocklist & .vscode HITL', () => {
+    it('should deny sensitive paths like .git, .env, and node_modules case-insensitively, including Windows trailing character and NTFS ADS bypasses', async () => {
+      const sensitivePaths = [
+        path.join(mockCwd, '.git', 'config'),
+        path.join(mockCwd, '.GIT', 'config'),
+        path.join(mockCwd, '.Git', 'config'),
+        path.join(mockCwd, '.env'),
+        path.join(mockCwd, '.Env'),
+        path.join(mockCwd, '.ENV'),
+        path.join(mockCwd, 'node_modules', 'package', 'index.js'),
+        path.join(mockCwd, 'NODE_MODULES', 'package', 'index.js'),
+        // Windows trailing character bypasses
+        path.join(mockCwd, '.git ', 'config'),
+        path.join(mockCwd, '.git.', 'config'),
+        path.join(mockCwd, '.env ', 'config'),
+        path.join(mockCwd, '.env.', 'config'),
+        path.join(mockCwd, 'node_modules ', 'package', 'index.js'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(mockCwd, '.git::$DATA', 'config'),
+        path.join(mockCwd, '.env::$DATA'),
+        path.join(mockCwd, 'node_modules::$DATA', 'package', 'index.js'),
+      ];
+
+      for (const p of sensitivePaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('Access to sensitive path');
+      }
+    });
+
+    it('should require ASK_USER for .vscode configuration files inside workspace, but deny them if outside, including NTFS ADS bypasses', async () => {
+      const vscodePaths = [
+        path.join(mockCwd, '.vscode', 'settings.json'),
+        path.join(mockCwd, '.vscode', 'settings.JSON'),
+        path.join(mockCwd, '.VSCODE', 'settings.json'),
+        path.join(mockCwd, '.vscode', 'launch.json'),
+        // Windows trailing character bypasses
+        path.join(mockCwd, '.vscode ', 'settings.json'),
+        path.join(mockCwd, '.vscode.', 'settings.json'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(mockCwd, '.vscode::$DATA', 'settings.json'),
+      ];
+
+      for (const p of vscodePaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.ASK_USER);
+        expect(result.reason).toContain(
+          'Modifying .vscode configuration files requires explicit user confirmation',
+        );
+      }
+
+      // Verify that paths outside the workspace containing .vscode are strictly denied
+      const outsideVscodePaths = [
+        path.join(testRootDir, 'outside', '.vscode', 'settings.json'),
+        path.join(testRootDir, 'outside', '.VSCODE', 'settings.json'),
+      ];
+
+      for (const p of outsideVscodePaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('outside of the allowed workspace');
+      }
+    });
+  });
 });

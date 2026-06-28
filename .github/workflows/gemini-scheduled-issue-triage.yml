@@ -192,10 +192,12 @@ jobs:
           settings: |-
             {
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)",
-                "read_file"
-              ],
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)",
+                  "read_file"
+                ]
+              },
               "telemetry": {
                 "enabled": false,
                 "target": "gcp"
@@ -315,12 +317,14 @@ jobs:
           settings: |-
             {
               "maxSessionTurns": 30,
-              "coreTools": [
-                "run_shell_command(echo)",
-                "grep_search",
-                "glob",
-                "read_file"
-              ],
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)",
+                  "grep_search",
+                  "glob",
+                  "read_file"
+                ]
+              },
               "telemetry": {
                 "enabled": false,
                 "target": "gcp"

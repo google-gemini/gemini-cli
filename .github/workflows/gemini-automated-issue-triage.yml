@@ -170,10 +170,12 @@ jobs:
                 "enabled": true,
                 "target": "gcp"
               },
-              "coreTools": [
-                "run_shell_command(echo)",
-                "read_file"
-              ]
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)",
+                  "read_file"
+                ]
+              }
             }
           prompt: |-
             ## Role

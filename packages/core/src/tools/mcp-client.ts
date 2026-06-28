@@ -1148,10 +1148,12 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
     try {
       return this.ajvValidator.getValidator<T>(schema);
     } catch (error) {
+      let id = '<no $id>';
+      if (schema && typeof schema === 'object' && '$id' in schema) {
+        id = String(schema.$id);
+      }
       debugLogger.warn(
-        `Failed to compile MCP tool output schema (${
-          (schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
+        `Failed to compile MCP tool output schema (${id}): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping output validation for this tool.',
       );
       return (input: unknown) => ({
