@@ -121,6 +121,15 @@ const VERTEX_AI_REQUEST_TYPE_HEADER = 'X-Vertex-AI-LLM-Request-Type';
 const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
   'X-Vertex-AI-LLM-Shared-Request-Type';
 
+/**
+ * Vertex AI Representative Endpoints (REP) for US and EU multi-regions.
+ * These are used as a workaround for the client dynamically
+ * constructing default legacy hostnames (e.g., 'us-aiplatform.googleapis.com')
+ * instead of routing to the official REP endpoints.
+ */
+const VERTEX_AI_US_REP_ENDPOINT = 'https://aiplatform.us.rep.googleapis.com';
+const VERTEX_AI_EU_REP_ENDPOINT = 'https://aiplatform.eu.rep.googleapis.com';
+
 function validateBaseUrl(baseUrl: string): void {
   try {
     new URL(baseUrl);
@@ -341,6 +350,13 @@ export async function createContentGenerator(
         if (envBaseUrl) {
           validateBaseUrl(envBaseUrl);
           baseUrl = envBaseUrl;
+        } else if (config.authType === AuthType.USE_VERTEX_AI) {
+          const location = process.env['GOOGLE_CLOUD_LOCATION'];
+          if (location === 'us') {
+            baseUrl = VERTEX_AI_US_REP_ENDPOINT;
+          } else if (location === 'eu') {
+            baseUrl = VERTEX_AI_EU_REP_ENDPOINT;
+          }
         }
       } else {
         validateBaseUrl(baseUrl);
@@ -361,7 +377,8 @@ export async function createContentGenerator(
           ? new HttpProxyAgent(proxyUrl)
           : new HttpsProxyAgent(proxyUrl)
         : undefined;
-
+      const useVertex =
+        config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI;
       const googleGenAI = new GoogleGenAI({
         apiKey:
           config.authType === AuthType.GATEWAY
@@ -372,10 +389,17 @@ export async function createContentGenerator(
         vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
-        ...(proxyAgent && {
+        // Merge proxy and GDCH endpoint into googleAuthOptions if either exists
+        ...((proxyAgent || (useVertex && baseUrl)) && {
           googleAuthOptions: {
             clientOptions: {
-              transporterOptions: { agent: proxyAgent },
+              ...(proxyAgent && {
+                transporterOptions: { agent: proxyAgent },
+              }),
+              ...(useVertex &&
+                baseUrl && {
+                  apiEndpoint: baseUrl,
+                }),
             },
           },
         }),
