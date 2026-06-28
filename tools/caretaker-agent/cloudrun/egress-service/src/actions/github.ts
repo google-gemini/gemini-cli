@@ -16,27 +16,35 @@ function getRequiredEnvVar(name: string): string {
   return value;
 }
 
+let cachedOctokit: Octokit | null = null;
+
+function getOctokit(): Octokit {
+  if (!cachedOctokit) {
+    const appId = getRequiredEnvVar('GH_APP_ID');
+    const privateKey = getRequiredEnvVar('GH_PRIVATE_KEY');
+    const installationId = getRequiredEnvVar('GH_INSTALLATION_ID');
+
+    cachedOctokit = new Octokit({
+      authStrategy: createAppAuth,
+      auth: {
+        appId: Number(appId),
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+        installationId: Number(installationId),
+      },
+    });
+  }
+  return cachedOctokit;
+}
+
 export async function handleEgressEvent(event: EgressEvent): Promise<void> {
-  const appId = getRequiredEnvVar('GH_APP_ID');
-  const privateKey = getRequiredEnvVar('GH_PRIVATE_KEY');
-  const installationId = getRequiredEnvVar('GH_INSTALLATION_ID');
-
-  const octokit = new Octokit({
-    authStrategy: createAppAuth,
-    auth: {
-      appId: Number(appId),
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-      installationId: Number(installationId),
-    },
-  });
-
+  const octokit = getOctokit();
   const { action, payload } = event;
   const { owner, repo, issueNumber } = payload;
 
   switch (action) {
     case 'COMMENT':
-      if (!payload.commentBody) {
-        throw new Error('Missing commentBody for COMMENT action');
+      if (!payload.commentBody || payload.commentBody.trim() === '') {
+        throw new Error('Missing or empty commentBody for COMMENT action');
       }
       console.log(
         `[EGRESS_GITHUB] Posting comment to ${owner}/${repo}#${issueNumber}...`,

@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleEgressEvent } from './github.js';
 
 const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
@@ -28,11 +27,16 @@ vi.mock('@octokit/auth-app', () => ({
 }));
 
 describe('GitHub Actions Handler', () => {
-  beforeEach(() => {
+  let handleEgressEvent: (typeof import('./github.js'))['handleEgressEvent'];
+
+  beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('GH_APP_ID', '12345');
     vi.stubEnv('GH_PRIVATE_KEY', 'test-key');
     vi.stubEnv('GH_INSTALLATION_ID', '67890');
+    const mod = await import('./github.js');
+    handleEgressEvent = mod.handleEgressEvent;
   });
 
   afterEach(() => {
@@ -47,6 +51,15 @@ describe('GitHub Actions Handler', () => {
         payload: { owner: 'o', repo: 'r', issueNumber: 1, commentBody: 'hi' },
       }),
     ).rejects.toThrow(/Missing required environment variable: GH_APP_ID/);
+  });
+
+  it('should throw an error if commentBody is empty or whitespace only', async () => {
+    await expect(
+      handleEgressEvent({
+        action: 'COMMENT',
+        payload: { owner: 'o', repo: 'r', issueNumber: 1, commentBody: '   ' },
+      }),
+    ).rejects.toThrow(/Missing or empty commentBody/);
   });
 
   it('should call createComment for COMMENT action', async () => {
