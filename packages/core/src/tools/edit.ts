@@ -27,7 +27,12 @@ import {
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
@@ -478,11 +483,12 @@ class EditToolInvocation
     );
     if (this.config.isPlanMode()) {
       try {
-        this.resolvedPath = resolveAndValidatePlanPath(
+        const planPath = resolveAndValidatePlanPath(
           this.params.file_path,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        this.resolvedPath = resolveToRealPath(planPath);
       } catch (e) {
         debugLogger.error(
           'Failed to resolve plan path during EditTool invocation setup',
@@ -495,15 +501,33 @@ class EditToolInvocation
     } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
-        this.resolvedPath = result.correctedPath;
+        try {
+          this.resolvedPath = resolveToRealPath(result.correctedPath);
+        } catch {
+          this.resolvedPath = result.correctedPath;
+        }
       } else {
-        this.resolvedPath = path.resolve(
-          this.config.getTargetDir(),
+        const sanitizedPath = resolveDefensiveToolPath(
           this.params.file_path,
+          this.config.getTargetDir(),
         );
+        try {
+          this.resolvedPath = resolveToRealPath(
+            path.resolve(this.config.getTargetDir(), sanitizedPath),
+          );
+        } catch {
+          this.resolvedPath = path.resolve(
+            this.config.getTargetDir(),
+            sanitizedPath,
+          );
+        }
       }
     } else {
-      this.resolvedPath = this.params.file_path;
+      try {
+        this.resolvedPath = resolveToRealPath(this.params.file_path);
+      } catch {
+        this.resolvedPath = this.params.file_path;
+      }
     }
   }
 
@@ -1094,28 +1118,43 @@ export class EditTool
     let resolvedPath: string;
     if (this.config.isPlanMode()) {
       try {
-        resolvedPath = resolveAndValidatePlanPath(
+        const planPath = resolveAndValidatePlanPath(
           params.file_path,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        resolvedPath = resolveToRealPath(planPath);
       } catch (err) {
         return err instanceof Error ? err.message : String(err);
       }
     } else if (!path.isAbsolute(params.file_path)) {
       const result = correctPath(params.file_path, this.config);
       if (result.success) {
-        resolvedPath = result.correctedPath;
+        try {
+          resolvedPath = resolveToRealPath(result.correctedPath);
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
       } else {
-        resolvedPath = path.resolve(
-          this.config.getTargetDir(),
+        const sanitizedPath = resolveDefensiveToolPath(
           params.file_path,
+          this.config.getTargetDir(),
         );
+        try {
+          resolvedPath = resolveToRealPath(
+            path.resolve(this.config.getTargetDir(), sanitizedPath),
+          );
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
       }
     } else {
-      resolvedPath = params.file_path;
+      try {
+        resolvedPath = resolveToRealPath(params.file_path);
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
     }
-
     const newPlaceholders = detectOmissionPlaceholders(params.new_string);
     if (newPlaceholders.length > 0) {
       const oldPlaceholders = new Set(
@@ -1150,13 +1189,65 @@ export class EditTool
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
+    const resolvePath = (params: EditToolParams): string => {
+      let pathBeforeRealResolve: string;
+
+      try {
+        if (this.config.isPlanMode()) {
+          pathBeforeRealResolve = resolveAndValidatePlanPath(
+            params.file_path,
+            this.config.storage.getPlansDir(),
+            this.config.getProjectRoot(),
+          );
+        } else if (!path.isAbsolute(params.file_path)) {
+          const result = correctPath(params.file_path, this.config);
+          if (result.success) {
+            pathBeforeRealResolve = result.correctedPath;
+          } else {
+            const sanitizedPath = resolveDefensiveToolPath(
+              params.file_path,
+              this.config.getTargetDir(),
+            );
+            pathBeforeRealResolve = path.resolve(
+              this.config.getTargetDir(),
+              sanitizedPath,
+            );
+          }
+        } else {
+          pathBeforeRealResolve = params.file_path;
+        }
+      } catch (err) {
+        throw new Error(
+          'Failed to resolve path: ' +
+            (err instanceof Error ? err.message : String(err)),
+        );
+      }
+
+      let resolved: string;
+      try {
+        resolved = resolveToRealPath(pathBeforeRealResolve);
+      } catch (err) {
+        throw new Error(
+          'Failed to resolve path: ' +
+            (err instanceof Error ? err.message : String(err)),
+        );
+      }
+
+      const validationError = this.config.validatePathAccess(resolved);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+      return resolved;
+    };
+
     return {
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
         try {
+          const resolvedPath = resolvePath(params);
           return await this.config
             .getFileSystemService()
-            .readTextFile(params.file_path);
+            .readTextFile(resolvedPath);
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
           return '';
@@ -1164,9 +1255,10 @@ export class EditTool
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
+          const resolvedPath = resolvePath(params);
           const currentContent = await this.config
             .getFileSystemService()
-            .readTextFile(params.file_path);
+            .readTextFile(resolvedPath);
           return applyReplacement(
             currentContent,
             params.old_string,
