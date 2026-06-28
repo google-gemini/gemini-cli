@@ -1427,7 +1427,8 @@ describe('handleAtCommand', () => {
     const query = `@${filePath}`;
 
     // Simulate user cancellation
-    const mockToolInstance = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockToolInstance: any = {
       buildAndExecute: vi
         .fn()
         .mockRejectedValue(new Error('User cancelled operation')),

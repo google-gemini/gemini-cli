@@ -94,6 +94,16 @@ function ensurePartArray(content: PartListUnion): Part[] {
   return [content];
 }
 
+export function isIgnoredUserContent(trimmedContent: string): boolean {
+  return (
+    trimmedContent.length === 0 ||
+    trimmedContent.startsWith('/') ||
+    trimmedContent.startsWith('?') ||
+    trimmedContent.startsWith('<session_context>') ||
+    trimmedContent.startsWith('<hook_context>')
+  );
+}
+
 /**
  * Converts session/conversation data into Gemini client history formats.
  */
@@ -110,12 +120,7 @@ export function convertSessionToClientHistory(
     if (msg.type === 'user') {
       const contentString = partListUnionToString(msg.content);
       const trimmedContent = contentString.trim();
-      if (
-        trimmedContent.startsWith('/') ||
-        trimmedContent.startsWith('?') ||
-        trimmedContent.startsWith('<session_context>') ||
-        trimmedContent.startsWith('<hook_context>')
-      ) {
+      if (isIgnoredUserContent(trimmedContent)) {
         continue;
       }
 

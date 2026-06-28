@@ -23,6 +23,7 @@ import {
   PRIORITY_YOLO_ALLOW_ALL,
   createPolicyEngineConfig,
 } from '@google/gemini-cli-core';
+import type { AgentSettings } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -290,9 +291,8 @@ describe('loadConfig', () => {
   });
 
   describe('policy engine configuration', () => {
-    it('should merge V1 and V2 tool settings into policySettings', async () => {
+    it('should map tool settings into policySettings', async () => {
       const settings: Settings = {
-        allowedTools: ['v1-allowed'],
         tools: {
           allowed: ['v2-allowed'],
           exclude: ['v2-exclude'],
@@ -312,7 +312,7 @@ describe('loadConfig', () => {
           tools: {
             core: ['v2-core'],
             exclude: ['v2-exclude'],
-            allowed: ['v1-allowed'],
+            allowed: ['v2-allowed'],
           },
           mcpServers: settings.mcpServers,
           policyPaths: settings.policyPaths,
@@ -323,64 +323,9 @@ describe('loadConfig', () => {
         true,
       );
     });
-
-    it('should use V2 tool settings when V1 is missing', async () => {
-      const settings: Settings = {
-        tools: {
-          allowed: ['v2-allowed'],
-        },
-      };
-
-      await loadConfig(settings, mockExtensionLoader, taskId);
-
-      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            allowed: ['v2-allowed'],
-          }),
-        }),
-        ApprovalMode.DEFAULT,
-        undefined,
-        true,
-      );
-    });
-
-    it('should use V1 tool settings when V2 is also present', async () => {
-      const settings: Settings = {
-        allowedTools: ['v1-allowed'],
-        tools: {
-          allowed: ['v2-allowed'],
-        },
-      };
-
-      await loadConfig(settings, mockExtensionLoader, taskId);
-
-      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            allowed: ['v1-allowed'],
-          }),
-        }),
-        ApprovalMode.DEFAULT,
-        undefined,
-        true,
-      );
-    });
   });
 
   describe('tool configuration', () => {
-    it('should pass V1 allowedTools to Config properly', async () => {
-      const settings: Settings = {
-        allowedTools: ['shell', 'edit'],
-      };
-      await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowedTools: ['shell', 'edit'],
-        }),
-      );
-    });
-
     it('should pass V2 tools.allowed to Config properly', async () => {
       const settings: Settings = {
         tools: {
@@ -391,21 +336,6 @@ describe('loadConfig', () => {
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],
-        }),
-      );
-    });
-
-    it('should prefer V1 allowedTools over V2 tools.allowed if both present', async () => {
-      const settings: Settings = {
-        allowedTools: ['v1-tool'],
-        tools: {
-          allowed: ['v2-tool'],
-        },
-      };
-      await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowedTools: ['v1-tool'],
         }),
       );
     });
@@ -610,5 +540,36 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('setIsTrusted', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
+    expect(setIsTrusted(undefined)).toBe(false);
   });
 });

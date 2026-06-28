@@ -53,7 +53,7 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     expect(responseText).toContain('8');
@@ -98,7 +98,7 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // The model should see the error "Tool failed visibly" and report it back.
@@ -140,7 +140,7 @@ describe('GeminiCliAgent Tool Integration', () => {
 
     const textEvents = events.filter((e) => e.type === 'content');
     const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .map((e) => ('value' in e && typeof e.value === 'string' ? e.value : ''))
       .join('');
 
     // The model should report the caught standard error.
