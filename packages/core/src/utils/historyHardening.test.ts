@@ -500,7 +500,7 @@ describe('scrubContents', () => {
     ]);
   });
 
-  it('should completely filter out Content objects that have no parts left after thought scrubbing', () => {
+  it('should completely filter out Content objects that have no parts left after thought scrubbing and coalesce adjacent turns of the same role', () => {
     const contents: Content[] = [
       {
         role: 'user',
@@ -519,11 +519,27 @@ describe('scrubContents', () => {
     expect(scrubbed).toEqual([
       {
         role: 'user',
-        parts: [{ text: 'Hello' }],
+        parts: [{ text: 'Hello' }, { text: 'How are you?' }],
+      },
+    ]);
+  });
+
+  it('should coalesce adjacent turns of the same role when no filtration occurs', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Part 1' }],
       },
       {
         role: 'user',
-        parts: [{ text: 'How are you?' }],
+        parts: [{ text: 'Part 2' }],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Part 1' }, { text: 'Part 2' }],
       },
     ]);
   });

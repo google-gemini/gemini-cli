@@ -416,19 +416,34 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
 
 /**
  * Deep-scrubs an array of Content objects to remove non-standard properties.
+ * Coalesces adjacent turns of the same role to preserve Gemini API alternation invariants.
  */
 export function scrubContents(contents: Content[]): Content[] {
-  return contents
-    .map((content) => {
-      const nonThoughtParts = (content.parts ?? []).filter(
-        (p) => !isInternalThought(p),
-      );
-      return {
-        role: content.role,
-        parts: nonThoughtParts.map((p) => scrubPart(p)),
+  const result: Content[] = [];
+  for (const content of contents) {
+    const nonThoughtParts = (content.parts ?? []).filter(
+      (p) => !isInternalThought(p),
+    );
+    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
+
+    const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
+
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.role === content.role) {
+      // Coalesce adjacent turns of the same role inline
+      result[lastIdx] = {
+        role: last.role,
+        parts: [...(last.parts || []), ...scrubbedParts],
       };
-    })
-    .filter((content) => content.parts.length > 0);
+    } else {
+      result.push({
+        role: content.role,
+        parts: scrubbedParts,
+      });
+    }
+  }
+  return result;
 }
 
 interface ThoughtPart extends Part {
