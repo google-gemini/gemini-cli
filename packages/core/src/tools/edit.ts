@@ -866,9 +866,11 @@ class EditToolInvocation
     // Append `...` when the snippet hides content from the user: the first
     // line was truncated, or there are additional lines below it.
     const snippet = (s: string) => {
-      const firstLine = s.split('\n')[0];
-      const hasHiddenContent = firstLine.length > 30 || s.includes('\n');
-      return firstLine.substring(0, 30) + (hasHiddenContent ? '...' : '');
+      const lineBreakIndex = s.search(/\r\n|\r|\n/);
+      const firstLine = lineBreakIndex === -1 ? s : s.slice(0, lineBreakIndex);
+      const chars = Array.from(firstLine);
+      const hasHiddenContent = chars.length > 30 || lineBreakIndex !== -1;
+      return chars.slice(0, 30).join('') + (hasHiddenContent ? '...' : '');
     };
     const oldStringSnippet = snippet(this.params.old_string);
     const newStringSnippet = snippet(this.params.new_string);

@@ -1534,6 +1534,32 @@ function doIt() {
       );
     });
 
+    it('strips carriage returns before appending ellipsis for CRLF edits', () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'CRLF multi-line',
+        old_string: 'foo\r\nbar',
+        new_string: 'baz\r\nqux',
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: foo... => baz...`,
+      );
+    });
+
+    it('does not split emoji when truncating long snippets', () => {
+      const oldStr = `${'a'.repeat(29)}😀b`;
+      const newStr = `${'c'.repeat(29)}😀d`;
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Unicode truncate',
+        old_string: oldStr,
+        new_string: newStr,
+      };
+      expect(tool.build(params).getDescription()).toBe(
+        `${testFile}: ${'a'.repeat(29)}😀... => ${'c'.repeat(29)}😀...`,
+      );
+    });
+
     it('emits an empty snippet without ellipsis when deleting to empty', () => {
       const params: EditToolParams = {
         file_path: filePath,
