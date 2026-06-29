@@ -1567,7 +1567,7 @@ ${JSON.stringify(
       // 3. If config.maxSessionTurns is custom configured (e.g., to 3), it should respect it.
       vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(3);
       client['sessionTurnCount'] = 0;
-      client['promptTurnCount'] = 0;
+      client['promptTurnCounts'].clear();
       client['lastPromptId'] = '';
 
       for (let i = 0; i < 3; i++) {
