@@ -71,9 +71,20 @@ export async function relaunchAppInChildProcess(
       }
     });
 
+    const forwardSignal = (signal: NodeJS.Signals) => {
+      child.kill(signal);
+    };
+
+    process.on('SIGINT', forwardSignal);
+    process.on('SIGTERM', forwardSignal);
+    process.on('SIGQUIT', forwardSignal);
+
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);
       child.on('close', (code) => {
+        process.off('SIGINT', forwardSignal);
+        process.off('SIGTERM', forwardSignal);
+        process.off('SIGQUIT', forwardSignal);
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);
