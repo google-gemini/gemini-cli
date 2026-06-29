@@ -63,8 +63,14 @@ export async function performInitialAuth(
         accountSuspensionInfo: null,
       };
     }
+    const rawMessage = getErrorMessage(e);
+    // Strip trailing periods from URLs to prevent broken terminal links
+    const sanitizedMessage = rawMessage.replace(
+      /(https?:\/\/[^\s]+)\.(?=\s|$)/g,
+      '$1',
+    );
     return {
-      authError: `Failed to sign in. Message: ${getErrorMessage(e)}`,
+      authError: `Failed to sign in. Message: ${sanitizedMessage}`,
       accountSuspensionInfo: null,
     };
   }

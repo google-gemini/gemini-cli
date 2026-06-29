@@ -151,9 +151,19 @@ export const useAuthCommand = (
         } else if (e instanceof ProjectIdRequiredError) {
           // OAuth succeeded but account setup requires project ID
           // Show the error message directly without "Failed to login" prefix
-          onAuthError(getErrorMessage(e));
+          const rawMessage = getErrorMessage(e);
+          const sanitizedMessage = rawMessage.replace(
+            /(https?:\/\/[^\s]+)\.(?=\s|$)/g,
+            '$1',
+          );
+          onAuthError(sanitizedMessage);
         } else {
-          onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
+          const rawMessage = getErrorMessage(e);
+          const sanitizedMessage = rawMessage.replace(
+            /(https?:\/\/[^\s]+)\.(?=\s|$)/g,
+            '$1',
+          );
+          onAuthError(`Failed to sign in. Message: ${sanitizedMessage}`);
         }
       }
     })();
