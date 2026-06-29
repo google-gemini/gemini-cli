@@ -1520,9 +1520,6 @@ ${JSON.stringify(
       // 1. With default maxSessionTurns = -1, the recursive limit should be 15.
       vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(-1);
 
-      const fs = await import('node:fs');
-      fs.writeFileSync('./debug-test.log', 'START TEST\n');
-
       // Run 15 recursive turns on the same prompt_id
       for (let i = 0; i < 15; i++) {
         const stream = client.sendMessageStream(
