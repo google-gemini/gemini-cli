@@ -102,10 +102,10 @@
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
     (subpath (param "CACHE_DIR"))
-    (subpath (string-append (param "HOME_DIR") "/.gemini"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
-    (literal (string-append (param "HOME_DIR") "/.gitconfig"))
+    ;; SECURITY: ~/.gemini and ~/.gitconfig are intentionally NOT writable to
+    ;; prevent prompt-injected sandbox escape via self-config/git changes.
     ;; Allow writes to included directories from --include-directories
     (subpath (param "INCLUDE_DIR_0"))
     (subpath (param "INCLUDE_DIR_1"))

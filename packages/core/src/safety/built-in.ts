@@ -11,7 +11,13 @@ import {
   type SafetyCheckResult,
 } from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import { GEMINI_DIR, resolveToRealPath } from '../utils/paths.js';
+
+/**
+ * The git config filename. Writing it can repoint git's editor/pager at an
+ * arbitrary command, so edits must be confirmed even under auto-accept.
+ */
+const GITCONFIG_FILENAME = '.gitconfig';
 
 /**
  * Interface for all in-process safety checkers.
@@ -65,6 +71,7 @@ export class AllowedPathChecker implements InProcessChecker {
       // Check for blocked segments case-insensitively
       let hasBlockedSegment = false;
       let isVscodePath = false;
+      let isProtectedConfigPath = false;
 
       for (const resolvedDir of resolvedAllowedDirs) {
         if (!this.isPathAllowed(resolvedPath, resolvedDir)) continue;
@@ -84,6 +91,14 @@ export class AllowedPathChecker implements InProcessChecker {
           if (clean === '.vscode') {
             isVscodePath = true;
           }
+          // The Gemini config directory (.gemini) and the git config file
+          // (.gitconfig) control the agent's own permissions and git's
+          // behavior. Writing them silently under auto-accept would let a
+          // prompt-injected edit escalate its privileges, so always require
+          // explicit user confirmation.
+          if (clean === GEMINI_DIR || clean === GITCONFIG_FILENAME) {
+            isProtectedConfigPath = true;
+          }
         }
       }
 
@@ -98,6 +113,13 @@ export class AllowedPathChecker implements InProcessChecker {
         return {
           decision: SafetyCheckDecision.ASK_USER,
           reason: `Modifying .vscode configuration files requires explicit user confirmation.`,
+        };
+      }
+
+      if (isProtectedConfigPath) {
+        return {
+          decision: SafetyCheckDecision.ASK_USER,
+          reason: `Modifying Gemini CLI configuration (${GEMINI_DIR}) or git configuration (${GITCONFIG_FILENAME}) requires explicit user confirmation.`,
         };
       }
 

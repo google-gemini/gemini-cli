@@ -308,4 +308,70 @@ describe('AllowedPathChecker', () => {
       }
     });
   });
+
+  describe('Security Regression: Gemini/git config HITL', () => {
+    it('should require ASK_USER for .gemini config writes inside the workspace, including case-insensitive and Windows trailing/ADS bypasses', async () => {
+      const geminiPaths = [
+        path.join(mockCwd, '.gemini', 'settings.json'),
+        path.join(mockCwd, '.gemini', 'config.yaml'),
+        path.join(mockCwd, '.GEMINI', 'settings.json'),
+        path.join(mockCwd, '.Gemini', 'settings.json'),
+        // Nested workspace root
+        path.join(mockWorkspaces[1], '.gemini', 'settings.json'),
+        // Windows trailing character bypasses
+        path.join(mockCwd, '.gemini ', 'settings.json'),
+        path.join(mockCwd, '.gemini.', 'settings.json'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(mockCwd, '.gemini::$DATA', 'settings.json'),
+      ];
+
+      for (const p of geminiPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.ASK_USER);
+        expect(result.reason).toContain('requires explicit user confirmation');
+      }
+    });
+
+    it('should require ASK_USER for .gitconfig writes inside the workspace, including case-insensitive and Windows trailing/ADS bypasses', async () => {
+      const gitconfigPaths = [
+        path.join(mockCwd, '.gitconfig'),
+        path.join(mockCwd, '.GITCONFIG'),
+        path.join(mockCwd, 'nested', '.gitconfig'),
+        // Windows trailing character bypasses
+        path.join(mockCwd, '.gitconfig '),
+        path.join(mockCwd, '.gitconfig.'),
+        // NTFS Alternate Data Stream bypasses
+        path.join(mockCwd, '.gitconfig::$DATA'),
+      ];
+
+      for (const p of gitconfigPaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.ASK_USER);
+        expect(result.reason).toContain('requires explicit user confirmation');
+      }
+    });
+
+    it('should still DENY .git directory writes (not confused with .gitconfig)', async () => {
+      const input = createInput({ path: path.join(mockCwd, '.git', 'config') });
+      const result = await checker.check(input);
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain('Access to sensitive path');
+    });
+
+    it('should DENY .gemini/.gitconfig paths outside the workspace rather than asking', async () => {
+      const outsidePaths = [
+        path.join(testRootDir, 'outside', '.gemini', 'settings.json'),
+        path.join(testRootDir, 'outside', '.gitconfig'),
+      ];
+
+      for (const p of outsidePaths) {
+        const input = createInput({ path: p });
+        const result = await checker.check(input);
+        expect(result.decision).toBe(SafetyCheckDecision.DENY);
+        expect(result.reason).toContain('outside of the allowed workspace');
+      }
+    });
+  });
 });
