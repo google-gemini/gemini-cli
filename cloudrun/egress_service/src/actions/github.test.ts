@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleEgressEvent } from './github.js';
-import { Octokit } from '@octokit/rest';
 
 const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
