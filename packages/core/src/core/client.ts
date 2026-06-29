@@ -93,7 +93,7 @@ type BeforeAgentHookReturn =
 export class GeminiClient {
   private chat?: GeminiChat;
   private sessionTurnCount = 0;
-  private promptTurnCount = 0;
+  private readonly promptTurnCounts = new Map<string, number>();
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
