@@ -926,17 +926,17 @@ export class GeminiClient {
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
-      this.promptTurnCount = 0;
     }
 
-    this.promptTurnCount++;
+    const currentTurns = (this.promptTurnCounts.get(prompt_id) ?? 0) + 1;
+    this.promptTurnCounts.set(prompt_id, currentTurns);
 
     const maxAllowedTurns =
       this.config.getMaxSessionTurns() > 0
         ? this.config.getMaxSessionTurns()
         : 15; // default to 15 recursive turns per single user request
 
-    if (this.promptTurnCount > maxAllowedTurns) {
+    if (currentTurns > maxAllowedTurns) {
       yield { type: GeminiEventType.MaxSessionTurns };
       return new Turn(this.getChat(), prompt_id);
     }
