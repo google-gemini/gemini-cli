@@ -1,23 +1,29 @@
 import unittest
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta, timezone
-from db.issues_store import _acquire_lock_tx, _release_lock_tx, ClaimAction, ReleaseAction
+from google.cloud import firestore
+from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 
 class TestIssuesStore(unittest.TestCase):
 
     def setUp(self):
         self.transaction = MagicMock()
-        self.doc_ref = MagicMock()
-        self.snapshot = MagicMock()
+        self.doc_ref = MagicMock(spec=firestore.DocumentReference)
+        self.snapshot = MagicMock(spec=firestore.DocumentSnapshot)
         self.doc_ref.get.return_value = self.snapshot
         self.lock_holder = "worker-exec-1"
+
+        self.mock_db = MagicMock(spec=firestore.Client)
+        self.mock_db.transaction.return_value = self.transaction
+        self.mock_db.collection.return_value.document.return_value = self.doc_ref
+        self.store = IssuesStore(db=self.mock_db, collection_name="issues")
 
     # --- acquire_lock tests ---
 
     def test_acquire_lock_nonexistent_doc(self):
         """acquire lock on non-existent doc should skip triage"""
         self.snapshot.exists = False
-        action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+        action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
         self.assertEqual(action, ClaimAction.SKIP)
         self.transaction.update.assert_not_called()
 
@@ -28,7 +34,7 @@ class TestIssuesStore(unittest.TestCase):
         for status in terminal_statuses:
             with self.subTest(status=status):
                 self.snapshot.to_dict.return_value = {"status": status, "triage_attempts": 0}
-                action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+                action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
                 self.assertEqual(action, ClaimAction.SKIP)
                 self.transaction.update.assert_not_called()
 
@@ -37,7 +43,7 @@ class TestIssuesStore(unittest.TestCase):
         self.snapshot.exists = True
         self.snapshot.to_dict.return_value = {"status": "UNTRIAGED", "triage_attempts": 2}
         
-        action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+        action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
         
         self.assertEqual(action, ClaimAction.NEEDS_HUMAN)
         self.transaction.update.assert_called_once()
@@ -56,7 +62,7 @@ class TestIssuesStore(unittest.TestCase):
                 "expires_at": now + timedelta(seconds=300)
             }
         }
-        action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+        action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
         self.assertEqual(action, ClaimAction.SKIP)
         self.transaction.update.assert_not_called()
 
@@ -72,7 +78,7 @@ class TestIssuesStore(unittest.TestCase):
                 "expires_at": past
             }
         }
-        action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+        action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
         self.assertEqual(action, ClaimAction.PROCEED)
         self.transaction.update.assert_called_once()
 
@@ -81,7 +87,7 @@ class TestIssuesStore(unittest.TestCase):
         self.snapshot.exists = True
         self.snapshot.to_dict.return_value = {"status": "UNTRIAGED", "triage_attempts": 0}
         
-        action = _acquire_lock_tx(self.transaction, self.doc_ref, self.lock_holder, 900)
+        action = self.store.acquire_lock("owner", "repo", 123, self.lock_holder, 900)
         
         self.assertEqual(action, ClaimAction.PROCEED)
         self.transaction.update.assert_called_once()
@@ -96,7 +102,7 @@ class TestIssuesStore(unittest.TestCase):
     def test_release_lock_nonexistent_doc(self):
         """release lock on non-existent doc should complete silently"""
         self.snapshot.exists = False
-        action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=True)
+        action = self.store.release_lock("owner", "repo", 123, self.lock_holder, success=True)
         self.assertEqual(action, ReleaseAction.COMPLETE)
         self.transaction.update.assert_not_called()
 
@@ -104,7 +110,7 @@ class TestIssuesStore(unittest.TestCase):
         """release lock when caller is not the lock holder should complete without updating"""
         self.snapshot.exists = True
         self.snapshot.to_dict.return_value = {"lock": {"holder": "different-holder"}}
-        action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=True)
+        action = self.store.release_lock("owner", "repo", 123, self.lock_holder, success=True)
         self.assertEqual(action, ReleaseAction.COMPLETE)
         self.transaction.update.assert_not_called()
 
@@ -114,8 +120,8 @@ class TestIssuesStore(unittest.TestCase):
         self.snapshot.to_dict.return_value = {"lock": {"holder": self.lock_holder}}
         workable_spec = {"summary": "Plan"}
         
-        action = _release_lock_tx(
-            self.transaction, self.doc_ref, self.lock_holder,
+        action = self.store.release_lock(
+            "owner", "repo", 123, self.lock_holder,
             success=True, workable_spec=workable_spec, status="TRIAGED"
         )
         
@@ -136,7 +142,7 @@ class TestIssuesStore(unittest.TestCase):
             "triage_attempts": 1,
         }
         
-        action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=False)
+        action = self.store.release_lock("owner", "repo", 123, self.lock_holder, success=False)
         
         self.assertEqual(action, ReleaseAction.RETRY)
         self.transaction.update.assert_called_once()
@@ -152,7 +158,7 @@ class TestIssuesStore(unittest.TestCase):
             "triage_attempts": 2,
         }
         
-        action = _release_lock_tx(self.transaction, self.doc_ref, self.lock_holder, success=False)
+        action = self.store.release_lock("owner", "repo", 123, self.lock_holder, success=False)
         
         self.assertEqual(action, ReleaseAction.COMPLETE)
         self.transaction.update.assert_called_once()
