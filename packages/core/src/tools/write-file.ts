@@ -28,7 +28,12 @@ import {
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
@@ -109,10 +114,67 @@ export async function getCorrectedFileContent(
   let fileExists = false;
   let correctedContent = proposedContent;
 
+  let resolvedPath: string;
+  if (config.isPlanMode()) {
+    try {
+      const cleanFilePath = filePath.replace(/\0/g, '');
+      const planPath = resolveAndValidatePlanPath(
+        cleanFilePath,
+        config.storage.getPlansDir(),
+        config.getProjectRoot(),
+      );
+      resolvedPath = resolveToRealPath(planPath);
+    } catch (err) {
+      return {
+        originalContent: '',
+        correctedContent: proposedContent,
+        fileExists: false,
+        error: {
+          message:
+            'Failed to resolve plan path: ' +
+            (err instanceof Error ? err.message : String(err)),
+          code: 'EINVAL',
+        },
+      };
+    }
+  } else {
+    const sanitizedPath = resolveDefensiveToolPath(
+      filePath,
+      config.getTargetDir(),
+    );
+    try {
+      resolvedPath = resolveToRealPath(
+        path.resolve(config.getTargetDir(), sanitizedPath),
+      );
+    } catch (err) {
+      return {
+        originalContent: '',
+        correctedContent: proposedContent,
+        fileExists: false,
+        error: {
+          message:
+            'Failed to resolve path: ' +
+            (err instanceof Error ? err.message : String(err)),
+          code: 'EINVAL',
+        },
+      };
+    }
+  }
+
+  const validationError = config.validatePathAccess(resolvedPath);
+  if (validationError) {
+    return {
+      originalContent: '',
+      correctedContent: proposedContent,
+      fileExists: false,
+      error: { message: validationError, code: 'EACCES' },
+    };
+  }
+
   try {
     originalContent = await config
       .getFileSystemService()
-      .readTextFile(filePath);
+      .readTextFile(resolvedPath);
     fileExists = true; // File exists and was read
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') {
@@ -177,24 +239,36 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     if (this.config.isPlanMode()) {
       try {
-        this.resolvedPath = resolveAndValidatePlanPath(
-          this.params.file_path,
+        const cleanFilePath = this.params.file_path.replace(/\0/g, '');
+        const planPath = resolveAndValidatePlanPath(
+          cleanFilePath,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        this.resolvedPath = resolveToRealPath(planPath);
       } catch (e) {
         debugLogger.error(
           'Failed to resolve plan path during WriteFileTool invocation setup',
           e,
         );
         // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
-        this.resolvedPath = this.params.file_path;
+        this.resolvedPath = this.params.file_path.replace(/\0/g, '');
       }
     } else {
-      this.resolvedPath = path.resolve(
-        this.config.getTargetDir(),
+      const sanitizedPath = resolveDefensiveToolPath(
         this.params.file_path,
+        this.config.getTargetDir(),
       );
+      try {
+        this.resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), sanitizedPath),
+        );
+      } catch {
+        this.resolvedPath = path.resolve(
+          this.config.getTargetDir(),
+          sanitizedPath,
+        );
+      }
     }
   }
 
@@ -532,16 +606,28 @@ export class WriteFileTool
     let resolvedPath: string;
     if (this.config.isPlanMode()) {
       try {
-        resolvedPath = resolveAndValidatePlanPath(
-          filePath,
+        const cleanFilePath = filePath.replace(/\0/g, '');
+        const planPath = resolveAndValidatePlanPath(
+          cleanFilePath,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        resolvedPath = resolveToRealPath(planPath);
       } catch (err) {
         return err instanceof Error ? err.message : String(err);
       }
     } else {
-      resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+      const sanitizedPath = resolveDefensiveToolPath(
+        filePath,
+        this.config.getTargetDir(),
+      );
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), sanitizedPath),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
     }
 
     const validationError = this.config.validatePathAccess(resolvedPath);

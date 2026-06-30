@@ -30,7 +30,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
@@ -44,8 +44,8 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 
-const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
-const plansDir = path.resolve(os.tmpdir(), 'gemini-cli-test-plans');
+let rootDir: string;
+let plansDir: string;
 
 // --- MOCKS ---
 vi.mock('../core/client.js');
@@ -134,16 +134,20 @@ describe('WriteFileTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Create a unique temporary directory for files created outside the root
-    tempDir = fs.mkdtempSync(
+    const rawTempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    // Ensure the rootDir and plansDir for the tool exists
-    if (!fs.existsSync(rootDir)) {
-      fs.mkdirSync(rootDir, { recursive: true });
-    }
-    if (!fs.existsSync(plansDir)) {
-      fs.mkdirSync(plansDir, { recursive: true });
-    }
+    tempDir = fs.realpathSync(rawTempDir);
+
+    const rawRootDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-root-'),
+    );
+    rootDir = fs.realpathSync(rawRootDir);
+
+    const rawPlansDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-plans-'),
+    );
+    plansDir = fs.realpathSync(rawPlansDir);
 
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
@@ -272,8 +276,9 @@ describe('WriteFileTool', () => {
         file_path: dirAsFilePath,
         content: 'hello',
       };
+      const realDirAsFilePath = resolveToRealPath(dirAsFilePath);
       expect(() => tool.build(params)).toThrow(
-        `Path is a directory, not a file: ${dirAsFilePath}`,
+        `Path is a directory, not a file: ${realDirAsFilePath}`,
       );
     });
 
@@ -474,7 +479,8 @@ describe('WriteFileTool', () => {
         abortSignal,
       );
 
-      expect(fsService.readTextFile).toHaveBeenCalledWith(filePath);
+      const realFilePath = resolveToRealPath(filePath);
+      expect(fsService.readTextFile).toHaveBeenCalledWith(realFilePath);
       expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(proposedContent);
       expect(result.originalContent).toBe('');
@@ -1047,8 +1053,9 @@ describe('WriteFileTool', () => {
 
           expect(result.error?.type).toBe(errorType);
           const errorSuffix = errorCode ? ` (${errorCode})` : '';
+          const realFilePath = resolveToRealPath(filePath);
           const expectedMessage = errorCode
-            ? `${expectedMessagePrefix}: ${filePath}${errorSuffix}`
+            ? `${expectedMessagePrefix}: ${realFilePath}${errorSuffix}`
             : `${expectedMessagePrefix}: ${errorMessage}`;
           expect(result.llmContent).toContain(expectedMessage);
           expect(result.returnDisplay).toContain(expectedMessage);

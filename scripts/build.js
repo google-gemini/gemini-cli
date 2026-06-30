@@ -54,7 +54,7 @@ if (process.env.CI) {
     .filter((name) => name !== '@google/gemini-cli-core');
 
   execSync(
-    `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
+    `npx --no-install npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
     { stdio: 'inherit', cwd: root },
   );
 }
