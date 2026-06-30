@@ -525,6 +525,102 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
         expect(result.current.proQuotaRequest).toBeNull();
       });
 
+      it('should handle ModelNotFoundError with Vertex AI by displaying region-specific availability message and documentation link', async () => {
+        vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+          authType: AuthType.USE_VERTEX_AI,
+        });
+        vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('gemini-3.5-flash', 'gemini-1.5-flash', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-3.5-flash');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Model "gemini-3.5-flash" is not available in region "us-central1".\n` +
+            `To see which models are available in this region, please visit:\n` +
+            `https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations\n` +
+            `/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+      });
+
+      it('should handle ModelNotFoundError with Vertex AI and invalid model by displaying generic not found error message', async () => {
+        vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+          authType: AuthType.USE_VERTEX_AI,
+        });
+        vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        act(() => {
+          promise = handler('invalid-model-name', 'gemini-1.5-flash', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('invalid-model-name');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Model "invalid-model-name" was not found or is invalid.\n` +
+            `/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+      });
+
       it('should handle ModelNotFoundError with invalid model correctly', async () => {
         const { result } = await renderHook(() =>
           useQuotaAndFallback({
