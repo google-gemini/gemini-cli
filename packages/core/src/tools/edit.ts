@@ -741,7 +741,12 @@ class EditToolInvocation
       };
     }
 
-    if (this.config.getDisableLLMCorrection()) {
+    const fileExt = path.extname(this.resolvedPath).toLowerCase();
+    const isJsonOrIpynb = ['.json', '.ipynb', '.jsonc', '.json5'].includes(
+      fileExt,
+    );
+
+    if (this.config.getDisableLLMCorrection() || isJsonOrIpynb) {
       return {
         currentContent,
         newContent: currentContent,

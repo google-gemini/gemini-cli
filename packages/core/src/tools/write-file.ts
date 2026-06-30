@@ -131,15 +131,22 @@ export async function getCorrectedFileContent(
     }
   }
 
-  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
-
-  correctedContent = await ensureCorrectFileContent(
-    proposedContent,
-    config.getBaseLlmClient(),
-    abortSignal,
-    config.getDisableLLMCorrection(),
-    aggressiveUnescape,
+  const fileExt = path.extname(filePath).toLowerCase();
+  const isJsonOrIpynb = ['.json', '.ipynb', '.jsonc', '.json5'].includes(
+    fileExt,
   );
+
+  if (!isJsonOrIpynb) {
+    const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
+
+    correctedContent = await ensureCorrectFileContent(
+      proposedContent,
+      config.getBaseLlmClient(),
+      abortSignal,
+      config.getDisableLLMCorrection(),
+      aggressiveUnescape,
+    );
+  }
 
   return { originalContent, correctedContent, fileExists };
 }
