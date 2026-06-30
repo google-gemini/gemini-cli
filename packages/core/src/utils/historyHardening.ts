@@ -69,7 +69,7 @@ export function hardenHistory(
  * Helper to check if a Part object represents an internal thought.
  */
 function isInternalThought(part: Part): boolean {
-  return !!(part as ThoughtPart).thought;
+  return !!part && !!(part as ThoughtPart).thought;
 }
 
 /**
@@ -384,7 +384,7 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
   const result: HistoryTurn[] = [];
   for (const turn of history) {
     const nonThoughtParts = (turn.content.parts ?? []).filter(
-      (p) => !isInternalThought(p),
+      (p) => p && !isInternalThought(p),
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
 
@@ -422,7 +422,7 @@ export function scrubContents(contents: Content[]): Content[] {
   const result: Content[] = [];
   for (const content of contents) {
     const nonThoughtParts = (content.parts ?? []).filter(
-      (p) => !isInternalThought(p),
+      (p) => p && !isInternalThought(p),
     );
     if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
 
