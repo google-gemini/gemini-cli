@@ -52,8 +52,8 @@ def main() -> None:
             workable_spec = triage_result.get("workable_spec", {})
             
             if quality in ["SPAM", "EMPTY", "FEATURE"]:
-                print(f"[WORKER] Quality: {quality}. Applying low_quality label.")
-                send_label_action(owner, repo, issue_number, ["low_quality"])
+                print(f"[WORKER] Quality: {quality}. Applying needs_human label.")
+                send_label_action(owner, repo, issue_number, ["needs_human"])
                 release_lock(owner, repo, issue_number, lock_holder, success=True, status="LOW_QUALITY")
                 sys.exit(0)
             elif quality == "NEEDS_INFO":

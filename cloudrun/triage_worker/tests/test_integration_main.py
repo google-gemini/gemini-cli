@@ -181,7 +181,7 @@ class TestIntegrationMain(unittest.TestCase):
             self.assertEqual(ctx.exception.code, 0)
             mock_acquire.assert_called_once_with("owner", "repo", 42, "test-workflow-exec-101")
             mock_release.assert_called_once_with("owner", "repo", 42, "test-workflow-exec-101", success=True, status="LOW_QUALITY")
-            mock_send_label.assert_called_once_with("owner", "repo", 42, ["low_quality"])
+            mock_send_label.assert_called_once_with("owner", "repo", 42, ["needs_human"])
 
             self.assertEqual(self.stored_data["status"], "LOW_QUALITY")
             self.assertIsNone(self.stored_data["lock"]["holder"])
