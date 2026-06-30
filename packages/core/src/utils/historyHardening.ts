@@ -83,7 +83,7 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
     if (!hasThought) return turn;
 
     const nonThoughtParts = turn.content.parts.filter(
-      (p) => !isInternalThought(p),
+      (p) => p && !isInternalThought(p),
     );
     return {
       id: turn.id,
