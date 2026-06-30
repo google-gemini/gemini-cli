@@ -45,7 +45,7 @@ The final `workable_spec` object must conform strictly to this JSON Schema speci
       "properties": {
         "files_to_modify": {
           "type": "array",
-          "description": "List of paths to files requiring changes relative to the repository root (e.g. ['src/cli.ts']).",
+          "description": "List of source code files requiring changes relative to the repository root (e.g. ['src/cli.ts']). Strictly do NOT include test files (*.test.ts, *.spec.ts) here; test files must go into testing_strategy.test_file.",
           "items": {
             "type": "string"
           }
