@@ -37,8 +37,8 @@ describe('handleAtCommand with Agents', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
 
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'agent-test-'),
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(path.join(os.tmpdir(), 'agent-test-')),
     );
 
     abortController = new AbortController();
