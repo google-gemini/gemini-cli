@@ -226,6 +226,14 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface NumericalRoutingRule {
+  maxScore: number;
+  model: string;
+}
+export interface RoutingSettings {
+  numericalRules?: NumericalRoutingRule[];
+}
+
 export interface GemmaModelRouterSettings {
   enabled?: boolean;
   autoStartServer?: boolean;
@@ -683,6 +691,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  routing?: RoutingSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
@@ -745,6 +754,14 @@ export interface ConfigParameters {
   };
   vertexAiRouting?: VertexAiRoutingConfig;
   logRagSnippets?: boolean;
+}
+
+export interface NumericalRoutingRule {
+  maxScore: number;
+  model: string;
+}
+export interface RoutingSettings {
+  numericalRules?: NumericalRoutingRule[];
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -983,9 +1000,11 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private readonly routing?: RoutingSettings;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
+    this.routing = params.routing;
     this.clientName = params.clientName;
     this._clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
@@ -3450,6 +3469,20 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     return defaultValue;
+  }
+
+  async getNumericalRoutingRules(): Promise<NumericalRoutingRule[]> {
+    if (
+      this.routing?.numericalRules &&
+      this.routing.numericalRules.length > 0
+    ) {
+      return this.routing.numericalRules;
+    }
+    const threshold = await this.getResolvedClassifierThreshold();
+    return [
+      { maxScore: threshold - 1, model: 'flash' },
+      { maxScore: 100, model: 'pro' },
+    ];
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
