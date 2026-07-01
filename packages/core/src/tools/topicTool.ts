@@ -33,6 +33,13 @@ class UpdateTopicInvocation extends BaseToolInvocation<
   UpdateTopicParams,
   ToolResult
 > {
+  /**
+   * The session id this tool call was scheduled in. If the session is reset
+   * (e.g. via /clear) before this call executes, applying the update would
+   * write the previous session's topic into the fresh one. See issue #26402.
+   */
+  private readonly scheduledSessionId: string;
+
   constructor(
     params: UpdateTopicParams,
     messageBus: MessageBus,
@@ -40,6 +47,7 @@ class UpdateTopicInvocation extends BaseToolInvocation<
     private readonly config: Config,
   ) {
     super(params, messageBus, toolName);
+    this.scheduledSessionId = config.getSessionId();
   }
 
   getDescription(): string {
@@ -51,7 +59,20 @@ class UpdateTopicInvocation extends BaseToolInvocation<
     return `Update tactical intent: "${intent || '...'}"`;
   }
 
-  async execute(_options: ExecuteOptions): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    // Guard against orphaned/stale calls. If this call was cancelled, or the
+    // session was reset (e.g. via /clear) after it was scheduled, do not touch
+    // the shared topicState — otherwise the previous session's topic would be
+    // re-injected into the new session's system prompt. See issue #26402.
+    if (
+      options.abortSignal?.aborted ||
+      this.config.getSessionId() !== this.scheduledSessionId
+    ) {
+      const message =
+        'Topic update skipped: the session was reset before it could be applied.';
+      return { llmContent: message, returnDisplay: '' };
+    }
+
     const title = this.params[TOPIC_PARAM_TITLE];
     const summary = this.params[TOPIC_PARAM_SUMMARY];
     const strategicIntent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
