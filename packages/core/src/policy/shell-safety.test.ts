@@ -247,6 +247,101 @@ describe('Shell Safety Policy', () => {
     const result = await policyEngineWithBoth.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
+
+  it('SHOULD NOT automatically allow shell parameter expansion in allowlisted commands', async () => {
+    const echoPolicy = createPolicyEngineWithPrefix('echo');
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "${SIMULATED_GEMINI_API_KEY:0:12}"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "$SIMULATED_GEMINI_API_KEY"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: `echo "hello '$SIMULATED_GEMINI_API_KEY'"` },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "$1"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+
+    await expect(
+      echoPolicy.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "$$ $-"' },
+        },
+        undefined,
+      ),
+    ).resolves.toMatchObject({ decision: PolicyDecision.ASK_USER });
+  });
+
+  it('SHOULD deny shell parameter expansion in YOLO non-interactive mode', async () => {
+    const argsPatternsEcho = buildArgsPatterns(undefined, 'echo', undefined);
+    const echoPolicy = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          decision: PolicyDecision.ALLOW,
+          priority: 2,
+        },
+      ],
+      approvalMode: ApprovalMode.YOLO,
+      nonInteractive: true,
+    });
+
+    const result = await echoPolicy.check(
+      {
+        name: 'run_shell_command',
+        args: { command: 'echo "${SIMULATED_GEMINI_API_KEY:0:12}"' },
+      },
+      undefined,
+    );
+
+    expect(result.decision).toBe(PolicyDecision.DENY);
+  });
+
+  it('SHOULD allow literal dollar signs that cannot trigger shell expansion', async () => {
+    const echoPolicy = createPolicyEngineWithPrefix('echo');
+
+    const result = await echoPolicy.check(
+      {
+        name: 'run_shell_command',
+        args: { command: "echo '$SIMULATED_GEMINI_API_KEY'" },
+      },
+      undefined,
+    );
+
+    expect(result.decision).toBe(PolicyDecision.ALLOW);
+  });
+
   it('SHOULD NOT allow command substitution with backticks `rm -rf /`', async () => {
     const toolCall: FunctionCall = {
       name: 'run_shell_command',

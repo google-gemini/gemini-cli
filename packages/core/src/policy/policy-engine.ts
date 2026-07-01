@@ -82,6 +82,57 @@ function matchesWildcard(
   return toolName === pattern;
 }
 
+function hasShellExpansion(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escaped = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && !inSingleQuote) {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (inSingleQuote || char !== '$') {
+      continue;
+    }
+
+    const next = command[i + 1];
+    if (
+      next === '{' ||
+      next === '?' ||
+      next === '#' ||
+      next === '!' ||
+      next === '@' ||
+      next === '*' ||
+      next === '$' ||
+      next === '-' ||
+      /^[0-9A-Za-z_]$/.test(next ?? '')
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
@@ -411,6 +462,26 @@ export class PolicyEngine {
     // If heuristics downgraded the decision, we don't blame the rule.
     let responsibleRule: PolicyRule | undefined =
       rule && ruleDecision === rule.decision ? rule : undefined;
+
+    if (hasShellExpansion(command)) {
+      if (this.approvalMode === ApprovalMode.YOLO || this.nonInteractive) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Denying shell expansion in non-interactive mode: ${command}`,
+        );
+        return {
+          decision: PolicyDecision.DENY,
+          rule: undefined,
+        };
+      }
+
+      if (aggregateDecision === PolicyDecision.ALLOW) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for shell expansion: ${command}`,
+        );
+        aggregateDecision = PolicyDecision.ASK_USER;
+        responsibleRule = undefined;
+      }
+    }
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
