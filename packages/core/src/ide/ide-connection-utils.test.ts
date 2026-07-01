@@ -468,7 +468,7 @@ describe('ide-connection-utils', () => {
   describe('with special characters and encoding', () => {
     it('should return true for a URI-encoded path with spaces', () => {
       const workspaceDir = path.resolve('/test/my workspace');
-      const workspacePath = '/test/my%20workspace';
+      const workspacePath = pathToFileURL(workspaceDir).toString();
       const cwd = path.join(workspaceDir, 'sub-dir');
       const result = validateWorkspacePath(workspacePath, cwd);
       expect(result.isValid).toBe(true);
@@ -476,7 +476,7 @@ describe('ide-connection-utils', () => {
 
     it('should return true for a URI-encoded path with Korean characters', () => {
       const workspaceDir = path.resolve('/test/테스트');
-      const workspacePath = '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8'; // "테스트"
+      const workspacePath = pathToFileURL(workspaceDir).toString();
       const cwd = path.join(workspaceDir, 'sub-dir');
       const result = validateWorkspacePath(workspacePath, cwd);
       expect(result.isValid).toBe(true);
@@ -494,7 +494,7 @@ describe('ide-connection-utils', () => {
       const workspaceDir2 = path.resolve('/test/테스트');
       const workspacePath = [
         workspaceDir1,
-        '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8', // "테스트"
+        pathToFileURL(workspaceDir2).toString(),
       ].join(path.delimiter);
       const cwd = path.join(workspaceDir2, 'sub-dir');
       const result = validateWorkspacePath(workspacePath, cwd);
@@ -536,17 +536,18 @@ describe('ide-connection-utils', () => {
         expectedValid: true,
       },
       {
-        description: 'should return true when workspace has encoded spaces',
-        workspacePath: path.resolve('test', 'my ws').replace(/ /g, '%20'),
+        description:
+          'should return true when workspace has encoded spaces in file:// URL',
+        workspacePath: pathToFileURL(path.resolve('test', 'my ws')).toString(),
         cwd: path.resolve('test', 'my ws'),
         expectedValid: true,
       },
       {
         description:
-          'should return true when cwd needs normalization matching workspace',
+          'should return false when cwd has literal %20 and workspace has space',
         workspacePath: path.resolve('test', 'my ws'),
         cwd: path.resolve('test', 'my ws').replace(/ /g, '%20'),
-        expectedValid: true,
+        expectedValid: false,
       },
     ])('$description', ({ workspacePath, cwd, expectedValid }) => {
       expect(validateWorkspacePath(workspacePath, cwd)).toMatchObject({
