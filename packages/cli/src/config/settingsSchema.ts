@@ -183,6 +183,17 @@ const SETTINGS_SCHEMA = {
     'Additional admin policy files or directories to load.',
   ),
 
+  allowCommandSubstitution: {
+    type: 'boolean',
+    label: 'Allow Command Substitution',
+    category: 'Security',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Allow command substitution (e.g., $()) in shell tool execution.',
+    showInDialog: true,
+  },
+
   general: {
     type: 'object',
     label: 'General',
