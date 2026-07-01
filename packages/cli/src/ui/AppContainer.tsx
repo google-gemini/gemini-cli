@@ -1178,6 +1178,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [config, getPreferredEditor],
   );
 
+  useEffect(
+    () => () => {
+      streamAgent?.dispose?.();
+    },
+    [streamAgent],
+  );
+
   const activeStream = streamAgent
     ? // eslint-disable-next-line react-hooks/rules-of-hooks
       useAgentStream({
