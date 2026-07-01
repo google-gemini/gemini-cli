@@ -146,7 +146,7 @@ describe('useApprovalModeIndicator', () => {
         addItem: vi.fn(),
       }),
     );
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.AUTO_EDIT);
     expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
   });
 
@@ -158,7 +158,7 @@ describe('useApprovalModeIndicator', () => {
         addItem: vi.fn(),
       }),
     );
-    expect(result.current).toBe(ApprovalMode.DEFAULT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
     expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
   });
 
@@ -170,7 +170,7 @@ describe('useApprovalModeIndicator', () => {
         addItem: vi.fn(),
       }),
     );
-    expect(result.current).toBe(ApprovalMode.YOLO);
+    expect(result.current.approvalMode).toBe(ApprovalMode.YOLO);
     expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(1);
   });
 
@@ -182,7 +182,7 @@ describe('useApprovalModeIndicator', () => {
         addItem: vi.fn(),
       }),
     );
-    expect(result.current).toBe(ApprovalMode.DEFAULT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
 
     // Shift+Tab cycles to AUTO_EDIT
     act(() => {
@@ -194,7 +194,7 @@ describe('useApprovalModeIndicator', () => {
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
     );
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.AUTO_EDIT);
 
     act(() => {
       capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
@@ -202,7 +202,7 @@ describe('useApprovalModeIndicator', () => {
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.YOLO,
     );
-    expect(result.current).toBe(ApprovalMode.YOLO);
+    expect(result.current.approvalMode).toBe(ApprovalMode.YOLO);
 
     // Shift+Tab cycles back to AUTO_EDIT (from YOLO)
     act(() => {
@@ -214,7 +214,7 @@ describe('useApprovalModeIndicator', () => {
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
     );
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.AUTO_EDIT);
 
     // Ctrl+Y toggles YOLO
     act(() => {
@@ -223,7 +223,7 @@ describe('useApprovalModeIndicator', () => {
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.YOLO,
     );
-    expect(result.current).toBe(ApprovalMode.YOLO);
+    expect(result.current.approvalMode).toBe(ApprovalMode.YOLO);
 
     // Shift+Tab from YOLO jumps to AUTO_EDIT
     act(() => {
@@ -235,7 +235,7 @@ describe('useApprovalModeIndicator', () => {
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
     );
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.AUTO_EDIT);
   });
 
   it('should not toggle if only one key or other keys combinations are pressed', async () => {
@@ -309,7 +309,7 @@ describe('useApprovalModeIndicator', () => {
         },
       },
     );
-    expect(result.current).toBe(ApprovalMode.DEFAULT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
 
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
 
@@ -317,7 +317,7 @@ describe('useApprovalModeIndicator', () => {
       config: mockConfigInstance as unknown as ActualConfigType,
       addItem: vi.fn(),
     });
-    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
+    expect(result.current.approvalMode).toBe(ApprovalMode.AUTO_EDIT);
     expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(3);
   });
 
@@ -341,7 +341,7 @@ describe('useApprovalModeIndicator', () => {
         }),
       );
 
-      expect(result.current).toBe(ApprovalMode.DEFAULT);
+      expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
 
       act(() => {
         capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
@@ -371,7 +371,7 @@ describe('useApprovalModeIndicator', () => {
         }),
       );
 
-      expect(result.current).toBe(ApprovalMode.DEFAULT);
+      expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
 
       act(() => {
         capturedUseKeypressHandler({
@@ -504,7 +504,7 @@ describe('useApprovalModeIndicator', () => {
         }),
       );
 
-      expect(result.current).toBe(ApprovalMode.DEFAULT);
+      expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
 
       act(() => {
         capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
@@ -521,7 +521,7 @@ describe('useApprovalModeIndicator', () => {
         expect.any(Number),
       );
       // The mode should not change
-      expect(result.current).toBe(ApprovalMode.DEFAULT);
+      expect(result.current.approvalMode).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should show admin error message when YOLO mode is disabled by admin', async () => {

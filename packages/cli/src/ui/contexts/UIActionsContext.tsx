@@ -97,6 +97,7 @@ export interface UIActions {
   getPreferredEditor: () => EditorType | undefined;
   clearAccountSuspension: () => void;
   setVoiceModeEnabled: (value: boolean) => void;
+  cycleApprovalMode: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);
