@@ -451,6 +451,13 @@ export async function runNonInteractive(
         }
 
         if (toolCallRequests.length > 0) {
+          // Re-check the abort signal before scheduling any tool calls.
+          // A SIGINT can fire after the stream loop has already buffered
+          // a tool-call event; without this guard the side effect would
+          // execute even though the user has cancelled.
+          if (abortController.signal.aborted) {
+            handleCancellationError(config);
+          }
           textOutput.ensureTrailingNewline();
           const completedToolCalls = await scheduler.schedule(
             toolCallRequests,

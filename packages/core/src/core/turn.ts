@@ -364,8 +364,18 @@ export class Turn {
           yield { type: GeminiEventType.Content, value: text, traceId };
         }
 
-        // Handle function calls (requesting tool execution)
+        // Handle function calls (requesting tool execution).
+        //
+        // Re-check the abort signal here: a SIGINT can fire between the
+        // top-of-loop check above and the moment we materialize tool calls
+        // from a chunk that arrived after cancellation. Without this guard
+        // a delayed function-call chunk is yielded to the scheduler and
+        // the side effect runs after the user cancelled.
         const functionCalls = resp.functionCalls ?? [];
+        if (functionCalls.length > 0 && signal?.aborted) {
+          yield { type: GeminiEventType.UserCancelled };
+          return;
+        }
         for (const fnCall of functionCalls) {
           const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {
