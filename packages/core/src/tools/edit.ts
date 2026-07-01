@@ -863,12 +863,31 @@ class EditToolInvocation
       return `Create ${shortenPath(relativePath)}`;
     }
 
-    const oldStringSnippet =
-      this.params.old_string.split('\n')[0].substring(0, 30) +
-      (this.params.old_string.length > 30 ? '...' : '');
-    const newStringSnippet =
-      this.params.new_string.split('\n')[0].substring(0, 30) +
-      (this.params.new_string.length > 30 ? '...' : '');
+    const getSnippet = (str: string): string => {
+      const safeStr = str ?? '';
+      const newlineIdx = safeStr.indexOf('\n');
+      let firstLine =
+        newlineIdx !== -1 ? safeStr.substring(0, newlineIdx) : safeStr;
+      if (firstLine.endsWith('\r')) {
+        firstLine = firstLine.slice(0, -1);
+      }
+
+      const segments: string[] = [];
+      for (const s of new Intl.Segmenter().segment(firstLine)) {
+        segments.push(s.segment);
+        if (segments.length > 30) {
+          break;
+        }
+      }
+
+      if (segments.length > 30) {
+        return segments.slice(0, 30).join('') + '...';
+      }
+      return firstLine + (newlineIdx !== -1 ? '...' : '');
+    };
+
+    const oldStringSnippet = getSnippet(this.params.old_string);
+    const newStringSnippet = getSnippet(this.params.new_string);
 
     if (this.params.old_string === this.params.new_string) {
       return `No file changes to ${shortenPath(relativePath)}`;
