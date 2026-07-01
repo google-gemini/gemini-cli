@@ -1,0 +1,28 @@
+{
+  "name": "ingestion-service",
+  "version": "1.0.0",
+  "description": "Ingestion service for triage worker",
+  "main": "server.ts",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.7.0",
+    "@google-cloud/pubsub": "^4.4.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "tsx": "^4.9.3",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
