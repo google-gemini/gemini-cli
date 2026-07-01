@@ -5,6 +5,18 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const mockDebugLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
+}));
+
 import { MessageBus } from './message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
@@ -180,6 +192,22 @@ describe('MessageBus', () => {
       await messageBus.publish(message);
 
       expect(successHandler).toHaveBeenCalledWith(message);
+    });
+
+    it('should not dump full payload in debug mode', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+      const debugBus = new MessageBus(policyEngine, true);
+      const request: ToolConfirmationRequest = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-correlation-id',
+        toolCall: { name: 'sensitive_tool', args: { secret: 'do_not_log' } },
+      };
+      await debugBus.publish(request);
+      expect(mockDebugLogger.debug).toHaveBeenCalledWith(
+        '[MESSAGE_BUS] publish: type=tool-confirmation-request correlationId=test-correlation-id',
+      );
     });
   });
 
