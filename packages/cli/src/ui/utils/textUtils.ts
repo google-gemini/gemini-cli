@@ -155,8 +155,11 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
 
   let sanitized = stripUnsafeCharacters(str).replace(/\s+/g, ' ');
 
-  if (maxLength && sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  // Count and slice by code points so an astral character (e.g. an emoji,
+  // stored as a surrogate pair) isn't split in half, which would leave a lone
+  // surrogate and render as a replacement character.
+  if (maxLength && cpLen(sanitized) > maxLength) {
+    sanitized = cpSlice(sanitized, 0, maxLength - 3) + '...';
   }
 
   return sanitized;

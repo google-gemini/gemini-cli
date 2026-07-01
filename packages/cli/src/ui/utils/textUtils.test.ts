@@ -33,6 +33,15 @@ describe('textUtils', () => {
       expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
     });
 
+    it('should not split a surrogate pair when truncating', () => {
+      // Each 🎉 is a single code point stored as two UTF-16 code units.
+      const input = '🎉'.repeat(10);
+      const result = sanitizeForDisplay(input, 8);
+      expect(result).toBe('🎉'.repeat(5) + '...');
+      // No lone surrogate should remain.
+      expect(/[\uD800-\uDFFF]/u.test(result)).toBe(false);
+    });
+
     it('should handle empty or null input', () => {
       expect(sanitizeForDisplay('')).toBe('');
       expect(sanitizeForDisplay(null as unknown as string)).toBe('');
