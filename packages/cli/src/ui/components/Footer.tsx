@@ -69,6 +69,20 @@ interface SandboxIndicatorProps {
   isTrustedFolder: boolean | undefined;
 }
 
+/**
+ * Returns a human-readable label for the active sandbox, mirroring the
+ * logic used by the `/about` command.
+ */
+function getSandboxLabel(): string | null {
+  const sandbox = process.env['SANDBOX'];
+  if (!sandbox) return null;
+  if (sandbox === 'sandbox-exec') {
+    const profile = process.env['SEATBELT_PROFILE'] || 'unknown';
+    return `sandbox-exec (${profile})`;
+  }
+  return sandbox;
+}
+
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
@@ -78,9 +92,9 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
-  const sandbox = process.env['SANDBOX'];
-  if (sandbox) {
-    return <Text color={theme.status.warning}>current process</Text>;
+  const sandboxLabel = getSandboxLabel();
+  if (sandboxLabel) {
+    return <Text color={theme.status.warning}>{sandboxLabel}</Text>;
   }
 
   if (sandboxEnabled) {
@@ -309,10 +323,12 @@ export const Footer: React.FC = () => {
       }
       case 'sandbox': {
         let str = 'no sandbox';
-        const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox) str = 'current process';
-        else if (config.getSandboxEnabled()) str = 'all tools';
+        else {
+          const sandboxLabel = getSandboxLabel();
+          if (sandboxLabel) str = sandboxLabel;
+          else if (config.getSandboxEnabled()) str = 'all tools';
+        }
 
         addCol(
           id,
