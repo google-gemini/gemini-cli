@@ -522,8 +522,11 @@ export class ActivityLogger extends EventEmitter {
                   ),
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-        return (oldWrite as any).apply(this, [chunk, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return (oldWrite as (...args: unknown[]) => boolean).apply(this, [
+          chunk,
+          ...etc,
+        ]);
       };
 
       req.end = function (
@@ -559,8 +562,11 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-        return (oldEnd as any).apply(this, [chunkOrCb, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return (oldEnd as (...args: unknown[]) => http.ClientRequest).apply(
+          this,
+          [chunkOrCb, ...etc],
+        );
       };
 
       req.on('response', (res: http.IncomingMessage) => {
