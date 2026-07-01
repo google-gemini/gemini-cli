@@ -419,6 +419,56 @@ describe('sandbox', () => {
       );
     });
 
+    it('should skip setting hostname if setHostname is false', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        setHostname: false,
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const containerName = 'gemini-cli-sandbox-a1b2c3d4e5f6';
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.not.arrayContaining(['--hostname']),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining(['--name', containerName]),
+        expect.anything(),
+      );
+    });
+
     it('should pull image if missing', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',

@@ -2877,6 +2877,13 @@
           "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrStringOrObject"
         },
+        "sandboxSetHostname": {
+          "title": "Sandbox Set Hostname",
+          "description": "Whether to set the hostname in the sandbox container. Set to false to avoid Mutating UTS namespace, which is required for some rootless container environments.",
+          "markdownDescription": "Whether to set the hostname in the sandbox container. Set to false to avoid Mutating UTS namespace, which is required for some rootless container environments.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "sandboxAllowedPaths": {
           "title": "Sandbox Allowed Paths",
           "description": "List of additional paths that the sandbox is allowed to access.",
