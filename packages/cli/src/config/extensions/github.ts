@@ -69,6 +69,10 @@ export async function cloneFromGit(
     // After fetching, checkout FETCH_HEAD to get the content of the fetched ref.
     // This results in a detached HEAD state, which is fine for this purpose.
     await git.checkout('FETCH_HEAD');
+
+    // Some extensions vendor code or assets via git submodules. Initialize
+    // them after checking out the requested ref so they match that commit.
+    await git.submoduleUpdate(['--init', '--recursive']);
   } catch (error) {
     throw new Error(
       `Failed to clone Git repository from ${installMetadata.source} ${getErrorMessage(error)}`,
