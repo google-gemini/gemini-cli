@@ -18,6 +18,24 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.49.0 - 2026-06-25
+
+- **Evaluation Inventory:** Added a new `eval:inventory` CLI command with JSON
+  output to catalog and analyze behavioral evaluations
+  ([#28009](https://github.com/google-gemini/gemini-cli/pull/28009),
+  [#28058](https://github.com/google-gemini/gemini-cli/pull/28058) by @ved015).
+- **GDC Air-Gapped Support:** Enabled Google Distributed Cloud (GDC) air-gapped
+  Service Identity support following an authentication library update
+  ([#27956](https://github.com/google-gemini/gemini-cli/pull/27956) by
+  @sidhantgoyal-droid).
+- **Security and Compatibility:** Prevented path traversal vulnerabilities
+  during skill installation and resolved tmux false-positive background command
+  execution detection
+  ([#27767](https://github.com/google-gemini/gemini-cli/pull/27767) by
+  @ompatel-aiml,
+  [#27572](https://github.com/google-gemini/gemini-cli/pull/27572) by
+  @amelidev).
+
 ## Announcements: v0.45.0 - 2026-06-03
 
 - **Context Simplification:** Completed major architectural work to simplify the

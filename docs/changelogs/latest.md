@@ -1,6 +1,6 @@
-# Latest stable release: v0.45.0
+# Latest stable release: v0.49.0
 
-Released: June 03, 2026
+Released: June 25, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -11,55 +11,78 @@ npm install -g @google/gemini-cli
 
 ## Highlights
 
-- **Context Manager Simplification:** Completed a significant refactoring of the
-  context management system to improve reliability and architectural clarity.
-- **A2A Usage Metadata:** Enhanced the Agent-to-Agent protocol to expose usage
-  metadata, enabling more transparent resource monitoring.
-- **Terminal & PTY Robustness:** Resolved several critical issues related to
-  terminal interactions, including Termux relaunch loops and PTY resize errors.
-- **Routing Optimizations:** Updated default auto-routing and bypassed
-  classifiers for specific tool responses to prevent orphaned function errors.
-- **Tool Execution Control:** Forced the `update_topic` tool to execute
-  sequentially, ensuring consistent narrative flow in agent interactions.
+- **Evaluation Inventory:** Added a new `eval:inventory` CLI command along with
+  JSON reporting output to inventory and track behavioral evaluations.
+- **GDC Air-Gapped Support:** Support for Google Distributed Cloud (GDC)
+  air-gapped Service Identity following an auth library update.
+- **Standardized Tool Output and Config:** Standardized formatting for tool
+  outputs and migrated the `coreTools` configuration setting to `tools.core`.
+- **Security and Reliability Fixes:** Prevented potential path traversal
+  vulnerabilities during skill installation, handled tmux false-positive
+  background detection, and ensured zero-quota API limits fail fast to prevent
+  hangs.
 
 ## What's Changed
 
-- chore(release): bump version to 0.45.0-nightly.20260521.g854f811be by
+- chore(release): bump version to 0.48.0-nightly.20260609.g3a13b8eeb by
   @gemini-cli-robot in
-  [#27362](https://github.com/google-gemini/gemini-cli/pull/27362)
-- fix(cli): prevent Termux relaunch and resize remount loops by @saymanq in
-  [#27110](https://github.com/google-gemini/gemini-cli/pull/27110)
-- Feat/a2a expose usage metadata by @jvargassanchez-dot in
-  [#27288](https://github.com/google-gemini/gemini-cli/pull/27288)
-- feat(context): Complete simplification work. by @joshualitt in
-  [#27345](https://github.com/google-gemini/gemini-cli/pull/27345)
-- fix(core): force update_topic tool to execute sequentially by
-  @jvargassanchez-dot in
-  [#27357](https://github.com/google-gemini/gemini-cli/pull/27357)
-- Changelog for v0.44.0-preview.0 by @gemini-cli-robot in
-  [#27360](https://github.com/google-gemini/gemini-cli/pull/27360)
-- Changelog for v0.43.0 by @gemini-cli-robot in
-  [#27361](https://github.com/google-gemini/gemini-cli/pull/27361)
-- Revert "fix(core): prevent SIGHUP kills in PTY environments" by @bbiggs in
-  [#27401](https://github.com/google-gemini/gemini-cli/pull/27401)
-- fix(cli): filter internal session context from history during resumption by
+  [#27779](https://github.com/google-gemini/gemini-cli/pull/27779)
+- ci(dependabot): enable cooldown period for npm packages by @ruomengz in
+  [#27743](https://github.com/google-gemini/gemini-cli/pull/27743)
+- refactor(core): standardize tool output formatting by @galz10 in
+  [#27772](https://github.com/google-gemini/gemini-cli/pull/27772)
+- ci: update workflow logging and policy configurations by @galz10 in
+  [#27853](https://github.com/google-gemini/gemini-cli/pull/27853)
+- fix(core): Ensure zero-quota limits fail fast to prevent retry loop hang by
+  @luisfelipe-alt in
+  [#27698](https://github.com/google-gemini/gemini-cli/pull/27698)
+- fix(core): handle multi-line escaped quotes in stripShellWrapper by
+  @sanchezcoraspe in
+  [#27467](https://github.com/google-gemini/gemini-cli/pull/27467)
+- fix(cli): prevent path traversal vulnerabilities during skill install… by
+  @ompatel-aiml in
+  [#27767](https://github.com/google-gemini/gemini-cli/pull/27767)
+- Fix/pending tools and trust overrides by @jvargassanchez-dot in
+  [#27854](https://github.com/google-gemini/gemini-cli/pull/27854)
+- ci: use internal environment for scheduled nightly releases (#27865) by
   @rmedranollamas in
-  [#27391](https://github.com/google-gemini/gemini-cli/pull/27391)
-- Update default auto routing by @DavidAPierce in
-  [#27071](https://github.com/google-gemini/gemini-cli/pull/27071)
-- fix(core): bypass routing classifiers to prevent orphaned function response
-  errors by @danielweis in
-  [#27389](https://github.com/google-gemini/gemini-cli/pull/27389)
-- fix(core): suppress PTY resize EBADF errors by @scidomino in
-  [#27461](https://github.com/google-gemini/gemini-cli/pull/27461)
-- fix(core): prevent blacklist bypass in mcp list by @ompatel-aiml in
-  [#27377](https://github.com/google-gemini/gemini-cli/pull/27377)
-- fix(cli): ignore unmapped vim normal keys by @MukundaKatta in
-  [#27102](https://github.com/google-gemini/gemini-cli/pull/27102)
-- fix(patch): cherry-pick bd53951 to release/v0.45.0-preview.0-pr-27496 to patch
-  version v0.45.0-preview.0 and create version 0.45.0-preview.1 by
+  [#27939](https://github.com/google-gemini/gemini-cli/pull/27939)
+- feat(core): Support GDC air-gapped Service Identity after auth library update
+  by @sidhantgoyal-droid in
+  [#27956](https://github.com/google-gemini/gemini-cli/pull/27956)
+- fix(cli): handle tmux false positive background detection by @amelidev in
+  [#27572](https://github.com/google-gemini/gemini-cli/pull/27572)
+- Add static eval source analyzer by @ved015 in
+  [#27631](https://github.com/google-gemini/gemini-cli/pull/27631)
+- fix(config): migrate coreTools setting to tools.core by @galz10 in
+  [#27947](https://github.com/google-gemini/gemini-cli/pull/27947)
+- fix(core-tools): resolve defensive path resolution for at-reference files by
+  @luisfelipe-alt in
+  [#27943](https://github.com/google-gemini/gemini-cli/pull/27943)
+- Revert "fix(core-tools): resolve defensive path resolution for at-reference
+  files" by @galz10 in
+  [#27992](https://github.com/google-gemini/gemini-cli/pull/27992)
+- chore(release): bump version to 0.49.0-nightly.20260617.g4d3dcdce1 by
   @gemini-cli-robot in
-  [#27535](https://github.com/google-gemini/gemini-cli/pull/27535)
+  [#28003](https://github.com/google-gemini/gemini-cli/pull/28003)
+- Changelog for v0.48.0-preview.0 by @gemini-cli-robot in
+  [#27999](https://github.com/google-gemini/gemini-cli/pull/27999)
+- fix(ci): provide fallbacks for package variables in nightly release by @galz10
+  in [#28016](https://github.com/google-gemini/gemini-cli/pull/28016)
+- chore(deps): pin dependencies and enforce 14-day update cooldown by @galz10 in
+  [#27948](https://github.com/google-gemini/gemini-cli/pull/27948)
+- fix(ci): append trailing slash to registry url in npmrc by @rmedranollamas in
+  [#28038](https://github.com/google-gemini/gemini-cli/pull/28038)
+- feat: add eval:inventory CLI command and reporting logic by @ved015 in
+  [#28009](https://github.com/google-gemini/gemini-cli/pull/28009)
+- fix: resolve workspace publish failures and scheduler event loop starvation by
+  @rmedranollamas in
+  [#28063](https://github.com/google-gemini/gemini-cli/pull/28063)
+- fix(ci): use wombat dressing room fallback in nightly release to prevent
+  ENEEDAUTH by @rmedranollamas in
+  [#28104](https://github.com/google-gemini/gemini-cli/pull/28104)
+- Add JSON output for eval inventory by @ved015 in
+  [#28058](https://github.com/google-gemini/gemini-cli/pull/28058)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.44.1...v0.45.0
+https://github.com/google-gemini/gemini-cli/compare/v0.47.0...v0.49.0
