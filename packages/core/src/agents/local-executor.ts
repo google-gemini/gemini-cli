@@ -225,7 +225,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           return;
         }
 
-        const parsed = parseMcpToolName(toolName);
+        const knownServerNames = Array.from(
+          new Set(
+            parentToolRegistry
+              .getAllTools()
+              .filter(
+                (t): t is DiscoveredMCPTool => t instanceof DiscoveredMCPTool,
+              )
+              .map((t) => t.serverName),
+          ),
+        );
+        const parsed = parseMcpToolName(toolName, knownServerNames);
         if (parsed.serverName && parsed.toolName === '*') {
           for (const tool of parentToolRegistry.getToolsByServer(
             parsed.serverName,
