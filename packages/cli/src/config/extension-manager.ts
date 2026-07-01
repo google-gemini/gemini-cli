@@ -773,7 +773,14 @@ Would you like to attempt to install via "git clone" instead?`,
           extensionId,
           ExtensionSettingScope.USER,
         );
-        if (isWorkspaceTrusted(this.settings).isTrusted) {
+        // Respect `advanced.ignoreLocalEnv`: when set, don't read the
+        // workspace-local extension settings (.env) at all — this both honors
+        // the user's intent and avoids touching a file the process may not be
+        // allowed to read (e.g. EACCES under a sandbox).
+        if (
+          !this.settings.advanced?.ignoreLocalEnv &&
+          isWorkspaceTrusted(this.settings).isTrusted
+        ) {
           workspaceSettings = await getScopedEnvContents(
             config,
             extensionId,
