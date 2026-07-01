@@ -312,4 +312,36 @@ describe('applySubstitutions', () => {
     );
     expect(result).toBe('A plain prompt with no variables.');
   });
+
+  it("should insert skills content containing $' (dollar-quote) literally", () => {
+    const skillsWithDollarQuote = "Run: echo $'a\\nb' to print two lines";
+    const result = applySubstitutions(
+      'Header.\n${AgentSkills}\nTAIL: follow policy.',
+      mockConfig,
+      skillsWithDollarQuote,
+    );
+    expect(result).toBe(
+      `Header.\n${skillsWithDollarQuote}\nTAIL: follow policy.`,
+    );
+  });
+
+  it('should insert skills content containing $$ literally without collapsing', () => {
+    const skillsWithDoubleDollar = 'Cost is $$5 for the $$VAR variable';
+    const result = applySubstitutions(
+      'Header.\n${AgentSkills}\nTAIL.',
+      mockConfig,
+      skillsWithDoubleDollar,
+    );
+    expect(result).toBe(`Header.\n${skillsWithDoubleDollar}\nTAIL.`);
+  });
+
+  it('should insert skills content containing $& literally without re-inserting the match', () => {
+    const skillsWithDollarAmp = 'Use $& carefully';
+    const result = applySubstitutions(
+      'Header.\n${AgentSkills}\nTAIL.',
+      mockConfig,
+      skillsWithDollarAmp,
+    );
+    expect(result).toBe(`Header.\n${skillsWithDollarAmp}\nTAIL.`);
+  });
 });
