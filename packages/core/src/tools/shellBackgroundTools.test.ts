@@ -331,4 +331,29 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+
+  it('read_background_output should abort the delay_ms wait when the signal is aborted', async () => {
+    const invocation = readTool.build({ pid: 12345, delay_ms: 60_000 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+
+    const controller = new AbortController();
+    const promise = invocation.execute({ abortSignal: controller.signal });
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('read_background_output should reject immediately when the signal is already aborted', async () => {
+    const invocation = readTool.build({ pid: 12345, delay_ms: 60_000 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      invocation.execute({ abortSignal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });
