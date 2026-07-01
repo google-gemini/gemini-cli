@@ -9,6 +9,8 @@ import { ReadMcpResourceTool } from './read-mcp-resource.js';
 import { ToolErrorType } from './tool-error.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { ToolConfirmationOutcome } from './tools.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 
 describe('ReadMcpResourceTool', () => {
   let tool: ReadMcpResourceTool;
@@ -19,6 +21,7 @@ describe('ReadMcpResourceTool', () => {
   };
   let mockMcpManager: {
     findResourceByUri: Mock;
+    findResourcesByUri: Mock;
     getClient: Mock;
   };
   const abortSignal = new AbortController().signal;
@@ -26,6 +29,7 @@ describe('ReadMcpResourceTool', () => {
   beforeEach(() => {
     mockMcpManager = {
       findResourceByUri: vi.fn(),
+      findResourcesByUri: vi.fn().mockReturnValue([]),
       getClient: vi.fn(),
     };
 
@@ -190,5 +194,56 @@ describe('ReadMcpResourceTool', () => {
 
     expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
     expect(result.error?.message).toContain('Failed to read resource');
+  });
+
+  it('asks for a server-qualified id when a bare URI is exposed by multiple servers', async () => {
+    const uri = 'config://settings';
+    mockMcpManager.findResourceByUri.mockReturnValue(undefined);
+    mockMcpManager.findResourcesByUri.mockReturnValue([
+      { uri, serverName: 'server-b' },
+      { uri, serverName: 'server-a' },
+    ]);
+
+    const invocation = (
+      tool as unknown as {
+        createInvocation: (params: Record<string, unknown>) => {
+          execute: (options: { abortSignal: AbortSignal }) => Promise<unknown>;
+        };
+      }
+    ).createInvocation({ uri });
+    const result = (await invocation.execute({ abortSignal })) as {
+      error: { type: string; message: string };
+    };
+
+    // The wrong-server read must not happen; the model is told to disambiguate.
+    expect(mockMcpManager.getClient).not.toHaveBeenCalled();
+    expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    expect(result.error?.message).toContain('multiple MCP servers');
+    // Server names are listed deterministically (sorted).
+    expect(result.error?.message).toContain('server-a, server-b');
+    expect(result.error?.message).toContain(`server-a:${uri}`);
+  });
+
+  it('scopes an "always allow" approval to the specific resource URI', () => {
+    const uri = 'protocol://resource';
+    const invocation = (
+      tool as unknown as {
+        createInvocation: (params: Record<string, unknown>) => {
+          getPolicyUpdateOptions: (
+            outcome: ToolConfirmationOutcome,
+          ) => { argsPattern?: string } | undefined;
+        };
+      }
+    ).createInvocation({ uri });
+
+    const options = invocation.getPolicyUpdateOptions(
+      ToolConfirmationOutcome.ProceedAlways,
+    );
+
+    // Narrowed to this exact URI, not the bare tool name (which would approve
+    // every resource on every server).
+    expect(options).toEqual({
+      argsPattern: buildParamArgsPattern('uri', uri),
+    });
   });
 });
