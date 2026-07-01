@@ -34,6 +34,7 @@ import {
   SettingScope,
   resetSettingsCacheForTesting,
 } from './settings.js';
+import { formatVersion, getPackageVersion } from './extension.js';
 import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
@@ -248,6 +249,48 @@ describe('extension tests', () => {
       expect(extensions).toHaveLength(1);
       expect(extensions[0].path).toBe(extensionDir);
       expect(extensions[0].name).toBe('test-extension');
+    });
+
+    it('should populate packageVersion from package.json when present', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'pkg-version-extension',
+        version: 'latest',
+        packageJson: { name: 'pkg-version-extension', version: '0.20.2' },
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].version).toBe('latest');
+      expect(extensions[0].packageVersion).toBe('0.20.2');
+    });
+
+    it('should leave packageVersion undefined when package.json is absent', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'no-pkg-extension',
+        version: '1.0.0',
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].packageVersion).toBeUndefined();
+    });
+
+    it('toOutputString includes package.json version when it differs from the config version', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'tagged-extension',
+        version: 'latest',
+        packageJson: { name: 'tagged-extension', version: '0.20.2' },
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      const output = extensionManager.toOutputString(extensions[0]);
+
+      expect(output).toContain('tagged-extension (latest (0.20.2))');
     });
 
     it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
@@ -2351,6 +2394,69 @@ ${INSTALL_WARNING_MESSAGE}`,
         SettingScope.Workspace,
       );
     });
+  });
+});
+
+describe('formatVersion', () => {
+  it('returns the config version unchanged when no package version is provided', () => {
+    expect(formatVersion('1.0.0')).toBe('1.0.0');
+    expect(formatVersion('latest', undefined)).toBe('latest');
+  });
+
+  it('returns the config version unchanged when it equals the package version', () => {
+    expect(formatVersion('1.0.0', '1.0.0')).toBe('1.0.0');
+  });
+
+  it('appends the package version in parentheses when it differs', () => {
+    expect(formatVersion('latest', '0.20.2')).toBe('latest (0.20.2)');
+    expect(formatVersion('main', '2.1.0')).toBe('main (2.1.0)');
+  });
+
+  it('treats an empty package version as missing', () => {
+    expect(formatVersion('latest', '')).toBe('latest');
+  });
+});
+
+describe('getPackageVersion', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-pkgver-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns the version from package.json when present', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'ext', version: '0.20.2' }),
+    );
+    await expect(getPackageVersion(tmpDir)).resolves.toBe('0.20.2');
+  });
+
+  it('returns undefined when package.json does not exist', async () => {
+    await expect(getPackageVersion(tmpDir)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined for malformed JSON', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), '{not valid');
+    await expect(getPackageVersion(tmpDir)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined when version is missing or non-string', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'ext' }),
+    );
+    await expect(getPackageVersion(tmpDir)).resolves.toBeUndefined();
+
+    fs.writeFileSync(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'ext', version: 123 }),
+    );
+    await expect(getPackageVersion(tmpDir)).resolves.toBeUndefined();
   });
 });
 
