@@ -19,6 +19,7 @@ import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
 import {
   ShellExecutionService,
+  DRAIN_STALL_TIMEOUT_MS,
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
@@ -1247,6 +1248,47 @@ describe('ShellExecutionService', () => {
       expect(destroySpy).toHaveBeenCalled();
     });
   });
+
+  describe('Exit finalization resilience', () => {
+    // Regression tests for the "shell stuck in Awaiting input after the
+    // command completes" family (#25166): the exit result is gated on the
+    // output processing chain, so a chunk that throws anywhere in the
+    // rendering pipeline must never leave the execution unresolved.
+
+    it('resolves the result even if rendering throws while processing output', async () => {
+      mockSerializeTerminalToObject.mockImplementation(() => {
+        throw new Error('serializer boom');
+      });
+
+      const { result } = await simulateExecution('echo hello', (pty) => {
+        pty.onData.mock.calls[0][0]('hello\r\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output.trim()).toBe('hello');
+      // The serialized snapshot is lost, but the execution must not hang.
+      expect(result.ansiOutput).toBeUndefined();
+      expect(mockDebugLogger.warn).toHaveBeenCalled();
+    });
+
+    it('resolves the result even if a chunk throws before reaching the terminal', async () => {
+      mockIsBinary.mockImplementation(() => {
+        throw new Error('sniff boom');
+      });
+
+      const { result } = await simulateExecution('echo hello', (pty) => {
+        pty.onData.mock.calls[0][0]('hello\r\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Error while processing shell output chunk'),
+        expect.any(Error),
+      );
+    });
+  });
 });
 
 describe('ShellExecutionService child_process fallback', () => {
@@ -1301,6 +1343,85 @@ describe('ShellExecutionService child_process fallback', () => {
     const result = await handle.result;
     return { result, handle, abortController };
   };
+
+  describe('Post-exit drain watchdog', () => {
+    // 'close' waits for the stdio pipes to end; a grandchild that
+    // inherited them (common on Windows) keeps 'close' from ever firing
+    // even though the shell already exited — the same stuck-result family
+    // as #25166, through the fallback path.
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const startExecution = async () => {
+      const handle = await ShellExecutionService.execute(
+        'spawns-a-daemon',
+        '/test/dir',
+        onOutputEventMock,
+        new AbortController().signal,
+        true,
+        shellExecutionConfig,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      return handle;
+    };
+
+    it('finalizes when close never fires after exit', async () => {
+      vi.useFakeTimers();
+      const handle = await startExecution();
+
+      mockChildProcess.stdout?.emit('data', Buffer.from('hello\n'));
+      mockChildProcess.emit('exit', 0, null);
+      // No 'close': the pipes are held open by a grandchild.
+
+      await vi.advanceTimersByTimeAsync(DRAIN_STALL_TIMEOUT_MS + 500);
+      const result = await handle.result;
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toContain('hello');
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('stdio drain stalled'),
+      );
+    });
+
+    it('caps the wait when a grandchild keeps writing through the pipes', async () => {
+      vi.useFakeTimers();
+      const handle = await startExecution();
+
+      mockChildProcess.emit('exit', 0, null);
+
+      let resolved = false;
+      void handle.result.then(() => {
+        resolved = true;
+      });
+
+      // Keep the streams busy: the idle window never elapses, but the
+      // hard cap (10s) must still end the wait.
+      for (let i = 0; i < 9; i++) {
+        await vi.advanceTimersByTimeAsync(1000);
+        mockChildProcess.stdout?.emit('data', Buffer.from(`tick ${i}\n`));
+      }
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1500);
+      const result = await handle.result;
+      expect(result.exitCode).toBe(0);
+    });
+
+    it('lets a prompt close win without logging a warning', async () => {
+      vi.useFakeTimers();
+      const handle = await startExecution();
+
+      mockChildProcess.emit('exit', 0, null);
+      mockChildProcess.emit('close', 0, null);
+      await vi.advanceTimersByTimeAsync(DRAIN_STALL_TIMEOUT_MS * 2);
+
+      const result = await handle.result;
+      expect(result.exitCode).toBe(0);
+      expect(mockDebugLogger.warn).not.toHaveBeenCalled();
+    });
+  });
 
   describe('Successful Execution', () => {
     it('should execute a command and capture stdout and stderr', async () => {

@@ -65,6 +65,22 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 // we capture significant output from long-running commands.
 export const SCROLLBACK_LIMIT = 300000;
 
+// After the process exits, the result still waits for queued output to
+// drain through the headless terminal. That drain is bounded by an idle
+// watchdog: if no chunk settles for a full window, the chain is considered
+// stuck (e.g. a swallowed terminal write callback) and the execution
+// finalizes with the output buffered so far. Progress resets the window,
+// so a slow but advancing drain is never cut short.
+export const DRAIN_STALL_TIMEOUT_MS = 2000;
+const DRAIN_STALL_POLL_MS = 250;
+
+// In the child_process fallback the post-exit wait is for the stdio
+// 'close' event, and data may keep arriving from a live grandchild that
+// inherited the pipes rather than from a finite queue — so on top of the
+// idle window there is a hard cap: a process that keeps writing through
+// inherited pipes must not hold the exit result hostage indefinitely.
+export const POST_EXIT_DRAIN_CAP_MS = 10_000;
+
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
@@ -655,12 +671,22 @@ export class ShellExecutionService {
       let stderrDecoder: TextDecoder | null = null;
       let error: Error | null = null;
       let exited = false;
+      let finalized = false;
+      let closeWatchdog: NodeJS.Timeout | undefined;
+      // Updated on every output chunk so the post-exit watchdog only fires
+      // when the streams go silent, not while a grandchild is still
+      // writing through the inherited pipes.
+      let lastDrainActivityAt = performance.now();
+      const markDrainActivity = () => {
+        lastDrainActivityAt = performance.now();
+      };
 
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+        markDrainActivity();
         if (!stdoutDecoder || !stderrDecoder) {
           stdoutDecoder = new TextDecoder('utf-8');
           stderrDecoder = new TextDecoder('utf-8');
@@ -734,6 +760,14 @@ export class ShellExecutionService {
         code: number | null,
         signal: NodeJS.Signals | null,
       ) => {
+        if (finalized) {
+          return;
+        }
+        finalized = true;
+        if (closeWatchdog) {
+          clearInterval(closeWatchdog);
+          closeWatchdog = undefined;
+        }
         cleanup();
         cmdCleanup?.();
 
@@ -815,6 +849,33 @@ export class ShellExecutionService {
 
       child.on('close', (code, signal) => {
         handleExit(code, signal);
+      });
+
+      // 'close' waits for the stdio streams to end, which never happens if
+      // a grandchild inherited the pipes and outlives the shell (common on
+      // Windows). 'exit' still fires, so from there the wait for 'close'
+      // is bounded: stream activity resets an idle window (to capture the
+      // trailing flush), and a hard cap covers grandchildren that keep
+      // writing indefinitely.
+      child.on('exit', (code, signal) => {
+        if (finalized || closeWatchdog) {
+          return;
+        }
+        const exitedAt = performance.now();
+        markDrainActivity();
+        closeWatchdog = setInterval(() => {
+          const now = performance.now();
+          const stalled = now - lastDrainActivityAt >= DRAIN_STALL_TIMEOUT_MS;
+          const capped = now - exitedAt >= POST_EXIT_DRAIN_CAP_MS;
+          if (stalled || capped) {
+            debugLogger.warn(
+              `Shell stdio drain stalled after exit (pid ${child.pid}); ` +
+                `finalizing with the output received so far.`,
+            );
+            handleExit(code, signal);
+          }
+        }, DRAIN_STALL_POLL_MS);
+        closeWatchdog.unref?.();
       });
 
       function cleanup() {
@@ -1050,6 +1111,15 @@ export class ShellExecutionService {
       const error: Error | null = null;
       let exited = false;
 
+      // Updated every time an output chunk settles so the post-exit drain
+      // watchdog only fires when the chain is stuck, never while it is
+      // slow but advancing. Uses the monotonic clock: wall-clock (Date.now)
+      // adjustments, e.g. NTP, must not fire or delay the watchdog.
+      let lastDrainActivityAt = performance.now();
+      const markDrainActivity = () => {
+        lastDrainActivityAt = performance.now();
+      };
+
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
@@ -1153,8 +1223,18 @@ export class ShellExecutionService {
         }
 
         renderTimeout = setTimeout(() => {
-          renderFn();
-          renderTimeout = null;
+          // A deferred render runs outside any caller's try/catch; a throw
+          // here would surface as an uncaught exception and kill the CLI.
+          try {
+            renderFn();
+          } catch (err) {
+            debugLogger.warn(
+              `Deferred render failed for shell execution (pid ${ptyPid}):`,
+              err,
+            );
+          } finally {
+            renderTimeout = null;
+          }
         }, 68);
       };
 
@@ -1168,58 +1248,82 @@ export class ShellExecutionService {
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolveChunk) => {
-              if (!decoder) {
-                decoder = new TextDecoder('utf-8');
-              }
+              // A chunk that throws must settle rather than poison the
+              // chain: finalize() races against this chain on exit, and an
+              // unsettled link would block the exit result forever.
+              try {
+                if (!decoder) {
+                  decoder = new TextDecoder('utf-8');
+                }
 
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                sniffChunks.push(data);
-              } else if (!isStreamingRawContent) {
-                binaryBytesReceived += data.length;
-              }
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  sniffChunks.push(data);
+                } else if (!isStreamingRawContent) {
+                  binaryBytesReceived += data.length;
+                }
 
-              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks);
-                sniffedBytes = sniffBuffer.length;
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  const sniffBuffer = Buffer.concat(sniffChunks);
+                  sniffedBytes = sniffBuffer.length;
 
-                if (isBinary(sniffBuffer, 512, true)) {
-                  isStreamingRawContent = false;
-                  binaryBytesReceived = sniffBuffer.length;
-                  const event: ShellOutputEvent = { type: 'binary_detected' };
+                  if (isBinary(sniffBuffer, 512, true)) {
+                    isStreamingRawContent = false;
+                    binaryBytesReceived = sniffBuffer.length;
+                    const event: ShellOutputEvent = { type: 'binary_detected' };
+                    onOutputEvent(event);
+                    ExecutionLifecycleService.emitEvent(ptyPid, event);
+                  }
+                }
+
+                if (isStreamingRawContent) {
+                  const decodedChunk = decoder.decode(data, { stream: true });
+                  if (decodedChunk.length === 0) {
+                    resolveChunk();
+                    return;
+                  }
+
+                  if (ShellExecutionService.backgroundLogPids.has(ptyPid)) {
+                    ShellExecutionService.syncBackgroundLog(
+                      ptyPid,
+                      decodedChunk,
+                    );
+                  }
+
+                  isWriting = true;
+                  headlessTerminal.write(decodedChunk, () => {
+                    // A throw inside render() must not leave this chunk
+                    // unsettled: the exit result is gated on the chain
+                    // draining.
+                    try {
+                      render();
+                    } finally {
+                      isWriting = false;
+                      resolveChunk();
+                    }
+                  });
+                } else {
+                  const totalBytes = binaryBytesReceived;
+                  const event: ShellOutputEvent = {
+                    type: 'binary_progress',
+                    bytesReceived: totalBytes,
+                  };
                   onOutputEvent(event);
                   ExecutionLifecycleService.emitEvent(ptyPid, event);
-                }
-              }
-
-              if (isStreamingRawContent) {
-                const decodedChunk = decoder.decode(data, { stream: true });
-                if (decodedChunk.length === 0) {
                   resolveChunk();
-                  return;
                 }
-
-                if (ShellExecutionService.backgroundLogPids.has(ptyPid)) {
-                  ShellExecutionService.syncBackgroundLog(ptyPid, decodedChunk);
-                }
-
-                isWriting = true;
-                headlessTerminal.write(decodedChunk, () => {
-                  render();
-                  isWriting = false;
-                  resolveChunk();
-                });
-              } else {
-                const totalBytes = binaryBytesReceived;
-                const event: ShellOutputEvent = {
-                  type: 'binary_progress',
-                  bytesReceived: totalBytes,
-                };
-                onOutputEvent(event);
-                ExecutionLifecycleService.emitEvent(ptyPid, event);
+              } catch (err) {
+                debugLogger.warn(
+                  `Error while processing shell output chunk (pid ${ptyPid}):`,
+                  err,
+                );
+                isWriting = false;
                 resolveChunk();
               }
             }),
         );
+        // Feed the post-exit drain watchdog: every settled chunk is
+        // progress, whether it drained cleanly or failed.
+        void processingChain.then(markDrainActivity, markDrainActivity);
       };
 
       ptyProcess.onData((data: string) => {
@@ -1237,8 +1341,32 @@ export class ShellExecutionService {
           // its buffer contents, then disposed to free memory.
           ShellExecutionService.destroyPtyProcess(ptyProcess);
 
+          // finalize() is the only path that resolves the execution result,
+          // so it must run exactly once on every exit, no matter how the
+          // drain race below settles.
+          let finalized = false;
+          let drainWatchdog: NodeJS.Timeout | undefined;
+
           const finalize = () => {
-            render(true);
+            if (finalized) {
+              return;
+            }
+            finalized = true;
+            if (drainWatchdog) {
+              clearInterval(drainWatchdog);
+              drainWatchdog = undefined;
+            }
+            // Nothing below may prevent the result from reaching the caller:
+            // a failure in the rendering pipeline must degrade output, not
+            // hang the execution.
+            try {
+              render(true);
+            } catch (err) {
+              debugLogger.warn(
+                `Final render failed for shell execution (pid ${ptyPid}):`,
+                err,
+              );
+            }
             cmdCleanup?.();
 
             const event: ShellOutputEvent = {
@@ -1259,17 +1387,33 @@ export class ShellExecutionService {
             }
             onOutputEvent(event);
 
-            const endLine = headlessTerminal.buffer.active.length;
-            const startLine = Math.max(
-              0,
-              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
-            );
-            const ansiOutputSnapshot = serializeTerminalToObject(
-              headlessTerminal,
-              startLine,
-              endLine,
-            );
-            const finalOutput = getFullBufferText(headlessTerminal);
+            let ansiOutputSnapshot: AnsiOutput | undefined;
+            try {
+              const endLine = headlessTerminal.buffer.active.length;
+              const startLine = Math.max(
+                0,
+                endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+              );
+              ansiOutputSnapshot = serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+              );
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to serialize final shell output (pid ${ptyPid}):`,
+                err,
+              );
+            }
+            let finalOutput = '';
+            try {
+              finalOutput = getFullBufferText(headlessTerminal);
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to extract final shell output (pid ${ptyPid}):`,
+                err,
+              );
+            }
 
             // Dispose the headless terminal to free scrollback buffers.
             // This must happen after getFullBufferText() extracts the output.
@@ -1302,7 +1446,12 @@ export class ShellExecutionService {
             return;
           }
 
-          const processingComplete = processingChain.then(() => 'processed');
+          // A rejected chunk counts as drained: the exit result must never
+          // be blocked on the rendering pipeline failing.
+          const processingComplete = processingChain.then(
+            () => 'processed' as const,
+            () => 'processed' as const,
+          );
           const abortFired = new Promise<'aborted'>((res) => {
             if (abortSignal.aborted) {
               res('aborted');
@@ -1313,10 +1462,40 @@ export class ShellExecutionService {
             });
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          Promise.race([processingComplete, abortFired]).then(() => {
-            finalize();
+          // Bound the drain with an idle watchdog: if no chunk settles for
+          // a full window after exit, the chain is stuck and the exit
+          // result must win. finalize() clears the interval.
+          markDrainActivity();
+          const drainStalled = new Promise<'drain-stalled'>((res) => {
+            drainWatchdog = setInterval(() => {
+              if (
+                performance.now() - lastDrainActivityAt >=
+                DRAIN_STALL_TIMEOUT_MS
+              ) {
+                res('drain-stalled');
+              }
+            }, DRAIN_STALL_POLL_MS);
+            drainWatchdog.unref?.();
           });
+
+          void Promise.race([
+            processingComplete,
+            abortFired,
+            drainStalled,
+          ]).then(
+            (outcome) => {
+              if (outcome === 'drain-stalled') {
+                debugLogger.warn(
+                  `Shell output drain stalled after exit (pid ${ptyPid}); ` +
+                    `finalizing with the output buffered so far.`,
+                );
+              }
+              finalize();
+            },
+            () => {
+              finalize();
+            },
+          );
         },
       );
 
