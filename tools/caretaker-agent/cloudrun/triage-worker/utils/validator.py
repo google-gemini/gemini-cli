@@ -37,6 +37,8 @@ def _assert_section_schema(
 def validate_triage_result(data: dict) -> None:
     """
     Validates the structure of the LLM triage result.
+    Expects an already-parsed dictionary (json.loads is called upstream
+    by the triage orchestrator before invoking this validator).
     Ensures required metadata, effort estimates, and nested schemas
     are present when quality is OK.
     """
