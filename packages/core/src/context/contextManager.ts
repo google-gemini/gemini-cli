@@ -139,7 +139,11 @@ export class ContextManager {
         this.hasPerformedHotStart = true;
         if (this.buffer.nodes.length > 0) {
           const nodesForHotStart = [...this.buffer.nodes, ...previewNodes];
-          await this.performHotStartCalibration(nodesForHotStart, abortSignal);
+          await this.performHotStartCalibration(
+            nodesForHotStart,
+            this.env.model,
+            abortSignal,
+          );
         }
       }
     })();
@@ -468,6 +472,7 @@ export class ContextManager {
 
   private async performHotStartCalibration(
     nodes: readonly ConcreteNode[],
+    model: string,
     abortSignal?: AbortSignal,
   ) {
     const history = this.env.graphMapper.fromGraph(nodes);
@@ -475,7 +480,7 @@ export class ContextManager {
 
     try {
       const { totalTokens } = await this.env.llmClient.countTokens({
-        modelConfigKey: { model: 'context-calibrator' },
+        modelConfigKey: { model },
         contents,
         abortSignal,
       });
