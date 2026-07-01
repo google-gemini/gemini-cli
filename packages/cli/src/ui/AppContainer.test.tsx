@@ -2161,6 +2161,68 @@ describe('AppContainer State Management', () => {
     });
 
     describe('CTRL+C', () => {
+      it('should not trigger quit flow when input buffer has text', async () => {
+        const setText = vi.fn();
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'hello world',
+          setText,
+          lines: ['hello world'],
+          cursor: [0, 11],
+          handleInput: vi.fn().mockReturnValue(false),
+        });
+        await setupKeypressTest();
+
+        pressKey('\x03'); // Ctrl+C
+
+        expect(mockCancelOngoingRequest).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('should clear buffer and reset quit count when Ctrl+C is pressed with text', async () => {
+        const setText = vi.fn();
+        const bufferWithText = {
+          text: 'hello world',
+          setText,
+          lines: ['hello world'],
+          cursor: [0, 11],
+          handleInput: vi.fn().mockReturnValue(false),
+        };
+        const bufferEmpty = {
+          text: '',
+          setText,
+          lines: [''],
+          cursor: [0, 0],
+          handleInput: vi.fn().mockReturnValue(false),
+        };
+
+        // First press with text
+        mockedUseTextBuffer.mockReturnValue(bufferWithText);
+        await setupKeypressTest();
+        pressKey('\x03'); // Ctrl+C
+
+        expect(mockCancelOngoingRequest).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Second press with empty buffer (simulating clear happened)
+        // Since we reset the count, this should be treated as the "first" press for quit flow
+        mockedUseTextBuffer.mockReturnValue(bufferEmpty);
+        pressKey('\x03'); // Ctrl+C
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Third press with empty buffer should finally quit
+        pressKey('\x03'); // Ctrl+C
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
       it('should cancel ongoing request on first press', async () => {
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
