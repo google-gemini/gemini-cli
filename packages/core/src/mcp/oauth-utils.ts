@@ -7,6 +7,8 @@
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isLoopbackHost, resolveAndValidateDns } from '../utils/fetch.js';
+import { Agent, type Dispatcher } from 'undici';
 
 /**
  * Error thrown when the discovered resource metadata does not match the expected resource.
@@ -97,7 +99,40 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
-      const response = await fetch(resourceMetadataUrl);
+      const parsedUrl = new URL(resourceMetadataUrl);
+      if (isLoopbackHost(parsedUrl.hostname)) {
+        debugLogger.debug(
+          `Blocked OAuth metadata fetch to loopback address: ${resourceMetadataUrl}`,
+        );
+        return null;
+      }
+      const resolvedAddrs = await resolveAndValidateDns(resourceMetadataUrl);
+      if (resolvedAddrs.length === 0) {
+        debugLogger.debug(
+          `Blocked OAuth metadata fetch to private/reserved IP: ${resourceMetadataUrl}`,
+        );
+        return null;
+      }
+      const pinnedIp = resolvedAddrs[0];
+      const dispatcher = new Agent({
+        connect: {
+          lookup: (
+            _hostname: string,
+            _options: unknown,
+            callback: (
+              err: NodeJS.ErrnoException | null,
+              addresses: Array<{ address: string; family: number }>,
+            ) => void,
+          ) => {
+            callback(null, [
+              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+            ]);
+          },
+        },
+      });
+      const response = await fetch(resourceMetadataUrl, {
+        dispatcher: dispatcher as Dispatcher,
+      } as RequestInit & { dispatcher: Dispatcher });
       if (!response.ok) {
         return null;
       }
@@ -121,7 +156,40 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
-      const response = await fetch(authServerMetadataUrl);
+      const parsedUrl = new URL(authServerMetadataUrl);
+      if (isLoopbackHost(parsedUrl.hostname)) {
+        debugLogger.debug(
+          `Blocked OAuth metadata fetch to loopback address: ${authServerMetadataUrl}`,
+        );
+        return null;
+      }
+      const resolvedAddrs = await resolveAndValidateDns(authServerMetadataUrl);
+      if (resolvedAddrs.length === 0) {
+        debugLogger.debug(
+          `Blocked OAuth metadata fetch to private/reserved IP: ${authServerMetadataUrl}`,
+        );
+        return null;
+      }
+      const pinnedIp = resolvedAddrs[0];
+      const dispatcher = new Agent({
+        connect: {
+          lookup: (
+            _hostname: string,
+            _options: unknown,
+            callback: (
+              err: NodeJS.ErrnoException | null,
+              addresses: Array<{ address: string; family: number }>,
+            ) => void,
+          ) => {
+            callback(null, [
+              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+            ]);
+          },
+        },
+      });
+      const response = await fetch(authServerMetadataUrl, {
+        dispatcher: dispatcher as Dispatcher,
+      } as RequestInit & { dispatcher: Dispatcher });
       if (!response.ok) {
         return null;
       }

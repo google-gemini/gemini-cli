@@ -6,7 +6,13 @@
 
 import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import type {
+  Dispatcher} from 'undici';
+import {
+  Agent,
+  EnvHttpProxyAgent,
+  setGlobalDispatcher,
+} from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -144,27 +150,25 @@ export function isAddressPrivate(address: string): boolean {
   }
 }
 
-/**
- * Checks if a URL resolves to a private IP address.
- */
-export async function isPrivateIpAsync(url: string): Promise<boolean> {
+export async function resolveAndValidateDns(url: string): Promise<string[]> {
   try {
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname;
 
     if (isLoopbackHost(hostname)) {
-      return false;
+      return [];
     }
 
     const addresses = await lookup(hostname, { all: true });
-    return addresses.some((addr) => isAddressPrivate(addr.address));
+    if (addresses.some((addr) => isAddressPrivate(addr.address))) {
+      return [];
+    }
+    return addresses.map((addr) => addr.address);
   } catch (error) {
     if (error instanceof TypeError) {
-      return false;
+      return [];
     }
-    throw new Error('Failed to verify if URL resolves to private IP', {
-      cause: error,
-    });
+    return []; // Fail closed on DNS errors
   }
 }
 
@@ -190,7 +194,7 @@ export function createSafeProxyAgent(proxyUrl: string): EnvHttpProxyAgent {
 export async function fetchWithTimeout(
   url: string,
   timeout: number,
-  options?: RequestInit,
+  options?: RequestInit & { dispatcher?: Dispatcher },
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

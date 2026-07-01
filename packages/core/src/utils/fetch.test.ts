@@ -29,7 +29,7 @@ vi.mock('node:dns/promises', () => ({
 // Import after mocks are established
 const {
   isPrivateIp,
-  isPrivateIpAsync,
+  resolveAndValidateDns,
   isAddressPrivate,
   fetchWithTimeout,
   setGlobalProxy,
@@ -138,9 +138,9 @@ describe('fetch utils', () => {
     });
   });
 
-  describe('isPrivateIpAsync', () => {
+  describe('resolveAndValidateDns', () => {
     it('should identify private IPs directly', async () => {
-      expect(await isPrivateIpAsync('http://10.0.0.1/')).toBe(true);
+      expect(await resolveAndValidateDns('http://10.0.0.1/')).toEqual([]);
     });
 
     it('should identify domains resolving to private IPs', async () => {
@@ -150,7 +150,7 @@ describe('fetch utils', () => {
           options: LookupAllOptions,
         ) => Promise<LookupAddress[]>,
       ).mockImplementation(async () => [{ address: '10.0.0.1', family: 4 }]);
-      expect(await isPrivateIpAsync('http://malicious.com/')).toBe(true);
+      expect(await resolveAndValidateDns('http://malicious.com/')).toEqual([]);
     });
 
     it('should identify domains resolving to public IPs as non-private', async () => {
@@ -160,18 +160,20 @@ describe('fetch utils', () => {
           options: LookupAllOptions,
         ) => Promise<LookupAddress[]>,
       ).mockImplementation(async () => [{ address: '8.8.8.8', family: 4 }]);
-      expect(await isPrivateIpAsync('http://google.com/')).toBe(false);
+      expect(await resolveAndValidateDns('http://google.com/')).toEqual([
+        '8.8.8.8',
+      ]);
     });
 
-    it('should throw error if DNS resolution fails (fail closed)', async () => {
+    it('should return empty array if DNS resolution fails (fail closed)', async () => {
       vi.mocked(dnsPromises.lookup).mockRejectedValue(new Error('DNS Error'));
-      await expect(isPrivateIpAsync('http://unreachable.com/')).rejects.toThrow(
-        'Failed to verify if URL resolves to private IP',
+      expect(await resolveAndValidateDns('http://unreachable.com/')).toEqual(
+        [],
       );
     });
 
-    it('should return false for invalid URLs instead of throwing verification error', async () => {
-      expect(await isPrivateIpAsync('not-a-url')).toBe(false);
+    it('should return empty array for invalid URLs', async () => {
+      expect(await resolveAndValidateDns('not-a-url')).toEqual([]);
     });
   });
 
