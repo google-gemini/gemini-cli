@@ -325,6 +325,10 @@ Gemini CLI uses these structures to ensure hooks don't break across SDK updates.
     "content": { "role": "model", "parts": string[] },
     "finishReason": string
   }>,
-  "usageMetadata": { "totalTokenCount": number }
+  "usageMetadata": {
+    "promptTokenCount": number,
+    "candidatesTokenCount": number,
+    "totalTokenCount": number
+  }
 }
 ```
