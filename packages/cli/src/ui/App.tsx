@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from './contexts/UIStateContext.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -13,7 +14,7 @@ import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 import { AlternateBufferQuittingDisplay } from './components/AlternateBufferQuittingDisplay.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 
-export const App = () => {
+export const App = React.memo(() => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -35,4 +36,6 @@ export const App = () => {
       {isScreenReaderEnabled ? <ScreenReaderAppLayout /> : <DefaultAppLayout />}
     </StreamingContext.Provider>
   );
-};
+});
+
+App.displayName = 'App';

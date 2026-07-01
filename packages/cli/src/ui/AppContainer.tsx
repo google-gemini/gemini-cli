@@ -1557,6 +1557,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight - stableControlsHeight - backgroundTaskHeight - 1,
   );
 
+  // In terminalBuffer mode, we return terminalHeight - 1 to prevent frequent
+  // invalidation of UIState. This value is correct for the few cases where a
+  // fixed terminal height must be respected.
+  const uiStateAvailableTerminalHeight = config.getUseTerminalBuffer()
+    ? terminalHeight - 1
+    : availableTerminalHeight;
+
   config.setShellExecutionConfig({
     terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
     terminalHeight: Math.max(
@@ -2488,7 +2495,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
-      isFocused,
       elapsedTime,
       currentLoadingPhrase,
       currentTip,
@@ -2502,7 +2508,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       currentModel,
       contextFileNames,
       errorCount,
-      availableTerminalHeight,
+      availableTerminalHeight: uiStateAvailableTerminalHeight,
       stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,
@@ -2601,7 +2607,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlDPressCount,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
-      isFocused,
       elapsedTime,
       currentLoadingPhrase,
       currentTip,
@@ -2614,7 +2619,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       allowPlanMode,
       contextFileNames,
       errorCount,
-      availableTerminalHeight,
+      uiStateAvailableTerminalHeight,
       stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,

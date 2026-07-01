@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders as render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
-import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
+import {
+  SCROLL_TO_ITEM_END,
+  VirtualizedList,
+  type VirtualizedListRef,
+} from './VirtualizedList.js';
 import { Text, Box } from 'ink';
 import {
   createRef,
@@ -115,6 +119,41 @@ describe('<VirtualizedList />', () => {
       unmount();
     });
 
+    it('rerenders cached items when renderItem changes', async () => {
+      const data = ['Item 0'];
+      const renderWithLabel = (label: string) => (
+        <Box height={10} width={100}>
+          <VirtualizedList
+            data={data}
+            renderItem={({ item }) => (
+              <Box height={1}>
+                <Text>
+                  {label} {item}
+                </Text>
+              </Box>
+            )}
+            keyExtractor={keyExtractor}
+            estimatedItemHeight={() => itemHeight}
+          />
+        </Box>
+      );
+
+      const { lastFrame, rerender, waitUntilReady, unmount } = await render(
+        renderWithLabel('Initial'),
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('Initial Item 0');
+
+      await act(async () => {
+        rerender(renderWithLabel('Updated'));
+      });
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('Updated Item 0');
+      expect(lastFrame()).not.toContain('Initial Item 0');
+      unmount();
+    });
+
     it('scrolls down to show new items when requested via ref', async () => {
       const ref = createRef<VirtualizedListRef<string>>();
       const { lastFrame, waitUntilReady, unmount } = await render(
@@ -170,7 +209,7 @@ describe('<VirtualizedList />', () => {
           (_, i) => `Item ${i}`,
         );
 
-        const { lastFrame, unmount } = await render(
+        const { lastFrame, unmount, waitUntilReady } = await render(
           <Box height={20} width={100} borderStyle="round">
             <VirtualizedList
               data={veryLongData}
@@ -184,8 +223,12 @@ describe('<VirtualizedList />', () => {
           </Box>,
         );
 
+        await waitUntilReady();
+        await waitFor(() => {
+          expect(mountedCount).toBe(expectedMountedCount);
+        });
+
         const frame = lastFrame();
-        expect(mountedCount).toBe(expectedMountedCount);
         expect(frame).toMatchSnapshot();
         unmount();
       },
@@ -316,12 +359,69 @@ describe('<VirtualizedList />', () => {
     unmount();
   });
 
-  it('renders correctly in copyModeEnabled when scrolled', async () => {
+  it('culls items that exceed maxScrollbackLength when overflowToBackbuffer is true', async () => {
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
-    // Use copy mode
-    const { lastFrame, unmount } = await render(
+    const renderedIndices = new Set<number>();
+    const renderItem1px = ({
+      item,
+      index,
+    }: {
+      item: string;
+      index: number;
+    }) => {
+      renderedIndices.add(index);
+      return (
+        <Box height={1}>
+          <Text>{item}</Text>
+        </Box>
+      );
+    };
+
+    const { unmount } = await render(
+      <Box height={10} width={100} borderStyle="round">
+        <VirtualizedList
+          data={longData}
+          renderItem={renderItem1px}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    // Viewport height is 10, total items = 100.
+    // actualScrollTop = 92 (due to top/bottom borders taking 2 lines out of 10, inner height 8).
+    // wait, if height is 10 with round border, inner height is 8.
+    // actualScrollTop = 100 - 8 = 92.
+    // maxScrollbackLength = 10.
+    // targetOffset = 92 - 10 = 82.
+    // So renderRangeStart should be 81 (or 82).
+    // Items 0 to 80 should not be rendered!
+
+    // Check viewport items are rendered
+    expect(renderedIndices.has(95)).toBe(true);
+    expect(renderedIndices.has(99)).toBe(true);
+
+    // Check items in maxScrollbackLength are rendered
+    expect(renderedIndices.has(85)).toBe(true);
+
+    // Check items beyond maxScrollbackLength are NOT rendered
+    expect(renderedIndices.has(0)).toBe(false);
+    expect(renderedIndices.has(50)).toBe(false);
+    expect(renderedIndices.has(75)).toBe(false);
+
+    unmount();
+  });
+
+  it('crops the document height when maxScrollbackLength is exceeded', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { unmount, waitUntilReady } = await render(
       <Box height={10} width={100}>
         <VirtualizedList
+          ref={ref}
           data={longData}
           renderItem={({ item }) => (
             <Box height={1}>
@@ -330,18 +430,243 @@ describe('<VirtualizedList />', () => {
           )}
           keyExtractor={(item) => item}
           estimatedItemHeight={() => 1}
-          initialScrollIndex={50}
-          copyModeEnabled={true}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
         />
       </Box>,
     );
 
-    // Item 50 should be visible
-    expect(lastFrame()).toContain('Item 50');
-    // And surrounding items
-    expect(lastFrame()).toContain('Item 59');
-    // But far away items should not be (ensures we are actually scrolled)
-    expect(lastFrame()).not.toContain('Item 0');
+    await waitUntilReady();
+
+    // Viewport height is 10.
+    // maxScrollbackLength = 10.
+    // Total expected scrollHeight = 10 + 10 = 20.
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollHeight).toBe(20);
+
+    // The top of the projected document (offset 0) should correspond to absolute offset 80.
+    // getAnchorForScrollTop(80) will return index 90 because it's near the bottom and uses a bottom anchor.
+    await act(async () => {
+      ref.current?.scrollTo(0);
+    });
+    expect(ref.current?.getScrollIndex()).toBe(90);
+
+    unmount();
+  });
+
+  it('culls the backbuffer by measured row height instead of item count', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const renderedIndices = new Set<number>();
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { unmount, waitUntilReady } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item, index }) => {
+            renderedIndices.add(index);
+            return (
+              <Box height={2}>
+                <Text>{item}</Text>
+              </Box>
+            );
+          }}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 2}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollHeight).toBe(20);
+    expect(state?.innerHeight).toBe(10);
+    expect(renderedIndices.has(90)).toBe(true);
+    expect(renderedIndices.has(85)).toBe(false);
+
+    unmount();
+  });
+
+  it('keeps keyboard scrolling in logical history coordinates after culling', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const ref = createRef<VirtualizedListRef<string>>();
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={99}
+          overflowToBackbuffer={true}
+          maxScrollbackLength={10}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    expect(ref.current?.getScrollState().scrollTop).toBe(10);
+
+    await act(async () => {
+      ref.current?.scrollBy(-1);
+    });
+    await waitUntilReady();
+
+    const state = ref.current?.getScrollState();
+    expect(state?.scrollTop).toBeGreaterThan(0);
+    expect(lastFrame()).not.toContain('Item 79');
+    expect(lastFrame()).not.toContain('Item 80');
+
+    unmount();
+  });
+
+  it('measures mounted zero-height items instead of keeping their estimate', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const data = ['Item 0', 'Item 1', 'pending'];
+    const { unmount, waitUntilReady } = await render(
+      <Box height={50} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={data}
+          renderItem={({ item }) =>
+            item === 'pending' ? (
+              <Box height={0} />
+            ) : (
+              <Box height={1}>
+                <Text>{item}</Text>
+              </Box>
+            )
+          }
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 10}
+          initialScrollIndex={2}
+          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+
+    expect(ref.current?.getScrollState()).toEqual({
+      scrollTop: 0,
+      scrollHeight: 2,
+      innerHeight: 50,
+    });
+
+    unmount();
+  });
+
+  it('does not forget item heights when items are prepended', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const data = ['Item 1', 'Item 2'];
+    const { rerender, waitUntilReady, unmount } = await render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={data}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1000}
+        />
+      </Box>,
+    );
+
+    await waitUntilReady();
+    await waitFor(() => {
+      // Item 1 and 2 measured. totalHeight = 2.
+      expect(ref.current?.getScrollState().scrollHeight).toBe(2);
+    });
+
+    // Prepend Item 0
+    const newData = ['Item 0', 'Item 1', 'Item 2'];
+    await act(async () => {
+      rerender(
+        <Box height={10} width={100}>
+          <VirtualizedList
+            ref={ref}
+            data={newData}
+            renderItem={({ item }) => (
+              <Box height={1}>
+                <Text>{item}</Text>
+              </Box>
+            )}
+            keyExtractor={(item) => item}
+            estimatedItemHeight={() => 1000}
+          />
+        </Box>,
+      );
+    });
+    // With the Map-based cache, Item 1 and 2 heights (1 each) should be preserved
+    // even though their indices changed.
+    // Item 0 is new and uses estimate 1000.
+    // So totalHeight should be 1002 (before Item 0 is measured).
+    // Note: It might already be 3 if Item 0 was measured immediately, but it
+    // definitely shouldn't be 3000 (which it would be if Item 1 and 2 were forgotten).
+    const scrollHeight = ref.current?.getScrollState().scrollHeight;
+    expect(scrollHeight).toBeGreaterThan(0);
+    expect(scrollHeight).toBeLessThan(3000);
+
+    await waitFor(() => {
+      expect(ref.current?.getScrollState().scrollHeight).toBe(3);
+    });
+
+    unmount();
+  });
+
+  it('updates totalHeight correctly when estimated height differs from real height and scrolled up', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const longData = Array.from({ length: 10 }, (_, i) => `Item ${i}`);
+    const itemHeight = 1;
+    const renderItem1px = ({ item }: { item: string }) => (
+      <Box height={itemHeight}>
+        <Text>{item}</Text>
+      </Box>
+    );
+    const keyExtractor = (item: string) => item;
+
+    const { unmount, waitUntilReady } = await render(
+      <Box height={5} width={100}>
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={renderItem1px}
+          keyExtractor={keyExtractor}
+          estimatedItemHeight={() => 1000}
+        />
+      </Box>,
+    );
+
+    for (let i = 1; i <= 10; i++) {
+      await act(async () => {
+        ref.current?.scrollTo(i * 1000);
+      });
+      await waitUntilReady();
+    }
+
+    await act(async () => {
+      ref.current?.scrollTo(0);
+    });
+    // Wait for the final scroll top to settle and height to be correct
+    await waitFor(() => {
+      expect(ref.current?.getScrollState().scrollTop).toBe(0);
+      expect(ref.current?.getScrollState().scrollHeight).toBe(10);
+    });
+
     unmount();
   });
 });

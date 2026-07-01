@@ -167,6 +167,7 @@ export async function startInteractiveUI(
         useAlternateBuffer &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
+      maxScrollbackLength: settings.merged.ui.maxScrollbackLength,
     },
   );
 

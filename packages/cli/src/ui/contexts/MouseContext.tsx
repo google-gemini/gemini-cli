@@ -11,6 +11,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
 } from 'react';
@@ -35,6 +36,7 @@ const MAX_MOUSE_BUFFER_SIZE = 4096;
 interface MouseContextValue {
   subscribe: (handler: MouseHandler) => void;
   unsubscribe: (handler: MouseHandler) => void;
+  broadcast: (event: MouseEvent) => void;
 }
 
 const MouseContext = createContext<MouseContextValue | undefined>(undefined);
@@ -50,7 +52,7 @@ export function useMouseContext() {
 export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
   const { subscribe, unsubscribe } = useMouseContext();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isActive) {
       return;
     }
@@ -92,14 +94,8 @@ export function MouseProvider({
     [subscribers],
   );
 
-  useEffect(() => {
-    if (!mouseEventsEnabled) {
-      return;
-    }
-
-    let mouseBuffer = '';
-
-    const broadcast = (event: MouseEvent) => {
+  const broadcast = useCallback(
+    (event: MouseEvent) => {
       let handled = false;
       for (const handler of subscribers) {
         if (handler(event) === true) {
@@ -143,7 +139,16 @@ export function MouseProvider({
         // events not the terminal.
         appEvents.emit(AppEvent.SelectionWarning);
       }
-    };
+    },
+    [subscribers],
+  );
+
+  useEffect(() => {
+    if (!mouseEventsEnabled) {
+      return;
+    }
+
+    let mouseBuffer = '';
 
     const handleData = (data: Buffer | string) => {
       mouseBuffer += typeof data === 'string' ? data : data.toString('utf-8');
@@ -190,11 +195,11 @@ export function MouseProvider({
     return () => {
       stdin.removeListener('data', handleData);
     };
-  }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
+  }, [stdin, mouseEventsEnabled, broadcast, debugKeystrokeLogging]);
 
   const contextValue = useMemo(
-    () => ({ subscribe, unsubscribe }),
-    [subscribe, unsubscribe],
+    () => ({ subscribe, unsubscribe, broadcast }),
+    [subscribe, unsubscribe, broadcast],
   );
 
   return (
