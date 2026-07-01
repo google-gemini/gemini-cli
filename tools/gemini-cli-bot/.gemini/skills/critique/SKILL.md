@@ -114,8 +114,12 @@ above:
 4.  **Strict Scope Constraint**: You are STRICTLY FORBIDDEN from modifying or
     staging any file that was not already staged by the investigation phase. You
     must ONLY critique and fix the files explicitly included in
-    `git diff --staged`. Do not attempt to complete pending tasks from the
-    memory ledger or introduce unrelated refactoring to unstaged files.
+    `git diff --staged`. Furthermore, within those staged files, you must ONLY
+    fix the specific logical or technical flaw you identified. You are
+    STRICTLY FORBIDDEN from performing unrelated refactoring, changing type
+    signatures, or modifying code outside the immediate scope of the required fix.
+    Do not attempt to complete pending tasks from the memory ledger or introduce
+    unrelated "cleanups".
 5.  Re-stage the file with `git add`. **CRITICAL: You MUST use `git add` to
     stage your fixes.**
 

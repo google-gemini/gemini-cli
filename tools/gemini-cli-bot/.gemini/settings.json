@@ -1,0 +1,7 @@
+{
+  "security": {
+    "environmentVariableRedaction": {
+      "allowed": ["GH_TOKEN", "GITHUB_TOKEN"]
+    }
+  }
+}
