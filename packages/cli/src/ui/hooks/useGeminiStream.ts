@@ -387,6 +387,11 @@ export const useGeminiStream = (
     [setIsResponding],
   );
 
+  const streamingState = useMemo(
+    () => calculateStreamingState(isResponding, toolCalls),
+    [isResponding, toolCalls],
+  );
+
   const {
     handleShellCommand,
     activeShellPtyId,
@@ -409,11 +414,7 @@ export const useGeminiStream = (
     terminalWidth,
     terminalHeight,
     activeBackgroundExecutionId,
-  );
-
-  const streamingState = useMemo(
-    () => calculateStreamingState(isResponding, toolCalls),
-    [isResponding, toolCalls],
+    streamingState === StreamingState.WaitingForConfirmation,
   );
 
   // Reset tracking when a new batch of tools starts
@@ -599,6 +600,7 @@ export const useGeminiStream = (
     backgroundTasks,
     settings.merged.ui?.compactToolOutput,
   ]);
+
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
       (tc) => !pushedToolCallIds.has(tc.request.callId),
@@ -983,16 +985,28 @@ export const useGeminiStream = (
 
                 if (postSubmitPrompt) {
                   localQueryToSendToGemini = postSubmitPrompt;
+                  addItem(
+                    { type: MessageType.USER, text: trimmedQuery },
+                    userMessageTimestamp,
+                  );
                   return {
                     queryToSend: localQueryToSendToGemini,
                     shouldProceed: true,
                   };
                 }
 
+                addItem(
+                  { type: MessageType.USER, text: trimmedQuery },
+                  userMessageTimestamp,
+                );
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {
                 localQueryToSendToGemini = slashCommandResult.content;
+                addItem(
+                  { type: MessageType.USER, text: trimmedQuery },
+                  userMessageTimestamp,
+                );
 
                 return {
                   queryToSend: localQueryToSendToGemini,

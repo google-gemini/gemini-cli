@@ -1183,6 +1183,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       useAgentStream({
         agent: streamAgent,
         addItem: historyManager.addItem,
+        handleSlashCommand,
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
         logger,

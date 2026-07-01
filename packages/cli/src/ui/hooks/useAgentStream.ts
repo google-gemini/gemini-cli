@@ -5,12 +5,14 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { type PartListUnion } from '@google/genai';
 import {
   getErrorMessage,
   MessageSenderType,
   debugLogger,
   geminiPartsToContentParts,
   displayContentToString,
+  partToString,
   parseThought,
   CoreToolCallStatus,
   type ApprovalMode,
@@ -20,15 +22,16 @@ import {
   type AgentEvent,
   type AgentProtocol,
   type Logger,
-  type Part,
 } from '@google/gemini-cli-core';
 import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
   IndividualToolCallDisplay,
   HistoryItemToolDisplayGroup,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundTask } from './useExecutionLifecycle.js';
@@ -41,6 +44,9 @@ import { useKeypress } from './useKeypress.js';
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
   addItem: UseHistoryManagerReturn['addItem'];
+  handleSlashCommand: (
+    cmd: string,
+  ) => Promise<SlashCommandProcessorResult | false>;
   onCancelSubmit: (
     shouldRestorePrompt?: boolean,
     clearBuffer?: boolean,
@@ -56,6 +62,7 @@ export interface UseAgentStreamOptions {
 export const useAgentStream = ({
   agent,
   addItem,
+  handleSlashCommand,
   onCancelSubmit,
   isShellFocused,
   logger,
@@ -333,8 +340,8 @@ export const useAgentStream = ({
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape' && !isShellFocused) {
-        void cancelOngoingRequest(false);
+      if (key.ctrl && key.name === 'c') {
+        void cancelOngoingRequest();
         return true;
       }
       return false;
@@ -348,7 +355,7 @@ export const useAgentStream = ({
 
   const submitQuery = useCallback(
     async (
-      query: Part[] | string,
+      query: PartListUnion,
       options?: { isContinuation: boolean },
       _prompt_id?: string,
     ) => {
@@ -360,16 +367,59 @@ export const useAgentStream = ({
 
       geminiMessageBufferRef.current = '';
 
+      let localQuery: PartListUnion = query;
+
       if (!options?.isContinuation) {
-        if (typeof query === 'string') {
-          addItem({ type: MessageType.USER, text: query }, timestamp);
-          void logger?.logMessage(MessageSenderType.USER, query);
+        let shouldAddToHistory = true;
+        if (typeof localQuery === 'string') {
+          const trimmedQuery = localQuery.trim();
+          void logger?.logMessage(MessageSenderType.USER, trimmedQuery);
+
+          if (isSlashCommand(trimmedQuery)) {
+            const slashResult = await handleSlashCommand(trimmedQuery);
+            if (slashResult) {
+              if (slashResult.type === 'submit_prompt') {
+                localQuery = slashResult.content;
+              } else if (slashResult.type === 'schedule_tool') {
+                addItem(
+                  {
+                    type: MessageType.ERROR,
+                    text: `The /${slashResult.toolName} command is not yet supported in Agent mode.`,
+                  },
+                  timestamp,
+                );
+                return;
+              } else {
+                // 'handled' or other types that don't need LLM submission
+                shouldAddToHistory = false;
+                return;
+              }
+            }
+          }
+        }
+
+        if (shouldAddToHistory) {
+          const originalQueryText =
+            typeof query === 'string' ? query : partToString(query);
+
+          addItem(
+            { type: MessageType.USER, text: originalQueryText },
+            timestamp,
+          );
+          if (typeof localQuery !== 'string') {
+            void logger?.logMessage(
+              MessageSenderType.USER,
+              partToString(localQuery),
+            );
+          }
         }
         startNewPrompt();
       }
 
       const parts = geminiPartsToContentParts(
-        typeof query === 'string' ? [{ text: query }] : query,
+        (Array.isArray(localQuery) ? localQuery : [localQuery]).map((p) =>
+          typeof p === 'string' ? { text: p } : p,
+        ),
       );
 
       try {
@@ -384,9 +434,8 @@ export const useAgentStream = ({
         );
       }
     },
-    [agent, addItem, logger, startNewPrompt],
+    [agent, addItem, logger, startNewPrompt, handleSlashCommand],
   );
-
   useEffect(() => {
     if (trackedTools.length > 0) {
       const isNewBatch = !trackedTools.some((tc) =>
@@ -397,6 +446,7 @@ export const useAgentStream = ({
         setIsFirstToolInGroup(true);
       }
     } else if (streamingState === StreamingState.Idle) {
+      // Clear when idle to be ready for next turn
       setPushedToolCallIds(new Set());
       setIsFirstToolInGroup(true);
     }
