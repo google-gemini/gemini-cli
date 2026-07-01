@@ -10,6 +10,7 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getFormattedSettingValue } from '../../../commands/extensions/utils.js';
+import { theme } from '../../semantic-colors.js';
 
 interface ExtensionsList {
   extensions: readonly GeminiCLIExtension[];
@@ -61,11 +62,29 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
 
           return (
             <Box key={ext.name} flexDirection="column" marginBottom={1}>
-              <Text>
-                <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
-                <Text color={activeColor}>{` - ${activeString}`}</Text>
-                {<Text color={stateColor}>{` (${stateText})`}</Text>}
-              </Text>
+              <Box flexDirection="row">
+                <Text>
+                  <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
+                  <Text color={activeColor}>{` - ${activeString}`}</Text>
+                  <Text color={stateColor}>{` (${stateText})`}</Text>
+                </Text>
+                {ext.manifestType === 'open-plugin' && (
+                  <Box marginLeft={1}>
+                    <Text
+                      backgroundColor={theme.ui.dark}
+                      color={theme.text.secondary}
+                    >
+                      {' '}
+                      Plugin{' '}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              {ext.description && (
+                <Box paddingLeft={2}>
+                  <Text color="gray">{ext.description}</Text>
+                </Box>
+              )}
               {ext.resolvedSettings && ext.resolvedSettings.length > 0 && (
                 <Box flexDirection="column" paddingLeft={2}>
                   <Text>settings:</Text>
