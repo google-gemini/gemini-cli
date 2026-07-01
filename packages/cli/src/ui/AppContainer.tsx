@@ -165,6 +165,7 @@ import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js'
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
+import { shouldAllowMouseEvents } from './utils/mouseEvents.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useBackgroundTaskManager } from './hooks/useBackgroundTaskManager.js';
 import {
@@ -238,20 +239,38 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
-  const [mouseMode, setMouseMode] = useState(() =>
-    config.getUseAlternateBuffer(),
+  const shouldUseAlternateScreen = shouldEnterAlternateScreen(
+    isAlternateBuffer,
+    config.getScreenReader(),
   );
+  const mouseEventsAllowed = shouldAllowMouseEvents(
+    settings.merged.ui.mouseEvents,
+  );
+  const shouldEnableMouseEventsInitially =
+    shouldUseAlternateScreen && mouseEventsAllowed;
+  const [mouseMode, setMouseMode] = useState(
+    () => shouldEnableMouseEventsInitially,
+  );
+  const effectiveMouseMode = mouseEventsAllowed && mouseMode;
+
+  useEffect(() => {
+    if (!mouseEventsAllowed) {
+      setMouseMode(false);
+    } else if (shouldEnableMouseEventsInitially) {
+      setMouseMode(true);
+    }
+  }, [mouseEventsAllowed, shouldEnableMouseEventsInitially]);
 
   useEffect(() => {
     setOptions({
-      stickyHeadersInBackbuffer: mouseMode,
+      stickyHeadersInBackbuffer: effectiveMouseMode,
     });
-    if (mouseMode) {
+    if (effectiveMouseMode) {
       enableMouseEvents();
     } else {
       disableMouseEvents();
     }
-  }, [mouseMode, setOptions]);
+  }, [effectiveMouseMode, setOptions]);
 
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -650,23 +669,20 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
 
-  const shouldUseAlternateScreen = shouldEnterAlternateScreen(
-    isAlternateBuffer,
-    config.getScreenReader(),
-  );
-
   const handleEditorClose = useCallback(() => {
     if (shouldUseAlternateScreen) {
       // The editor may have exited alternate buffer mode so we need to
       // enter it again to be safe.
       enterAlternateScreen();
-      enableMouseEvents();
+      if (effectiveMouseMode) {
+        enableMouseEvents();
+      }
       disableLineWrapping();
       app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
-  }, [refreshStatic, shouldUseAlternateScreen, app]);
+  }, [refreshStatic, shouldUseAlternateScreen, effectiveMouseMode, app]);
 
   const [editorError, setEditorError] = useState<string | null>(null);
   const {
@@ -1231,6 +1247,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     retryStatus,
   } = activeStream;
 
+  const isAgentRunning =
+    streamingState === StreamingState.Responding ||
+    streamingState === StreamingState.WaitingForConfirmation;
+  const lastEmergencyAbortAtRef = useRef(0);
+
+  useEffect(() => {
+    const handleEmergencyAbort = () => {
+      if (!isAgentRunning) {
+        return;
+      }
+      lastEmergencyAbortAtRef.current = Date.now();
+      void cancelOngoingRequest?.();
+    };
+
+    appEvents.on(AppEvent.EmergencyAbort, handleEmergencyAbort);
+    return () => {
+      appEvents.off(AppEvent.EmergencyAbort, handleEmergencyAbort);
+    };
+  }, [cancelOngoingRequest, isAgentRunning]);
+
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
@@ -1739,6 +1775,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     handleWarning,
     setRawMode,
     shouldUseAlternateScreen,
+    shouldUseMouseEvents: effectiveMouseMode,
   });
 
   useEffect(() => {
@@ -1796,6 +1833,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.TOGGLE_MOUSE_MODE](key)) {
+        if (!mouseEventsAllowed) {
+          return true;
+        }
         setMouseMode((prev) => !prev);
         if (mouseMode && !isAlternateBuffer) {
           appEvents.emit(AppEvent.ScrollToBottom);
@@ -1809,11 +1849,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       }
 
-      if (keyMatchers[Command.QUIT](key)) {
-        // If the user presses Ctrl+C, we want to cancel any ongoing requests.
-        // This should happen regardless of the count.
-        void cancelOngoingRequest?.();
+      if (keyMatchers[Command.ABORT](key) && isAgentRunning) {
+        const alreadyHandledRawCtrlC =
+          key.sequence === '\x03' &&
+          Date.now() - lastEmergencyAbortAtRef.current < 100;
+        if (!alreadyHandledRawCtrlC) {
+          void cancelOngoingRequest?.();
+        }
+        return true;
+      }
 
+      if (keyMatchers[Command.QUIT](key)) {
         handleCtrlCPress();
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
@@ -2013,6 +2059,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleCtrlDPress,
       handleSlashCommand,
       cancelOngoingRequest,
+      isAgentRunning,
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
@@ -2041,6 +2088,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       startRecording,
       stopRecording,
       mouseMode,
+      mouseEventsAllowed,
     ],
   );
 
@@ -2060,7 +2108,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       setCopyModeEnabled(false);
-      if (mouseMode) {
+      if (effectiveMouseMode) {
         enableMouseEvents();
       }
       return true;
@@ -2443,7 +2491,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
-      mouseMode,
+      mouseMode: effectiveMouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2556,7 +2604,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
-      mouseMode,
+      effectiveMouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2850,7 +2898,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
                   toggleAllExpansion={toggleAllExpansion}
                 >
                   <ShellFocusContext.Provider value={isFocused}>
-                    <MouseProvider mouseEventsEnabled={mouseMode}>
+                    <MouseProvider mouseEventsEnabled={effectiveMouseMode}>
                       <ScrollProvider>
                         <App />
                       </ScrollProvider>
