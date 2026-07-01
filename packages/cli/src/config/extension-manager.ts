@@ -321,7 +321,15 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         const newHasHooks = fs.existsSync(
-          path.join(localSourcePath, 'hooks', 'hooks.json'),
+          path.join(
+            this.resolveExtensionDir(
+              localSourcePath,
+              newExtensionConfig.hooksDir,
+              'hooks',
+              'hooks',
+            ),
+            'hooks.json',
+          ),
         );
         const previousHasHooks = !!(
           isUpdate &&
@@ -331,7 +339,12 @@ Would you like to attempt to install via "git clone" instead?`,
         );
 
         const newSkills = await loadSkillsFromDir(
-          path.join(localSourcePath, 'skills'),
+          this.resolveExtensionDir(
+            localSourcePath,
+            newExtensionConfig.skillsDir,
+            'skills',
+            'skills',
+          ),
         );
         const previousSkills = previous?.skills ?? [];
         const isMigrating = Boolean(
@@ -881,11 +894,23 @@ Would you like to attempt to install via "git clone" instead?`,
         pathSeparator: path.sep,
         ...customEnv,
       };
+      const hooksDir = this.resolveExtensionDir(
+        effectiveExtensionPath,
+        config.hooksDir,
+        'hooks',
+        'hooks',
+      );
+      const skillsDir = this.resolveExtensionDir(
+        effectiveExtensionPath,
+        config.skillsDir,
+        'skills',
+        'skills',
+      );
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
       if (this.settings.hooksConfig.enabled) {
         hooks = await this.loadExtensionHooks(
-          effectiveExtensionPath,
+          path.join(hooksDir, 'hooks.json'),
           hydrationContext,
         );
       }
@@ -918,9 +943,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       }
 
-      let skills = await loadSkillsFromDir(
-        path.join(effectiveExtensionPath, 'skills'),
-      );
+      let skills = await loadSkillsFromDir(skillsDir);
       skills = skills.map((skill) => ({
         ...recursivelyHydrateStrings(skill, hydrationContext),
         extensionName: config.name,
@@ -1052,11 +1075,9 @@ Would you like to attempt to install via "git clone" instead?`,
   }
 
   private async loadExtensionHooks(
-    extensionDir: string,
+    hooksFilePath: string,
     context: VariableContext,
   ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
-    const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
-
     try {
       const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -1099,6 +1120,29 @@ Would you like to attempt to install via "git clone" instead?`,
       );
       return undefined;
     }
+  }
+
+  private resolveExtensionDir(
+    extensionDir: string,
+    configuredDir: string | undefined,
+    defaultDir: string,
+    dirType: 'hooks' | 'skills',
+  ): string {
+    const dirName = configuredDir ?? defaultDir;
+    if (!dirName.trim()) {
+      throw new Error(
+        `Invalid ${dirType} directory path: "${dirName}". ${capitalize(dirType)} directory must be within the extension directory.`,
+      );
+    }
+
+    const resolvedDir = path.resolve(extensionDir, dirName);
+    if (!isSubpath(extensionDir, resolvedDir)) {
+      throw new Error(
+        `Invalid ${dirType} directory path: "${dirName}". ${capitalize(dirType)} directory must be within the extension directory.`,
+      );
+    }
+
+    return resolvedDir;
   }
 
   toOutputString(extension: GeminiCLIExtension): string {
@@ -1235,6 +1279,10 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     await this.maybeStartExtension(extension);
   }
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
