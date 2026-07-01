@@ -9,8 +9,8 @@
  * e.g., "camelCaseString" -> "Camel Case String"
  */
 function camelToSpace(text: string): string {
-  const result = text.replace(/([A-Z])/g, ' $1');
-  return result.charAt(0).toUpperCase() + result.slice(1).trim();
+  const result = text.replace(/([A-Z])/g, ' $1').trim();
+  return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
 /**
