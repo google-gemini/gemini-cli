@@ -26,6 +26,8 @@ export enum MessageBusType {
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
   SUBAGENT_ACTIVITY = 'subagent-activity',
+  MCP_ELICITATION_REQUEST = 'mcp-elicitation-request',
+  MCP_ELICITATION_RESPONSE = 'mcp-elicitation-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -217,6 +219,60 @@ export interface SubagentActivityMessage {
   activity: SubagentActivityItem;
 }
 
+/**
+ * Request to elicit information from the user on behalf of an MCP server,
+ * per the MCP `elicitation/create` request (spec 2025-11-25).
+ *
+ * Two modes are supported:
+ * - `form`: render a structured form built from the requested JSON schema.
+ * - `url`: open a URL out-of-band (e.g. third-party OAuth, secure credential
+ *   collection) and wait for the server to signal completion.
+ */
+export type McpElicitationRequest = {
+  type: MessageBusType.MCP_ELICITATION_REQUEST;
+  correlationId: string;
+  serverName: string;
+  message: string;
+} & (
+  | {
+      mode: 'form';
+      /** JSON Schema describing requested fields. */
+      requestedSchema: unknown;
+    }
+  | {
+      mode: 'url';
+      /** Opaque server-issued id used to correlate completion. */
+      elicitationId: string;
+      /** URL the user should open. Always validated to be http(s) before publish. */
+      url: string;
+    }
+);
+
+export type McpElicitationResponse = {
+  type: MessageBusType.MCP_ELICITATION_RESPONSE;
+  correlationId: string;
+} & (
+  | {
+      action: 'accept';
+      /** Form values when `action === 'accept'` for form-mode requests. */
+      content?: Record<string, string | number | boolean | string[]>;
+    }
+  | {
+      action: 'decline' | 'cancel';
+    }
+);
+
+/**
+ * Distributive `Omit` so that omitting a key from a discriminated union
+ * preserves the union shape (rather than collapsing it).
+ */
+export type McpElicitationRequestWithoutCorrelationId =
+  McpElicitationRequest extends infer T
+    ? T extends { type: MessageBusType.MCP_ELICITATION_REQUEST }
+      ? Omit<T, 'correlationId'>
+      : never
+    : never;
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -227,4 +283,6 @@ export type Message =
   | AskUserRequest
   | AskUserResponse
   | ToolCallsUpdateMessage
-  | SubagentActivityMessage;
+  | SubagentActivityMessage
+  | McpElicitationRequest
+  | McpElicitationResponse;

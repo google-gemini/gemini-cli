@@ -43,6 +43,7 @@ import {
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -3233,5 +3234,250 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(3);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+  });
+});
+
+describe('connectToMcpServer - elicitation', () => {
+  let mockedClient: ClientLib.Client;
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+  let localContext: McpContext;
+
+  beforeEach(() => {
+    mockedClient = {
+      connect: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn(),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      onclose: vi.fn(),
+      notification: vi.fn(),
+    } as unknown as ClientLib.Client;
+    vi.mocked(ClientLib.Client).mockImplementation(() => mockedClient);
+    vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+      {} as SdkClientStdioLib.StdioClientTransport,
+    );
+
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-elicitation-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+    localContext = {
+      sanitizationConfig: EMPTY_CONFIG,
+      emitMcpDiagnostic: vi.fn(),
+      setUserInteractedWithMcp: vi.fn(),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+    };
+  });
+
+  afterEach(async () => {
+    await cleanupTmpDir(testWorkspace);
+    workspaceContext = null as unknown as WorkspaceContext;
+    vi.clearAllMocks();
+  });
+
+  it('advertises the elicitation { form, url } capability at connect', async () => {
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+    );
+
+    expect(mockedClient.registerCapabilities).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elicitation: { form: {}, url: {} },
+      }),
+    );
+  });
+
+  it('registers an elicitation/create request handler', async () => {
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    // The first registered handler is for `ListRootsRequestSchema`; the
+    // elicitation handler is registered in addition to it.
+    expect(setRequestHandler).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['javascript:alert(1)'],
+    ['file:///etc/passwd'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['not a url at all'],
+  ])('declines url-mode elicitation for unsafe URL %s', async (badUrl) => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    // Second registered handler is the elicitation handler. First arg is the
+    // schema, second is the async handler callback.
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: {
+        mode: 'url',
+        message: 'log in please',
+        elicitationId: 'eid-1',
+        url: badUrl,
+      },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
+  });
+
+  it('declines when params payload is missing', async () => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({});
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
+  });
+
+  it('declines when mode is unknown', async () => {
+    const messageBus = {
+      request: vi.fn(),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: { mode: 'something-new', message: 'hi' },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'url is not a string',
+      { mode: 'url', message: 'm', elicitationId: 'eid', url: 42 },
+    ],
+    [
+      'elicitationId is missing',
+      { mode: 'url', message: 'm', url: 'https://example.com' },
+    ],
+    [
+      'elicitationId is a number',
+      {
+        mode: 'url',
+        message: 'm',
+        elicitationId: 7,
+        url: 'https://example.com',
+      },
+    ],
+  ])(
+    'declines url-mode when payload is malformed (%s)',
+    async (_label, badParams) => {
+      const messageBus = {
+        request: vi.fn(),
+      } as unknown as MessageBus;
+
+      await connectToMcpServer(
+        '0.0.1',
+        'test-server',
+        { command: 'test-command' },
+        false,
+        workspaceContext,
+        localContext,
+        messageBus,
+      );
+
+      const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+      const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+        req: unknown,
+      ) => Promise<{ action: string }>;
+
+      const result = await elicitationHandler({ params: badParams });
+
+      expect(result).toEqual({ action: 'decline' });
+      expect(messageBus.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('declines when messageBus.request throws', async () => {
+    const messageBus = {
+      request: vi.fn().mockRejectedValue(new Error('bus exploded')),
+    } as unknown as MessageBus;
+
+    await connectToMcpServer(
+      '0.0.1',
+      'test-server',
+      { command: 'test-command' },
+      false,
+      workspaceContext,
+      localContext,
+      messageBus,
+    );
+
+    const setRequestHandler = vi.mocked(mockedClient.setRequestHandler);
+    const elicitationHandler = setRequestHandler.mock.calls[1][1] as (
+      req: unknown,
+    ) => Promise<{ action: string }>;
+
+    const result = await elicitationHandler({
+      params: {
+        mode: 'form',
+        message: 'fill this in',
+        requestedSchema: { type: 'object', properties: {} },
+      },
+    });
+
+    expect(result).toEqual({ action: 'decline' });
+    expect(messageBus.request).toHaveBeenCalledTimes(1);
   });
 });

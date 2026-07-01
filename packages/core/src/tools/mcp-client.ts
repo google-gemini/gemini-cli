@@ -24,6 +24,7 @@ import {
 import { EnvHttpProxyAgent } from 'undici';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
+  ElicitRequestSchema,
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -33,6 +34,10 @@ import {
   McpError,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  UrlElicitationRequiredError,
+  type ElicitRequestFormParams,
+  type ElicitRequestURLParams,
+  type ElicitResult,
   type GetPromptResult,
   type Prompt,
   type ReadResourceResult,
@@ -75,6 +80,12 @@ import { getToolCallContext } from '../utils/toolCallContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  MessageBusType,
+  type McpElicitationRequest,
+  type McpElicitationRequestWithoutCorrelationId,
+  type McpElicitationResponse,
+} from '../confirmation-bus/types.js';
 import { coreEvents } from '../utils/events.js';
 import {
   type ResourceRegistry,
@@ -168,6 +179,12 @@ export class McpClient implements McpProgressReporter {
    */
   private readonly progressTokenToCallId = new Map<string | number, string>();
 
+  /**
+   * Message bus used to forward `elicitation/create` requests from the server
+   * to the UI. Resolved lazily from the first registered tool registry.
+   */
+  private messageBus: MessageBus | undefined;
+
   constructor(
     private readonly serverName: string,
     private readonly serverConfig: MCPServerConfig,
@@ -176,7 +193,14 @@ export class McpClient implements McpProgressReporter {
     private readonly debugMode: boolean,
     private readonly clientVersion: string,
     private readonly onContextUpdated?: (signal?: AbortSignal) => Promise<void>,
-  ) {}
+    messageBus?: MessageBus,
+  ) {
+    this.messageBus = messageBus;
+  }
+
+  setMessageBus(messageBus: MessageBus | undefined): void {
+    this.messageBus = messageBus;
+  }
 
   getServerName(): string {
     return this.serverName;
@@ -200,6 +224,7 @@ export class McpClient implements McpProgressReporter {
         this.debugMode,
         this.workspaceContext,
         this.cliConfig,
+        this.messageBus,
       );
 
       this.registerNotificationHandlers();
@@ -235,11 +260,9 @@ export class McpClient implements McpProgressReporter {
     this.assertConnected();
     this.registeredRegistries.add(registries);
 
+    const messageBus = registries.toolRegistry.getMessageBus();
     const prompts = await this.fetchPrompts();
-    const tools = await this.discoverTools(
-      cliConfig,
-      registries.toolRegistry.getMessageBus(),
-    );
+    const tools = await this.discoverTools(cliConfig, messageBus);
     const resources = await this.discoverResources();
     this.updateResourceRegistry(resources, registries.resourceRegistry);
 
@@ -1359,7 +1382,9 @@ export async function discoverTools(
           mcpClient,
           toolDef,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+          mcpServerName,
           options?.progressReporter,
+          messageBus,
         );
 
         // Extract annotations from the tool definition
@@ -1412,12 +1437,33 @@ export async function discoverTools(
   }
 }
 
+/**
+ * Max number of URL-elicitation retry rounds for a single MCP tool call.
+ * Bounded to prevent an unbounded loop if the server keeps re-requesting.
+ */
+const MAX_URL_ELICITATION_ROUNDS = 3;
+
+/**
+ * MCP servers are not trusted; reject any URL that does not use a benign
+ * protocol so the UI never opens `javascript:`, `file:`, `data:` etc.
+ */
+function isSafeElicitationUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 class McpCallableTool implements CallableTool {
   constructor(
     private readonly client: Client,
     private readonly toolDef: McpTool,
     private readonly timeout: number,
+    private readonly serverName: string,
     private readonly progressReporter?: McpProgressReporter,
+    private readonly messageBus?: MessageBus,
   ) {}
 
   async tool(): Promise<Tool> {
@@ -1449,16 +1495,12 @@ class McpCallableTool implements CallableTool {
     }
 
     try {
-      const result = await this.client.callTool(
-        {
-          name: call.name!,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          arguments: call.args as Record<string, unknown>,
-          _meta: { progressToken },
-        },
-        undefined,
-        { timeout: this.timeout },
-      );
+      const result = await this.invokeWithUrlElicitationRetry(call, {
+        name: call.name!,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        arguments: call.args as Record<string, unknown>,
+        _meta: { progressToken },
+      });
 
       return [
         {
@@ -1487,6 +1529,103 @@ class McpCallableTool implements CallableTool {
       if (this.progressReporter) {
         this.progressReporter.unregisterProgressToken(progressToken);
       }
+    }
+  }
+
+  /**
+   * Invokes the tool and, when the server responds with the URL-elicitation
+   * required error (code -32042), routes the elicitation to the UI via the
+   * message bus and retries the call. Bounded by MAX_URL_ELICITATION_ROUNDS.
+   */
+  private async invokeWithUrlElicitationRetry(
+    call: FunctionCall,
+    request: {
+      name: string;
+      arguments: Record<string, unknown>;
+      _meta: { progressToken: string };
+    },
+  ): Promise<Record<string, unknown>> {
+    for (let attempt = 0; attempt < MAX_URL_ELICITATION_ROUNDS; attempt++) {
+      try {
+        return (await this.client.callTool(request, undefined, {
+          timeout: this.timeout,
+        })) as Record<string, unknown>;
+      } catch (error) {
+        if (
+          !(error instanceof UrlElicitationRequiredError) ||
+          !this.messageBus
+        ) {
+          throw error;
+        }
+        const accepted = await this.runUrlElicitations(error.elicitations);
+        if (!accepted) {
+          // The user declined or cancelled; surface a clean error rather
+          // than re-prompting them on every retry round.
+          throw new Error(
+            `MCP tool '${call.name}' on server '${this.serverName}' was ` +
+              `cancelled: user declined the URL elicitation request.`,
+          );
+        }
+        // Retry the tool call now that the elicitations have been resolved.
+      }
+    }
+    throw new Error(
+      `MCP tool '${call.name}' on server '${this.serverName}' exceeded ` +
+        `the URL elicitation retry limit (${MAX_URL_ELICITATION_ROUNDS}).`,
+    );
+  }
+
+  /**
+   * Drives each URL elicitation past the UI.
+   * Returns `true` only if every elicitation was accepted; if any was
+   * declined, cancelled, malformed, or the message bus failed, returns
+   * `false` so the caller can abort the retry loop rather than
+   * re-prompting the user.
+   */
+  private async runUrlElicitations(
+    elicitations: ElicitRequestURLParams[] | undefined,
+  ): Promise<boolean> {
+    if (!this.messageBus || !elicitations || elicitations.length === 0) {
+      return false;
+    }
+    try {
+      for (const elicitation of elicitations) {
+        if (
+          typeof elicitation.url !== 'string' ||
+          typeof elicitation.elicitationId !== 'string' ||
+          !isSafeElicitationUrl(elicitation.url)
+        ) {
+          // Untrusted MCP server sent a malformed payload or an unsafe
+          // URL; treat as declined so we don't surface
+          // `javascript:`/`file:`/etc. to the UI and don't retry in a loop.
+          return false;
+        }
+        const elicitationRequest: McpElicitationRequestWithoutCorrelationId = {
+          type: MessageBusType.MCP_ELICITATION_REQUEST,
+          serverName: this.serverName,
+          mode: 'url',
+          message: elicitation.message,
+          elicitationId: elicitation.elicitationId,
+          url: elicitation.url,
+        };
+        const response = await this.messageBus.request<
+          McpElicitationRequest,
+          McpElicitationResponse
+        >(
+          elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
+          MessageBusType.MCP_ELICITATION_RESPONSE,
+          this.timeout,
+        );
+        if (response.action !== 'accept') {
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      debugLogger.error(
+        `URL elicitation request for server '${this.serverName}' failed: ${getErrorMessage(error)}`,
+      );
+      return false;
     }
   }
 }
@@ -1842,6 +1981,7 @@ export async function connectToMcpServer(
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
   cliConfig: McpContext,
+  messageBus?: MessageBus,
 ): Promise<Client> {
   const mcpClient = new Client(
     {
@@ -1858,6 +1998,10 @@ export async function connectToMcpServer(
     roots: {
       listChanged: true,
     },
+    elicitation: {
+      form: {},
+      url: {},
+    },
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
@@ -1871,6 +2015,87 @@ export async function connectToMcpServer(
     return {
       roots,
     };
+  });
+
+  mcpClient.setRequestHandler(ElicitRequestSchema, async (request) => {
+    if (!messageBus) {
+      // Without a message bus we cannot route the request to the UI, so
+      // decline rather than silently hanging the server.
+      return { action: 'decline' } as ElicitResult;
+    }
+
+    // Defensively guard against malformed payloads. The MCP SDK should
+    // validate these via the Zod schema, but a misbehaving server can
+    // still slip through if validation is ever relaxed.
+    const params = request?.params;
+    if (!params || typeof params !== 'object') {
+      return { action: 'decline' } as ElicitResult;
+    }
+
+    const isUrlMode = params.mode === 'url';
+    const isFormMode = params.mode === 'form' || params.mode === undefined;
+    if (!isUrlMode && !isFormMode) {
+      // Unknown / future mode; decline rather than forwarding something
+      // we don't know how to render.
+      return { action: 'decline' } as ElicitResult;
+    }
+
+    if (isUrlMode) {
+      const urlStr = (params as ElicitRequestURLParams).url;
+      const elicitationId = (params as ElicitRequestURLParams).elicitationId;
+      if (
+        typeof urlStr !== 'string' ||
+        typeof elicitationId !== 'string' ||
+        !isSafeElicitationUrl(urlStr)
+      ) {
+        // Untrusted or misbehaving MCP server: malformed payload, or
+        // tried to coerce the UI into opening a dangerous URL
+        // (e.g. `javascript:`/`file:`/`data:`). Decline rather than
+        // forward it.
+        return { action: 'decline' } as ElicitResult;
+      }
+    }
+
+    const elicitationRequest: McpElicitationRequestWithoutCorrelationId =
+      isUrlMode
+        ? {
+            type: MessageBusType.MCP_ELICITATION_REQUEST,
+            serverName: mcpServerName,
+            mode: 'url',
+            message: params.message,
+            elicitationId: (params as ElicitRequestURLParams).elicitationId,
+            url: (params as ElicitRequestURLParams).url,
+          }
+        : {
+            type: MessageBusType.MCP_ELICITATION_REQUEST,
+            serverName: mcpServerName,
+            mode: 'form',
+            message: params.message,
+            requestedSchema: (params as ElicitRequestFormParams)
+              .requestedSchema,
+          };
+
+    try {
+      const response = await messageBus.request<
+        McpElicitationRequest,
+        McpElicitationResponse
+      >(
+        elicitationRequest as Omit<McpElicitationRequest, 'correlationId'>,
+        MessageBusType.MCP_ELICITATION_RESPONSE,
+        mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      );
+
+      const result: ElicitResult = { action: response.action };
+      if (response.action === 'accept' && response.content) {
+        result.content = response.content;
+      }
+      return result;
+    } catch (error) {
+      debugLogger.error(
+        `Elicitation request for server '${mcpServerName}' failed: ${getErrorMessage(error)}`,
+      );
+      return { action: 'decline' } as ElicitResult;
+    }
   });
 
   let unlistenDirectories: Unsubscribe | undefined =
