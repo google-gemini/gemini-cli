@@ -176,6 +176,32 @@ describe('checkpoint utils', () => {
       expect(fileContent.messageId).toBe('p1');
     });
 
+    it('keeps the .json in the checkpoint name when editing a .json file', async () => {
+      const toolCalls = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: { file_path: 'config.json' },
+          prompt_id: 'p1',
+          isClientInitiated: false,
+        },
+      ] as ToolCallRequestInfo[];
+
+      (mockGitService.createFileSnapshot as Mock).mockResolvedValue('hash123');
+      (mockGeminiClient.getHistory as Mock).mockReturnValue([]);
+
+      const { toolCallToCheckpointMap } = await processRestorableToolCalls(
+        toolCalls,
+        mockGitService,
+        mockGeminiClient,
+        'history-data',
+      );
+
+      expect(toolCallToCheckpointMap.get('1')).toMatch(
+        /-config\.json-replace$/,
+      );
+    });
+
     it('should handle git snapshot failure by using current commit hash', async () => {
       const toolCalls = [
         {
@@ -278,6 +304,23 @@ describe('checkpoint utils', () => {
 
       const actual = getCheckpointInfoList(checkpointFiles);
       expect(actual).toEqual(expected);
+    });
+
+    it('strips only the trailing .json when the edited file is itself .json', () => {
+      const checkpointFiles = new Map([
+        [
+          '2025-01-01T12-00-00_000Z-config.json-replace.json',
+          JSON.stringify({ messageId: 'msg1' }),
+        ],
+      ]);
+
+      const actual = getCheckpointInfoList(checkpointFiles);
+      expect(actual).toEqual([
+        {
+          messageId: 'msg1',
+          checkpoint: '2025-01-01T12-00-00_000Z-config.json-replace',
+        },
+      ]);
     });
 
     it('should ignore files with invalid JSON', () => {

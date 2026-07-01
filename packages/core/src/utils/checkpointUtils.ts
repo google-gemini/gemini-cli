@@ -142,7 +142,10 @@ export async function processRestorableToolCalls<HistoryType>(
       checkpointsToWrite.set(fileName, JSON.stringify(checkpointData, null, 2));
       toolCallToCheckpointMap.set(
         toolCall.callId,
-        fileName.replace('.json', ''),
+        // Use the base name directly; fileName.replace('.json', '') would strip
+        // the first ".json" instead of the extension when the edited file is
+        // itself a .json file (e.g. "...-config.json-replace.json").
+        checkpointFileName,
       );
     } catch (error) {
       errors.push(
@@ -176,7 +179,10 @@ export function getCheckpointInfoList(
       if (result.success) {
         checkpointInfoList.push({
           messageId: result.data.messageId,
-          checkpoint: file.replace('.json', ''),
+          // basename(file, '.json') strips only the trailing extension; a
+          // plain replace('.json', '') would corrupt names from edited .json
+          // files (e.g. "...-config.json-replace.json").
+          checkpoint: path.basename(file, '.json'),
         });
       }
     } catch {
