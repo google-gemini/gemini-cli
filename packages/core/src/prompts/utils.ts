@@ -69,7 +69,7 @@ export function applySubstitutions(
 ): string {
   let result = prompt;
 
-  result = result.replace(/\${AgentSkills}/g, skillsPrompt);
+  result = result.replace(/\${AgentSkills}/g, () => skillsPrompt);
 
   const activeSnippets = isGemini3 ? snippets : legacySnippets;
   const subAgentsContent = activeSnippets.renderSubAgents(
@@ -82,7 +82,7 @@ export function applySubstitutions(
       })),
   );
 
-  result = result.replace(/\${SubAgents}/g, subAgentsContent);
+  result = result.replace(/\${SubAgents}/g, () => subAgentsContent);
 
   const toolRegistry = context.toolRegistry;
   const allToolNames = toolRegistry.getAllToolNames();
@@ -90,13 +90,14 @@ export function applySubstitutions(
     allToolNames.length > 0
       ? allToolNames.map((name) => `- ${name}`).join('\n')
       : 'No tools are currently available.';
-  result = result.replace(/\${AvailableTools}/g, availableToolsList);
+  result = result.replace(/\${AvailableTools}/g, () => availableToolsList);
 
   for (const toolName of allToolNames) {
     const varName = `${toolName}_ToolName`;
+    const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     result = result.replace(
-      new RegExp(`\\\${\\b${varName}\\b}`, 'g'),
-      toolName,
+      new RegExp(`\\$\\{${escapedVarName}\\}`, 'g'),
+      () => toolName,
     );
   }
 
