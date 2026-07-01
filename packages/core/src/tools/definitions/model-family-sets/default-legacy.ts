@@ -112,7 +112,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     name: WRITE_FILE_TOOL_NAME,
     description: `Writes content to a specified file in the local filesystem.
 
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response. WARNING: Do NOT use this tool if the file contains massive literal text sequences (like a 6000+ character string, large arrays, or inline base64 images), as LLMs are prone to corrupting or truncating such sequences during a full file rewrite. Use the '${EDIT_TOOL_NAME}' tool instead.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -122,7 +122,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
         },
         [WRITE_FILE_PARAM_CONTENT]: {
           description:
-            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
+            "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content. WARNING: Do not use this tool to rewrite files containing massive literal text blocks (e.g., inline base64 images or >6000 character strings) because you may corrupt them. Use the replace tool instead.",
           type: 'string',
         },
       },
