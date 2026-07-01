@@ -43,6 +43,26 @@ class TestValidator(unittest.TestCase):
         """valid triage result matching complete schema should pass"""
         validate_triage_result(self.payload)
 
+    def test_needs_info_comment_fallback(self):
+        """
+        NEEDS_INFO quality with missing/empty comment injects a non-empty
+        default fallback comment string instead of raising a validation failure.
+        """
+        for empty_val in [None, "", "   "]:
+            with self.subTest(empty_val=empty_val):
+                payload = {
+                    "triage_metadata": {
+                        "quality": "NEEDS_INFO",
+                        "reasoning": "Issue missing logs."
+                    }
+                }
+                if empty_val is not None:
+                    payload["triage_metadata"]["comment"] = empty_val
+                validate_triage_result(payload)
+                comment = payload["triage_metadata"].get("comment")
+                self.assertIsInstance(comment, str)
+                self.assertTrue(len(comment.strip()) > 0)
+
     def test_missing_triage_metadata(self):
         """payload missing triage_metadata should fail"""
         del self.payload["triage_metadata"]

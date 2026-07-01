@@ -50,6 +50,16 @@ def validate_triage_result(data: dict) -> None:
             f"Invalid or missing 'quality': {metadata.get('quality')}"
         )
 
+    if metadata.get("quality") == "NEEDS_INFO":
+        comment = metadata.get("comment")
+        if not isinstance(comment, str) or not comment.strip():
+            metadata["comment"] = (
+                "Thank you for opening this issue! Additional information (such as "
+                "reproduction steps, environment details, or error logs) is required "
+                "to help us triage and investigate. Please provide any relevant details "
+                "so we can assist you."
+            )
+
     if metadata.get("quality") == "OK":
         effort = metadata.get("effort_estimate")
         if effort not in ["SMALL", "MEDIUM", "LARGE"]:
