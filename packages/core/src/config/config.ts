@@ -319,6 +319,7 @@ export interface CustomTheme {
   };
   border?: {
     default?: string;
+    focused?: string;
   };
   ui?: {
     comment?: string;
