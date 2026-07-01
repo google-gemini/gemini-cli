@@ -30,6 +30,7 @@ import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';
+import * as https from 'node:https';
 import open from 'open';
 import crypto from 'node:crypto';
 import * as os from 'node:os';
@@ -408,6 +409,78 @@ describe('oauth2', () => {
         redirect_uri: 'https://codeassist.google.com/authcode',
       });
       expect(mockOAuth2Client.setCredentials).toHaveBeenCalledWith(mockTokens);
+    });
+
+    describe('transporter keep-alive (nodejs/node#63989 workaround)', () => {
+      const setupUserCodeClient = () => {
+        const mockOAuth2Client = {
+          generateAuthUrl: vi.fn().mockReturnValue('https://example.com/auth'),
+          getToken: vi.fn().mockResolvedValue({
+            tokens: {
+              access_token: 'test-access-token',
+              refresh_token: 'test-refresh-token',
+            },
+          }),
+          generateCodeVerifierAsync: vi.fn().mockResolvedValue({
+            codeChallenge: 'test-challenge',
+            codeVerifier: 'test-verifier',
+          }),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          setCredentials: vi.fn(),
+          on: vi.fn(),
+          credentials: {},
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+        (readline.createInterface as Mock).mockReturnValue({
+          question: vi.fn((_query, callback) => callback('test-user-code')),
+          close: vi.fn(),
+          on: vi.fn(),
+        });
+      };
+
+      it('disables HTTP keep-alive when no proxy is configured', async () => {
+        setupUserCodeClient();
+        const config = {
+          getNoBrowser: () => true,
+          getProxy: () => undefined,
+          isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => true,
+        } as unknown as Config;
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, config);
+
+        const transporterOptions = (
+          vi.mocked(OAuth2Client).mock.calls[0]?.[0] as unknown as {
+            transporterOptions?: {
+              agent?: { keepAlive?: boolean };
+              proxy?: string;
+            };
+          }
+        )?.transporterOptions;
+        expect(transporterOptions?.agent).toBeInstanceOf(https.Agent);
+        expect(transporterOptions?.agent?.keepAlive).toBe(false);
+        expect(transporterOptions?.proxy).toBeUndefined();
+      });
+
+      it('keeps the proxy and no custom agent when a proxy is configured', async () => {
+        setupUserCodeClient();
+        const config = {
+          getNoBrowser: () => true,
+          getProxy: () => 'http://test.proxy.com:8080',
+          isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => true,
+        } as unknown as Config;
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, config);
+
+        const transporterOptions = (
+          vi.mocked(OAuth2Client).mock.calls[0]?.[0] as unknown as {
+            transporterOptions?: { agent?: unknown; proxy?: string };
+          }
+        )?.transporterOptions;
+        expect(transporterOptions?.proxy).toBe('http://test.proxy.com:8080');
+        expect(transporterOptions?.agent).toBeUndefined();
+      });
     });
 
     it('should cache Google Account when logging in with user code', async () => {

@@ -14,6 +14,7 @@ import {
   type JWTInput,
 } from 'google-auth-library';
 import * as http from 'node:http';
+import * as https from 'node:https';
 import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
@@ -140,12 +141,19 @@ async function initOauthClient(
     }
   }
 
+  // The CVE-2026-48931 fix regressed http.Agent keep-alive socket reuse in
+  // Node 24.17.0 / 22.23.0 / 26.3.1 (fixed in 24.18.0 / 22.23.1 / 26.x),
+  // making node-fetch (via gaxios) throw a spurious ERR_STREAM_PREMATURE_CLOSE
+  // during the OAuth token exchange. Disable keep-alive to avoid it; with a
+  // proxy we keep `proxy` instead, since our own agent would make gaxios
+  // ignore it. See https://github.com/nodejs/node/issues/63989
+  const proxy = config.getProxy();
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
-    transporterOptions: {
-      proxy: config.getProxy(),
-    },
+    transporterOptions: proxy
+      ? { proxy }
+      : { agent: new https.Agent({ keepAlive: false }) },
   });
   const useEncryptedStorage = getUseEncryptedStorageFlag();
 
