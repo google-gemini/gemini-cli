@@ -87,7 +87,9 @@ export function loadSettings(
       const parsedUserSettings = JSON.parse(
         stripJsonComments(userContent),
       ) as Settings;
-      userSettings = resolveEnvVarsInObject(parsedUserSettings);
+      userSettings = normalizeSettings(
+        resolveEnvVarsInObject(parsedUserSettings),
+      );
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -121,7 +123,9 @@ export function loadSettings(
         const parsedWorkspaceSettings = JSON.parse(
           stripJsonComments(projectContent),
         ) as Settings;
-        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+        workspaceSettings = normalizeSettings(
+          resolveEnvVarsInObject(parsedWorkspaceSettings),
+        );
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -140,11 +144,11 @@ export function loadSettings(
   }
 
   // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  const mergedSettings = {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // override values from userSettings. Nested objects are merged recursively
+  // so workspace settings override only the specific keys they define, instead
+  // of replacing an entire nested section and silently dropping unrelated
+  // user-level configuration.
+  const mergedSettings = deepMergeSettings(userSettings, workspaceSettings);
 
   // Security: ensure policyPaths and adminPolicyPaths are only loaded from trusted, user-level
   // configuration and cannot be overridden by workspace-level settings, even if the
@@ -201,4 +205,68 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   return obj;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Normalizes a parsed settings value into a plain `Settings` object. An empty
+ * settings file or one containing `null` or a primitive parses to a non-object
+ * (e.g. `JSON.parse("null")` returns `null`); returning `{}` in those cases
+ * keeps downstream property access and merging safe instead of crashing.
+ */
+function normalizeSettings(value: unknown): Settings {
+  return isPlainObject(value) ? (value as Settings) : {};
+}
+
+/**
+ * Deeply merges two settings objects. Nested plain objects are merged
+ * recursively so that the `source` settings override only the specific keys
+ * they define, instead of replacing an entire nested section. Arrays and
+ * primitive values in `source` replace those in `target`, and `undefined`
+ * values in `source` are ignored so they never clobber an existing value.
+ *
+ * Exported for testing.
+ */
+export function deepMergeSettings<T extends object>(target: T, source: T): T {
+  // Defensively default to empty objects when either side is not a plain
+  // object. An empty or `null` settings file parses to `null`
+  // (`JSON.parse("null")`), and calling `Object.entries(null)` would throw and
+  // crash the server.
+  const t = isPlainObject(target) ? target : {};
+  const s = isPlainObject(source) ? source : {};
+  const output: Record<string, unknown> = { ...t };
+
+  for (const [key, sourceValue] of Object.entries(s)) {
+    // Skip dangerous keys that JSON.parse can create as own properties, to
+    // prevent prototype pollution.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+    if (sourceValue === undefined) {
+      continue;
+    }
+    const targetValue = output[key];
+    if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+      output[key] = deepMergeSettings(targetValue, sourceValue);
+    } else if (isPlainObject(sourceValue)) {
+      // The source value is a nested object but the target value is not, so
+      // recursively clone it. Assigning `sourceValue` directly would make the
+      // merged result share references with the original `source` object,
+      // allowing later mutations to leak back into it.
+      output[key] = deepMergeSettings({}, sourceValue);
+    } else if (Array.isArray(sourceValue)) {
+      // Arrays replace the target value wholesale, but clone them so the merged
+      // result does not share references with the original `source` object
+      // (same reasoning as nested objects above).
+      output[key] = structuredClone(sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return output as T;
 }
