@@ -1398,6 +1398,14 @@ function doIt() {
   });
 
   describe('plan mode', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(false);
+    });
+
     it('should allow edits to plans directory when isPlanMode is true', async () => {
       const mockProjectTempDir = path.join(tempDir, 'project');
       fs.mkdirSync(mockProjectTempDir);
@@ -1407,8 +1415,6 @@ function doIt() {
 
       const plansDir = path.join(mockProjectTempDir, 'plans');
       fs.mkdirSync(plansDir);
-
-      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
       vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
 
       const filePath = 'test-file.txt';
@@ -1431,6 +1437,78 @@ function doIt() {
       expect(result.llmContent).toMatch(/Successfully modified file/);
 
       // Verify plan file is written with new content
+      expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
+
+      fs.rmSync(plansDir, { recursive: true, force: true });
+    });
+
+    it('should preserve nested directory structure within the plans directory in Plan Mode', async () => {
+      const mockProjectTempDir = path.join(tempDir, 'project');
+      fs.mkdirSync(mockProjectTempDir);
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+        mockProjectTempDir,
+      );
+
+      const plansDir = path.join(mockProjectTempDir, 'plans');
+      fs.mkdirSync(plansDir);
+      vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
+
+      const nestedDir = path.join(plansDir, 'tracks', 'fibsqrt_20260519');
+      fs.mkdirSync(nestedDir, { recursive: true });
+
+      const planFilePath = path.join(nestedDir, 'spec.md');
+      const initialContent = 'some initial content';
+      fs.writeFileSync(planFilePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: 'tracks/fibsqrt_20260519/spec.md',
+        instruction: 'Replace initial with new',
+        old_string: 'initial',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
+
+      fs.rmSync(plansDir, { recursive: true, force: true });
+    });
+
+    it('should strip the leading plansDir folder name segment if present in path', async () => {
+      const mockProjectTempDir = path.join(tempDir, 'project');
+      fs.mkdirSync(mockProjectTempDir);
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+        mockProjectTempDir,
+      );
+
+      const plansDir = path.join(mockProjectTempDir, 'plans');
+      fs.mkdirSync(plansDir);
+      vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
+
+      const nestedDir = path.join(plansDir, 'tracks', 'fibsqrt_20260519');
+      fs.mkdirSync(nestedDir, { recursive: true });
+
+      const planFilePath = path.join(nestedDir, 'spec.md');
+      const initialContent = 'some initial content';
+      fs.writeFileSync(planFilePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: 'plans/tracks/fibsqrt_20260519/spec.md',
+        instruction: 'Replace initial with new',
+        old_string: 'initial',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
 
       fs.rmSync(plansDir, { recursive: true, force: true });
