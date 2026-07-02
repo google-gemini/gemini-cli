@@ -82,9 +82,9 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'GITHUB_ENV',
     'IS_PULL_REQUEST',
     'ISSUES_TO_TRIAGE',
-    'ISSUE_BODY',
+    // 'ISSUE_BODY' removed: attacker-controlled GitHub event data; must not bypass sanitization
     'ISSUE_NUMBER',
-    'ISSUE_TITLE',
+    // 'ISSUE_TITLE' removed: attacker-controlled GitHub event data; must not bypass sanitization
     'PULL_REQUEST_NUMBER',
     'REPOSITORY',
     'TITLE',
