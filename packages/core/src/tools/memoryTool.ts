@@ -66,7 +66,7 @@ export function resetGeminiMdFilename(
   );
 
   if (cleaned.length === 0) {
-    currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;
+    currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAMES;
   } else if (cleaned.length === 1) {
     currentGeminiMdFilename = cleaned[0];
   } else {
