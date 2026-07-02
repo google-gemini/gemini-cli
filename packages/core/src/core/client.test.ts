@@ -1497,6 +1497,109 @@ ${JSON.stringify(
       expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
     });
 
+    it('should limit recursive turns per single prompt_id to default 15 and respect custom limit if configured', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      vi.mocked(checkNextSpeaker).mockResolvedValue(null);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // 1. With default maxSessionTurns = -1, the recursive limit should be 15.
+      vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(-1);
+
+      // Run 15 recursive turns on the same prompt_id
+      for (let i = 0; i < 15; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-recursive',
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxSessionTurns,
+        });
+      }
+
+      // The 16th call on the same prompt_id should exceed the default limit of 15
+      const streamExceeded = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-recursive',
+      );
+      const eventsExceeded = [];
+      for await (const event of streamExceeded) {
+        eventsExceeded.push(event);
+      }
+      expect(eventsExceeded).toEqual([
+        { type: GeminiEventType.MaxSessionTurns },
+      ]);
+
+      // 2. If prompt_id changes, it should reset the counter and succeed again
+      const streamNewPrompt = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-new',
+      );
+      const eventsNewPrompt = [];
+      for await (const event of streamNewPrompt) {
+        eventsNewPrompt.push(event);
+      }
+      expect(eventsNewPrompt).not.toContainEqual({
+        type: GeminiEventType.MaxSessionTurns,
+      });
+
+      // 3. If config.maxSessionTurns is custom configured (e.g., to 3), it should respect it.
+      vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(3);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCounts'].clear();
+      client['lastPromptId'] = '';
+
+      for (let i = 0; i < 3; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-custom',
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxSessionTurns,
+        });
+      }
+
+      // The 4th call on prompt-id-custom should be blocked because limit is 3
+      const streamCustomExceeded = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-custom',
+      );
+      const eventsCustomExceeded = [];
+      for await (const event of streamCustomExceeded) {
+        eventsCustomExceeded.push(event);
+      }
+      expect(eventsCustomExceeded).toEqual([
+        { type: GeminiEventType.MaxSessionTurns },
+      ]);
+    });
+
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
       // Arrange
       const MOCKED_TOKEN_LIMIT = 1000;
