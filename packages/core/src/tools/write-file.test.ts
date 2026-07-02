@@ -428,6 +428,39 @@ describe('WriteFileTool', () => {
       expect(result.error).toBeUndefined();
     });
 
+    it('should not call ensureCorrectFileContent for .json files', async () => {
+      const filePath = path.join(rootDir, 'config.json');
+      const proposedContent = '{"key": "value\\nwith\\nescapes"}';
+      const abortSignal = new AbortController().signal;
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+    });
+
+    it('should not call ensureCorrectFileContent for .ipynb files', async () => {
+      const filePath = path.join(rootDir, 'notebook.ipynb');
+      const proposedContent =
+        '{"cells": [{"source": ["print(\\"hello\\\\n\\")"]}]}';
+      const abortSignal = new AbortController().signal;
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+    });
+
     it('should return error if reading an existing file fails (e.g. permissions)', async () => {
       const filePath = path.join(rootDir, 'unreadable_file.txt');
       const proposedContent = 'some content';
