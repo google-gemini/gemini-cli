@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { marked } from 'marked';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
@@ -866,6 +868,47 @@ describe('memoryImportProcessor', () => {
         'file.md',
       );
       expect(validateImportPath(dotPath, basePath, [allowedPath])).toBe(true);
+    });
+
+    it('should reject paths that escape allowed directories via symbolic links', () => {
+      const tmpDir = fsSync.realpathSync(os.tmpdir());
+      const testRoot = fsSync.mkdtempSync(path.join(tmpDir, 'gemini-test-'));
+      const allowedDir = path.join(testRoot, 'allowed');
+      const outsideDir = path.join(testRoot, 'outside');
+      const symlinkDir = path.join(allowedDir, 'sym_outside');
+
+      try {
+        // Create real directories and files on disk
+        fsSync.mkdirSync(allowedDir, { recursive: true });
+        fsSync.mkdirSync(outsideDir, { recursive: true });
+        fsSync.writeFileSync(path.join(outsideDir, 'sensitive.md'), 'secret');
+
+        // Create a symbolic link pointing outside the allowed directory
+        try {
+          fsSync.symlinkSync(outsideDir, symlinkDir, 'dir');
+        } catch (err: unknown) {
+          if (
+            process.platform === 'win32' &&
+            err &&
+            typeof err === 'object' &&
+            'code' in err &&
+            err.code === 'EPERM'
+          ) {
+            // Skip the test if the user lacks symlink creation privileges on Windows
+            return;
+          }
+          throw err;
+        }
+
+        const importPath = 'sym_outside/sensitive.md';
+
+        expect(validateImportPath(importPath, allowedDir, [allowedDir])).toBe(
+          false,
+        );
+      } finally {
+        // Cleanup
+        fsSync.rmSync(testRoot, { recursive: true, force: true });
+      }
     });
   });
 });
