@@ -33,8 +33,10 @@ To create your first policy:
     decision = "deny"
     priority = 100
     ```
-3.  **Run a command** that triggers the policy (for example, ask Gemini CLI to
-    `rm -rf /`). The tool will now be blocked automatically.
+3.  **Test the policy.** Ask Gemini CLI to run a command that matches the rule,
+    such as `rm -rf ./policy-test`. The tool is now blocked automatically. Use a
+    harmless throwaway path like this rather than a destructive target such as
+    `rm -rf /`, so the test stays safe even if the rule fails to load.
 
 ## Core concepts
 
