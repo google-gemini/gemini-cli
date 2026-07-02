@@ -10,10 +10,11 @@ import { resolveToRealPath } from '../utils/paths.js';
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const PROJECT_MEMORY_INDEX_FILENAME = 'MEMORY.md';
+export const DEFAULT_CONTEXT_FILENAMES = ['GEMINI.md', 'AGENTS.md'];
 
 // This variable will hold the currently configured filenames for GEMINI.md context files.
-// It defaults to DEFAULT_CONTEXT_FILENAME but can be extended by setGeminiMdFilename.
-let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
+// It defaults to DEFAULT_CONTEXT_FILENAMES but can be extended by setGeminiMdFilename.
+let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAMES;
 
 /**
  * Adds one or more filenames to the current context filenames.
@@ -53,7 +54,7 @@ export function setGeminiMdFilename(newFilename: string | string[]): void {
  * This replaces all current filenames.
  */
 export function resetGeminiMdFilename(
-  filename: string | string[] = DEFAULT_CONTEXT_FILENAME,
+  filename: string | string[] = DEFAULT_CONTEXT_FILENAMES,
 ): void {
   const filenames = Array.isArray(filename) ? filename : [filename];
   const cleaned = Array.from(
@@ -65,7 +66,7 @@ export function resetGeminiMdFilename(
   );
 
   if (cleaned.length === 0) {
-    currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAME;
+    currentGeminiMdFilename = DEFAULT_CONTEXT_FILENAMES;
   } else if (cleaned.length === 1) {
     currentGeminiMdFilename = cleaned[0];
   } else {

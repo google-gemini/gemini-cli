@@ -19,6 +19,7 @@ import {
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
+  resetGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
   PROJECT_MEMORY_INDEX_FILENAME,
 } from '../tools/memoryTool.js';
@@ -87,7 +88,7 @@ describe('memoryDiscovery', () => {
   afterEach(async () => {
     vi.unstubAllEnvs();
     // Some tests set this to a different value.
-    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    resetGeminiMdFilename();
     // Clean up the temporary directory to prevent resource leaks.
     // Use maxRetries option for robust cleanup without race conditions
     await fsPromises.rm(testRootDir, {

@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  DEFAULT_CONTEXT_FILENAME,
+  DEFAULT_CONTEXT_FILENAMES,
   getAllGeminiMdFilenames,
   resetGeminiMdFilename,
   setGeminiMdFilename,
@@ -14,7 +14,7 @@ import {
 
 describe('memoryTool filename helpers', () => {
   afterEach(() => {
-    resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    resetGeminiMdFilename();
   });
 
   describe('setGeminiMdFilename', () => {
@@ -23,7 +23,7 @@ describe('memoryTool filename helpers', () => {
       setGeminiMdFilename(newName);
       expect(getAllGeminiMdFilenames()).toEqual([
         newName,
-        DEFAULT_CONTEXT_FILENAME,
+        ...DEFAULT_CONTEXT_FILENAMES,
       ]);
     });
 
@@ -41,18 +41,18 @@ describe('memoryTool filename helpers', () => {
       setGeminiMdFilename(newNames);
       expect(getAllGeminiMdFilenames()).toEqual([
         ...newNames,
-        DEFAULT_CONTEXT_FILENAME,
+        ...DEFAULT_CONTEXT_FILENAMES,
       ]);
     });
 
     it('ensures uniqueness when adding names', () => {
-      setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
-      expect(getAllGeminiMdFilenames()).toEqual([DEFAULT_CONTEXT_FILENAME]);
+      setGeminiMdFilename(DEFAULT_CONTEXT_FILENAMES);
+      expect(getAllGeminiMdFilenames()).toEqual(DEFAULT_CONTEXT_FILENAMES);
 
       setGeminiMdFilename(['NEW.md', 'NEW.md']);
       expect(getAllGeminiMdFilenames()).toEqual([
         'NEW.md',
-        DEFAULT_CONTEXT_FILENAME,
+        ...DEFAULT_CONTEXT_FILENAMES,
       ]);
     });
   });
@@ -66,8 +66,8 @@ describe('memoryTool filename helpers', () => {
 
     it('resets to default if no argument provided', () => {
       resetGeminiMdFilename('OTHER.md');
-      resetGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
-      expect(getAllGeminiMdFilenames()).toEqual([DEFAULT_CONTEXT_FILENAME]);
+      resetGeminiMdFilename();
+      expect(getAllGeminiMdFilenames()).toEqual(DEFAULT_CONTEXT_FILENAMES);
     });
 
     it('handles array reset', () => {
