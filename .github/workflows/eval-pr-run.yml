@@ -1,0 +1,146 @@
+name: 'Evals: PR Evaluation (Trusted)'
+
+on:
+  workflow_run:
+    workflows: ['Evals: PR Build (Untrusted Code)']
+    types: ['completed']
+
+# This workflow runs in the context of the base branch (main), NOT the fork.
+# It has access to repository secrets because it only executes trusted code
+# from main — the fork's compiled bundle is treated as data input only.
+permissions:
+  pull-requests: write
+  contents: read
+  actions: read
+
+jobs:
+  pr-evaluation:
+    name: 'Evaluate Steering & Regressions'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.event.workflow_run.conclusion == 'success'"
+    env:
+      MODEL_LIST: 'gemini-3-flash-preview'
+
+    steps:
+      - name: 'Checkout main (trusted scripts)'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install main dependencies (trusted)'
+        run: 'npm ci'
+        # Security: this installs main branch's package.json, not the fork's.
+
+      - name: 'Download build artifacts from PR build workflow'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          ARTIFACT_ID=$(gh api \
+            "repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts" \
+            --jq '.artifacts[] | select(.name | startswith("eval-build-")) | .id' | head -n 1)
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No eval-build artifact found — skipping evaluation."
+            exit 1
+          fi
+          gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > artifact.zip
+          unzip -o artifact.zip -d artifact-out
+
+      - name: 'Place fork artifacts into working directory'
+        run: |
+          # Replace bundle/ and evals/ with fork's versions for evaluation.
+          # These are treated as data inputs — execution uses main's trusted scripts.
+          rm -rf bundle/ evals/
+          cp -r artifact-out/bundle ./bundle
+          cp -r artifact-out/evals ./evals
+
+      - name: 'Read PR metadata'
+        id: 'metadata'
+        run: |
+          PR_NUMBER=$(cat artifact-out/pr_number.txt)
+          STEERING_DETECTED=$(cat artifact-out/steering_detected.txt)
+          PR_ACTOR=$(cat artifact-out/pr_actor.txt)
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
+          echo "PR_ACTOR=$PR_ACTOR" >> "$GITHUB_OUTPUT"
+
+      - name: 'Analyze PR Content (Guidance)'
+        if: "steps.metadata.outputs.STEERING_DETECTED == 'true'"
+        id: 'analysis'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          EVAL_CHANGES=$(git diff --name-only origin/main...HEAD | grep "^evals/" || true)
+          if [ -z "$EVAL_CHANGES" ]; then
+            echo "MISSING_EVALS=true" >> "$GITHUB_OUTPUT"
+          fi
+          USER_PERMISSION=$(gh api \
+            "repos/${{ github.repository }}/collaborators/${{ steps.metadata.outputs.PR_ACTOR }}/permission" \
+            --jq '.permission' 2>/dev/null || echo "none")
+          if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
+            echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 'Execute Regression Check'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          MODEL_LIST: '${{ env.MODEL_LIST }}'
+        run: |
+          # Security: this script is from the trusted main branch, not the fork.
+          # GEMINI_API_KEY is only available here, after fork code has already
+          # been built (in the separate pull_request workflow with no secrets).
+          node scripts/run_eval_regression.js
+          if [[ -f eval_regression_report.md ]]; then
+            echo "REPORT_FILE=eval_regression_report.md" >> "$GITHUB_ENV"
+          fi
+
+      - name: 'Post or Update PR Comment'
+        if: "always()"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ steps.metadata.outputs.PR_NUMBER }}'
+          STEERING_DETECTED: '${{ steps.metadata.outputs.STEERING_DETECTED }}'
+        run: |
+          {
+            if [[ -f eval_regression_report.md ]]; then
+              cat eval_regression_report.md
+              echo ""
+            fi
+
+            if [[ "$STEERING_DETECTED" == "true" ]]; then
+              echo "### 🧠 Model Steering Guidance"
+              echo ""
+              echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
+              echo ""
+
+              if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
+                echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
+              fi
+
+              if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+                echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
+              fi
+            fi
+
+            echo ""
+            echo "---"
+            echo "*This is an automated guidance message triggered by steering logic signatures.*"
+            echo "<!-- eval-pr-report -->"
+          } > full_comment.md
+
+          COMMENT_ID=$(gh pr view "$PR_NUMBER" --json comments \
+            --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .url' \
+            | grep -oE "[0-9]+$" | head -n 1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+              -F body=@full_comment.md
+          else
+            gh pr comment "$PR_NUMBER" --body-file full_comment.md
+          fi
