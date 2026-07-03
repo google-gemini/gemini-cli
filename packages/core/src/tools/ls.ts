@@ -7,6 +7,7 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import picomatch from 'picomatch';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -93,23 +94,25 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   }
 
   /**
-   * Checks if a filename matches any of the ignore patterns
-   * @param filename Filename to check
+   * Checks if a path matches any of the ignore patterns. Patterns with a path
+   * separator are matched against the workspace-relative path, while basename
+   * patterns keep the historical filename-only behavior.
+   * @param relativePath Workspace-relative path to check
    * @param patterns Array of glob patterns to check against
-   * @returns True if the filename should be ignored
+   * @returns True if the path should be ignored
    */
-  private shouldIgnore(filename: string, patterns?: string[]): boolean {
+  private shouldIgnore(relativePath: string, patterns?: string[]): boolean {
     if (!patterns || patterns.length === 0) {
       return false;
     }
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const filename = path.basename(relativePath);
     for (const pattern of patterns) {
-      // Convert glob pattern to RegExp
-      const regexPattern = pattern
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.');
-      const regex = new RegExp(`^${regexPattern}$`);
-      if (regex.test(filename)) {
+      const normalizedPattern = pattern.replace(/\\/g, '/');
+      const hasPathSeparator = normalizedPattern.includes('/');
+      const matcher = picomatch(normalizedPattern, { dot: true });
+
+      if (matcher(hasPathSeparator ? normalizedPath : filename)) {
         return true;
       }
     }
@@ -229,7 +232,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       for (const relativePath of filteredPaths) {
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
 
-        if (this.shouldIgnore(path.basename(fullPath), this.params.ignore)) {
+        if (this.shouldIgnore(relativePath, this.params.ignore)) {
           continue;
         }
 

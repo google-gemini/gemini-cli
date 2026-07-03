@@ -183,6 +183,51 @@ describe('LSTool', () => {
       });
     });
 
+    it('should respect workspace-relative ignore patterns', async () => {
+      const distDir = path.join(tempRootDir, 'dist');
+      await fs.mkdir(distDir);
+      await fs.writeFile(path.join(distDir, 'app.js'), 'content1');
+      await fs.writeFile(path.join(distDir, 'keep.txt'), 'content2');
+
+      const invocation = lsTool.build({
+        dir_path: distDir,
+        ignore: ['dist/*.js'],
+      });
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).not.toContain('app.js');
+      expect(result.llmContent).toContain('keep.txt');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Found 1 item(s).',
+        files: expect.any(Array),
+      });
+    });
+
+    it('should respect globstar ignore patterns while keeping basename patterns', async () => {
+      const logsDir = path.join(tempRootDir, 'logs', 'nested');
+      await fs.mkdir(logsDir, { recursive: true });
+      await fs.writeFile(path.join(logsDir, 'error.log'), 'content1');
+      await fs.writeFile(path.join(logsDir, 'keep.txt'), 'content2');
+
+      const globstarInvocation = lsTool.build({
+        dir_path: logsDir,
+        ignore: ['**/*.log'],
+      });
+      const globstarResult = await globstarInvocation.execute({ abortSignal });
+
+      expect(globstarResult.llmContent).not.toContain('error.log');
+      expect(globstarResult.llmContent).toContain('keep.txt');
+
+      const basenameInvocation = lsTool.build({
+        dir_path: logsDir,
+        ignore: ['*.log'],
+      });
+      const basenameResult = await basenameInvocation.execute({ abortSignal });
+
+      expect(basenameResult.llmContent).not.toContain('error.log');
+      expect(basenameResult.llmContent).toContain('keep.txt');
+    });
+
     it('should respect gitignore patterns', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
