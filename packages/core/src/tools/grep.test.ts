@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -156,7 +156,7 @@ describe('GrepTool', () => {
     });
 
     it('should return error if path is a file, not a directory', async () => {
-      const filePath = path.join(tempRootDir, 'fileA.txt');
+      const filePath = resolveToRealPath(path.join(tempRootDir, 'fileA.txt'));
       const params: GrepToolParams = { pattern: 'hello', dir_path: filePath };
       expect(grepTool.validateToolParams(params)).toContain(
         `Path is not a directory: ${filePath}`,
