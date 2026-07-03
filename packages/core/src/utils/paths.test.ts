@@ -20,6 +20,7 @@ import {
   toAbsolutePath,
   toPathKey,
   isTrustedSystemPath,
+  resolveDefensiveToolPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -916,6 +917,22 @@ describe('normalizePath', () => {
         vi.stubEnv(envVar, value);
         expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
       });
+    });
+  });
+
+  describe('resolveDefensiveToolPath', () => {
+    it('should sanitize paths by stripping null bytes', () => {
+      const targetDir = '/workspace';
+      const filePathWithNull = 'src/index.ts\0.exe';
+      const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
+      expect(result).toBe('src/index.ts.exe');
+    });
+
+    it('should sanitize @ prefixed paths by stripping null bytes', () => {
+      const targetDir = '/workspace';
+      const filePathWithNull = '@/components/Button.tsx\0';
+      const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
+      expect(result).toBe('components/Button.tsx');
     });
   });
 });
