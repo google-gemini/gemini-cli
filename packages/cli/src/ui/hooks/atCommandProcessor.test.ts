@@ -63,8 +63,10 @@ describe('handleAtCommand', () => {
     vi.restoreAllMocks();
     vi.resetAllMocks();
 
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'folder-structure-test-'),
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'folder-structure-test-'),
+      ),
     );
 
     abortController = new AbortController();
@@ -1467,8 +1469,8 @@ describe('handleAtCommand', () => {
   });
 
   it('should resolve files in multiple workspace directories', async () => {
-    const secondRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'second-root-'),
+    const secondRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(path.join(os.tmpdir(), 'second-root-')),
     );
     try {
       const fileContent = 'Second root content';
@@ -1649,8 +1651,10 @@ describe('checkPermissions', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'check-permissions-test-'),
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'check-permissions-test-'),
+      ),
     );
 
     mockConfig = {
