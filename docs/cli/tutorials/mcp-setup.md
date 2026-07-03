@@ -68,6 +68,11 @@ You tell Gemini about new servers by editing your `settings.json`.
 > map the local environment variable into the container so your secret isn't
 > hardcoded in the config file.
 
+`mcpServers` string values support environment-variable expansion. Use `$VAR` or
+`${VAR}` on all platforms, `${VAR:-fallback}` for defaults, and `%VAR%` on
+Windows. Mustache-style `{{VAR}}`, `${env:VAR}`, and `~` are not expanded; use
+`${HOME}` or `%USERPROFILE%` in paths instead.
+
 ## How to verify the connection
 
 Restart Gemini CLI. It will automatically try to start the defined servers.

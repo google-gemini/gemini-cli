@@ -2473,6 +2473,36 @@ must be provided. If multiple are specified, the order of precedence is
     precedence over `includeTools` - if a tool is in both lists, it will be
     excluded.
 
+##### Path and environment variable expansion
+
+String values in `mcpServers` entries are expanded when settings load. Use
+standard environment-variable syntax:
+
+- `$VAR` or `${VAR}` on all platforms.
+- `${VAR:-fallback}` to provide a fallback value.
+- `%VAR%` on Windows.
+
+`{{VAR}}` template syntax and `${env:VAR}` are not supported. `~` is not
+expanded automatically, so use `$HOME` or `${HOME}` instead. Missing variables
+expand to an empty string, which can turn a mistyped command or path into an
+invalid value.
+
+Examples:
+
+```json
+{
+  "mcpServers": {
+    "node-server": {
+      "command": "$HOME/bin/my-mcp-server",
+      "args": ["--cache", "${XDG_CACHE_HOME:-$HOME/.cache}/my-server"]
+    },
+    "windows-server": {
+      "command": "%USERPROFILE%\\bin\\my-mcp-server.exe"
+    }
+  }
+}
+```
+
 #### `telemetry`
 
 Configures logging and metrics collection for Gemini CLI. For more information,
