@@ -74,7 +74,7 @@ runs:
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |-
-        gemini_version=$(npx --prefer-online "${INPUTS_NPM_PACKAGE}" --version)
+        gemini_version=$(npx --yes --prefer-online "${INPUTS_NPM_PACKAGE}" --version)
         if [ "$gemini_version" != "${INPUTS_EXPECTED_VERSION}" ]; then
           echo "❌ NPX Run Version mismatch: Got $gemini_version from ${INPUTS_NPM_PACKAGE}, expected ${INPUTS_EXPECTED_VERSION}"
           exit 1
@@ -86,7 +86,7 @@ runs:
     - name: 'Install dependencies for integration tests'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
-      run: 'npm ci'
+      run: 'npm ci --ignore-scripts'
 
     - name: '🔬 Run integration tests against NPM release'
       working-directory: '${{ inputs.working-directory }}'
@@ -98,4 +98,6 @@ runs:
         # See https://github.com/google-gemini/gemini-cli/issues/10517
         CI: 'false'
       shell: 'bash'
-      run: 'npm run test:integration:sandbox:none'
+      run: |
+        export INTEGRATION_TEST_GEMINI_BINARY_PATH=$(which gemini)
+        npm run test:integration:sandbox:none

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import { vi } from 'vitest';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
@@ -17,7 +18,17 @@ export function createMockWorkspaceContext(
   rootDir: string,
   additionalDirs: string[] = [],
 ): WorkspaceContext {
-  const allDirs = [rootDir, ...additionalDirs];
+  const resolveToRealPathSafe = (p: string) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+
+  const resolvedRootDir = resolveToRealPathSafe(rootDir);
+  const resolvedAdditionalDirs = additionalDirs.map(resolveToRealPathSafe);
+  const allDirs = [resolvedRootDir, ...resolvedAdditionalDirs];
 
   const mockWorkspaceContext = {
     addDirectory: vi.fn(),

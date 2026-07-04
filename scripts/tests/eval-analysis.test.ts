@@ -279,4 +279,235 @@ describe('eval-analysis', () => {
       'Could not statically resolve eval case object for evalTest call.',
     ]);
   });
+
+  describe('tool reference extraction', () => {
+    it('extracts tool from waitForToolCall string literal', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'grep test',
+          prompt: 'find something',
+          assert: async (rig) => {
+            await rig.waitForToolCall('grep_search');
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['grep_search']);
+    });
+
+    it('extracts tool from toolRequest.name comparison', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'shell test',
+          prompt: 'run a command',
+          assert: async (rig) => {
+            const logs = rig.readToolLogs();
+            const calls = logs.filter(
+              (log) => log.toolRequest.name === 'run_shell_command',
+            );
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['run_shell_command']);
+    });
+
+    it('extracts multiple tools from array includes', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'edit test',
+          prompt: 'edit a file',
+          assert: async (rig) => {
+            const logs = rig.readToolLogs();
+            const editCalls = logs.filter(
+              (log) => ['write_file', 'replace'].includes(log.toolRequest.name),
+            );
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual([
+        'replace',
+        'write_file',
+      ]);
+    });
+
+    it('extracts tool from imported constant', () => {
+      const analysis = analyzeEvalSource(`
+        import { TRACKER_CREATE_TASK_TOOL_NAME } from '@google/gemini-cli-core';
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'tracker test',
+          prompt: 'create a task',
+          assert: async (rig) => {
+            await rig.waitForToolCall(TRACKER_CREATE_TASK_TOOL_NAME);
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['tracker_create_task']);
+    });
+
+    it('deduplicates references within a case', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'dedup test',
+          prompt: 'search twice',
+          assert: async (rig) => {
+            await rig.waitForToolCall('grep_search');
+            const logs = rig.readToolLogs();
+            const calls = logs.filter(
+              (log) => log.toolRequest.name === 'grep_search',
+            );
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['grep_search']);
+    });
+
+    it('sorts references alphabetically', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'sorted test',
+          prompt: 'do things',
+          assert: async (rig) => {
+            await rig.waitForToolCall('write_file');
+            await rig.waitForToolCall('grep_search');
+            await rig.waitForToolCall('glob');
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual([
+        'glob',
+        'grep_search',
+        'write_file',
+      ]);
+    });
+
+    it('returns empty array when no tool refs found', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'no tools',
+          prompt: 'just answer',
+          assert: async (rig, result) => {
+            expect(result).toContain('hello');
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual([]);
+    });
+
+    it('aggregates file-level toolReferences across cases', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'case 1',
+          prompt: 'first',
+          assert: async (rig) => {
+            await rig.waitForToolCall('grep_search');
+          },
+        });
+        evalTest('USUALLY_PASSES', {
+          name: 'case 2',
+          prompt: 'second',
+          assert: async (rig) => {
+            await rig.waitForToolCall('write_file');
+          },
+        });
+      `);
+
+      expect(analysis.toolReferences).toEqual(['grep_search', 'write_file']);
+    });
+
+    it('deduplicates file-level toolReferences', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'case 1',
+          prompt: 'first',
+          assert: async (rig) => {
+            await rig.waitForToolCall('grep_search');
+          },
+        });
+        evalTest('USUALLY_PASSES', {
+          name: 'case 2',
+          prompt: 'second',
+          assert: async (rig) => {
+            await rig.waitForToolCall('grep_search');
+          },
+        });
+      `);
+
+      expect(analysis.toolReferences).toEqual(['grep_search']);
+    });
+
+    it('handles aliased constant imports', () => {
+      const analysis = analyzeEvalSource(`
+        import { TRACKER_CREATE_TASK_TOOL_NAME as CREATE_TOOL } from '@google/gemini-cli-core';
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'alias test',
+          prompt: 'create task',
+          assert: async (rig) => {
+            await rig.waitForToolCall(CREATE_TOOL);
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['tracker_create_task']);
+    });
+
+    it('handles reversed toolRequest.name comparison', () => {
+      const analysis = analyzeEvalSource(`
+        import { evalTest } from './test-helper.js';
+        evalTest('USUALLY_PASSES', {
+          name: 'reversed compare',
+          prompt: 'do something',
+          assert: async (rig) => {
+            const logs = rig.readToolLogs();
+            const calls = logs.filter(
+              (log) => 'replace' === log.toolRequest.name,
+            );
+          },
+        });
+      `);
+
+      expect(analysis.cases[0].toolReferences).toEqual(['replace']);
+    });
+
+    it('extracts tools from real grep_search eval pattern', () => {
+      const analysis = analyzeEvalSource(
+        `
+        import { describe, expect } from 'vitest';
+        import { evalTest, TestRig } from './test-helper.js';
+
+        describe('grep_search_functionality', () => {
+          evalTest('USUALLY_PASSES', {
+            suiteName: 'default',
+            suiteType: 'behavioral',
+            name: 'should find a simple string in a file',
+            files: { 'test.txt': 'hello world' },
+            prompt: 'Find "world" in test.txt',
+            assert: async (rig: TestRig, result: string) => {
+              await rig.waitForToolCall('grep_search');
+            },
+          });
+        });
+        `,
+        { filePath: '/repo/evals/grep_search.eval.ts', repoRoot: '/repo' },
+      );
+
+      expect(analysis.cases[0].toolReferences).toEqual(['grep_search']);
+      expect(analysis.toolReferences).toEqual(['grep_search']);
+    });
+  });
 });

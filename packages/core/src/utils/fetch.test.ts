@@ -263,6 +263,7 @@ describe('fetch utils', () => {
     it('should fall back to no_proxy if NO_PROXY is not set', () => {
       const proxyUrl = 'http://proxy.example.com';
       const noProxyValue = 'localhost,127.0.0.1';
+      vi.stubEnv('NO_PROXY', undefined);
       vi.stubEnv('no_proxy', noProxyValue);
 
       setGlobalProxy(proxyUrl);
