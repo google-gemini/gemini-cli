@@ -32,6 +32,8 @@
     "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
+    "eval:coverage": "tsx ./scripts/eval-coverage-cli.ts",
+    "eval:validate": "tsx ./scripts/eval-validate-cli.ts",
     "eval:inventory": "tsx ./scripts/eval-inventory-cli.ts",
     "eval:inventory:json": "tsx ./scripts/eval-inventory-cli.ts --json",
     "build": "node scripts/build.js",
