@@ -7,8 +7,12 @@
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isLoopbackHost, resolveAndValidateDns } from '../utils/fetch.js';
-import { Agent, type Dispatcher } from 'undici';
+import {
+  createPinnedDispatcher,
+  isLoopbackHost,
+  resolveAndValidateDns,
+} from '../utils/fetch.js';
+import type { Dispatcher } from 'undici';
 
 /**
  * Error thrown when the discovered resource metadata does not match the expected resource.
@@ -113,25 +117,9 @@ export class OAuthUtils {
         );
         return null;
       }
-      const pinnedIp = resolvedAddrs[0];
-      const dispatcher = new Agent({
-        connect: {
-          lookup: (
-            _hostname: string,
-            _options: unknown,
-            callback: (
-              err: NodeJS.ErrnoException | null,
-              addresses: Array<{ address: string; family: number }>,
-            ) => void,
-          ) => {
-            callback(null, [
-              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
-            ]);
-          },
-        },
-      });
+      const dispatcher = createPinnedDispatcher(resolvedAddrs[0]);
       const response = await fetch(resourceMetadataUrl, {
-        dispatcher: dispatcher as Dispatcher,
+        dispatcher,
       } as RequestInit & { dispatcher: Dispatcher });
       if (!response.ok) {
         return null;
@@ -170,25 +158,9 @@ export class OAuthUtils {
         );
         return null;
       }
-      const pinnedIp = resolvedAddrs[0];
-      const dispatcher = new Agent({
-        connect: {
-          lookup: (
-            _hostname: string,
-            _options: unknown,
-            callback: (
-              err: NodeJS.ErrnoException | null,
-              addresses: Array<{ address: string; family: number }>,
-            ) => void,
-          ) => {
-            callback(null, [
-              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
-            ]);
-          },
-        },
-      });
+      const dispatcher = createPinnedDispatcher(resolvedAddrs[0]);
       const response = await fetch(authServerMetadataUrl, {
-        dispatcher: dispatcher as Dispatcher,
+        dispatcher,
       } as RequestInit & { dispatcher: Dispatcher });
       if (!response.ok) {
         return null;

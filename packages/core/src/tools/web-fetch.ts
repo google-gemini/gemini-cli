@@ -20,11 +20,11 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import {
+  createPinnedDispatcher,
   fetchWithTimeout,
   isLoopbackHost,
   resolveAndValidateDns,
 } from '../utils/fetch.js';
-import { Agent, type Dispatcher } from 'undici';
 import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -316,22 +316,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       );
     }
 
-    const dispatcher = new Agent({
-      connect: {
-        lookup: (
-          _hostname: string,
-          _options: unknown,
-          callback: (
-            err: NodeJS.ErrnoException | null,
-            addresses: Array<{ address: string; family: number }>,
-          ) => void,
-        ) => {
-          callback(null, [
-            { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
-          ]);
-        },
-      },
-    }) as Dispatcher;
+    const dispatcher = createPinnedDispatcher(pinnedIp);
 
     const response = await retryWithBackoff(
       async () => {
@@ -674,22 +659,7 @@ ${aggregatedContent}
     }
 
     try {
-      const dispatcher = new Agent({
-        connect: {
-          lookup: (
-            _hostname: string,
-            _options: unknown,
-            callback: (
-              err: NodeJS.ErrnoException | null,
-              addresses: Array<{ address: string; family: number }>,
-            ) => void,
-          ) => {
-            callback(null, [
-              { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
-            ]);
-          },
-        },
-      }) as Dispatcher;
+      const dispatcher = createPinnedDispatcher(pinnedIp);
 
       const response = await retryWithBackoff(
         async () => {

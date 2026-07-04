@@ -6,13 +6,8 @@
 
 import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import type {
-  Dispatcher} from 'undici';
-import {
-  Agent,
-  EnvHttpProxyAgent,
-  setGlobalDispatcher,
-} from 'undici';
+import type { Dispatcher } from 'undici';
+import { Agent, EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -148,6 +143,34 @@ export function isAddressPrivate(address: string): boolean {
     // If parsing fails despite isValid(), we treat it as potentially unsafe.
     return true;
   }
+}
+
+/**
+ * Creates an undici dispatcher that pins DNS resolution to a specific IP
+ * address while leaving the request URL and TLS SNI/hostname untouched.
+ *
+ * This is used to prevent DNS rebinding: the hostname is resolved and
+ * validated once by the caller (see resolveAndValidateDns), and the
+ * connection is then forced to that already-validated address instead of
+ * re-resolving the hostname at connect time.
+ */
+export function createPinnedDispatcher(pinnedIp: string): Dispatcher {
+  return new Agent({
+    connect: {
+      lookup: (
+        _hostname: string,
+        _options: unknown,
+        callback: (
+          err: NodeJS.ErrnoException | null,
+          addresses: Array<{ address: string; family: number }>,
+        ) => void,
+      ) => {
+        callback(null, [
+          { address: pinnedIp, family: pinnedIp.includes(':') ? 6 : 4 },
+        ]);
+      },
+    },
+  }) as Dispatcher;
 }
 
 export async function resolveAndValidateDns(url: string): Promise<string[]> {
