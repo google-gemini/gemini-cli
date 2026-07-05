@@ -10,6 +10,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
+import { formatToolLogChain } from '../scripts/utils/tool-log-formatter.js';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
@@ -186,6 +187,15 @@ export async function internalEvalTest(evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
+    } catch (error: unknown) {
+      const toolLogs = rig.readToolLogs();
+      if (toolLogs && toolLogs.length > 0) {
+        const summary = formatToolLogChain(toolLogs);
+        if (error instanceof Error) {
+          error.message = `${error.message}\n\nTool Call Chain (${toolLogs.length} calls):\n${summary}`;
+        }
+      }
+      throw error;
     } finally {
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
