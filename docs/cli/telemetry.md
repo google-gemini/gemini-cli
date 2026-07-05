@@ -156,6 +156,20 @@ You must complete several setup steps before enabling Google Cloud telemetry.
 We recommend using direct export to send telemetry directly to Google Cloud
 services.
 
+If you embed `@google/gemini-cli-core` as a library and enable direct Google
+Cloud export, install the optional Google Cloud exporter peer dependencies in
+your application:
+
+```bash
+npm install @google-cloud/logging \
+  @google-cloud/opentelemetry-cloud-monitoring-exporter \
+  @google-cloud/opentelemetry-cloud-trace-exporter
+```
+
+The bundled Gemini CLI includes the direct exporters. Core library consumers who
+do not install these optional packages can still export through an OTLP
+collector by setting `telemetry.useCollector` to `true`.
+
 1.  Enable telemetry in `.gemini/settings.json`:
     ```json
     {

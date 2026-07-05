@@ -82,6 +82,22 @@ describe('GCP Exporters', () => {
     describe('constructor', () => {
       it('should create a log exporter with project ID', () => {
         expect(exporter).toBeDefined();
+      });
+
+      it('should lazily create the Cloud Logging client on first export', async () => {
+        const mockLogRecords: ReadableLogRecord[] = [
+          {
+            hrTime: [1234567890, 123456789],
+            hrTimeObserved: [1234567890, 123456789],
+            body: 'Test log message',
+          } as unknown as ReadableLogRecord,
+        ];
+
+        const callback = vi.fn();
+
+        exporter.export(mockLogRecords, callback);
+        await exporter.forceFlush();
+
         expect(mockLogging.log).toHaveBeenCalledWith('gemini_cli');
       });
 
@@ -236,7 +252,7 @@ describe('GCP Exporters', () => {
         });
       });
 
-      it('should handle synchronous errors', () => {
+      it('should handle synchronous errors', async () => {
         const mockLogRecords: ReadableLogRecord[] = [
           {
             hrTime: [1234567890, 123456789],
@@ -252,6 +268,7 @@ describe('GCP Exporters', () => {
         const callback = vi.fn();
 
         exporter.export(mockLogRecords, callback);
+        await exporter.forceFlush();
 
         expect(callback).toHaveBeenCalledWith({
           code: ExportResultCode.FAILED,
@@ -261,7 +278,7 @@ describe('GCP Exporters', () => {
     });
 
     describe('severity mapping', () => {
-      it('should map OpenTelemetry severity numbers to Cloud Logging levels', () => {
+      it('should map OpenTelemetry severity numbers to Cloud Logging levels', async () => {
         const testCases = [
           { severityNumber: undefined, expected: 'DEFAULT' },
           { severityNumber: 1, expected: 'DEFAULT' },
@@ -273,7 +290,7 @@ describe('GCP Exporters', () => {
           { severityNumber: 25, expected: 'CRITICAL' },
         ];
 
-        testCases.forEach(({ severityNumber, expected }) => {
+        for (const { severityNumber, expected } of testCases) {
           const mockLogRecords: ReadableLogRecord[] = [
             {
               hrTime: [1234567890, 123456789],
@@ -285,6 +302,7 @@ describe('GCP Exporters', () => {
 
           const callback = vi.fn();
           exporter.export(mockLogRecords, callback);
+          await exporter.forceFlush();
 
           expect(mockLog.entry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -294,7 +312,7 @@ describe('GCP Exporters', () => {
           );
 
           mockLog.entry.mockClear();
-        });
+        }
       });
     });
 

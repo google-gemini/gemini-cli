@@ -24,6 +24,7 @@ import {
   GcpTraceExporter,
   GcpLogExporter,
   GcpMetricExporter,
+  ensureGcpExporterDependenciesAvailable,
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 
@@ -63,6 +64,9 @@ describe('Telemetry SDK', () => {
         ({
           getApplicationDefault: mockGetApplicationDefault,
         }) as unknown as GoogleAuth,
+    );
+    vi.mocked(ensureGcpExporterDependenciesAvailable).mockResolvedValue(
+      undefined,
     );
     mockConfig = {
       getTelemetryEnabled: () => true,
@@ -170,6 +174,29 @@ describe('Telemetry SDK', () => {
         delete process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
       }
     }
+  });
+
+  it('should disable direct GCP telemetry when optional exporter dependencies are missing', async () => {
+    const error = new Error('Cannot find package @google-cloud/logging');
+    vi.mocked(ensureGcpExporterDependenciesAvailable).mockRejectedValueOnce(
+      error,
+    );
+    vi.spyOn(mockConfig, 'getTelemetryTarget').mockReturnValue(
+      TelemetryTarget.GCP,
+    );
+    vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');
+
+    await initializeTelemetry(mockConfig);
+
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Direct GCP telemetry exporters are unavailable'),
+      error,
+    );
+    expect(GcpTraceExporter).not.toHaveBeenCalled();
+    expect(GcpLogExporter).not.toHaveBeenCalled();
+    expect(GcpMetricExporter).not.toHaveBeenCalled();
+    expect(NodeSDK.prototype.start).not.toHaveBeenCalled();
   });
 
   it('should use OTLP exporters when target is gcp but useCollector is true', async () => {

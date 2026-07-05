@@ -49,6 +49,7 @@ import {
   GcpTraceExporter,
   GcpMetricExporter,
   GcpLogExporter,
+  ensureGcpExporterDependenciesAvailable,
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -121,6 +122,28 @@ export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
   } else {
     telemetryBuffer.push(fn);
   }
+}
+
+function unregisterTelemetryEventListeners(): void {
+  if (authListener) {
+    authEvents.off('post_auth', authListener);
+    authListener = undefined;
+  }
+  if (keychainAvailabilityListener) {
+    coreEvents.off(
+      CoreEvent.TelemetryKeychainAvailability,
+      keychainAvailabilityListener,
+    );
+    keychainAvailabilityListener = undefined;
+  }
+  if (tokenStorageTypeListener) {
+    coreEvents.off(
+      CoreEvent.TelemetryTokenStorageType,
+      tokenStorageTypeListener,
+    );
+    tokenStorageTypeListener = undefined;
+  }
+  callbackRegistered = false;
 }
 
 async function flushTelemetryBuffer(): Promise<void> {
@@ -272,6 +295,19 @@ export async function initializeTelemetry(
       'using',
       credentials ? 'provided credentials' : 'ADC',
     );
+    try {
+      await ensureGcpExporterDependenciesAvailable();
+    } catch (error) {
+      debugLogger.error(
+        'Direct GCP telemetry exporters are unavailable. ' +
+          'Install the optional Google Cloud exporter peer dependencies ' +
+          'or enable telemetry.useCollector to export through an OTLP collector.',
+        error,
+      );
+      unregisterTelemetryEventListeners();
+      return;
+    }
+
     spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
     logExporter = new GcpLogExporter(gcpProjectId, credentials);
     metricReader = new PeriodicExportingMetricReader({
@@ -439,25 +475,7 @@ export async function shutdownTelemetry(
     metrics.disable();
     propagation.disable();
     diag.disable();
-    if (authListener) {
-      authEvents.off('post_auth', authListener);
-      authListener = undefined;
-    }
-    if (keychainAvailabilityListener) {
-      coreEvents.off(
-        CoreEvent.TelemetryKeychainAvailability,
-        keychainAvailabilityListener,
-      );
-      keychainAvailabilityListener = undefined;
-    }
-    if (tokenStorageTypeListener) {
-      coreEvents.off(
-        CoreEvent.TelemetryTokenStorageType,
-        tokenStorageTypeListener,
-      );
-      tokenStorageTypeListener = undefined;
-    }
-    callbackRegistered = false;
+    unregisterTelemetryEventListeners();
     activeTelemetryEmail = undefined;
   }
 }

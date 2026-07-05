@@ -25,9 +25,6 @@
   "dependencies": {
     "@a2a-js/sdk": "0.3.11",
     "@bufbuild/protobuf": "2.11.0",
-    "@google-cloud/logging": "11.2.1",
-    "@google-cloud/opentelemetry-cloud-monitoring-exporter": "0.21.0",
-    "@google-cloud/opentelemetry-cloud-trace-exporter": "3.0.0",
     "@google/genai": "1.30.0",
     "@grpc/grpc-js": "1.14.3",
     "@iarna/toml": "2.2.5",
@@ -93,6 +90,22 @@
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.1"
   },
+  "peerDependencies": {
+    "@google-cloud/logging": "^11.2.1",
+    "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
+    "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@google-cloud/logging": {
+      "optional": true
+    },
+    "@google-cloud/opentelemetry-cloud-monitoring-exporter": {
+      "optional": true
+    },
+    "@google-cloud/opentelemetry-cloud-trace-exporter": {
+      "optional": true
+    }
+  },
   "optionalDependencies": {
     "@github/keytar": "7.10.6",
     "@lydell/node-pty": "1.1.0",
@@ -105,6 +118,9 @@
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
+    "@google-cloud/logging": "11.2.1",
+    "@google-cloud/opentelemetry-cloud-monitoring-exporter": "0.21.0",
+    "@google-cloud/opentelemetry-cloud-trace-exporter": "3.0.0",
     "@types/fast-levenshtein": "0.0.4",
     "@types/js-yaml": "4.0.9",
     "@types/json-stable-stringify": "1.1.0",

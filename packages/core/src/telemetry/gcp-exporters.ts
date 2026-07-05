@@ -4,10 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type JWTInput } from 'google-auth-library';
-import { TraceExporter } from '@google-cloud/opentelemetry-cloud-trace-exporter';
-import { MetricExporter } from '@google-cloud/opentelemetry-cloud-monitoring-exporter';
-import { Logging, type Log } from '@google-cloud/logging';
+import type { JWTInput } from 'google-auth-library';
+import type { TraceExporter as CloudTraceExporter } from '@google-cloud/opentelemetry-cloud-trace-exporter';
+import type { MetricExporter as CloudMetricExporter } from '@google-cloud/opentelemetry-cloud-monitoring-exporter';
+import type {
+  Logging as CloudLogging,
+  Log as CloudLog,
+} from '@google-cloud/logging';
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type {
+  PushMetricExporter,
+  ResourceMetrics,
+} from '@opentelemetry/sdk-metrics';
 import {
   hrTimeToMilliseconds,
   ExportResultCode,
@@ -17,58 +25,178 @@ import type {
   ReadableLogRecord,
   LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
-import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
+
+const DIRECT_GCP_TELEMETRY_INSTALL_HINT =
+  'Direct GCP telemetry export requires optional peer dependencies. ' +
+  'Install @google-cloud/opentelemetry-cloud-trace-exporter, ' +
+  '@google-cloud/opentelemetry-cloud-monitoring-exporter, and ' +
+  '@google-cloud/logging, or configure telemetry to use an OTLP collector.';
+
+let traceExporterClassPromise: Promise<typeof CloudTraceExporter> | undefined;
+let metricExporterClassPromise: Promise<typeof CloudMetricExporter> | undefined;
+let loggingClassPromise: Promise<typeof CloudLogging> | undefined;
+
+function createOptionalDependencyError(error: unknown): Error {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  return new Error(`${DIRECT_GCP_TELEMETRY_INSTALL_HINT} ${errorMessage}`);
+}
+
+async function loadTraceExporterClass(): Promise<typeof CloudTraceExporter> {
+  traceExporterClassPromise ??= import(
+    '@google-cloud/opentelemetry-cloud-trace-exporter'
+  )
+    .then((module) => module.TraceExporter)
+    .catch((error: unknown) => {
+      traceExporterClassPromise = undefined;
+      throw createOptionalDependencyError(error);
+    });
+  return traceExporterClassPromise;
+}
+
+async function loadMetricExporterClass(): Promise<typeof CloudMetricExporter> {
+  metricExporterClassPromise ??= import(
+    '@google-cloud/opentelemetry-cloud-monitoring-exporter'
+  )
+    .then((module) => module.MetricExporter)
+    .catch((error: unknown) => {
+      metricExporterClassPromise = undefined;
+      throw createOptionalDependencyError(error);
+    });
+  return metricExporterClassPromise;
+}
+
+async function loadLoggingClass(): Promise<typeof CloudLogging> {
+  loggingClassPromise ??= import('@google-cloud/logging')
+    .then((module) => module.Logging)
+    .catch((error: unknown) => {
+      loggingClassPromise = undefined;
+      throw createOptionalDependencyError(error);
+    });
+  return loggingClassPromise;
+}
+
+export async function ensureGcpExporterDependenciesAvailable(): Promise<void> {
+  await Promise.all([
+    loadTraceExporterClass(),
+    loadMetricExporterClass(),
+    loadLoggingClass(),
+  ]);
+}
 
 /**
- * Google Cloud Trace exporter that extends the official trace exporter
+ * Google Cloud Trace exporter that delegates to the optional Cloud Trace exporter.
  */
-export class GcpTraceExporter extends TraceExporter {
+export class GcpTraceExporter implements SpanExporter {
+  private exporterPromise: Promise<CloudTraceExporter> | undefined;
+
   constructor(projectId?: string, credentials?: JWTInput) {
-    super({
-      projectId,
-      credentials,
-      resourceFilter: /^gcp\./,
-    });
+    this.projectId = projectId;
+    this.credentials = credentials;
+  }
+
+  private readonly projectId?: string;
+  private readonly credentials?: JWTInput;
+
+  private getExporter(): Promise<CloudTraceExporter> {
+    this.exporterPromise ??= loadTraceExporterClass().then(
+      (TraceExporter) =>
+        new TraceExporter({
+          projectId: this.projectId,
+          credentials: this.credentials,
+          resourceFilter: /^gcp\./,
+        }),
+    );
+    return this.exporterPromise;
+  }
+
+  export(
+    spans: ReadableSpan[],
+    resultCallback: (result: ExportResult) => void,
+  ): void {
+    void this.getExporter()
+      .then((exporter) => exporter.export(spans, resultCallback))
+      .catch((error: Error) => {
+        resultCallback({ code: ExportResultCode.FAILED, error });
+      });
   }
 
   async forceFlush(): Promise<void> {
     return Promise.resolve();
   }
+
+  async shutdown(): Promise<void> {
+    await this.getExporter().then((exporter) => exporter.shutdown());
+  }
 }
 
 /**
- * Google Cloud Monitoring exporter that extends the official metrics exporter
+ * Google Cloud Monitoring exporter that delegates to the optional Monitoring exporter.
  */
-export class GcpMetricExporter extends MetricExporter {
+export class GcpMetricExporter implements PushMetricExporter {
+  private exporterPromise: Promise<CloudMetricExporter> | undefined;
+
   constructor(projectId?: string, credentials?: JWTInput) {
-    super({
-      projectId,
-      credentials,
-      prefix: 'custom.googleapis.com/gemini_cli',
-    });
+    this.projectId = projectId;
+    this.credentials = credentials;
   }
 
-  override export(
+  private readonly projectId?: string;
+  private readonly credentials?: JWTInput;
+
+  private getExporter(): Promise<CloudMetricExporter> {
+    this.exporterPromise ??= loadMetricExporterClass().then(
+      (MetricExporter) =>
+        new MetricExporter({
+          projectId: this.projectId,
+          credentials: this.credentials,
+          prefix: 'custom.googleapis.com/gemini_cli',
+        }),
+    );
+    return this.exporterPromise;
+  }
+
+  private handleExportResult(
+    result: ExportResult,
+    resultCallback: (result: ExportResult) => void,
+  ): void {
+    if (result.code === ExportResultCode.FAILED && result.error) {
+      // Suppress errors related to writing too frequently, as they are
+      // expected when the CLI shuts down quickly after a periodic export.
+      const errorMessage = result.error.message || String(result.error);
+      if (
+        process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true' &&
+        errorMessage.includes(
+          'written more frequently than the maximum sampling period',
+        )
+      ) {
+        resultCallback({ code: ExportResultCode.SUCCESS });
+        return;
+      }
+    }
+    resultCallback(result);
+  }
+
+  export(
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
   ): void {
-    super.export(metrics, (result: ExportResult) => {
-      if (result.code === ExportResultCode.FAILED && result.error) {
-        // Suppress errors related to writing too frequently, as they are
-        // expected when the CLI shuts down quickly after a periodic export.
-        const errorMessage = result.error.message || String(result.error);
-        if (
-          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true' &&
-          errorMessage.includes(
-            'written more frequently than the maximum sampling period',
-          )
-        ) {
-          resultCallback({ code: ExportResultCode.SUCCESS });
-          return;
-        }
-      }
-      resultCallback(result);
-    });
+    void this.getExporter()
+      .then((exporter) => {
+        exporter.export(metrics, (result: ExportResult) => {
+          this.handleExportResult(result, resultCallback);
+        });
+      })
+      .catch((error: Error) => {
+        resultCallback({ code: ExportResultCode.FAILED, error });
+      });
+  }
+
+  async forceFlush(): Promise<void> {
+    await this.getExporter().then((exporter) => exporter.forceFlush());
+  }
+
+  async shutdown(): Promise<void> {
+    await this.getExporter().then((exporter) => exporter.shutdown());
   }
 }
 
@@ -96,16 +224,31 @@ function truncateLogPayload(payload: unknown, limit = 200000): unknown {
 }
 
 /**
- * Google Cloud Logging exporter that uses the Cloud Logging client
+ * Google Cloud Logging exporter that delegates to the optional Cloud Logging client.
  */
 export class GcpLogExporter implements LogRecordExporter {
-  private logging: Logging;
-  private log: Log;
+  private loggingPromise:
+    | Promise<{ logging: CloudLogging; log: CloudLog }>
+    | undefined;
   private pendingWrites: Array<Promise<void>> = [];
 
   constructor(projectId?: string, credentials?: JWTInput) {
-    this.logging = new Logging({ projectId, credentials });
-    this.log = this.logging.log('gemini_cli');
+    this.projectId = projectId;
+    this.credentials = credentials;
+  }
+
+  private readonly projectId?: string;
+  private readonly credentials?: JWTInput;
+
+  private getLogging(): Promise<{ logging: CloudLogging; log: CloudLog }> {
+    this.loggingPromise ??= loadLoggingClass().then((Logging) => {
+      const logging = new Logging({
+        projectId: this.projectId,
+        credentials: this.credentials,
+      });
+      return { logging, log: logging.log('gemini_cli') };
+    });
+    return this.loggingPromise;
   }
 
   export(
@@ -113,65 +256,87 @@ export class GcpLogExporter implements LogRecordExporter {
     resultCallback: (result: ExportResult) => void,
   ): void {
     try {
-      const entries = logs.map((log) => {
-        const rawPayload = {
-          ...log.attributes,
-          ...log.resource?.attributes,
-          message: log.body,
-        };
+      const writePromise = this.getLogging()
+        .then(({ logging, log }) => {
+          try {
+            const entries = logs.map((logRecord) => {
+              const rawPayload = {
+                ...logRecord.attributes,
+                ...logRecord.resource?.attributes,
+                message: logRecord.body,
+              };
 
-        const isStrictTelemetry =
-          process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
+              const isStrictTelemetry =
+                process.env['GEMINI_STRICT_TELEMETRY_LIMITS'] === 'true';
 
-        let finalPayload: unknown = rawPayload;
+              let finalPayload: unknown = rawPayload;
 
-        if (isStrictTelemetry) {
-          // Enforce a strict cap on the entire payload to avoid 256KB limit crashes in CI.
-          let safePayload = truncateLogPayload(rawPayload, 10000);
-          let payloadString = JSON.stringify(safePayload);
+              if (isStrictTelemetry) {
+                // Enforce a strict cap on the entire payload to avoid 256KB limit crashes in CI.
+                let safePayload = truncateLogPayload(rawPayload, 10000);
+                let payloadString = JSON.stringify(safePayload);
 
-          if (payloadString && payloadString.length > 100000) {
-            // If still too large, apply a stricter limit
-            safePayload = truncateLogPayload(rawPayload, 2000);
-            payloadString = JSON.stringify(safePayload);
+                if (payloadString && payloadString.length > 100000) {
+                  // If still too large, apply a stricter limit
+                  safePayload = truncateLogPayload(rawPayload, 2000);
+                  payloadString = JSON.stringify(safePayload);
 
-            if (payloadString && payloadString.length > 100000) {
-              safePayload = truncateLogPayload(rawPayload, 5000);
-              payloadString = JSON.stringify(safePayload);
+                  if (payloadString && payloadString.length > 100000) {
+                    safePayload = truncateLogPayload(rawPayload, 5000);
+                    payloadString = JSON.stringify(safePayload);
 
-              if (payloadString && payloadString.length > 100000) {
-                // Fallback: strip structure and send a truncated raw string
-                safePayload = {
-                  _warning: 'Payload heavily truncated due to strict limits',
-                  data: payloadString.substring(0, 50000) + '... (truncated)',
-                };
+                    if (payloadString && payloadString.length > 100000) {
+                      // Fallback: strip structure and send a truncated raw string
+                      safePayload = {
+                        _warning:
+                          'Payload heavily truncated due to strict limits',
+                        data:
+                          payloadString.substring(0, 50000) + '... (truncated)',
+                      };
+                    }
+                  }
+                }
+                finalPayload = safePayload;
               }
-            }
+
+              const entry = log.entry(
+                {
+                  severity: this.mapSeverityToCloudLogging(
+                    logRecord.severityNumber,
+                  ),
+                  timestamp: new Date(hrTimeToMilliseconds(logRecord.hrTime)),
+                  resource: {
+                    type: 'global',
+                    labels: {
+                      project_id: logging.projectId,
+                    },
+                  },
+                },
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                finalPayload as Record<string, unknown>,
+              );
+              return entry;
+            });
+
+            return log
+              .write(entries)
+              .then(() => {
+                resultCallback({ code: ExportResultCode.SUCCESS });
+              })
+              .catch((error: Error) => {
+                resultCallback({
+                  code: ExportResultCode.FAILED,
+                  error,
+                });
+              });
+          } catch (error) {
+            resultCallback({
+              code: ExportResultCode.FAILED,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              error: error as Error,
+            });
+            return undefined;
           }
-          finalPayload = safePayload;
-        }
-
-        const entry = this.log.entry(
-          {
-            severity: this.mapSeverityToCloudLogging(log.severityNumber),
-            timestamp: new Date(hrTimeToMilliseconds(log.hrTime)),
-            resource: {
-              type: 'global',
-              labels: {
-                project_id: this.logging.projectId,
-              },
-            },
-          },
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          finalPayload as Record<string, unknown>,
-        );
-        return entry;
-      });
-
-      const writePromise = this.log
-        .write(entries)
-        .then(() => {
-          resultCallback({ code: ExportResultCode.SUCCESS });
         })
         .catch((error: Error) => {
           resultCallback({
