@@ -562,6 +562,8 @@ export function isTrustedSystemPath(filePath: string): boolean {
       '/usr/local/Cellar',
       '/usr/sbin',
       '/sbin',
+      // Nix package manager (NixOS, nix-darwin, devenv)
+      '/nix/store',
       // 1P internal hermetic execution paths
       '/google/bin',
       '/google/src/cloud',
