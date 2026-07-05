@@ -12,6 +12,30 @@ export type ParsedSlashCommand = {
   canonicalPath: string[];
 };
 
+const commandMapCache = new WeakMap<
+  readonly SlashCommand[],
+  Map<string, SlashCommand>
+>();
+
+function getCommandMap(
+  commands: readonly SlashCommand[],
+): Map<string, SlashCommand> {
+  let map = commandMapCache.get(commands);
+  if (!map) {
+    map = new Map();
+    for (const cmd of commands) {
+      map.set(cmd.name, cmd);
+      if (cmd.altNames) {
+        for (const alt of cmd.altNames) {
+          map.set(alt, cmd);
+        }
+      }
+    }
+    commandMapCache.set(commands, map);
+  }
+  return map;
+}
+
 /**
  * Parses a raw slash command string into its command, arguments, and canonical path.
  * If no valid command is found, the `commandToExecute` property will be `undefined`.
@@ -36,21 +60,8 @@ export const parseSlashCommand = (
   let parentCommand: SlashCommand | undefined;
 
   for (const part of commandPath) {
-    // TODO: For better performance and architectural clarity, this two-pass
-    // search could be replaced. A more optimal approach would be to
-    // pre-compute a single lookup map in `CommandService.ts` that resolves
-    // all name and alias conflicts during the initial loading phase. The
-    // processor would then perform a single, fast lookup on that map.
-
-    // First pass: check for an exact match on the primary command name.
-    let foundCommand = currentCommands.find((cmd) => cmd.name === part);
-
-    // Second pass: if no primary name matches, check for an alias.
-    if (!foundCommand) {
-      foundCommand = currentCommands.find((cmd) =>
-        cmd.altNames?.includes(part),
-      );
-    }
+    const commandMap = getCommandMap(currentCommands);
+    const foundCommand = commandMap.get(part);
 
     if (foundCommand) {
       parentCommand = commandToExecute;
