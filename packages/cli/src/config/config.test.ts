@@ -2179,7 +2179,7 @@ describe('loadCliConfig context management', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when generalistProfile / context management is not set in settings', async () => {
+  it('should be false by default when context management is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings();
