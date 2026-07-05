@@ -24,10 +24,16 @@ function getCommandMap(
   if (!map) {
     map = new Map();
     for (const cmd of commands) {
-      map.set(cmd.name, cmd);
+      if (!map.has(cmd.name)) {
+        map.set(cmd.name, cmd);
+      }
+    }
+    for (const cmd of commands) {
       if (cmd.altNames) {
         for (const alt of cmd.altNames) {
-          map.set(alt, cmd);
+          if (!map.has(alt)) {
+            map.set(alt, cmd);
+          }
         }
       }
     }
