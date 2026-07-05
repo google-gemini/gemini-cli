@@ -72,7 +72,7 @@ export async function initializeContextManager(
   });
 
   const sidecarProfile = await loadContextManagementConfig(
-    config.getExperimentalContextManagementConfig(),
+    undefined,
     registry,
   );
 

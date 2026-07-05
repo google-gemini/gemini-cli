@@ -2439,25 +2439,7 @@ const SETTINGS_SCHEMA = {
           'Automatically extract memory patches and skills from past sessions in the background. Every change is written as a unified diff `.patch` file under `<projectMemoryDir>/.inbox/<kind>/` and held for review in /memory inbox; nothing is applied until you approve it.',
         showInDialog: true,
       },
-      generalistProfile: {
-        type: 'boolean',
-        label: 'Use the generalist profile to manage agent contexts.',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Suitable for general coding and software development tasks.',
-        showInDialog: true,
-      },
-      powerUserProfile: {
-        type: 'boolean',
-        label: 'Use the power user profile to manage agent contexts.',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Less cache friendly version of the generalist profile.',
-        showInDialog: false,
-      },
+
       contextManagement: {
         type: 'boolean',
         label: 'Enable Context Management',
