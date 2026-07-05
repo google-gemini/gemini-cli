@@ -938,21 +938,8 @@ export async function loadCliConfig(
     clientName = 'tui';
   }
 
-  // TODO(joshualitt): Clean this up alongside removal of the legacy config.
-  let profileSelector: string | undefined = undefined;
-  if (settings.experimental?.stressTestProfile) {
-    profileSelector = 'stressTestProfile';
-  } else if (settings.experimental?.powerUserProfile) {
-    profileSelector = 'powerUserProfile';
-  } else if (
-    settings.experimental?.generalistProfile ||
-    settings.experimental?.contextManagement
-  ) {
-    profileSelector = 'generalistProfile';
-  }
-
   const contextManagement = {
-    enabled: !!profileSelector,
+    enabled: !!settings.experimental?.contextManagement,
   };
 
   return new Config({
@@ -976,7 +963,6 @@ export async function loadCliConfig(
     worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
-    experimentalContextManagementConfig: profileSelector,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     policyUpdateConfirmationRequest,
