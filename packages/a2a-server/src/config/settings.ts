@@ -22,16 +22,15 @@ import stripJsonComments from 'strip-json-comments';
 export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-// TODO: Ensure full compatibility with V2 nested settings structure (settings.schema.json).
-// This involves updating the interface and implementing migration logic to support legacy V1 (flat) settings,
-// similar to how packages/cli/src/config/settings.ts handles it.
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
-  tools?: {
-    allowed?: string[];
-    exclude?: string[];
-    core?: string[];
-  };
+  tools?:
+    | string[]
+    | {
+        allowed?: string[];
+        exclude?: string[];
+        core?: string[];
+      };
   telemetry?: TelemetrySettings;
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
@@ -152,7 +151,26 @@ export function loadSettings(
   mergedSettings.policyPaths = userSettings.policyPaths;
   mergedSettings.adminPolicyPaths = userSettings.adminPolicyPaths;
 
+  migrateDeprecatedSettings(mergedSettings);
+
   return mergedSettings;
+}
+
+function migrateDeprecatedSettings(settings: Settings): void {
+  // Migrate legacy tools flat array to tools.allowed
+  if (Array.isArray(settings.tools)) {
+    settings.tools = {
+      allowed: settings.tools,
+    };
+  } else if (
+    settings.tools &&
+    typeof settings.tools === 'object' &&
+    !Array.isArray(settings.tools)
+  ) {
+    // Also remove deprecated 'approvalMode' if it somehow leaked from cli settings
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    delete (settings.tools as Record<string, unknown>)['approvalMode'];
+  }
 }
 
 function resolveEnvVarsInString(value: string): string {

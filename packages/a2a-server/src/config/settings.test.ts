@@ -116,6 +116,18 @@ describe('loadSettings', () => {
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
   });
 
+  it('should migrate legacy tools flat array to tools.allowed', () => {
+    const settings = {
+      tools: ['tool1', 'tool2'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.tools).toEqual({
+      allowed: ['tool1', 'tool2'],
+    });
+  });
+
   it('should load experimental settings correctly', () => {
     const settings = {
       experimental: {
