@@ -20,7 +20,10 @@ describe('pathCorrector', () => {
   let mockConfig: Config;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'path-corrector-test-'));
+    const rawTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'path-corrector-test-'),
+    );
+    tempDir = fs.realpathSync(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     otherWorkspaceDir = path.join(tempDir, 'other');
     fs.mkdirSync(rootDir, { recursive: true });

@@ -6,6 +6,11 @@
 
 import path from 'node:path';
 import * as ts from 'typescript';
+import {
+  ALL_BUILTIN_TOOL_NAMES,
+  isValidToolName,
+} from '@google/gemini-cli-core';
+import { buildToolRegistry } from './tool-registry.js';
 
 export const BASE_EVAL_HELPERS = [
   'evalTest',
@@ -45,6 +50,7 @@ export interface EvalCaseRecord {
   timeout?: number;
   hasFiles: boolean;
   hasPrompt: boolean;
+  toolReferences: readonly string[];
   location: EvalSourceLocation;
 }
 
@@ -53,6 +59,7 @@ export interface EvalFileAnalysis {
   relativePath: string;
   helpers: Record<string, BaseEvalHelper | 'unknown'>;
   cases: readonly EvalCaseRecord[];
+  toolReferences: readonly string[];
   diagnostics: readonly EvalAnalysisDiagnostic[];
 }
 
@@ -76,6 +83,7 @@ export function analyzeEvalSource(
   );
 
   const helpers = collectHelperMappings(sourceFile);
+  const importedConstants = collectImportedToolNameConstants(sourceFile);
   const diagnostics: EvalAnalysisDiagnostic[] = [];
   const cases: EvalCaseRecord[] = [];
 
@@ -118,6 +126,30 @@ export function analyzeEvalSource(
       });
     }
 
+    const assertProp = getPropertyAssignment(evalCase, 'assert');
+    const assertBody = assertProp
+      ? getFunctionBody(assertProp.initializer)
+      : undefined;
+    const toolRefsInfo = assertBody
+      ? collectToolReferences(assertBody, importedConstants)
+      : [];
+
+    const toolRefs: string[] = [];
+    const registry = buildToolRegistry();
+
+    for (const { name: resolvedName, node } of toolRefsInfo) {
+      const canonicalName = registry.aliasLookup.get(resolvedName);
+      if (!canonicalName && !isValidToolName(resolvedName)) {
+        diagnostics.push({
+          severity: 'warning',
+          message: `Unrecognized tool name extracted: "${resolvedName}"`,
+          filePath,
+          location: getLocation(sourceFile, node),
+        });
+      }
+      toolRefs.push(canonicalName ?? resolvedName);
+    }
+
     cases.push({
       filePath,
       relativePath,
@@ -130,17 +162,23 @@ export function analyzeEvalSource(
       timeout: getStaticNumberProperty(evalCase, 'timeout'),
       hasFiles: hasProperty(evalCase, 'files'),
       hasPrompt: hasProperty(evalCase, 'prompt'),
+      toolReferences: Object.freeze([...new Set(toolRefs)].sort()),
       location: getLocation(sourceFile, callExpression),
     });
   });
 
   cases.sort(compareEvalCases);
 
+  const fileToolRefs = [
+    ...new Set(cases.flatMap((c) => [...c.toolReferences])),
+  ].sort();
+
   return {
     filePath,
     relativePath,
     helpers,
     cases,
+    toolReferences: Object.freeze(fileToolRefs),
     diagnostics: diagnostics.sort(compareDiagnostics),
   };
 }
@@ -438,4 +476,205 @@ function compareDiagnostics(
 
 function compareStrings(left: string, right: string) {
   return left.localeCompare(right, 'en');
+}
+
+const TOOL_NAME_TO_CONSTANT: Record<
+  (typeof ALL_BUILTIN_TOOL_NAMES)[number],
+  keyof typeof import('@google/gemini-cli-core')
+> = {
+  glob: 'GLOB_TOOL_NAME',
+  grep_search: 'GREP_TOOL_NAME',
+  list_directory: 'LS_TOOL_NAME',
+  read_file: 'READ_FILE_TOOL_NAME',
+  run_shell_command: 'SHELL_TOOL_NAME',
+  write_file: 'WRITE_FILE_TOOL_NAME',
+  replace: 'EDIT_TOOL_NAME',
+  google_web_search: 'WEB_SEARCH_TOOL_NAME',
+  write_todos: 'WRITE_TODOS_TOOL_NAME',
+  web_fetch: 'WEB_FETCH_TOOL_NAME',
+  read_many_files: 'READ_MANY_FILES_TOOL_NAME',
+  get_internal_docs: 'GET_INTERNAL_DOCS_TOOL_NAME',
+  activate_skill: 'ACTIVATE_SKILL_TOOL_NAME',
+  ask_user: 'ASK_USER_TOOL_NAME',
+  exit_plan_mode: 'EXIT_PLAN_MODE_TOOL_NAME',
+  enter_plan_mode: 'ENTER_PLAN_MODE_TOOL_NAME',
+  update_topic: 'UPDATE_TOPIC_TOOL_NAME',
+  complete_task: 'COMPLETE_TASK_TOOL_NAME',
+  read_mcp_resource: 'READ_MCP_RESOURCE_TOOL_NAME',
+  list_mcp_resources: 'LIST_MCP_RESOURCES_TOOL_NAME',
+  tracker_create_task: 'TRACKER_CREATE_TASK_TOOL_NAME',
+  tracker_update_task: 'TRACKER_UPDATE_TASK_TOOL_NAME',
+  tracker_get_task: 'TRACKER_GET_TASK_TOOL_NAME',
+  tracker_list_tasks: 'TRACKER_LIST_TASKS_TOOL_NAME',
+  tracker_add_dependency: 'TRACKER_ADD_DEPENDENCY_TOOL_NAME',
+  tracker_visualize: 'TRACKER_VISUALIZE_TOOL_NAME',
+  invoke_agent: 'AGENT_TOOL_NAME',
+};
+
+const WELL_KNOWN_TOOL_CONSTANTS: Record<
+  string,
+  (typeof ALL_BUILTIN_TOOL_NAMES)[number]
+> = Object.fromEntries(
+  Object.entries(TOOL_NAME_TO_CONSTANT).map(([toolName, constantName]) => [
+    constantName,
+    toolName as (typeof ALL_BUILTIN_TOOL_NAMES)[number],
+  ]),
+);
+
+function collectImportedToolNameConstants(
+  sourceFile: ts.SourceFile,
+): Map<string, string> {
+  const constants = new Map<string, string>();
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause?.namedBindings ||
+      !ts.isNamedImports(statement.importClause.namedBindings) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== '@google/gemini-cli-core'
+    ) {
+      continue;
+    }
+
+    for (const element of statement.importClause.namedBindings.elements) {
+      const importedName = element.propertyName?.text ?? element.name.text;
+      const localName = element.name.text;
+      const resolvedValue = WELL_KNOWN_TOOL_CONSTANTS[importedName];
+      if (resolvedValue !== undefined) {
+        constants.set(localName, resolvedValue);
+      }
+    }
+  }
+
+  return constants;
+}
+
+function getFunctionBody(
+  node: ts.Expression,
+): ts.ConciseBody | ts.Block | undefined {
+  if (ts.isArrowFunction(node)) {
+    return node.body;
+  }
+  if (ts.isFunctionExpression(node)) {
+    return node.body;
+  }
+  return undefined;
+}
+
+function collectToolReferences(
+  body: ts.ConciseBody | ts.Block,
+  importedConstants: Map<string, string>,
+): { name: string; node: ts.Node }[] {
+  const refs: { name: string; node: ts.Node }[] = [];
+
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      extractFromWaitForToolCall(node, importedConstants, refs);
+      extractFromArrayIncludes(node, importedConstants, refs);
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      extractFromToolRequestNameComparison(node, importedConstants, refs);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(body);
+  return refs;
+}
+
+function extractFromWaitForToolCall(
+  call: ts.CallExpression,
+  importedConstants: Map<string, string>,
+  refs: { name: string; node: ts.Node }[],
+) {
+  const expr = call.expression;
+  if (
+    !ts.isPropertyAccessExpression(expr) ||
+    expr.name.text !== 'waitForToolCall'
+  ) {
+    return;
+  }
+  const firstArg = call.arguments[0];
+  if (!firstArg) {
+    return;
+  }
+  const resolved = resolveStringValue(firstArg, importedConstants);
+  if (resolved) {
+    refs.push({ name: resolved, node: firstArg });
+  }
+}
+
+function isToolRequestName(node: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'name' &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'toolRequest'
+  );
+}
+
+function extractFromToolRequestNameComparison(
+  binary: ts.BinaryExpression,
+  importedConstants: Map<string, string>,
+  refs: { name: string; node: ts.Node }[],
+) {
+  let valueNode: ts.Expression | undefined;
+  if (isToolRequestName(binary.left)) {
+    valueNode = binary.right;
+  } else if (isToolRequestName(binary.right)) {
+    valueNode = binary.left;
+  }
+
+  if (valueNode) {
+    const resolved = resolveStringValue(valueNode, importedConstants);
+    if (resolved) {
+      refs.push({ name: resolved, node: valueNode });
+    }
+  }
+}
+
+function extractFromArrayIncludes(
+  call: ts.CallExpression,
+  importedConstants: Map<string, string>,
+  refs: { name: string; node: ts.Node }[],
+) {
+  const expr = call.expression;
+  if (!ts.isPropertyAccessExpression(expr) || expr.name.text !== 'includes') {
+    return;
+  }
+
+  const firstArg = call.arguments[0];
+  if (!firstArg || !isToolRequestName(firstArg)) {
+    return;
+  }
+
+  const arrayExpr = expr.expression;
+  if (!ts.isArrayLiteralExpression(arrayExpr)) {
+    return;
+  }
+
+  for (const element of arrayExpr.elements) {
+    const resolved = resolveStringValue(element, importedConstants);
+    if (resolved) {
+      refs.push({ name: resolved, node: element });
+    }
+  }
+}
+
+function resolveStringValue(
+  node: ts.Expression,
+  importedConstants: Map<string, string>,
+): string | undefined {
+  const literal = getStringLiteralValue(node);
+  if (literal !== undefined) {
+    return literal;
+  }
+  if (ts.isIdentifier(node)) {
+    return importedConstants.get(node.text);
+  }
+  return undefined;
 }
