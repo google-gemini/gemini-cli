@@ -6,7 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
+
+vi.mock('./actions/github.js', () => ({
+  handleEgressEvent: vi.fn(),
+}));
+
 import { app } from './app.js';
+import { handleEgressEvent } from './actions/github.js';
 
 /**
  * Helper function simulating GCP Cloud Pub/Sub HTTP Push message wrapper.
@@ -63,7 +69,7 @@ describe('Egress Service App Router', () => {
     expect(res.text).toContain('Malformed payload');
   });
 
-  it('POST / should trigger handleEgressEvent stub and return 200 for valid payloads', async () => {
+  it('POST / should trigger handleEgressEvent handler and return 200 for valid payloads', async () => {
     const validEvent = {
       action: 'COMMENT',
       payload: {
@@ -80,5 +86,6 @@ describe('Egress Service App Router', () => {
 
     expect(res.status).toBe(200);
     expect(res.text).toBe('OK');
+    expect(handleEgressEvent).toHaveBeenCalledWith(validEvent);
   });
 });
