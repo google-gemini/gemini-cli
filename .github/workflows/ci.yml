@@ -355,7 +355,7 @@ jobs:
           languages: 'javascript'
 
       - name: 'Perform CodeQL Analysis'
-        uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
+        uses: 'github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a' # ratchet:github/codeql-action/analyze@v3
 
   # Check for changes in bundle size.
   bundle_size:
