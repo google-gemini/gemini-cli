@@ -58,7 +58,7 @@ jobs:
 
       - name: 'Set up Docker'
         if: "matrix.sandbox == 'sandbox:docker'"
-        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+        uses: 'docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c' # ratchet:docker/setup-buildx-action@v3
 
       - name: 'Run E2E tests'
         env:
