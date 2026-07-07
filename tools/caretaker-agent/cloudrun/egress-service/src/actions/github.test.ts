@@ -9,8 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
 
-vi.mock('@octokit/rest', () => {
-  return {
+vi.mock('@octokit/rest', () => ({
     Octokit: vi.fn().mockImplementation(() => ({
       rest: {
         issues: {
@@ -19,8 +18,7 @@ vi.mock('@octokit/rest', () => {
         },
       },
     })),
-  };
-});
+  }));
 
 vi.mock('@octokit/auth-app', () => ({
   createAppAuth: vi.fn(),
@@ -35,6 +33,8 @@ describe('GitHub Actions Handler', () => {
     vi.stubEnv('GH_APP_ID', '12345');
     vi.stubEnv('GH_PRIVATE_KEY', 'test-key');
     vi.stubEnv('GH_INSTALLATION_ID', '67890');
+    vi.stubEnv('ALLOWED_OWNER', 'google-gemini');
+    vi.stubEnv('ALLOWED_REPO', 'gemini-cli');
     const mod = await import('./github.js');
     handleEgressEvent = mod.handleEgressEvent;
   });
@@ -43,12 +43,33 @@ describe('GitHub Actions Handler', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should throw an error for unauthorized repository target', async () => {
+    await expect(
+      handleEgressEvent({
+        action: 'COMMENT',
+        payload: {
+          owner: 'unauthorized-org',
+          repo: 'other-repo',
+          issueNumber: 1,
+          commentBody: 'hi',
+        },
+      }),
+    ).rejects.toThrow(
+      /Unauthorized repository target: unauthorized-org\/other-repo/,
+    );
+  });
+
   it('should throw an error if environment variables are missing', async () => {
     vi.stubEnv('GH_APP_ID', '');
     await expect(
       handleEgressEvent({
         action: 'COMMENT',
-        payload: { owner: 'o', repo: 'r', issueNumber: 1, commentBody: 'hi' },
+        payload: {
+          owner: 'google-gemini',
+          repo: 'gemini-cli',
+          issueNumber: 1,
+          commentBody: 'hi',
+        },
       }),
     ).rejects.toThrow(/Missing required environment variable: GH_APP_ID/);
   });
@@ -57,7 +78,12 @@ describe('GitHub Actions Handler', () => {
     await expect(
       handleEgressEvent({
         action: 'COMMENT',
-        payload: { owner: 'o', repo: 'r', issueNumber: 1, commentBody: '   ' },
+        payload: {
+          owner: 'google-gemini',
+          repo: 'gemini-cli',
+          issueNumber: 1,
+          commentBody: '   ',
+        },
       }),
     ).rejects.toThrow(/Missing or empty commentBody/);
   });
@@ -67,16 +93,16 @@ describe('GitHub Actions Handler', () => {
     await handleEgressEvent({
       action: 'COMMENT',
       payload: {
-        owner: 'google',
-        repo: 'cli',
+        owner: 'google-gemini',
+        repo: 'gemini-cli',
         issueNumber: 10,
         commentBody: 'Hello world',
       },
     });
 
     expect(mockCreateComment).toHaveBeenCalledWith({
-      owner: 'google',
-      repo: 'cli',
+      owner: 'google-gemini',
+      repo: 'gemini-cli',
       issue_number: 10,
       body: 'Hello world',
     });
@@ -87,18 +113,31 @@ describe('GitHub Actions Handler', () => {
     await handleEgressEvent({
       action: 'LABEL',
       payload: {
-        owner: 'google',
-        repo: 'cli',
+        owner: 'google-gemini',
+        repo: 'gemini-cli',
         issueNumber: 10,
         labels: ['effort/small'],
       },
     });
 
     expect(mockAddLabels).toHaveBeenCalledWith({
-      owner: 'google',
-      repo: 'cli',
+      owner: 'google-gemini',
+      repo: 'gemini-cli',
       issue_number: 10,
       labels: ['effort/small'],
     });
+  });
+
+  it('should throw an error for unsupported PATCH action', async () => {
+    await expect(
+      handleEgressEvent({
+        action: 'PATCH',
+        payload: {
+          owner: 'google-gemini',
+          repo: 'gemini-cli',
+          issueNumber: 1,
+        },
+      }),
+    ).rejects.toThrow(/PATCH action is not yet implemented/);
   });
 });

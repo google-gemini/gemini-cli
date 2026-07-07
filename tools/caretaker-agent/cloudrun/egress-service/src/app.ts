@@ -23,7 +23,11 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Pub/Sub push subscription endpoint
+/**
+ * Pub/Sub push subscription endpoint.
+ * Note: Authentication is enforced by GCP Cloud Run IAM (`roles/run.invoker`)
+ * using GCP-managed OIDC bearer tokens on the Pub/Sub push subscription.
+ */
 app.post('/', async (req, res) => {
   if (!isPubSubMessageEnvelope(req.body)) {
     return res.status(400).send('Invalid Pub/Sub message envelope');

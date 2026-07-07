@@ -6,7 +6,7 @@
 
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
-import { EgressEvent } from '../types.js';
+import type { EgressEvent } from '../types.js';
 
 function getRequiredEnvVar(name: string): string {
   const value = process.env[name];
@@ -37,9 +37,20 @@ function getOctokit(): Octokit {
 }
 
 export async function handleEgressEvent(event: EgressEvent): Promise<void> {
-  const octokit = getOctokit();
   const { action, payload } = event;
   const { owner, repo, issueNumber } = payload;
+
+  const allowedOwner = getRequiredEnvVar('ALLOWED_OWNER');
+  const allowedRepo = getRequiredEnvVar('ALLOWED_REPO');
+
+  if (
+    owner.toLowerCase() !== allowedOwner.toLowerCase() ||
+    repo.toLowerCase() !== allowedRepo.toLowerCase()
+  ) {
+    throw new Error(`Unauthorized repository target: ${owner}/${repo}`);
+  }
+
+  const octokit = getOctokit();
 
   switch (action) {
     case 'COMMENT':
@@ -73,11 +84,9 @@ export async function handleEgressEvent(event: EgressEvent): Promise<void> {
       break;
 
     case 'PATCH':
-      console.log('[EGRESS] Patching action triggered (not yet implemented).');
-      break;
+      throw new Error('PATCH action is not yet implemented');
 
     default:
-      console.log(`[EGRESS] Unknown action: ${action}`);
-      break;
+      throw new Error(`Unknown or unsupported egress action: ${action}`);
   }
 }
