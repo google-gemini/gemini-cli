@@ -31,14 +31,20 @@ def main() -> None:
         print(f"[PROD] Error decoding payload: {e}")
         sys.exit(1)
     
-    issue_number = payload.get("issue_number", "unknown")
-    repository = payload.get("repository", "unknown/unknown")
-    if "/" not in repository:
-        print(
-            f"[PROD] Error: Malformed repository format '{repository}'. Exiting."
-        )
+    try:
+        issue_number = int(payload.get("issue_number"))
+    except (TypeError, ValueError):
+        print("[PROD] Error: issue_number is not a valid number. Exiting.")
         sys.exit(1)
-    owner, repo = repository.split("/")
+
+    try:
+        owner, repo = payload.get("repository", "").split("/")
+        if not owner or not repo:
+            raise ValueError
+    except (TypeError, ValueError):
+        print("[PROD] Error: Malformed repository format (expected 'owner/repo'). Exiting.")
+        sys.exit(1)
+
     lock_holder = os.environ.get("WORKFLOW_EXECUTION_ID", "local-exec")
     
     # Initialize Firestore Client & IssuesStore
@@ -63,7 +69,11 @@ def main() -> None:
         sys.exit(0)
         
     print(f"[WORKER] Starting triage for issue #{issue_number}...")
-    success, raw_output = process_issue_triage(payload)
+    try:
+        success, raw_output = process_issue_triage(payload)
+    except Exception as e:
+        print(f"[WORKER] Triage process failed with exception: {e}")
+        success, raw_output = False, ""
     
     if success:
         try:

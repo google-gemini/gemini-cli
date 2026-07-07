@@ -2,28 +2,27 @@ import os
 import json
 from google.cloud import pubsub_v1
 
-PROJECT_ID = os.environ.get("PROJECT_ID")
-EGRESS_TOPIC_ID = os.environ.get("EGRESS_TOPIC_ID")
-
-
 def _publish_egress_action(egress_event: dict) -> None:
     """
     [Internal] Publishes an EgressEvent JSON payload to Pub/Sub.
     """
-    if not PROJECT_ID or not EGRESS_TOPIC_ID:
+    project_id = os.environ.get("PROJECT_ID")
+    egress_topic_id = os.environ.get("EGRESS_TOPIC_ID")
+
+    if not project_id or not egress_topic_id:
         print(
-            f"[WORKER] Warning: Missing PROJECT_ID ({PROJECT_ID}) or "
-            f"EGRESS_TOPIC_ID ({EGRESS_TOPIC_ID}), skipping egress."
+            f"[WORKER] Warning: Missing PROJECT_ID ({project_id}) or "
+            f"EGRESS_TOPIC_ID ({egress_topic_id}), skipping egress."
         )
         return
     try:
         publisher = pubsub_v1.PublisherClient()
-        topic_path = publisher.topic_path(PROJECT_ID, EGRESS_TOPIC_ID)
+        topic_path = publisher.topic_path(project_id, egress_topic_id)
         data = json.dumps(egress_event).encode("utf-8")
         future = publisher.publish(topic_path, data)
         message_id = future.result()
         print(
-            f"[WORKER] Published egress action to Pub/Sub ({EGRESS_TOPIC_ID}). "
+            f"[WORKER] Published egress action to Pub/Sub ({egress_topic_id}). "
             f"Message ID: {message_id}"
         )
     except Exception as e:
