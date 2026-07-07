@@ -20,6 +20,7 @@ Analyze the issue content (title, body, and any context or quality assessment) t
 - UI/Aesthetic Adjustments: Fixing minor layout bugs in Ink components (e.g., adding flexShrink, correcting padding in a single Box), text color changes.
 - Documentation & Strings: Typos, log message updates, CLI argument descriptions.
 - Localized Bug Fixes: Single-file logic errors, straightforward promise rejections (e.g., wrapping a known failure in a try/catch), simple regex or string parsing fixes.
+- Unhandled Errors with Obvious Fixes: Issues with provided stack traces or obvious offending lines where the root cause and fix are clear.
 **MEDIUM** (2-3 days):
 - React/Ink State Management: Debugging useState/useEffect/useReducer bugs, component lifecycle issues (memory leaks in the UI), terminal redraw flickering, or state synchronization between the CLI's internal input buffer and the interactive React components.
 - Asynchronous Flow & Integration: Resolving complex Promise chains, ERR_STREAM_PREMATURE_CLOSE, debugging IDE companion extensions (VS Code, Android Studio) or resolving hanging HTTP requests/IPC between the CLI and external plugins, timeouts in non-interactive/ACP modes.
