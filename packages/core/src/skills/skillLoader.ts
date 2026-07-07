@@ -54,10 +54,10 @@ export function parseFrontmatter(
       const nameVal = normalizedRecord['name'];
       const descVal = normalizedRecord['description'];
 
-      const name = nameVal !== undefined && nameVal !== null ? String(nameVal) : undefined;
-      const description = descVal !== undefined && descVal !== null ? String(descVal) : undefined;
+      const name = nameVal !== undefined && nameVal !== null ? String(nameVal).trim() : undefined;
+      const description = descVal !== undefined && descVal !== null ? String(descVal).trim() : undefined;
 
-      if (typeof name === 'string' && typeof description === 'string') {
+      if (name !== undefined && description !== undefined) {
         return { name, description };
       }
     }
@@ -85,14 +85,14 @@ function parseSimpleFrontmatter(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Match "name:" at the start of the line (optional whitespace, case-insensitive, optional spaces before colon)
+    // Match "name" at the start of the line (optional whitespace, case-insensitive, optional spaces before/after colon)
     const nameMatch = line.match(/^\s*name\s*:\s*(.*)$/i);
     if (nameMatch) {
       name = nameMatch[1].trim();
       continue;
     }
 
-    // Match "description:" at the start of the line (optional whitespace, case-insensitive, optional spaces before colon)
+    // Match "description" at the start of the line (optional whitespace, case-insensitive, optional spaces before/after colon)
     const descMatch = line.match(/^\s*description\s*:\s*(.*)$/i);
     if (descMatch) {
       const descLines = [descMatch[1].trim()];
