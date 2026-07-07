@@ -10,6 +10,7 @@ import {
   ThinkingLevel,
   type Content,
   type GenerateContentResponse,
+  type Part,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -2250,6 +2251,35 @@ describe('GeminiChat', () => {
           ],
         },
       ]);
+    });
+  });
+
+  describe('thought leakage in getHistoryTurns', () => {
+    it('should completely filter out thought parts from getHistoryTurns when context management is enabled', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'internal monologue', thought: true } as unknown as Part,
+            { text: 'actual conversational response' },
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      expect(turns).toHaveLength(2);
+      const modelTurn = turns[1];
+      expect(modelTurn.content.parts).toHaveLength(1);
+      expect(modelTurn.content.parts![0]).toEqual({
+        text: 'actual conversational response',
+      });
     });
   });
 
