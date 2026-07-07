@@ -88,4 +88,32 @@ describe('Egress Service App Router', () => {
     expect(res.text).toBe('OK');
     expect(handleEgressEvent).toHaveBeenCalledWith(validEvent);
   });
+
+  it('POST / should return 500 if handleEgressEvent fails', async () => {
+    const validEvent = {
+      action: 'LABEL',
+      payload: {
+        owner: 'google-gemini',
+        repo: 'gemini-cli',
+        issueNumber: 42,
+        labels: ['bug'],
+      },
+    };
+
+    vi.mocked(handleEgressEvent).mockRejectedValueOnce(
+      new Error('GitHub API Error'),
+    );
+
+    // Suppress console.error during expected failure test
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await request(app)
+      .post('/')
+      .send(createPubSubPushEnvelope(validEvent));
+
+    expect(res.status).toBe(500);
+    expect(res.text).toBe('GitHub API Error');
+
+    consoleSpy.mockRestore();
+  });
 });
