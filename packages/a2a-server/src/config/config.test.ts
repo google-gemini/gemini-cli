@@ -19,8 +19,11 @@ import {
   isHeadlessMode,
   FatalAuthenticationError,
   PolicyDecision,
+  ApprovalMode,
   PRIORITY_YOLO_ALLOW_ALL,
+  createPolicyEngineConfig,
 } from '@google/gemini-cli-core';
+import type { AgentSettings } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -53,6 +56,32 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     isHeadlessMode: vi.fn().mockReturnValue(false),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
+    createPolicyEngineConfig: vi
+      .fn()
+      .mockImplementation(
+        (_settings, mode, _defaultPoliciesDir, _interactive) => ({
+          rules:
+            mode === actual.ApprovalMode.YOLO
+              ? [
+                  {
+                    toolName: '*',
+                    decision: actual.PolicyDecision.ALLOW,
+                    priority: actual.PRIORITY_YOLO_ALLOW_ALL,
+                    modes: [actual.ApprovalMode.YOLO],
+                    allowRedirection: true,
+                  },
+                ]
+              : [
+                  {
+                    toolName: 'read_file',
+                    decision: actual.PolicyDecision.ALLOW,
+                    priority: 1.05,
+                    source: 'Default: read-only.toml',
+                  },
+                ],
+          checkers: [],
+        }),
+      ),
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },
@@ -261,19 +290,42 @@ describe('loadConfig', () => {
     expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
   });
 
-  describe('tool configuration', () => {
-    it('should pass V1 allowedTools to Config properly', async () => {
+  describe('policy engine configuration', () => {
+    it('should map tool settings into policySettings', async () => {
       const settings: Settings = {
-        allowedTools: ['shell', 'edit'],
+        tools: {
+          allowed: ['v2-allowed'],
+          exclude: ['v2-exclude'],
+          core: ['v2-core'],
+        },
+        mcpServers: {
+          test: { command: 'test', args: [] },
+        },
+        policyPaths: ['/path/to/policy'],
+        adminPolicyPaths: ['/path/to/admin/policy'],
       };
+
       await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
+
+      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
         expect.objectContaining({
-          allowedTools: ['shell', 'edit'],
+          tools: {
+            core: ['v2-core'],
+            exclude: ['v2-exclude'],
+            allowed: ['v2-allowed'],
+          },
+          mcpServers: settings.mcpServers,
+          policyPaths: settings.policyPaths,
+          adminPolicyPaths: settings.adminPolicyPaths,
         }),
+        ApprovalMode.DEFAULT,
+        undefined,
+        true,
       );
     });
+  });
 
+  describe('tool configuration', () => {
     it('should pass V2 tools.allowed to Config properly', async () => {
       const settings: Settings = {
         tools: {
@@ -284,21 +336,6 @@ describe('loadConfig', () => {
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           allowedTools: ['shell', 'fetch'],
-        }),
-      );
-    });
-
-    it('should prefer V1 allowedTools over V2 tools.allowed if both present', async () => {
-      const settings: Settings = {
-        allowedTools: ['v1-tool'],
-        tools: {
-          allowed: ['v2-tool'],
-        },
-      };
-      await loadConfig(settings, mockExtensionLoader, taskId);
-      expect(Config).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowedTools: ['v1-tool'],
         }),
       );
     });
@@ -385,14 +422,19 @@ describe('loadConfig', () => {
         );
       });
 
-      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+      it('should use default approval mode and load default rules when GEMINI_YOLO_MODE is not true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'false');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             approvalMode: 'default',
             policyEngineConfig: expect.objectContaining({
-              rules: [],
+              rules: expect.arrayContaining([
+                expect.objectContaining({
+                  toolName: 'read_file',
+                  decision: PolicyDecision.ALLOW,
+                }),
+              ]),
             }),
           }),
         );
@@ -498,5 +540,36 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('setIsTrusted', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return true when GEMINI_FOLDER_TRUST env var is true', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'true');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(true);
+  });
+
+  it('should return false when GEMINI_FOLDER_TRUST env var is false', async () => {
+    vi.stubEnv('GEMINI_FOLDER_TRUST', 'false');
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted(undefined)).toBe(false);
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(false);
+  });
+
+  it('should fallback to agentSettings.isTrusted if env var is undefined', async () => {
+    const { setIsTrusted } = await import('./config.js');
+    expect(setIsTrusted({ isTrusted: true } as AgentSettings)).toBe(true);
+    expect(setIsTrusted({ isTrusted: false } as AgentSettings)).toBe(false);
+    expect(setIsTrusted(undefined)).toBe(false);
   });
 });

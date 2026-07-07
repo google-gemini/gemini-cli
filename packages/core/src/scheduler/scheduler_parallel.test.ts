@@ -79,6 +79,12 @@ import {
   type Status,
   type ToolCall,
 } from './types.js';
+import {
+  UPDATE_TOPIC_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 
@@ -160,6 +166,12 @@ describe('Scheduler Parallel Execution', () => {
     isReadOnly: false,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
+  const editTool = {
+    name: EDIT_TOOL_NAME,
+    kind: Kind.Execute,
+    isReadOnly: false,
+    build: vi.fn(),
+  } as unknown as AnyDeclarativeTool;
   const agentTool1 = {
     name: 'agent-tool-1',
     kind: Kind.Agent,
@@ -169,6 +181,12 @@ describe('Scheduler Parallel Execution', () => {
   const agentTool2 = {
     name: 'agent-tool-2',
     kind: Kind.Agent,
+    isReadOnly: false,
+    build: vi.fn(),
+  } as unknown as AnyDeclarativeTool;
+  const topicTool = {
+    name: UPDATE_TOPIC_TOOL_NAME,
+    kind: Kind.Other,
     isReadOnly: false,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
@@ -195,6 +213,9 @@ describe('Scheduler Parallel Execution', () => {
         if (name === 'write-tool') return writeTool;
         if (name === 'agent-tool-1') return agentTool1;
         if (name === 'agent-tool-2') return agentTool2;
+        if (name === UPDATE_TOPIC_TOOL_NAME) return topicTool;
+        if (name === WRITE_FILE_TOOL_NAME) return writeTool;
+        if (name === EDIT_TOOL_NAME) return editTool;
         return undefined;
       }),
       getAllToolNames: vi
@@ -205,6 +226,9 @@ describe('Scheduler Parallel Execution', () => {
           'write-tool',
           'agent-tool-1',
           'agent-tool-2',
+          UPDATE_TOPIC_TOOL_NAME,
+          WRITE_FILE_TOOL_NAME,
+          EDIT_TOOL_NAME,
         ]),
     } as unknown as Mocked<ToolRegistry>;
 
@@ -327,10 +351,16 @@ describe('Scheduler Parallel Execution', () => {
     vi.mocked(writeTool.build).mockReturnValue(
       mockInvocation as unknown as AnyToolInvocation,
     );
+    vi.mocked(editTool.build).mockReturnValue(
+      mockInvocation as unknown as AnyToolInvocation,
+    );
     vi.mocked(agentTool1.build).mockReturnValue(
       mockInvocation as unknown as AnyToolInvocation,
     );
     vi.mocked(agentTool2.build).mockReturnValue(
+      mockInvocation as unknown as AnyToolInvocation,
+    );
+    vi.mocked(topicTool.build).mockReturnValue(
       mockInvocation as unknown as AnyToolInvocation,
     );
   });
@@ -555,4 +585,74 @@ describe('Scheduler Parallel Execution', () => {
     expect(executionLog[2]).toBe('start-r2');
     expect(executionLog[3]).toBe('end-r2');
   });
+
+  it('should execute UPDATE_TOPIC_TOOL_NAME sequentially even without wait_for_previous', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const topicReq: ToolCallRequestInfo = {
+      callId: 'call-topic',
+      name: UPDATE_TOPIC_TOOL_NAME,
+      args: { title: 'New Topic' },
+      isClientInitiated: false,
+      prompt_id: 'p1',
+      schedulerId: ROOT_SCHEDULER_ID,
+    };
+
+    await scheduler.schedule([req1, topicReq, req2], signal);
+
+    expect(executionLog[0]).toBe('start-call-topic');
+    expect(executionLog[1]).toBe('end-call-topic');
+    expect(executionLog.slice(2, 4)).toContain('start-call-1');
+    expect(executionLog.slice(2, 4)).toContain('start-call-2');
+  });
+
+  it.each(Array.from(EDIT_TOOL_NAMES))(
+    'should execute %s sequentially even without wait_for_previous',
+    async (toolName) => {
+      const executionLog: string[] = [];
+      mockExecutor.execute.mockImplementation(async ({ call }) => {
+        const id = call.request.callId;
+        executionLog.push(`start-${id}`);
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        executionLog.push(`end-${id}`);
+        return {
+          status: 'success',
+          response: { callId: id, responseParts: [] },
+        } as unknown as SuccessfulToolCall;
+      });
+
+      const e1: ToolCallRequestInfo = {
+        callId: 'e1',
+        name: toolName,
+        args: { path: 'a.txt', wait_for_previous: false },
+        isClientInitiated: false,
+        prompt_id: 'p1',
+        schedulerId: ROOT_SCHEDULER_ID,
+      };
+      const e2: ToolCallRequestInfo = {
+        ...e1,
+        callId: 'e2',
+      };
+
+      await scheduler.schedule([e1, e2], signal);
+
+      // Even though wait_for_previous is false, EDIT_TOOL_NAMES enforces sequential execution
+      expect(executionLog).toEqual([
+        'start-e1',
+        'end-e1',
+        'start-e2',
+        'end-e2',
+      ]);
+    },
+  );
 });

@@ -20,6 +20,7 @@ import {
   toAbsolutePath,
   toPathKey,
   isTrustedSystemPath,
+  resolveDefensiveToolPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -811,6 +812,24 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath(cwd)).toBe(false);
     });
 
+    it('should not reject paths if the current working directory is the root directory', () => {
+      mockPlatform('linux');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('/');
+      expect(isTrustedSystemPath('/usr/bin/rg')).toBe(true);
+      process.cwd = originalCwd;
+    });
+
+    it('should not reject paths if the current working directory is a Windows root directory', () => {
+      mockPlatform('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      const originalCwd = process.cwd;
+      process.cwd = vi.fn().mockReturnValue('C:\\');
+      expect(isTrustedSystemPath('C:\\Windows\\System32\\rg.exe')).toBe(true);
+      process.cwd = originalCwd;
+      vi.unstubAllEnvs();
+    });
+
     it('should allow trusted paths on Windows', () => {
       mockPlatform('win32');
       vi.stubEnv('SystemRoot', 'C:\\Windows');
@@ -853,6 +872,67 @@ describe('normalizePath', () => {
       expect(isTrustedSystemPath('/home/user/bin/rg')).toBe(false);
       expect(isTrustedSystemPath('/tmp/rg')).toBe(false);
       expect(isTrustedSystemPath('/Library/rg')).toBe(false);
+    });
+
+    it('should allow 1P internal hermetic execution paths', () => {
+      mockPlatform('linux');
+
+      expect(isTrustedSystemPath('/google/bin/rg')).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/bazel-out/k8-fastbuild/bin/rg',
+        ),
+      ).toBe(true);
+      expect(
+        isTrustedSystemPath(
+          '/google/src/cloud/user/workspace/blaze-out/k8-opt/bin/rg',
+        ),
+      ).toBe(true);
+    });
+
+    describe('in secure hermetic environments', () => {
+      const originalCwd = process.cwd;
+      const cwd = '/sandbox';
+
+      beforeEach(() => {
+        mockPlatform('linux');
+        process.cwd = vi.fn().mockReturnValue(cwd);
+      });
+
+      afterEach(() => {
+        process.cwd = originalCwd;
+        vi.unstubAllEnvs();
+      });
+
+      it('should reject paths in the CWD by default', () => {
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(false);
+      });
+
+      it.each([
+        ['TEST_SRCDIR', '/mock/runfiles'],
+        ['BAZEL_TEST', '1'],
+        ['TEST_WORKSPACE', 'my_workspace'],
+        ['RUNFILES_DIR', '/mock/runfiles'],
+      ])('should bypass CWD rejection when %s is set', (envVar, value) => {
+        vi.stubEnv(envVar, value);
+        expect(isTrustedSystemPath(path.join(cwd, 'bin/rg'))).toBe(true);
+      });
+    });
+  });
+
+  describe('resolveDefensiveToolPath', () => {
+    it('should sanitize paths by stripping null bytes', () => {
+      const targetDir = '/workspace';
+      const filePathWithNull = 'src/index.ts\0.exe';
+      const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
+      expect(result).toBe('src/index.ts.exe');
+    });
+
+    it('should sanitize @ prefixed paths by stripping null bytes', () => {
+      const targetDir = '/workspace';
+      const filePathWithNull = '@/components/Button.tsx\0';
+      const result = resolveDefensiveToolPath(filePathWithNull, targetDir);
+      expect(result).toBe('components/Button.tsx');
     });
   });
 });

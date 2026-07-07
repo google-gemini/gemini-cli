@@ -470,10 +470,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       // We monitor both the external signal and our new grace period timeout
-      const combinedSignal = AbortSignal.any([
-        externalSignal,
-        graceTimeoutController.signal,
-      ]);
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      const combinedSignal = (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([externalSignal, graceTimeoutController.signal]);
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
       const turnResult = await this.executeTurn(
         chat,
@@ -593,7 +596,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+    const combinedSignal = (
+      AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }
+    ).any([signal, deadlineTimer.signal]);
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
     logAgentStart(
       this.context.config,
@@ -919,12 +926,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.hasFailedCompressionAttempt = true;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         this.hasFailedCompressionAttempt = false;
       }
     } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const turns = newHistory.map((c) => ({
+          id: randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         // Do NOT reset hasFailedCompressionAttempt.
         // We only truncated content because summarization previously failed.
         // We want to keep avoiding expensive summarization calls.

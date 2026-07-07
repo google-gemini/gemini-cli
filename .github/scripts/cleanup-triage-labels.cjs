@@ -22,29 +22,53 @@ module.exports = async ({ github, context, core }) => {
 
   for (const issue of issuesToCleanup) {
     try {
-      await github.rest.issues.removeLabel({
+      const { data: issueData } = await github.rest.issues.get({
         owner: context.repo.owner,
         repo: context.repo.repo,
         issue_number: issue.number,
-        name: 'status/need-triage',
       });
-      core.info(
-        `Successfully removed status/need-triage from #${issue.number}`,
+
+      const labels = issueData.labels.map((l) =>
+        typeof l === 'string' ? l : l.name,
       );
-    } catch (error) {
-      if (error.status === 404) {
+
+      if (
+        labels.includes('status/bot-triaged') &&
+        labels.includes('status/need-triage')
+      ) {
+        await github.rest.issues.removeLabel({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issue.number,
+          name: 'status/need-triage',
+        });
         core.info(
-          `Label status/need-triage not found on #${issue.number}, skipping.`,
-        );
-      } else {
-        core.warning(
-          `Failed to remove label from #${issue.number}: ${error.message}`,
+          `Successfully removed status/need-triage from #${issue.number}`,
         );
       }
+
+      if (
+        labels.includes('status/bot-triaged') &&
+        labels.includes('status/manual-triage')
+      ) {
+        await github.rest.issues.removeLabel({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: issue.number,
+          name: 'status/bot-triaged',
+        });
+        core.info(
+          `Successfully removed status/bot-triaged from #${issue.number} because it requires manual triage`,
+        );
+      }
+    } catch (error) {
+      core.warning(
+        `Failed to clean up labels for #${issue.number}: ${error.message}`,
+      );
     }
   }
 
   core.info(
-    `Cleaned up status/need-triage from ${issuesToCleanup.length} issues.`,
+    `Cleaned up conflicting labels from ${issuesToCleanup.length} issues.`,
   );
 };

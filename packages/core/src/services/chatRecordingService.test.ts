@@ -40,6 +40,8 @@ vi.mock('node:fs', async (importOriginal) => {
 
 import {
   ChatRecordingService,
+  hasResumableConversationContent,
+  isResumableMessageRecord,
   loadConversationRecord,
   type ConversationRecord,
   type ToolCallRecord,
@@ -47,9 +49,10 @@ import {
 } from './chatRecordingService.js';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
-import type { Content, Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
 
 vi.mock('../utils/paths.js');
 vi.mock('node:crypto', async (importOriginal) => {
@@ -122,6 +125,76 @@ describe('ChatRecordingService', () => {
     if (testTempDir) {
       await fs.promises.rm(testTempDir, { recursive: true, force: true });
     }
+  });
+
+  describe('isResumableMessageRecord', () => {
+    it('should treat malformed messages without content as non-resumable', () => {
+      const message = {
+        id: 'malformed-message',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        type: 'user',
+      } as MessageRecord;
+
+      expect(() => isResumableMessageRecord(message)).not.toThrow();
+      expect(isResumableMessageRecord(message)).toBe(false);
+    });
+
+    it('should return false for command-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '?help',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return false for internal context-only messages', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '<session_context>previous state</session_context>',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'user',
+          content: '<hook_context>hook data</hook_context>',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(false);
+    });
+
+    it('should return true for real user or assistant content', () => {
+      const messages = [
+        {
+          type: 'user',
+          content: '/resume',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+        {
+          type: 'gemini',
+          content: 'I can help with that.',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:01:00.000Z',
+        },
+      ] as MessageRecord[];
+
+      expect(hasResumableConversationContent(messages)).toBe(true);
+    });
   });
 
   describe('initialize', () => {
@@ -837,6 +910,49 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('deleteCurrentSessionIfNotResumableAsync', () => {
+    it('should delete a startup-only session', async () => {
+      await chatRecordingService.initialize();
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should delete a command-only session', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: '/resume',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+    });
+
+    it('should keep a session with a real user message', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Help me debug this test',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      await chatRecordingService.deleteCurrentSessionIfNotResumableAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+    });
+  });
+
   describe('recordDirectories', () => {
     beforeEach(async () => {
       await chatRecordingService.initialize();
@@ -1065,7 +1181,7 @@ describe('ChatRecordingService', () => {
 
     it('should update tool results from API history (masking sync)', async () => {
       // 1. Record an initial message and tool call
-      chatRecordingService.recordMessage({
+      const modelMsgId = chatRecordingService.recordMessage({
         type: 'gemini',
         content: 'I will list the files.',
         model: 'gemini-pro',
@@ -1087,24 +1203,30 @@ describe('ChatRecordingService', () => {
       // 2. Prepare mock history with masked content
       const maskedSnippet =
         '<tool_output_masked>short preview</tool_output_masked>';
-      const history: Content[] = [
+      const history: HistoryTurn[] = [
         {
-          role: 'model',
-          parts: [
-            { functionCall: { name: 'list_files', args: { path: '.' } } },
-          ],
+          id: modelMsgId,
+          content: {
+            role: 'model',
+            parts: [
+              { functionCall: { name: 'list_files', args: { path: '.' } } },
+            ],
+          },
         },
         {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'list_files',
-                id: callId,
-                response: { output: maskedSnippet },
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'list_files',
+                  id: callId,
+                  response: { output: maskedSnippet },
+                },
               },
-            },
-          ],
+            ],
+          },
         },
       ];
 
@@ -1132,8 +1254,15 @@ describe('ChatRecordingService', () => {
         output: maskedSnippet,
       });
     });
+
     it('should preserve multi-modal sibling parts during sync', async () => {
       await chatRecordingService.initialize();
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
       const callId = 'multi-modal-call';
       const originalResult: Part[] = [
         {
@@ -1145,12 +1274,6 @@ describe('ChatRecordingService', () => {
         },
         { inlineData: { mimeType: 'image/png', data: 'base64...' } },
       ];
-
-      chatRecordingService.recordMessage({
-        type: 'gemini',
-        content: '',
-        model: 'gemini-pro',
-      });
 
       chatRecordingService.recordToolCalls('gemini-pro', [
         {
@@ -1164,19 +1287,26 @@ describe('ChatRecordingService', () => {
       ]);
 
       const maskedSnippet = '<masked>';
-      const history: Content[] = [
+      const history: HistoryTurn[] = [
         {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'read_file',
-                id: callId,
-                response: { output: maskedSnippet },
+          id: modelMsgId,
+          content: { role: 'model', parts: [] },
+        },
+        {
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'read_file',
+                  id: callId,
+                  response: { output: maskedSnippet },
+                },
               },
-            },
-            { inlineData: { mimeType: 'image/png', data: 'base64...' } },
-          ],
+              { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+            ],
+          },
         },
       ];
 
@@ -1201,13 +1331,13 @@ describe('ChatRecordingService', () => {
 
     it('should handle parts appearing BEFORE the functionResponse in a content block', async () => {
       await chatRecordingService.initialize();
-      const callId = 'prefix-part-call';
-
-      chatRecordingService.recordMessage({
+      const modelMsgId = chatRecordingService.recordMessage({
         type: 'gemini',
         content: '',
         model: 'gemini-pro',
       });
+
+      const callId = 'prefix-part-call';
 
       chatRecordingService.recordToolCalls('gemini-pro', [
         {
@@ -1220,19 +1350,26 @@ describe('ChatRecordingService', () => {
         },
       ]);
 
-      const history: Content[] = [
+      const history: HistoryTurn[] = [
         {
-          role: 'user',
-          parts: [
-            { text: 'Prefix metadata or text' },
-            {
-              functionResponse: {
-                name: 'read_file',
-                id: callId,
-                response: { output: 'file content' },
+          id: modelMsgId,
+          content: { role: 'model', parts: [] },
+        },
+        {
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              { text: 'Prefix metadata or text' },
+              {
+                functionResponse: {
+                  name: 'read_file',
+                  id: callId,
+                  response: { output: 'file content' },
+                },
               },
-            },
-          ],
+            ],
+          },
         },
       ];
 
@@ -1263,25 +1400,30 @@ describe('ChatRecordingService', () => {
       appendFileSyncSpy.mockClear();
 
       // History with a tool call ID that doesn't exist in the conversation
-      const history: Content[] = [
+      const history: HistoryTurn[] = [
         {
-          role: 'user',
-          parts: [
-            {
-              functionResponse: {
-                name: 'read_file',
-                id: 'nonexistent-call-id',
-                response: { output: 'some content' },
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'read_file',
+                  id: 'nonexistent-call-id',
+                  response: { output: 'some content' },
+                },
               },
-            },
-          ],
+            ],
+          },
         },
       ];
 
       chatRecordingService.updateMessagesFromHistory(history);
 
-      // No tool calls matched, so writeFileSync should NOT have been called
-      expect(appendFileSyncSpy).not.toHaveBeenCalled();
+      // In the new 'Strong Owner' architecture, updateMessagesFromHistory ensures that
+      // all turns in history (including new/synthetic ones) are recorded.
+      // Since 'user-id' was not in the original conversation, it is added.
+      expect(appendFileSyncSpy).toHaveBeenCalled();
     });
   });
 
@@ -1313,6 +1455,71 @@ describe('ChatRecordingService', () => {
       expect(lastMkdir).toBeLessThan(lastWrite);
 
       mkdirSyncSpy.mockRestore();
+    });
+  });
+
+  describe('recordSyntheticMessage and history sync', () => {
+    it('should correctly record synthetic messages with durable IDs', async () => {
+      await chatRecordingService.initialize(undefined, 'main');
+      const parts = [{ text: 'Synthetic Turn' }];
+
+      // Implicit ID generation
+      const id1 = chatRecordingService.recordSyntheticMessage('user', parts);
+      expect(id1).toBeDefined();
+      expect(id1).toMatch(/test-uuid-/);
+
+      // Explicit ID registration (e.g. from context processor)
+      const customId = 'stable-hash-123';
+      const id2 = chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        parts,
+        customId,
+      );
+      expect(id2).toBe(customId);
+
+      const record = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(record!.messages).toHaveLength(2);
+      expect(record!.messages[0].id).toBe(id1);
+      expect(record!.messages[0].type).toBe('user');
+      expect(record!.messages[1].id).toBe(customId);
+      expect(record!.messages[1].type).toBe('gemini');
+    });
+
+    it('should synchronize history turns and maintain their durable identity', async () => {
+      await chatRecordingService.initialize(undefined, 'main');
+      const history: HistoryTurn[] = [
+        { id: 'h1', content: { role: 'user', parts: [{ text: 'msg1' }] } },
+        { id: 'h2', content: { role: 'model', parts: [{ text: 'msg2' }] } },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const record = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(record!.messages).toHaveLength(2);
+      expect(record!.messages[0].id).toBe('h1');
+      expect(record!.messages[1].id).toBe('h2');
+
+      // Update with a summary
+      const summaryId = 'summary-123';
+      const updatedHistory: HistoryTurn[] = [
+        {
+          id: summaryId,
+          content: { role: 'user', parts: [{ text: 'summary' }] },
+        },
+        ...history.slice(1),
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(updatedHistory);
+      const record2 = await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      );
+      expect(record2!.messages).toHaveLength(2);
+      expect(record2!.messages[0].id).toBe(summaryId);
+      expect(record2!.messages[1].id).toBe('h2');
     });
   });
 });

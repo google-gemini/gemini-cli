@@ -499,6 +499,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
     skipExtensions: true,
+    loadedSettings: settings,
   });
 
   adminControlsListner.setConfig(partialConfig);
@@ -627,6 +628,7 @@ export async function main() {
     config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
       worktreeSettings: worktreeInfo,
+      loadedSettings: settings,
     });
     loadConfigHandle?.end();
 
@@ -655,7 +657,7 @@ export async function main() {
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
     registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+      await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
     // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks

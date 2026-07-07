@@ -89,6 +89,12 @@ export class Task {
   currentAgentMessageId = uuidv4();
   promptCount = 0;
   autoExecute: boolean;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+    cachedContentTokenCount?: number;
+  };
   private get isYoloMatch(): boolean {
     return (
       this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
@@ -129,6 +135,14 @@ export class Task {
       // intent achieves this.
       async () => 'stop',
     );
+  }
+
+  get hasPendingTools(): boolean {
+    return this.pendingToolCalls.size > 0;
+  }
+
+  get pendingToolsCount(): number {
+    return this.pendingToolCalls.size;
   }
 
   static async create(
@@ -274,6 +288,7 @@ export class Task {
       userTier?: UserTierId;
       error?: string;
       traceId?: string;
+      usageMetadata?: Task['usageMetadata'];
     } = {
       coderAgent: coderAgentMessage,
       model: this.modelInfo || this.config.getModel(),
@@ -286,6 +301,10 @@ export class Task {
 
     if (traceId) {
       metadata.traceId = traceId;
+    }
+
+    if (final && this.usageMetadata) {
+      metadata.usageMetadata = this.usageMetadata;
     }
 
     return {
@@ -857,8 +876,18 @@ export class Task {
         break;
       case GeminiEventType.Finished:
         logger.info(`[Task ${this.id}] Agent finished its turn.`);
+        // Capture the usage metadata when the stream finishes
+        if (
+          event.value &&
+          typeof event.value === 'object' &&
+          'usageMetadata' in event.value
+        ) {
+          this.usageMetadata = event.value
+            .usageMetadata as typeof this.usageMetadata;
+        }
         break;
       case GeminiEventType.ModelInfo:
+        this.usageMetadata = undefined;
         this.modelInfo = event.value;
         break;
       case GeminiEventType.Retry:

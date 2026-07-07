@@ -23,8 +23,8 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
-  PolicyDecision,
-  PRIORITY_YOLO_ALLOW_ALL,
+  createPolicyEngineConfig,
+  type PolicySettings,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -34,10 +34,13 @@ import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
+const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
+
 export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  trusted: boolean = false,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
 
@@ -63,6 +66,24 @@ export async function loadConfig(
       ? ApprovalMode.YOLO
       : ApprovalMode.DEFAULT;
 
+  const policySettings: PolicySettings = {
+    mcpServers: settings.mcpServers,
+    tools: {
+      core: settings.tools?.core,
+      exclude: settings.tools?.exclude,
+      allowed: settings.tools?.allowed,
+    },
+    policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    true,
+  );
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -73,25 +94,12 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || settings.tools?.core || undefined,
-    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
-    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
+    coreTools: settings.tools?.core || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    allowedTools: settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode,
-    policyEngineConfig: {
-      rules:
-        approvalMode === ApprovalMode.YOLO
-          ? [
-              {
-                toolName: '*',
-                decision: PolicyDecision.ALLOW,
-                priority: PRIORITY_YOLO_ALLOW_ALL,
-                modes: [ApprovalMode.YOLO],
-                allowRedirection: true,
-              },
-            ]
-          : [],
-    },
+    policyEngineConfig,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
@@ -118,7 +126,7 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust,
-    trustedFolder: true,
+    trustedFolder: trusted,
     extensionLoader,
     checkpointing,
     interactive: true,
@@ -174,6 +182,15 @@ export async function loadConfig(
   await refreshAuthentication(config, 'Config');
 
   return config;
+}
+
+export function setIsTrusted(
+  agentSettings: AgentSettings | undefined,
+): boolean {
+  if (INITIAL_FOLDER_TRUST !== undefined) {
+    return INITIAL_FOLDER_TRUST === 'true';
+  }
+  return !!agentSettings?.isTrusted;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {

@@ -69,6 +69,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -716,20 +717,6 @@ describe('Server Config (config.ts)', () => {
       });
     });
 
-    describe('getGemini31FlashLiteLaunchedSync', () => {
-      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
-        'should return true for %s',
-        async (authType) => {
-          const config = new Config(baseParams);
-          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
-            authType,
-          });
-          await config.refreshAuth(authType);
-          expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
-        },
-      );
-    });
-
     describe('getProModelNoAccessSync', () => {
       it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
         vi.mocked(getExperiments).mockResolvedValue({
@@ -861,6 +848,16 @@ describe('Server Config (config.ts)', () => {
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should clear fallback overrides when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getFallbackOverride('failed-model')).toBeUndefined();
     });
 
     it('should pass Vertex AI routing settings when refreshing auth', async () => {
@@ -1902,6 +1899,21 @@ describe('Server Config (config.ts)', () => {
     );
   });
 
+  it('clears fallback overrides when session changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    await config.initialize();
+
+    config.activateFallbackMode('fallback-model', 'failed-model');
+    expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+    config.setSessionId('session-two');
+
+    expect(config.getFallbackOverride('failed-model')).toBeUndefined();
+  });
+
   it('does not throw when changing sessions before the previous plans dir exists', async () => {
     const config = new Config({
       ...baseParams,
@@ -2715,6 +2727,16 @@ describe('Config getHooks', () => {
       expect(spy).toHaveBeenCalled();
     });
 
+    it('should preserve fallback overrides when setting a new model', () => {
+      const config = new Config(baseParams);
+      config.activateFallbackMode('fallback-model', 'failed-model');
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+
+      config.setModel('new-model');
+
+      expect(config.getFallbackOverride('failed-model')).toBe('fallback-model');
+    });
+
     it('should allow setting auto model from auto model and reset availability', () => {
       const config = new Config({
         cwd: '/tmp',
@@ -3475,6 +3497,53 @@ describe('Config Quota & Preview Model Access', () => {
         planSettings: { modelRouting: false },
       });
       expect(await config.getPlanModeRoutingEnabled()).toBe(false);
+    });
+  });
+
+  describe('validatePathAccess (PathValidator integration)', () => {
+    it('should reject pathologically long paths', () => {
+      const config = new Config(baseParams);
+      const longPath = path.join(baseParams.targetDir, 'a'.repeat(5000));
+      const result = config.validatePathAccess(longPath, 'read');
+      expect(result).toContain('Invalid path: Path is too long');
+    });
+
+    it('should reject paths with log markers', () => {
+      const config = new Config(baseParams);
+      const logPath = path.join(
+        baseParams.targetDir,
+        'AssertionError: expected true to be false',
+      );
+      const result = config.validatePathAccess(logPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path appears to be a misinterpreted log fragment',
+      );
+    });
+
+    it('should reject paths with control characters', () => {
+      const config = new Config(baseParams);
+      const malformedPath = path.join(
+        baseParams.targetDir,
+        'file\nwith\nnewline.txt',
+      );
+      const result = config.validatePathAccess(malformedPath, 'read');
+      expect(result).toContain(
+        'Invalid path: Path contains invalid characters',
+      );
+    });
+
+    it('should allow normal paths', () => {
+      const config = new Config(baseParams);
+      const normalPath = path.resolve(baseParams.targetDir, 'src/index.ts');
+      const result = config.validatePathAccess(normalPath, 'read');
+
+      // It might return "Path not in workspace" or similar if not authorized,
+      // but it should NOT return the "Invalid path" prefix from PathValidator.
+      if (result) {
+        expect(result).not.toContain('Invalid path:');
+      } else {
+        expect(result).toBeNull();
+      }
     });
   });
 });
@@ -4276,5 +4345,59 @@ describe('ADKSettings', () => {
     };
     const config = new Config(params);
     expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
+  });
+});
+
+describe('hasGemini35FlashGAAccess model setting', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL to gemini-3.5-flash and PREVIEW_GEMINI_FLASH_MODEL to gemini-3-flash-preview if hasGemini35FlashGAAccess returns true and authType is USE_GEMINI', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.USE_GEMINI };
+
+    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+          boolValue: true,
+        },
+      },
+    });
+
+    // Call the method
+    const result = config.hasGemini35FlashGAAccess();
+    expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3-flash-preview');
+  });
+
+  it('should set DEFAULT_GEMINI_FLASH_MODEL and PREVIEW_GEMINI_FLASH_MODEL to gemini-3.5-flash if hasGemini35FlashGAAccess returns true and authType is not USE_GEMINI', () => {
+    const config = new Config(baseParams);
+    config['contentGeneratorConfig'] = { authType: AuthType.LOGIN_WITH_GOOGLE };
+
+    // Set experiment to return true for GEMINI_3_5_FLASH_GA_LAUNCHED
+    config.setExperiments({
+      experimentIds: [],
+      flags: {
+        [ExperimentFlags.GEMINI_3_5_FLASH_GA_LAUNCHED]: {
+          boolValue: true,
+        },
+      },
+    });
+
+    // Call the method
+    const result = config.hasGemini35FlashGAAccess();
+    expect(result).toBe(true);
+
+    expect(DEFAULT_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
+    expect(PREVIEW_GEMINI_FLASH_MODEL).toBe('gemini-3.5-flash');
   });
 });

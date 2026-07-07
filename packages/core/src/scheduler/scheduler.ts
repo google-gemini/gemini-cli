@@ -26,7 +26,10 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  UPDATE_TOPIC_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -537,7 +540,7 @@ export class Scheduler {
 
     if (isWaitingForExternal && this.state.isActive) {
       // Yield to the event loop to allow external events (tool completion, user input) to progress.
-      await new Promise((resolve) => queueMicrotask(() => resolve(true)));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return true;
     }
 
@@ -547,6 +550,13 @@ export class Scheduler {
   }
 
   private _isParallelizable(request: ToolCallRequestInfo): boolean {
+    // update_topic tool is forced as sequential call
+    if (
+      request.name === UPDATE_TOPIC_TOOL_NAME ||
+      EDIT_TOOL_NAMES.has(request.name)
+    ) {
+      return false;
+    }
     if (request.args) {
       const wait = request.args['wait_for_previous'];
       if (typeof wait === 'boolean') {

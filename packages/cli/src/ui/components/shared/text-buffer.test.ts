@@ -44,6 +44,17 @@ import { cpLen } from '../../utils/textUtils.js';
 import { type Key } from '../../hooks/useKeypress.js';
 import { escapePath } from '@google/gemini-cli-core';
 
+vi.mock('../../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/SettingsContext.js')>();
+  return {
+    ...actual,
+    useSettings: () => ({
+      merged: { general: { openEditorInNewWindow: false } },
+    }),
+  };
+});
+
 const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
   logicalToVisualMap: [[[0, 0]]],

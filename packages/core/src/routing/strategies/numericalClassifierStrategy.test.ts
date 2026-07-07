@@ -20,6 +20,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -63,7 +64,6 @@ describe('NumericalClassifierStrategy', () => {
       getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
-      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
         const authType = mockConfig.getContentGeneratorConfig().authType;
@@ -476,6 +476,105 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
+  it('should return null (bypass classifier) if history is only tool turns and request is a function response', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
+      },
+      { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [
+      { functionResponse: { name: 'tool2', response: { ok: true } } },
+    ];
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should still route if history is only tool turns but request is text', async () => {
+    const history: Content[] = [
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'tool', response: { ok: true } } }],
+      },
+      { role: 'model', parts: [{ functionCall: { name: 'tool2' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [{ text: 'simple task' }];
+
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
+
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    const contents = generateJsonCall.contents;
+
+    // History should be empty because all turns were tool turns and stripped.
+    // Request should be present.
+    const expectedContents = [
+      {
+        role: 'user',
+        parts: [{ text: 'simple task' }],
+      },
+    ];
+    expect(contents).toEqual(expectedContents);
+  });
+
+  it('should still route if history has text turns and request is a function response', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'some task' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'tool' } }] },
+    ];
+    mockContext.history = history;
+    mockContext.request = [
+      { functionResponse: { name: 'tool', response: { ok: true } } },
+    ];
+
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple.',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
+  });
+
   it('should preserve tool turns when they appear after a non-tool turn in the middle of history', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'turn 0 (before)' }] },
@@ -795,6 +894,28 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    });
+
+    it('should route to DEFAULT_GEMINI_FLASH_MODEL when hasGemini35FlashGAAccess is true', async () => {
+      mockConfig.hasGemini35FlashGAAccess = vi.fn().mockReturnValue(true);
+      vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+
+      const mockApiResponse = {
+        complexity_reasoning: 'Simple task',
+        complexity_score: 10,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
+      );
+
+      expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
   });
 });

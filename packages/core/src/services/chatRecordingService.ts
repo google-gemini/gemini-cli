@@ -12,18 +12,19 @@ import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import { isNodeError } from '../utils/errors.js';
 import {
   deleteSessionArtifactsAsync,
-  deleteSubagentSessionDirAndArtifactsAsync,
+  deleteStoredSession,
 } from '../utils/sessionOperations.js';
 import readline from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import type {
-  Content,
-  Part,
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
+import { partListUnionToString } from '../core/geminiRequest.js';
+import { isIgnoredUserContent } from '../utils/sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
   type TokensSummary,
@@ -99,8 +100,34 @@ function isTextPart(part: unknown): part is { text: string } {
   return isStringProperty(part, 'text');
 }
 
-function isSessionIdRecord(record: unknown): record is { sessionId: string } {
-  return isStringProperty(record, 'sessionId');
+/**
+ * Returns true when a stored message represents conversation content worth
+ * surfacing in resume flows.
+ */
+export function isResumableMessageRecord(message: MessageRecord): boolean {
+  const contentString = message.content
+    ? partListUnionToString(message.content)
+    : '';
+
+  if (message.type === 'user') {
+    return !isIgnoredUserContent(contentString.trim());
+  }
+
+  if (message.type === 'gemini') {
+    return (
+      contentString.trim().length > 0 ||
+      (message.toolCalls?.length ?? 0) > 0 ||
+      (message.thoughts?.length ?? 0) > 0
+    );
+  }
+
+  return false;
+}
+
+export function hasResumableConversationContent(
+  messages: readonly MessageRecord[],
+): boolean {
+  return messages.some((message) => isResumableMessageRecord(message));
 }
 
 export async function loadConversationRecord(
@@ -111,7 +138,7 @@ export async function loadConversationRecord(
       messageCount?: number;
       userMessageCount?: number;
       firstUserMessage?: string;
-      hasUserOrAssistantMessage?: boolean;
+      hasResumableContent?: boolean;
       memoryScratchpadIsStale?: boolean;
     })
   | null
@@ -132,7 +159,7 @@ export async function loadConversationRecord(
     const messageIds: string[] = [];
     const messageKinds = new Map<
       string,
-      { isUser: boolean; isUserOrAssistant: boolean }
+      { isUser: boolean; isResumable: boolean }
     >();
     let isTrackingMemoryScratchpadFreshness = false;
     let memoryScratchpadIsStale = false;
@@ -179,19 +206,18 @@ export async function loadConversationRecord(
           }
           const id = record.id;
           const isUser = hasProperty(record, 'type') && record.type === 'user';
-          const isUserOrAssistant =
-            hasProperty(record, 'type') &&
-            (record.type === 'user' || record.type === 'gemini');
+          const isResumable = isResumableMessageRecord(record);
           // Track message count and first user message
           if (options?.metadataOnly) {
             messageIds.push(id);
-            messageKinds.set(id, { isUser, isUserOrAssistant });
+            messageKinds.set(id, { isUser, isResumable });
           }
           if (
             !firstUserMessageStr &&
             isUser &&
             hasProperty(record, 'content') &&
-            record['content']
+            record['content'] &&
+            isResumable
           ) {
             // Basic extraction of first user message for display
             const rawContent = record['content'];
@@ -221,14 +247,98 @@ export async function loadConversationRecord(
             );
             memoryScratchpadIsStale = false;
           }
+          if (
+            hasProperty(record.$set, 'messages') &&
+            Array.isArray(record.$set.messages)
+          ) {
+            // Checkpoint: clear and rebuild from the provided messages array
+            messagesMap.clear();
+            if (options?.metadataOnly) {
+              messageIds.length = 0;
+              messageKinds.clear();
+            }
+            for (const msg of record.$set.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isResumable = isResumableMessageRecord(msg);
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, {
+                    isUser,
+                    isResumable,
+                  });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  isResumable &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
           // Metadata update
           metadata = {
             ...metadata,
             ...record.$set,
           };
         } else if (isPartialMetadataRecord(record)) {
-          // Initial metadata line
+          // Initial metadata line (or entire legacy record if on one line)
           metadata = { ...metadata, ...record };
+          if (
+            hasProperty(record, 'messages') &&
+            Array.isArray(record.messages)
+          ) {
+            for (const msg of record.messages) {
+              if (isMessageRecord(msg)) {
+                const id = msg.id;
+                const isUser = msg.type === 'user';
+                const isResumable = isResumableMessageRecord(msg);
+
+                if (options?.metadataOnly) {
+                  messageIds.push(id);
+                  messageKinds.set(id, {
+                    isUser,
+                    isResumable,
+                  });
+                } else {
+                  messagesMap.set(id, msg);
+                }
+
+                if (
+                  !firstUserMessageStr &&
+                  isUser &&
+                  isResumable &&
+                  msg.content &&
+                  (Array.isArray(msg.content) ||
+                    typeof msg.content === 'string')
+                ) {
+                  if (Array.isArray(msg.content)) {
+                    firstUserMessageStr = msg.content
+                      .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                      .join('');
+                  } else {
+                    firstUserMessageStr = msg.content;
+                  }
+                }
+              }
+            }
+          }
         }
       } catch {
         // ignore parse errors on individual lines
@@ -239,15 +349,12 @@ export async function loadConversationRecord(
       return await parseLegacyRecordFallback(filePath, options);
     }
 
-    const metadataMessages = Array.isArray(metadata.messages)
-      ? metadata.messages
-      : [];
-    const loadedMessages =
-      metadataMessages.length > 0
-        ? metadataMessages
-        : Array.from(messagesMap.values());
+    const loadedMessages = Array.from(messagesMap.values());
     const metadataFirstUserMessage =
-      metadataMessages.find((message) => message.type === 'user') ?? null;
+      loadedMessages.find(
+        (message) =>
+          message.type === 'user' && isResumableMessageRecord(message),
+      ) ?? null;
     let fallbackFirstUserMessage = firstUserMessageStr;
     if (!fallbackFirstUserMessage && metadataFirstUserMessage) {
       const rawContent = metadataFirstUserMessage.content;
@@ -262,9 +369,9 @@ export async function loadConversationRecord(
     const userMessageCount = options?.metadataOnly
       ? Array.from(messageKinds.values()).filter((m) => m.isUser).length
       : loadedMessages.filter((m) => m.type === 'user').length;
-    const hasUserOrAssistant = options?.metadataOnly
-      ? Array.from(messageKinds.values()).some((m) => m.isUserOrAssistant)
-      : loadedMessages.some((m) => m.type === 'user' || m.type === 'gemini');
+    const hasResumableContent = options?.metadataOnly
+      ? Array.from(messageKinds.values()).some((m) => m.isResumable)
+      : hasResumableConversationContent(loadedMessages);
 
     return {
       sessionId: metadata.sessionId,
@@ -277,22 +384,14 @@ export async function loadConversationRecord(
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
       messageCount: options?.metadataOnly
-        ? metadataMessages.length || messageIds.length
+        ? loadedMessages.length || messageIds.length
         : loadedMessages.length,
-      userMessageCount:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.filter((m) => m.type === 'user').length
-          : userMessageCount,
+      userMessageCount,
       memoryScratchpadIsStale: isTrackingMemoryScratchpadFreshness
         ? memoryScratchpadIsStale
         : undefined,
       firstUserMessage: fallbackFirstUserMessage,
-      hasUserOrAssistantMessage:
-        options?.metadataOnly && metadataMessages.length > 0
-          ? metadataMessages.some(
-              (m) => m.type === 'user' || m.type === 'gemini',
-            )
-          : hasUserOrAssistant,
+      hasResumableContent,
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);
@@ -497,9 +596,10 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'],
     content: PartListUnion,
     displayContent?: PartListUnion,
+    id?: string,
   ): MessageRecord {
     return {
-      id: randomUUID(),
+      id: id || randomUUID(),
       timestamp: new Date().toISOString(),
       type,
       content,
@@ -512,14 +612,17 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
     displayContent?: PartListUnion;
-  }): void {
-    if (!this.conversationFile || !this.cachedConversation) return;
+    id?: string;
+  }): string {
+    if (!this.conversationFile || !this.cachedConversation)
+      return message.id || randomUUID();
 
     try {
       const msg = this.newMessage(
         message.type,
         message.content,
         message.displayContent,
+        message.id,
       );
       if (msg.type === 'gemini') {
         msg.thoughts = this.queuedThoughts;
@@ -530,10 +633,28 @@ export class ChatRecordingService {
       }
       this.pushMessage(msg);
       this.updateMetadata({ lastUpdated: new Date().toISOString() });
+      return msg.id;
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
+  }
+
+  /**
+   * Records a synthetic message (e.g. Binary Received, Snapshot/Summary)
+   * and returns its durable ID.
+   */
+  recordSyntheticMessage(
+    type: ConversationRecordExtra['type'],
+    content: PartListUnion,
+    id?: string,
+  ): string {
+    return this.recordMessage({
+      model: undefined,
+      type,
+      content,
+      id,
+    });
   }
 
   recordThought(thought: ThoughtSummary): void {
@@ -681,140 +802,7 @@ export class ChatRecordingService {
    * @throws {Error} If shortId validation fails.
    */
   async deleteSession(sessionIdOrBasename: string): Promise<void> {
-    try {
-      const tempDir = this.context.config.storage.getProjectTempDir();
-      const chatsDir = path.join(tempDir, 'chats');
-      const shortId = this.deriveShortId(sessionIdOrBasename);
-
-      // Using stat instead of existsSync for async sanity
-      if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
-        return; // Nothing to delete
-      }
-
-      const matchingFiles = await this.getMatchingSessionFiles(
-        chatsDir,
-        shortId,
-      );
-      for (const file of matchingFiles) {
-        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
-      }
-    } catch (error) {
-      debugLogger.error('Error deleting session file.', error);
-      throw error;
-    }
-  }
-
-  private deriveShortId(sessionIdOrBasename: string): string {
-    let shortId = sessionIdOrBasename;
-    if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
-      const withoutExt = sessionIdOrBasename.replace(/\.jsonl?$/, '');
-      const parts = withoutExt.split('-');
-      shortId = parts[parts.length - 1];
-    } else if (sessionIdOrBasename.length >= 8) {
-      shortId = sessionIdOrBasename.slice(0, 8);
-    } else {
-      throw new Error('Invalid sessionId or basename provided for deletion');
-    }
-
-    if (shortId.length !== 8) {
-      throw new Error('Derived shortId must be exactly 8 characters');
-    }
-
-    return shortId;
-  }
-
-  private async getMatchingSessionFiles(
-    chatsDir: string,
-    shortId: string,
-  ): Promise<string[]> {
-    const files = await fs.promises.readdir(chatsDir);
-    return files.filter(
-      (f) =>
-        f.startsWith(SESSION_FILE_PREFIX) &&
-        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
-    );
-  }
-
-  /**
-   * Deletes a single session file and its associated logs, tool-outputs, and directory.
-   */
-  private async deleteSessionAndArtifacts(
-    chatsDir: string,
-    file: string,
-    tempDir: string,
-  ): Promise<void> {
-    const filePath = path.join(chatsDir, file);
-    let fullSessionId: string | undefined;
-
-    try {
-      const CHUNK_SIZE = 4096;
-      const buffer = Buffer.alloc(CHUNK_SIZE);
-      let firstLine: string;
-      let fd: fs.promises.FileHandle | undefined;
-      try {
-        fd = await fs.promises.open(filePath, 'r');
-        const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-        if (bytesRead > 0) {
-          const contentChunk = buffer.toString('utf8', 0, bytesRead);
-          const newlineIndex = contentChunk.indexOf('\n');
-          firstLine =
-            newlineIndex !== -1
-              ? contentChunk.substring(0, newlineIndex)
-              : contentChunk;
-
-          try {
-            const content = JSON.parse(firstLine) as unknown;
-            if (isSessionIdRecord(content)) {
-              fullSessionId = content.sessionId;
-            }
-          } catch {
-            // If first line parse fails, it might be a legacy pretty-printed JSON.
-            // We'll fall back to full file read below.
-          }
-        }
-      } finally {
-        if (fd !== undefined) {
-          await fd.close();
-        }
-      }
-
-      // Fallback for legacy JSON files if we couldn't get sessionId from first line
-      if (!fullSessionId) {
-        try {
-          const fileContent = await fs.promises.readFile(filePath, 'utf8');
-          const parsed = JSON.parse(fileContent) as unknown;
-          if (isSessionIdRecord(parsed)) {
-            fullSessionId = parsed.sessionId;
-          }
-        } catch {
-          // Ignore parse errors, we'll still try to unlink the file
-        }
-      }
-
-      if (fullSessionId) {
-        // Delegate to shared utility!
-        await deleteSessionArtifactsAsync(fullSessionId, tempDir);
-        await deleteSubagentSessionDirAndArtifactsAsync(
-          fullSessionId,
-          chatsDir,
-          tempDir,
-        );
-      }
-    } catch (error) {
-      debugLogger.error(
-        `Error deleting artifacts for session file ${file}:`,
-        error,
-      );
-    } finally {
-      // ALWAYS try to delete the session file itself
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (error) {
-        if (isNodeError(error) && error.code !== 'ENOENT') {
-          debugLogger.error(`Error unlinking session file ${file}:`, error);
-        }
-      }
-    }
+    return deleteStoredSession(this.context.config, sessionIdOrBasename);
   }
 
   /**
@@ -844,6 +832,23 @@ export class ChatRecordingService {
   }
 
   /**
+   * Deletes the current session only if it has no resumable conversation
+   * content. This removes abandoned startup-only sessions while preserving any
+   * session with a real user prompt, model response, or tool activity.
+   */
+  async deleteCurrentSessionIfNotResumableAsync(): Promise<void> {
+    if (!this.conversationFile || !this.cachedConversation) {
+      return;
+    }
+
+    if (hasResumableConversationContent(this.cachedConversation.messages)) {
+      return;
+    }
+
+    await this.deleteCurrentSessionAsync();
+  }
+
+  /**
    * Rewinds the conversation to the state just before the specified message ID.
    * All messages from (and including) the specified ID onwards are removed.
    */
@@ -869,48 +874,83 @@ export class ChatRecordingService {
     return this.cachedConversation;
   }
 
-  updateMessagesFromHistory(history: readonly Content[]): void {
+  updateMessagesFromHistory(history: readonly HistoryTurn[]): void {
     if (!this.conversationFile || !this.cachedConversation) return;
 
     try {
-      const partsMap = new Map<string, Part[]>();
-      for (const content of history) {
-        if (content.role === 'user' && content.parts) {
-          const callIds = content.parts
-            .map((p) => p.functionResponse?.id)
-            .filter((id): id is string => !!id);
+      let updated = false;
 
-          if (callIds.length === 0) continue;
+      // 1. Sync content and IDs
+      const newMessages: MessageRecord[] = history.map((turn) => {
+        const existing = this.cachedConversation?.messages.find(
+          (m) => m.id === turn.id,
+        );
 
-          let currentCallId = callIds[0];
-          for (const part of content.parts) {
-            if (part.functionResponse?.id) {
-              currentCallId = part.functionResponse.id;
+        if (existing) {
+          // If content parts have changed (e.g. masking), update them
+          if (
+            JSON.stringify(existing.content) !==
+            JSON.stringify(turn.content.parts)
+          ) {
+            updated = true;
+          }
+          return {
+            ...existing,
+            content: turn.content.parts || [],
+          };
+        }
+
+        // It's a new (possibly synthetic) turn like a summary
+        updated = true;
+        return this.newMessage(
+          turn.content.role === 'user' ? 'user' : 'gemini',
+          turn.content.parts || [],
+          undefined,
+          turn.id,
+        );
+      });
+
+      // 2. Specialized 'Masking Sync' for tool call results
+      // If a user turn in history contains a functionResponse, we update the
+      // corresponding ToolCallRecord in the preceding gemini message.
+      for (const turn of history) {
+        if (turn.content.role !== 'user') continue;
+        for (const part of turn.content.parts || []) {
+          if (part.functionResponse) {
+            const callId = part.functionResponse.id;
+            // Find the gemini message that contains this tool call
+            const geminiMsg = newMessages.find(
+              (m) =>
+                m.type === 'gemini' &&
+                m.toolCalls?.some((tc) => tc.id === callId),
+            );
+            if (geminiMsg && geminiMsg.type === 'gemini') {
+              const tc = geminiMsg.toolCalls!.find((tc) => tc.id === callId);
+              if (tc) {
+                // If the history version is different (e.g. masked), sync it into the record
+                // We sync the entire parts array of the user turn to ensure sibling parts are preserved
+                if (
+                  JSON.stringify(tc.result) !==
+                  JSON.stringify(turn.content.parts)
+                ) {
+                  tc.result = turn.content.parts || [];
+                  updated = true;
+                }
+              }
             }
-
-            if (!partsMap.has(currentCallId)) {
-              partsMap.set(currentCallId, []);
-            }
-            partsMap.get(currentCallId)!.push(part);
           }
         }
       }
 
-      for (const message of this.cachedConversation.messages) {
-        let msgChanged = false;
-        if (message.type === 'gemini' && message.toolCalls) {
-          for (const toolCall of message.toolCalls) {
-            const newParts = partsMap.get(toolCall.id);
-            if (newParts !== undefined) {
-              toolCall.result = newParts;
-              msgChanged = true;
-            }
-          }
-        }
-        if (msgChanged) {
-          // Push updated message to log
-          this.pushMessage(message);
-        }
+      if (
+        updated ||
+        newMessages.length !== this.cachedConversation.messages.length
+      ) {
+        this.cachedConversation.messages = newMessages;
+        this.updateMetadata({
+          messages: newMessages,
+          lastUpdated: new Date().toISOString(),
+        });
       }
     } catch (error) {
       debugLogger.error(
@@ -930,7 +970,7 @@ async function parseLegacyRecordFallback(
       messageCount?: number;
       userMessageCount?: number;
       firstUserMessage?: string;
-      hasUserOrAssistantMessage?: boolean;
+      hasResumableContent?: boolean;
     })
   | null
 > {
@@ -946,7 +986,7 @@ async function parseLegacyRecordFallback(
       if (options?.metadataOnly) {
         let fallbackFirstUserMessageStr: string | undefined;
         const firstUserMessage = legacyRecord.messages?.find(
-          (m) => m.type === 'user',
+          (m) => m.type === 'user' && isResumableMessageRecord(m),
         );
         if (firstUserMessage) {
           const rawContent = firstUserMessage.content;
@@ -965,20 +1005,18 @@ async function parseLegacyRecordFallback(
           userMessageCount:
             legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
           firstUserMessage: fallbackFirstUserMessageStr,
-          hasUserOrAssistantMessage:
-            legacyRecord.messages?.some(
-              (m) => m.type === 'user' || m.type === 'gemini',
-            ) || false,
+          hasResumableContent:
+            legacyRecord.messages?.some((m) => isResumableMessageRecord(m)) ||
+            false,
         };
       }
       return {
         ...legacyRecord,
         userMessageCount:
           legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
-        hasUserOrAssistantMessage:
-          legacyRecord.messages?.some(
-            (m) => m.type === 'user' || m.type === 'gemini',
-          ) || false,
+        hasResumableContent:
+          legacyRecord.messages?.some((m) => isResumableMessageRecord(m)) ||
+          false,
       };
     }
   } catch {
