@@ -10,15 +10,15 @@ const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
 
 vi.mock('@octokit/rest', () => ({
-    Octokit: vi.fn().mockImplementation(() => ({
-      rest: {
-        issues: {
-          createComment: mockCreateComment,
-          addLabels: mockAddLabels,
-        },
+  Octokit: vi.fn().mockImplementation(() => ({
+    rest: {
+      issues: {
+        createComment: mockCreateComment,
+        addLabels: mockAddLabels,
       },
-    })),
-  }));
+    },
+  })),
+}));
 
 vi.mock('@octokit/auth-app', () => ({
   createAppAuth: vi.fn(),
