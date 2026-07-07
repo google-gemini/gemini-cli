@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockCreateComment = vi.fn();
 const mockAddLabels = vi.fn();
+const mockRemoveLabel = vi.fn();
 
 vi.mock('@octokit/rest', () => ({
   Octokit: vi.fn().mockImplementation(() => ({
@@ -15,6 +16,7 @@ vi.mock('@octokit/rest', () => ({
       issues: {
         createComment: mockCreateComment,
         addLabels: mockAddLabels,
+        removeLabel: mockRemoveLabel,
       },
     },
   })),
@@ -125,6 +127,26 @@ describe('GitHub Actions Handler', () => {
       repo: 'gemini-cli',
       issue_number: 10,
       labels: ['effort/small'],
+    });
+  });
+
+  it('should call removeLabel for UNLABEL action', async () => {
+    mockRemoveLabel.mockResolvedValueOnce({});
+    await handleEgressEvent({
+      action: 'UNLABEL',
+      payload: {
+        owner: 'google-gemini',
+        repo: 'gemini-cli',
+        issueNumber: 10,
+        labels: ['need-triage'],
+      },
+    });
+
+    expect(mockRemoveLabel).toHaveBeenCalledWith({
+      owner: 'google-gemini',
+      repo: 'gemini-cli',
+      issue_number: 10,
+      name: 'need-triage',
     });
   });
 

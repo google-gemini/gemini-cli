@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type EgressAction = 'COMMENT' | 'LABEL' | 'PATCH';
+export type EgressAction = 'COMMENT' | 'LABEL' | 'UNLABEL' | 'PATCH';
 
 export interface EgressEventPayload {
   owner: string;
@@ -68,7 +68,7 @@ export function isEgressEvent(obj: unknown): obj is EgressEvent {
   }
   if (
     typeof obj.action !== 'string' ||
-    !['COMMENT', 'LABEL', 'PATCH'].includes(obj.action)
+    !['COMMENT', 'LABEL', 'UNLABEL', 'PATCH'].includes(obj.action)
   ) {
     return false;
   }

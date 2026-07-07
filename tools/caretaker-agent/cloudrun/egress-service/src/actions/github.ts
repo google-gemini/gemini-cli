@@ -53,6 +53,10 @@ export async function handleEgressEvent(event: EgressEvent): Promise<void> {
   const octokit = getOctokit();
 
   switch (action) {
+    // Note: The Egress Service operates as a stateless execution worker ("Hands").
+    // Upstream event filtering (e.g. evaluating newly created issues for NEEDS_INFO
+    // or verifying bot mention/author criteria) is performed in the Triage Worker
+    // before publishing action payloads to the egress-actions topic.
     case 'COMMENT':
       if (!payload.commentBody || payload.commentBody.trim() === '') {
         throw new Error('Missing or empty commentBody for COMMENT action');
@@ -81,6 +85,23 @@ export async function handleEgressEvent(event: EgressEvent): Promise<void> {
         issue_number: issueNumber,
         labels: payload.labels,
       });
+      break;
+
+    case 'UNLABEL':
+      if (!payload.labels || !Array.isArray(payload.labels)) {
+        throw new Error('Missing or invalid labels array for UNLABEL action');
+      }
+      console.log(
+        `[EGRESS_GITHUB] Removing labels [${payload.labels.join(', ')}] from ${owner}/${repo}#${issueNumber}...`,
+      );
+      for (const name of payload.labels) {
+        await octokit.rest.issues.removeLabel({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          name,
+        });
+      }
       break;
 
     case 'PATCH':
