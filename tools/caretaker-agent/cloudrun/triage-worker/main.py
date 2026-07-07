@@ -11,6 +11,13 @@ from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 
 
 def main() -> None:
+    """
+    Main entrypoint for Caretaker Triage Cloud Run Job worker.
+
+    Assumptions:
+        - Assumes ISSUE_DETAILS env var contains base64-encoded JSON payload.
+        - Assumes WORKFLOW_EXECUTION_ID contains unique lock holder ID.
+    """
     # Cloud Run Jobs inject data via environment variables
     encoded_data = os.environ.get("ISSUE_DETAILS")
     
