@@ -1,0 +1,1 @@
+google-cloud-firestore>=2.15.0, <3.0.0
