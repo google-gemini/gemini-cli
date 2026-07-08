@@ -12,7 +12,7 @@ from db.issues_store import IssuesStore, ClaimAction, ReleaseAction
 
 def main() -> None:
     """
-    Main entrypoint for Caretaker Triage Cloud Run Job worker.
+    Orchestrates the Cloud Run Job execution loop for Caretaker Triage.
 
     Assumptions:
         - Assumes ISSUE_DETAILS env var contains base64-encoded JSON payload.
