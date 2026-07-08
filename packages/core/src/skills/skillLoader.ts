@@ -86,14 +86,14 @@ function parseSimpleFrontmatter(
     const line = lines[i];
 
     // Match "name" at the start of the line (optional whitespace, case-insensitive, optional spaces before/after colon)
-    const nameMatch = line.match(/^\s*name\s*:\s*(.*)$/i) || line.match(/^\s*name\s+:\s*(.*)$/i);
+    const nameMatch = line.match(/^\s*name\s*:\s*(.*)$/i);
     if (nameMatch) {
       name = nameMatch[1].trim();
       continue;
     }
 
     // Match "description" at the start of the line (optional whitespace, case-insensitive, optional spaces before/after colon)
-    const descMatch = line.match(/^\s*description\s*:\s*(.*)$/i) || line.match(/^\s*description\s+:\s*(.*)$/i);
+    const descMatch = line.match(/^\s*description\s*:\s*(.*)$/i);
     if (descMatch) {
       const descLines = [descMatch[1].trim()];
 
@@ -103,7 +103,7 @@ function parseSimpleFrontmatter(
         // If next line is indented, it's a continuation of the description, but only if it does not resemble keys
         if (nextLine.match(/^[ \t]+\S/)) {
           // Check if the continuation line looks like another key (e.g. "  name : value" or "  description : value")
-          if (nextLine.match(/^\s*(?:name|description)\s*:/i) || nextLine.match(/^\s*(?:name|description)\s+:/i)) {
+          if (nextLine.match(/^\s*(?:name|description)\s*:/i)) {
             break;
           }
           descLines.push(nextLine.trim());
