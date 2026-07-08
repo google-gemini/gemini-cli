@@ -198,19 +198,19 @@ export async function createApp() {
   try {
     // Load the server configuration once on startup.
     const workspaceRoot = setTargetDir(undefined);
-    loadEnvironment();
 
     // Use a temporary settings load to check if folder trust is enabled.
     // This is similar to how the CLI handles the initial trust check.
-    const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isFolderTrustEnabled: true,
       isHeadless: isHeadlessMode(),
     });
 
+    loadEnvironment(isTrusted ?? false, workspaceRoot);
+
     const settings = loadSettings(workspaceRoot, isTrusted ?? false);
-    const extensions = loadExtensions(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot, isTrusted ?? false);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),

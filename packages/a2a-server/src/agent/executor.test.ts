@@ -15,6 +15,16 @@ import { EventEmitter } from 'node:events';
 import { requestStorage } from '../http/requestStorage.js';
 
 // Mocks for constructor dependencies
+vi.mock('@google/gemini-cli-core', () => ({
+  GeminiEventType: {
+    PRIMARY_TURN_STARTED: 'PRIMARY_TURN_STARTED',
+    SECONDARY_TURN_STARTED: 'SECONDARY_TURN_STARTED',
+  },
+  SimpleExtensionLoader: vi.fn(),
+  checkPathTrust: vi.fn().mockReturnValue({ isTrusted: false }),
+  isHeadlessMode: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock('../config/config.js', () => ({
   loadConfig: vi.fn().mockReturnValue({
     getSessionId: () => 'test-session',

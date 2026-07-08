@@ -221,8 +221,26 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
   }
 }
 
-export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
+export function loadEnvironment(
+  isTrusted: boolean = false,
+  workspacePath: string = process.cwd(),
+): void {
+  // For untrusted workspaces, we completely bypass workspace-level .env loading
+  // and only load environment variables from the user's trusted home directory.
+  let envFilePath: string | null = null;
+  if (isTrusted) {
+    envFilePath = findEnvFile(workspacePath);
+  } else {
+    const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+    if (fs.existsSync(homeGeminiEnvPath)) {
+      envFilePath = homeGeminiEnvPath;
+    } else {
+      const homeEnvPath = path.join(homedir(), '.env');
+      if (fs.existsSync(homeEnvPath)) {
+        envFilePath = homeEnvPath;
+      }
+    }
+  }
   if (envFilePath) {
     dotenv.config({ path: envFilePath, override: true });
   }
@@ -242,19 +260,17 @@ function findEnvFile(startDir: string): string | null {
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
+      break;
     }
     currentDir = parentDir;
   }
+  // check .env under home as fallback, again preferring gemini-specific .env
+  const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+  if (fs.existsSync(homeGeminiEnvPath)) {
+    return homeGeminiEnvPath;
+  }
+  const homeEnvPath = path.join(homedir(), '.env');
+  return fs.existsSync(homeEnvPath) ? homeEnvPath : null;
 }
 
 async function refreshAuthentication(

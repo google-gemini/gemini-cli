@@ -17,6 +17,8 @@ import {
   SimpleExtensionLoader,
   type ToolCallRequestInfo,
   type Config,
+  checkPathTrust,
+  isHeadlessMode,
 } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -31,12 +33,7 @@ import {
   getContextIdFromMetadata,
   getAgentSettingsFromMetadata,
 } from '../types.js';
-import {
-  loadConfig,
-  loadEnvironment,
-  setIsTrusted,
-  setTargetDir,
-} from '../config/config.js';
+import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
@@ -98,15 +95,22 @@ export class CoderAgentExecutor implements AgentExecutor {
     taskId: string,
   ): Promise<Config> {
     const workspaceRoot = setTargetDir(agentSettings);
-    loadEnvironment(); // Will override any global env with workspace envs
-    const isTrusted = setIsTrusted(agentSettings);
-    const settings = loadSettings(workspaceRoot, isTrusted);
-    const extensions = loadExtensions(workspaceRoot);
+
+    // Independently verify the trust status of the workspace path on the server side
+    const { isTrusted } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled: true,
+      isHeadless: isHeadlessMode(),
+    });
+
+    loadEnvironment(isTrusted ?? false, workspaceRoot);
+    const settings = loadSettings(workspaceRoot, isTrusted ?? false);
+    const extensions = loadExtensions(workspaceRoot, isTrusted ?? false);
     return loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       taskId,
-      isTrusted,
+      isTrusted ?? false,
     );
   }
 
