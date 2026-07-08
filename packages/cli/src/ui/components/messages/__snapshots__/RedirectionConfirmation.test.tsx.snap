@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolConfirmationMessage Redirection > should display redirection warning and tip for redirected commands 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ echo "hello" > test.txt                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [Shell]?
+Redirection detected. To auto-accept, press Shift+Tab
+
+● 1. Allow once               
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;

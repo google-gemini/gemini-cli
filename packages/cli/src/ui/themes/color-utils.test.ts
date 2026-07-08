@@ -1,0 +1,430 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  isValidColor,
+  resolveColor,
+  interpolateColor,
+  CSS_NAME_TO_HEX_MAP,
+  INK_SUPPORTED_NAMES,
+  getThemeTypeFromBackgroundColor,
+  getLuminance,
+  parseColor,
+  shouldSwitchTheme,
+} from './color-utils.js';
+
+describe('Color Utils', () => {
+  describe('isValidColor', () => {
+    it('should validate hex colors', () => {
+      expect(isValidColor('#ff0000')).toBe(true);
+      expect(isValidColor('#00ff00')).toBe(true);
+      expect(isValidColor('#0000ff')).toBe(true);
+      expect(isValidColor('#fff')).toBe(true);
+      expect(isValidColor('#000')).toBe(true);
+      expect(isValidColor('#FF0000')).toBe(true); // Case insensitive
+    });
+
+    it('should validate Ink-supported color names', () => {
+      expect(isValidColor('black')).toBe(true);
+      expect(isValidColor('red')).toBe(true);
+      expect(isValidColor('green')).toBe(true);
+      expect(isValidColor('yellow')).toBe(true);
+      expect(isValidColor('blue')).toBe(true);
+      expect(isValidColor('cyan')).toBe(true);
+      expect(isValidColor('magenta')).toBe(true);
+      expect(isValidColor('white')).toBe(true);
+      expect(isValidColor('gray')).toBe(true);
+      expect(isValidColor('grey')).toBe(true);
+      expect(isValidColor('blackbright')).toBe(true);
+      expect(isValidColor('redbright')).toBe(true);
+      expect(isValidColor('greenbright')).toBe(true);
+      expect(isValidColor('yellowbright')).toBe(true);
+      expect(isValidColor('bluebright')).toBe(true);
+      expect(isValidColor('cyanbright')).toBe(true);
+      expect(isValidColor('magentabright')).toBe(true);
+      expect(isValidColor('whitebright')).toBe(true);
+    });
+
+    it('should validate Ink-supported color names case insensitive', () => {
+      expect(isValidColor('BLACK')).toBe(true);
+      expect(isValidColor('Red')).toBe(true);
+      expect(isValidColor('GREEN')).toBe(true);
+    });
+
+    it('should validate CSS color names', () => {
+      expect(isValidColor('darkkhaki')).toBe(true);
+      expect(isValidColor('coral')).toBe(true);
+      expect(isValidColor('teal')).toBe(true);
+      expect(isValidColor('tomato')).toBe(true);
+      expect(isValidColor('turquoise')).toBe(true);
+      expect(isValidColor('violet')).toBe(true);
+      expect(isValidColor('wheat')).toBe(true);
+      expect(isValidColor('whitesmoke')).toBe(true);
+      expect(isValidColor('yellowgreen')).toBe(true);
+    });
+
+    it('should validate CSS color names case insensitive', () => {
+      expect(isValidColor('DARKKHAKI')).toBe(true);
+      expect(isValidColor('Coral')).toBe(true);
+      expect(isValidColor('TEAL')).toBe(true);
+    });
+
+    it('should reject invalid color names', () => {
+      expect(isValidColor('invalidcolor')).toBe(false);
+      expect(isValidColor('notacolor')).toBe(false);
+      expect(isValidColor('')).toBe(false);
+    });
+  });
+
+  describe('resolveColor', () => {
+    it('should resolve hex colors', () => {
+      expect(resolveColor('#ff0000')).toBe('#ff0000');
+      expect(resolveColor('#00ff00')).toBe('#00ff00');
+      expect(resolveColor('#0000ff')).toBe('#0000ff');
+      expect(resolveColor('#fff')).toBe('#fff');
+      expect(resolveColor('#000')).toBe('#000');
+    });
+
+    it('should resolve Ink-supported color names', () => {
+      expect(resolveColor('black')).toBe('black');
+      expect(resolveColor('red')).toBe('red');
+      expect(resolveColor('green')).toBe('green');
+      expect(resolveColor('yellow')).toBe('yellow');
+      expect(resolveColor('blue')).toBe('blue');
+      expect(resolveColor('cyan')).toBe('cyan');
+      expect(resolveColor('magenta')).toBe('magenta');
+      expect(resolveColor('white')).toBe('white');
+      expect(resolveColor('gray')).toBe('gray');
+      expect(resolveColor('grey')).toBe('grey');
+    });
+
+    it('should resolve CSS color names to hex', () => {
+      expect(resolveColor('darkkhaki')).toBe('#bdb76b');
+      expect(resolveColor('coral')).toBe('#ff7f50');
+      expect(resolveColor('teal')).toBe('#008080');
+      expect(resolveColor('tomato')).toBe('#ff6347');
+      expect(resolveColor('turquoise')).toBe('#40e0d0');
+      expect(resolveColor('violet')).toBe('#ee82ee');
+      expect(resolveColor('wheat')).toBe('#f5deb3');
+      expect(resolveColor('whitesmoke')).toBe('#f5f5f5');
+      expect(resolveColor('yellowgreen')).toBe('#9acd32');
+    });
+
+    it('should handle case insensitive color names', () => {
+      expect(resolveColor('DARKKHAKI')).toBe('#bdb76b');
+      expect(resolveColor('Coral')).toBe('#ff7f50');
+      expect(resolveColor('TEAL')).toBe('#008080');
+    });
+
+    it('should return undefined for invalid colors', () => {
+      expect(resolveColor('invalidcolor')).toBeUndefined();
+      expect(resolveColor('notacolor')).toBeUndefined();
+      expect(resolveColor('')).toBeUndefined();
+    });
+  });
+
+  describe('CSS_NAME_TO_HEX_MAP', () => {
+    it('should contain expected CSS color mappings', () => {
+      expect(CSS_NAME_TO_HEX_MAP['darkkhaki']).toBe('#bdb76b');
+      expect(CSS_NAME_TO_HEX_MAP['coral']).toBe('#ff7f50');
+      expect(CSS_NAME_TO_HEX_MAP['teal']).toBe('#008080');
+      expect(CSS_NAME_TO_HEX_MAP['tomato']).toBe('#ff6347');
+      expect(CSS_NAME_TO_HEX_MAP['turquoise']).toBe('#40e0d0');
+    });
+
+    it('should not contain Ink-supported color names', () => {
+      expect(CSS_NAME_TO_HEX_MAP['black']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['red']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['green']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['blue']).toBeUndefined();
+    });
+  });
+
+  describe('INK_SUPPORTED_NAMES', () => {
+    it('should contain all Ink-supported color names', () => {
+      expect(INK_SUPPORTED_NAMES.has('black')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('red')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('green')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('yellow')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('blue')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('cyan')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('magenta')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('white')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('gray')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('grey')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('blackbright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('redbright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('greenbright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('yellowbright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('bluebright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('cyanbright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('magentabright')).toBe(true);
+      expect(INK_SUPPORTED_NAMES.has('whitebright')).toBe(true);
+    });
+
+    it('should not contain CSS color names', () => {
+      expect(INK_SUPPORTED_NAMES.has('darkkhaki')).toBe(false);
+      expect(INK_SUPPORTED_NAMES.has('coral')).toBe(false);
+      expect(INK_SUPPORTED_NAMES.has('teal')).toBe(false);
+    });
+  });
+
+  describe('Consistency between validation and resolution', () => {
+    it('should have consistent behavior between isValidColor and resolveColor', () => {
+      // Test that any color that isValidColor returns true for can be resolved
+      const testColors = [
+        '#ff0000',
+        '#00ff00',
+        '#0000ff',
+        '#fff',
+        '#000',
+        'black',
+        'red',
+        'green',
+        'yellow',
+        'blue',
+        'cyan',
+        'magenta',
+        'white',
+        'gray',
+        'grey',
+        'darkkhaki',
+        'coral',
+        'teal',
+        'tomato',
+        'turquoise',
+        'violet',
+        'wheat',
+        'whitesmoke',
+        'yellowgreen',
+      ];
+
+      for (const color of testColors) {
+        expect(isValidColor(color)).toBe(true);
+        expect(resolveColor(color)).toBeDefined();
+      }
+
+      // Test that invalid colors are consistently rejected
+      const invalidColors = [
+        'invalidcolor',
+        'notacolor',
+        '',
+        '#gg0000',
+        '#ff00',
+      ];
+
+      for (const color of invalidColors) {
+        expect(isValidColor(color)).toBe(false);
+        expect(resolveColor(color)).toBeUndefined();
+      }
+    });
+  });
+
+  describe('interpolateColor', () => {
+    it('should interpolate between two colors', () => {
+      // Midpoint between black (#000000) and white (#ffffff) should be gray
+      expect(interpolateColor('#000000', '#ffffff', 0.5)).toBe('#7f7f7f');
+    });
+
+    it('should return start color when factor is 0', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 0)).toBe('#ff0000');
+    });
+
+    it('should return end color when factor is 1', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 1)).toBe('#0000ff');
+    });
+
+    it('should return start color when factor is < 0', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', -0.5)).toBe('#ff0000');
+    });
+
+    it('should return end color when factor is > 1', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 1.5)).toBe('#0000ff');
+    });
+
+    it('should return valid color if one is empty but factor selects the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 1)).toBe('#ffffff');
+      expect(interpolateColor('#ffffff', '', 0)).toBe('#ffffff');
+    });
+
+    it('should return empty string if either color is empty and factor does not select the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 0.5)).toBe('');
+      expect(interpolateColor('#ffffff', '', 0.5)).toBe('');
+      expect(interpolateColor('', '', 0.5)).toBe('');
+      expect(interpolateColor('', '#ffffff', 0)).toBe('');
+      expect(interpolateColor('#ffffff', '', 1)).toBe('');
+    });
+  });
+
+  describe('getThemeTypeFromBackgroundColor', () => {
+    it('should return light for light backgrounds', () => {
+      expect(getThemeTypeFromBackgroundColor('#ffffff')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('#f0f0f0')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('#cccccc')).toBe('light');
+    });
+
+    it('should return dark for dark backgrounds', () => {
+      expect(getThemeTypeFromBackgroundColor('#000000')).toBe('dark');
+      expect(getThemeTypeFromBackgroundColor('#1a1a1a')).toBe('dark');
+      expect(getThemeTypeFromBackgroundColor('#333333')).toBe('dark');
+    });
+
+    it('should return undefined for undefined background', () => {
+      expect(getThemeTypeFromBackgroundColor(undefined)).toBeUndefined();
+    });
+
+    it('should handle colors without # prefix', () => {
+      expect(getThemeTypeFromBackgroundColor('ffffff')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('000000')).toBe('dark');
+    });
+  });
+
+  describe('getLuminance', () => {
+    it('should calculate luminance correctly', () => {
+      // White: 0.2126*255 + 0.7152*255 + 0.0722*255 = 255
+      expect(getLuminance('#ffffff')).toBeCloseTo(255);
+      // Black: 0.2126*0 + 0.7152*0 + 0.0722*0 = 0
+      expect(getLuminance('#000000')).toBeCloseTo(0);
+      // Pure Red: 0.2126*255 = 54.213
+      expect(getLuminance('#ff0000')).toBeCloseTo(54.213);
+      // Pure Green: 0.7152*255 = 182.376
+      expect(getLuminance('#00ff00')).toBeCloseTo(182.376);
+      // Pure Blue: 0.0722*255 = 18.411
+      expect(getLuminance('#0000ff')).toBeCloseTo(18.411);
+    });
+
+    it('should handle colors without # prefix', () => {
+      expect(getLuminance('ffffff')).toBeCloseTo(255);
+    });
+
+    it('should handle 3-digit hex codes', () => {
+      // #fff -> #ffffff -> 255
+      expect(getLuminance('#fff')).toBeCloseTo(255);
+      // #000 -> #000000 -> 0
+      expect(getLuminance('#000')).toBeCloseTo(0);
+      // #f00 -> #ff0000 -> 54.213
+      expect(getLuminance('#f00')).toBeCloseTo(54.213);
+    });
+  });
+
+  describe('parseColor', () => {
+    it('should parse 1-digit components', () => {
+      // F/F/F => #ffffff
+      expect(parseColor('f', 'f', 'f')).toBe('#ffffff');
+      // 0/0/0 => #000000
+      expect(parseColor('0', '0', '0')).toBe('#000000');
+    });
+
+    it('should parse 2-digit components', () => {
+      // ff/ff/ff => #ffffff
+      expect(parseColor('ff', 'ff', 'ff')).toBe('#ffffff');
+      // 80/80/80 => #808080
+      expect(parseColor('80', '80', '80')).toBe('#808080');
+    });
+
+    it('should parse 4-digit components (standard X11)', () => {
+      // ffff/ffff/ffff => #ffffff (65535/65535 * 255 = 255)
+      expect(parseColor('ffff', 'ffff', 'ffff')).toBe('#ffffff');
+      // 0000/0000/0000 => #000000
+      expect(parseColor('0000', '0000', '0000')).toBe('#000000');
+      // 7fff/7fff/7fff => approx #7f7f7f (32767/65535 * 255 = 127.498... -> 127 -> 7f)
+      expect(parseColor('7fff', '7fff', '7fff')).toBe('#7f7f7f');
+    });
+
+    it('should handle mixed case', () => {
+      expect(parseColor('FFFF', 'FFFF', 'FFFF')).toBe('#ffffff');
+      expect(parseColor('Ffff', 'fFFF', 'ffFF')).toBe('#ffffff');
+    });
+  });
+
+  describe('shouldSwitchTheme', () => {
+    const DEFAULT_THEME = 'default';
+    const DEFAULT_LIGHT_THEME = 'default-light';
+    const LIGHT_THRESHOLD = 140;
+    const DARK_THRESHOLD = 110;
+
+    it('should switch to light theme if luminance > threshold and current is default', () => {
+      // 141 > 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+
+      // Undefined current theme counts as default
+      expect(
+        shouldSwitchTheme(
+          undefined,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+    });
+
+    it('should NOT switch to light theme if luminance <= threshold', () => {
+      // 140 <= 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to light theme if current theme is not default', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should switch to dark theme if luminance < threshold and current is default light', () => {
+      // 109 < 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_THEME);
+    });
+
+    it('should NOT switch to dark theme if luminance >= threshold', () => {
+      // 110 >= 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to dark theme if current theme is not default light', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+  });
+});

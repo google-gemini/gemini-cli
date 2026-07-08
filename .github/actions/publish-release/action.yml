@@ -1,0 +1,359 @@
+name: 'Publish Release'
+description: 'Builds, prepares, and publishes the gemini-cli packages to npm and creates a GitHub release.'
+
+inputs:
+  release-version:
+    description: 'The version to release (e.g., 0.1.11).'
+    required: true
+  npm-tag:
+    description: 'The npm tag to publish with (e.g., latest, preview, nightly).'
+    required: true
+  wombat-token-core:
+    description: 'The npm token for the cli-core package.'
+    required: true
+  wombat-token-cli:
+    description: 'The npm token for the cli package.'
+    required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the a2a package.'
+    required: true
+  github-token:
+    description: 'The GitHub token for creating the release.'
+    required: true
+  github-release-token:
+    description: 'The GitHub token used specifically for creating the GitHub release (to trigger other workflows).'
+    required: false
+  dry-run:
+    description: 'Whether to run in dry-run mode.'
+    type: 'string'
+    required: true
+  release-tag:
+    description: 'The release tag for the release (e.g., v0.1.11).'
+    required: true
+  previous-tag:
+    description: 'The previous tag to use for generating release notes.'
+    required: true
+  skip-github-release:
+    description: 'Whether to skip creating a GitHub release.'
+    type: 'boolean'
+    required: false
+    default: false
+  working-directory:
+    description: 'The working directory to run the steps in.'
+    required: false
+    default: '.'
+  force-skip-tests:
+    description: 'Skip tests and validation'
+    required: false
+    default: false
+  skip-branch-cleanup:
+    description: 'Whether to skip cleaning up the release branch.'
+    type: 'boolean'
+    required: false
+    default: false
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
+  npm-registry-publish-url:
+    description: 'npm registry publish url'
+    required: true
+  npm-registry-url:
+    description: 'npm registry url'
+    required: true
+  npm-registry-scope:
+    description: 'npm registry scope'
+    required: true
+  cli-package-name:
+    description: 'The name of the cli package.'
+    required: true
+  core-package-name:
+    description: 'The name of the core package.'
+    required: true
+  a2a-package-name:
+    description: 'The name of the a2a package.'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: '👤 Configure Git User'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        git config user.name "gemini-cli-robot"
+        git config user.email "gemini-cli-robot@google.com"
+
+    - name: '🌿 Create and switch to a release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      id: 'release_branch'
+      shell: 'bash'
+      run: |
+        BRANCH_NAME="release/${INPUTS_RELEASE_TAG}"
+        git switch -c "${BRANCH_NAME}"
+        echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+      env:
+        INPUTS_RELEASE_TAG: '${{ inputs.release-tag }}'
+
+    - name: '⬆️ Update package versions'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run release:version "${INPUTS_RELEASE_VERSION}"
+      env:
+        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
+
+    - name: '💾 Commit and Conditionally Push package versions'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      env:
+        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        DRY_RUN: '${{ inputs.dry-run }}'
+        RELEASE_TAG: '${{ inputs.release-tag }}'
+        GIT_PUSH_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
+      run: |-
+        set -e
+        git add package.json package-lock.json packages/*/package.json
+        git commit -m "chore(release): ${RELEASE_TAG}"
+        if [[ "${DRY_RUN}" == "false" ]]; then
+          echo "Pushing release branch to remote..."
+          git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
+        else
+          echo "Dry run enabled. Skipping push."
+        fi
+
+    - name: '🛠️ Build and Prepare Packages'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run build:packages
+        npm run prepare:package
+
+    - name: '🎁 Bundle'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run bundle
+
+    # TODO: Refactor this github specific publishing script to be generalized based upon inputs.
+    - name: '📦 Prepare for GitHub release'
+      if: "inputs.npm-registry-url == 'https://npm.pkg.github.com/'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        node ${{ github.workspace }}/scripts/prepare-github-release.js
+
+    - name: 'Configure npm for publishing to npm'
+      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      with:
+        node-version-file: '${{ inputs.working-directory }}/.nvmrc'
+        registry-url: '${{inputs.npm-registry-publish-url}}'
+        scope: '${{inputs.npm-registry-scope}}'
+
+    - name: 'Get core Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'core-token'
+      with:
+        package-name: '${{ inputs.core-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: '📦 Publish CORE to NPM'
+      working-directory: '${{ inputs.working-directory }}'
+      env:
+        NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+      shell: 'bash'
+      run: |
+        npm publish \
+          --ignore-scripts \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
+          --tag staging-tmp
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} staging-tmp
+        fi
+
+    - name: '🔗 Install latest core package'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run != 'true' }}"
+      shell: 'bash'
+      run: |
+        npm install "${INPUTS_CORE_PACKAGE_NAME}@${INPUTS_RELEASE_VERSION}" \
+        --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
+        --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
+        --save-exact
+      env:
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+
+    - name: '📦 Prepare bundled CLI for npm release'
+      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        node ${{ github.workspace }}/scripts/prepare-npm-release.js
+
+    - name: '📦 Pack CLI for verification'
+      if: "inputs.dry-run != 'true' && inputs.force-skip-tests != 'true'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm pack --workspace="${INPUTS_CLI_PACKAGE_NAME}"
+        # We restore the package.json so that `npm ci` in verify-release doesn't fail due to deleted dependencies
+        git checkout packages/cli/package.json
+      env:
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
+      with:
+        npm-package: './google-gemini-cli-${{ inputs.release-version }}.tgz'
+        expected-version: '${{ inputs.release-version }}'
+        working-directory: '${{ inputs.working-directory }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
+        github-token: '${{ inputs.github-token }}'
+        npm-registry-url: '${{ inputs.npm-registry-url }}'
+        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
+
+    - name: 'Get CLI Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'cli-token'
+      with:
+        package-name: '${{ inputs.cli-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: '📦 Publish CLI'
+      working-directory: '${{ inputs.working-directory }}'
+      env:
+        NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
+      shell: 'bash'
+      run: |
+        if [ -f "google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz" ]; then
+          PUBLISH_TARGET="google-gemini-cli-${INPUTS_RELEASE_VERSION}.tgz"
+        else
+          PUBLISH_TARGET="--workspace=${INPUTS_CLI_PACKAGE_NAME}"
+        fi
+
+        npm publish \
+          --ignore-scripts \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          ${PUBLISH_TARGET} \
+          --tag staging-tmp
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} staging-tmp
+        fi
+
+    - name: 'Get a2a-server Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'a2a-token'
+      with:
+        package-name: '${{ inputs.a2a-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: '📦 Publish a2a'
+      working-directory: '${{ inputs.working-directory }}'
+      env:
+        NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+      shell: 'bash'
+      # Tag staging for initial release
+      run: |
+        npm publish \
+          --ignore-scripts \
+          --dry-run="${INPUTS_DRY_RUN}" \
+          --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
+          --tag staging-tmp
+          if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+            npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} staging-tmp
+          fi
+
+    - name: '🏷️ Tag release'
+      uses: './.github/actions/tag-npm-release'
+      with:
+        channel: '${{ inputs.npm-tag }}'
+        version: '${{ inputs.release-version }}'
+        dry-run: '${{ inputs.dry-run }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+        cli-package-name: '${{ inputs.cli-package-name }}'
+        core-package-name: '${{ inputs.core-package-name }}'
+        a2a-package-name: '${{ inputs.a2a-package-name }}'
+        working-directory: '${{ inputs.working-directory }}'
+
+    - name: '🎉 Create GitHub Release'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
+      env:
+        GITHUB_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
+        INPUTS_RELEASE_TAG: '${{ inputs.release-tag }}'
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
+      shell: 'bash'
+      run: |
+        rm -f gemini-cli-bundle.zip
+        (cd bundle && chmod +x gemini.js && zip -r ../gemini-cli-bundle.zip .)
+
+        echo "Testing the generated bundle archive..."
+        rm -rf test-bundle
+        mkdir -p test-bundle
+        unzip -q gemini-cli-bundle.zip -d test-bundle
+
+        # Verify it runs and outputs a version
+        BUNDLE_VERSION=$(node test-bundle/gemini.js --version | xargs)
+        echo "Bundle version output: ${BUNDLE_VERSION}"
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo "Error: Bundle failed to execute or return version."
+          exit 1
+        fi
+        rm -rf test-bundle
+
+        RELEASE_ASSETS=("gemini-cli-bundle.zip")
+
+        # Check for and prepare macOS binaries if they exist
+        for arch in arm64 x64; do
+          BINARY_PATH="dist/darwin-${arch}/gemini"
+          if [[ -f "$BINARY_PATH" ]]; then
+            chmod +x "$BINARY_PATH"
+            ZIP_NAME="gemini-darwin-${arch}-unsigned.zip"
+            zip -j "$ZIP_NAME" "$BINARY_PATH"
+            RELEASE_ASSETS+=("$ZIP_NAME")
+          fi
+        done
+
+        gh release create "${INPUTS_RELEASE_TAG}" \
+          "${RELEASE_ASSETS[@]}" \
+          --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
+          --title "Release ${INPUTS_RELEASE_TAG}" \
+          --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
+          --generate-notes \
+          ${{ inputs.npm-tag != 'latest' && '--prerelease' || '' }}
+
+    - name: '🧹 Clean up release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
+      continue-on-error: true
+      shell: 'bash'
+      run: |
+        echo "Cleaning up release branch ${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}..."
+        git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
+
+      env:
+        GIT_PUSH_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'

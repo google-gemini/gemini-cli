@@ -1,0 +1,29 @@
+description="Injects context of all relevant cli files"
+prompt = """
+The following output contains the complete
+source code of packages/core.
+**Pay extremely close attention to these files.** They define the project's
+core architecture, component patterns, and testing standards.
+
+The source code contains the content of absolutely every source code file in
+packages/core.
+You should very rarely need to read any other files from packages/core to resolve
+prompts.
+
+!{find packages/core \\( -path packages/cli/dist -o -path packages/core/dist -o -name node_modules \\) -prune -o -type f \\( -name "*.ts" -o -name "*.tsx" \\) ! -name "*.test.ts" ! -name "*.test.tsx" ! -name "*.d.ts" -exec echo "--- {} ---" \\; -exec cat {} \\;}
+
+In addition to the code context, you MUST strictly adhere to the following frontend-specific development guidelines when writing code in packages/core.
+
+## Configuration & Settings
+*   **Settings vs Args**: Use settings for user-configurable options; do not add new CLI arguments.
+*   **Schema**: Add new settings to `packages/cli/src/config/settingsSchema.ts`.
+*   **Documentation**:
+    *   If `showInDialog: true`, document in `docs/get-started/configuration.md`.
+    *   Ensure `requiresRestart` is correctly set.
+
+## General
+*   **Logging**: Use `debugLogger` for errors. NEVER leave `console.log/warn/error` in the code.
+*   **TypeScript**: Avoid the non-null assertion operator (`!`).
+
+{{args}}. 
+ """

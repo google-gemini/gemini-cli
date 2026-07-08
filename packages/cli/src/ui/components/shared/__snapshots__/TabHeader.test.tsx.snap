@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TabHeader > arrows > hides arrows when showArrows is false 1`] = `
+"□ Tab 1 │ □ Tab 2 │ □ Tab 3
+"
+`;
+
+exports[`TabHeader > arrows > shows arrows by default 1`] = `
+"← □ Tab 1 │ □ Tab 2 │ □ Tab 3 →
+"
+`;
+
+exports[`TabHeader > rendering > renders all tab headers 1`] = `
+"← □ Tab 1 │ □ Tab 2 │ □ Tab 3 →
+"
+`;
+
+exports[`TabHeader > rendering > renders separators between tabs 1`] = `
+"← □ Tab 1 │ □ Tab 2 │ □ Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > falls back to default when renderStatusIcon returns undefined 1`] = `
+"← □ Tab 1 │ □ Tab 2 │ □ Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > hides status icons when showStatusIcons is false 1`] = `
+"← Tab 1 │ Tab 2 │ Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > shows checkmark for completed tabs 1`] = `
+"← ✓ Tab 1 │ □ Tab 2 │ ✓ Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > shows special icon for special tabs 1`] = `
+"← □ Tab 1 │ ≡ Review →
+"
+`;
+
+exports[`TabHeader > status icons > shows status icons by default 1`] = `
+"← □ Tab 1 │ □ Tab 2 │ □ Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > uses custom renderStatusIcon when provided 1`] = `
+"← • Tab 1 │ • Tab 2 │ • Tab 3 →
+"
+`;
+
+exports[`TabHeader > status icons > uses tab statusIcon when provided 1`] = `
+"← ★ Tab 1 │ □ Tab 2 →
+"
+`;

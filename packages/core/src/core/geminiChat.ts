@@ -1,0 +1,1474 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
+// where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
+
+import {
+  createUserContent,
+  FinishReason,
+  type GenerateContentResponse,
+  type Content,
+  type Part,
+  type Tool,
+  type PartListUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
+  type FunctionCall,
+} from '@google/genai';
+export { AgentChatHistory, type HistoryTurn } from './agentChatHistory.js';
+import { AgentChatHistory, type HistoryTurn } from './agentChatHistory.js';
+
+import { randomUUID } from 'node:crypto';
+import { toParts } from '../code_assist/converter.js';
+import {
+  retryWithBackoff,
+  isRetryableError,
+  getRetryErrorType,
+} from '../utils/retry.js';
+import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import { hasCycleInSchema } from '../tools/tools.js';
+import type { StructuredError } from './turn.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
+import {
+  logContentRetry,
+  logContentRetryFailure,
+  logNetworkRetryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  ChatRecordingService,
+  type ResumedSessionData,
+} from '../services/chatRecordingService.js';
+import {
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
+  NetworkRetryAttemptEvent,
+  type LlmRole,
+} from '../telemetry/types.js';
+import { handleFallback } from '../fallback/handler.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { scrubHistory, scrubContents } from '../utils/historyHardening.js';
+import {
+  partListUnionToString,
+  ensureStableToolIds,
+} from '../utils/sessionUtils.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import {
+  applyModelSelection,
+  createAvailabilityContextProvider,
+} from '../availability/policyHelpers.js';
+import { coreEvents } from '../utils/events.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+
+export enum StreamEventType {
+  /** A regular content chunk from the API. */
+  CHUNK = 'chunk',
+  /** A signal that a retry is about to happen. The UI should discard any partial
+   * content from the attempt that just failed. */
+  RETRY = 'retry',
+  /** A signal that the agent execution has been stopped by a hook. */
+  AGENT_EXECUTION_STOPPED = 'agent_execution_stopped',
+  /** A signal that the agent execution has been blocked by a hook. */
+  AGENT_EXECUTION_BLOCKED = 'agent_execution_blocked',
+}
+
+export type StreamEvent =
+  | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
+  | { type: StreamEventType.RETRY }
+  | { type: StreamEventType.AGENT_EXECUTION_STOPPED; reason: string }
+  | { type: StreamEventType.AGENT_EXECUTION_BLOCKED; reason: string };
+
+/**
+ * Options for retrying mid-stream errors (e.g. invalid content or API disconnects).
+ */
+interface MidStreamRetryOptions {
+  /** Total number of attempts to make (1 initial + N retries). */
+  maxAttempts: number;
+  /** The base delay in milliseconds for backoff. */
+  initialDelayMs: number;
+  /** Whether to use exponential backoff instead of linear. */
+  useExponentialBackoff: boolean;
+}
+
+const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
+  maxAttempts: 4, // 1 initial call + 3 retries mid-stream
+  initialDelayMs: 1000,
+  useExponentialBackoff: true,
+};
+
+export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
+/**
+ * Internal interface for parts that carry the magic 'callIndex' property
+ * used during model response consolidation.
+ */
+interface IndexedPart extends Part {
+  callIndex?: number;
+}
+
+function isIndexedPart(part: Part): part is IndexedPart {
+  return 'callIndex' in part;
+}
+
+/**
+ * Returns true if the response is valid, false otherwise.
+ */
+function isValidResponse(response: GenerateContentResponse): boolean {
+  if (response.candidates === undefined || response.candidates.length === 0) {
+    return false;
+  }
+  const content = response.candidates[0]?.content;
+  if (content === undefined) {
+    return false;
+  }
+  return isValidContent(content);
+}
+
+export function isValidNonThoughtTextPart(part: Part): boolean {
+  return (
+    typeof part.text === 'string' &&
+    !part.thought &&
+    // Technically, the model should never generate parts that have text and
+    //  any of these but we don't trust them so check anyways.
+    !part.functionCall &&
+    !part.functionResponse &&
+    !part.inlineData &&
+    !part.fileData
+  );
+}
+
+function isValidContent(content: Content): boolean {
+  if (content.parts === undefined || content.parts.length === 0) {
+    return false;
+  }
+  for (const part of content.parts) {
+    if (part === undefined || Object.keys(part).length === 0) {
+      return false;
+    }
+    if (!part.thought && part.text !== undefined && part.text === '') {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Validates the history contains the correct roles.
+ *
+ * @throws Error if the history does not start with a user turn.
+ * @throws Error if the history contains an invalid role.
+ */
+function validateHistory(history: Array<Content | HistoryTurn>) {
+  for (const item of history) {
+    const content = 'content' in item ? item.content : item;
+    if (content.role !== 'user' && content.role !== 'model') {
+      throw new Error(`Role must be user or model, but got ${content.role}.`);
+    }
+  }
+}
+
+/**
+ * Extracts the curated (valid) history from a comprehensive history.
+ *
+ * @remarks
+ * The model may sometimes generate invalid or empty contents(e.g., due to safety
+ * filters or recitation). Extracting valid turns from the history
+ * ensures that subsequent requests could be accepted by the model.
+ */
+function extractCuratedHistory(
+  comprehensiveHistory: readonly HistoryTurn[],
+): HistoryTurn[] {
+  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
+    return [];
+  }
+  const curatedHistory: HistoryTurn[] = [];
+  const length = comprehensiveHistory.length;
+  let i = 0;
+  while (i < length) {
+    if (comprehensiveHistory[i].content.role === 'user') {
+      curatedHistory.push(comprehensiveHistory[i]);
+      i++;
+    } else {
+      const modelOutput: HistoryTurn[] = [];
+      let isValid = true;
+      while (i < length && comprehensiveHistory[i].content.role === 'model') {
+        modelOutput.push(comprehensiveHistory[i]);
+        if (isValid && !isValidContent(comprehensiveHistory[i].content)) {
+          isValid = false;
+        }
+        i++;
+      }
+      if (isValid) {
+        curatedHistory.push(...modelOutput);
+      }
+    }
+  }
+  return curatedHistory;
+}
+
+/**
+ * Custom error to signal that a stream completed with invalid content,
+ * which should trigger a retry.
+ */
+export class InvalidStreamError extends Error {
+  readonly type:
+    | 'NO_FINISH_REASON'
+    | 'NO_RESPONSE_TEXT'
+    | 'MALFORMED_FUNCTION_CALL'
+    | 'UNEXPECTED_TOOL_CALL';
+
+  constructor(
+    message: string,
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL',
+  ) {
+    super(message);
+    this.name = 'InvalidStreamError';
+    this.type = type;
+  }
+}
+
+/**
+ * Custom error to signal that agent execution has been stopped.
+ */
+export class AgentExecutionStoppedError extends Error {
+  constructor(public reason: string) {
+    super(reason);
+    this.name = 'AgentExecutionStoppedError';
+  }
+}
+
+/**
+ * Custom error to signal that agent execution has been blocked.
+ */
+export class AgentExecutionBlockedError extends Error {
+  constructor(
+    public reason: string,
+    public syntheticResponse?: GenerateContentResponse,
+  ) {
+    super(reason);
+    this.name = 'AgentExecutionBlockedError';
+  }
+}
+
+/**
+ * Chat session that enables sending messages to the model with previous
+ * conversation context.
+ *
+ * @remarks
+ * The session maintains all the turns between user and model.
+ */
+export class GeminiChat {
+  // A promise to represent the current state of the message being sent to the
+  // model.
+  private sendPromise: Promise<void> = Promise.resolve();
+  private readonly chatRecordingService: ChatRecordingService;
+  private lastPromptTokenCount: number;
+  private callCounter = 0;
+  agentHistory: AgentChatHistory;
+
+  constructor(
+    readonly context: AgentLoopContext,
+    private systemInstruction: string = '',
+    private tools: Tool[] = [],
+    history: Array<Content | HistoryTurn> = [],
+    resumedSessionData?: ResumedSessionData,
+    private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
+  ) {
+    validateHistory(history);
+
+    let initialHistory: HistoryTurn[];
+    // If history is passed, it is the most up-to-date in-memory state and takes precedence.
+    // This is critical for hot-restarts after operations like context compression.
+    if (history.length > 0) {
+      initialHistory = history.map((item) =>
+        'id' in item && 'content' in item
+          ? item
+          : { id: randomUUID(), content: item },
+      );
+    } else if (resumedSessionData) {
+      // Otherwise, if resuming from disk, build from the persisted record.
+      initialHistory = resumedSessionData.conversation.messages
+        .filter((m) => m.type === 'user' || m.type === 'gemini')
+        .map((m) => ({
+          id: m.id,
+          content: {
+            role: m.type === 'user' ? 'user' : 'model',
+            parts: Array.isArray(m.content)
+              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                (m.content as Part[])
+              : [{ text: String(m.content) }],
+          },
+        }));
+    } else {
+      initialHistory = [];
+    }
+
+    this.agentHistory = new AgentChatHistory(initialHistory);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
+    this.chatRecordingService = new ChatRecordingService(context);
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.agentHistory.flatMap((c) => c.content.parts || []),
+    );
+  }
+
+  get loopContext(): AgentLoopContext {
+    return this.context;
+  }
+
+  async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind: 'main' | 'subagent' = 'main',
+  ): Promise<void> {
+    await this.chatRecordingService.initialize(resumedSessionData, kind);
+    // Sync initial history with the recorder to ensure all turns (even bootstrapped ones)
+    // are durable and coordinated.
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+  }
+
+  setSystemInstruction(sysInstr: string) {
+    this.systemInstruction = sysInstr;
+  }
+
+  getSystemInstruction(): string {
+    return this.systemInstruction;
+  }
+
+  /**
+   * Sends a message to the model and returns the response in chunks.
+   *
+   * @remarks
+   * This method will wait for the previous message to be processed before
+   * sending the next message.
+   *
+   * @see {@link Chat#sendMessage} for non-streaming method.
+   * @param modelConfigKey - The key for the model config.
+   * @param message - The list of messages to send.
+   * @param prompt_id - The ID of the prompt.
+   * @param signal - An abort signal for this message.
+   * @param displayContent - An optional user-friendly version of the message to record.
+   * @return The model's response.
+   *
+   * @example
+   * ```ts
+   * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
+   * const response = await chat.sendMessageStream({
+   * message: 'Why is the sky blue?'
+   * });
+   * for await (const chunk of response) {
+   * console.log(chunk.text);
+   * }
+   * ```
+   */
+  async sendMessageStream(
+    modelConfigKey: ModelConfigKey,
+    message: PartListUnion,
+    prompt_id: string,
+    signal: AbortSignal,
+    role: LlmRole,
+    displayContent?: PartListUnion,
+    apiHistoryOverride?: Content[],
+  ): Promise<AsyncGenerator<StreamEvent>> {
+    await this.sendPromise;
+
+    let streamDoneResolver: () => void;
+    const streamDonePromise = new Promise<void>((resolve) => {
+      streamDoneResolver = resolve;
+    });
+    this.sendPromise = streamDonePromise;
+
+    let userContent = createUserContent(message);
+    const { model } =
+      this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
+
+    const isContextManagementEnabled =
+      this.context.config.isContextManagementEnabled();
+
+    // Record user input - capture complete message with all parts (text, files, images, etc.)
+    // but skip recording function responses (tool call results) as they should be stored in tool call records
+    if (!isFunctionResponse(userContent)) {
+      const userMessageParts = userContent.parts || [];
+      const userMessageContent = partListUnionToString(userMessageParts);
+
+      let finalDisplayContent: Part[] | undefined = undefined;
+      if (displayContent !== undefined) {
+        const displayParts = toParts(
+          Array.isArray(displayContent) ? displayContent : [displayContent],
+        );
+        const displayContentString = partListUnionToString(displayParts);
+        if (displayContentString !== userMessageContent) {
+          finalDisplayContent = displayParts;
+        }
+      }
+
+      if (!isContextManagementEnabled) {
+        const id = this.chatRecordingService.recordMessage({
+          model,
+          type: 'user',
+          content: userMessageParts,
+          displayContent: finalDisplayContent,
+        });
+        this.agentHistory.push({ id, content: userContent });
+      } else {
+        // With Context Management, the client has already recorded the user message
+        // and called setHistory to ensure the graph is in sync.
+        // We just verify it's there.
+        const history = this.agentHistory.get();
+        const lastTurn = history[history.length - 1];
+        if (
+          !lastTurn ||
+          partListUnionToString(lastTurn.content.parts || []) !==
+            userMessageContent
+        ) {
+          const id = this.chatRecordingService.recordMessage({
+            model,
+            type: 'user',
+            content: userMessageParts,
+            displayContent: finalDisplayContent,
+          });
+          this.agentHistory.push({ id, content: userContent });
+        }
+      }
+    } else {
+      // Record tool response as a message to ensure durable ID and linear history for resume.
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        'user',
+        userContent.parts || [],
+      );
+
+      if (!isContextManagementEnabled) {
+        // Binary injections: If the tool output contains binary data, we expand the history.
+        const binaryParts = this.extractBinaryInjections(userContent.parts);
+        if (binaryParts) {
+          // Turn 1: The original tool response (now cleaned)
+          this.agentHistory.push({ id, content: userContent });
+
+          // Turn 2: Synthetic Model Acknowledgment
+          const modelId = this.chatRecordingService.recordSyntheticMessage(
+            'gemini',
+            [
+              {
+                text: 'Binary content received. Proceeding with analysis.',
+                thought: true,
+                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+              },
+            ],
+          );
+          this.agentHistory.push({
+            id: modelId,
+            content: {
+              role: 'model',
+              parts: [
+                {
+                  text: 'Binary content received. Proceeding with analysis.',
+                  thought: true,
+                  thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                },
+              ],
+            },
+          });
+
+          // Turn 3: The actual binary data (becomes the current request message)
+          const binaryId = this.chatRecordingService.recordSyntheticMessage(
+            'info',
+            binaryParts,
+          );
+          userContent = {
+            role: 'user',
+            parts: binaryParts,
+          };
+          this.agentHistory.push({ id: binaryId, content: userContent });
+        } else {
+          this.agentHistory.push({ id, content: userContent });
+        }
+      } else {
+        // With Context Management, we just push it to the history if not already there.
+        // (The client should have handled this, but we're defensive).
+        const history = this.agentHistory.get();
+        const lastTurn = history[history.length - 1];
+        if (
+          !lastTurn ||
+          partListUnionToString(lastTurn.content.parts || []) !==
+            partListUnionToString(userContent.parts || [])
+        ) {
+          this.agentHistory.push({ id, content: userContent });
+        }
+      }
+    }
+
+    const requestHistory = this.getHistoryTurns(true);
+
+    const streamWithRetries = async function* (
+      this: GeminiChat,
+    ): AsyncGenerator<StreamEvent, void, void> {
+      try {
+        const maxAttempts = this.context.config.getMaxAttempts();
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          let isConnectionPhase = true;
+          try {
+            if (attempt > 0) {
+              yield { type: StreamEventType.RETRY };
+            }
+
+            // If this is a retry, update the key with the new context.
+            const currentConfigKey =
+              attempt > 0
+                ? { ...modelConfigKey, isRetry: true }
+                : modelConfigKey;
+
+            isConnectionPhase = true;
+            const stream = await this.makeApiCallAndProcessStream(
+              currentConfigKey,
+              requestHistory,
+              prompt_id,
+              signal,
+              role,
+              apiHistoryOverride,
+            );
+            isConnectionPhase = false;
+            for await (const chunk of stream) {
+              yield { type: StreamEventType.CHUNK, value: chunk };
+            }
+
+            return;
+          } catch (error) {
+            if (error instanceof AgentExecutionStoppedError) {
+              yield {
+                type: StreamEventType.AGENT_EXECUTION_STOPPED,
+                reason: error.reason,
+              };
+              return; // Stop the generator
+            }
+
+            if (error instanceof AgentExecutionBlockedError) {
+              yield {
+                type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+                reason: error.reason,
+              };
+              if (error.syntheticResponse) {
+                yield {
+                  type: StreamEventType.CHUNK,
+                  value: error.syntheticResponse,
+                };
+              }
+              return; // Stop the generator
+            }
+
+            if (isConnectionPhase) {
+              // Connection phase errors have already been retried by retryWithBackoff.
+              // If they bubble up here, they are exhausted or fatal.
+              throw error;
+            }
+
+            // Check if the error is retryable (e.g., transient SSL errors
+            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC or ApiError)
+            const isRetryable = isRetryableError(
+              error,
+              this.context.config.getRetryFetchErrors(),
+            );
+
+            const isContentError = error instanceof InvalidStreamError;
+            const isRetryableContentError =
+              isContentError && error.type !== 'NO_RESPONSE_TEXT';
+            const errorType = isContentError
+              ? error.type
+              : getRetryErrorType(error);
+
+            if (isRetryableContentError || (isRetryable && !signal.aborted)) {
+              // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
+              // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
+              // up to 3 times before finally throwing the error to the user.
+              const maxMidStreamAttempts = MID_STREAM_RETRY_OPTIONS.maxAttempts;
+
+              if (
+                attempt < maxAttempts - 1 &&
+                attempt < maxMidStreamAttempts - 1
+              ) {
+                const delayMs = MID_STREAM_RETRY_OPTIONS.useExponentialBackoff
+                  ? MID_STREAM_RETRY_OPTIONS.initialDelayMs *
+                    Math.pow(2, attempt)
+                  : MID_STREAM_RETRY_OPTIONS.initialDelayMs * (attempt + 1);
+
+                if (isContentError) {
+                  logContentRetry(
+                    this.context.config,
+                    new ContentRetryEvent(attempt, errorType, delayMs, model),
+                  );
+                } else {
+                  logNetworkRetryAttempt(
+                    this.context.config,
+                    new NetworkRetryAttemptEvent(
+                      attempt + 1,
+                      maxAttempts,
+                      errorType,
+                      delayMs,
+                      model,
+                    ),
+                  );
+                }
+                coreEvents.emitRetryAttempt({
+                  attempt: attempt + 1,
+                  maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
+                  delayMs,
+                  error: errorType,
+                  model,
+                });
+                await new Promise((res) => setTimeout(res, delayMs));
+                continue;
+              }
+            }
+
+            // If we've aborted, we throw without logging a failure.
+            if (signal.aborted) {
+              throw error;
+            }
+
+            logContentRetryFailure(
+              this.context.config,
+              new ContentRetryFailureEvent(attempt + 1, errorType, model),
+            );
+
+            throw error;
+          }
+        }
+      } finally {
+        streamDoneResolver!();
+      }
+    };
+
+    return streamWithRetries.call(this);
+  }
+
+  private extractBinaryInjections(
+    parts: Part[] | undefined,
+  ): Part[] | undefined {
+    const binaryParts: Part[] = [];
+    if (parts) {
+      for (const part of parts) {
+        const response = part.functionResponse?.response;
+        if (response && BINARY_INJECTION_KEY in response) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const injected = response[BINARY_INJECTION_KEY] as Part[];
+          delete response[BINARY_INJECTION_KEY];
+          if (Array.isArray(injected)) {
+            binaryParts.push(...injected);
+          }
+        }
+      }
+    }
+
+    return binaryParts.length > 0 ? binaryParts : undefined;
+  }
+
+  private async makeApiCallAndProcessStream(
+    modelConfigKey: ModelConfigKey,
+    requestHistory: readonly HistoryTurn[],
+    prompt_id: string,
+    abortSignal: AbortSignal,
+    role: LlmRole,
+    apiHistoryOverride?: Content[],
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
+    // before sending to the Gemini API. This whitelists only standard Gemini fields.
+    const scrubbedHistory = this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...requestHistory])
+      : [...requestHistory];
+
+    const scrubbedContents = scrubbedHistory.map((h) => h.content);
+
+    const requestContents = apiHistoryOverride
+      ? scrubContents(apiHistoryOverride)
+      : scrubbedContents;
+
+    const contentsForPreviewModel =
+      this.ensureActiveLoopHasThoughtSignatures(requestContents);
+
+    // Track final request parameters for AfterModel hooks
+    const {
+      model: availabilityFinalModel,
+      config: newAvailabilityConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(this.context.config, modelConfigKey);
+
+    let lastModelToUse = availabilityFinalModel;
+    let currentGenerateContentConfig: GenerateContentConfig =
+      newAvailabilityConfig;
+    let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
+    let lastContentsToUse: Content[] = [...requestContents];
+
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.context.config,
+      () => lastModelToUse,
+    );
+    // Track initial active model to detect fallback changes
+    const initialActiveModel = this.context.config.getActiveModel();
+
+    const apiCall = async () => {
+      const useGemini3_1 =
+        (await this.context.config.getGemini31Launched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+      // Default to the last used model (which respects arguments/availability selection)
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        false,
+        hasAccessToPreview,
+        this.context.config,
+        this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+      );
+
+      // If the active model has changed (e.g. due to a fallback updating the config),
+      // we switch to the new active model.
+      if (this.context.config.getActiveModel() !== initialActiveModel) {
+        modelToUse = resolveModel(
+          this.context.config.getActiveModel(),
+          useGemini3_1,
+          false,
+          hasAccessToPreview,
+          this.context.config,
+          this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+        );
+      }
+
+      if (modelToUse !== lastModelToUse) {
+        const { generateContentConfig: newConfig } =
+          this.context.config.modelConfigService.getResolvedConfig({
+            ...modelConfigKey,
+            model: modelToUse,
+          });
+        currentGenerateContentConfig = newConfig;
+      }
+
+      lastModelToUse = modelToUse;
+      const config: GenerateContentConfig = {
+        ...currentGenerateContentConfig,
+        // TODO(12622): Ensure we don't overrwrite these when they are
+        // passed via config.
+        systemInstruction: this.systemInstruction,
+        tools: this.tools,
+        abortSignal,
+      };
+
+      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+        ? [...contentsForPreviewModel]
+        : [...requestContents];
+
+      const hookSystem = this.context.config.getHookSystem();
+      if (hookSystem) {
+        const beforeModelResult = await hookSystem.fireBeforeModelEvent({
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        });
+
+        if (beforeModelResult.stopped) {
+          throw new AgentExecutionStoppedError(
+            beforeModelResult.reason || 'Agent execution stopped by hook',
+          );
+        }
+
+        if (beforeModelResult.blocked) {
+          const syntheticResponse = beforeModelResult.syntheticResponse;
+
+          for (const candidate of syntheticResponse?.candidates ?? []) {
+            if (!candidate.finishReason) {
+              candidate.finishReason = FinishReason.STOP;
+            }
+          }
+
+          throw new AgentExecutionBlockedError(
+            beforeModelResult.reason || 'Model call blocked by hook',
+            syntheticResponse,
+          );
+        }
+
+        if (beforeModelResult.modifiedModel) {
+          modelToUse = resolveModel(
+            beforeModelResult.modifiedModel,
+            useGemini3_1,
+            false,
+            hasAccessToPreview,
+            this.context.config,
+            this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+          );
+          lastModelToUse = modelToUse;
+          // Re-evaluate contentsToUse based on the new model's feature support
+          contentsToUse = supportsModernFeatures(modelToUse)
+            ? [...contentsForPreviewModel]
+            : [...requestContents];
+        }
+        if (beforeModelResult.modifiedConfig) {
+          Object.assign(config, beforeModelResult.modifiedConfig);
+        }
+        if (
+          beforeModelResult.modifiedContents &&
+          Array.isArray(beforeModelResult.modifiedContents)
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        }
+
+        const toolSelectionResult =
+          await hookSystem.fireBeforeToolSelectionEvent({
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          });
+
+        if (toolSelectionResult.toolConfig) {
+          config.toolConfig = toolSelectionResult.toolConfig;
+        }
+        if (
+          toolSelectionResult.tools &&
+          Array.isArray(toolSelectionResult.tools)
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          config.tools = toolSelectionResult.tools as Tool[];
+        }
+      }
+
+      if (this.onModelChanged) {
+        this.tools = await this.onModelChanged(modelToUse);
+      }
+
+      // Track final request parameters for AfterModel hooks
+      lastModelToUse = modelToUse;
+      lastConfig = config;
+      lastContentsToUse = contentsToUse;
+
+      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+
+      return this.context.config.getContentGenerator().generateContentStream(
+        {
+          model: modelToUse,
+          contents: finalContents,
+          config,
+        },
+        prompt_id,
+        role,
+      );
+    };
+
+    const onPersistent429Callback = async (
+      authType?: string,
+      error?: unknown,
+    ) => handleFallback(this.context.config, lastModelToUse, authType, error);
+
+    const onValidationRequiredCallback = async (
+      validationError: ValidationRequiredError,
+    ) => {
+      const handler = this.context.config.getValidationHandler();
+      if (typeof handler !== 'function') {
+        // No handler registered, re-throw to show default error message
+        throw validationError;
+      }
+      return handler(
+        validationError.validationLink,
+        validationError.validationDescription,
+        validationError.learnMoreUrl,
+      );
+    };
+
+    const streamResponse = await retryWithBackoff(apiCall, {
+      onPersistent429: onPersistent429Callback,
+      onValidationRequired: onValidationRequiredCallback,
+      authType: this.context.config.getContentGeneratorConfig()?.authType,
+      retryFetchErrors: this.context.config.getRetryFetchErrors(),
+      signal: abortSignal,
+      maxAttempts:
+        availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
+      getAvailabilityContext,
+      onRetry: (attempt, error, delayMs) => {
+        coreEvents.emitRetryAttempt({
+          attempt,
+          maxAttempts:
+            availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+          model: lastModelToUse,
+        });
+      },
+    });
+
+    // Store the original request for AfterModel hooks
+    const originalRequest: GenerateContentParameters = {
+      model: lastModelToUse,
+      config: lastConfig,
+      contents: lastContentsToUse,
+    };
+
+    return this.processStreamResponse(
+      lastModelToUse,
+      streamResponse,
+      originalRequest,
+    );
+  }
+
+  /**
+   * Returns the chat history.
+   *
+   * @remarks
+   * The history is a list of contents alternating between user and model.
+   *
+   * There are two types of history:
+   * - The `curated history` contains only the valid turns between user and
+   * model, which will be included in the subsequent requests sent to the model.
+   * - The `comprehensive history` contains all turns, including invalid or
+   * empty model outputs, providing a complete record of the history.
+   *
+   * The history is updated after receiving the response from the model,
+   * for streaming response, it means receiving the last chunk of the response.
+   *
+   * The `comprehensive history` is returned by default. To get the `curated
+   * history`, set the `curated` parameter to `true`.
+   *
+   * @param curated - whether to return the curated history or the comprehensive
+   * history.
+   * @return History contents alternating between user and model for the entire
+   * chat session.
+   */
+  getHistory(curated: boolean = false): Content[] {
+    return this.getHistoryTurns(curated).map((h) => h.content);
+  }
+
+  /**
+   * Returns the chat history as HistoryTurns.
+   */
+  getHistoryTurns(curated: boolean = false): HistoryTurn[] {
+    const history = curated
+      ? extractCuratedHistory(this.agentHistory.get())
+      : [...this.agentHistory.get()];
+
+    return this.context.config.isContextManagementEnabled()
+      ? scrubHistory(history)
+      : history;
+  }
+
+  /**
+   * Clears the chat history.
+   */
+  clearHistory(): void {
+    this.agentHistory.clear();
+  }
+
+  /**
+   * Adds a new entry to the chat history.
+   */
+  addHistory(content: Content | HistoryTurn): void {
+    if ('id' in content && 'content' in content) {
+      this.agentHistory.push(content);
+    } else {
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        content.role === 'user' ? 'user' : 'gemini',
+        content.parts || [],
+      );
+      this.agentHistory.push({ id, content });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
+  }
+
+  setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
+    const wrappedHistory: HistoryTurn[] = history.map((item) => {
+      if ('id' in item && 'content' in item) {
+        return item;
+      }
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        item.role === 'user' ? 'user' : 'gemini',
+        item.parts || [],
+      );
+      return { id, content: item };
+    });
+    ensureStableToolIds(wrappedHistory);
+    this.agentHistory.set(wrappedHistory);
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.agentHistory.flatMap((c) => c.content.parts || []),
+    );
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+  }
+
+  stripThoughtsFromHistory(): void {
+    const newHistory = this.agentHistory.map((turn) => {
+      const newContent = { ...turn.content };
+      if (newContent.parts) {
+        newContent.parts = newContent.parts.map((part) => {
+          if (part && typeof part === 'object' && 'thoughtSignature' in part) {
+            const newPart = { ...part };
+            delete (newPart as { thoughtSignature?: string }).thoughtSignature;
+            return newPart;
+          }
+          return part;
+        });
+      }
+      return { id: turn.id, content: newContent };
+    });
+    this.agentHistory.set(newHistory);
+  }
+
+  // To ensure our requests validate, the first function call in every model
+  // turn within the active loop must have a `thoughtSignature` property.
+  // If we do not do this, we will get back 400 errors from the API.
+  ensureActiveLoopHasThoughtSignatures(
+    requestContents: readonly Content[],
+  ): readonly Content[] {
+    // First, find the start of the active loop by finding the last user turn
+    // with a text message, i.e. that is not a function response.
+    let activeLoopStartIndex = -1;
+    for (let i = requestContents.length - 1; i >= 0; i--) {
+      const content = requestContents[i];
+      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+        activeLoopStartIndex = i;
+        break;
+      }
+    }
+
+    if (activeLoopStartIndex === -1) {
+      return requestContents;
+    }
+
+    // Iterate through every message in the active loop, ensuring that the first
+    // function call in each message's list of parts has a valid
+    // thoughtSignature property. If it does not we replace the function call
+    // with a copy that uses the synthetic thought signature.
+    const newContents = requestContents.slice(); // Shallow copy the array
+    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
+      const content = newContents[i];
+      if (content.role === 'model' && content.parts) {
+        const newParts = content.parts.slice();
+        for (let j = 0; j < newParts.length; j++) {
+          const part = newParts[j];
+          if (part.functionCall) {
+            if (!part.thoughtSignature) {
+              newParts[j] = {
+                ...part,
+                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+              };
+              newContents[i] = {
+                ...content,
+                parts: newParts,
+              };
+            }
+            break; // Only consider the first function call
+          }
+        }
+      }
+    }
+    return newContents;
+  }
+
+  setTools(tools: Tool[]): void {
+    this.tools = tools;
+  }
+
+  getTools(): Tool[] {
+    return this.tools;
+  }
+
+  async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
+    // Check for potentially problematic cyclic tools with cyclic schemas
+    // and include a recommendation to remove potentially problematic tools.
+    if (
+      isSchemaDepthError(error.message) ||
+      isInvalidArgumentError(error.message)
+    ) {
+      const tools = this.context.toolRegistry.getAllTools();
+      const cyclicSchemaTools: string[] = [];
+      for (const tool of tools) {
+        if (
+          (tool.schema.parametersJsonSchema &&
+            hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
+          (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
+        ) {
+          cyclicSchemaTools.push(tool.displayName);
+        }
+      }
+      if (cyclicSchemaTools.length > 0) {
+        const extraDetails =
+          `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them with excludeTools:\n\n - ` +
+          cyclicSchemaTools.join(`\n - `) +
+          `\n`;
+        error.message += extraDetails;
+      }
+    }
+  }
+
+  private async *processStreamResponse(
+    model: string,
+    streamResponse: AsyncGenerator<GenerateContentResponse>,
+    originalRequest: GenerateContentParameters,
+  ): AsyncGenerator<GenerateContentResponse> {
+    const modelResponseParts: Part[] = [];
+
+    let hasToolCall = false;
+    let hasThoughts = false;
+    let finishReason: FinishReason | undefined;
+
+    // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
+    // We use a Map to ensure we only keep the latest version of each call (by ID)
+    const finalFunctionCallsMap = new Map<string, FunctionCall>();
+    const legacyFunctionCalls: FunctionCall[] = [];
+
+    // Map to track synthetic IDs assigned to each call index across chunks
+    const callIndexToId = new Map<number, string>();
+    let runningFunctionCallCounter = 0;
+
+    for await (const chunk of streamResponse) {
+      const currentChunkStartCounter = runningFunctionCallCounter;
+      const candidateWithReason = chunk?.candidates?.find(
+        (candidate) => candidate.finishReason,
+      );
+      if (candidateWithReason) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        finishReason = candidateWithReason.finishReason as FinishReason;
+      }
+
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        if (this.context.config.isContextManagementEnabled()) {
+          for (let i = 0; i < chunk.functionCalls.length; i++) {
+            const fnCall = chunk.functionCalls[i];
+            const globalIndex = currentChunkStartCounter + i;
+            if (!fnCall.id) {
+              let id = callIndexToId.get(globalIndex);
+              if (!id) {
+                id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
+                callIndexToId.set(globalIndex, id);
+              }
+              fnCall.id = id;
+            }
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
+            finalFunctionCallsMap.set(fnCall.id, fnCall);
+          }
+          runningFunctionCallCounter += chunk.functionCalls.length;
+        } else {
+          for (const fnCall of chunk.functionCalls) {
+            const name = fnCall.name?.trim() || 'generic_tool';
+            if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
+              fnCall.id = `${name}__${fnCall.id}`;
+            }
+          }
+          legacyFunctionCalls.push(...chunk.functionCalls);
+        }
+      }
+      if (isValidResponse(chunk)) {
+        const content = chunk.candidates?.[0]?.content;
+        if (content?.parts) {
+          if (content.parts.some((part) => part.thought)) {
+            // Record thoughts
+            hasThoughts = true;
+            this.recordThoughtFromContent(content);
+          }
+          if (content.parts.some((part) => part.functionCall)) {
+            hasToolCall = true;
+          }
+
+          let localFunctionCallCounter = 0;
+          modelResponseParts.push(
+            ...content.parts
+              .filter((part) => !part.thought)
+              .map((part) => {
+                if (!this.context.config.isContextManagementEnabled()) {
+                  return part;
+                }
+                let callIndex: number | undefined;
+                if (part.functionCall) {
+                  callIndex =
+                    currentChunkStartCounter + localFunctionCallCounter++;
+                }
+                return {
+                  ...part,
+                  callIndex,
+                };
+              }),
+          );
+        }
+      }
+
+      // Record token usage if this chunk has usageMetadata
+      if (chunk.usageMetadata) {
+        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+        if (chunk.usageMetadata.promptTokenCount !== undefined) {
+          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
+        }
+      }
+
+      const hookSystem = this.context.config.getHookSystem();
+      if (originalRequest && chunk && hookSystem) {
+        const hookResult = await hookSystem.fireAfterModelEvent(
+          originalRequest,
+          chunk,
+        );
+
+        if (hookResult.stopped) {
+          throw new AgentExecutionStoppedError(
+            hookResult.reason || 'Agent execution stopped by hook',
+          );
+        }
+
+        if (hookResult.blocked) {
+          throw new AgentExecutionBlockedError(
+            hookResult.reason || 'Agent execution blocked by hook',
+            hookResult.response,
+          );
+        }
+
+        yield hookResult.response;
+      } else {
+        yield chunk;
+      }
+    }
+
+    // String thoughts and consolidate text parts.
+    const consolidatedParts: Part[] = [];
+    const finalFunctionCalls = this.context.config.isContextManagementEnabled()
+      ? Array.from(finalFunctionCallsMap.values())
+      : legacyFunctionCalls;
+
+    let currentCallSourceIndex = -1;
+    if (this.context.config.isContextManagementEnabled()) {
+      for (const part of modelResponseParts) {
+        if (part.functionCall) {
+          const partIndex = isIndexedPart(part) ? part.callIndex : undefined;
+          const isNewCall =
+            partIndex !== undefined && partIndex > currentCallSourceIndex;
+
+          if (isNewCall) {
+            currentCallSourceIndex = partIndex;
+            consolidatedParts.push({ ...part }); // Push placeholder
+          }
+        } else {
+          const lastPart = consolidatedParts[consolidatedParts.length - 1];
+          if (
+            lastPart?.text &&
+            isValidNonThoughtTextPart(lastPart) &&
+            isValidNonThoughtTextPart(part)
+          ) {
+            lastPart.text += part.text;
+          } else {
+            consolidatedParts.push(part);
+          }
+        }
+      }
+
+      // Now, replace the placeholders with the perfectly assembled final arguments
+      if (finalFunctionCalls.length > 0) {
+        let callIndex = 0;
+        for (const part of consolidatedParts) {
+          if (part.functionCall && callIndex < finalFunctionCalls.length) {
+            part.functionCall = finalFunctionCalls[callIndex];
+            callIndex++;
+          }
+        }
+      }
+    } else {
+      // Fallback to legacy consolidation for non-context-manager users
+      for (const part of modelResponseParts) {
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          lastPart?.text &&
+          isValidNonThoughtTextPart(lastPart) &&
+          isValidNonThoughtTextPart(part)
+        ) {
+          lastPart.text += part.text;
+        } else {
+          consolidatedParts.push(part);
+        }
+      }
+    }
+
+    const responseText = consolidatedParts
+      .filter((part) => part.text)
+      .map((part) => part.text)
+      .join('')
+      .trim();
+
+    let id: string;
+    // Record model response text from the collected parts.
+    // Also flush when there are thoughts or a tool call (even with no text)
+    // so that BeforeTool hooks always see the latest transcript state.
+    if (responseText || hasThoughts || hasToolCall) {
+      id = this.chatRecordingService.recordMessage({
+        model,
+        type: 'gemini',
+        content: responseText,
+      });
+    } else {
+      // Still need a durable ID even if response is empty (e.g. only tool calls)
+      id = this.chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        consolidatedParts,
+      );
+    }
+
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call OR
+    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
+    //
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - MALFORMED_FUNCTION_CALL finish reason OR
+    // - Empty response text (e.g., only thoughts with no actual content)
+    if (!hasToolCall) {
+      if (!finishReason) {
+        throw new InvalidStreamError(
+          'Model stream ended without a finish reason.',
+          'NO_FINISH_REASON',
+        );
+      }
+      if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with malformed function call.',
+          'MALFORMED_FUNCTION_CALL',
+        );
+      }
+      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with unexpected tool call.',
+          'UNEXPECTED_TOOL_CALL',
+        );
+      }
+      if (!responseText) {
+        throw new InvalidStreamError(
+          'Model stream ended with empty response text.',
+          'NO_RESPONSE_TEXT',
+        );
+      }
+    }
+
+    this.agentHistory.push({
+      id,
+      content: { role: 'model', parts: consolidatedParts },
+    });
+  }
+
+  getLastPromptTokenCount(): number {
+    return this.lastPromptTokenCount;
+  }
+
+  /**
+   * Gets the chat recording service instance.
+   */
+  getChatRecordingService(): ChatRecordingService {
+    return this.chatRecordingService;
+  }
+
+  /**
+   * Records completed tool calls with full metadata.
+   * This is called by external components when tool calls complete, before sending responses to Gemini.
+   */
+  recordCompletedToolCalls(
+    model: string,
+    toolCalls: CompletedToolCall[],
+  ): void {
+    const toolCallRecords = toolCalls.map((call) => {
+      const resultDisplayRaw = call.response?.resultDisplay;
+      const resultDisplay =
+        typeof resultDisplayRaw === 'string' ||
+        (typeof resultDisplayRaw === 'object' && resultDisplayRaw !== null)
+          ? resultDisplayRaw
+          : undefined;
+
+      return {
+        id: call.request.callId,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
+        result: call.response?.responseParts || null,
+        status: call.status,
+        timestamp: new Date().toISOString(),
+        agentId:
+          typeof call.response?.data?.['agentId'] === 'string'
+            ? call.response.data['agentId']
+            : undefined,
+        resultDisplay,
+        description:
+          'invocation' in call ? call.invocation?.getDescription() : undefined,
+      };
+    });
+
+    this.chatRecordingService.recordToolCalls(model, toolCallRecords);
+  }
+
+  /**
+   * Extracts and records thought from thought content.
+   */
+  private recordThoughtFromContent(content: Content): void {
+    if (!content.parts || content.parts.length === 0) {
+      return;
+    }
+
+    const thoughtPart = content.parts[0];
+    if (thoughtPart.text) {
+      // Extract subject and description using the same logic as turn.ts
+      const rawText = thoughtPart.text;
+      const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
+      const subject = subjectStringMatches
+        ? subjectStringMatches[1].trim()
+        : '';
+      const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
+
+      this.chatRecordingService.recordThought({
+        subject,
+        description,
+      });
+    }
+  }
+}
+
+/** Visible for Testing */
+export function isSchemaDepthError(errorMessage: string): boolean {
+  return errorMessage.includes('maximum schema depth exceeded');
+}
+
+export function isInvalidArgumentError(errorMessage: string): boolean {
+  return errorMessage.includes('Request contains an invalid argument');
+}
+
+export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
+  return contents.map((content) => ({
+    ...content,
+    parts: (content.parts || []).map((part) => {
+      const newPart = { ...part };
+      if (newPart.functionCall) {
+        const fc = newPart.functionCall;
+        const name = fc.name?.trim() || 'generic_tool';
+        if (fc.id && fc.id.startsWith(`${name}__`)) {
+          newPart.functionCall = {
+            name: fc.name,
+            args: fc.args,
+            id: fc.id.substring(name.length + 2),
+          };
+        }
+      }
+      if (newPart.functionResponse) {
+        const fr = newPart.functionResponse;
+        const name = fr.name?.trim() || 'generic_tool';
+        if (fr.id && fr.id.startsWith(`${name}__`)) {
+          newPart.functionResponse = {
+            name: fr.name,
+            response: fr.response,
+            id: fr.id.substring(name.length + 2),
+          };
+        }
+      }
+      return newPart;
+    }),
+  }));
+}

@@ -1,0 +1,31 @@
+description="Reviews a pull request based on issue number."
+prompt = """
+Please provide a detailed pull request review on GitHub issue: {{args}}.
+
+Follow these steps:
+
+1. Use `gh pr view {{args}}` to pull the information of the PR.
+2. Use `gh pr diff {{args}}` to view the diff of the PR.
+3. Understand the intent of the PR using the PR description.
+4. If PR description is not detailed enough to understand the intent of the PR,
+   make sure to note it in your review.
+5. Make sure the PR title follows Conventional Commits, here are the last five
+   commits to the repo as examples: !{git log --pretty=format:"%s" -n 5}
+6. Search the codebase if required.
+7. Write a concise review of the PR, keeping in mind to encourage strong code
+   quality and best practices. Pay particular attention to the Gemini MD file
+   in the repo.
+8. Consider ways the code may not be consistent with existing code in the repo.
+   In particular it is critical that the react code uses patterns consistent
+   with existing code in the repo.
+9. Follow these detailed review rules:
+!{cat .gemini/commands/strict-development-rules.md}
+10. Discuss with me before making any comments on the issue. I will clarify
+    which possible issues you identified are problems, which ones you need to
+    investigate further, and which ones I do not care about.
+11. If I request you to add comments to the issue, use
+    `gh pr comment {{args}} --body {{review}}` to post the review to the PR.
+
+Remember to use the GitHub CLI (`gh`) with the Shell tool for all
+GitHub-related tasks.
+"""

@@ -1,0 +1,93 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { Config } from '../config/config.js';
+import { Scheduler } from '../scheduler/scheduler.js';
+import type {
+  ToolCallRequestInfo,
+  CompletedToolCall,
+} from '../scheduler/types.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
+import type { EditorType } from '../utils/editor.js';
+
+/**
+ * Options for scheduling agent tools.
+ */
+export interface AgentSchedulingOptions {
+  /** The unique ID for this agent's scheduler. */
+  schedulerId: string;
+  /** The name of the subagent. */
+  subagent?: string;
+  /** The ID of the tool call that invoked this agent. */
+  parentCallId?: string;
+  /** The tool registry specific to this agent. */
+  toolRegistry: ToolRegistry;
+  /** The prompt registry specific to this agent. */
+  promptRegistry?: PromptRegistry;
+  /** The resource registry specific to this agent. */
+  resourceRegistry?: ResourceRegistry;
+  /** AbortSignal for cancellation. */
+  signal: AbortSignal;
+  /** Optional function to get the preferred editor for tool modifications. */
+  getPreferredEditor?: () => EditorType | undefined;
+  /** Optional function to be notified when the scheduler is waiting for user confirmation. */
+  onWaitingForConfirmation?: (waiting: boolean) => void;
+}
+
+/**
+ * Schedules a batch of tool calls for an agent using the new event-driven Scheduler.
+ *
+ * @param config The global runtime configuration.
+ * @param requests The list of tool call requests from the agent.
+ * @param options Scheduling options including registry and IDs.
+ * @returns A promise that resolves to the completed tool calls.
+ */
+export async function scheduleAgentTools(
+  config: Config,
+  requests: ToolCallRequestInfo[],
+  options: AgentSchedulingOptions,
+): Promise<CompletedToolCall[]> {
+  const {
+    schedulerId,
+    subagent,
+    parentCallId,
+    toolRegistry,
+    promptRegistry,
+    resourceRegistry,
+    signal,
+    getPreferredEditor,
+    onWaitingForConfirmation,
+  } = options;
+
+  const schedulerContext = {
+    config,
+    promptId: config.promptId,
+    toolRegistry,
+    promptRegistry: promptRegistry ?? config.getPromptRegistry(),
+    resourceRegistry: resourceRegistry ?? config.getResourceRegistry(),
+    messageBus: toolRegistry.messageBus,
+    geminiClient: config.geminiClient,
+    sandboxManager: config.sandboxManager,
+  };
+
+  const scheduler = new Scheduler({
+    context: schedulerContext,
+    messageBus: toolRegistry.messageBus,
+    getPreferredEditor: getPreferredEditor ?? (() => undefined),
+    schedulerId,
+    subagent,
+    parentCallId,
+    onWaitingForConfirmation,
+  });
+
+  try {
+    return await scheduler.schedule(requests, signal);
+  } finally {
+    scheduler.dispose();
+  }
+}

@@ -1,0 +1,318 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as dotenv from 'dotenv';
+
+import {
+  AuthType,
+  Config,
+  ApprovalMode,
+  GEMINI_DIR,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  startupProfiler,
+  PREVIEW_GEMINI_MODEL,
+  homedir,
+  GitService,
+  fetchAdminControlsOnce,
+  getCodeAssistServer,
+  ExperimentFlags,
+  isHeadlessMode,
+  FatalAuthenticationError,
+  createPolicyEngineConfig,
+  type PolicySettings,
+  type TelemetryTarget,
+  type ConfigParameters,
+  type ExtensionLoader,
+} from '@google/gemini-cli-core';
+
+import { logger } from '../utils/logger.js';
+import type { Settings } from './settings.js';
+import { type AgentSettings, CoderAgentEvent } from '../types.js';
+
+const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
+
+export async function loadConfig(
+  settings: Settings,
+  extensionLoader: ExtensionLoader,
+  taskId: string,
+  trusted: boolean = false,
+): Promise<Config> {
+  const workspaceDir = process.cwd();
+
+  const folderTrust =
+    settings.folderTrust === true ||
+    process.env['GEMINI_FOLDER_TRUST'] === 'true';
+
+  let checkpointing = process.env['CHECKPOINTING']
+    ? process.env['CHECKPOINTING'] === 'true'
+    : settings.checkpointing?.enabled;
+
+  if (checkpointing) {
+    if (!(await GitService.verifyGitAvailability())) {
+      logger.warn(
+        '[Config] Checkpointing is enabled but git is not installed. Disabling checkpointing.',
+      );
+      checkpointing = false;
+    }
+  }
+
+  const approvalMode =
+    process.env['GEMINI_YOLO_MODE'] === 'true'
+      ? ApprovalMode.YOLO
+      : ApprovalMode.DEFAULT;
+
+  const policySettings: PolicySettings = {
+    mcpServers: settings.mcpServers,
+    tools: {
+      core: settings.tools?.core,
+      exclude: settings.tools?.exclude,
+      allowed: settings.tools?.allowed,
+    },
+    policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    policySettings,
+    approvalMode,
+    undefined,
+    true,
+  );
+
+  const configParams: ConfigParameters = {
+    sessionId: taskId,
+    clientName: 'a2a-server',
+    model: PREVIEW_GEMINI_MODEL,
+    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+    sandbox: undefined, // Sandbox might not be relevant for a server-side agent
+    targetDir: workspaceDir, // Or a specific directory the agent operates on
+    debugMode: process.env['DEBUG'] === 'true' || false,
+    question: '', // Not used in server mode directly like CLI
+
+    coreTools: settings.tools?.core || undefined,
+    excludeTools: settings.tools?.exclude || undefined,
+    allowedTools: settings.tools?.allowed || undefined,
+    showMemoryUsage: settings.showMemoryUsage || false,
+    approvalMode,
+    policyEngineConfig,
+    mcpServers: settings.mcpServers,
+    cwd: workspaceDir,
+    telemetry: {
+      enabled: settings.telemetry?.enabled,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      target: settings.telemetry?.target as TelemetryTarget,
+      otlpEndpoint:
+        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
+        settings.telemetry?.otlpEndpoint,
+      logPrompts: settings.telemetry?.logPrompts,
+    },
+    // Git-aware file filtering settings
+    fileFiltering: {
+      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
+      enableRecursiveFileSearch:
+        settings.fileFiltering?.enableRecursiveFileSearch,
+      customIgnoreFilePaths: [
+        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
+          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(path.delimiter)
+          : []),
+      ],
+    },
+    ideMode: false,
+    folderTrust,
+    trustedFolder: trusted,
+    extensionLoader,
+    checkpointing,
+    interactive: true,
+    enableInteractiveShell: !isHeadlessMode(),
+    ptyInfo: 'auto',
+    enableAgents: settings.experimental?.enableAgents ?? true,
+  };
+
+  // Set an initial config to use to get a code assist server.
+  // This is needed to fetch admin controls.
+  const initialConfig = new Config({
+    ...configParams,
+  });
+
+  const codeAssistServer = getCodeAssistServer(initialConfig);
+
+  const adminControlsEnabled =
+    initialConfig.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+      ?.boolValue ?? false;
+
+  // Initialize final config parameters to the previous parameters.
+  // If no admin controls are needed, these will be used as-is for the final
+  // config.
+  const finalConfigParams = { ...configParams };
+  if (adminControlsEnabled) {
+    const adminSettings = await fetchAdminControlsOnce(
+      codeAssistServer,
+      adminControlsEnabled,
+    );
+
+    // Admin settings are able to be undefined if unset, but if any are present,
+    // we should initialize them all.
+    // If any are present, undefined settings should be treated as if they were
+    // set to false.
+    // If NONE are present, disregard admin settings entirely, and pass the
+    // final config as is.
+    if (Object.keys(adminSettings).length !== 0) {
+      finalConfigParams.disableYoloMode = !adminSettings.strictModeDisabled;
+      finalConfigParams.mcpEnabled = adminSettings.mcpSetting?.mcpEnabled;
+      finalConfigParams.extensionsEnabled =
+        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled;
+    }
+  }
+
+  const config = new Config(finalConfigParams);
+
+  // Needed to initialize ToolRegistry, and git checkpointing if enabled
+  await config.initialize();
+
+  await config.waitForMcpInit();
+  startupProfiler.flush(config);
+
+  await refreshAuthentication(config, 'Config');
+
+  return config;
+}
+
+export function setIsTrusted(
+  agentSettings: AgentSettings | undefined,
+): boolean {
+  if (INITIAL_FOLDER_TRUST !== undefined) {
+    return INITIAL_FOLDER_TRUST === 'true';
+  }
+  return !!agentSettings?.isTrusted;
+}
+
+export function setTargetDir(agentSettings: AgentSettings | undefined): string {
+  const originalCWD = process.cwd();
+  const targetDir =
+    process.env['CODER_AGENT_WORKSPACE_PATH'] ??
+    (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent
+      ? agentSettings.workspacePath
+      : undefined);
+
+  if (!targetDir) {
+    return originalCWD;
+  }
+
+  logger.info(
+    `[CoderAgentExecutor] Overriding workspace path to: ${targetDir}`,
+  );
+
+  try {
+    const resolvedPath = path.resolve(targetDir);
+    process.chdir(resolvedPath);
+    return resolvedPath;
+  } catch (e) {
+    logger.error(
+      `[CoderAgentExecutor] Error resolving workspace path: ${e}, returning original os.cwd()`,
+    );
+    return originalCWD;
+  }
+}
+
+export function loadEnvironment(): void {
+  const envFilePath = findEnvFile(process.cwd());
+  if (envFilePath) {
+    dotenv.config({ path: envFilePath, override: true });
+  }
+}
+
+function findEnvFile(startDir: string): string | null {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    // prefer gemini-specific .env under GEMINI_DIR
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    if (fs.existsSync(geminiEnvPath)) {
+      return geminiEnvPath;
+    }
+    const envPath = path.join(currentDir, '.env');
+    if (fs.existsSync(envPath)) {
+      return envPath;
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir || !parentDir) {
+      // check .env under home as fallback, again preferring gemini-specific .env
+      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
+      if (fs.existsSync(homeGeminiEnvPath)) {
+        return homeGeminiEnvPath;
+      }
+      const homeEnvPath = path.join(homedir(), '.env');
+      if (fs.existsSync(homeEnvPath)) {
+        return homeEnvPath;
+      }
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+async function refreshAuthentication(
+  config: Config,
+  logPrefix: string,
+): Promise<void> {
+  if (process.env['USE_CCPA']) {
+    logger.info(`[${logPrefix}] Using CCPA Auth:`);
+
+    logger.info(`[${logPrefix}] Attempting COMPUTE_ADC first.`);
+    try {
+      await config.refreshAuth(AuthType.COMPUTE_ADC);
+      logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
+    } catch (adcError) {
+      const adcMessage =
+        adcError instanceof Error ? adcError.message : String(adcError);
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed or not available: ${adcMessage}`,
+      );
+
+      const useComputeAdc =
+        process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
+      const isHeadless = isHeadlessMode();
+
+      if (isHeadless || useComputeAdc) {
+        const reason = isHeadless
+          ? 'headless mode'
+          : 'GEMINI_CLI_USE_COMPUTE_ADC=true';
+        throw new FatalAuthenticationError(
+          `COMPUTE_ADC failed: ${adcMessage}. (LOGIN_WITH_GOOGLE fallback skipped due to ${reason}. Run in an interactive terminal to use OAuth.)`,
+        );
+      }
+
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed, falling back to LOGIN_WITH_GOOGLE.`,
+      );
+      try {
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      } catch (e) {
+        if (e instanceof FatalAuthenticationError) {
+          const originalMessage = e instanceof Error ? e.message : String(e);
+          throw new FatalAuthenticationError(
+            `${originalMessage}. The initial COMPUTE_ADC attempt also failed: ${adcMessage}`,
+          );
+        }
+        throw e;
+      }
+    }
+
+    logger.info(
+      `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
+    );
+  } else if (process.env['GEMINI_API_KEY']) {
+    logger.info(`[${logPrefix}] Using Gemini API Key`);
+    await config.refreshAuth(AuthType.USE_GEMINI);
+  } else {
+    const errorMessage = `[${logPrefix}] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.`;
+    logger.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+}

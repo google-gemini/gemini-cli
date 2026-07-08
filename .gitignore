@@ -1,21 +1,35 @@
-# Byte-compiled / optimized / DLL files
+# Python (from local)
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environments
-.env
 .venv
-env/
 venv/
-ENV/
-env.bak/
 venv.bak/
+env/
+env.bak/
+ENV/
+
+# API keys and secrets
+.env
+.env~
+
+# gemini-cli settings
+**/.gemini/
+!/.gemini/
+.gemini/*
+!.gemini/config.yaml
+!.gemini/commands/
+!.gemini/skills/
+!.gemini/settings.json
+
+# Dependencies
 node_modules/
+bower_components
 
 # IDEs and editors
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 
@@ -23,7 +37,33 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-experimental/
+# Build and dist
 dist/
+*.tsbuildinfo
+bundle
+
+# Project specific ignores (local)
+experimental/
 DESIGN.md
 iam_policy.yaml
+
+# Project specific ignores (remote)
+.docker
+junit.xml
+packages/*/coverage/
+packages/cli/src/generated/
+packages/core/src/generated/
+packages/devtools/src/_client-assets.ts
+.integration-tests/
+.perf-tests/
+packages/vscode-ide-companion/*.vsix
+packages/cli/download-ripgrep*/
+gha-creds-*.json
+patch_output.log
+gemini-debug.log
+.genkit
+.gemini-clipboard/
+.eslintcache
+evals/logs/
+temp_agents/
+conductor/

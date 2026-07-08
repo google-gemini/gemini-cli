@@ -1,0 +1,529 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs/promises';
+import { createWriteStream, existsSync, statSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
+import * as path from 'node:path';
+import {
+  debugLogger,
+  spawnAsync,
+  escapePath,
+  Storage,
+} from '@google/gemini-cli-core';
+
+/**
+ * Supported image file extensions based on Gemini API.
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export const IMAGE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.heic',
+  '.heif',
+];
+
+/** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
+const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
+
+// Track which tool works on Linux to avoid redundant checks/failures
+let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
+
+// Helper to check the user's display server and whether they have a compatible clipboard tool installed
+function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
+  if (linuxClipboardTool !== null) {
+    return linuxClipboardTool;
+  }
+
+  let toolName: 'wl-paste' | 'xclip' | null = null;
+  const displayServer = process.env['XDG_SESSION_TYPE'];
+
+  if (displayServer === 'wayland') toolName = 'wl-paste';
+  else if (displayServer === 'x11') toolName = 'xclip';
+  else return null;
+
+  try {
+    // output is piped to stdio: 'ignore' to suppress the path printing to console
+    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
+    linuxClipboardTool = toolName;
+    return toolName;
+  } catch (e) {
+    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
+    return null;
+  }
+}
+
+/**
+ * Helper to save command stdout to a file while preventing shell injections and race conditions
+ */
+async function saveFromCommand(
+  command: string,
+  args: string[],
+  destination: string,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args);
+    const fileStream = createWriteStream(destination);
+    let resolved = false;
+
+    const safeResolve = (value: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    };
+
+    child.stdout.pipe(fileStream);
+
+    child.on('error', (err) => {
+      debugLogger.debug(`Failed to spawn ${command}:`, err);
+      safeResolve(false);
+    });
+
+    fileStream.on('error', (err) => {
+      debugLogger.debug(`File stream error for ${destination}:`, err);
+      safeResolve(false);
+    });
+
+    child.on('close', async (code) => {
+      if (resolved) return;
+
+      if (code !== 0) {
+        debugLogger.debug(
+          `${command} exited with code ${code}. Args: ${args.join(' ')}`,
+        );
+        safeResolve(false);
+        return;
+      }
+
+      // Helper to check file size
+      const checkFile = async () => {
+        try {
+          const stats = await fs.stat(destination);
+          safeResolve(stats.size > 0);
+        } catch (e) {
+          debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+          safeResolve(false);
+        }
+      };
+
+      if (fileStream.writableFinished) {
+        await checkFile();
+      } else {
+        fileStream.on('finish', checkFile);
+        // In case finish never fires due to error (though error handler should catch it)
+        fileStream.on('close', async () => {
+          if (!resolved) await checkFile();
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Checks if the Wayland clipboard contains an image using wl-paste.
+ */
+async function checkWlPasteForImage() {
+  try {
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking wl-clipboard for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the X11 clipboard contains an image using xclip.
+ */
+async function checkXclipForImage() {
+  try {
+    const { stdout } = await spawnAsync('xclip', [
+      '-selection',
+      'clipboard',
+      '-t',
+      'TARGETS',
+      '-o',
+    ]);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking xclip for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the system clipboard contains an image (macOS, Windows, and Linux)
+ * @returns true if clipboard contains an image
+ */
+export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'linux') {
+    const tool = getUserLinuxClipboardTool();
+    if (tool === 'wl-paste') {
+      if (await checkWlPasteForImage()) return true;
+    } else if (tool === 'xclip') {
+      if (await checkXclipForImage()) return true;
+    }
+    return false;
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+      ]);
+      return stdout.trim() === 'True';
+    } catch (error) {
+      debugLogger.warn('Error checking clipboard for image:', error);
+      return false;
+    }
+  }
+
+  if (process.platform !== 'darwin') {
+    return false;
+  }
+
+  try {
+    // Use osascript to check clipboard type
+    const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
+    const imageRegex =
+      /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
+    return imageRegex.test(stdout);
+  } catch (error) {
+    debugLogger.warn('Error checking clipboard for image:', error);
+    return false;
+  }
+}
+
+/**
+ * Saves clipboard content to a file using wl-paste (Wayland).
+ */
+async function saveFileWithWlPaste(tempFilePath: string) {
+  const success = await saveFromCommand(
+    'wl-paste',
+    ['--no-newline', '--type', 'image/png'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Saves clipboard content to a file using xclip (X11).
+ */
+const saveFileWithXclip = async (tempFilePath: string) => {
+  const success = await saveFromCommand(
+    'xclip',
+    ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+};
+
+/**
+ * Gets the directory where clipboard images should be stored for a specific project.
+ *
+ * This uses the global temporary directory but creates a project-specific subdirectory
+ * based on the hash of the project path (via `Storage.getProjectTempDir()`).
+ * This prevents path conflicts between different projects while keeping the images
+ * outside of the user's project directory.
+ *
+ * @param targetDir The root directory of the current project.
+ * @returns The absolute path to the images directory.
+ */
+async function getProjectClipboardImagesDir(
+  targetDir: string,
+): Promise<string> {
+  const storage = new Storage(targetDir);
+  await storage.initialize();
+  const baseDir = storage.getProjectTempDir();
+  return path.join(baseDir, 'images');
+}
+
+/**
+ * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
+ * @param targetDir The target directory to create temp files within
+ * @returns The path to the saved image file, or null if no image or error
+ */
+export async function saveClipboardImage(
+  targetDir: string,
+): Promise<string | null> {
+  try {
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Generate a unique filename with timestamp
+    const timestamp = new Date().getTime();
+
+    if (process.platform === 'linux') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      const tool = getUserLinuxClipboardTool();
+
+      if (tool === 'wl-paste') {
+        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      if (tool === 'xclip') {
+        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      return null;
+    }
+
+    if (process.platform === 'win32') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      // The path is used directly in the PowerShell script.
+      const psPath = tempFilePath.replace(/'/g, "''");
+
+      const script = `
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+          $image = [System.Windows.Forms.Clipboard]::GetImage()
+          $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
+          Write-Output "success"
+        }
+      `;
+
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
+
+      if (stdout.trim() === 'success') {
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // File doesn't exist
+        }
+      }
+      return null;
+    }
+
+    // AppleScript clipboard classes to try, in order of preference.
+    // macOS converts clipboard images to these formats (WEBP/HEIC/HEIF not supported by osascript).
+    const formats = [
+      { class: 'PNGf', extension: 'png' },
+      { class: 'JPEG', extension: 'jpg' },
+    ];
+
+    for (const format of formats) {
+      const tempFilePath = path.join(
+        tempDir,
+        `clipboard-${timestamp}.${format.extension}`,
+      );
+
+      // Try to save clipboard as this format
+      const script = `
+        try
+          set imageData to the clipboard as «class ${format.class}»
+          set fileRef to open for access POSIX file "${tempFilePath}" with write permission
+          write imageData to fileRef
+          close access fileRef
+          return "success"
+        on error errMsg
+          try
+            close access POSIX file "${tempFilePath}"
+          end try
+          return "error"
+        end try
+      `;
+
+      const { stdout } = await spawnAsync('osascript', ['-e', script]);
+
+      if (stdout.trim() === 'success') {
+        // Verify the file was created and has content
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch (e) {
+          // File doesn't exist, continue to next format
+          debugLogger.debug('Clipboard image file not found:', tempFilePath, e);
+        }
+      }
+
+      // Clean up failed attempt
+      try {
+        await fs.unlink(tempFilePath);
+      } catch (e) {
+        // Ignore cleanup errors
+        debugLogger.debug('Failed to clean up temp file:', tempFilePath, e);
+      }
+    }
+
+    // No format worked
+    return null;
+  } catch (error) {
+    debugLogger.warn('Error saving clipboard image:', error);
+    return null;
+  }
+}
+
+/**
+ * Cleans up old temporary clipboard image files
+ * Removes files older than 1 hour
+ * @param targetDir The target directory where temp files are stored
+ */
+export async function cleanupOldClipboardImages(
+  targetDir: string,
+): Promise<void> {
+  try {
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
+    const files = await fs.readdir(tempDir);
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (file.startsWith('clipboard-') && IMAGE_EXTENSIONS.includes(ext)) {
+        const filePath = path.join(tempDir, file);
+        const stats = await fs.stat(filePath);
+        if (stats.mtimeMs < oneHourAgo) {
+          await fs.unlink(filePath);
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore errors in cleanup
+    debugLogger.debug('Failed to clean up old clipboard images:', e);
+  }
+}
+/**
+ * Splits a pasted text block up into escaped path segements if it's a legal
+ * drag-and-drop string.
+ *
+ * There are multiple ways drag-and-drop paths might be escaped:
+ *  - Bare (only if there are no special chars): /path/to/myfile.png
+ *  - Wrapped in double quotes (Windows only): "/path/to/my file~!.png"
+ *  - Escaped with backslashes (POSIX only): /path/to/my\ file~!.png
+ *  - Wrapped in single quotes: '/path/to/my file~!.png'
+ *
+ * When wrapped in single quotes, actual single quotes in the filename are
+ * escaped with "'\''". For example: '/path/to/my '\''fancy file'\''.png'
+ *
+ * When wrapped in double quotes, actual double quotes are not an issue becuase
+ * windows doesn't allow them in filenames.
+ *
+ * On all systems, a single drag-and-drop may include both wrapped and bare
+ * paths, so we need to handle both simultaneously.
+ *
+ * @param text
+ * @returns An iterable of escaped paths
+ */
+export function* splitDragAndDropPaths(text: string): Generator<string> {
+  let current = '';
+  let mode: 'NORMAL' | 'DOUBLE' | 'SINGLE' = 'NORMAL';
+  const isWindows = process.platform === 'win32';
+
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+
+    if (mode === 'NORMAL') {
+      if (char === ' ') {
+        if (current.length > 0) {
+          yield current;
+          current = '';
+        }
+      } else if (char === '"') {
+        mode = 'DOUBLE';
+      } else if (char === "'") {
+        mode = 'SINGLE';
+      } else if (char === '\\' && !isWindows) {
+        // POSIX escape in normal mode
+        if (i + 1 < text.length) {
+          const next = text[i + 1];
+          current += next;
+          i++;
+        }
+      } else {
+        current += char;
+      }
+    } else if (mode === 'DOUBLE') {
+      if (char === '"') {
+        mode = 'NORMAL';
+      } else {
+        current += char;
+      }
+    } else if (mode === 'SINGLE') {
+      if (char === "'") {
+        mode = 'NORMAL';
+      } else {
+        current += char;
+      }
+    }
+
+    i++;
+  }
+
+  if (current.length > 0) {
+    yield current;
+  }
+}
+
+/**
+ * Helper to validate if a path exists and is a file.
+ */
+function isValidFilePath(p: string): boolean {
+  try {
+    return PATH_PREFIX_PATTERN.test(p) && existsSync(p) && statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Processes pasted text containing file paths (like those from drag and drop),
+ * adding @ prefix to valid paths and escaping them in a standard way.
+ *
+ * @param text The pasted text
+ * @returns Processed string with @ prefixes or null if any paths are invalid
+ */
+export function parsePastedPaths(text: string): string | null {
+  // First, check if the entire text is a single valid path
+  if (isValidFilePath(text)) {
+    return `@${escapePath(text)} `;
+  }
+
+  const validPaths = [];
+  for (const segment of splitDragAndDropPaths(text)) {
+    if (isValidFilePath(segment)) {
+      validPaths.push(`@${escapePath(segment)}`);
+    } else {
+      return null; // If any segment is invalid, return null for the whole string
+    }
+  }
+  if (validPaths.length === 0) {
+    return null;
+  }
+  return validPaths.join(' ') + ' ';
+}

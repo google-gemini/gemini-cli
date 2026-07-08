@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ErrorMessage > renders multiline error messages 1`] = `
+"✕ Error line 1
+  Error line 2
+"
+`;
+
+exports[`ErrorMessage > renders with the correct prefix and text 1`] = `
+"✕ Something went wrong
+"
+`;

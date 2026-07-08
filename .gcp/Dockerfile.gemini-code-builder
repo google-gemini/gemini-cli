@@ -1,0 +1,89 @@
+# Use a common base image like Debian.
+# Using 'bookworm-slim' for a balance of size and compatibility.
+FROM debian:bookworm-slim
+
+# Set environment variables to prevent interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NODE_VERSION=20.12.2
+ENV NODE_VERSION_MAJOR=20
+ENV DOCKER_CLI_VERSION=26.1.3
+ENV BUILDX_VERSION=v0.14.0
+
+# Install dependencies for adding NodeSource repository, gcloud, and other tools
+# - curl: for downloading files
+# - gnupg: for managing GPG keys (used by NodeSource & Google Cloud SDK)
+# - apt-transport-https: for HTTPS apt repositories
+# - ca-certificates: for HTTPS apt repositories
+# - rsync: the rsync utility itself
+# - git: often useful in build environments
+# - python3, python3-pip, python3-venv, python3-crcmod: for gcloud SDK and some of its components
+# - lsb-release: for gcloud install script to identify distribution
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    apt-transport-https \
+    ca-certificates \
+    rsync \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-crcmod \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js and npm
+# We'll use the official NodeSource repository for a specific version
+RUN set -eux; \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    # For Node.js 20.x, it's node_20.x
+    # Let's explicitly define the major version for clarity
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g npm@latest && \
+    # Verify installations
+    node -v && \
+    npm -v && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI
+# Download the static binary from Docker's official source
+RUN set -eux; \
+    DOCKER_CLI_ARCH=$(dpkg --print-architecture); \
+    case "${DOCKER_CLI_ARCH}" in \
+        amd64) DOCKER_CLI_ARCH_SUFFIX="x86_64" ;; \
+        arm64) DOCKER_CLI_ARCH_SUFFIX="aarch64" ;; \
+        *) echo "Unsupported architecture: ${DOCKER_CLI_ARCH}"; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://download.docker.com/linux/static/stable/${DOCKER_CLI_ARCH_SUFFIX}/docker-${DOCKER_CLI_VERSION}.tgz" -o docker.tgz && \
+    tar -xzf docker.tgz --strip-components=1 -C /usr/local/bin docker/docker && \
+    rm docker.tgz && \
+    # Verify installation
+    docker --version
+
+# Install Docker Buildx plugin
+RUN set -eux; \
+    BUILDX_ARCH_DEB=$(dpkg --print-architecture); \
+    case "${BUILDX_ARCH_DEB}" in \
+        amd64) BUILDX_ARCH_SUFFIX="amd64" ;; \
+        arm64) BUILDX_ARCH_SUFFIX="arm64" ;; \
+        *) echo "Unsupported architecture for Buildx: ${BUILDX_ARCH_DEB}"; exit 1 ;; \
+    esac; \
+    mkdir -p /usr/local/lib/docker/cli-plugins && \
+    curl -fsSL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${BUILDX_ARCH_SUFFIX}" -o /usr/local/lib/docker/cli-plugins/docker-buildx && \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx && \
+    # verify installation
+    docker buildx version
+
+# Install Google Cloud SDK (gcloud CLI)
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && apt-get update -y && apt-get install google-cloud-cli -y
+
+# Set a working directory (optional, but good practice)
+WORKDIR /workspace
+
+# You can add a CMD or ENTRYPOINT if you intend to run this image directly,
+# but for Cloud Build, it's usually not necessary as Cloud Build steps override it.
+# For example:
+ENTRYPOINT '/bin/bash'

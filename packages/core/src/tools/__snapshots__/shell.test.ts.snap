@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ShellTool > getDescription > should return the non-windows description when not on windows 1`] = `
+"This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
+
+      The following information is returned:
+
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
+`;
+
+exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
+"This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
+
+      The following information is returned:
+
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
+`;
+
+exports[`ShellTool > getSchema > should return the base schema when no modelId is provided 1`] = `
+"This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
+
+      The following information is returned:
+
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
+`;
+
+exports[`ShellTool > getSchema > should return the schema from the resolver when modelId is provided 1`] = `
+"This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
+
+      The following information is returned:
+
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
+`;

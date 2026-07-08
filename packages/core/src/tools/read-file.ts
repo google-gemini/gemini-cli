@@ -1,0 +1,321 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import path from 'node:path';
+import {
+  makeRelative,
+  shortenPath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolLocation,
+  type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
+  type ExecuteOptions,
+} from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
+
+import type { PartListUnion } from '@google/genai';
+import {
+  processSingleFileContent,
+  getSpecificMimeType,
+} from '../utils/fileUtils.js';
+import type { Config } from '../config/config.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import {
+  discoverJitContext,
+  appendJitContext,
+  appendJitContextToParts,
+} from './jit-context.js';
+
+/**
+ * Parameters for the ReadFile tool
+ */
+export interface ReadFileToolParams {
+  /**
+   * The path to the file to read
+   */
+  file_path: string;
+
+  /**
+   * The line number to start reading from (optional, 1-based)
+   */
+  start_line?: number;
+
+  /**
+   * The line number to end reading at (optional, 1-based, inclusive)
+   */
+  end_line?: number;
+}
+
+class ReadFileToolInvocation extends BaseToolInvocation<
+  ReadFileToolParams,
+  ToolResult
+> {
+  private readonly resolvedPath: string;
+  constructor(
+    private config: Config,
+    params: ReadFileToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+    const sanitizedPath = resolveDefensiveToolPath(
+      this.params.file_path,
+      this.config.getTargetDir(),
+    );
+    try {
+      this.resolvedPath = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
+    } catch {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        sanitizedPath,
+      );
+    }
+  }
+
+  getDescription(): string {
+    const relativePath = makeRelative(
+      this.resolvedPath,
+      this.config.getTargetDir(),
+    );
+    return shortenPath(relativePath);
+  }
+
+  override toolLocations(): ToolLocation[] {
+    return [
+      {
+        path: this.resolvedPath,
+        line: this.params.start_line,
+      },
+    ];
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildFilePathArgsPattern(this.params.file_path),
+    };
+  }
+
+  async execute(_options: ExecuteOptions): Promise<ToolResult> {
+    const validationError = this.config.validatePathAccess(
+      this.resolvedPath,
+      'read',
+    );
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
+    const result = await processSingleFileContent(
+      this.resolvedPath,
+      this.config.getTargetDir(),
+      this.config.getFileSystemService(),
+      this.params.start_line,
+      this.params.end_line,
+    );
+
+    if (result.error) {
+      return {
+        llmContent: result.llmContent,
+        returnDisplay: result.returnDisplay || 'Error reading file',
+        error: {
+          message: result.error,
+          type: result.errorType,
+        },
+      };
+    }
+
+    let llmContent: PartListUnion;
+    if (result.isTruncated) {
+      const [start, end] = result.linesShown!;
+      const total = result.originalLineCount!;
+
+      llmContent = `
+IMPORTANT: The file content has been truncated.
+Status: Showing lines ${start}-${end} of ${total} total lines.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
+
+--- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+    } else {
+      llmContent = result.llmContent || '';
+    }
+
+    const lines =
+      typeof result.llmContent === 'string'
+        ? result.llmContent.split('\n').length
+        : undefined;
+    const mimetype = getSpecificMimeType(this.resolvedPath);
+    const programming_language = getProgrammingLanguage({
+      file_path: this.resolvedPath,
+    });
+    logFileOperation(
+      this.config,
+      new FileOperationEvent(
+        READ_FILE_TOOL_NAME,
+        FileOperation.READ,
+        lines,
+        mimetype,
+        path.extname(this.resolvedPath),
+        programming_language,
+      ),
+    );
+
+    // Discover JIT subdirectory context for the accessed file path
+    const jitContext = await discoverJitContext(this.config, this.resolvedPath);
+    if (jitContext) {
+      if (typeof llmContent === 'string') {
+        llmContent = appendJitContext(llmContent, jitContext);
+      } else {
+        llmContent = appendJitContextToParts(llmContent, jitContext);
+      }
+    }
+
+    const displayResultSummary = result.isTruncated
+      ? `${result.linesShown![0]}-${result.linesShown![1]} of ${result.originalLineCount}`
+      : lines !== undefined
+        ? `${lines} lines`
+        : undefined;
+
+    return {
+      llmContent,
+      display: {
+        name: READ_FILE_DISPLAY_NAME,
+        description: this.getDescription(),
+        resultSummary: displayResultSummary,
+        result: { type: 'text', text: result.returnDisplay || '' },
+      },
+      returnDisplay: result.returnDisplay || '',
+    };
+  }
+}
+
+/**
+ * Implementation of the ReadFile tool logic
+ */
+export class ReadFileTool extends BaseDeclarativeTool<
+  ReadFileToolParams,
+  ToolResult
+> {
+  static readonly Name = READ_FILE_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
+
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
+    super(
+      ReadFileTool.Name,
+      READ_FILE_DISPLAY_NAME,
+      READ_FILE_DEFINITION.base.description!,
+      Kind.Read,
+      READ_FILE_DEFINITION.base.parametersJsonSchema,
+      messageBus,
+      true,
+      false,
+    );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
+    );
+  }
+
+  protected override validateToolParamValues(
+    params: ReadFileToolParams,
+  ): string | null {
+    if (params.file_path.trim() === '') {
+      return "The 'file_path' parameter must be non-empty.";
+    }
+
+    const sanitizedPath = resolveDefensiveToolPath(
+      params.file_path,
+      this.config.getTargetDir(),
+    );
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
+    } catch (err) {
+      return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    const validationError = this.config.validatePathAccess(
+      resolvedPath,
+      'read',
+    );
+    if (validationError) {
+      return validationError;
+    }
+
+    if (
+      params.start_line !== undefined &&
+      params.end_line !== undefined &&
+      params.start_line > params.end_line
+    ) {
+      return 'start_line cannot be greater than end_line';
+    }
+
+    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    if (
+      this.fileDiscoveryService.shouldIgnoreFile(
+        resolvedPath,
+        fileFilteringOptions,
+      )
+    ) {
+      return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
+    }
+
+    return null;
+  }
+
+  protected createInvocation(
+    params: ReadFileToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<ReadFileToolParams, ToolResult> {
+    return new ReadFileToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
+  }
+}
