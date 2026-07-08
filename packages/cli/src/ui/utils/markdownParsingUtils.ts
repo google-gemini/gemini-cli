@@ -123,7 +123,7 @@ export const parseMarkdownToANSI = (
 
   let result = '';
   const inlineRegex =
-    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|__.*?__|_[^_]*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let lastIndex = 0;
   let match;
 
@@ -153,8 +153,8 @@ export const parseMarkdownToANSI = (
           ),
         );
       } else if (
-        fullMatch.endsWith('**') &&
-        fullMatch.startsWith('**') &&
+        ((fullMatch.endsWith('**') && fullMatch.startsWith('**')) ||
+          (fullMatch.endsWith('__') && fullMatch.startsWith('__'))) &&
         fullMatch.length > BOLD_MARKER_LENGTH * 2
       ) {
         styledPart = chalk.bold(

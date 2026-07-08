@@ -77,11 +77,45 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   let inTable = false;
   let tableRows: string[][] = [];
   let tableHeaders: string[] = [];
+  let paragraphBuffer: string[] = [];
 
   function addContentBlock(block: React.ReactNode) {
     if (block) {
       contentBlocks.push(block);
       lastLineEmpty = false;
+    }
+  }
+
+  function flushParagraph() {
+    if (paragraphBuffer.length > 0) {
+      let mergedText = '';
+      paragraphBuffer.forEach((line) => {
+        if (mergedText === '') {
+          mergedText = line;
+        } else {
+          const lastChar = mergedText.slice(-1);
+          const firstChar = line.slice(0, 1);
+          const isCJK = (char: string) =>
+            /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(
+              char,
+            );
+          if (isCJK(lastChar) && isCJK(firstChar)) {
+            mergedText += line;
+          } else {
+            mergedText += ' ' + line;
+          }
+        }
+      });
+
+      const key = `paragraph-${contentBlocks.length}`;
+      addContentBlock(
+        <Box key={key}>
+          <Text wrap="wrap" color={responseColor}>
+            <RenderInline text={mergedText} defaultColor={responseColor} />
+          </Text>
+        </Box>,
+      );
+      paragraphBuffer = [];
     }
   }
 
@@ -126,6 +160,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
     if (codeFenceMatch) {
+      flushParagraph();
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
       codeBlockLang = codeFenceMatch[2] || null;
@@ -135,18 +170,13 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         index + 1 < lines.length &&
         lines[index + 1].match(tableSeparatorRegex)
       ) {
+        flushParagraph();
         inTable = true;
         tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
         tableRows = [];
       } else {
         // Not a table, treat as regular text
-        addContentBlock(
-          <Box key={key}>
-            <Text wrap="wrap" color={responseColor}>
-              <RenderInline text={line} defaultColor={responseColor} />
-            </Text>
-          </Box>,
-        );
+        paragraphBuffer.push(line);
       }
     } else if (inTable && tableSeparatorMatch) {
       // Skip separator line - already handled
@@ -179,21 +209,17 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 
       // Process current line as normal
       if (line.trim().length > 0) {
-        addContentBlock(
-          <Box key={key}>
-            <Text wrap="wrap" color={responseColor}>
-              <RenderInline text={line} defaultColor={responseColor} />
-            </Text>
-          </Box>,
-        );
+        paragraphBuffer.push(line);
       }
     } else if (hrMatch) {
+      flushParagraph();
       addContentBlock(
         <Box key={key}>
           <Text dimColor>---</Text>
         </Box>,
       );
     } else if (headerMatch) {
+      flushParagraph();
       const level = headerMatch[1].length;
       const headerText = headerMatch[2];
       let headerNode: React.ReactNode = null;
@@ -239,6 +265,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       }
       if (headerNode) addContentBlock(<Box key={key}>{headerNode}</Box>);
     } else if (ulMatch) {
+      flushParagraph();
       const leadingWhitespace = ulMatch[1];
       const marker = ulMatch[2];
       const itemText = ulMatch[3];
@@ -252,6 +279,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         />,
       );
     } else if (olMatch) {
+      flushParagraph();
       const leadingWhitespace = olMatch[1];
       const marker = olMatch[2];
       const itemText = olMatch[3];
@@ -266,6 +294,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       );
     } else {
       if (line.trim().length === 0 && !inCodeBlock) {
+        flushParagraph();
         if (!lastLineEmpty) {
           contentBlocks.push(
             <Box key={`spacer-${index}`} height={EMPTY_LINE_HEIGHT} />,
@@ -273,16 +302,12 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           lastLineEmpty = true;
         }
       } else {
-        addContentBlock(
-          <Box key={key}>
-            <Text wrap="wrap" color={responseColor}>
-              <RenderInline text={line} defaultColor={responseColor} />
-            </Text>
-          </Box>,
-        );
+        paragraphBuffer.push(line);
       }
     }
   });
+
+  flushParagraph();
 
   if (inCodeBlock) {
     addContentBlock(

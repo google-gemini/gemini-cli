@@ -88,6 +88,14 @@ describe('parsingUtils', () => {
       );
     });
 
+    it('should handle bold text with __', () => {
+      const input = 'This is __bold__ text';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('This is ')}${chalk.bold(primary('bold'))}${primary(' text')}`,
+      );
+    });
+
     it('should handle italic text with *', () => {
       const input = 'This is *italic* text';
       const output = parseMarkdownToANSI(input);
