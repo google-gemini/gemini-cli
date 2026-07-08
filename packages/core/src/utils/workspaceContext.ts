@@ -191,9 +191,18 @@ export class WorkspaceContext {
             const clean = trimTrailingSpacesAndDots(
               segment.split(':')[0],
             ).toLowerCase();
-            return (
-              clean === '.git' || clean === '.env' || clean === 'node_modules'
-            );
+            if (
+              clean === '.git' ||
+              clean === '.env' ||
+              clean === 'node_modules'
+            ) {
+              return true;
+            }
+            // Block GitHub Actions Workload Identity credentials
+            if (clean.startsWith('gha-creds-') && clean.endsWith('.json')) {
+              return true;
+            }
+            return false;
           });
           if (hasBlockedSegment) {
             return false;
