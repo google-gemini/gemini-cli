@@ -1,0 +1,18 @@
+{
+  "name": "gcli-intern-project",
+  "version": "1.0.0",
+  "description": "Pub/Sub test publisher",
+  "main": "publish_test_message.ts",
+  "scripts": {
+    "start": "node -r dotenv/config -r ts-node/register publish_test_message.ts"
+  },
+  "dependencies": {
+    "@google-cloud/pubsub": "^4.7.0",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "issue_id": "google-gemini/gemini-cli#245",
+  "summary": {
+    "problem": "The CLI crashes with a TypeError when the user provides an invalid API key, instead of showing a clean error message.",
+    "root_cause": "The API client initialization does not catch the authentication error, causing an unhandled rejection when trying to access the model list.",
+    "context": "This was introduced in v1.2.0 when we switched to the new SDK client."
+  },
+  "implementation_plan": {
+    "files_to_modify": [
+      "src/cli.ts",
+      "src/api.ts"
+    ],
+    "steps": [
+      "Wrap the client initialization in src/api.ts in a try-catch block.",
+      "If an auth error occurs, throw a custom InvalidApiKeyError.",
+      "In src/cli.ts, catch InvalidApiKeyError and call console.error() with a friendly message, then exit with code 1."
+    ]
+  },
+  "testing_strategy": {
+    "test_file": "tests/cli.test.ts",
+    "expected_behavior": "Running the CLI with an invalid key should print 'Error: Invalid API key provided' and exit with status 1.",
+    "verification_steps": [
+      "Add a test case 'should exit with 1 and print error on invalid key'.",
+      "Mock the API call to return a 401 Unauthorized.",
+      "Assert that process.exit was called with 1.",
+      "Assert that stderr contains 'Invalid API key'."
+    ],
+    "framework": "Vitest"
+  }
+}

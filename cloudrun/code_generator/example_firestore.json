@@ -1,0 +1,50 @@
+{
+  "expected": {
+    "effort": "SMALL",
+    "quality": "OK"
+  },
+  "workable_spec": {
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/skills/skillLoader.ts"
+      ],
+      "steps": [
+        "Update the `FRONTMATTER_REGEX` to optionally match a UTF-8 BOM (`\\uFEFF?`) at the start and allow optional trailing horizontal whitespace (`[ \\t]*`) after the triple-dash markers.",
+        "Modify the `parseSimpleFrontmatter` function to make key matching (for 'name' and 'description') case-insensitive.",
+        "Adjust the key matching regex within `parseSimpleFrontmatter` to support optional spaces before the colon (e.g., `name :`).",
+        "Enhance the multi-line description parsing logic in `parseSimpleFrontmatter` to ensure that subsequent indented lines are only treated as part of the description if they do not resemble known keys (like 'name' or 'description').",
+        "Add a fallback mechanism in `parseFrontmatter` to treat non-string YAML values (like numbers or booleans) as strings by falling back to the simple parser, preventing parsing failures."
+      ]
+    },
+    "issue_id": "google-gemini/gemini-cli#25693",
+    "summary": {
+      "context": "This issue resides within the core skill loading and parsing mechanism of the Gemini CLI, specifically in how it reads and interprets the YAML frontmatter of `SKILL.md` files to extract skill metadata (name, description).",
+      "problem": "The Gemini CLI skill discovery mechanism fails to recognize local skills when the 'description' field in SKILL.md YAML frontmatter is a single line, or when the file contains invisible characters like UTF-8 BOM, or has trailing spaces after frontmatter markers.",
+      "root_cause": "The `FRONTMATTER_REGEX` and `parseSimpleFrontmatter` logic in `skillLoader.ts` were not robust enough to handle common formatting variations. Specifically, the regex did not account for UTF-8 Byte Order Marks (BOM) or trailing horizontal whitespace after triple-dash markers. The simple parser was case-sensitive for keys, rigid about spacing around colons, and incorrectly consumed subsequent metadata lines into multi-line descriptions."
+    },
+    "testing_strategy": {
+      "expected_behavior": "The skill discovery mechanism should successfully parse `SKILL.md` files and discover skills even when the frontmatter contains UTF-8 BOM, trailing spaces after markers, case-insensitive keys, spaces before colons, or multi-line descriptions that might otherwise be misinterpreted.",
+      "framework": "Vitest",
+      "test_file": "packages/core/src/skills/skillLoader.test.ts",
+      "verification_steps": [
+        "Assert that a skill with a UTF-8 BOM in its `SKILL.md` file is correctly discovered.",
+        "Assert that a skill with trailing spaces after the `---` frontmatter markers in `SKILL.md` is correctly discovered.",
+        "Assert that a skill with frontmatter using case-insensitive keys (e.g., `Name :` or `DESCRIPTION :`) and spaces before colons is correctly discovered and its name/description are parsed.",
+        "Assert that a skill with a multi-line description where a subsequent indented line could be mistaken for a new key (e.g., `name: my-skill` indented under `description`) correctly parses the description without swallowing the `name` key.",
+        "Assert that a multi-line description containing a line starting with 'Note:' is correctly included as part of the description and not misinterpreted as a new key."
+      ]
+    }
+  },
+  "github_metadata": {
+    "issue_number": 25693,
+    "issue_url": "https://github.com/google-gemini/gemini-cli/issues/25693",
+    "owner": "google-gemini",
+    "pr_url": "https://github.com/google-gemini/gemini-cli/pull/25728",
+    "repo": "gemini-cli",
+    "target_version": "main"
+  },
+  "input": {
+    "body": "--- title: \"[Bug] Skills discovery fails when `description` in `SKILL.md` frontmatter is a single line\" labels: [\"area/extensions\", \"status/need-triage\"] --- ### Description The Gemini CLI skill discovery mechanism fails to recognize local skills in `.agents/skills/` or `.gemini/skills/` if the `description` field in the `SKILL.md` YAML frontmatter is written as a single line. Changing the description to a multi-line block (using the YAML `>` operator) immediately resolves the issue and allows the skill to be discovered by `/skills list`. ### Steps to Reproduce 1. Create a folder `.agents/skills/test-skill/`. 2. Create a `SKILL.md` with the following content: ```markdown --- name: test-skill description: A single line description that is relatively long and contains some punctuation. --- # Test Skill Content here. ``` 3. Run `gemini chat` and type `/skills list`. 4. **Actual Result**: `test-skill` is missing from the list. 5. Modify `SKILL.md` to use multi-line YAML scalar: ```markdown --- name: test-skill description: > A multi-line description that is relatively long and contains some punctuation. --- # Test Skill Content here. ``` 6. Run `/skills list` again. 7. **Expected Result**: `test-skill` should be visible in both cases. Currently, it only works with the multi-line format. ### Environment - OS: Windows 11 (PowerShell 7) - Gemini CLI Version: 0.38.2 - Runtime: Node.js / Bun ### Additional Context This bug significantly impacts the developer experience as many users intuitively write short, single-line descriptions. The workaround (using `>`) suggests a specific issue in how the CLI parses YAML frontmatter in `SKILL.md` files during the initial scanning phase.",
+    "title": "[Bug] Skills discovery fails when 'description' in SKILL.md frontmatter is a single line"
+  }
+}

@@ -1,0 +1,57 @@
+# Simplified Google Cloud Workflow that triggers a single Cloud Run Job
+# which handles the entire iterative Code Gen and Evaluation loop.
+
+main:
+  params: [event]
+  steps:
+    - init:
+        assign:
+          - project_id: 'gcli-intern-project-2026'
+          - job_name: "jetski-worker-job" # The Cloud Run Job name
+          - job_location: "us-central1"
+          - repo_url: "https://github.com/joneba-google/gemini-cli-clone"
+          
+          # Decode Pub/Sub message
+          - pubsub_message_bytes: '${base64.decode(event.data.message.data)}'
+          - firestore_doc_str: '${text.decode(pubsub_message_bytes)}'
+          - status: "STARTED"
+          - error_details: null
+
+    - run_job:
+        try:
+          call: googleapis.run.v1.namespaces.jobs.run
+          args:
+            name: '${"namespaces/" + project_id + "/jobs/" + job_name}'
+            location: '${job_location}'
+            body:
+              overrides:
+                containerOverrides:
+                  - env:
+                      - name: "FIRESTORE_DOC"
+                        value: '${firestore_doc_str}'
+                      - name: "REPO_URL"
+                        value: '${repo_url}'
+                      - name: "USE_ADC"
+                        value: "true"
+          result: job_result
+        except:
+          as: e
+          steps:
+            - handle_job_error:
+                assign:
+                  - status: "NEEDS_HUMAN"
+                  - error_details: '${e}'
+                next: handle_failure
+        next: mark_completed
+
+    - handle_failure:
+        # Fixed: Correctly terminated expression and JSON encoding
+        return: '${"Failed: " + json.encode_to_string(error_details)}'
+
+    - mark_completed:
+        assign:
+          - status: "COMPLETED"
+        next: finish
+
+    - finish:
+        return: '${status}'
