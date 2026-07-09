@@ -108,6 +108,28 @@ export function buildToolRegistry(): ToolRegistry {
     }
   }
 
+  const customTools: Array<[string, ToolCategory]> = [
+    ['read_background_output', 'shell'],
+    ['list_background_processes', 'shell'],
+    ['mutation-agent', 'agent'],
+  ];
+
+  for (const [name, category] of customTools) {
+    aliasLookup.set(name, name);
+    const entry: ToolRegistryEntry = {
+      name,
+      category,
+      aliases: Object.freeze([]),
+    };
+    tools.set(name, entry);
+    const group = categoryGroups.get(category);
+    if (group) {
+      group.push(entry);
+    } else {
+      categoryGroups.set(category, [entry]);
+    }
+  }
+
   const frozenCategories = new Map<
     ToolCategory,
     readonly ToolRegistryEntry[]

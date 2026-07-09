@@ -5,7 +5,16 @@
  */
 
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    execSync: vi.fn().mockReturnValue(''),
+  };
+});
 import {
   validateInventory,
   formatValidationReport,
@@ -32,8 +41,10 @@ function makeCase(overrides: Partial<EvalCaseRecord> = {}): EvalCaseRecord {
     suiteName: 'default',
     suiteType: 'behavioral',
     hasFiles: false,
+    hasSetup: false,
     hasPrompt: true,
-    toolReferences: [],
+    prompt: 'Describe how the function works.',
+    toolReferences: ['grep_search'],
     location: { line: 10, column: 3 },
     ...overrides,
   };
@@ -82,8 +93,8 @@ describe('eval-validate', () => {
   });
 
   describe('VALIDATION_RULES', () => {
-    it('exports the expected five rules', () => {
-      expect(VALIDATION_RULES).toHaveLength(5);
+    it('exports the expected nine rules', () => {
+      expect(VALIDATION_RULES).toHaveLength(9);
       const ids = VALIDATION_RULES.map((r) => r.id);
       expect(ids).toEqual([
         'file-naming',
@@ -91,6 +102,10 @@ describe('eval-validate', () => {
         'suite-metadata',
         'prompt-presence',
         'case-name-static',
+        'invalid-tool-refs',
+        'positive-assertion',
+        'workspace-setup',
+        'new-evals-policy',
       ]);
     });
 
@@ -421,6 +436,123 @@ describe('eval-validate', () => {
       expect(result.analyzerDiagnostics).toHaveLength(1);
       expect(result.analyzerDiagnostics[0].message).toBe(
         'Could not resolve wrapper helper',
+      );
+    });
+
+    it('flags invalid-tool-refs when unrecognized tools are reported in diagnostics', () => {
+      const diag: EvalAnalysisDiagnostic = {
+        severity: 'warning',
+        message: 'Unrecognized tool name extracted: "bad_tool"',
+        filePath: '/repo/evals/test.eval.ts',
+        location: { line: 5, column: 1 },
+      };
+      const f = makeFile([makeCase()], { diagnostics: [diag] });
+      const result = validateInventory(makeInventory([f]), registry);
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'invalid-tool-refs',
+      );
+      expect(violations).toHaveLength(1);
+      expect(violations[0].message).toContain('bad_tool');
+    });
+
+    it('flags positive-assertion when standard test has no tool references', () => {
+      const c = makeCase({ toolReferences: [] });
+      const result = validateInventory(
+        makeInventory([makeFile([c])]),
+        registry,
+      );
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'positive-assertion',
+      );
+      expect(violations).toHaveLength(1);
+      expect(violations[0].message).toContain(
+        'assert function does not track any tool references',
+      );
+    });
+
+    it('does not flag positive-assertion for component-level tests', () => {
+      const c1 = makeCase({
+        baseHelperName: 'componentEvalTest',
+        toolReferences: [],
+      });
+      const c2 = makeCase({
+        suiteType: 'component-level',
+        toolReferences: [],
+      });
+      const result = validateInventory(
+        makeInventory([makeFile([c1, c2])]),
+        registry,
+      );
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'positive-assertion',
+      );
+      expect(violations).toHaveLength(0);
+    });
+
+    it('flags workspace-setup when workspace prompt has no files or setup config', () => {
+      const c = makeCase({
+        prompt: 'Please edit app.ts and fix the typo.',
+        hasFiles: false,
+        hasSetup: false,
+      });
+      const result = validateInventory(
+        makeInventory([makeFile([c])]),
+        registry,
+      );
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'workspace-setup',
+      );
+      expect(violations).toHaveLength(1);
+      expect(violations[0].message).toContain('suggests workspace interaction');
+    });
+
+    it('accepts workspace prompt if files or setup are provided', () => {
+      const c1 = makeCase({
+        prompt: 'Please edit app.ts and fix the typo.',
+        hasFiles: true,
+        hasSetup: false,
+      });
+      const c2 = makeCase({
+        prompt: 'Please edit app.ts and fix the typo.',
+        hasFiles: false,
+        hasSetup: true,
+      });
+      const result = validateInventory(
+        makeInventory([makeFile([c1, c2])]),
+        registry,
+      );
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'workspace-setup',
+      );
+      expect(violations).toHaveLength(0);
+    });
+
+    it('flags new-evals-policy when a new file has ALWAYS_PASSES policy', () => {
+      const c = makeCase({
+        filePath: '/repo/evals/untracked-test.eval.ts',
+        relativePath: 'evals/untracked-test.eval.ts',
+        policy: 'ALWAYS_PASSES',
+      });
+
+      // First call: git status --porcelain (working-tree additions)
+      vi.mocked(execSync).mockReturnValueOnce(
+        '?? evals/untracked-test.eval.ts\n',
+      );
+      // Subsequent calls for git merge-base can throw — addFromOutput won't add anything
+      vi.mocked(execSync).mockImplementationOnce(() => {
+        throw new Error('no merge base');
+      });
+
+      const result = validateInventory(
+        makeInventory([makeFile([c])]),
+        registry,
+      );
+      const violations = result.violations.filter(
+        (v) => v.ruleId === 'new-evals-policy',
+      );
+      expect(violations).toHaveLength(1);
+      expect(violations[0].message).toContain(
+        'not use ALWAYS_PASSES policy initially',
       );
     });
 

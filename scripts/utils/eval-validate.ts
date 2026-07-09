@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import type {
   EvalCaseRecord,
   EvalAnalysisDiagnostic,
@@ -66,6 +67,25 @@ export const VALIDATION_RULES: readonly ValidationRule[] = [
     id: 'case-name-static',
     description:
       'The case name must be a static string literal, not a computed value.',
+  },
+  {
+    id: 'invalid-tool-refs',
+    description:
+      'All tools referenced in assertions must be valid, existing tools in the registry.',
+  },
+  {
+    id: 'positive-assertion',
+    description:
+      'Behavioral evaluation cases must assert on at least one tool call.',
+  },
+  {
+    id: 'workspace-setup',
+    description:
+      'Workspace behavior evaluations must provide files or a setup function.',
+  },
+  {
+    id: 'new-evals-policy',
+    description: 'New evaluations must not use ALWAYS_PASSES policy initially.',
   },
 ];
 
@@ -176,6 +196,141 @@ function checkCaseNameStatic(
   return undefined;
 }
 
+const WORKSPACE_PROMPT_KEYWORDS =
+  /\b(create|write|edit|modify|delete|remove|patch|git|file|directory|folder|repo|workspace)\b/i;
+
+function checkPositiveAssertion(
+  evalCase: EvalCaseRecord,
+  filePath: string,
+): ValidationViolation | undefined {
+  if (
+    evalCase.baseHelperName !== 'componentEvalTest' &&
+    evalCase.suiteType !== 'component-level' &&
+    evalCase.toolReferences.length === 0
+  ) {
+    return {
+      ruleId: 'positive-assertion',
+      message:
+        'Eval case assert function does not track any tool references. Use at least one positive tool assertion.',
+      filePath,
+      location: evalCase.location,
+    };
+  }
+  return undefined;
+}
+
+function checkWorkspaceSetup(
+  evalCase: EvalCaseRecord,
+  filePath: string,
+): ValidationViolation | undefined {
+  if (
+    evalCase.baseHelperName !== 'componentEvalTest' &&
+    evalCase.suiteType !== 'component-level' &&
+    evalCase.prompt &&
+    WORKSPACE_PROMPT_KEYWORDS.test(evalCase.prompt) &&
+    !evalCase.hasFiles &&
+    !evalCase.hasSetup
+  ) {
+    return {
+      ruleId: 'workspace-setup',
+      message:
+        'Eval case prompt suggests workspace interaction (files/git), but neither "files" nor a "setup" hook is specified.',
+      filePath,
+      location: evalCase.location,
+    };
+  }
+  return undefined;
+}
+
+function getNewEvalFiles(repoRoot?: string): Set<string> {
+  const newFiles = new Set<string>();
+  const cwd = repoRoot || process.cwd();
+
+  function addFromOutput(output: string): void {
+    for (const line of output.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      // git status --porcelain: "A  path" or "?? path"
+      // git diff --name-only: bare path
+      let filePath: string;
+      if (trimmed.startsWith('A') || trimmed.startsWith('??')) {
+        filePath = trimmed.slice(2).trim();
+      } else {
+        filePath = trimmed;
+      }
+      if (filePath.startsWith('"') && filePath.endsWith('"')) {
+        filePath = filePath.slice(1, -1);
+      }
+      if (filePath) {
+        newFiles.add(path.resolve(cwd, filePath).replace(/\\/g, '/'));
+      }
+    }
+  }
+
+  try {
+    // Working-tree additions (useful locally)
+    const status = execSync('git status --porcelain', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    addFromOutput(status);
+  } catch {
+    // Ignore
+  }
+
+  try {
+    // PR-level additions against the merge base (works in CI where working
+    // tree is clean). Try origin/main, fall back to main, then HEAD~1.
+    const bases = ['origin/main', 'main', 'HEAD~1'];
+    for (const base of bases) {
+      try {
+        const mergeBase = execSync(`git merge-base HEAD ${base}`, {
+          cwd,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+        if (mergeBase) {
+          const diff = execSync(
+            `git diff --diff-filter=A --name-only ${mergeBase}`,
+            {
+              cwd,
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+            },
+          );
+          addFromOutput(diff);
+          break; // succeeded, no need to try next base
+        }
+      } catch {
+        // Try next base
+      }
+    }
+  } catch {
+    // Ignore
+  }
+
+  return newFiles;
+}
+
+function checkNewEvalPolicy(
+  evalCase: EvalCaseRecord,
+  filePath: string,
+  newFiles: Set<string>,
+): ValidationViolation | undefined {
+  const normalizedPath = path.resolve(filePath).replace(/\\/g, '/');
+  if (newFiles.has(normalizedPath) && evalCase.policy === 'ALWAYS_PASSES') {
+    return {
+      ruleId: 'new-evals-policy',
+      message:
+        'New evaluations must not use ALWAYS_PASSES policy initially. Use USUALLY_PASSES.',
+      filePath,
+      location: evalCase.location,
+    };
+  }
+  return undefined;
+}
+
 /**
  * Validates every eval case in the given inventory and returns a
  * ValidationResult. Pass `options.filePaths` to restrict to a subset of
@@ -217,6 +372,7 @@ export function validateInventory(
     { totalCases: number; violationCount: number }
   >();
   const allViolations: ValidationViolation[] = [];
+  const newFiles = getNewEvalFiles(inventory.repoRoot);
 
   for (const fileAnalysis of inventory.files) {
     const relativePath = fileAnalysis.relativePath;
@@ -251,8 +407,38 @@ export function validateInventory(
       const ns = checkCaseNameStatic(evalCase, fp);
       if (ns) caseViolations.push(ns);
 
+      const pos = checkPositiveAssertion(evalCase, fp);
+      if (pos) caseViolations.push(pos);
+
+      const ws = checkWorkspaceSetup(evalCase, fp);
+      if (ws) caseViolations.push(ws);
+
+      const nep = checkNewEvalPolicy(evalCase, fp, newFiles);
+      if (nep) caseViolations.push(nep);
+
       allViolations.push(...caseViolations);
       summary.violationCount += caseViolations.length;
+    }
+  }
+
+  // Elevate unrecognized tool warning diagnostics to validation violations
+  for (const d of inventory.diagnostics) {
+    if (d.message.startsWith('Unrecognized tool name extracted:')) {
+      const displayPath = resolveDisplayPath(d.filePath, inventory.repoRoot);
+      if (filterSet && !filterSet.has(displayPath)) {
+        continue;
+      }
+      allViolations.push({
+        ruleId: 'invalid-tool-refs',
+        message: d.message,
+        filePath: d.filePath,
+        location: d.location,
+      });
+
+      const summary = fileSummaryMap.get(displayPath);
+      if (summary) {
+        summary.violationCount += 1;
+      }
     }
   }
 

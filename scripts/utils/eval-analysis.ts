@@ -49,7 +49,9 @@ export interface EvalCaseRecord {
   suiteType?: string;
   timeout?: number;
   hasFiles: boolean;
+  hasSetup: boolean;
   hasPrompt: boolean;
+  prompt?: string;
   toolReferences: readonly string[];
   location: EvalSourceLocation;
 }
@@ -161,7 +163,9 @@ export function analyzeEvalSource(
       suiteType: getStaticStringProperty(evalCase, 'suiteType'),
       timeout: getStaticNumberProperty(evalCase, 'timeout'),
       hasFiles: hasProperty(evalCase, 'files'),
+      hasSetup: hasProperty(evalCase, 'setup'),
       hasPrompt: hasProperty(evalCase, 'prompt'),
+      prompt: getStaticStringProperty(evalCase, 'prompt'),
       toolReferences: Object.freeze([...new Set(toolRefs)].sort()),
       location: getLocation(sourceFile, callExpression),
     });
