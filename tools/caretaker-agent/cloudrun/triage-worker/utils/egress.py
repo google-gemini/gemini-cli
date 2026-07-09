@@ -1,8 +1,37 @@
 import os
 import json
+from typing import TypedDict, Literal, Union
 from google.cloud import pubsub_v1
 
-def _publish_egress_action(egress_event: dict) -> None:
+
+class BasePayload(TypedDict):
+    owner: str
+    repo: str
+    issueNumber: int
+
+
+class LabelPayload(BasePayload):
+    labels: list[str]
+
+
+class CommentPayload(BasePayload):
+    commentBody: str
+
+
+class LabelEvent(TypedDict):
+    action: Literal["LABEL"]
+    payload: LabelPayload
+
+
+class CommentEvent(TypedDict):
+    action: Literal["COMMENT"]
+    payload: CommentPayload
+
+
+EgressEvent = Union[LabelEvent, CommentEvent]
+
+
+def _publish_egress_action(egress_event: EgressEvent) -> None:
     """
     [Internal] Publishes an EgressEvent JSON payload to Pub/Sub.
     """
@@ -27,6 +56,7 @@ def _publish_egress_action(egress_event: dict) -> None:
         )
     except Exception as e:
         print(f"[WORKER] Error publishing to Pub/Sub: {e}")
+        raise
 
 
 def send_label_action(
