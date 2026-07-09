@@ -1385,7 +1385,7 @@ describe('LocalAgentExecutor', () => {
       );
     });
 
-    it('should error immediately if the model stops tools without calling complete_task (Protocol Violation)', async () => {
+    it('should attempt guided recovery when the model stops tools without calling complete_task', async () => {
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1427,38 +1427,25 @@ describe('LocalAgentExecutor', () => {
         },
       ]);
 
-      // Turn 2 (protocol violation)
-      mockModelResponse([], 'I think I am done.');
-
-      // Turn 3 (recovery turn - also fails)
-      mockModelResponse([], 'I still give up.');
+      // Model now consistently responds with text only, triggering guided recovery
+      for (let i = 0; i < 5; i++) {
+        mockModelResponse([], 'I think I am done, but I am just talking.');
+      }
 
       const output = await executor.run({ goal: 'Strict test' }, signal);
 
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      // The loop will now continue through recovery turns until it hits maxTurns or STAGNATED
+      expect([
+        AgentTerminateMode.MAX_TURNS,
+        AgentTerminateMode.STAGNATED,
+      ]).toContain(output.terminate_reason);
 
-      const expectedError = `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}'.`;
-
-      expect(output.terminate_reason).toBe(
-        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-      );
-      expect(output.result).toBe(expectedError);
-
-      // Telemetry check for error
-      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
-          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-        }),
-      );
-
+      // Verify that the guided recovery warning was emitted
       expect(activities).toContainEqual(
         expect.objectContaining({
-          type: 'ERROR',
+          type: 'WARN',
           data: expect.objectContaining({
-            context: 'protocol_violation',
-            error: expectedError,
-            errorType: SubagentActivityErrorType.GENERIC,
+            context: 'guided_recovery',
           }),
         }),
       );
@@ -2760,16 +2747,19 @@ describe('LocalAgentExecutor', () => {
         signal,
       );
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(output.result).toContain('Agent reached max turns limit');
+      expect(output.terminate_reason).toBe(AgentTerminateMode.STAGNATED);
+      expect(output.result).toContain(
+        'Agent has responded with text for 2 consecutive turns',
+      );
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
 
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
           data: expect.objectContaining({
-            context: 'recovery_turn',
-            error: 'Graceful recovery attempt failed. Reason: stop',
+            context: 'stagnation',
+            error:
+              'Agent has responded with text for 2 consecutive turns without calling tools. Terminating due to stagnation.',
             errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
@@ -2810,9 +2800,10 @@ describe('LocalAgentExecutor', () => {
 
       expect(activities).toContainEqual(
         expect.objectContaining({
-          type: 'THOUGHT_CHUNK',
+          type: 'WARN',
           data: expect.objectContaining({
-            text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
+            context: 'guided_recovery',
+            error: expect.stringContaining('Attempting guided recovery'),
           }),
         }),
       );
@@ -2841,20 +2832,16 @@ describe('LocalAgentExecutor', () => {
       );
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
-      expect(output.terminate_reason).toBe(
-        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-      );
-      expect(output.result).toContain(
-        `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}'`,
-      );
+      expect(output.terminate_reason).toBe(AgentTerminateMode.STAGNATED);
 
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
           data: expect.objectContaining({
-            context: 'recovery_turn',
-            error: 'Graceful recovery attempt failed. Reason: stop',
-            errorType: SubagentActivityErrorType.GENERIC,
+            context: 'stagnation',
+            error: expect.stringContaining(
+              'Agent has responded with text for 2 consecutive turns',
+            ),
           }),
         }),
       );
@@ -4228,5 +4215,36 @@ describe('LocalAgentExecutor', () => {
         expect(memoryPart?.text).not.toContain('Extension memory rule');
       });
     });
+  });
+});
+
+describe('Bug Reproduction: #28300 Agentic loop breaks after /rewind', () => {
+  it('should fail (stop) when the model responds with text but no tool calls (simulating post-rewind behavior)', async () => {
+    const definition = createTestDefinition([LS_TOOL_NAME]);
+    const localActivities: SubagentActivityEvent[] = [];
+    const localOnActivity: ActivityCallback = (activity) =>
+      localActivities.push(activity);
+    const executor = await LocalAgentExecutor.create(
+      definition,
+      mockConfig,
+      localOnActivity,
+    );
+    const abortController = new AbortController();
+
+    // Simulate the model responding with just text, no tools.
+    // This is what happens post-rewind when the agent "thinks" it's done or just talks.
+    mockModelResponse([], 'I will now start the task by listing the files.');
+
+    const output = await executor.run(
+      { goal: 'List files' },
+      abortController.signal,
+    );
+
+    // This expectation confirms the fix: it should NO LONGER stop with ERROR_NO_COMPLETE_TASK_CALL
+    // but instead continue until it hits MAX_TURNS (since our mock model continues to return only text).
+    expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
+    expect(output.result).not.toContain(
+      `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}'`,
+    );
   });
 });

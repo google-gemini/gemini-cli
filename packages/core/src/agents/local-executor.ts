@@ -129,6 +129,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+  private consecutiveTextTurns = 0;
   private cache: LRUCache<string, string>;
 
   private get executionContext(): AgentLoopContext {
@@ -359,19 +360,46 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
     }
 
-    // If the model stops calling tools without calling complete_task, it's an error.
+    // If the model stops calling tools without calling complete_task, it's a potential stall.
     if (functionCalls.length === 0) {
-      this.emitActivity('ERROR', {
-        error: `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}' to finalize the session.`,
-        context: 'protocol_violation',
+      this.consecutiveTextTurns++;
+
+      if (this.consecutiveTextTurns >= 2) {
+        this.emitActivity('ERROR', {
+          error: `Agent has responded with text for ${this.consecutiveTextTurns} consecutive turns without calling tools. Terminating due to stagnation.`,
+          context: 'stagnation',
+          errorType: SubagentActivityErrorType.GENERIC,
+        });
+        return {
+          status: 'stop',
+          terminateReason: AgentTerminateMode.STAGNATED,
+          finalResult: null,
+        };
+      }
+
+      this.emitActivity('WARN', {
+        error: `Agent responded with text but no tool calls. Attempting guided recovery (Turn ${this.consecutiveTextTurns}/2)...`,
+        context: 'guided_recovery',
         errorType: SubagentActivityErrorType.GENERIC,
       });
+
+      const recoveryPrompt = {
+        role: 'user',
+        parts: [
+          {
+            text: `[SYSTEM: Action required. The current task is not yet complete. Please provide the next tool call to proceed.]`,
+          },
+        ],
+      };
+
       return {
-        status: 'stop',
-        terminateReason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-        finalResult: null,
+        status: 'continue',
+        nextMessage: recoveryPrompt,
       };
     }
+
+    // Reset the stagnation counter because the agent is actively using tools.
+    this.consecutiveTextTurns = 0;
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
