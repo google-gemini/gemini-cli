@@ -38,6 +38,8 @@ import {
   loadEnvironment,
   setTargetDir,
   envStorage,
+  cwdSymbol,
+  type TaskEnv,
 } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
@@ -95,35 +97,54 @@ export class CoderAgentExecutor implements AgentExecutor {
 
   constructor(private taskStore?: TaskStore) {}
 
-  private async getConfig(
+  private async getConfigWithEnv(
     agentSettings: AgentSettings,
     taskId: string,
+    isTrusted: boolean,
+    workspaceRoot: string,
   ): Promise<Config> {
-    const workspaceRoot = setTargetDir(agentSettings);
+    const settings = loadSettings(workspaceRoot, isTrusted);
+    const extensions = loadExtensions(workspaceRoot, isTrusted);
+    return loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      taskId,
+      isTrusted,
+      workspaceRoot,
+    );
+  }
 
-    // Independently verify the trust status of the workspace path on the server side
+  private runInIsolatedEnv<T>(
+    agentSettings: AgentSettings,
+    fn: (isTrusted: boolean, workspaceRoot: string) => Promise<T>,
+  ): Promise<T> {
+    const workspaceRoot = setTargetDir(agentSettings);
+    const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: true,
+      isFolderTrustEnabled: initialSettings.folderTrust,
       isHeadless: isHeadlessMode(),
     });
 
-    const envVars: Record<string, string> = { ...process.env };
+    const envVars: TaskEnv = { ...process.env };
+    envVars[cwdSymbol] = workspaceRoot;
+
     return envStorage.run(envVars, async () => {
       Object.assign(
         envVars,
         loadEnvironment(isTrusted ?? false, workspaceRoot),
       );
-      const settings = loadSettings(workspaceRoot, isTrusted ?? false);
-      const extensions = loadExtensions(workspaceRoot, isTrusted ?? false);
-      return loadConfig(
-        settings,
-        new SimpleExtensionLoader(extensions),
-        taskId,
-        isTrusted ?? false,
-        workspaceRoot,
-      );
+      return fn(isTrusted ?? false, workspaceRoot);
     });
+  }
+
+  private async getConfig(
+    agentSettings: AgentSettings,
+    taskId: string,
+  ): Promise<Config> {
+    return this.runInIsolatedEnv(agentSettings, (isTrusted, workspaceRoot) =>
+      this.getConfigWithEnv(agentSettings, taskId, isTrusted, workspaceRoot),
+    );
   }
 
   /**
@@ -143,23 +164,33 @@ export class CoderAgentExecutor implements AgentExecutor {
     }
 
     const agentSettings = persistedState._agentSettings;
-    const config = await this.getConfig(agentSettings, sdkTask.id);
-    const contextId: string =
-      getContextIdFromMetadata(metadata) || sdkTask.contextId;
-    const runtimeTask = await Task.create(
-      sdkTask.id,
-      contextId,
-      config,
-      eventBus,
-      agentSettings.autoExecute,
-    );
-    runtimeTask.taskState = persistedState._taskState;
-    await runtimeTask.geminiClient.initialize();
+    return this.runInIsolatedEnv(
+      agentSettings,
+      async (isTrusted, workspaceRoot) => {
+        const config = await this.getConfigWithEnv(
+          agentSettings,
+          sdkTask.id,
+          isTrusted,
+          workspaceRoot,
+        );
+        const contextId: string =
+          getContextIdFromMetadata(metadata) || sdkTask.contextId;
+        const runtimeTask = await Task.create(
+          sdkTask.id,
+          contextId,
+          config,
+          eventBus,
+          agentSettings.autoExecute,
+        );
+        runtimeTask.taskState = persistedState._taskState;
+        await runtimeTask.geminiClient.initialize();
 
-    const wrapper = new TaskWrapper(runtimeTask, agentSettings);
-    this.tasks.set(sdkTask.id, wrapper);
-    logger.info(`Task ${sdkTask.id} reconstructed from store.`);
-    return wrapper;
+        const wrapper = new TaskWrapper(runtimeTask, agentSettings);
+        this.tasks.set(sdkTask.id, wrapper);
+        logger.info(`Task ${sdkTask.id} reconstructed from store.`);
+        return wrapper;
+      },
+    );
   }
 
   async createTask(
@@ -172,20 +203,30 @@ export class CoderAgentExecutor implements AgentExecutor {
       kind: CoderAgentEvent.StateAgentSettingsEvent,
       workspacePath: process.cwd(),
     };
-    const config = await this.getConfig(agentSettings, taskId);
-    const runtimeTask = await Task.create(
-      taskId,
-      contextId,
-      config,
-      eventBus,
-      agentSettings.autoExecute,
-    );
-    await runtimeTask.geminiClient.initialize();
+    return this.runInIsolatedEnv(
+      agentSettings,
+      async (isTrusted, workspaceRoot) => {
+        const config = await this.getConfigWithEnv(
+          agentSettings,
+          taskId,
+          isTrusted,
+          workspaceRoot,
+        );
+        const runtimeTask = await Task.create(
+          taskId,
+          contextId,
+          config,
+          eventBus,
+          agentSettings.autoExecute,
+        );
+        await runtimeTask.geminiClient.initialize();
 
-    const wrapper = new TaskWrapper(runtimeTask, agentSettings);
-    this.tasks.set(taskId, wrapper);
-    logger.info(`New task ${taskId} created.`);
-    return wrapper;
+        const wrapper = new TaskWrapper(runtimeTask, agentSettings);
+        this.tasks.set(taskId, wrapper);
+        logger.info(`New task ${taskId} created.`);
+        return wrapper;
+      },
+    );
   }
 
   getTask(taskId: string): TaskWrapper | undefined {
@@ -343,7 +384,8 @@ export class CoderAgentExecutor implements AgentExecutor {
       isHeadless: isHeadlessMode(),
     });
 
-    const envVars: Record<string, string> = { ...process.env };
+    const envVars: TaskEnv = { ...process.env };
+    envVars[cwdSymbol] = workspaceRoot;
 
     return envStorage.run(envVars, async () => {
       Object.assign(

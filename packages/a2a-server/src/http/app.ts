@@ -201,12 +201,17 @@ export async function createApp() {
 
     // Use a temporary settings load to check if folder trust is enabled.
     // This is similar to how the CLI handles the initial trust check.
+    const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: true,
+      isFolderTrustEnabled: initialSettings.folderTrust,
       isHeadless: isHeadlessMode(),
     });
 
+    // Change the global working directory to the workspace root during startup
+    process.chdir(workspaceRoot);
+
+    // Load environment globally for the server startup
     loadEnvironment(isTrusted ?? false, workspaceRoot);
 
     const settings = loadSettings(workspaceRoot, isTrusted ?? false);

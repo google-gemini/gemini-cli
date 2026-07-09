@@ -29,18 +29,21 @@ import {
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
-export const envStorage = new AsyncLocalStorage<Record<string, string>>();
+export const envStorage = new AsyncLocalStorage<TaskEnv>();
 
 const deletedKeysSymbol = Symbol('deletedKeys');
+export const cwdSymbol = Symbol('cwd');
 
-interface TaskEnv extends Record<string, string> {
+export interface TaskEnv extends Record<string, string> {
   [deletedKeysSymbol]?: Set<string>;
+  [cwdSymbol]?: string;
 }
 
 // Set up a Proxy on process.env to intercept reads and writes, isolating environment variables per task
@@ -48,104 +51,98 @@ const originalEnv = process.env;
 const envProxy = new Proxy(originalEnv, {
   get(target, prop) {
     if (typeof prop === 'string') {
-      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      const taskEnv = envStorage.getStore();
       if (taskEnv) {
         const deleted = taskEnv[deletedKeysSymbol];
         if (deleted?.has(prop)) {
           return undefined;
         }
-        if (prop in taskEnv) {
+        if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return taskEnv[prop];
         }
-        return target[prop];
       }
-      return target[prop];
     }
-    return undefined;
+    return target[prop];
   },
   has(target, prop) {
     if (typeof prop === 'string') {
-      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      const taskEnv = envStorage.getStore();
       if (taskEnv) {
         const deleted = taskEnv[deletedKeysSymbol];
         if (deleted?.has(prop)) {
           return false;
         }
-        if (prop in taskEnv) {
+        if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return true;
         }
-        return prop in target;
       }
-      return prop in target;
     }
-    return false;
+    return prop in target;
   },
   set(target, prop, value) {
     if (typeof prop === 'string') {
-      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (
+        prop === '__proto__' ||
+        prop === 'constructor' ||
+        prop === 'prototype'
+      ) {
+        return false;
+      }
+      const taskEnv = envStorage.getStore();
       if (taskEnv) {
-        const deleted = taskEnv[deletedKeysSymbol];
-        if (deleted) {
-          deleted.delete(prop);
-        }
+        taskEnv[deletedKeysSymbol]?.delete(prop);
         taskEnv[prop] = String(value);
         return true;
       }
-      target[prop] = String(value);
-      return true;
     }
-    return false;
+    target[prop] = String(value);
+    return true;
   },
   deleteProperty(target, prop) {
     if (typeof prop === 'string') {
-      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (
+        prop === '__proto__' ||
+        prop === 'constructor' ||
+        prop === 'prototype'
+      ) {
+        return false;
+      }
+      const taskEnv = envStorage.getStore();
       if (taskEnv) {
-        if (prop in taskEnv) {
-          delete taskEnv[prop];
-        }
-        let deleted = taskEnv[deletedKeysSymbol];
-        if (!deleted) {
-          deleted = new Set<string>();
-          Object.defineProperty(taskEnv, deletedKeysSymbol, {
-            value: deleted,
-            configurable: true,
-            writable: true,
-            enumerable: false,
-          });
-        }
-        deleted.add(prop);
+        delete taskEnv[prop];
+        (taskEnv[deletedKeysSymbol] ??= new Set()).add(prop);
         return true;
       }
-      delete target[prop];
-      return true;
     }
-    return false;
+    delete target[prop];
+    return true;
   },
   ownKeys(target) {
-    const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+    const taskEnv = envStorage.getStore();
     if (taskEnv) {
-      const deleted = taskEnv[deletedKeysSymbol];
-      const keys = new Set([
+      const keys = new Set<string | symbol>([
         ...Object.getOwnPropertyNames(target),
+        ...Object.getOwnPropertySymbols(target),
         ...Object.keys(taskEnv),
       ]);
-      if (deleted) {
-        for (const key of deleted) {
-          keys.delete(key);
-        }
-      }
+      taskEnv[deletedKeysSymbol]?.forEach((key) => {
+        keys.delete(key);
+      });
       return Array.from(keys);
     }
-    return Object.getOwnPropertyNames(target);
+    return [
+      ...Object.getOwnPropertyNames(target),
+      ...Object.getOwnPropertySymbols(target),
+    ];
   },
   getOwnPropertyDescriptor(target, prop) {
-    const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+    const taskEnv = envStorage.getStore();
     if (taskEnv && typeof prop === 'string') {
       const deleted = taskEnv[deletedKeysSymbol];
       if (deleted?.has(prop)) {
         return undefined;
       }
-      if (prop in taskEnv) {
+      if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
         return {
           value: taskEnv[prop],
           writable: true,
@@ -164,6 +161,42 @@ Object.defineProperty(process, 'env', {
   writable: true,
   configurable: true,
 });
+
+// NOTE: Monkey-patching process.cwd and process.chdir via AsyncLocalStorage is a robust way
+// to simulate workspace isolation in a concurrent server. However, please be aware of a critical
+// limitation: Node.js native C++ APIs (such as fs.readFileSync, fs.writeFile, etc.) and child
+// process spawning APIs (like child_process.spawn) resolve relative paths using the OS-level
+// working directory of the process, NOT the JS-level process.cwd() function.
+// To prevent cross-task interference, all file paths in the core package must be resolved to
+// absolute paths using path.resolve/path.join relative to config.getTargetDir() or config.getCwd()
+// before being passed to native APIs.
+const originalCwd = process.cwd;
+process.cwd = function () {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv && taskEnv[cwdSymbol]) {
+    return taskEnv[cwdSymbol];
+  }
+  return originalCwd.call(process);
+};
+
+const originalChdir = process.chdir;
+process.chdir = function (directory: string) {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv) {
+    const resolved = path.resolve(process.cwd(), directory);
+    const stats = fs.statSync(resolved);
+    if (!stats.isDirectory()) {
+      const err = new Error(
+        "ENOTDIR: not a directory, chdir '" + resolved + "'",
+      );
+      (err as NodeJS.ErrnoException).code = 'ENOTDIR';
+      throw err;
+    }
+    taskEnv[cwdSymbol] = resolved;
+    return;
+  }
+  return originalChdir.call(process, directory);
+};
 
 const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
 
@@ -340,7 +373,16 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
   );
 
   try {
-    const resolvedPath = path.resolve(targetDir);
+    const resolvedPath = resolveToRealPath(targetDir);
+    if (
+      !fs.existsSync(resolvedPath) ||
+      !fs.statSync(resolvedPath).isDirectory()
+    ) {
+      logger.warn(
+        `[CoderAgentExecutor] Workspace path ${resolvedPath} does not exist or is not a directory, returning original os.cwd()`,
+      );
+      return originalCWD;
+    }
     return resolvedPath;
   } catch (e) {
     logger.error(

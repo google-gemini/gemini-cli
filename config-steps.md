@@ -40,12 +40,10 @@ to achieve parity with the secure implementation in
 
 - **Action:** Modify `loadEnvironment(isTrusted: boolean)` to accept the trust
   state.
-- **Action:** If `isTrusted` is `false`, completely ignore `.gemini/.env` files.
-- **Action:** If `isTrusted` is `false` and a root `.env` file is loaded,
-  strictly filter the keys against a safe whitelist (e.g.,
-  `AUTH_ENV_VAR_WHITELIST` containing only API keys and Cloud Project IDs).
-- **Action:** Sanitize the values of any whitelisted variables loaded from an
-  untrusted workspace to prevent shell injection.
+- **Action:** If `isTrusted` is `false`, completely ignore all workspace-level
+  `.env` and `.gemini/.env` files, and only load environment variables from the
+  user's trusted home directory. This completely prevents any untrusted
+  workspace from poisoning the environment.
 
 ### 3. Refactor Startup Sequence
 
