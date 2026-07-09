@@ -534,6 +534,14 @@ describe('resolveToRealPath', () => {
       expected: path.resolve('path', 'to', 'report%202026.txt'),
     },
     {
+      description:
+        'should preserve literal % in file:// URLs without double-decoding (#28276)',
+      input: pathToFileURL(
+        path.resolve('path', 'to', 'report%202026.txt'),
+      ).toString(),
+      expected: path.resolve('path', 'to', 'report%202026.txt'),
+    },
+    {
       description: 'should handle both file protocol and encoding',
       input: pathToFileURL(path.resolve('path', 'to', 'My Project')).toString(),
       expected: path.resolve('path', 'to', 'My Project'),
