@@ -272,4 +272,53 @@ describe('evalTest reliability logic', () => {
       expect(msg).toContain('[ENOENT] File not found');
     }
   });
+
+  it('should not crash when error.message is read-only (frozen error)', async () => {
+    const mockRig = {
+      setup: vi.fn(),
+      run: vi.fn(),
+      cleanup: vi.fn(),
+      readToolLogs: vi.fn(),
+      _lastRunStderr: '',
+    } as any;
+    (TestRig as any).mockReturnValue(mockRig);
+
+    mockRig.run.mockResolvedValue('Success');
+    mockRig.readToolLogs.mockReturnValue([
+      {
+        toolRequest: {
+          name: 'read_file',
+          args: '{"path":"/foo.ts"}',
+          success: true,
+          duration_ms: 10,
+        },
+      },
+    ]);
+
+    // Simulate a frozen error whose message property cannot be mutated
+    const frozenError = Object.freeze(new Error('Frozen assertion error'));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      await expect(
+        internalEvalTest({
+          suiteName: 'test',
+          suiteType: 'behavioral',
+          name: 'test-frozen-error',
+          prompt: 'do something',
+          assert: async () => {
+            throw frozenError;
+          },
+        }),
+      ).rejects.toThrow('Frozen assertion error');
+
+      // Should have warned that the message could not be mutated
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Could not append tool call chain'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

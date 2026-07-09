@@ -25,7 +25,11 @@ function formatArgs(argsJson: string): string {
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(argsJson) as Record<string, unknown>;
+    const val = JSON.parse(argsJson);
+    if (val === null || typeof val !== 'object' || Array.isArray(val)) {
+      return truncate(argsJson, MAX_ARG_VALUE_LENGTH);
+    }
+    parsed = val as Record<string, unknown>;
   } catch {
     return truncate(argsJson, MAX_ARG_VALUE_LENGTH);
   }

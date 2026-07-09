@@ -101,6 +101,33 @@ describe('formatToolLogChain', () => {
     expect(result).toContain('not-json');
   });
 
+  it('handles JSON null args without crashing', () => {
+    // JSON.parse('null') returns null; Object.entries(null) would throw TypeError
+    const logs = [makeEntry({ name: 'some_tool', args: 'null' })];
+    const result = formatToolLogChain(logs);
+    expect(result).toContain('some_tool(');
+    expect(result).toContain('null');
+  });
+
+  it('handles JSON primitive string args without producing garbage output', () => {
+    // JSON.parse('"hello"') returns a string; Object.entries("hello") would produce char pairs
+    const logs = [makeEntry({ name: 'some_tool', args: '"hello"' })];
+    const result = formatToolLogChain(logs);
+    expect(result).toContain('some_tool(');
+    expect(result).toContain('hello');
+    // Should NOT produce character-index pairs like 0="h"
+    expect(result).not.toMatch(/0="h"/);
+  });
+
+  it('handles JSON array args without producing indexed output', () => {
+    // JSON.parse('[1,2,3]') returns an array; Object.entries([1,2,3]) would produce index pairs
+    const logs = [makeEntry({ name: 'some_tool', args: '[1, 2, 3]' })];
+    const result = formatToolLogChain(logs);
+    expect(result).toContain('some_tool(');
+    // Should NOT produce array-index pairs like 0="1"
+    expect(result).not.toMatch(/0="1"/);
+  });
+
   it('formats multiple tool calls with correct numbering', () => {
     const logs = [
       makeEntry({ name: 'grep_search', duration_ms: 10 }),

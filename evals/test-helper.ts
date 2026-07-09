@@ -192,7 +192,15 @@ export async function internalEvalTest(evalCase: EvalCase) {
       if (toolLogs && toolLogs.length > 0) {
         const summary = formatToolLogChain(toolLogs);
         if (error instanceof Error) {
-          error.message = `${error.message}\n\nTool Call Chain (${toolLogs.length} calls):\n${summary}`;
+          try {
+            error.message = `${error.message}\n\nTool Call Chain (${toolLogs.length} calls):\n${summary}`;
+          } catch {
+            // Error object may be frozen or have a read-only message property.
+            // The original error is still re-thrown, so no failure is hidden.
+            console.warn(
+              `[eval] Could not append tool call chain to error message (${toolLogs.length} calls)`,
+            );
+          }
         }
       }
       throw error;
