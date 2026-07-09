@@ -93,8 +93,18 @@ async function writePortAndWorkspace({
     // the token file was briefly world-readable (default umask) before chmod
     // locked it down, letting local attackers read the IDE companion auth
     // token on multi-user systems. `mode` is honored on POSIX; on Windows it
-    // is ignored (the original chmod was also a no-op there). See #28278.
-    await fs.writeFile(portFile, content, { mode: 0o600 });
+    // is ignored (the original chmod was also a no-op there).
+    //
+    // `mode` only applies to newly created files - if the file already exists
+    // (e.g. an attacker pre-created it with loose permissions in the shared
+    // /tmp dir, or a stale file from a prior run), writeFile would overwrite
+    // the contents but preserve the insecure mode. Unlink first, then use the
+    // exclusive `wx` flag so creation fails (rather than silently overwriting)
+    // if the file reappears between the unlink and the write. See #28278.
+    await fs.unlink(portFile).catch(() => {
+      // File didn't exist (the common case) - expected, ignore.
+    });
+    await fs.writeFile(portFile, content, { mode: 0o600, flag: 'wx' });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to write port to file: ${message}`);

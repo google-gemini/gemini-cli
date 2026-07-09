@@ -158,10 +158,13 @@ describe('IDEServer', () => {
     expect(fs.mkdir).toHaveBeenCalledWith(path.join('/tmp', 'gemini', 'ide'), {
       recursive: true,
     });
+    // The stale/pre-created file is removed before the exclusive write so the
+    // 0o600 mode always applies to a fresh file (see #28278).
+    expect(fs.unlink).toHaveBeenCalledWith(expectedPortFile);
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
-      { mode: 0o600 },
+      { mode: 0o600, flag: 'wx' },
     );
   });
 
@@ -191,7 +194,7 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
-      { mode: 0o600 },
+      { mode: 0o600, flag: 'wx' },
     );
   });
 
@@ -221,7 +224,7 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
-      { mode: 0o600 },
+      { mode: 0o600, flag: 'wx' },
     );
   });
 
@@ -269,7 +272,7 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
-      { mode: 0o600 },
+      { mode: 0o600, flag: 'wx' },
     );
 
     // Simulate removing a folder
@@ -288,7 +291,7 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent2,
-      { mode: 0o600 },
+      { mode: 0o600, flag: 'wx' },
     );
   });
 
@@ -304,6 +307,7 @@ describe('IDEServer', () => {
     );
     expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String), {
       mode: 0o600,
+      flag: 'wx',
     });
 
     await ideServer.stop();
@@ -344,7 +348,7 @@ describe('IDEServer', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedPortFile,
         expectedContent,
-        { mode: 0o600 },
+        { mode: 0o600, flag: 'wx' },
       );
     },
   );
