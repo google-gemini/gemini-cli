@@ -141,6 +141,12 @@ function checkPromptPresence(
   evalCase: EvalCaseRecord,
   filePath: string,
 ): ValidationViolation | undefined {
+  if (
+    evalCase.baseHelperName === 'componentEvalTest' ||
+    evalCase.suiteType === 'component-level'
+  ) {
+    return undefined;
+  }
   if (!evalCase.hasPrompt) {
     return {
       ruleId: 'prompt-presence',

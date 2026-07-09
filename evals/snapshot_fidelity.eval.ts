@@ -21,7 +21,7 @@ function snapshotEvalTest(policy: EvalPolicy, evalCase: ComponentEvalCase) {
 describe('snapshot_fidelity', () => {
   snapshotEvalTest('ALWAYS_PASSES', {
     suiteName: 'default',
-    suiteType: 'behavioral',
+    suiteType: 'component-level',
     name: 'SnapshotGenerator strictly retains specific empirical facts',
     assert: async (config) => {
       // 1. Construct a highly specific mock transcript containing 3 empirical facts we can test for:
