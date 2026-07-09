@@ -602,6 +602,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
+    this.consecutiveTextTurns = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
