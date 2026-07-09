@@ -88,7 +88,13 @@ async function writePortAndWorkspace({
   log(`Writing port file to: ${portFile}`);
 
   try {
-    await fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600));
+    // Set the file mode atomically at creation time (0o600) instead of
+    // writeFile + chmod. The two-step approach opened a TOCTOU window where
+    // the token file was briefly world-readable (default umask) before chmod
+    // locked it down, letting local attackers read the IDE companion auth
+    // token on multi-user systems. `mode` is honored on POSIX; on Windows it
+    // is ignored (the original chmod was also a no-op there). See #28278.
+    await fs.writeFile(portFile, content, { mode: 0o600 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to write port to file: ${message}`);

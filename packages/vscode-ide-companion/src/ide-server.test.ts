@@ -161,8 +161,8 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
+      { mode: 0o600 },
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should set a single folder path', async () => {
@@ -191,8 +191,8 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
+      { mode: 0o600 },
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should set an empty string if no folders are open', async () => {
@@ -221,8 +221,8 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
+      { mode: 0o600 },
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should update the path when workspace folders change', async () => {
@@ -269,8 +269,8 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent,
+      { mode: 0o600 },
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
@@ -288,8 +288,8 @@ describe('IDEServer', () => {
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
       expectedContent2,
+      { mode: 0o600 },
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should clear env vars and delete port file on stop', async () => {
@@ -302,7 +302,9 @@ describe('IDEServer', () => {
       'ide',
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
-    expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String));
+    expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String), {
+      mode: 0o600,
+    });
 
     await ideServer.stop();
 
@@ -342,8 +344,8 @@ describe('IDEServer', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedPortFile,
         expectedContent,
+        { mode: 0o600 },
       );
-      expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
     },
   );
 
