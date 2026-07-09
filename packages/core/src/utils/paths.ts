@@ -417,9 +417,11 @@ export function resolveToRealPath(pathStr: string): string {
   try {
     if (resolvedPath.startsWith('file://')) {
       resolvedPath = fileURLToPath(resolvedPath);
+      // Only file:// URLs are percent-encoded; decoding arbitrary filesystem
+      // paths corrupts filenames that legitimately contain a '%' followed by
+      // hex digits (e.g. `report%202026.txt` -> `report 2026.txt`). See #28276.
+      resolvedPath = decodeURIComponent(resolvedPath);
     }
-
-    resolvedPath = decodeURIComponent(resolvedPath);
   } catch {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
