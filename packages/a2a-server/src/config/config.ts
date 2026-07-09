@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
   AuthType,
@@ -34,6 +35,136 @@ import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
+export const envStorage = new AsyncLocalStorage<Record<string, string>>();
+
+const deletedKeysSymbol = Symbol('deletedKeys');
+
+interface TaskEnv extends Record<string, string> {
+  [deletedKeysSymbol]?: Set<string>;
+}
+
+// Set up a Proxy on process.env to intercept reads and writes, isolating environment variables per task
+const originalEnv = process.env;
+const envProxy = new Proxy(originalEnv, {
+  get(target, prop) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (taskEnv) {
+        const deleted = taskEnv[deletedKeysSymbol];
+        if (deleted?.has(prop)) {
+          return undefined;
+        }
+        if (prop in taskEnv) {
+          return taskEnv[prop];
+        }
+        return target[prop];
+      }
+      return target[prop];
+    }
+    return undefined;
+  },
+  has(target, prop) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (taskEnv) {
+        const deleted = taskEnv[deletedKeysSymbol];
+        if (deleted?.has(prop)) {
+          return false;
+        }
+        if (prop in taskEnv) {
+          return true;
+        }
+        return prop in target;
+      }
+      return prop in target;
+    }
+    return false;
+  },
+  set(target, prop, value) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (taskEnv) {
+        const deleted = taskEnv[deletedKeysSymbol];
+        if (deleted) {
+          deleted.delete(prop);
+        }
+        taskEnv[prop] = String(value);
+        return true;
+      }
+      target[prop] = String(value);
+      return true;
+    }
+    return false;
+  },
+  deleteProperty(target, prop) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+      if (taskEnv) {
+        if (prop in taskEnv) {
+          delete taskEnv[prop];
+        }
+        let deleted = taskEnv[deletedKeysSymbol];
+        if (!deleted) {
+          deleted = new Set<string>();
+          Object.defineProperty(taskEnv, deletedKeysSymbol, {
+            value: deleted,
+            configurable: true,
+            writable: true,
+            enumerable: false,
+          });
+        }
+        deleted.add(prop);
+        return true;
+      }
+      delete target[prop];
+      return true;
+    }
+    return false;
+  },
+  ownKeys(target) {
+    const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+    if (taskEnv) {
+      const deleted = taskEnv[deletedKeysSymbol];
+      const keys = new Set([
+        ...Object.getOwnPropertyNames(target),
+        ...Object.keys(taskEnv),
+      ]);
+      if (deleted) {
+        for (const key of deleted) {
+          keys.delete(key);
+        }
+      }
+      return Array.from(keys);
+    }
+    return Object.getOwnPropertyNames(target);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    const taskEnv = envStorage.getStore() as TaskEnv | undefined;
+    if (taskEnv && typeof prop === 'string') {
+      const deleted = taskEnv[deletedKeysSymbol];
+      if (deleted?.has(prop)) {
+        return undefined;
+      }
+      if (prop in taskEnv) {
+        return {
+          value: taskEnv[prop],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+    }
+    return Object.getOwnPropertyDescriptor(target, prop);
+  },
+});
+
+// Replace process.env with the proxy
+Object.defineProperty(process, 'env', {
+  value: envProxy,
+  writable: true,
+  configurable: true,
+});
+
 const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
 
 export async function loadConfig(
@@ -41,9 +172,8 @@ export async function loadConfig(
   extensionLoader: ExtensionLoader,
   taskId: string,
   trusted: boolean = false,
+  workspaceDir: string = process.cwd(),
 ): Promise<Config> {
-  const workspaceDir = process.cwd();
-
   const folderTrust =
     settings.folderTrust === true ||
     process.env['GEMINI_FOLDER_TRUST'] === 'true';
@@ -211,7 +341,6 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 
   try {
     const resolvedPath = path.resolve(targetDir);
-    process.chdir(resolvedPath);
     return resolvedPath;
   } catch (e) {
     logger.error(
@@ -224,7 +353,7 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 export function loadEnvironment(
   isTrusted: boolean = false,
   workspacePath: string = process.cwd(),
-): void {
+): Record<string, string> {
   // For untrusted workspaces, we completely bypass workspace-level .env loading
   // and only load environment variables from the user's trusted home directory.
   let envFilePath: string | null = null;
@@ -241,9 +370,22 @@ export function loadEnvironment(
       }
     }
   }
+  const envVars: Record<string, string> = {};
   if (envFilePath) {
-    dotenv.config({ path: envFilePath, override: true });
+    try {
+      const content = fs.readFileSync(envFilePath, 'utf-8');
+      const parsed = dotenv.parse(content);
+      for (const key in parsed) {
+        if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+          envVars[key] = parsed[key];
+          process.env[key] = parsed[key];
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
   }
+  return envVars;
 }
 
 function findEnvFile(startDir: string): string | null {

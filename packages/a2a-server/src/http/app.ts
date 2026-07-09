@@ -216,6 +216,7 @@ export async function createApp() {
       new SimpleExtensionLoader(extensions),
       'a2a-server',
       isTrusted ?? false,
+      workspaceRoot,
     );
 
     let git: GitService | undefined;
