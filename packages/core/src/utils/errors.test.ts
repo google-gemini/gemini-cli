@@ -103,6 +103,30 @@ describe('isAuthenticationError', () => {
     expect(isAuthenticationError(new Error('401 Unauthorized'))).toBe(true);
     expect(isAuthenticationError(new Error('HTTP 401'))).toBe(true);
     expect(isAuthenticationError(new Error('Status code: 401'))).toBe(true);
+    // the actual MCP SDK message shape the fallback exists for
+    expect(
+      isAuthenticationError(
+        new Error('Error POSTing to endpoint (HTTP 401): access denied'),
+      ),
+    ).toBe(true);
+  });
+
+  it('should not treat non-auth 401 substrings as authentication errors', () => {
+    expect(
+      isAuthenticationError(
+        new Error('Error connecting to http://localhost:4012'),
+      ),
+    ).toBe(false);
+    expect(
+      isAuthenticationError(new Error('Command failed: exit status 4010')),
+    ).toBe(false);
+    expect(isAuthenticationError(new Error('error at line 401'))).toBe(false);
+    // a context word and an unrelated 401 far apart in the same message
+    expect(
+      isAuthenticationError(
+        new Error('Process status: active. Error at line 401.'),
+      ),
+    ).toBe(false);
   });
 });
 

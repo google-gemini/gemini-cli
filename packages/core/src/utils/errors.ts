@@ -296,10 +296,20 @@ export function isAuthenticationError(error: unknown): boolean {
     return true;
   }
 
-  // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
-  // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
+  // Fallback: Check for MCP SDK's plain Error messages with HTTP 401, e.g.
+  // `Error POSTing to endpoint (HTTP 401): ...`. Match a standalone 401 token only when it
+  // sits close to an HTTP/auth keyword, so a port or line number (localhost:4012, "error at
+  // line 401") — or a stray context word far from an unrelated 401 — isn't read as an auth
+  // failure.
   const message = getErrorMessage(error);
-  if (message.includes('401')) {
+  if (
+    /\b(?:HTTP|status|unauthorized|authentication)\b.{0,15}\b401\b/i.test(
+      message,
+    ) ||
+    /\b401\b.{0,15}\b(?:HTTP|status|unauthorized|authentication)\b/i.test(
+      message,
+    )
+  ) {
     return true;
   }
 
