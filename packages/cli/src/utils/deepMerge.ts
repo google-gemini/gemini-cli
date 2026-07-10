@@ -26,15 +26,17 @@ function mergeRecursively(
   source: MergeableObject,
   getMergeStrategyForPath: (path: string[]) => MergeStrategy | undefined,
   path: string[] = [],
-  seen: WeakSet<object> = new WeakSet(),
+  clones: Map<object, MergeableObject> = new Map(),
 ) {
-  // Track the chain of source objects currently being merged. A circular
-  // reference (a source object that points back to one of its own ancestors)
-  // is assigned by reference instead of being recursed into, which would
-  // otherwise overflow the stack. `seen` is scoped to the current recursion
-  // branch (added on entry, removed on exit), so shared but non-circular
-  // references are still merged normally.
-  seen.add(source);
+  // Track the chain of source objects currently being merged, mapping each to
+  // the clone being built for it. A circular reference (a source object that
+  // points back to one of its own ancestors) is resolved to that ancestor's
+  // clone instead of being recursed into, which would otherwise overflow the
+  // stack — and keeps the merged result a fully independent clone rather than
+  // embedding a reference to the original source. Entries are scoped to the
+  // current recursion branch (added on entry, removed on exit), so shared but
+  // non-circular references are still merged normally.
+  clones.set(source, target);
   for (const key of Object.keys(source)) {
     // JSON.parse can create objects with __proto__ as an own property.
     // We must skip it to prevent prototype pollution.
@@ -70,10 +72,14 @@ function mergeRecursively(
       }
     }
 
-    if (isPlainObject(srcValue) && seen.has(srcValue)) {
-      // Circular reference back to an ancestor source object: assign the
-      // reference directly instead of recursing to avoid infinite recursion.
-      target[key] = srcValue;
+    const ancestorClone = isPlainObject(srcValue)
+      ? clones.get(srcValue)
+      : undefined;
+    if (ancestorClone !== undefined) {
+      // Circular reference back to an ancestor source object: assign that
+      // ancestor's clone so the cycle is reproduced inside the new structure,
+      // instead of recursing forever or leaking a reference to the source.
+      target[key] = ancestorClone;
       continue;
     }
 
@@ -83,7 +89,7 @@ function mergeRecursively(
         srcValue,
         getMergeStrategyForPath,
         newPath,
-        seen,
+        clones,
       );
     } else if (isPlainObject(srcValue)) {
       target[key] = {};
@@ -93,13 +99,13 @@ function mergeRecursively(
         srcValue,
         getMergeStrategyForPath,
         newPath,
-        seen,
+        clones,
       );
     } else {
       target[key] = srcValue;
     }
   }
-  seen.delete(source);
+  clones.delete(source);
   return target;
 }
 

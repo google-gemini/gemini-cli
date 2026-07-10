@@ -249,8 +249,10 @@ describe('customDeepMerge', () => {
 
     const result = customDeepMerge(getMergeStrategy, {}, circular);
     expect(result['a']).toBe(1);
-    // The cycle is preserved by reference rather than recursed into.
-    expect(result['self']).toBe(circular);
+    // The cycle is reproduced inside the cloned structure rather than pointing
+    // back to the original source object (a fully independent clone).
+    expect(result['self']).toBe(result);
+    expect(result['self']).not.toBe(circular);
   });
 
   it('should handle indirect (mutual) circular references', () => {
@@ -260,7 +262,13 @@ describe('customDeepMerge', () => {
     b['a'] = a; // a -> b -> a
     const getMergeStrategy = () => undefined;
 
-    expect(() => customDeepMerge(getMergeStrategy, {}, a)).not.toThrow();
+    const result = customDeepMerge(getMergeStrategy, {}, a);
+    // The mutual cycle is reproduced within the clone (a -> b -> a), not shared
+    // with the original source objects.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['b']['a']).toBe(result);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['b']['a']).not.toBe(a);
   });
 
   it('should still merge shared but non-circular references normally', () => {
