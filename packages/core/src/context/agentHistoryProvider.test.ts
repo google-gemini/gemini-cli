@@ -135,6 +135,29 @@ describe('AgentHistoryProvider', () => {
     );
   });
 
+  it('should use unambiguous label in fallback summary to avoid LLM confusion', async () => {
+    providerConfig.maxTokens = 60000;
+    providerConfig.retainedTokens = 60000;
+    vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
+      enabled: true,
+    } as unknown as ContextManagementConfig);
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 4000,
+    );
+    generateContentMock.mockRejectedValue(new Error('API Error'));
+
+    const history = createMockHistory(35);
+    const result = await provider.manageHistory(history);
+
+    expect(generateContentMock).toHaveBeenCalled();
+    expect(result.length).toBe(15);
+    // The fallback summary should use clear and unambiguous phrasing
+    expect(result[0].parts![0].text).toContain(
+      'Previous User Intent (Truncated):',
+    );
+    expect(result[0].parts![0].text).not.toContain('Last User Intent:');
+  });
+
   it('should pass the contextual bridge to the summarizer', async () => {
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,

@@ -65,7 +65,7 @@ class IssuesStore:
         
         # Early exit for terminal states
         terminal_states = {
-            "TRIAGED", "LOW_QUALITY", "NEEDS_INFO", "NEEDS_HUMAN"
+            "TRIAGED", "AUTO_CLOSE", "NEEDS_INFO", "NEEDS_HUMAN"
         }
         if current_status in terminal_states:
             return ClaimAction.SKIP
@@ -209,7 +209,7 @@ class IssuesStore:
             success: Whether AI triage completed successfully.
             workable_spec: Parsed workable specification to persist when status
               is TRIAGED.
-            status: Target issue status (TRIAGED, NEEDS_INFO, LOW_QUALITY,
+            status: Target issue status (TRIAGED, NEEDS_INFO, AUTO_CLOSE,
               or NEEDS_HUMAN).
 
         Returns:

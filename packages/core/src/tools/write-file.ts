@@ -198,21 +198,28 @@ export async function getCorrectedFileContent(
     }
   }
 
-  const activeModel = config.getActiveModel();
-  const resolvedModel = resolveModel(activeModel, false, false, true, config);
-
-  const aggressiveUnescape =
-    !isGemini3Model(resolvedModel, config) &&
-    !isGemini2Model(resolvedModel) &&
-    !isCustomModel(resolvedModel, config);
-
-  correctedContent = await ensureCorrectFileContent(
-    proposedContent,
-    config.getBaseLlmClient(),
-    abortSignal,
-    config.getDisableLLMCorrection(),
-    aggressiveUnescape,
+  const fileExt = path.extname(filePath).toLowerCase();
+  const isJsonOrIpynb = ['.json', '.ipynb', '.jsonc', '.json5'].includes(
+    fileExt,
   );
+
+  if (!isJsonOrIpynb) {
+    const activeModel = config.getActiveModel();
+    const resolvedModel = resolveModel(activeModel, false, false, true, config);
+
+    const aggressiveUnescape =
+      !isGemini3Model(resolvedModel, config) &&
+      !isGemini2Model(resolvedModel) &&
+      !isCustomModel(resolvedModel, config);
+
+    correctedContent = await ensureCorrectFileContent(
+      proposedContent,
+      config.getBaseLlmClient(),
+      abortSignal,
+      config.getDisableLLMCorrection(),
+      aggressiveUnescape,
+    );
+  }
 
   return { originalContent, correctedContent, fileExists };
 }
