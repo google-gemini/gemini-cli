@@ -722,13 +722,20 @@ export class GeminiChat {
     // reused across retry attempts this causes listener accumulation that
     // triggers MaxListenersExceededWarning. Create a child AbortController
     // per API call so the SDK's listeners are isolated to short-lived
-    // signals. AbortSignal.any() chains the parent signal so cancellation
-    // still propagates correctly.
+    // signals. Manually link the parent signal to propagate cancellation
+    // while maintaining Node.js >=20.0.0 compatibility.
     const apiCall = async () => {
       const callAbortController = new AbortController();
-      const callSignal = abortSignal
-        ? AbortSignal.any([abortSignal, callAbortController.signal])
-        : callAbortController.signal;
+      let onAbort: (() => void) | undefined;
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          callAbortController.abort();
+        } else {
+          onAbort = () => callAbortController.abort();
+          abortSignal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+      const callSignal = callAbortController.signal;
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
       const hasAccessToPreview =
@@ -883,6 +890,9 @@ export class GeminiChat {
         try {
           yield* streamGenerator;
         } finally {
+          if (onAbort && abortSignal) {
+            abortSignal.removeEventListener('abort', onAbort);
+          }
           callAbortController.abort();
         }
       }
