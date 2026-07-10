@@ -378,9 +378,13 @@ export class CoderAgentExecutor implements AgentExecutor {
       };
 
     const workspaceRoot = setTargetDir(agentSettings);
+    const workspaceRoot = setTargetDir(agentSettings);
+    const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: true,
+      isFolderTrustEnabled: initialSettings.folderTrust,
+      isHeadless: isHeadlessMode(),
+    });
       isHeadless: isHeadlessMode(),
     });
 
