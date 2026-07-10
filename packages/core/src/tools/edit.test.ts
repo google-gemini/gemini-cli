@@ -1331,6 +1331,44 @@ function doIt() {
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
+
+    it('should NOT call FixLLMEditWithInstruction for .json files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'test.json');
+      fs.writeFileSync(filePath, '{"key": "value"}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace value',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('should NOT call FixLLMEditWithInstruction for .ipynb files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'notebook.ipynb');
+      fs.writeFileSync(filePath, '{"cells": []}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace cell',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
   });
 
   describe('JIT context discovery', () => {
