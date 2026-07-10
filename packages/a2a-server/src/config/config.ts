@@ -60,6 +60,7 @@ const envProxy = new Proxy(originalEnv, {
         if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return taskEnv[prop];
         }
+        return target[prop];
       }
     }
     return target[prop];
@@ -75,6 +76,7 @@ const envProxy = new Proxy(originalEnv, {
         if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return true;
         }
+        return prop in target;
       }
     }
     return prop in target;
@@ -128,6 +130,8 @@ const envProxy = new Proxy(originalEnv, {
       taskEnv[deletedKeysSymbol]?.forEach((key) => {
         keys.delete(key);
       });
+      keys.delete(deletedKeysSymbol);
+      keys.delete(cwdSymbol);
       return Array.from(keys);
     }
     return [
@@ -150,6 +154,9 @@ const envProxy = new Proxy(originalEnv, {
           configurable: true,
         };
       }
+      if (Object.prototype.hasOwnProperty.call(target, prop)) {
+        return Object.getOwnPropertyDescriptor(target, prop);
+      }
     }
     return Object.getOwnPropertyDescriptor(target, prop);
   },
@@ -161,42 +168,6 @@ Object.defineProperty(process, 'env', {
   writable: true,
   configurable: true,
 });
-
-// NOTE: Monkey-patching process.cwd and process.chdir via AsyncLocalStorage is a robust way
-// to simulate workspace isolation in a concurrent server. However, please be aware of a critical
-// limitation: Node.js native C++ APIs (such as fs.readFileSync, fs.writeFile, etc.) and child
-// process spawning APIs (like child_process.spawn) resolve relative paths using the OS-level
-// working directory of the process, NOT the JS-level process.cwd() function.
-// To prevent cross-task interference, all file paths in the core package must be resolved to
-// absolute paths using path.resolve/path.join relative to config.getTargetDir() or config.getCwd()
-// before being passed to native APIs.
-const originalCwd = process.cwd;
-process.cwd = function () {
-  const taskEnv = envStorage.getStore();
-  if (taskEnv && taskEnv[cwdSymbol]) {
-    return taskEnv[cwdSymbol];
-  }
-  return originalCwd.call(process);
-};
-
-const originalChdir = process.chdir;
-process.chdir = function (directory: string) {
-  const taskEnv = envStorage.getStore();
-  if (taskEnv) {
-    const resolved = path.resolve(process.cwd(), directory);
-    const stats = fs.statSync(resolved);
-    if (!stats.isDirectory()) {
-      const err = new Error(
-        "ENOTDIR: not a directory, chdir '" + resolved + "'",
-      );
-      (err as NodeJS.ErrnoException).code = 'ENOTDIR';
-      throw err;
-    }
-    taskEnv[cwdSymbol] = resolved;
-    return;
-  }
-  return originalChdir.call(process, directory);
-};
 
 const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
 
@@ -374,6 +345,16 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 
   try {
     const resolvedPath = resolveToRealPath(targetDir);
+    const allowedRoot = resolveToRealPath(
+      process.env['CODER_AGENT_ALLOWED_ROOT'] || originalCWD,
+    );
+    const relative = path.relative(allowedRoot, resolvedPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      logger.warn(
+        `[CoderAgentExecutor] Workspace path ${resolvedPath} is outside the allowed root directory, returning original os.cwd()`,
+      );
+      return originalCWD;
+    }
     if (
       !fs.existsSync(resolvedPath) ||
       !fs.statSync(resolvedPath).isDirectory()
@@ -418,7 +399,12 @@ export function loadEnvironment(
       const content = fs.readFileSync(envFilePath, 'utf-8');
       const parsed = dotenv.parse(content);
       for (const key in parsed) {
-        if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+        if (
+          Object.prototype.hasOwnProperty.call(parsed, key) &&
+          key !== '__proto__' &&
+          key !== 'constructor' &&
+          key !== 'prototype'
+        ) {
           envVars[key] = parsed[key];
           process.env[key] = parsed[key];
         }

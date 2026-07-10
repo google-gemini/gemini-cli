@@ -38,6 +38,7 @@ vi.mock('../config/config.js', () => ({
     run: (env: Record<string, string>, cb: () => unknown) => cb(),
   },
   cwdSymbol: Symbol('cwd'),
+  cleanEnv: {},
 }));
 
 vi.mock('../config/settings.js', () => ({

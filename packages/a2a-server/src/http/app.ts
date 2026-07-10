@@ -208,9 +208,6 @@ export async function createApp() {
       isHeadless: isHeadlessMode(),
     });
 
-    // Change the global working directory to the workspace root during startup
-    process.chdir(workspaceRoot);
-
     // Load environment globally for the server startup
     loadEnvironment(isTrusted ?? false, workspaceRoot);
 
