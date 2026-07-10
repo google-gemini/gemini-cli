@@ -2,8 +2,7 @@ import os
 import asyncio
 from utils.agent_logger import (
     upload_to_bucket,
-    upload_agent_run_logs,
-    save_local_agent_run_logs,
+    log_agent_run,
     extract_final_output,
 )
 from google.antigravity import Agent, LocalAgentConfig
@@ -73,14 +72,12 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
             # Extract the final step's output
             text_output = extract_final_output(resolved_chunks)
 
-            if gcs_logging == "LOCAL":
-                save_local_agent_run_logs(
-                    issue_num,
-                    resolved_chunks,
-                    output_dir=os.environ.get("LOCAL_LOG_DIR"),
-                )
-            elif gcs_logging in ("GCS", "ON"):
-                upload_agent_run_logs(repo_name, issue_num, resolved_chunks)
+            log_agent_run(
+                repo_name,
+                issue_num,
+                resolved_chunks,
+                mode=gcs_logging,
+            )
 
             print(f"[LOGIC] Agent Response:\n{text_output}")
                 
@@ -93,5 +90,6 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
         error_msg = f"Error during Antigravity Agent run: {e}"
         print(f"[LOGIC] {error_msg}")
         if gcs_logging != "OFF":
+            # If agent failed/crashed before chunks resolved, upload traceback string directly
             upload_to_bucket(repo_name, issue_num, error_msg)
         return False, error_msg

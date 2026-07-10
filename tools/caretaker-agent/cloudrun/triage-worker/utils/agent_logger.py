@@ -28,7 +28,7 @@ def upload_to_bucket(repository: str, issue_number: str | int, payload: str) -> 
     except Exception as e:
         print(f"[LOGIC] Error uploading debug logs to GCS: {e}")
 
-def format_debug_trajectory(resolved_chunks: list) -> str:
+def _format_debug_trajectory(resolved_chunks: list) -> str:
     """
     Formats Antigravity Agent resolved stream chunks (thoughts, tool calls,
     tool outputs) into a structured, human-readable JSON string.
@@ -46,44 +46,47 @@ def format_debug_trajectory(resolved_chunks: list) -> str:
     return json.dumps(serializable, indent=2, default=str)
 
 
-def save_local_agent_run_logs(issue_number: str | int, resolved_chunks: list, output_dir: str = None) -> str:
+def log_agent_run(
+    repository: str,
+    issue_number: str | int,
+    resolved_chunks: list,
+    mode: str = "GCS",
+) -> None:
     """
-    Serializes resolved stream chunks to JSON and saves them to local disk under target output_dir
-    or falls back to evals/triage/results/logs/. Used for local evaluation runs and debugging.
-    """
-    if not resolved_chunks:
-        return ""
-    try:
-        debug_log_str = format_debug_trajectory(resolved_chunks)
-        
-        if not output_dir:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-            output_dir = os.environ.get("LOCAL_LOG_DIR", os.path.join(project_root, "evals", "triage", "results", "logs"))
-            
-        os.makedirs(output_dir, exist_ok=True)
-        
-        log_path = os.path.join(output_dir, f"gemini_cli_{issue_number}_debug.json")
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(debug_log_str)
-            
-        print(f"[LOGIC] 📄 Saved local agent trajectory log to: {log_path}")
-        return log_path
-    except Exception as e:
-        print(f"[LOGIC] Error saving local agent debug log: {e}")
-        return ""
+    Logs the agent execution trajectory based on the mode parameter.
 
-
-def upload_agent_run_logs(repository: str, issue_number: str | int, resolved_chunks: list) -> None:
-    """
-    Serializes the Antigravity Agent resolved stream chunks to JSON and uploads them to GCS.
+    Modes:
+      - "LOCAL": Saves log file to local disk (requires LOCAL_LOG_DIR env var).
+      - "GCS": Uploads log file to the GCS bucket.
+      - Any other mode (e.g. "OFF"): Skips logging.
     """
     if not resolved_chunks:
         return
+
+    mode_upper = str(mode).upper()
     try:
-        debug_log_str = format_debug_trajectory(resolved_chunks)
-        upload_to_bucket(repository, issue_number, debug_log_str)
+        debug_log_str = _format_debug_trajectory(resolved_chunks)
+
+        if mode_upper == "LOCAL":
+            local_dir = os.environ.get("LOCAL_LOG_DIR")
+            if not local_dir:
+                print(
+                    "[LOGIC] Error: LOCAL_LOG_DIR env var is not configured."
+                )
+                return
+            os.makedirs(local_dir, exist_ok=True)
+            log_path = os.path.join(
+                local_dir, f"gemini_cli_{issue_number}_debug.json"
+            )
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(debug_log_str)
+            print(f"[LOGIC] 📄 Saved local agent trajectory log to: {log_path}")
+
+        elif mode_upper == "GCS":
+            upload_to_bucket(repository, issue_number, debug_log_str)
+
     except Exception as e:
-        print(f"[LOGIC] Error serializing/uploading agent debug logs: {e}")
+        print(f"[LOGIC] Error logging agent run: {e}")
 
 def extract_final_output(resolved_chunks: list) -> str:
     """
