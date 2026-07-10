@@ -133,7 +133,7 @@ describe('ide-installer', () => {
             'google.gemini-cli-vscode-ide-companion',
             '--force',
           ],
-          { stdio: 'pipe', shell: false },
+          { stdio: 'pipe', shell: false, env: expect.any(Object) },
         );
       });
 
@@ -150,7 +150,7 @@ describe('ide-installer', () => {
             'google.gemini-cli-vscode-ide-companion',
             '--force',
           ],
-          { stdio: 'pipe', shell: true },
+          { stdio: 'pipe', shell: true, env: expect.any(Object) },
         );
       });
 
@@ -232,7 +232,7 @@ describe('ide-installer', () => {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe', shell: false },
+        { stdio: 'pipe', shell: false, env: expect.any(Object) },
       );
     });
 
@@ -277,7 +277,7 @@ describe('AntigravityInstaller', () => {
         'google.gemini-cli-vscode-ide-companion',
         '--force',
       ],
-      { stdio: 'pipe', shell: false },
+      { stdio: 'pipe', shell: false, env: expect.any(Object) },
     );
   });
 
@@ -300,7 +300,7 @@ describe('AntigravityInstaller', () => {
         'google.gemini-cli-vscode-ide-companion',
         '--force',
       ],
-      { stdio: 'pipe', shell: false },
+      { stdio: 'pipe', shell: false, env: expect.any(Object) },
     );
   });
 
@@ -335,7 +335,7 @@ describe('AntigravityInstaller', () => {
         'google.gemini-cli-vscode-ide-companion',
         '--force',
       ],
-      { stdio: 'pipe', shell: false },
+      { stdio: 'pipe', shell: false, env: expect.any(Object) },
     );
   });
 
@@ -370,7 +370,7 @@ describe('AntigravityInstaller', () => {
         'google.gemini-cli-vscode-ide-companion',
         '--force',
       ],
-      { stdio: 'pipe', shell: true },
+      { stdio: 'pipe', shell: true, env: expect.any(Object) },
     );
   });
 

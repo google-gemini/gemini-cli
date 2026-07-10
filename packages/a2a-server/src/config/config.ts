@@ -60,10 +60,11 @@ const envProxy = new Proxy(originalEnv, {
         if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return taskEnv[prop];
         }
-        return target[prop];
       }
+      return target[prop];
     }
-    return target[prop];
+    /* eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-unsafe-return */
+    return Reflect.get(target, prop);
   },
   has(target, prop) {
     if (typeof prop === 'string') {
@@ -76,10 +77,11 @@ const envProxy = new Proxy(originalEnv, {
         if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
           return true;
         }
-        return prop in target;
       }
+      return prop in target;
     }
-    return prop in target;
+    /* eslint-disable-next-line no-restricted-syntax */
+    return Reflect.has(target, prop);
   },
   set(target, prop, value) {
     if (typeof prop === 'string') {
@@ -96,9 +98,11 @@ const envProxy = new Proxy(originalEnv, {
         taskEnv[prop] = String(value);
         return true;
       }
+      target[prop] = String(value);
+      return true;
     }
-    target[prop] = String(value);
-    return true;
+    /* eslint-disable-next-line no-restricted-syntax */
+    return Reflect.set(target, prop, value);
   },
   deleteProperty(target, prop) {
     if (typeof prop === 'string') {
@@ -115,9 +119,11 @@ const envProxy = new Proxy(originalEnv, {
         (taskEnv[deletedKeysSymbol] ??= new Set()).add(prop);
         return true;
       }
+      delete target[prop];
+      return true;
     }
-    delete target[prop];
-    return true;
+    /* eslint-disable-next-line no-restricted-syntax */
+    return Reflect.deleteProperty(target, prop);
   },
   ownKeys(target) {
     const taskEnv = envStorage.getStore();
@@ -154,11 +160,9 @@ const envProxy = new Proxy(originalEnv, {
           configurable: true,
         };
       }
-      if (Object.prototype.hasOwnProperty.call(target, prop)) {
-        return Object.getOwnPropertyDescriptor(target, prop);
-      }
     }
-    return Object.getOwnPropertyDescriptor(target, prop);
+    /* eslint-disable-next-line no-restricted-syntax */
+    return Reflect.getOwnPropertyDescriptor(target, prop);
   },
 });
 
@@ -168,6 +172,46 @@ Object.defineProperty(process, 'env', {
   writable: true,
   configurable: true,
 });
+
+const originalCwd = process.cwd;
+process.cwd = function () {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv && taskEnv[cwdSymbol]) {
+    return taskEnv[cwdSymbol];
+  }
+  return originalCwd.call(process);
+};
+
+const originalChdir = process.chdir;
+process.chdir = function (directory: string) {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv) {
+    const resolved = resolveToRealPath(path.resolve(process.cwd(), directory));
+    const initialWorkspace = taskEnv[cwdSymbol];
+    if (initialWorkspace) {
+      const relative = path.relative(initialWorkspace, resolved);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        const err = new Error(
+          "EACCES: permission denied, chdir outside workspace '" +
+            resolved +
+            "'",
+        );
+        throw err;
+      }
+    }
+    const stats = fs.statSync(resolved);
+    if (!stats.isDirectory()) {
+      const err = new Error(
+        "ENOTDIR: not a directory, chdir '" + resolved + "'",
+      );
+      (err as NodeJS.ErrnoException).code = 'ENOTDIR';
+      throw err;
+    }
+    taskEnv[cwdSymbol] = resolved;
+    return;
+  }
+  return originalChdir.call(process, directory);
+};
 
 const INITIAL_FOLDER_TRUST = process.env['GEMINI_FOLDER_TRUST'];
 

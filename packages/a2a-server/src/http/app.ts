@@ -204,7 +204,7 @@ export async function createApp() {
     const initialSettings = loadSettings(workspaceRoot, false);
     const { isTrusted } = checkPathTrust({
       path: workspaceRoot,
-      isFolderTrustEnabled: initialSettings.folderTrust,
+      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
       isHeadless: isHeadlessMode(),
     });
 

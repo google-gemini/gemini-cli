@@ -173,7 +173,11 @@ class VsCodeInstaller implements IdeInstaller {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
+        {
+          stdio: 'pipe',
+          shell: this.platform === 'win32',
+          env: { ...process.env },
+        },
       );
 
       if (result.status !== 0) {
@@ -223,7 +227,11 @@ class PositronInstaller implements IdeInstaller {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
+        {
+          stdio: 'pipe',
+          shell: this.platform === 'win32',
+          env: { ...process.env },
+        },
       );
 
       if (result.status !== 0) {
@@ -293,7 +301,11 @@ class AntigravityInstaller implements IdeInstaller {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
+        {
+          stdio: 'pipe',
+          shell: this.platform === 'win32',
+          env: { ...process.env },
+        },
       );
 
       if (result.status !== 0) {

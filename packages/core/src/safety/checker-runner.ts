@@ -168,6 +168,7 @@ export class CheckerRunner {
     return new Promise((resolve) => {
       const child = spawn(checkerPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
       });
 
       let stdout = '';

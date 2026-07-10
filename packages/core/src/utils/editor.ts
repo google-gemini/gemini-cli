@@ -418,6 +418,7 @@ export async function openDiff(
 
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
+        env: { ...process.env },
       });
       if (result.error) {
         throw result.error;
@@ -435,6 +436,7 @@ export async function openDiff(
     const childProcess = spawn(diffCommand.command, diffCommand.args, {
       stdio: 'inherit',
       shell: process.platform === 'win32',
+      env: { ...process.env },
     });
 
     // Guard against both 'error' and 'close' firing for a single failure,
