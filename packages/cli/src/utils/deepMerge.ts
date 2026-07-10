@@ -26,7 +26,15 @@ function mergeRecursively(
   source: MergeableObject,
   getMergeStrategyForPath: (path: string[]) => MergeStrategy | undefined,
   path: string[] = [],
+  seen: WeakSet<object> = new WeakSet(),
 ) {
+  // Track the chain of source objects currently being merged. A circular
+  // reference (a source object that points back to one of its own ancestors)
+  // is assigned by reference instead of being recursed into, which would
+  // otherwise overflow the stack. `seen` is scoped to the current recursion
+  // branch (added on entry, removed on exit), so shared but non-circular
+  // references are still merged normally.
+  seen.add(source);
   for (const key of Object.keys(source)) {
     // JSON.parse can create objects with __proto__ as an own property.
     // We must skip it to prevent prototype pollution.
@@ -62,8 +70,21 @@ function mergeRecursively(
       }
     }
 
+    if (isPlainObject(srcValue) && seen.has(srcValue)) {
+      // Circular reference back to an ancestor source object: assign the
+      // reference directly instead of recursing to avoid infinite recursion.
+      target[key] = srcValue;
+      continue;
+    }
+
     if (isPlainObject(objValue) && isPlainObject(srcValue)) {
-      mergeRecursively(objValue, srcValue, getMergeStrategyForPath, newPath);
+      mergeRecursively(
+        objValue,
+        srcValue,
+        getMergeStrategyForPath,
+        newPath,
+        seen,
+      );
     } else if (isPlainObject(srcValue)) {
       target[key] = {};
       mergeRecursively(
@@ -72,11 +93,13 @@ function mergeRecursively(
         srcValue,
         getMergeStrategyForPath,
         newPath,
+        seen,
       );
     } else {
       target[key] = srcValue;
     }
   }
+  seen.delete(source);
   return target;
 }
 

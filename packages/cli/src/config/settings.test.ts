@@ -3636,15 +3636,16 @@ describe('LoadedSettings Isolation and Serializability', () => {
       expect(settingsValue.myMap).not.toBe(mapValue.myMap);
     });
 
-    it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
+    it('should handle circular references without crashing', () => {
       const circular: Record<string, unknown> = { a: 1 };
       circular['self'] = circular;
 
-      // structuredClone(circular) works, but LoadedSettings.setValue calls
-      // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
+      // LoadedSettings.setValue() calls computeMergedSettings() ->
+      // customDeepMerge(), which now guards against circular references instead
+      // of overflowing the stack (see deepMerge cycle handling).
       expect(() => {
         loadedSettings.setValue(SettingScope.User, 'test', circular);
-      }).toThrow(/Maximum call stack size exceeded/);
+      }).not.toThrow();
     });
   });
 });

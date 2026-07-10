@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { customDeepMerge } from './deepMerge.js';
+import { customDeepMerge, type MergeableObject } from './deepMerge.js';
 import { MergeStrategy } from '../config/settingsSchema.js';
 
 describe('customDeepMerge', () => {
@@ -236,5 +236,40 @@ describe('customDeepMerge', () => {
     const getMergeStrategy = () => undefined;
     const result = customDeepMerge(getMergeStrategy, target, source);
     expect(result).toEqual({ a: 1 });
+  });
+
+  it('should handle self-referential objects without stack overflow', () => {
+    const circular: MergeableObject = { a: 1 };
+    circular['self'] = circular;
+    const getMergeStrategy = () => undefined;
+
+    expect(() =>
+      customDeepMerge(getMergeStrategy, { existing: true }, circular),
+    ).not.toThrow();
+
+    const result = customDeepMerge(getMergeStrategy, {}, circular);
+    expect(result['a']).toBe(1);
+    // The cycle is preserved by reference rather than recursed into.
+    expect(result['self']).toBe(circular);
+  });
+
+  it('should handle indirect (mutual) circular references', () => {
+    const a: MergeableObject = { name: 'a' };
+    const b: MergeableObject = { name: 'b' };
+    a['b'] = b;
+    b['a'] = a; // a -> b -> a
+    const getMergeStrategy = () => undefined;
+
+    expect(() => customDeepMerge(getMergeStrategy, {}, a)).not.toThrow();
+  });
+
+  it('should still merge shared but non-circular references normally', () => {
+    // The same nested object referenced twice is a DAG, not a cycle, and must
+    // still be merged (the cycle guard must not short-circuit it).
+    const shared = { x: 1 };
+    const source = { first: shared, second: shared };
+    const getMergeStrategy = () => undefined;
+    const result = customDeepMerge(getMergeStrategy, {}, source);
+    expect(result).toEqual({ first: { x: 1 }, second: { x: 1 } });
   });
 });
