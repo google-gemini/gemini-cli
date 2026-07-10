@@ -60,10 +60,10 @@ def log_agent_run(
       - "GCS": Uploads log file to the GCS bucket.
       - Any other mode (e.g. "OFF"): Skips logging.
     """
-    if not resolved_chunks:
+    mode_upper = str(mode).upper()
+    if not resolved_chunks or mode_upper not in ("LOCAL", "GCS"):
         return
 
-    mode_upper = str(mode).upper()
     try:
         debug_log_str = _format_debug_trajectory(resolved_chunks)
 

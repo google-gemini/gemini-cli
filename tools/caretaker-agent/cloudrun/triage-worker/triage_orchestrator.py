@@ -89,7 +89,7 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
     except Exception as e:
         error_msg = f"Error during Antigravity Agent run: {e}"
         print(f"[LOGIC] {error_msg}")
-        if gcs_logging != "OFF":
+        if gcs_logging == "GCS":
             # If agent failed/crashed before chunks resolved, upload traceback string directly
             upload_to_bucket(repo_name, issue_num, error_msg)
         return False, error_msg
