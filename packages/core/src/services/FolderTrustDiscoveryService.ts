@@ -159,17 +159,12 @@ export class FolderTrustDiscoveryService {
 
       const hooksConfig = settings['hooks'];
       if (this.isRecord(hooksConfig)) {
-        const hooks = new Set<string>();
-        for (const event of Object.values(hooksConfig)) {
-          if (!Array.isArray(event)) continue;
-          for (const hook of event) {
-            // eslint-disable-next-line no-restricted-syntax
-            if (this.isRecord(hook) && typeof hook['command'] === 'string') {
-              hooks.add(hook['command']);
-            }
-          }
+        results.hooks = this.extractCommandHooks(hooksConfig);
+        if (results.hooks.length > 0) {
+          results.securityWarnings.push(
+            'This project contains hooks that can execute commands.',
+          );
         }
-        results.hooks = Array.from(hooks);
       }
     } catch (e) {
       results.discoveryErrors.push(
@@ -219,6 +214,35 @@ export class FolderTrustDiscoveryService {
     }
 
     return warnings;
+  }
+
+  private static extractCommandHooks(
+    hooksConfig: Record<string, unknown>,
+  ): string[] {
+    const hooks = new Set<string>();
+
+    for (const definitions of Object.values(hooksConfig)) {
+      if (!Array.isArray(definitions)) continue;
+
+      for (const definition of definitions) {
+        if (!this.isRecord(definition) || !Array.isArray(definition['hooks'])) {
+          continue;
+        }
+
+        for (const hookConfig of definition['hooks']) {
+          if (!this.isRecord(hookConfig) || hookConfig['type'] !== 'command') {
+            continue;
+          }
+
+          const command = hookConfig['command'];
+          if (typeof command === 'string') {
+            hooks.add(command);
+          }
+        }
+      }
+    }
+
+    return Array.from(hooks);
   }
 
   private static isRecord(val: unknown): val is Record<string, unknown> {

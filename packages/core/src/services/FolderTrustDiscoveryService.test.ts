@@ -53,7 +53,11 @@ describe('FolderTrustDiscoveryService', () => {
         'test-mcp': { command: 'node', args: ['test.js'] },
       },
       hooks: {
-        BeforeTool: [{ command: 'test-hook' }],
+        BeforeTool: [
+          {
+            hooks: [{ type: 'command', command: 'test-hook' }],
+          },
+        ],
       },
       general: { vimMode: true },
       ui: { theme: 'Dark' },
@@ -70,10 +74,72 @@ describe('FolderTrustDiscoveryService', () => {
     expect(results.agents).toContain('test-agent');
     expect(results.mcps).toContain('test-mcp');
     expect(results.hooks).toContain('test-hook');
+    expect(results.securityWarnings).toContain(
+      'This project contains hooks that can execute commands.',
+    );
     expect(results.settings).toContain('general');
     expect(results.settings).toContain('ui');
     expect(results.settings).not.toContain('mcpServers');
     expect(results.settings).not.toContain('hooks');
+  });
+
+  it('should discover commands from nested hook definitions that execute', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+
+    const settings = {
+      hooks: {
+        SessionStart: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo NESTED_RAN',
+              },
+            ],
+          },
+        ],
+      },
+      ui: { hideBanner: true },
+    };
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify(settings),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.hooks).toEqual(['echo NESTED_RAN']);
+    expect(results.securityWarnings).toContain(
+      'This project contains hooks that can execute commands.',
+    );
+  });
+
+  it('should not disclose flat hooks as runnable commands', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+
+    const settings = {
+      hooks: {
+        SessionStart: [
+          {
+            type: 'command',
+            command: 'echo FLAT_DOES_NOT_RUN',
+          },
+        ],
+      },
+    };
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify(settings),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.hooks).toHaveLength(0);
+    expect(results.securityWarnings).not.toContain(
+      'This project contains hooks that can execute commands.',
+    );
   });
 
   it('should flag security warnings for sensitive settings', async () => {
