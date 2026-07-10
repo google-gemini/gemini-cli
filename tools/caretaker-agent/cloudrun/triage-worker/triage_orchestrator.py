@@ -38,7 +38,7 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
         allow("finish")
     ]
     
-    with open(system_prompt_path, "r") as f:
+    with open(system_prompt_path, "r", encoding="utf-8") as f:
         system_instructions = f.read()
 
     skills_dir = os.path.join(current_dir, ".gemini", "skills")

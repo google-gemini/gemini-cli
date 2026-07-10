@@ -19,7 +19,7 @@ def upload_to_bucket(repository: str, issue_number: str | int, payload: str) -> 
         bucket = storage_client.bucket(BUCKET_NAME)
         
         timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
-        safe_repo = repository.replace("/", "_")
+        safe_repo = str(repository).replace("/", "_") if repository else "unknown"
         blob_name = f"{safe_repo}/issue_{issue_number}_{timestamp}_debug.log"
         
         blob = bucket.blob(blob_name)
@@ -93,6 +93,8 @@ def extract_final_output(resolved_chunks: list) -> str:
     this function isolates the final turn (highest step_index) and filters for text chunks,
     stripping away any intermediate planning text, thoughts, or markdown backticks around the JSON.
     """
+    if not resolved_chunks:
+        return ""
     # Filter for Text chunks (skip Thought and ToolCall chunks)
     text_chunks = [c for c in resolved_chunks if isinstance(c, Text)]
     if not text_chunks:
