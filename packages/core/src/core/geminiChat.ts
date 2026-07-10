@@ -65,6 +65,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { delay } from '../utils/delay.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -626,7 +627,7 @@ export class GeminiChat {
                   error: errorType,
                   model,
                 });
-                await new Promise((res) => setTimeout(res, delayMs));
+                await delay(delayMs, signal);
                 continue;
               }
             }
@@ -716,7 +717,18 @@ export class GeminiChat {
     // Track initial active model to detect fallback changes
     const initialActiveModel = this.context.config.getActiveModel();
 
+    // The @google/genai SDK adds abort listeners to the signal passed in
+    // GenerateContentConfig but never removes them. When the same signal is
+    // reused across retry attempts this causes listener accumulation that
+    // triggers MaxListenersExceededWarning. Create a child AbortController
+    // per API call so the SDK's listeners are isolated to short-lived
+    // signals. AbortSignal.any() chains the parent signal so cancellation
+    // still propagates correctly.
     const apiCall = async () => {
+      const callAbortController = new AbortController();
+      const callSignal = abortSignal
+        ? AbortSignal.any([abortSignal, callAbortController.signal])
+        : callAbortController.signal;
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
       const hasAccessToPreview =
@@ -760,7 +772,7 @@ export class GeminiChat {
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: callSignal,
       };
 
       let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
@@ -852,15 +864,30 @@ export class GeminiChat {
 
       const finalContents = stripToolCallIdPrefixes(contentsToUse);
 
-      return this.context.config.getContentGenerator().generateContentStream(
-        {
-          model: modelToUse,
-          contents: finalContents,
-          config,
-        },
-        prompt_id,
-        role,
-      );
+      const streamGenerator = await this.context.config
+        .getContentGenerator()
+        .generateContentStream(
+          {
+            model: modelToUse,
+            contents: finalContents,
+            config,
+          },
+          prompt_id,
+          role,
+        );
+
+      // Wrap the generator to abort the child controller after the stream
+      // is fully consumed. This cleans up the SDK's abort listeners from
+      // the child signal, preventing listener accumulation across retries.
+      async function* wrappedStream(): AsyncGenerator<GenerateContentResponse> {
+        try {
+          yield* streamGenerator;
+        } finally {
+          callAbortController.abort();
+        }
+      }
+
+      return wrappedStream();
     };
 
     const onPersistent429Callback = async (

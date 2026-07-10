@@ -476,6 +476,16 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
+
+      // Explicitly save credentials before returning.
+      // The client.on('tokens') handler is async and may not complete
+      // before the process exits on restart (e.g., via relaunchApp).
+      // Saving here ensures credentials are persisted synchronously.
+      if (getUseEncryptedStorageFlag()) {
+        await OAuthCredentialStorage.saveCredentials(tokens);
+      } else {
+        await cacheCredentials(tokens);
+      }
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
@@ -564,6 +574,16 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
+
+            // Explicitly save credentials before the callback resolves.
+            // The client.on('tokens') handler is async and may not complete
+            // before the process exits on restart (e.g., via relaunchApp).
+            // Saving here ensures credentials are persisted synchronously.
+            if (getUseEncryptedStorageFlag()) {
+              await OAuthCredentialStorage.saveCredentials(tokens);
+            } else {
+              await cacheCredentials(tokens);
+            }
 
             // Retrieve and cache Google Account ID during authentication
             try {
