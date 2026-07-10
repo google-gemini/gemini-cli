@@ -210,12 +210,15 @@ export class CoderAgentExecutor implements AgentExecutor {
     return Array.from(this.tasks.values());
   }
 
-  private _cleanupAndEvictTask(taskId: string, wrapper: TaskWrapper) {
-    logger.info(
-      `[CoderAgentExecutor] Task ${taskId} reached terminal state ${wrapper.task.taskState}. Evicting and disposing.`,
-    );
-    wrapper.task.dispose();
-    this.tasks.delete(taskId);
+  private cleanupAndEvictTask(taskId: string) {
+    const wrapper = this.tasks.get(taskId);
+    if (wrapper) {
+      logger.info(
+        `[CoderAgentExecutor] Task ${taskId} reached terminal state ${wrapper.task.taskState}. Evicting and disposing.`,
+      );
+      wrapper.task.dispose();
+      this.tasks.delete(taskId);
+    }
   }
 
   cancelTask = async (
@@ -249,8 +252,18 @@ export class CoderAgentExecutor implements AgentExecutor {
           undefined,
           true,
         );
-        // No need to save here; the main execution loop's finally block
-        // is guaranteed to run and save the updated 'canceled' state.
+        try {
+          await this.taskStore?.save(wrapper.toSDKTask());
+          logger.info(
+            `[CoderAgentExecutor] Task ${taskId} state CANCELED saved during active abort.`,
+          );
+        } catch (saveError) {
+          logger.error(
+            `[CoderAgentExecutor] Failed to save task ${taskId} state during active abort:`,
+            saveError,
+          );
+        }
+        this.cleanupAndEvictTask(taskId);
       }
       return;
     }
@@ -338,7 +351,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       logger.info(`[CoderAgentExecutor] Task ${taskId} state CANCELED saved.`);
 
       // Cleanup listener subscriptions to avoid memory leaks.
-      this._cleanupAndEvictTask(taskId, wrapper);
+      this.cleanupAndEvictTask(taskId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -585,7 +598,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           );
         }
         if (isExplicitCancel) {
-          this._cleanupAndEvictTask(taskId, wrapper);
+          this.cleanupAndEvictTask(taskId);
         }
         return;
       }
@@ -647,8 +660,8 @@ export class CoderAgentExecutor implements AgentExecutor {
 
       while (agentTurnActive) {
         if (abortSignal.aborted) {
-          logger.warn(
-            `[CoderAgentExecutor] Task ${taskId} aborted at turn boundary. Exiting loop.`,
+          logger.info(
+            `[CoderAgentExecutor] Task ${taskId} aborted before turn. Exiting loop.`,
           );
           throw new Error('Execution aborted');
         }
@@ -809,7 +822,7 @@ export class CoderAgentExecutor implements AgentExecutor {
         if (
           ['canceled', 'failed', 'completed'].includes(currentTask.taskState)
         ) {
-          this._cleanupAndEvictTask(taskId, wrapper);
+          this.cleanupAndEvictTask(taskId);
         }
       }
     }

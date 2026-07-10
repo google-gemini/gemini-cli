@@ -380,4 +380,51 @@ describe('CoderAgentExecutor', () => {
 
     abortSpy.mockRestore();
   });
+
+  it('cancelTask should explicitly save task state to TaskStore and evict task during active aborts', async () => {
+    const taskId = 'test-task-active-abort-save';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'a long running prompt' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    const primaryPromise = executor.execute(requestContext, mockEventBus);
+
+    // Wait for task to be registered
+    let attempts = 0;
+    while (!executor.getTask(taskId)) {
+      if (attempts++ > 100) {
+        throw new Error('Timed out waiting for task to be registered');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    const wrapper = executor.getTask(taskId)!;
+    const saveSpy = vi.spyOn(mockTaskStore, 'save');
+
+    // Now, cancel the task.
+    await executor.cancelTask(taskId, mockEventBus);
+
+    // Verify that the task state was saved to TaskStore during cancelTask
+    expect(saveSpy).toHaveBeenCalled();
+    expect(wrapper.task.dispose).toHaveBeenCalled();
+    expect(executor.getTask(taskId)).toBeUndefined();
+
+    // Clean up the test by allowing the promise to resolve.
+    await primaryPromise;
+  });
 });
