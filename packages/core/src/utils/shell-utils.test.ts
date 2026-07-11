@@ -426,6 +426,24 @@ describe('stripShellWrapper', () => {
   it('should not strip an interactive shell that has no -c flag', () => {
     expect(stripShellWrapper('bash -i')).toEqual('bash -i');
   });
+
+  it('should not strip non-canonical option groups where -c is not last', () => {
+    // POSIX Utility Syntax Guideline 5: the argument-taking option (-c) should
+    // be last. For -ci/-cl the command source is shell-dependent, so we leave
+    // the wrapper intact and let the shell-level policy check gate it.
+    expect(stripShellWrapper('bash -ci "rm -rf ~"')).toEqual(
+      'bash -ci "rm -rf ~"',
+    );
+    expect(stripShellWrapper('bash -cl "rm -rf ~"')).toEqual(
+      'bash -cl "rm -rf ~"',
+    );
+  });
+
+  it('should strip an absolute Windows-path login shell (backslash separator)', () => {
+    expect(stripShellWrapper('C:\\tools\\bash -lc "rm -rf ~"')).toEqual(
+      'rm -rf ~',
+    );
+  });
 });
 
 describe('escapeShellArg', () => {

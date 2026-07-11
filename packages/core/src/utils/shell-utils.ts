@@ -846,8 +846,14 @@ export function stripShellWrapper(command: string): string {
   // `bash --login -c "..."`. These forms must be stripped (and re-checked by the
   // policy engine) exactly like a bare `-c`; matching only `-c` here let the
   // login/interactive variants slip past the wrapper re-check.
+  // `-c` must be the LAST character in an option group (`-[il]*c`, e.g. `-lc`):
+  // POSIX Utility Syntax Guideline 5 requires the argument-taking option last,
+  // and for non-canonical groups like `-ci`/`-cl` the command source is
+  // shell-dependent, so we do not fine-grain re-check them here — they fall
+  // through to the shell-level policy check instead. The executable prefix
+  // accepts `/` or `\` so absolute-path invocations are matched on Windows too.
   const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+(?:(?:-[il]+|--login|--interactive)\s+)*-[il]*c[il]*|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+[/\\])?(?:sh|bash|zsh))\s+(?:(?:-[il]+|--login|--interactive)\s+)*-[il]*c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
@@ -858,8 +864,9 @@ export function stripShellWrapper(command: string): string {
     ) {
       // Detect a POSIX shell wrapper by its shell name rather than a literal
       // `-c` suffix, so login/interactive forms (`-lc`, `--login -c`, …) take
-      // the same shell-word parsing path as a bare `-c`.
-      const isPosixShell = /(?:^|\/)(?:sh|bash|zsh)\b/i.test(
+      // the same shell-word parsing path as a bare `-c`. Accept `/` or `\` as
+      // the path separator so an absolute-path shell is still recognised.
+      const isPosixShell = /(?:^|[/\\])(?:sh|bash|zsh)\b/i.test(
         match[0].trimStart(),
       );
       if (isPosixShell && newCommand.startsWith('"')) {
