@@ -398,6 +398,34 @@ describe('stripShellWrapper', () => {
     const expected = 'hg commit -m "title\n\nbody"';
     expect(stripShellWrapper(multiLine)).toEqual(expected);
   });
+
+  it('should strip bash -lc (login shell) with quotes', () => {
+    expect(stripShellWrapper('bash -lc "rm -rf ~"')).toEqual('rm -rf ~');
+  });
+
+  it('should strip bash -ic (interactive shell) with quotes', () => {
+    expect(stripShellWrapper('bash -ic "rm -rf ~"')).toEqual('rm -rf ~');
+  });
+
+  it('should strip sh -lc without quotes', () => {
+    expect(stripShellWrapper('sh -lc rm -rf ~')).toEqual('rm -rf ~');
+  });
+
+  it('should strip separated login and command flags (bash -l -c)', () => {
+    expect(stripShellWrapper('bash -l -c "rm -rf ~"')).toEqual('rm -rf ~');
+  });
+
+  it('should strip long-form login flag with -c (bash --login -c)', () => {
+    expect(stripShellWrapper('bash --login -c "rm -rf ~"')).toEqual('rm -rf ~');
+  });
+
+  it('should strip an absolute-path login shell (/bin/bash -lc)', () => {
+    expect(stripShellWrapper('/bin/bash -lc "rm -rf ~"')).toEqual('rm -rf ~');
+  });
+
+  it('should not strip an interactive shell that has no -c flag', () => {
+    expect(stripShellWrapper('bash -i')).toEqual('bash -i');
+  });
 });
 
 describe('escapeShellArg', () => {
