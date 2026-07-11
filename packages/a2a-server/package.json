@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-a2a-server",
-  "version": "0.52.0-nightly.20260707.g27a3da3e8",
+  "version": "0.52.0-nightly.20260711.gf354eebaf",
   "description": "Gemini CLI A2A Server",
   "repository": {
     "type": "git",
