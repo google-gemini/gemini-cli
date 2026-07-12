@@ -117,6 +117,14 @@ function ruleMatches(
     }
   }
 
+  // A builtinOnly rule never matches MCP tools, regardless of its toolName
+  // pattern. This lets a blanket '*' rule (e.g. a default-deny paired with
+  // an allowlist) stay scoped to built-in tools without also excluding MCP
+  // tools, which are governed separately by their own trust/allow rules.
+  if ('builtinOnly' in rule && rule.builtinOnly && serverName !== undefined) {
+    return false;
+  }
+
   // Check tool name if specified
   if (rule.toolName !== undefined) {
     // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"

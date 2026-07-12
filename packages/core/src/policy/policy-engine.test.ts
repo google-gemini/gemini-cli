@@ -858,6 +858,75 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('builtinOnly rules', () => {
+    it('should not match MCP tools even with a wildcard toolName', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*',
+            builtinOnly: true,
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      // Built-in tool: the builtinOnly wildcard DENY applies.
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // MCP tool: builtinOnly excludes it from the rule, so it falls through
+      // to the engine's default decision instead of being denied.
+      expect(
+        (await engine.check({ name: 'mcp_server_tool' }, 'server')).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should not affect rules without builtinOnly set', async () => {
+      engine = new PolicyEngine({
+        rules: [{ toolName: '*', decision: PolicyDecision.DENY, priority: 10 }],
+      });
+
+      expect(
+        (await engine.check({ name: 'mcp_server_tool' }, 'server')).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    // Regression test for the `tools.core` bug (settings.tools.core caused a
+    // builtinOnly-less wildcard DENY that outranked mcpServers.<name>.trust,
+    // silently disabling every MCP tool). Reproduces the priority ordering
+    // documented in the issue: the Core Tools Allowlist Enforcement DENY
+    // (4.24) sits above the MCP trust ALLOW (4.2), so without builtinOnly the
+    // MCP tool would be denied despite being trusted.
+    it('lets a higher-priority MCP trust ALLOW win over a lower-priority builtinOnly wildcard DENY', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'mcp_*',
+            decision: PolicyDecision.ALLOW,
+            priority: 4.2, // TRUSTED_MCP_SERVER_PRIORITY
+            source: 'Settings (MCP Trusted)',
+          },
+          {
+            toolName: '*',
+            builtinOnly: true,
+            decision: PolicyDecision.DENY,
+            priority: 4.24, // CORE_TOOLS_FLAG_PRIORITY - 0.01
+            source: 'Settings (Core Tools Allowlist Enforcement)',
+          },
+        ],
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      expect(
+        (await engine.check({ name: 'mcp_github_get_pull_request' }, 'github'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
   describe('complex scenarios', () => {
     it('should handle multiple matching rules with different priorities', async () => {
       const rules: PolicyRule[] = [
@@ -2799,6 +2868,24 @@ describe('PolicyEngine', () => {
           ['mcp_otherserver_read', { _serverName: 'otherserver' }],
         ]),
         expected: ['mcp_server_search'],
+      },
+      {
+        // Regression test for the `tools.core` bug: a builtinOnly wildcard
+        // DENY (as config.ts sets on the Core Tools Allowlist Enforcement
+        // rule) must exclude built-in tools but leave MCP tool declarations
+        // alone, so MCP tools stay governed by their own trust/allow rules.
+        name: 'should exclude only built-in tools for a builtinOnly wildcard * in getExcludedTools',
+        rules: [
+          {
+            toolName: '*',
+            builtinOnly: true,
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        allToolNames: ['toolA', 'toolB', 'mcp_server_toolC'],
+        metadata: new Map([['mcp_server_toolC', { _serverName: 'server' }]]),
+        expected: ['toolA', 'toolB'],
       },
     ];
 
