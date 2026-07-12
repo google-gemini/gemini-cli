@@ -24,7 +24,7 @@ describe('update_topic_behavior', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: 'update_topic should be used at start, end and middle for complex tasks',
-    prompt: `Create a simple users REST API using Express. 
+    prompt: `Create a simple users REST API using Express.
 1. Initialize a new npm project and install express.
 2. Create src/app.ts as the main entry point.
 3. Create src/routes/userRoutes.ts for user routes.

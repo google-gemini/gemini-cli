@@ -44,9 +44,9 @@ describe('Automated tool use', () => {
 
         export default [
           {
-            files: ["**/*.{js,mjs,cjs,ts}"], 
-            languageOptions: { 
-                globals: globals.node 
+            files: ["**/*.{js,mjs,cjs,ts}"],
+            languageOptions: {
+                globals: globals.node
             }
           },
           pluginJs.configs.recommended,

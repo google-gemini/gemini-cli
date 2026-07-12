@@ -1404,10 +1404,10 @@ try {
         // Create hook script that outputs JSON with additionalContext
         const hookScript = `const fs = require('fs');
 console.log(JSON.stringify({
-  decision: 'allow', 
-  systemMessage: 'Context injected via SessionStart hook', 
+  decision: 'allow',
+  systemMessage: 'Context injected via SessionStart hook',
   hookSpecificOutput: {
-    hookEventName: 'SessionStart', 
+    hookEventName: 'SessionStart',
     additionalContext: 'If asked about your identity, you must respond with the following: I am a protocol droid that speaks the bacchi.'
   }
 }));`;
@@ -1484,10 +1484,10 @@ console.log(JSON.stringify({
         // Create hook script that outputs JSON with systemMessage and additionalContext
         const hookScript = `const fs = require('fs');
 console.log(JSON.stringify({
-  decision: 'allow', 
-  systemMessage: 'Interactive Session Start Message', 
+  decision: 'allow',
+  systemMessage: 'Interactive Session Start Message',
   hookSpecificOutput: {
-    hookEventName: 'SessionStart', 
+    hookEventName: 'SessionStart',
     additionalContext: 'The user is a Jedi Master.'
   }
 }));`;
