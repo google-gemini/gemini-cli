@@ -1303,18 +1303,23 @@ export class ShellExecutionService {
           }
 
           const processingComplete = processingChain.then(() => 'processed');
+          let onAbort: (() => void) | undefined;
           const abortFired = new Promise<'aborted'>((res) => {
             if (abortSignal.aborted) {
               res('aborted');
               return;
             }
-            abortSignal.addEventListener('abort', () => res('aborted'), {
+            onAbort = () => res('aborted');
+            abortSignal.addEventListener('abort', onAbort, {
               once: true,
             });
           });
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           Promise.race([processingComplete, abortFired]).then(() => {
+            if (onAbort) {
+              abortSignal.removeEventListener('abort', onAbort);
+            }
             finalize();
           });
         },
