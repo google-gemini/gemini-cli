@@ -10,6 +10,7 @@ import {
   type ModelConfigAlias,
   type ModelConfigServiceConfig,
 } from './modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -1152,5 +1153,122 @@ describe('ModelConfigService', () => {
         'gemini-3-pro',
       );
     });
+  });
+});
+
+describe('ModelConfigService.mergeConfigs', () => {
+  const alias = (model: string): ModelConfigAlias => ({
+    modelConfig: {
+      model,
+      generateContentConfig: { temperature: 0, topP: 0.9 },
+    },
+  });
+
+  it('preserves default aliases when the user supplies a partial config', () => {
+    // Reproduces #28264: previously, providing any custom alias obliterated the
+    // built-in default aliases.
+    const merged = ModelConfigService.mergeConfigs(DEFAULT_MODEL_CONFIGS, {
+      aliases: { 'my-custom': alias('gemini-custom') },
+    });
+
+    // The user's custom alias is present...
+    expect(merged.aliases?.['my-custom']).toBeDefined();
+    // ...and every default alias is still there.
+    for (const key of Object.keys(DEFAULT_MODEL_CONFIGS.aliases ?? {})) {
+      expect(merged.aliases?.[key]).toBeDefined();
+    }
+  });
+
+  it('deep-merges nested objects so a partial override augments defaults', () => {
+    const base: ModelConfigServiceConfig = {
+      aliases: {
+        base: {
+          modelConfig: {
+            model: 'model-a',
+            generateContentConfig: { temperature: 0, topP: 0.9 },
+          },
+        },
+      },
+    };
+    const override: ModelConfigServiceConfig = {
+      aliases: {
+        // Only override one leaf; `model` and `topP` should be preserved.
+        base: { modelConfig: { generateContentConfig: { temperature: 1 } } },
+      },
+    };
+
+    const merged = ModelConfigService.mergeConfigs(base, override);
+
+    expect(merged.aliases?.['base']?.modelConfig?.model).toBe('model-a');
+    expect(
+      merged.aliases?.['base']?.modelConfig?.generateContentConfig,
+    ).toEqual({ temperature: 1, topP: 0.9 });
+  });
+
+  it('adds override keys without dropping existing ones', () => {
+    const base: ModelConfigServiceConfig = {
+      aliases: { a: alias('model-a'), b: alias('model-b') },
+    };
+    const override: ModelConfigServiceConfig = {
+      aliases: { b: alias('model-b2'), c: alias('model-c') },
+    };
+
+    const merged = ModelConfigService.mergeConfigs(base, override);
+
+    expect(Object.keys(merged.aliases ?? {}).sort()).toEqual(['a', 'b', 'c']);
+    expect(merged.aliases?.['a']?.modelConfig?.model).toBe('model-a');
+    expect(merged.aliases?.['b']?.modelConfig?.model).toBe('model-b2');
+    expect(merged.aliases?.['c']?.modelConfig?.model).toBe('model-c');
+  });
+
+  it('replaces arrays wholesale rather than merging them', () => {
+    const base: ModelConfigServiceConfig = {
+      overrides: [{ match: { model: 'a' }, modelConfig: { model: 'a' } }],
+    };
+    const override: ModelConfigServiceConfig = {
+      overrides: [{ match: { model: 'b' }, modelConfig: { model: 'b' } }],
+    };
+
+    const merged = ModelConfigService.mergeConfigs(base, override);
+
+    expect(merged.overrides).toEqual([
+      { match: { model: 'b' }, modelConfig: { model: 'b' } },
+    ]);
+  });
+
+  it('keeps base arrays when the override omits them', () => {
+    const base: ModelConfigServiceConfig = {
+      overrides: [{ match: { model: 'a' }, modelConfig: { model: 'a' } }],
+    };
+    const override: ModelConfigServiceConfig = {
+      aliases: { c: alias('model-c') },
+    };
+
+    const merged = ModelConfigService.mergeConfigs(base, override);
+
+    expect(merged.overrides).toEqual(base.overrides);
+    expect(merged.aliases?.['c']).toBeDefined();
+  });
+
+  it('returns an equivalent config when the override is undefined', () => {
+    const base: ModelConfigServiceConfig = {
+      aliases: { a: alias('model-a') },
+      overrides: [],
+    };
+
+    expect(ModelConfigService.mergeConfigs(base, undefined)).toEqual(base);
+  });
+
+  it('does not mutate the base config', () => {
+    const base: ModelConfigServiceConfig = {
+      aliases: { a: alias('model-a') },
+    };
+    const snapshot = structuredClone(base);
+
+    ModelConfigService.mergeConfigs(base, {
+      aliases: { a: alias('model-a2'), b: alias('model-b') },
+    });
+
+    expect(base).toEqual(snapshot);
   });
 });
