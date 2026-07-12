@@ -884,6 +884,30 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should fall back to the mcp_ name prefix when serverName is undefined', async () => {
+      // serverName is derived from caller-supplied tool metadata and can be
+      // undefined even for a genuine MCP tool call (missing/incomplete
+      // metadata, a tool not recognized as DiscoveredMCPTool, etc). The
+      // mcp_ name prefix is a structural guarantee that doesn't depend on
+      // that metadata, so builtinOnly must also honor it directly.
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*',
+            builtinOnly: true,
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      // No serverName passed, but the tool name is still mcp_-prefixed.
+      expect(
+        (await engine.check({ name: 'mcp_server_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should not affect rules without builtinOnly set', async () => {
       engine = new PolicyEngine({
         rules: [{ toolName: '*', decision: PolicyDecision.DENY, priority: 10 }],
@@ -2885,6 +2909,25 @@ describe('PolicyEngine', () => {
         ],
         allToolNames: ['toolA', 'toolB', 'mcp_server_toolC'],
         metadata: new Map([['mcp_server_toolC', { _serverName: 'server' }]]),
+        expected: ['toolA', 'toolB'],
+      },
+      {
+        // Same as above, but with no metadata provided at all (as happens
+        // when toolMetadata is omitted, or a tool has no entry in the map,
+        // e.g. it isn't recognized as DiscoveredMCPTool upstream). serverName
+        // resolves to undefined for every tool in this case, so builtinOnly
+        // must fall back to the mcp_ name prefix to still protect the MCP
+        // tool from the wildcard DENY.
+        name: 'should exclude only built-in tools for a builtinOnly wildcard * in getExcludedTools even without metadata',
+        rules: [
+          {
+            toolName: '*',
+            builtinOnly: true,
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+        allToolNames: ['toolA', 'toolB', 'mcp_server_toolC'],
         expected: ['toolA', 'toolB'],
       },
     ];

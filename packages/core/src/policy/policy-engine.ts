@@ -121,7 +121,18 @@ function ruleMatches(
   // pattern. This lets a blanket '*' rule (e.g. a default-deny paired with
   // an allowlist) stay scoped to built-in tools without also excluding MCP
   // tools, which are governed separately by their own trust/allow rules.
-  if ('builtinOnly' in rule && rule.builtinOnly && serverName !== undefined) {
+  // Check both serverName (from caller-supplied metadata) and the tool
+  // name's own mcp_ prefix: serverName can be undefined even for a real
+  // MCP tool when metadata is missing or incomplete (e.g. a tool not
+  // recognized as DiscoveredMCPTool, or a caller that omits toolMetadata),
+  // so name-prefix is the structural fallback that doesn't depend on any
+  // external metadata being correctly populated.
+  if (
+    'builtinOnly' in rule &&
+    rule.builtinOnly &&
+    (serverName !== undefined ||
+      (toolCall.name !== undefined && isMcpToolName(toolCall.name)))
+  ) {
     return false;
   }
 
