@@ -1,4 +1,4 @@
-nEcoTecNo
+EcoTecNo Global Co ® HADWER y SOFWER HÍBRIDOS PROPIEDAD MAPA830324UM9 
 𝙀𝙩𝙖𝙥𝙖 3.0 𝙄𝘼'𝙨 𝘼𝙡𝙞𝙣𝙚𝙖𝙙𝙖𝙨: 
 
 
