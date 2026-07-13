@@ -62,6 +62,7 @@ export enum GeminiEventType {
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
   MaxSessionTurns = 'max_session_turns',
+  MaxPromptTurns = 'max_prompt_turns',
   Finished = 'finished',
   LoopDetected = 'loop_detected',
   Citation = 'citation',
@@ -202,6 +203,10 @@ export type ServerGeminiMaxSessionTurnsEvent = {
   type: GeminiEventType.MaxSessionTurns;
 };
 
+export type ServerGeminiMaxPromptTurnsEvent = {
+  type: GeminiEventType.MaxPromptTurns;
+};
+
 export type ServerGeminiFinishedEvent = {
   type: GeminiEventType.Finished;
   value: GeminiFinishedEventValue;
@@ -225,6 +230,7 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiFinishedEvent
   | ServerGeminiLoopDetectedEvent
   | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiMaxPromptTurnsEvent
   | ServerGeminiThoughtEvent
   | ServerGeminiToolCallConfirmationEvent
   | ServerGeminiToolCallRequestEvent

@@ -1336,6 +1336,17 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleMaxPromptTurnsEvent = useCallback(
+    () =>
+      addItem({
+        type: 'info',
+        text:
+          `The prompt has reached the maximum number of reasoning turns: ${config.getMaxPromptTurns()}. ` +
+          `Please update this limit in your settings.json file under model.maxPromptTurns or try to simplify your query.`,
+      }),
+    [addItem, config],
+  );
+
   const handleContextWindowWillOverflowEvent = useCallback(
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit(true);
@@ -1520,6 +1531,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.MaxPromptTurns:
+            handleMaxPromptTurnsEvent();
+            break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
@@ -1570,6 +1584,7 @@ export const useGeminiStream = (
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      handleMaxPromptTurnsEvent,
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,

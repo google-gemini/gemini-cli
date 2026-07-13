@@ -42,6 +42,7 @@ function createMockDeps(
 
   const mockConfig = {
     getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+    getMaxPromptTurns: vi.fn().mockReturnValue(15),
     getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
     getGeminiClient: vi.fn().mockReturnValue(mockClient),
     getMessageBus: vi.fn().mockImplementation(() => ({
@@ -749,7 +750,7 @@ describe('LegacyAgentSession', () => {
 
   describe('stream - max turns', () => {
     it('emits agent_end with max_turns when the session turn limit is exceeded', async () => {
-      const configMock = deps.config.getMaxSessionTurns as ReturnType<
+      const configMock = deps.config.getMaxPromptTurns as ReturnType<
         typeof vi.fn
       >;
       configMock.mockReturnValue(0);
@@ -772,7 +773,7 @@ describe('LegacyAgentSession', () => {
       );
       expect(streamEnd?.reason).toBe('max_turns');
       expect(streamEnd?.data).toEqual({
-        code: 'MAX_TURNS_EXCEEDED',
+        code: 'MAX_PROMPT_TURNS_EXCEEDED',
         maxTurns: 0,
         turnCount: 0,
       });

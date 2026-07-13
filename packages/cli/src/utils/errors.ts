@@ -243,3 +243,44 @@ export function handleMaxTurnsExceededError(config: Config): never {
     process.exit(maxTurnsError.exitCode);
   }
 }
+
+/**
+ * Handles max prompt turns exceeded consistently.
+ */
+export function handleMaxPromptTurnsExceededError(config: Config): never {
+  const maxTurnsError = new FatalTurnLimitedError(
+    'Reached max prompt turns for this prompt. Increase the number of turns by specifying maxPromptTurns in settings.json.',
+  );
+
+  if (config.getOutputFormat() === OutputFormat.STREAM_JSON) {
+    const streamFormatter = new StreamJsonFormatter();
+    const metrics = uiTelemetryService.getMetrics();
+    streamFormatter.emitEvent({
+      type: JsonStreamEventType.RESULT,
+      timestamp: new Date().toISOString(),
+      status: 'error',
+      error: {
+        type: getErrorType(maxTurnsError),
+        message: maxTurnsError.message,
+      },
+      stats: streamFormatter.convertToStreamStats(metrics, 0),
+    });
+    runSyncCleanup();
+    process.exit(maxTurnsError.exitCode);
+  } else if (config.getOutputFormat() === OutputFormat.JSON) {
+    const formatter = new JsonFormatter();
+    const formattedError = formatter.formatError(
+      maxTurnsError,
+      maxTurnsError.exitCode,
+      config.getSessionId(),
+    );
+
+    coreEvents.emitFeedback('error', formattedError);
+    runSyncCleanup();
+    process.exit(maxTurnsError.exitCode);
+  } else {
+    coreEvents.emitFeedback('error', maxTurnsError.message);
+    runSyncCleanup();
+    process.exit(maxTurnsError.exitCode);
+  }
+}

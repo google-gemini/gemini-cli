@@ -641,6 +641,7 @@ export interface ConfigParameters {
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
+  maxPromptTurns?: number;
   acpMode?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
@@ -837,6 +838,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _activeModel: string;
   private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
+  private readonly maxPromptTurns: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -1236,6 +1238,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.maxPromptTurns = params.maxPromptTurns ?? 15;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
@@ -2002,6 +2005,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMaxSessionTurns(): number {
     return this.maxSessionTurns;
+  }
+
+  getMaxPromptTurns(): number {
+    return this.maxPromptTurns;
   }
 
   setQuotaErrorOccurred(value: boolean): void {

@@ -705,6 +705,13 @@
           "default": -1,
           "type": "number"
         },
+        "maxPromptTurns": {
+          "title": "Max Prompt Turns",
+          "description": "Maximum number of recursive turns (tool calls and model responses) allowed for a single prompt before halting. -1 means unlimited.",
+          "markdownDescription": "Maximum number of recursive turns (tool calls and model responses) allowed for a single prompt before halting. -1 means unlimited.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `15`",
+          "default": 15,
+          "type": "number"
+        },
         "summarizeToolOutput": {
           "title": "Summarize Tool Output",
           "description": "Enables or disables summarization of tool output. Configure per-tool token budgets (for example {\"run_shell_command\": {\"tokenBudget\": 2000}}). Currently only the run_shell_command tool supports summarization.",

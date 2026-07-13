@@ -591,7 +591,11 @@ export async function runNonInteractive({
                 typeof event.data?.['maxTurns'] === 'number' ||
                 typeof event.data?.['turnCount'] === 'number';
 
-              if (isConfiguredTurnLimit) {
+              if (event.data?.['code'] === 'MAX_PROMPT_TURNS_EXCEEDED') {
+                throw new FatalTurnLimitedError(
+                  'Reached max prompt turns for this prompt. Increase the number of turns by specifying maxPromptTurns in settings.json.',
+                );
+              } else if (isConfiguredTurnLimit) {
                 throw new FatalTurnLimitedError(
                   'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
                 );

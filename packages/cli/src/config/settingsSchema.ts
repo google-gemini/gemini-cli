@@ -1087,6 +1087,16 @@ const SETTINGS_SCHEMA = {
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,
       },
+      maxPromptTurns: {
+        type: 'number',
+        label: 'Max Prompt Turns',
+        category: 'Model',
+        requiresRestart: false,
+        default: 15,
+        description:
+          'Maximum number of recursive turns (tool calls and model responses) allowed for a single prompt before halting. -1 means unlimited.',
+        showInDialog: true,
+      },
       summarizeToolOutput: {
         type: 'object',
         label: 'Summarize Tool Output',

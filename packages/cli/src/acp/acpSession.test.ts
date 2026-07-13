@@ -154,6 +154,7 @@ describe('Session', () => {
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+      getMaxPromptTurns: vi.fn().mockReturnValue(15),
       geminiClient: {
         sendMessageStream: mockSendMessageStream,
         getChat: vi.fn().mockReturnValue(mockChat),

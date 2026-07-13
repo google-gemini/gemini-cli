@@ -178,14 +178,23 @@ export class LegacyAgentProtocol implements AgentProtocol {
     let currentParts: Part[] = initialParts;
     let currentDisplayContent = initialDisplayContent;
     let turnCount = 0;
-    const maxTurns = this._config.getMaxSessionTurns();
+    const maxSessionTurns = this._config.getMaxSessionTurns();
+    const maxPromptTurns = this._config.getMaxPromptTurns();
 
     while (true) {
       turnCount++;
-      if (maxTurns >= 0 && turnCount > maxTurns) {
+      if (maxSessionTurns >= 0 && turnCount > maxSessionTurns) {
         this._finishStream('max_turns', {
           code: 'MAX_TURNS_EXCEEDED',
-          maxTurns,
+          maxTurns: maxSessionTurns,
+          turnCount: turnCount - 1,
+        });
+        return;
+      }
+      if (maxPromptTurns >= 0 && turnCount > maxPromptTurns) {
+        this._finishStream('max_turns', {
+          code: 'MAX_PROMPT_TURNS_EXCEEDED',
+          maxTurns: maxPromptTurns,
           turnCount: turnCount - 1,
         });
         return;

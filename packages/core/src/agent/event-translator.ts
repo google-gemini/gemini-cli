@@ -170,6 +170,18 @@ export function translateEvent(
       );
       break;
 
+    case GeminiEventType.MaxPromptTurns:
+      ensureStreamStart(state, out);
+      out.push(
+        makeEvent('agent_end', state, {
+          reason: 'max_turns',
+          data: {
+            code: 'MAX_PROMPT_TURNS_EXCEEDED',
+          },
+        }),
+      );
+      break;
+
     case GeminiEventType.LoopDetected:
       ensureStreamStart(state, out);
       out.push(

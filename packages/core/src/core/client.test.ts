@@ -236,6 +236,7 @@ describe('Gemini Client (client.ts)', () => {
       getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
       getFileService: vi.fn().mockReturnValue(fileService),
       getMaxSessionTurns: vi.fn().mockReturnValue(0),
+      getMaxPromptTurns: vi.fn().mockReturnValue(15),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       getNoBrowser: vi.fn().mockReturnValue(false),
@@ -1517,8 +1518,8 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      // 1. With default maxSessionTurns = -1, the recursive limit should be 15.
-      vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(-1);
+      // 1. With default maxPromptTurns = 15, the recursive limit should be 15.
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(15);
 
       // Run 15 recursive turns on the same prompt_id
       for (let i = 0; i < 15; i++) {
@@ -1532,7 +1533,7 @@ ${JSON.stringify(
           events.push(event);
         }
         expect(events).not.toContainEqual({
-          type: GeminiEventType.MaxSessionTurns,
+          type: GeminiEventType.MaxPromptTurns,
         });
       }
 
@@ -1547,7 +1548,7 @@ ${JSON.stringify(
         eventsExceeded.push(event);
       }
       expect(eventsExceeded).toEqual([
-        { type: GeminiEventType.MaxSessionTurns },
+        { type: GeminiEventType.MaxPromptTurns },
       ]);
 
       // 2. If prompt_id changes, it should reset the counter and succeed again
@@ -1561,11 +1562,11 @@ ${JSON.stringify(
         eventsNewPrompt.push(event);
       }
       expect(eventsNewPrompt).not.toContainEqual({
-        type: GeminiEventType.MaxSessionTurns,
+        type: GeminiEventType.MaxPromptTurns,
       });
 
-      // 3. If config.maxSessionTurns is custom configured (e.g., to 3), it should respect it.
-      vi.spyOn(client['config'], 'getMaxSessionTurns').mockReturnValue(3);
+      // 3. If config.maxPromptTurns is custom configured (e.g., to 3), it should respect it.
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(3);
       client['sessionTurnCount'] = 0;
       client['promptTurnCount'] = 0;
       client['lastPromptId'] = '';
@@ -1581,7 +1582,7 @@ ${JSON.stringify(
           events.push(event);
         }
         expect(events).not.toContainEqual({
-          type: GeminiEventType.MaxSessionTurns,
+          type: GeminiEventType.MaxPromptTurns,
         });
       }
 
@@ -1596,7 +1597,7 @@ ${JSON.stringify(
         eventsCustomExceeded.push(event);
       }
       expect(eventsCustomExceeded).toEqual([
-        { type: GeminiEventType.MaxSessionTurns },
+        { type: GeminiEventType.MaxPromptTurns },
       ]);
     });
 
@@ -3126,7 +3127,7 @@ ${JSON.stringify(
         // Assert
         // Should NOT trigger recovery because boundedTurns would reach 0
         expect(events).toContainEqual({
-          type: GeminiEventType.MaxSessionTurns,
+          type: GeminiEventType.MaxPromptTurns,
         });
         expect(sendMessageStreamSpy).toHaveBeenCalledTimes(1);
       });

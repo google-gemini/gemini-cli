@@ -177,6 +177,7 @@ describe('runNonInteractive', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
+      getMaxPromptTurns: vi.fn().mockReturnValue(15),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project'),
       storage: {
@@ -624,6 +625,18 @@ describe('runNonInteractive', () => {
 
   it('should exit when max session turns are exceeded', async () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
+    await expect(
+      runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger loop',
+        prompt_id: 'prompt-id-6',
+      }),
+    ).rejects.toThrow('process.exit(53) called');
+  });
+
+  it('should exit when max prompt turns are exceeded', async () => {
+    vi.mocked(mockConfig.getMaxPromptTurns).mockReturnValue(0);
     await expect(
       runNonInteractive({
         config: mockConfig,
