@@ -12,6 +12,11 @@ import {
   detectIdeFromEnv,
 } from '@google/gemini-cli-core/src/ide/detect-ide.js';
 
+const createDisposable = (name: string) => ({
+  name,
+  dispose: vi.fn(),
+});
+
 vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
   const actual = await vi.importActual(
     '@google/gemini-cli-core/src/ide/detect-ide.js',
@@ -43,16 +48,26 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
+    onDidCloseTextDocument: vi.fn(() =>
+      createDisposable('onDidCloseTextDocument'),
+    ),
+    registerTextDocumentContentProvider: vi.fn(() =>
+      createDisposable('registerTextDocumentContentProvider'),
+    ),
+    onDidChangeWorkspaceFolders: vi.fn(() =>
+      createDisposable('onDidChangeWorkspaceFolders'),
+    ),
+    onDidGrantWorkspaceTrust: vi.fn(() =>
+      createDisposable('onDidGrantWorkspaceTrust'),
+    ),
     getConfiguration: vi.fn(() => ({
       get: vi.fn(),
     })),
   },
   commands: {
-    registerCommand: vi.fn(),
+    registerCommand: vi.fn((command: string) =>
+      createDisposable(`registerCommand:${command}`),
+    ),
     executeCommand: vi.fn(),
   },
   Uri: {
@@ -129,6 +144,27 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('tracks all activation disposables for cleanup', async () => {
+    await activate(context);
+
+    expect(context.subscriptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'registerCommand:gemini.diff.accept',
+        }),
+        expect.objectContaining({
+          name: 'registerCommand:gemini.diff.cancel',
+        }),
+        expect.objectContaining({
+          name: 'onDidChangeWorkspaceFolders',
+        }),
+        expect.objectContaining({
+          name: 'onDidGrantWorkspaceTrust',
+        }),
+      ]),
+    );
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
