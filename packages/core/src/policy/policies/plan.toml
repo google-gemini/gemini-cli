@@ -110,14 +110,15 @@ modes = ["plan"]
 interactive = true
 
 # Allow write_file and replace for .md files in the plans directory (cross-platform).
-# Note: The tools themselves strictly validate and restrict the resolved path to the plans directory,
-# so matching any .md file path here is completely safe and robust.
+# This rule employs a defense-in-depth regular expression to allow either:
+# 1. An absolute path inside the designated temporary plans directory (.gemini/tmp/ with 1 or 2 levels of subdirectories)
+# 2. A clean relative path (disallowing absolute paths and parent directory traversal '..')
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\\x00\"file_path\":\"[^\"]+\\.md\"\\x00"
+argsPattern = "\\x00\"file_path\":\"(?:[^\\\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+(?:[\\w-]+[\\\\/]+){1,2}plans[\\\\/]+[\\w-]+\\.md|(?![\\\\/])(?![A-Za-z]:)(?:(?!\\.\\.)[^\\\"])+\\.md)\"\\x00"
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]
