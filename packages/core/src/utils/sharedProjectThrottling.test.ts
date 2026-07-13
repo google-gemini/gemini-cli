@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -44,6 +44,9 @@ describe('Shared Project Throttling Integration', () => {
         },
       ],
     };
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('fails completely when both Pro and Flash fallback models hit shared project quota limits', async () => {
@@ -118,8 +121,6 @@ describe('Shared Project Throttling Integration', () => {
     expect(caughtError?.message).toContain(
       'gcloud config set project [PROJECT_ID]',
     );
-
-    vi.unstubAllEnvs();
   });
 
   it('does not append troubleshooting hint if a dedicated user project is set in environment', async () => {
@@ -142,8 +143,6 @@ describe('Shared Project Throttling Integration', () => {
     const errorMsg =
       caughtError instanceof Error ? caughtError.message : String(caughtError);
     expect(errorMsg).not.toContain('💡 Tip:');
-
-    vi.unstubAllEnvs();
   });
 
   it('does not append troubleshooting hint for non-Google/ADC auth types', async () => {
@@ -166,7 +165,5 @@ describe('Shared Project Throttling Integration', () => {
     const errorMsg =
       caughtError instanceof Error ? caughtError.message : String(caughtError);
     expect(errorMsg).not.toContain('💡 Tip:');
-
-    vi.unstubAllEnvs();
   });
 });
