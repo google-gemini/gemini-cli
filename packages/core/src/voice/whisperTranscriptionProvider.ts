@@ -74,24 +74,18 @@ export class WhisperTranscriptionProvider
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
         // Setting step == 0 enables sliding window mode with VAD, which outputs
         // non-overlapping transcription blocks suitable for appending.
-        this.process = spawn(
-          'whisper-stream',
-          [
-            '-m',
-            modelPath,
-            '-t',
-            threads.toString(),
-            '--step',
-            step.toString(),
-            '--length',
-            length.toString(),
-            '-vth',
-            '0.6',
-          ],
-          {
-            env: { ...process.env },
-          },
-        );
+        this.process = spawn('whisper-stream', [
+          '-m',
+          modelPath,
+          '-t',
+          threads.toString(),
+          '--step',
+          step.toString(),
+          '--length',
+          length.toString(),
+          '-vth',
+          '0.6',
+        ]);
 
         this.process.stdout.on('data', (data: Buffer) => {
           const output = data.toString();

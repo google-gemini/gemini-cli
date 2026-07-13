@@ -39,6 +39,10 @@ vi.mock('child_process', () => ({
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
 }));
 
+vi.mock('./headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+
 const originalPlatform = process.platform;
 
 describe('editor utils', () => {
@@ -433,7 +437,6 @@ describe('editor utils', () => {
           {
             stdio: 'inherit',
             shell: process.platform === 'win32',
-            env: expect.any(Object),
           },
         );
         expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
@@ -553,7 +556,6 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
-            env: expect.any(Object),
           },
         );
       });

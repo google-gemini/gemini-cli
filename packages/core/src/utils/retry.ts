@@ -209,6 +209,46 @@ export function isRetryableError(
 }
 
 /**
+ * Enriches quota-related errors with helpful hints if using a shared Google project
+ * without a dedicated user project set in their environment.
+ */
+function enrichQuotaError(error: Error, authType?: string): Error {
+  const isQuotaError =
+    error instanceof TerminalQuotaError ||
+    error instanceof RetryableQuotaError ||
+    error.name === 'TerminalQuotaError' ||
+    error.name === 'RetryableQuotaError';
+
+  if (
+    isQuotaError &&
+    (authType === 'oauth-personal' ||
+      authType === 'compute-default-credentials' ||
+      authType === 'LOGIN_WITH_GOOGLE' ||
+      authType === 'COMPUTE_ADC')
+  ) {
+    const hasUserProject = !!(
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID']
+    );
+    if (!hasUserProject) {
+      const enrichment =
+        '\n\n💡 Tip: The shared Google Cloud project is experiencing high traffic and has hit its quota limits. ' +
+        'To get dedicated, uninterrupted quota, please set your own Google Cloud project by running:\n' +
+        '  gcloud config set project [PROJECT_ID]\n' +
+        'or by setting the GOOGLE_CLOUD_PROJECT environment variable.';
+      if (!error.message.includes('💡 Tip:')) {
+        Object.defineProperty(error, 'message', {
+          value: error.message + enrichment,
+          writable: true,
+          configurable: true,
+        });
+      }
+    }
+  }
+  return error;
+}
+
+/**
  * Retries a function with exponential backoff and jitter.
  * @param fn The asynchronous function to retry.
  * @param options Optional retry configuration.
@@ -321,7 +361,9 @@ export async function retryWithBackoff<T>(
           }
         }
         // Terminal/not_found already recorded; nothing else to mark here.
-        throw classifiedError; // Throw if no fallback or fallback failed.
+        throw classifiedError instanceof Error
+          ? enrichQuotaError(classifiedError, authType)
+          : classifiedError; // Throw if no fallback or fallback failed.
       }
 
       // Handle ValidationRequiredError - user needs to verify before proceeding
@@ -370,7 +412,7 @@ export async function retryWithBackoff<T>(
             }
           }
           throw classifiedError instanceof RetryableQuotaError
-            ? classifiedError
+            ? enrichQuotaError(classifiedError, authType)
             : error;
         }
 

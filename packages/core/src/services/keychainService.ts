@@ -212,7 +212,6 @@ export class KeychainService {
       // We pipe stdout to read the path, but ignore stderr to suppress
       // "keychain not found" errors from polluting the terminal.
       stdio: ['ignore', 'pipe', 'ignore'],
-      env: { ...process.env },
     });
 
     // If the command fails or lacks output, no default keychain is configured.

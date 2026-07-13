@@ -54,27 +54,21 @@ export class AudioRecorder extends EventEmitter<AudioRecorderEvents> {
       }
 
       // rec -q -V0 -e signed -c 1 -b 16 -r 16000 -t raw -
-      this.recProcess = spawn(
-        'rec',
-        [
-          '-q',
-          '-V0',
-          '-e',
-          'signed',
-          '-c',
-          '1',
-          '-b',
-          '16',
-          '-r',
-          '16000',
-          '-t',
-          'raw',
-          '-',
-        ],
-        {
-          env: { ...process.env },
-        },
-      );
+      this.recProcess = spawn('rec', [
+        '-q',
+        '-V0',
+        '-e',
+        'signed',
+        '-c',
+        '1',
+        '-b',
+        '16',
+        '-r',
+        '16000',
+        '-t',
+        'raw',
+        '-',
+      ]);
 
       if (!this.isRecordingInternal) {
         this.recProcess.kill('SIGTERM');
