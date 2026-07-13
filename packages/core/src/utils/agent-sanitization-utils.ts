@@ -5,7 +5,30 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import restoreRedact from 'restore-redact';
+import { createRequire as createModuleRequire } from 'node:module';
+
+interface RestoreRedact {
+  detect<T>(data: T): T;
+  restore<T>(data: T): T;
+  clear(): void;
+}
+
+function isRestoreRedact(v: unknown): v is RestoreRedact {
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('detect' in v && 'restore' in v && 'clear' in v)) return false;
+  return (
+    typeof v.detect === 'function' &&
+    typeof v.restore === 'function' &&
+    typeof v.clear === 'function'
+  );
+}
+
+const moduleRequire = createModuleRequire(import.meta.url);
+const loaded: unknown = moduleRequire('restore-redact');
+if (!isRestoreRedact(loaded)) {
+  throw new Error('restore-redact module did not load as expected');
+}
+const restoreRedact: RestoreRedact = loaded;
 
 const RESTORABLE_REDACTION_TOKEN_RE =
   /\[REDACTED:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/g;
