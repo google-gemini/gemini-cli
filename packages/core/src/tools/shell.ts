@@ -5,7 +5,7 @@
  */
 
 import fsPromises from 'node:fs/promises';
-import fs from 'node:fs';
+
 import path from 'node:path';
 import os from 'node:os';
 import { debugLogger } from '../index.js';
@@ -498,7 +498,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
     try {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempDir = await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'gemini-shell-'),
+      );
       tempFilePath = path.join(tempDir, 'bgpids.tmp');
 
       // Windows shells do not support the POSIX jobs output used here.
@@ -906,45 +908,55 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
 
           if (sandboxDenial.filePaths) {
-            for (const p of sandboxDenial.filePaths) {
-              try {
-                // Find an existing parent directory to add instead of a non-existent file
-                let currentPath = p;
-                if (currentPath.startsWith('~')) {
-                  currentPath = path.join(os.homedir(), currentPath.slice(1));
-                }
+            await Promise.all(
+              sandboxDenial.filePaths.map(async (p) => {
                 try {
-                  if (
-                    fs.existsSync(currentPath) &&
-                    fs.statSync(currentPath).isFile()
-                  ) {
+                  // Find an existing parent directory to add instead of a non-existent file
+                  let currentPath = p;
+                  if (currentPath.startsWith('~')) {
+                    currentPath = path.join(os.homedir(), currentPath.slice(1));
+                  }
+                  try {
+                    const exists = await fsPromises
+                      .access(currentPath)
+                      .then(() => true)
+                      .catch(() => false);
+                    if (exists) {
+                      const stat = await fsPromises.stat(currentPath);
+                      if (stat.isFile()) {
+                        currentPath = path.dirname(currentPath);
+                      }
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                  while (currentPath.length > 1) {
+                    const exists = await fsPromises
+                      .access(currentPath)
+                      .then(() => true)
+                      .catch(() => false);
+                    if (exists) {
+                      const mode = this.context.config.getApprovalMode();
+                      const isReadonlyMode =
+                        this.context.config.sandboxPolicyManager.getModeConfig(
+                          mode,
+                        )?.readonly ?? false;
+                      const isAllowed =
+                        this.context.config.isPathAllowed(currentPath);
+
+                      if (!isAllowed || isReadonlyMode) {
+                        writePaths.add(currentPath);
+                        readPaths.add(currentPath);
+                      }
+                      break;
+                    }
                     currentPath = path.dirname(currentPath);
                   }
                 } catch {
-                  /* ignore */
+                  // ignore
                 }
-                while (currentPath.length > 1) {
-                  if (fs.existsSync(currentPath)) {
-                    const mode = this.context.config.getApprovalMode();
-                    const isReadonlyMode =
-                      this.context.config.sandboxPolicyManager.getModeConfig(
-                        mode,
-                      )?.readonly ?? false;
-                    const isAllowed =
-                      this.context.config.isPathAllowed(currentPath);
-
-                    if (!isAllowed || isReadonlyMode) {
-                      writePaths.add(currentPath);
-                      readPaths.add(currentPath);
-                    }
-                    break;
-                  }
-                  currentPath = path.dirname(currentPath);
-                }
-              } catch {
-                // ignore
-              }
-            }
+              }),
+            );
           }
 
           const simplifiedRead = this.simplifyPaths(readPaths);
