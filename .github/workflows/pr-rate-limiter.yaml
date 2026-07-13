@@ -18,7 +18,7 @@ jobs:
       pull-requests: 'write'
     steps:
       - name: 'Limit open pull requests per user'
-        uses: 'Homebrew/actions/limit-pull-requests@9ceb7934560eb61d131dde205a6c2d77b2e1529d' # master
+        uses: 'Homebrew/actions/limit-pull-requests@18fcb8e3e06b4247c676c506750dc95ea7226479' # master
         with:
           except-author-associations: 'MEMBER,OWNER,COLLABORATOR'
           comment-limit: 8
