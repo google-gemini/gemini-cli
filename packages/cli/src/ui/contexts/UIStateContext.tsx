@@ -27,6 +27,7 @@ import type {
   AgentDefinition,
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
+  OpenAICredentials,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -101,9 +102,11 @@ export interface UIState {
   accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
   isAwaitingApiKeyInput: boolean;
+  isAwaitingOpenAIInput: boolean;
   isAwaitingLoginRestart: boolean;
   loginRestartMessage?: string;
   apiKeyDefaultValue?: string;
+  openAIDefaultValue?: OpenAICredentials;
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;

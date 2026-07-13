@@ -32,6 +32,8 @@ import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
 import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
+import { OpenAIContentGenerator } from './openaiContentGenerator.js';
+import { loadOpenAICredentials } from './openaiCredentialStorage.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -67,6 +69,7 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  USE_OPENAI = 'openai-compatible',
 }
 
 /**
@@ -83,6 +86,9 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   }
   if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
     return AuthType.USE_VERTEX_AI;
+  }
+  if (process.env['OPENAI_BASE_URL']) {
+    return AuthType.USE_OPENAI;
   }
   if (process.env['GOOGLE_GEMINI_BASE_URL']) {
     return AuthType.GATEWAY;
@@ -105,6 +111,7 @@ export type ContentGeneratorConfig = {
   authType?: AuthType;
   proxy?: string;
   baseUrl?: string;
+  model?: string;
   customHeaders?: Record<string, string>;
   vertexAiRouting?: VertexAiRoutingConfig;
 };
@@ -196,6 +203,19 @@ export async function createContentGeneratorConfig(
   if (authType === AuthType.GATEWAY) {
     contentGeneratorConfig.apiKey =
       apiKey || process.env['GEMINI_API_KEY'] || '';
+    contentGeneratorConfig.vertexai = false;
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_OPENAI) {
+    const storedCredentials = await loadOpenAICredentials();
+    contentGeneratorConfig.apiKey =
+      apiKey || process.env['OPENAI_API_KEY'] || storedCredentials?.apiKey;
+    contentGeneratorConfig.baseUrl =
+      baseUrl || process.env['OPENAI_BASE_URL'] || storedCredentials?.baseUrl;
+    contentGeneratorConfig.model =
+      process.env['OPENAI_MODEL'] || storedCredentials?.model;
     contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
@@ -302,6 +322,23 @@ export async function createContentGenerator(
           ),
           CCPA_AI_MODEL_MAPPINGS,
         ),
+        gcConfig,
+      );
+    }
+
+    if (config.authType === AuthType.USE_OPENAI) {
+      if (!config.baseUrl) {
+        throw new Error(
+          'OpenAI-compatible provider requires baseUrl (OPENAI_BASE_URL)',
+        );
+      }
+      return new LoggingContentGenerator(
+        new OpenAIContentGenerator({
+          baseUrl: config.baseUrl,
+          apiKey: config.apiKey,
+          model: config.model,
+          headers: { ...baseHeaders, ...config.customHeaders },
+        }),
         gcConfig,
       );
     }

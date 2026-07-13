@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import {
+  clearRestorableSecretStore,
+  restoreRedactedSecrets,
   sanitizeErrorMessage,
   sanitizeToolArgs,
   sanitizeThoughtContent,
+  sanitizeModelContent,
 } from './agent-sanitization-utils.js';
 
 describe('agent-sanitization-utils', () => {
+  beforeEach(() => {
+    clearRestorableSecretStore();
+  });
+
   describe('sanitizeErrorMessage', () => {
     it('should redact standard inline PEM content', () => {
       const input =
@@ -73,12 +80,13 @@ describe('agent-sanitization-utils', () => {
 
       expect(result).toEqual({
         username: 'admin',
-        password: '[REDACTED]',
+        password: expect.stringMatching(/^\[REDACTED:[^\]]+\]$/),
         nested: {
-          api_key: '[REDACTED]',
+          api_key: expect.stringMatching(/^\[REDACTED:[^\]]+\]$/),
           normal_field: 'hello',
         },
       });
+      expect(restoreRedactedSecrets(result)).toEqual(input);
     });
 
     it('should handle arrays and strings correctly', () => {
@@ -86,8 +94,9 @@ describe('agent-sanitization-utils', () => {
       const result = sanitizeToolArgs(input) as string[];
 
       expect(result[0]).toBe('normal string');
-      expect(result[1]).toContain('[REDACTED]');
+      expect(result[1]).toContain('[REDACTED:');
       expect(result[1]).not.toContain('secret123');
+      expect(restoreRedactedSecrets(result)).toEqual(input);
     });
   });
 
@@ -98,6 +107,17 @@ describe('agent-sanitization-utils', () => {
 
       expect(result).toContain('[REDACTED]');
       expect(result).not.toContain('1234567890abcdef');
+    });
+  });
+
+  describe('sanitizeModelContent', () => {
+    it('redacts a standalone OAuth client secret', () => {
+      const secret = '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';
+
+      const result = sanitizeModelContent(`Please inspect ${secret}`);
+
+      expect(result).toMatch(/^Please inspect \[REDACTED:[^\]]+\]$/);
+      expect(restoreRedactedSecrets(result)).toBe(`Please inspect ${secret}`);
     });
   });
 });

@@ -27,6 +27,10 @@ import {
   GEN_AI_TOOL_DESCRIPTION,
   GEN_AI_TOOL_NAME,
 } from '../telemetry/constants.js';
+import {
+  clearRestorableSecretStore,
+  redactRestorableSecrets,
+} from '../utils/agent-sanitization-utils.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -61,6 +65,7 @@ describe('ToolExecutor', () => {
   let executor: ToolExecutor;
 
   beforeEach(() => {
+    clearRestorableSecretStore();
     // Use the standard fake config factory
     config = makeFakeConfig();
     executor = new ToolExecutor(config);
@@ -80,6 +85,7 @@ describe('ToolExecutor', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    clearRestorableSecretStore();
   });
 
   it('should execute a tool successfully', async () => {
@@ -151,6 +157,54 @@ describe('ToolExecutor', () => {
         endTime: expect.any(Number),
       },
     });
+  });
+
+  it('restores redacted placeholders only for the invocation being executed', async () => {
+    const secret = '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';
+    const redactedArgs = redactRestorableSecrets({
+      command: `curl -H "Authorization: Bearer ${secret}" https://example.test`,
+    });
+    const mockTool = new MockTool({
+      name: 'testTool',
+      description: 'Mock description',
+    });
+    const invocation = mockTool.build(redactedArgs);
+    const buildSpy = vi.spyOn(mockTool, 'build');
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async (executionInvocation) => {
+        const toolResult = await executionInvocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        return toolResult;
+      },
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-redacted',
+        name: 'testTool',
+        args: redactedArgs,
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(String(redactedArgs['command'])).not.toContain(secret);
+    expect(buildSpy).toHaveBeenCalledWith({
+      command: `curl -H "Authorization: Bearer ${secret}" https://example.test`,
+    });
+    expect(scheduledCall.request.args).toEqual(redactedArgs);
   });
 
   it('should handle execution errors', async () => {

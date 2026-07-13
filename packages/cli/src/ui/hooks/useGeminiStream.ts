@@ -45,6 +45,8 @@ import {
   buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
+  AuthType,
+  sanitizeModelContent,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -959,7 +961,11 @@ export const useGeminiStream = (
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
-        await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
+        const promptForModel =
+          config.getContentGeneratorConfig()?.authType === AuthType.USE_OPENAI
+            ? sanitizeModelContent(trimmedQuery)
+            : trimmedQuery;
+        await logger?.logMessage(MessageSenderType.USER, promptForModel);
 
         if (!shellModeActive) {
           // Handle UI-only commands first
@@ -1020,7 +1026,7 @@ export const useGeminiStream = (
         if (isAtCommand(trimmedQuery)) {
           // Add user's turn before @ command processing for correct UI ordering.
           addItem(
-            { type: MessageType.USER, text: trimmedQuery },
+            { type: MessageType.USER, text: promptForModel },
             userMessageTimestamp,
           );
 
@@ -1041,10 +1047,10 @@ export const useGeminiStream = (
         } else {
           // Normal query for Gemini
           addItem(
-            { type: MessageType.USER, text: trimmedQuery },
+            { type: MessageType.USER, text: promptForModel },
             userMessageTimestamp,
           );
-          localQueryToSendToGemini = trimmedQuery;
+          localQueryToSendToGemini = promptForModel;
         }
       } else {
         // It's a function response (PartListUnion that isn't a string)
@@ -1595,7 +1601,11 @@ export const useGeminiStream = (
           sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {
-          spanMetadata.input = query;
+          spanMetadata.input =
+            config.getContentGeneratorConfig()?.authType ===
+              AuthType.USE_OPENAI && typeof query === 'string'
+              ? sanitizeModelContent(query)
+              : query;
 
           if (
             (isRespondingRef.current ||
@@ -1666,12 +1676,17 @@ export const useGeminiStream = (
             lastPromptIdRef.current = prompt_id!;
 
             try {
+              const displayQuery =
+                config.getContentGeneratorConfig()?.authType ===
+                  AuthType.USE_OPENAI && typeof query === 'string'
+                  ? sanitizeModelContent(query)
+                  : query;
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
                 abortSignal,
                 prompt_id!,
                 undefined,
-                query,
+                displayQuery,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,

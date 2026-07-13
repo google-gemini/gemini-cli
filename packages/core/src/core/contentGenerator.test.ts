@@ -21,6 +21,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
 import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
+import { loadOpenAICredentials } from './openaiCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { resetVersionCache } from '../utils/version.js';
@@ -30,6 +31,9 @@ vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
 vi.mock('./apiKeyCredentialStorage.js', () => ({
   loadApiKey: vi.fn(),
+}));
+vi.mock('./openaiCredentialStorage.js', () => ({
+  loadOpenAICredentials: vi.fn(),
 }));
 
 vi.mock('./fakeContentGenerator.js');
@@ -92,6 +96,7 @@ describe('createContentGenerator', () => {
   beforeEach(() => {
     resetVersionCache();
     vi.clearAllMocks();
+    vi.mocked(loadOpenAICredentials).mockResolvedValue(null);
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
   });
@@ -1525,5 +1530,25 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBe('');
     expect(config.vertexai).toBe(false);
+  });
+
+  it('should configure OpenAI-compatible auth from stored credentials', async () => {
+    vi.mocked(loadOpenAICredentials).mockResolvedValue({
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'stored-key',
+      model: 'stored-model',
+    });
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_OPENAI,
+    );
+
+    expect(config).toMatchObject({
+      apiKey: 'stored-key',
+      baseUrl: 'https://example.com/v1',
+      model: 'stored-model',
+      vertexai: false,
+    });
   });
 });

@@ -66,6 +66,9 @@ import {
   recordExitFail,
   ShellExecutionService,
   saveApiKey,
+  saveOpenAICredentials,
+  validateOpenAICredentials,
+  type OpenAICredentials,
   debugLogger,
   isValidEditorType,
   coreEvents,
@@ -721,6 +724,7 @@ export const AppContainer = (props: AppContainerProps) => {
     authError,
     onAuthError,
     apiKeyDefaultValue,
+    openAIDefaultValue,
     reloadApiKey,
     accountSuspensionInfo,
     setAccountSuspensionInfo,
@@ -767,7 +771,8 @@ export const AppContainer = (props: AppContainerProps) => {
   // TODO: Consider handling other auth types that should also skip the blocking screen
   const isAuthenticating =
     authState === AuthState.Unauthenticated &&
-    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
+    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI &&
+    settings.merged.security.auth.selectedType !== AuthType.USE_OPENAI;
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
@@ -878,6 +883,53 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setAuthState(AuthState.Updating);
   }, [setAuthState]);
 
+  const handleOpenAISubmit = useCallback(
+    async (credentials: OpenAICredentials) => {
+      try {
+        onAuthError(null);
+        if (!credentials.baseUrl.trim()) {
+          onAuthError('Base URL cannot be empty.');
+          setAuthState(AuthState.AwaitingOpenAIInput);
+          return;
+        }
+        try {
+          new URL(credentials.baseUrl);
+        } catch {
+          onAuthError('Base URL must be a valid URL.');
+          setAuthState(AuthState.AwaitingOpenAIInput);
+          return;
+        }
+        if (!credentials.model.trim()) {
+          onAuthError('Model cannot be empty.');
+          setAuthState(AuthState.AwaitingOpenAIInput);
+          return;
+        }
+
+        const validationError = await validateOpenAICredentials(credentials);
+        if (validationError) {
+          onAuthError(validationError);
+          setAuthState(AuthState.AwaitingOpenAIInput);
+          return;
+        }
+
+        await saveOpenAICredentials(credentials);
+        await config.refreshAuth(AuthType.USE_OPENAI);
+        setAuthState(AuthState.Authenticated);
+      } catch (e) {
+        onAuthError(
+          `Failed to save OpenAI-compatible credentials: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    },
+    [config, onAuthError, setAuthState],
+  );
+
+  const handleOpenAICancel = useCallback(() => {
+    setAuthState(AuthState.Updating);
+  }, [setAuthState]);
+
   // Sync user tier from config when authentication changes
   useEffect(() => {
     // Only sync when not currently authenticating
@@ -905,7 +957,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       // We skip validation for Gemini API key here because it might be stored
       // in the keychain, which we can't check synchronously.
       // The useAuth hook handles validation for this case.
-      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
+      if (
+        settings.merged.security.auth.selectedType === AuthType.USE_GEMINI ||
+        settings.merged.security.auth.selectedType === AuthType.USE_OPENAI
+      ) {
         return;
       }
 
@@ -2203,6 +2258,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
+    authState === AuthState.AwaitingOpenAIInput ||
     isAwaitingLoginRestart ||
     !!newAgents;
 
@@ -2437,9 +2493,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      isAwaitingOpenAIInput: authState === AuthState.AwaitingOpenAIInput,
       isAwaitingLoginRestart,
       loginRestartMessage,
       apiKeyDefaultValue,
+      openAIDefaultValue,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
@@ -2643,6 +2701,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showDebugProfiler,
       customDialog,
       apiKeyDefaultValue,
+      openAIDefaultValue,
       authState,
       isAwaitingLoginRestart,
       loginRestartMessage,
@@ -2709,6 +2768,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      handleOpenAISubmit,
+      handleOpenAICancel,
       setBannerVisible,
       setShortcutsHelpVisible,
       setCleanUiDetailsVisible,
@@ -2810,6 +2871,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      handleOpenAISubmit,
+      handleOpenAICancel,
       setBannerVisible,
       setShortcutsHelpVisible,
       setCleanUiDetailsVisible,

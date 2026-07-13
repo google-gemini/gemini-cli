@@ -368,6 +368,12 @@ describe('useGeminiStream', () => {
 
   beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
+    vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+      model: 'test-model',
+      apiKey: 'test-key',
+      vertexai: false,
+      authType: AuthType.USE_GEMINI,
+    });
     mockAddItem = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -3096,6 +3102,42 @@ describe('useGeminiStream', () => {
         expect.any(Number),
       );
     });
+  });
+
+  it('displays the same redacted prompt that an OpenAI-compatible model receives', async () => {
+    vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+      model: 'gpt-5.4',
+      authType: AuthType.USE_OPENAI,
+    });
+    const secret = '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';
+    const rawQuery = `can you read this secret?: ${secret}`;
+    const { result } = await renderTestHook();
+
+    await act(async () => {
+      await result.current.submitQuery(rawQuery);
+    });
+
+    const historyCall = mockAddItem.mock.calls.find(
+      ([item]) => item.type === MessageType.USER,
+    );
+    expect(historyCall).toBeDefined();
+    const redactedQuery = (historyCall?.[0] as { text: string }).text;
+    expect(redactedQuery).toMatch(
+      /^can you read this secret\?: \[REDACTED:[^\]]+\]$/,
+    );
+    expect(redactedQuery).not.toContain(secret);
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      { type: MessageType.USER, text: redactedQuery },
+      expect.any(Number),
+    );
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      redactedQuery,
+      expect.any(AbortSignal),
+      expect.any(String),
+      undefined,
+      redactedQuery,
+    );
   });
   describe('Thought Reset', () => {
     it('should keep full thinking entries in history when mode is full', async () => {

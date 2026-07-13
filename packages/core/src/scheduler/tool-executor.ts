@@ -43,6 +43,10 @@ import {
   GEN_AI_TOOL_DESCRIPTION,
   GEN_AI_TOOL_NAME,
 } from '../telemetry/constants.js';
+import {
+  hasRestorableRedactions,
+  restoreRedactedSecrets,
+} from '../utils/agent-sanitization-utils.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -70,6 +74,9 @@ export class ToolExecutor {
       );
     }
     const { tool, invocation } = call;
+    const executionInvocation = hasRestorableRedactions(request.args)
+      ? tool.build(restoreRedactedSecrets(request.args))
+      : invocation;
 
     // Setup live output handling
     const liveOutputCallback =
@@ -112,7 +119,7 @@ export class ToolExecutor {
           };
 
           const promise = executeToolWithHooks(
-            invocation,
+            executionInvocation,
             toolName,
             signal,
             tool,

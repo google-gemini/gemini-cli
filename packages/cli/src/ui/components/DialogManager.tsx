@@ -15,6 +15,7 @@ import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
 import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
+import { OpenAIAuthDialog } from '../auth/OpenAIAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
@@ -306,6 +307,19 @@ export const DialogManager = ({
       </Box>
     );
   }
+  if (uiState.isAwaitingOpenAIInput) {
+    return (
+      <Box flexDirection="column">
+        <OpenAIAuthDialog
+          key={JSON.stringify(uiState.openAIDefaultValue)}
+          onSubmit={uiActions.handleOpenAISubmit}
+          onCancel={uiActions.handleOpenAICancel}
+          error={uiState.authError}
+          defaultValue={uiState.openAIDefaultValue}
+        />
+      </Box>
+    );
+  }
 
   if (uiState.isAwaitingLoginRestart) {
     return (
@@ -322,7 +336,6 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <AuthDialog
-          config={config}
           settings={settings}
           setAuthState={uiActions.setAuthState}
           authError={uiState.authError}

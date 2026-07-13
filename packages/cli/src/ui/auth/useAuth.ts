@@ -10,6 +10,8 @@ import {
   AuthType,
   type Config,
   loadApiKey,
+  loadOpenAICredentials,
+  type OpenAICredentials,
   debugLogger,
   isAccountSuspendedError,
   ProjectIdRequiredError,
@@ -29,8 +31,8 @@ export async function validateAuthMethodWithSettings(
   if (settings.merged.security.auth.useExternal) {
     return null;
   }
-  // If using Gemini API key, we don't validate it here as we might need to prompt for it.
-  if (authType === AuthType.USE_GEMINI) {
+  // Interactive credential methods validate after their input dialogs.
+  if (authType === AuthType.USE_GEMINI || authType === AuthType.USE_OPENAI) {
     return null;
   }
   return validateAuthMethod(authType);
@@ -53,6 +55,9 @@ export const useAuthCommand = (
     useState<AccountSuspensionInfo | null>(initialAccountSuspensionInfo);
   const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
     string | undefined
+  >(undefined);
+  const [openAIDefaultValue, setOpenAIDefaultValue] = useState<
+    OpenAICredentials | undefined
   >(undefined);
 
   const onAuthError = useCallback(
@@ -85,6 +90,14 @@ export const useAuthCommand = (
   }, [authState, reloadApiKey]);
 
   useEffect(() => {
+    if (authState === AuthState.AwaitingOpenAIInput) {
+      void loadOpenAICredentials().then((credentials) => {
+        setOpenAIDefaultValue(credentials ?? undefined);
+      });
+    }
+  }, [authState]);
+
+  useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       if (authState !== AuthState.Unauthenticated) {
@@ -107,6 +120,14 @@ export const useAuthCommand = (
         const key = await reloadApiKey(); // Use the unified function
         if (!key) {
           setAuthState(AuthState.AwaitingApiKeyInput);
+          return;
+        }
+      }
+
+      if (authType === AuthType.USE_OPENAI) {
+        const credentials = await loadOpenAICredentials();
+        if (!credentials?.baseUrl || !credentials.model) {
+          setAuthState(AuthState.AwaitingOpenAIInput);
           return;
         }
       }
@@ -173,6 +194,7 @@ export const useAuthCommand = (
     authError,
     onAuthError,
     apiKeyDefaultValue,
+    openAIDefaultValue,
     reloadApiKey,
     accountSuspensionInfo,
     setAccountSuspensionInfo,

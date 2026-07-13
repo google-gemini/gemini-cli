@@ -111,6 +111,7 @@ vi.mock('../ui/auth/useAuth.js', () => ({
     authError: null,
     onAuthError: vi.fn(),
     apiKeyDefaultValue: 'test-api-key',
+    openAIDefaultValue: undefined,
     reloadApiKey: vi.fn().mockResolvedValue('test-api-key'),
     accountSuspensionInfo: null,
     setAccountSuspensionInfo: vi.fn(),

@@ -12,6 +12,7 @@ import {
   type AuthType,
   type EditorType,
   type AgentDefinition,
+  type OpenAICredentials,
 } from '@google/gemini-cli-core';
 import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
@@ -76,6 +77,8 @@ export interface UIActions {
   popAllMessages: () => string | undefined;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
+  handleOpenAISubmit: (credentials: OpenAICredentials) => Promise<void>;
+  handleOpenAICancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setShortcutsHelpVisible: (visible: boolean) => void;
   setCleanUiDetailsVisible: (visible: boolean) => void;
