@@ -447,6 +447,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.maxScrollbackLength`** (number):
+  - **Description:** Maximum number of lines to keep in the terminal scrollback
+    buffer.
+  - **Default:** `1000`
+  - **Requires restart:** Yes
+
 - **`ui.showSpinner`** (boolean):
 
   - **Description:** Show the spinner during operations.

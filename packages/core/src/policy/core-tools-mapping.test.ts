@@ -24,7 +24,7 @@ describe('PolicyEngine - Core Tools Mapping', () => {
     vi.restoreAllMocks();
   });
 
-  it('should allow tools explicitly listed in settings.tools.core', async () => {
+  it('should map tools listed in settings.tools.core to ALLOW with correct priority and fallback to default policies', async () => {
     const settings = {
       tools: {
         core: ['run_shell_command(ls)', 'run_shell_command(git status)'],
@@ -63,7 +63,7 @@ describe('PolicyEngine - Core Tools Mapping', () => {
     expect(result3.decision).toBe(PolicyDecision.DENY);
   });
 
-  it('should allow tools in tools.core even if they are restricted by default policies', async () => {
+  it('should map tools in tools.core with higher priority than default policies', async () => {
     // By default run_shell_command is ASK_USER.
     // Putting it in tools.core should make it ALLOW.
     const settings = {

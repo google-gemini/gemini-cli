@@ -12,6 +12,10 @@
   `MaxSizedBox.tsx`) to ensure size measurements are captured as soon as the
   element is available, avoiding potential rendering timing issues.
 - Avoid prop drilling when at all possible.
+- **StaticRender**: Unlike Ink's native `<Static>` (which is printed above the
+  application layout and takes no space in the flex container), the custom
+  `<StaticRender>` component preserves its layout and _does_ take up its
+  measured height in the active flex container.
 
 ## Testing
 

@@ -44,6 +44,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
+  itemKey?: string;
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
@@ -57,6 +58,7 @@ interface HistoryItemDisplayProps {
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
+  itemKey,
   availableTerminalHeight,
   terminalWidth,
   isPending,
@@ -102,6 +104,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage
+          itemKey={itemKey}
           text={itemForDisplay.text}
           isPending={isPending}
           availableTerminalHeight={
@@ -112,6 +115,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'gemini_content' && (
         <GeminiMessageContent
+          itemKey={itemKey}
           text={itemForDisplay.text}
           isPending={isPending}
           availableTerminalHeight={
@@ -188,6 +192,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage
+          itemKey={itemKey}
           item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
           availableTerminalHeight={availableTerminalHeight}

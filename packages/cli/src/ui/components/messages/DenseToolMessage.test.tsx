@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { waitFor } from '../../../test-utils/async.js';
@@ -22,6 +22,7 @@ import type {
   SerializableConfirmationDetails,
   ToolResultDisplay,
 } from '../../types.js';
+import { VirtualizedListContext } from '../shared/VirtualizedList.js';
 
 describe('DenseToolMessage', () => {
   const defaultProps = {
@@ -562,6 +563,114 @@ describe('DenseToolMessage', () => {
 
       // Verify it shows the diff when expanded
       expect(lastFrame()).toContain('new line');
+    });
+
+    it('shows diff content when globally expanded inside a VirtualizedList context', async () => {
+      const mockListContext = {
+        registerInteractivity: vi.fn(),
+        setItemState: vi.fn(),
+        getItemState: vi.fn(),
+        isItemToggled: vi.fn().mockReturnValue(false),
+        toggleItem: vi.fn(),
+        registerClickCallback: vi.fn(),
+        unregisterClickCallback: vi.fn(),
+        registerClickableArea: vi.fn(),
+        unregisterClickableArea: vi.fn(),
+      };
+
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <VirtualizedListContext.Provider
+          value={
+            mockListContext as unknown as React.ContextType<
+              typeof VirtualizedListContext
+            >
+          }
+        >
+          <DenseToolMessage
+            {...defaultProps}
+            itemKey="item-1"
+            resultDisplay={diffResult as ToolResultDisplay}
+            status={CoreToolCallStatus.Success}
+          />
+        </VirtualizedListContext.Provider>,
+        {
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          toolActions: {
+            isExpanded: () => true,
+          },
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('new line');
+    });
+
+    it('toggles expansion when header is clicked', async () => {
+      const toggleExpansion = vi.fn();
+      const toggleItem = vi.fn();
+      let registeredCallback: (() => void) | undefined;
+
+      const MockVirtualizedListWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => {
+        const itemKey = 'item-1';
+        const mockListContext = {
+          toggleItem,
+          registerClickCallback: vi.fn((key, id, cb) => {
+            if (key === itemKey && id === 'toggle-call-1') {
+              registeredCallback = cb;
+            }
+          }),
+          unregisterClickCallback: vi.fn(),
+          registerInteractivity: vi.fn(),
+          setItemState: vi.fn(),
+          getItemState: vi.fn(),
+          isItemToggled: vi.fn().mockReturnValue(false),
+          registerClickableArea: vi.fn(),
+          unregisterClickableArea: vi.fn(),
+        };
+
+        return (
+          <VirtualizedListContext.Provider
+            value={
+              mockListContext as unknown as React.ContextType<
+                typeof VirtualizedListContext
+              >
+            }
+          >
+            {children}
+          </VirtualizedListContext.Provider>
+        );
+      };
+
+      const { waitUntilReady } = await renderWithProviders(
+        <MockVirtualizedListWrapper>
+          <DenseToolMessage
+            {...defaultProps}
+            callId="call-1"
+            itemKey="item-1"
+          />
+        </MockVirtualizedListWrapper>,
+        {
+          toolActions: {
+            toggleExpansion,
+          },
+        },
+      );
+
+      await waitUntilReady();
+
+      await waitFor(() => expect(registeredCallback).toBeDefined());
+
+      // Trigger the registered callback manually (simulating VirtualizedList behavior)
+      if (registeredCallback) {
+        registeredCallback();
+      }
+
+      expect(toggleItem).toHaveBeenCalledWith('item-1');
     });
   });
 

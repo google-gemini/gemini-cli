@@ -29,6 +29,7 @@ import { useToolActions } from '../../contexts/ToolActionsContext.js';
 export type { TextEmphasis };
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
+  itemKey?: string;
   availableTerminalHeight?: number;
   terminalWidth: number;
   emphasis?: TextEmphasis;
@@ -44,6 +45,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
   callId,
+  itemKey,
   name,
   description,
   resultDisplay,
@@ -139,6 +141,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           />
         )}
         <ToolResultDisplay
+          itemKey={itemKey}
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
