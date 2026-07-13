@@ -27,7 +27,9 @@ export const CloudFreePrivacyNotice = ({
   useKeypress(
     (key) => {
       if (
-        (privacyState.error || privacyState.isFreeTier === false) &&
+        (privacyState.error ||
+          privacyState.isFreeTier === false ||
+          privacyState.isTierUnavailable) &&
         key.name === 'escape'
       ) {
         onExit();
@@ -48,6 +50,35 @@ export const CloudFreePrivacyNotice = ({
         <Text color={theme.status.error}>
           Error loading Opt-in settings: {privacyState.error}
         </Text>
+        <Text color={theme.text.secondary}>Press Esc to exit.</Text>
+      </Box>
+    );
+  }
+
+  if (privacyState.isTierUnavailable) {
+    return (
+      <Box flexDirection="column" marginY={1}>
+        <Text bold color={theme.text.accent}>
+          Gemini Code Assist Privacy Notice
+        </Text>
+        <Newline />
+        <Text color={theme.text.primary}>
+          The data collection opt-in isn&apos;t available for this account
+          because it doesn&apos;t have a Gemini Code Assist for Individuals
+          (free) tier.
+        </Text>
+        <Newline />
+        <Text color={theme.text.primary}>
+          If you&apos;re on a Google Workspace or enterprise account, use the
+          Vertex AI / Google Cloud path instead by setting the
+          GOOGLE_CLOUD_PROJECT environment variable to your Google Cloud
+          project.
+        </Text>
+        <Newline />
+        <Text color={theme.text.primary}>
+          Learn more: https://geminicli.com/docs/get-started/authentication/
+        </Text>
+        <Newline />
         <Text color={theme.text.secondary}>Press Esc to exit.</Text>
       </Box>
     );
