@@ -695,6 +695,25 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // If the model requested to run in the background, do so after a short delay.
         let completed = false;
         if (this.params.is_background) {
+          if (tempFilePath || tempDir) {
+            ShellExecutionService.onExit(pid, () => {
+              if (tempFilePath) {
+                try {
+                  fs.unlinkSync(tempFilePath);
+                } catch {
+                  // Ignore
+                }
+              }
+              if (tempDir) {
+                try {
+                  fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch {
+                  // Ignore
+                }
+              }
+            });
+          }
+
           resultPromise
             .then(() => {
               completed = true;
