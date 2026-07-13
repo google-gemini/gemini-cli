@@ -94,6 +94,7 @@ export class GeminiClient {
   private chat?: GeminiChat;
   private sessionTurnCount = 0;
   private promptTurnCount = 0;
+  private initialPromptTurns: number | undefined = undefined;
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
@@ -927,14 +928,21 @@ export class GeminiClient {
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
       this.promptTurnCount = 0;
+      this.initialPromptTurns = turns;
     }
 
     this.promptTurnCount++;
 
-    const maxAllowedTurns =
+    const configMax =
       this.config.getMaxPromptTurns() > 0
         ? this.config.getMaxPromptTurns()
         : 15; // default to 15 recursive turns per single user request
+
+    const maxAllowedTurns =
+      this.initialPromptTurns !== undefined &&
+      this.initialPromptTurns !== MAX_TURNS
+        ? this.initialPromptTurns
+        : configMax;
 
     if (this.promptTurnCount > maxAllowedTurns) {
       yield { type: GeminiEventType.MaxPromptTurns };

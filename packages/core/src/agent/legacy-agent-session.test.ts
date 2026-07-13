@@ -805,6 +805,32 @@ describe('LegacyAgentSession', () => {
         code: 'MAX_TURNS_EXCEEDED',
       });
     });
+
+    it('treats GeminiClient MaxPromptTurns as a terminal max_turns stream end', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      sendMock.mockReturnValue(
+        makeStream([{ type: GeminiEventType.MaxPromptTurns }]),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      await session.send(makeMessageSend('hi'));
+      const events = await collectEvents(session);
+
+      const errorEvents = events.filter(
+        (e): e is AgentEvent<'error'> => e.type === 'error',
+      );
+      expect(errorEvents).toHaveLength(0);
+
+      const streamEnd = events.findLast(
+        (e): e is AgentEvent<'agent_end'> => e.type === 'agent_end',
+      );
+      expect(streamEnd?.reason).toBe('max_turns');
+      expect(streamEnd?.data).toEqual({
+        code: 'MAX_PROMPT_TURNS_EXCEEDED',
+      });
+    });
   });
 
   describe('abort', () => {

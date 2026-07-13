@@ -1601,6 +1601,102 @@ ${JSON.stringify(
       ]);
     });
 
+    it('should cooperate with explicitly requested custom turns budget', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Default maxPromptTurns is 15
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(15);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      // Run with custom budget: 5 turns
+      const customTurnsBudget = 5;
+
+      // First 5 recursive calls on the same prompt-id should succeed
+      for (let i = 0; i < customTurnsBudget; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-cooperative',
+          customTurnsBudget,
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxPromptTurns,
+        });
+      }
+
+      // The 6th call should exceed the custom budget of 5 turns even though the default is 15
+      const streamExceeded = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-cooperative',
+        customTurnsBudget,
+      );
+      const eventsExceeded = [];
+      for await (const event of streamExceeded) {
+        eventsExceeded.push(event);
+      }
+      expect(eventsExceeded).toEqual([
+        { type: GeminiEventType.MaxPromptTurns },
+      ]);
+    });
+
+    it('should cooperate with explicitly requested larger turns budget', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Default maxPromptTurns is 15, but we explicitly pass 20 turns
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(15);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      const customTurnsBudget = 20;
+
+      // Run 18 recursive calls on the same prompt-id (exceeding default of 15 but within 20)
+      for (let i = 0; i < 18; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-cooperative-large',
+          customTurnsBudget,
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxPromptTurns,
+        });
+      }
+    });
+
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
       // Arrange
       const MOCKED_TOKEN_LIMIT = 1000;

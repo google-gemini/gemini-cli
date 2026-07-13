@@ -456,6 +456,7 @@ export class Session {
               break;
 
             case GeminiEventType.MaxSessionTurns:
+            case GeminiEventType.MaxPromptTurns:
               stopReason = 'max_turn_requests';
               break;
 

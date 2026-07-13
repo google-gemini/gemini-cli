@@ -11,5 +11,8 @@
   },
   "general": {
     "devtools": true
+  },
+  "model": {
+    "maxPromptTurns": 100
   }
 }

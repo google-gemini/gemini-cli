@@ -237,6 +237,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           case GeminiEventType.AgentExecutionStopped:
           case GeminiEventType.UserCancelled:
           case GeminiEventType.MaxSessionTurns:
+          case GeminiEventType.MaxPromptTurns:
             this._clearActiveStream();
             return;
           default:
