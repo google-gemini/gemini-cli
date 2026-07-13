@@ -21,6 +21,7 @@ import {
   clearEmittedPolicyWarnings,
   getPolicyDirectories,
 } from './config.js';
+import { PolicyEngine } from './policy-engine.js';
 import { Storage } from '../config/storage.js';
 import * as tomlLoader from './toml-loader.js';
 import { coreEvents } from '../utils/events.js';
@@ -452,6 +453,93 @@ describe('createPolicyEngineConfig', () => {
     );
     expect(excludedRule).toBeDefined();
     expect(excludedRule?.priority).toBe(4.9); // MCP excluded server
+  });
+
+  describe('Core Tools Allowlist (tools.core)', () => {
+    // Regression tests for a bug where any settings.tools.core value (even
+    // []) added a wildcard '*' DENY that silently excluded every MCP tool
+    // from the tool registry, outranking mcpServers.<name>.trust and
+    // mcp.allowed/autoAllowInHeadless — contradicting tools.core's documented
+    // scope of "restrict the set of built-in tools".
+
+    it('should mark the Core Tools Allowlist Enforcement rule as builtinOnly', async () => {
+      const config = await createPolicyEngineConfig(
+        { tools: { core: [] } },
+        ApprovalMode.DEFAULT,
+        MOCK_DEFAULT_DIR,
+      );
+
+      const enforcementRule = config.rules?.find(
+        (r) => r.source === 'Settings (Core Tools Allowlist Enforcement)',
+      );
+      expect(enforcementRule).toBeDefined();
+      expect(enforcementRule?.toolName).toBe('*');
+      expect(enforcementRule?.decision).toBe(PolicyDecision.DENY);
+      expect(enforcementRule?.builtinOnly).toBe(true);
+    });
+
+    it('should still deny built-in tools not in the tools.core allowlist', async () => {
+      const config = await createPolicyEngineConfig(
+        { tools: { core: ['read_file'] } },
+        ApprovalMode.DEFAULT,
+        MOCK_DEFAULT_DIR,
+      );
+      const engine = new PolicyEngine(config);
+
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should not deny a trusted MCP server tool when tools.core is set to []', async () => {
+      // Reproduces the issue's minimal repro: tools.core: [] plus a trusted
+      // MCP server should leave that server's tools callable.
+      const config = await createPolicyEngineConfig(
+        {
+          tools: { core: [] },
+          mcpServers: { github: { trust: true } },
+        },
+        ApprovalMode.DEFAULT,
+        MOCK_DEFAULT_DIR,
+      );
+      const engine = new PolicyEngine(config);
+
+      expect(
+        (await engine.check({ name: 'mcp_github_get_pull_request' }, 'github'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Built-in tools remain restricted to the (empty) core allowlist.
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should not statically exclude a trusted MCP tool from getExcludedTools when tools.core is set', async () => {
+      // This is the deeper root cause: getExcludedTools() drives which tools
+      // are removed from the model's declarations entirely (not just denied
+      // at call time). A trusted MCP tool must not be excluded here either.
+      const config = await createPolicyEngineConfig(
+        {
+          tools: { core: [] },
+          mcpServers: { github: { trust: true } },
+        },
+        ApprovalMode.DEFAULT,
+        MOCK_DEFAULT_DIR,
+      );
+      const engine = new PolicyEngine(config);
+
+      const excluded = engine.getExcludedTools(
+        new Map([['mcp_github_get_pull_request', { _serverName: 'github' }]]),
+        new Set(['read_file', 'mcp_github_get_pull_request']),
+      );
+
+      expect(excluded.has('mcp_github_get_pull_request')).toBe(false);
+      expect(excluded.has('read_file')).toBe(true);
+    });
   });
 
   it('should allow all tools in YOLO mode', async () => {

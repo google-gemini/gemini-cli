@@ -1779,7 +1779,11 @@ their corresponding top-level category object in your `settings.json` file.
 
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
-    available names.
+    available names. This setting only restricts built-in tools — it does not
+    affect MCP tools, which are governed separately by
+    `mcpServers.<name>.trust`, `mcp.allowed`, and `mcp.autoAllowInHeadless`.
+    Setting `tools.core` to `[]` disables all built-in tools but leaves MCP
+    tools unaffected.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 

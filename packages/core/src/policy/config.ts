@@ -552,8 +552,14 @@ export async function createPolicyEngineConfig(
 
     // If core tools are restricted, we should add a default DENY rule for everything else
     // at a slightly lower priority than the explicit allows.
+    // Scoped to built-in tools only (builtinOnly): `tools.core` restricts the
+    // set of built-in tools, as documented. It must not also exclude MCP
+    // tools, which are governed by their own trust/allow mechanisms
+    // (mcpServers.<name>.trust, mcp.allowed, mcp.autoAllowInHeadless) —
+    // otherwise this wildcard DENY silently outranks all of them.
     rules.push({
       toolName: '*',
+      builtinOnly: true,
       decision: PolicyDecision.DENY,
       priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
       source: 'Settings (Core Tools Allowlist Enforcement)',
