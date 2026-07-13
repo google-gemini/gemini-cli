@@ -109,7 +109,7 @@
     "@types/js-yaml": "4.0.9",
     "@types/json-stable-stringify": "1.1.0",
     "@types/picomatch": "4.0.1",
-    "chrome-devtools-mcp": "0.19.0",
+    "chrome-devtools-mcp": "1.5.0",
     "msw": "2.3.4",
     "typescript": "5.8.3",
     "vitest": "3.2.4"
