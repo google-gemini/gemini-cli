@@ -26,6 +26,7 @@ ENV GEMINI_API_KEY=""
 COPY worker.py /app/worker.py
 COPY bug_fixer_prompt.md /app/bug_fixer_prompt.md
 COPY code_evaluator_prompt.md /app/code_evaluator_prompt.md
+COPY code_revision_prompt.md /app/code_revision_prompt.md
 
 # 5. Execute script directly
 ENTRYPOINT ["python", "/app/worker.py"]

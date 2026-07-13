@@ -13,21 +13,30 @@ import urllib.error
 from google.antigravity import Agent, LocalAgentConfig, hooks
 
 # Inputs from environment
-REPO_URL = os.environ.get("REPO_URL", "https://github.com/joneba-google/gemini-cli-clone")
+REPO_URL = "https://github.com/joneba-google/gemini-cli-clone"
 GIT_TOKEN = os.environ.get("GIT_TOKEN")
 FIRESTORE_DOC_JSON = os.environ.get("FIRESTORE_DOC")
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "gcli-intern-project-2026")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
 
-TMP_DIR = "/tmp/jetski"
+TMP_DIR = "/tmp"
 PR_DIR = os.path.join(TMP_DIR, "pr")
 EVAL_DIR = os.path.join(TMP_DIR, "eval")
-REPO_NAME = "gemini-cli"
+REPO_NAME = REPO_URL.rstrip("/").split("/")[-1].replace(".git", "")
 PR_REPO_PATH = os.path.join(PR_DIR, REPO_NAME)
 EVAL_REPO_PATH = os.path.join(EVAL_DIR, REPO_NAME)
 
 MAX_ATTEMPTS = 5
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def load_prompt_file(filename):
+    path = os.path.join(SCRIPT_DIR, filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return None
 
 # Global hook to auto-approve all local sandbox tool calls to prevent blocking prompts in headless mode
 @hooks.pre_tool_call_decide
@@ -97,9 +106,18 @@ def create_github_pr(owner, repo, branch_name, title, body, token):
         print(f"Encountered unexpected error during PR creation: {general_err}")
         raise general_err
 
-async def run_agent_sdk(role, prompt, repo_path):
+async def run_agent_sdk(role, prompt, repo_path, system_prompt_file=None):
     print(f"Running {role} inside {repo_path}...")
     
+    sys_instructions = f"You are the {role}. You must complete the requested tasks in the workspace."
+    if system_prompt_file:
+        loaded = load_prompt_file(system_prompt_file)
+        if loaded:
+            sys_instructions = loaded
+            print(f"Loaded system prompt from {system_prompt_file}")
+        else:
+            print(f"Warning: System prompt file {system_prompt_file} not found, using default role instructions.")
+
     # Store the current working directory to restore it later
     original_cwd = os.getcwd()
     # The Antigravity SDK binds the Agent to the current working directory, 
@@ -110,7 +128,7 @@ async def run_agent_sdk(role, prompt, repo_path):
         vertex=True,                        # Uses GCP Vertex AI endpoint
         project=PROJECT_ID,
         location=LOCATION,
-        system_instructions=f"You are the {role}. You must complete the requested tasks in the workspace."
+        system_instructions=sys_instructions
     )
     
     stdout = ""
@@ -140,15 +158,12 @@ async def main():
     # Parse repository owner and name from REPO_URL (https://github.com/owner/repo)
     repo_parts = REPO_URL.rstrip("/").split("/")
     owner = repo_parts[-2]
-    repo_name_parsed = repo_parts[-1].replace(".git", "")
+    repo_name_parsed = REPO_NAME
 
     # Parse branch name based on issue ID number
+    issue_id = firestore_doc.get("workable_spec")["issue_id"]
     github_metadata = firestore_doc.get("github_metadata", {})
     issue_num = github_metadata.get("issue_number")
-    if not issue_num:
-        issue_id = firestore_doc.get("issue_id", "BUG")
-        match = re.search(r'#(\d+)', issue_id)
-        issue_num = match.group(1) if match else "fix"
     branch_name = f"ssr-agent-{issue_num}"
 
     # Initialize root directories
@@ -181,17 +196,11 @@ async def main():
         exclude_file = os.path.join(PR_REPO_PATH, ".git", "info", "exclude")
         os.makedirs(os.path.dirname(exclude_file), exist_ok=True)
         with open(exclude_file, "a") as f:
-            f.write("\nfirestore_doc.json\npr_feedback.md\nfeedback.md\nchanges.diff\nverdict.json\n")
+            f.write("\nfirestore_doc.json\npr_feedback.md\nfeedback.md\nchanges.diff\nverdict.json\npr_details.md\n")
 
-    # Checkout the target feature branch for commits (instead of committing to main)
-    # If the branch already exists locally (from previous iteration/retry), check it out. Otherwise create it.
-    local_branches = run_cmd("git branch", PR_REPO_PATH)
-    if branch_name in local_branches:
-        print(f"Checking out existing local feature branch: {branch_name}")
-        run_cmd(f"git checkout {branch_name}", PR_REPO_PATH)
-    else:
-        print(f"Creating and checking out feature branch: {branch_name}")
-        run_cmd(f"git checkout -b {branch_name}", PR_REPO_PATH)
+    # Checkout target feature branch cleanly from origin/main at the beginning of a run
+    print(f"Creating or resetting feature branch from origin/main: {branch_name}")
+    run_cmd(f"git checkout -B {branch_name} origin/main", PR_REPO_PATH)
 
     # Overwrite firestore doc inside the Coding Agent workspace
     spec_pr_path = os.path.join(PR_REPO_PATH, "firestore_doc.json")
@@ -217,6 +226,7 @@ async def main():
                 "run the test suite directly using your run_command tool (e.g. npm test). "
                 "Do NOT ask for permission or validation in the chat; execute commands directly."
             )
+            prompt_file = "bug_fixer_prompt.md"
         else:
             gen_prompt = (
                 "Use the feedback in pr_feedback.md to address the remaining issues in the code and tests. "
@@ -224,22 +234,25 @@ async def main():
                 "You are running in a headless sandbox environment. Execute any necessary test or build commands "
                 "directly using your run_command tool. Do NOT ask for permission in the chat."
             )
+            prompt_file = "code_revision_prompt.md"
 
         try:
             # Execute SDK-based Code Gen Agent in PR_REPO_PATH
-            await run_agent_sdk("Coding Agent", gen_prompt, PR_REPO_PATH)
+            await run_agent_sdk("Coding Agent", gen_prompt, PR_REPO_PATH, system_prompt_file=prompt_file)
         except Exception as e:
             print(f"Code Generation Agent encountered an error: {e}. Proceeding to evaluate what was changed.")
 
-        # Commit changes locally to create a diff
+        # Consolidate all cumulative changes across iterations into a single commit
+        # relative to origin/main on the feature branch
+        run_cmd("git add .", PR_REPO_PATH)
+        run_cmd("git reset --soft origin/main", PR_REPO_PATH)
+
         git_status = run_cmd("git status --porcelain", PR_REPO_PATH)
         if git_status:
             commit_message = f"[SSR Agent] Issue Fix: issues/{issue_num}"
-            
-            run_cmd("git add .", PR_REPO_PATH)
             run_cmd(f'git commit -m "{commit_message}" --allow-empty', PR_REPO_PATH)
         else:
-            print("No new changes generated in this iteration.")
+            print("No changes relative to origin/main in this iteration.")
             if loop_count == 1:
                 print("Failed to generate any changes in the first iteration.", file=sys.stderr)
                 sys.exit(1)
@@ -271,7 +284,7 @@ async def main():
 
         try:
             # Execute SDK-based Evaluator Agent
-            await run_agent_sdk("Evaluator Agent", eval_prompt, EVAL_REPO_PATH)
+            await run_agent_sdk("Evaluator Agent", eval_prompt, EVAL_REPO_PATH, system_prompt_file="code_evaluator_prompt.md")
         except Exception as e:
             print(f"Evaluator Agent execution failed: {e}")
 
@@ -330,24 +343,56 @@ async def main():
         else:
             print(f"Verdict: APPROVED. Proceeding to push branch {branch_name} and submit PR...")
             try:
+                # Read recommended PR details if generated by the Evaluator Agent
+                pr_details_file = os.path.join(EVAL_REPO_PATH, "pr_details.md")
+                new_commit_message = None
+                new_pr_description = None
+
+                if os.path.exists(pr_details_file):
+                    print(f"Reading recommended PR details from {pr_details_file}...")
+                    try:
+                        with open(pr_details_file, "r") as f:
+                            details_content = f.read()
+
+                        # Parse recommended Commit Message (case-insensitive search)
+                        commit_match = re.search(
+                            r"##\s*Commit\s*Message\r?\n\s*(.+?)(?=\r?\n##|$)", 
+                            details_content, 
+                            re.IGNORECASE | re.DOTALL
+                        )
+                        if commit_match:
+                            new_commit_message = commit_match.group(1).strip()
+                            print(f"Parsed recommended commit message: {new_commit_message}")
+
+                        # Parse recommended PR Description (case-insensitive search)
+                        desc_match = re.search(
+                            r"##\s*PR\s*Description\r?\n\s*(.+)", 
+                            details_content, 
+                            re.IGNORECASE | re.DOTALL
+                        )
+                        if desc_match:
+                            new_pr_description = desc_match.group(1).strip()
+                            print("Parsed recommended PR description successfully.")
+                    except Exception as parse_err:
+                        print(f"Failed to parse pr_details.md: {parse_err}. Falling back to default PR details.")
+
+                # If a recommended commit message was successfully parsed, amend the commit in the PR repository
+                if new_commit_message:
+                    print("Amending Git commit with recommended message...")
+                    run_cmd(f'git commit --amend -m "{new_commit_message}"', PR_REPO_PATH)
+
                 if GIT_TOKEN:
                     authenticated_url = REPO_URL.replace("https://", f"https://x-access-token:{GIT_TOKEN}@")
                     run_cmd(f"git remote set-url origin {authenticated_url}", PR_REPO_PATH)
                 
-                # Push the feature branch (if rejected, we rebase main onto our branch and retry)
-                try:
-                    run_cmd(f"git push origin HEAD:refs/heads/{branch_name}", PR_REPO_PATH)
-                    print("Branch push successful.")
-                except Exception as push_err:
-                    print(f"Push rejected: {push_err}. Attempting to pull main and rebase...")
-                    run_cmd("git pull --rebase origin main", PR_REPO_PATH)
-                    run_cmd(f"git push origin HEAD:refs/heads/{branch_name}", PR_REPO_PATH)
-                    print("Branch push successful after rebase.")
+                # Push the feature branch (force push to allow overwriting on retries)
+                run_cmd(f"git push -f origin HEAD:refs/heads/{branch_name}", PR_REPO_PATH)
+                print("Branch push successful.")
 
                 # Submit Pull Request via GitHub REST API
                 if GIT_TOKEN:
-                    pr_title = f"[SSR Agent] Issue Fix: issues/{issue_num}"
-                    pr_body = (
+                    pr_title = new_commit_message if new_commit_message else f"[SSR Agent] Issue Fix: issues/{issue_num}"
+                    pr_body = new_pr_description if new_pr_description else (
                         f"This Pull Request was automatically generated by the SSR Code Generator Agent "
                         f"to resolve issue `{issue_id}`.\n\n"
                         f"### Summary of Changes:\n"

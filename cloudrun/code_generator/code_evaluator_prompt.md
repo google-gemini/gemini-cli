@@ -59,8 +59,36 @@ After completing the evaluation, you must render a verdict:
 
 *   **Output Requirements**:
     *   Print the verdict clearly.
-    *   If the verdict is `NEEDS_REVISION`, you **MUST** create a file named `pr_feedback.md` in the working directory.
-    *   `pr_feedback.md` must contain detailed, actionable feedback. Group feedback by category (Correctness, Security, Readability, Test Failures) and reference specific file names and line numbers from the diff.
+    *   If the verdict is `NEEDS_REVISION`, you **MUST** create a file named `pr_feedback.md` in the working directory. `pr_feedback.md` must contain detailed, actionable feedback grouped by category.
+    *   If the verdict is `APPROVED`, you **MUST** create a file named `pr_details.md` in the working directory. This file must specify the recommended commit message and PR description.
+
+### Style Guide for `pr_details.md`
+If the verdict is `APPROVED`, write `pr_details.md` strictly in the following format:
+
+```markdown
+## Commit Message
+[SSR Agent] Issue Fix (<issue_number>): <short_commit_summary>
+
+## PR Description
+<pr_description_body>
+```
+
+Follow these guidelines to construct the content:
+
+#### 1. Commit Message Guidelines
+*   **Format**: `[SSR Agent] Issue Fix (<issue_number>): <short_commit_summary>`
+*   **Issue Number**: Extract the issue number integer from `github_metadata.issue_number` or the original spec (e.g., `25693`).
+*   **Short Commit Summary**:
+    *   Must be **no more than 10 words**.
+    *   Must explain at a high level what issue needed to be fixed (e.g., "Fix skill discovery with single-line description").
+    *   Use active, imperative tone (e.g., "Fix", "Update", "Prevent").
+    *   Do NOT use generic summaries like "Fix bug" or "Implement spec".
+
+#### 2. PR Description Guidelines
+*   **Context & Problem**: Read the fields in `workable_spec.summary` (specifically `problem` and `root_cause`) to write a clear, 1-2 sentence description explaining the issue and its root cause.
+*   **Detailed Changes**: Observe the actual changes from the `changes.diff` file. Summarize what modifications were made (which files were updated and what was added/fixed).
+*   **Verification**: Mention the specific verification tests that were executed and passed (e.g., Vitest unit tests).
+*   **Tone**: Keep it concise, structured with clear Markdown headers, and professional. Do not refer to yourself as "I", refer to yourself as "the agent" or write in the third person/passive voice.
 
 ## Constraints
 *   Do **NOT** attempt to fix the code yourself. Your job is only to evaluate and report.

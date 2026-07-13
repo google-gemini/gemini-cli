@@ -70,6 +70,14 @@ gcloud secrets add-iam-policy-binding test-github-push-key \
   --project="${PROJECT_ID}" \
   --quiet
 
+# Grant access to the GEMINI_API_KEY secret used by Cloud Run Job
+echo "Granting secretAccessor on GEMINI_API_KEY to ${EXEC_SA_EMAIL}..."
+gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
+  --member="serviceAccount:${EXEC_SA_EMAIL}" \
+  --role="roles/secretmanager.secretAccessor" \
+  --project="${PROJECT_ID}" \
+  --quiet
+
 # Grant workflow SA the serviceAccountUser role on the new execution SA so it can run jobs as the new SA
 echo "Granting iam.serviceAccountUser on ${EXEC_SA_EMAIL} to ${SA_EMAIL}..."
 gcloud iam service-accounts add-iam-policy-binding "${EXEC_SA_EMAIL}" \
