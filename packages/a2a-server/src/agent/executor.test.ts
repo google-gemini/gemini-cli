@@ -14,6 +14,12 @@ import type {
 import { EventEmitter } from 'node:events';
 import { requestStorage } from '../http/requestStorage.js';
 
+vi.mock('../utils/path_utils.js', () => ({
+  validateWorkspacePath: vi
+    .fn()
+    .mockImplementation(async (path?: string) => path || process.cwd()),
+}));
+
 // Mocks for constructor dependencies
 vi.mock('../config/config.js', () => ({
   loadConfig: vi.fn().mockReturnValue({
@@ -299,5 +305,126 @@ describe('CoderAgentExecutor', () => {
       undefined,
       true,
     );
+  });
+
+  it('cancelTask should abort the active execution loop', async () => {
+    const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+    const taskId = 'test-task-to-cancel';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'a long running prompt' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    // Don't await this, let it run in the background.
+    let primaryError: Error | null = null;
+    const primaryPromise = executor.execute(requestContext, mockEventBus);
+    primaryPromise.catch((err) => {
+      primaryError = err as Error;
+    });
+
+    // Poll until the task is registered in the executor to avoid flaky timeouts in slow CI environments.
+    let attempts = 0;
+    while (!executor.getTask(taskId)) {
+      if (primaryError) {
+        throw new Error(`Primary execution failed early: ${primaryError}`);
+      }
+      if (attempts++ > 100) {
+        // 100 * 5ms = 500ms timeout
+        throw new Error('Timed out waiting for task to be registered');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    const wrapper = executor.getTask(taskId);
+    expect(wrapper).toBeDefined();
+    const setTaskStateSpy = vi
+      .spyOn(wrapper!.task, 'setTaskStateAndPublishUpdate')
+      .mockImplementation((newState) => {
+        // Make the mock realistic: actually update the state when called.
+        wrapper!.task.taskState = newState;
+      });
+
+    // Now, cancel the task.
+    await executor.cancelTask(taskId, mockEventBus);
+
+    // Verify that the abort method on the controller was called and state was updated.
+    expect(abortSpy).toHaveBeenCalledOnce();
+    expect(setTaskStateSpy).toHaveBeenCalledWith(
+      'canceled',
+      expect.any(Object),
+      'Task canceled by user request.',
+      undefined,
+      true,
+    );
+
+    // Clean up the test by allowing the promise to resolve.
+    // The abort call should have unblocked the acceptUserMessage generator.
+    await primaryPromise;
+
+    // Verify task is evicted from cache
+    expect(executor.getTask(taskId)).toBeUndefined();
+
+    abortSpy.mockRestore();
+  });
+
+  it('cancelTask should explicitly save task state to TaskStore and evict task during active aborts', async () => {
+    const taskId = 'test-task-active-abort-save';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'a long running prompt' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    const primaryPromise = executor.execute(requestContext, mockEventBus);
+
+    // Wait for task to be registered
+    let attempts = 0;
+    while (!executor.getTask(taskId)) {
+      if (attempts++ > 100) {
+        throw new Error('Timed out waiting for task to be registered');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    const wrapper = executor.getTask(taskId)!;
+    const saveSpy = vi.spyOn(mockTaskStore, 'save');
+
+    // Now, cancel the task.
+    await executor.cancelTask(taskId, mockEventBus);
+
+    // Verify that the task state was saved to TaskStore during cancelTask
+    expect(saveSpy).toHaveBeenCalled();
+    expect(wrapper.task.dispose).toHaveBeenCalled();
+    expect(executor.getTask(taskId)).toBeUndefined();
+
+    // Clean up the test by allowing the promise to resolve.
+    await primaryPromise;
   });
 });
