@@ -18,6 +18,19 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.50.0 - 2026-07-08
+
+- **Tool Registry Discovery:** Introduced tool registry discovery capabilities
+  to automatically detect and register available tools
+  ([#28113](https://github.com/google-gemini/gemini-cli/pull/28113) by @ved015).
+- **Release Verification & CI Stability:** Enhanced release verification by
+  ignoring scripts during verification, preventing workspace binary shadowing,
+  and safeguarding against bad NPM releases
+  ([#28116](https://github.com/google-gemini/gemini-cli/pull/28116) by
+  @rmedranollamas,
+  [#28132](https://github.com/google-gemini/gemini-cli/pull/28132) by
+  @galdawave).
+
 ## Announcements: v0.45.0 - 2026-06-03
 
 - **Context Simplification:** Completed major architectural work to simplify the
