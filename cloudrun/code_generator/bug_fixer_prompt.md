@@ -30,15 +30,16 @@ You will receive a JSON payload containing a `workable_spec`. Key fields to extr
     *   Ensure the tests use the specified `framework`.
     *   Make sure tests are clean, readable, and properly mock external dependencies if necessary.
 
-### Phase 3: Verification & Regression Testing
-1.  **Determine Test Command**: Determine how to run tests for the project (e.g., check `package.json` for scripts, look for configuration files).
-2.  **Run Target Tests**: Run the tests in `test_file` to verify the fix works as expected.
-3.  **Run Regression Tests**: Run other relevant tests in the codebase to ensure no existing functionality is broken.
-4.  **Iterate on Failure**: If any tests fail:
+### Phase 3: Verification & Validation
+1.  **Run Target Tests**: Run only the tests in `test_file` to verify the fix works as expected.
+    *   Do NOT run `npm run preflight`.
+    *   Use the targeted test runner command, e.g. for Vitest: `npx vitest run <path/to/test_file>` or `npm test -w <workspace> -- <path/to/test_file>`.
+2.  **Ensure Target Test Success**: Ensure that all test cases in the target test file pass cleanly with zero failures.
+3.  **Iterate on Failure**: If targeted tests fail:
     *   Analyze the error output.
-    *   Correct the implementation or the test case.
-    *   Re-run the tests.
-    *   Repeat until all tests pass.
+    *   Correct the implementation or target test cases.
+    *   Re-run the targeted tests.
+    *   Repeat until target tests pass cleanly.
 
 ### Phase 4: Reporting
 *   Provide a summary of the changes made.

@@ -42,12 +42,17 @@ Perform a rigorous evaluation across the following dimensions:
 *   **Readability Skill**: If specific project readability guidelines are available in the repo (e.g., `.eslintrc`, `tsconfig`, or a style guide), enforce them strictly.
 
 ### Phase 3: Dynamic Verification (Execution)
-1.  **Run Linter**:
-    *   Execute the linter command (e.g., `npm run lint`, `eslint .`, or equivalent project linter).
-    *   Analyze the output. Zero lint errors should be present in the modified files.
-2.  **Run Tests**:
-    *   Execute the test suite using the appropriate test command (e.g., `npm test`, `vitest run`, `pytest`).
-    *   Ensure all tests pass, including the new tests and existing regression tests.
+To verify style, readability, and consistency, you MUST run the project's linter and automatic code formatting fixes. Confirm the success of the following command:
+
+1.  **Run Linter Fix**:
+    *   Execute the linter fixing command:
+        ```bash
+        npm run lint:fix
+        ```
+    *   Ensure the command completes successfully. If it proposes/implements any automatic fixes, check that they are readable and do not corrupt code logic.
+    *   Do NOT run `npm run preflight`, `npm run test`, or `npm run test:e2e`.
+
+The linter command must complete successfully before you approve the changes. If it fails, output the detailed linter failures to `pr_feedback.md`.
 
 ### Phase 4: Verdict and Feedback
 

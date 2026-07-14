@@ -1,0 +1,51 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  annotations:
+    run.googleapis.com/client-name: gcloud
+    run.googleapis.com/client-version: 575.0.1
+    run.googleapis.com/creator: joneba@google.com
+    run.googleapis.com/lastModifier: joneba@google.com
+    run.googleapis.com/operation-id: 8fdc12d7-ac9f-46ad-a895-700bce0b68f8
+  creationTimestamp: '2026-07-06T18:32:57.626061Z'
+  generation: 27
+  labels:
+    cloud.googleapis.com/location: us-central1
+    run.googleapis.com/lastUpdatedTime: '2026-07-13T20:33:31.403340Z'
+  name: jetski-worker-job
+  namespace: '279944320243'
+  resourceVersion: AAZWhADyp4Y
+  selfLink: /apis/run.googleapis.com/v1/namespaces/279944320243/jobs/jetski-worker-job
+  uid: 4526de07-d63c-420d-b0f2-88bd70e8a1a4
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 575.0.1
+        run.googleapis.com/execution-environment: gen2
+      labels:
+        client.knative.dev/nonce: wet_jif_fev
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          containers:
+          - env:
+            - name: GOOGLE_CLOUD_LOCATION
+              value: global
+            - name: MODEL_NAME
+              value: gemini-3.5-flash
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: GEMINI_API_KEY
+            image: us-central1-docker.pkg.dev/gcli-intern-project-2026/jetski-repo/jetski-worker:latest
+            resources:
+              limits:
+                cpu: '2'
+                memory: 8Gi
+          maxRetries: 3
+          serviceAccountName: code-gen-job-execution-sa@gcli-intern-project-2026.iam.gserviceaccount.com
+          timeoutSeconds: '3600'

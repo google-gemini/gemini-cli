@@ -10,15 +10,16 @@ import asyncio
 import re
 import urllib.request
 import urllib.error
-from google.antigravity import Agent, LocalAgentConfig, hooks
+from google.antigravity import Agent, LocalAgentConfig, hooks, policy
 
 # Inputs from environment
 REPO_URL = "https://github.com/joneba-google/gemini-cli-clone"
-GIT_TOKEN = os.environ.get("GIT_TOKEN")
+GIT_TOKEN = os.environ.pop("GIT_TOKEN", None)
 FIRESTORE_DOC_JSON = os.environ.get("FIRESTORE_DOC")
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "gcli-intern-project-2026")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+MODEL_NAME = os.environ.get("MODEL_NAME", "gemini-3.5-flash")
 
 TMP_DIR = "/tmp"
 PR_DIR = os.path.join(TMP_DIR, "pr")
@@ -128,17 +129,53 @@ async def run_agent_sdk(role, prompt, repo_path, system_prompt_file=None):
         vertex=True,                        # Uses GCP Vertex AI endpoint
         project=PROJECT_ID,
         location=LOCATION,
-        system_instructions=sys_instructions
+        model=MODEL_NAME,
+        system_instructions=sys_instructions,
+        policies=[policy.allow_all()]
     )
     
     stdout = ""
     try:
         async with Agent(config) as agent:
-            response = await agent.chat(prompt)
-            stdout = await response.text()
-            thoughts = response.thoughts
+            print(f"[{role}] Sending prompt to agent and waiting for execution loop...")
+            await agent.conversation.send(prompt)
+            
+            step_contents = {}
+            step_thoughts = {}
+            printed_steps = set()
+            
+            async for step in agent.conversation.receive_steps():
+                if step.content:
+                    step_contents[step.step_index] = step.content
+                
+                thinking = getattr(step, 'thinking', None) or getattr(step, 'thinking_delta', None)
+                if thinking:
+                    step_thoughts[step.step_index] = str(thinking)
+                
+                step_key = (step.step_index, step.status)
+                if step_key not in printed_steps:
+                    printed_steps.add(step_key)
+                    step_type_str = str(step.type)
+                    step_source_str = str(step.source)
+                    step_status_str = str(step.status)
+                    print(f"[{role} Step {step.step_index}] {step_type_str} (Source: {step_source_str}, Status: {step_status_str})")
+                    
+                    if step.content:
+                        print(f"[{role} Content]: {step.content}")
+                    if thinking:
+                        print(f"[{role} Thinking]: {thinking}")
+                    if step.tool_calls:
+                        for call in step.tool_calls:
+                            print(f"[{role} Tool Call]: {call.name} with args {call.args}")
+            
+            # Reconstruct unique cumulative contents
+            full_response_text = [step_contents[k] for k in sorted(step_contents.keys())]
+            thoughts = "\n".join([step_thoughts[k] for k in sorted(step_thoughts.keys())])
+            
+            stdout = "\n".join(full_response_text)
             if thoughts:
                 stdout += f"\nThoughts:\n{thoughts}"
+            
             log_agent_call(role, stdout, None)
             return stdout
     except Exception as e:
@@ -199,8 +236,10 @@ async def main():
             f.write("\nfirestore_doc.json\npr_feedback.md\nfeedback.md\nchanges.diff\nverdict.json\npr_details.md\n")
 
     # Checkout target feature branch cleanly from origin/main at the beginning of a run
-    print(f"Creating or resetting feature branch from origin/main: {branch_name}")
     run_cmd(f"git checkout -B {branch_name} origin/main", PR_REPO_PATH)
+
+    print("Installing project dependencies in PR workspace...")
+    run_cmd('NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3', PR_REPO_PATH)
 
     # Overwrite firestore doc inside the Coding Agent workspace
     spec_pr_path = os.path.join(PR_REPO_PATH, "firestore_doc.json")
@@ -250,7 +289,7 @@ async def main():
         git_status = run_cmd("git status --porcelain", PR_REPO_PATH)
         if git_status:
             commit_message = f"[SSR Agent] Issue Fix: issues/{issue_num}"
-            run_cmd(f'git commit -m "{commit_message}" --allow-empty', PR_REPO_PATH)
+            run_cmd(f'git commit -m "{commit_message}" --allow-empty --no-verify', PR_REPO_PATH)
         else:
             print("No changes relative to origin/main in this iteration.")
             if loop_count == 1:
@@ -265,7 +304,10 @@ async def main():
         
         # Sync PR repo state to Eval repo (clean start for eval)
         clean_dir(EVAL_DIR)
-        shutil.copytree(PR_REPO_PATH, EVAL_REPO_PATH, dirs_exist_ok=True)
+        shutil.copytree(PR_REPO_PATH, EVAL_REPO_PATH, dirs_exist_ok=True, ignore=shutil.ignore_patterns('node_modules'))
+
+        print("Installing project dependencies in Eval workspace...")
+        run_cmd('NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3', EVAL_REPO_PATH)
 
         # Write diff_content directly INSIDE the Evaluator Agent workspace
         diff_eval_path = os.path.join(EVAL_REPO_PATH, "changes.diff")
@@ -304,7 +346,30 @@ async def main():
             verdict = "NEEDS_REVISION"
 
         if verdict in ["APPROVED", "PASS"]:
-            approved = True
+            print("Evaluator approved the changes. Running deterministic regression checks (npm run preflight)...")
+            try:
+                # Run npm run preflight using the same memory optimization flags
+                preflight_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npx -p node@18.20.8 -- npm run preflight --no-audit'
+                run_cmd(preflight_cmd, EVAL_REPO_PATH)
+                print("Deterministic regression checks passed!")
+                approved = True
+            except subprocess.CalledProcessError as preflight_error:
+                print(f"Regression checks failed: {preflight_error}")
+                verdict = "NEEDS_REVISION"
+                approved = False
+                
+                # Write pr_feedback.md inside the evaluation workspace explaining the regression failures
+                eval_feedback_file = os.path.join(EVAL_REPO_PATH, "pr_feedback.md")
+                with open(eval_feedback_file, "w") as f:
+                    f.write("# E2E Regression Verification Failure\n\n")
+                    f.write("The Evaluator Agent approved the PR, but the orchestrator's deterministic regression testing suite (`npm run preflight`) failed.\n\n")
+                    f.write("## Error Details\n")
+                    f.write("```\n")
+                    f.write(f"Exit Code: {preflight_error.returncode}\n")
+                    f.write(f"Stdout:\n{preflight_error.stdout}\n")
+                    f.write(f"Stderr:\n{preflight_error.stderr}\n")
+                    f.write("```\n\n")
+                    f.write("Please analyze the regression and correct the implementation or tests.\n")
             
             # Calculate line count of the changes
             try:
@@ -319,7 +384,9 @@ async def main():
                 print(f"Total lines changed: {commit_line_count}")
             except Exception as e:
                 print(f"Failed to calculate line count: {e}")
-        else:
+
+        # Decouple the feedback copying to run whenever the iteration was not approved
+        if not approved:
             # Save feedback file inside the Coding Agent workspace for the next iteration
             eval_feedback_file = os.path.join(EVAL_REPO_PATH, "pr_feedback.md")
             pr_feedback_file = os.path.join(PR_REPO_PATH, "pr_feedback.md")
@@ -332,7 +399,7 @@ async def main():
                 print("----------------")
             else:
                 with open(pr_feedback_file, "w") as f:
-                    f.write("Evaluator rejected changes but did not provide pr_feedback.md.")
+                    f.write("Evaluator rejected changes or preflight failed, but did not provide pr_feedback.md.")
 
     # --- POST LOOP ---
     if approved:
@@ -379,7 +446,7 @@ async def main():
                 # If a recommended commit message was successfully parsed, amend the commit in the PR repository
                 if new_commit_message:
                     print("Amending Git commit with recommended message...")
-                    run_cmd(f'git commit --amend -m "{new_commit_message}"', PR_REPO_PATH)
+                    run_cmd(f'git commit --amend -m "{new_commit_message}" --no-verify', PR_REPO_PATH)
 
                 if GIT_TOKEN:
                     authenticated_url = REPO_URL.replace("https://", f"https://x-access-token:{GIT_TOKEN}@")

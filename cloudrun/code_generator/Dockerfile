@@ -4,11 +4,13 @@
 
 FROM python:3.11-slim
 
-# 1. Install system utilities (git is required for cloned repository operations)
+# 1. Install system utilities (git and nodejs are required for repository and test execution)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Set the workspace directory where the repository will be cloned

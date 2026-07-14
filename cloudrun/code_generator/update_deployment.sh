@@ -20,6 +20,7 @@ IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/jetski-repo/jetski-worker:l
 JOB_NAME="jetski-worker-job"
 WORKFLOW_NAME="jetski-workflow"
 WORKFLOW_SA="test-workflow-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+EXEC_SA="code-gen-job-execution-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Ensure script runs from the directory containing Dockerfile & worker.py
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,13 +57,17 @@ if [ "${STATUS}" != "SUCCESS" ]; then
 fi
 echo "Cloud Build completed successfully."
 
-# 2. Update the Cloud Run Job template with the new container image
+# 2. Update the Cloud Run Job template with the new container image (using 8Gi RAM to prevent OOM)
 echo ""
 echo "[2/3] Updating Cloud Run Job (${JOB_NAME})..."
 gcloud run jobs update "${JOB_NAME}" \
   --image="${IMAGE_NAME}" \
   --region="${REGION}" \
   --project="${PROJECT_ID}" \
+  --memory=8Gi \
+  --cpu=2 \
+  --service-account="${EXEC_SA}" \
+  --remove-env-vars=GIT_TOKEN \
   --quiet
 
 # 3. Deploy the latest local Cloud Workflow definition (workflow.yaml)
