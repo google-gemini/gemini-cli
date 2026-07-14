@@ -1601,6 +1601,78 @@ ${JSON.stringify(
       ]);
     });
 
+    it('should not limit turns when maxPromptTurns is set to -1 (unlimited)', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // maxPromptTurns is -1
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(-1);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      // Run 20 recursive calls on the same prompt-id (exceeding default 15, but allowed since -1)
+      for (let i = 0; i < 20; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-unlimited',
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxPromptTurns,
+        });
+      }
+    });
+
+    it('should immediately limit turns when maxPromptTurns is set to 0', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // maxPromptTurns is 0
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(0);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      // The 1st call on the same prompt_id should exceed the limit of 0 turns immediately
+      const streamExceeded = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-zero',
+      );
+      const eventsExceeded = [];
+      for await (const event of streamExceeded) {
+        eventsExceeded.push(event);
+      }
+      expect(eventsExceeded).toEqual([
+        { type: GeminiEventType.MaxPromptTurns },
+      ]);
+    });
+
     it('should cooperate with explicitly requested custom turns budget', async () => {
       // Arrange
       const mockStream = (async function* () {

@@ -933,10 +933,7 @@ export class GeminiClient {
 
     this.promptTurnCount++;
 
-    const configMax =
-      this.config.getMaxPromptTurns() > 0
-        ? this.config.getMaxPromptTurns()
-        : 15; // default to 15 recursive turns per single user request
+    const configMax = this.config.getMaxPromptTurns();
 
     const maxAllowedTurns =
       this.initialPromptTurns !== undefined &&
@@ -944,7 +941,7 @@ export class GeminiClient {
         ? this.initialPromptTurns
         : configMax;
 
-    if (this.promptTurnCount > maxAllowedTurns) {
+    if (maxAllowedTurns >= 0 && this.promptTurnCount > maxAllowedTurns) {
       yield { type: GeminiEventType.MaxPromptTurns };
       return new Turn(this.getChat(), prompt_id);
     }
