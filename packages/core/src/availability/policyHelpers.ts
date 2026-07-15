@@ -286,15 +286,39 @@ export function applyModelSelection(
   options: { consumeAttempt?: boolean } = {},
 ): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
   const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
-  const model = resolved.model;
+
+  // Tool sub-agent configs (web-search, web-fetch, loop-detection, etc.) resolve
+  // their alias chain to a concrete model ID (e.g. gemini-3-flash-preview via
+  // gemini-3-flash-base) but never go through modelIdResolutions. This means
+  // API-key users without preview access hit INVALID_MODEL. For non-chat-model
+  // calls, apply modelIdResolutions now so preview-gated sub-agent models fall
+  // back to the appropriate GA model (e.g. gemini-2.5-flash).
+  let model = resolved.model;
+  let resolvedGenerateContentConfig = resolved.generateContentConfig;
+  if (!modelConfigKey.isChatModel) {
+    const resolvedModelId = config.modelConfigService.resolveModelId(model, {
+      hasAccessToPreview: config.getHasAccessToPreviewModel?.() ?? false,
+      useGemini3_1: config.getGemini31LaunchedSync?.() ?? false,
+      useGemini3_5Flash: config.hasGemini35FlashGAAccess?.() ?? false,
+    });
+    if (resolvedModelId !== model) {
+      model = resolvedModelId;
+      const refetchedResolved = config.modelConfigService.getResolvedConfig({
+        ...modelConfigKey,
+        model,
+      });
+      resolvedGenerateContentConfig = refetchedResolved.generateContentConfig;
+    }
+  }
+
   const selection = selectModelForAvailability(config, model);
 
   if (!selection) {
-    return { model, config: resolved.generateContentConfig };
+    return { model, config: resolvedGenerateContentConfig };
   }
 
   const finalModel = selection.selectedModel ?? model;
-  let generateContentConfig = resolved.generateContentConfig;
+  let generateContentConfig = resolvedGenerateContentConfig;
 
   if (finalModel !== model) {
     const fallbackResolved = config.modelConfigService.getResolvedConfig({

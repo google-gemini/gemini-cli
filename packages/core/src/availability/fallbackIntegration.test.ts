@@ -29,6 +29,8 @@ describe('Fallback Integration', () => {
       setActiveModel: vi.fn(),
       getUserTier: () => undefined,
       getHasAccessToPreviewModel: () => true,
+      getGemini31LaunchedSync: () => false,
+      hasGemini35FlashGAAccess: () => false,
       getModelAvailabilityService: () => availabilityService,
       modelConfigService: undefined as unknown as ModelConfigService,
     } as unknown as Config;

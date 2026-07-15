@@ -37,6 +37,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
     },
     getContentGeneratorConfig: () => ({ authType: undefined }),
     getHasAccessToPreviewModel: () => true,
+    hasGemini35FlashGAAccess: () => false,
     getMaxAttemptsPerTurn: () => 3,
     getExperimentalDynamicModelConfiguration: () => false,
     getReleaseChannel: () => 'preview',
@@ -283,6 +284,9 @@ describe('policyHelpers', () => {
   describe('applyModelSelection', () => {
     const mockModelConfigService = {
       getResolvedConfig: vi.fn(),
+      // resolveModelId is called for non-chat-model calls to apply modelIdResolutions
+      // (preview-gated model fallback for API-key users).
+      resolveModelId: vi.fn((model: string) => model),
     };
 
     const mockAvailabilityService = {
@@ -445,6 +449,72 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+
+    it('applies modelIdResolutions for non-chat tool configs (web-search/web-fetch preview fallback)', () => {
+      // Reproduces the INVALID_MODEL bug: API-key users have hasAccessToPreview=false,
+      // but web-search/web-fetch alias chains resolve to gemini-3-flash-preview which
+      // requires preview access. resolveModelId must map it to gemini-2.5-flash.
+      const config = createExtendedMockConfig({
+        getHasAccessToPreviewModel: () => false,
+        getGemini31LaunchedSync: () => false,
+        hasGemini35FlashGAAccess: () => false,
+      });
+
+      // Alias chain resolves web-search → gemini-3-flash-base → gemini-3-flash-preview
+      mockModelConfigService.getResolvedConfig
+        .mockReturnValueOnce({
+          model: 'gemini-3-flash-preview',
+          generateContentConfig: { tools: [{ googleSearch: {} }] },
+        })
+        // Second call after resolveModelId returns the fallback model config
+        .mockReturnValueOnce({
+          model: 'gemini-2.5-flash',
+          generateContentConfig: { tools: [{ googleSearch: {} }] },
+        });
+
+      // resolveModelId maps gemini-3-flash-preview → gemini-2.5-flash for non-preview users
+      mockModelConfigService.resolveModelId.mockImplementation(
+        (model: string) =>
+          model === 'gemini-3-flash-preview' ? 'gemini-2.5-flash' : model,
+      );
+
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-2.5-flash',
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'web-search',
+        isChatModel: false,
+      });
+
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(mockModelConfigService.resolveModelId).toHaveBeenCalledWith(
+        'gemini-3-flash-preview',
+        expect.objectContaining({ hasAccessToPreview: false }),
+      );
+      expect(config.setActiveModel).not.toHaveBeenCalled();
+    });
+
+    it('does not apply modelIdResolutions for chat model calls (already routed)', () => {
+      const config = createExtendedMockConfig({
+        getHasAccessToPreviewModel: () => false,
+      });
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-2.5-pro',
+        generateContentConfig: {},
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-2.5-pro',
+      });
+
+      applyModelSelection(config, {
+        model: 'gemini-2.5-pro',
+        isChatModel: true,
+      });
+
+      // resolveModelId must NOT be called for chat model — router already handled it
+      expect(mockModelConfigService.resolveModelId).not.toHaveBeenCalled();
     });
   });
 
