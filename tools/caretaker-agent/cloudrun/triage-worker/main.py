@@ -93,8 +93,8 @@ def main() -> None:
                         "Thank you for bringing this to our attention. Right now, our "
                         "engineering team is focusing all resources on critical system "
                         "maintenance and core stability. Because of this, we don't have "
-                        "immediate plans to address this specific issue, but we truly "
-                        "appreciate you flagging it for us.",
+                        "immediate plans to address this specific issue. If you believe "
+                        "this issue was misclassified, feel free to reopen it.",
                     )
 
                 send_label_action(owner, repo, issue_number, ["auto-close"])
