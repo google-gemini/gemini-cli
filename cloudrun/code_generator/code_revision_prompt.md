@@ -60,3 +60,7 @@ You will have access to:
 *   **DO NOT** run `git commit`, `git push`, or any command that modifies the remote repository. Leave the refined changes in the working directory.
 *   **DO NOT** modify files outside of `files_to_modify` and `test_file` unless explicitly justified (e.g., build/test framework configuration requirements).
 *   Ensure all revised code matches the architectural patterns and style of the existing codebase.
+*   Your task is to apply the requested fixes based on `pr_feedback.md`.
+*   DO NOT waste turns running exploratory git commands (like `git status`, `git log`, or `git show`). You already have full access to the source code.
+*   Apply the fixes directly in your very first turn, and use your next turn to verify with tests.
+*   You have a strict budget of 3 turns maximum to complete this task.

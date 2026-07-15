@@ -42,17 +42,14 @@ Perform a rigorous evaluation across the following dimensions:
 *   **Readability Skill**: If specific project readability guidelines are available in the repo (e.g., `.eslintrc`, `tsconfig`, or a style guide), enforce them strictly.
 
 ### Phase 3: Dynamic Verification (Execution)
-To verify style, readability, and consistency, you MUST run the project's linter and automatic code formatting fixes. Confirm the success of the following command:
+To verify style, readability, and consistency, you MUST NOT run the linter yourself. The orchestrator has already run the linter on the modified files and saved the output in `linter_output.txt`.
 
-1.  **Run Linter Fix**:
-    *   Execute the linter fixing command:
-        ```bash
-        npm run lint:fix
-        ```
-    *   Ensure the command completes successfully. If it proposes/implements any automatic fixes, check that they are readable and do not corrupt code logic.
-    *   Do NOT run `npm run preflight`, `npm run test`, or `npm run test:e2e`.
+1.  **Inspect Linter Output**:
+    *   Read the contents of the file `linter_output.txt` in your workspace using your `view_file` tool.
+    *   Ensure the file indicates that the ESLint check succeeded without errors.
+    *   Do NOT run `npm run lint`, `npm run lint:fix`, `npm run preflight`, or `npm run test`.
 
-The linter command must complete successfully before you approve the changes. If it fails, output the detailed linter failures to `pr_feedback.md`.
+The linter check in `linter_output.txt` must succeed before you approve the changes. If it fails, copy the detailed linter errors from `linter_output.txt` into `pr_feedback.md` and set your verdict to `NEEDS_REVISION`.
 
 ### Phase 4: Verdict and Feedback
 
@@ -98,3 +95,8 @@ Follow these guidelines to construct the content:
 ## Constraints
 *   Do **NOT** attempt to fix the code yourself. Your job is only to evaluate and report.
 *   Do **NOT** commit or push any files.
+*   If any command you execute (like `npm run lint` or `npm test`) crashes or returns a non-zero exit code, you must treat this as a definitive failure.
+*   DO NOT say you are "waiting in the background" or "scheduling" a check.
+*   Immediately write `verdict.json` as {"verdict": "NEEDS_REVISION"}.
+*   Write the exact linter/test error trace into `pr_feedback.md`.
+*   Conclude your turn immediately. Do not make any more tool calls.

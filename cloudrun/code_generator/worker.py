@@ -314,14 +314,39 @@ async def main():
         with open(diff_eval_path, "w") as f:
             f.write(diff_content)
 
+        # Run linter on changed files and write to linter_output.txt
+        print("Running ESLint on modified files to write results for the Evaluator Agent...")
+        git_cmd = 'git diff origin/main... --name-only --diff-filter=d -- "*.ts" "*.tsx" "*.js" "*.jsx"'
+        changed_files_out = run_cmd(git_cmd, EVAL_REPO_PATH).strip()
+        changed_files = [f for f in changed_files_out.split('\n') if f]
+        
+        linter_output_path = os.path.join(EVAL_REPO_PATH, "linter_output.txt")
+        if changed_files:
+            quoted_files = " ".join(f'"{f}"' for f in changed_files)
+            print(f"ESLint target files: {quoted_files}")
+            eslint_cmd = f'NODE_OPTIONS="--max-old-space-size=4096" npx eslint {quoted_files} --max-warnings 0'
+            try:
+                lint_result = run_cmd(eslint_cmd, EVAL_REPO_PATH)
+                with open(linter_output_path, "w") as f:
+                    f.write(f"ESLint check succeeded. Output:\n{lint_result}")
+                print("ESLint check passed. Result written to linter_output.txt.")
+            except subprocess.CalledProcessError as lint_err:
+                with open(linter_output_path, "w") as f:
+                    f.write(f"ESLint check FAILED. Errors found:\n{lint_err.output}")
+                print("ESLint check failed. Error log written to linter_output.txt.")
+        else:
+            with open(linter_output_path, "w") as f:
+                f.write("No TypeScript/JavaScript files were modified. ESLint skipped.")
+            print("ESLint skipped (no changed JS/TS files).")
+
         # Run Evaluator Agent in EVAL_REPO_PATH
         eval_prompt = (
             "Evaluate the changes in changes.diff against the spec in firestore_doc.json. "
-            "You are running in a headless sandbox environment and have full authority to execute "
-            "the project's test suite and linter commands directly using your run_command tool (e.g., npm test). "
-            "Do NOT ask for permission in the chat; execute commands directly to verify the changes. "
+            "You are running in a headless sandbox environment. "
+            "Do NOT run the linter yourself; the linter has already been run and its results are "
+            "saved in linter_output.txt. You MUST read linter_output.txt to determine if there are lint issues. "
             "You MUST output verdict.json to verdict.json in the format {\"verdict\": \"APPROVED\" | \"NEEDS_REVISION\"}. "
-            "If verification fails or needs revision, output detailed feedback to pr_feedback.md."
+            "If verification (linter or static inspection) fails or needs revision, output detailed feedback to pr_feedback.md."
         )
 
         try:
@@ -346,15 +371,43 @@ async def main():
             verdict = "NEEDS_REVISION"
 
         if verdict in ["APPROVED", "PASS"]:
-            print("Evaluator approved the changes. Running deterministic regression checks (npm run preflight)...")
+            print("Evaluator approved the changes. Running deterministic regression checks...")
             try:
-                # Run npm run preflight using the same memory optimization flags
-                preflight_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npx -p node@18.20.8 -- npm run preflight --no-audit'
-                run_cmd(preflight_cmd, EVAL_REPO_PATH)
+                # 1. Dynamically get only modified TypeScript and JavaScript files
+                git_cmd = 'git diff origin/main... --name-only --diff-filter=d -- "*.ts" "*.tsx" "*.js" "*.jsx"'
+                changed_files_out = run_cmd(git_cmd, EVAL_REPO_PATH).strip()
+                changed_files = [f for f in changed_files_out.split('\n') if f]
+                
+                # 2. Decompose preflight to run linter/formatter specifically on changed files
+                print("Running standard preflight checks (clean, install)...")
+                run_cmd('npm run clean', EVAL_REPO_PATH)
+                run_cmd('npm ci --no-audit --no-fund', EVAL_REPO_PATH)
+                
+                if changed_files:
+                    quoted_files = " ".join(f'"{f}"' for f in changed_files)
+                    print(f"Formatting modified files: {quoted_files}")
+                    run_cmd(f'npx prettier --write {quoted_files}', EVAL_REPO_PATH)
+                    
+                    print(f"Linting modified files: {quoted_files}")
+                    eslint_cmd = f'NODE_OPTIONS="--max-old-space-size=4096" npx eslint {quoted_files} --max-warnings 0'
+                    run_cmd(eslint_cmd, EVAL_REPO_PATH)
+                else:
+                    print("No modified JS/TS files to lint or format. Skipping format and lint.")
+
+                print("Building project...")
+                run_cmd('npm run build', EVAL_REPO_PATH)
+                
+                print("Running typecheck...")
+                run_cmd('npm run typecheck', EVAL_REPO_PATH)
+                
+                print("Running test suite...")
+                run_cmd('npm run test:ci', EVAL_REPO_PATH)
+                
                 print("Deterministic regression checks passed!")
                 approved = True
             except subprocess.CalledProcessError as preflight_error:
-                print(f"Regression checks failed: {preflight_error}")
+                print(f"Regression checks failed during command: {preflight_error.cmd}")
+                print(f"Error output: {preflight_error.output}")
                 verdict = "NEEDS_REVISION"
                 approved = False
                 
