@@ -85,6 +85,18 @@ def main() -> None:
             
             if quality in ["SPAM", "EMPTY", "FEATURE"]:
                 print(f"[WORKER] Quality: {quality}. Applying auto-close label.")
+                if quality == "FEATURE":
+                    send_comment_action(
+                        owner,
+                        repo,
+                        issue_number,
+                        "Thank you for bringing this to our attention. Right now, our "
+                        "engineering team is focusing all resources on critical system "
+                        "maintenance and core stability. Because of this, we don't have "
+                        "immediate plans to address this specific issue, but we truly "
+                        "appreciate you flagging it for us.",
+                    )
+
                 send_label_action(owner, repo, issue_number, ["auto-close"])
                 store.release_lock(
                     owner,
