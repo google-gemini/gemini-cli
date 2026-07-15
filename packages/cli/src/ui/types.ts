@@ -139,6 +139,7 @@ export interface IndividualToolCallDisplay {
   progress?: number;
   progressTotal?: number;
   subagentHistory?: SubagentActivityItem[];
+  hasDensePayload?: boolean;
 }
 
 export interface CompressionProps {

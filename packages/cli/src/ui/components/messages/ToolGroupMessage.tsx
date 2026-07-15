@@ -33,7 +33,6 @@ import {
   WEB_FETCH_DISPLAY_NAME,
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
-  isFileDiff,
 } from '@google/gemini-cli-core';
 import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
@@ -68,29 +67,6 @@ export const isCompactTool = (
     hasCompactOutputSupport &&
     displayStatus !== ToolCallStatus.Confirming
   );
-};
-
-// Helper to identify if a compact tool has a payload (diff, list, etc.)
-export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
-  if (tool.outputFile) return true;
-  const res = tool.resultDisplay;
-  if (!res) return false;
-
-  // TODO(24053): Usage of type guards makes this class too aware of internals
-  if (isFileDiff(res)) return true;
-  if (tool.confirmationDetails?.type === 'edit') return true;
-
-  // Generic summary/payload pattern
-  if (
-    typeof res === 'object' &&
-    res !== null &&
-    'summary' in res &&
-    'payload' in res
-  ) {
-    return true;
-  }
-
-  return false;
 };
 
 interface ToolGroupMessageProps {
@@ -279,7 +255,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   for (const tool of visibleToolCalls) {
     if (tool.kind !== Kind.Agent) {
       if (isCompactTool(tool, isCompactModeEnabled)) {
-        if (hasDensePayload(tool)) {
+        if (tool.hasDensePayload) {
           countToolCallsWithResults++;
         }
       } else if (
