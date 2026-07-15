@@ -931,7 +931,11 @@ export class GeminiClient {
       this.initialPromptTurns = turns;
     }
 
-    this.promptTurnCount++;
+    if (!prompt_id) {
+      this.promptTurnCount = 1;
+    } else {
+      this.promptTurnCount++;
+    }
 
     const configMax = this.config.getMaxPromptTurns();
 
