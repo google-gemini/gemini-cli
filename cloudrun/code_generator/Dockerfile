@@ -1,5 +1,5 @@
 # Dockerfile for Jetski/Antigravity Worker Job using the Python SDK
-# This container runs the manager script (worker.py) which orchestrates
+# This container runs the manager script (code_generation_orchestrator/worker.py) which orchestrates
 # the code generation and evaluation in-process using google-antigravity.
 
 FROM python:3.11-slim
@@ -26,10 +26,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 ENV GEMINI_API_KEY=""
 
 # 4. Copy the pipeline orchestration script and prompts
-COPY worker.py /app/worker.py
-COPY bug_fixer_prompt.md /app/bug_fixer_prompt.md
-COPY code_evaluator_prompt.md /app/code_evaluator_prompt.md
-COPY code_revision_prompt.md /app/code_revision_prompt.md
+COPY code_generation_orchestrator/ /app/code_generation_orchestrator/
+COPY agent_prompts/ /app/agent_prompts/
 
 # 5. Execute script directly
-ENTRYPOINT ["python", "/app/worker.py"]
+ENTRYPOINT ["python", "/app/code_generation_orchestrator/worker.py"]

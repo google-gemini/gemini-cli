@@ -16,13 +16,13 @@ set -e
 PROJECT_ID=${1:-"gcli-intern-project-2026"}
 REGION=${2:-"us-central1"}
 
-IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/jetski-repo/jetski-worker:latest"
-JOB_NAME="jetski-worker-job"
-WORKFLOW_NAME="jetski-workflow"
-WORKFLOW_SA="test-workflow-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/pr-gen-repo/jetski-worker:latest"
+JOB_NAME="pr-gen-job"
+WORKFLOW_NAME="pr-gen-workflow"
+WORKFLOW_SA="triaged-issue-ingestion@${PROJECT_ID}.iam.gserviceaccount.com"
 EXEC_SA="code-gen-job-execution-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# Ensure script runs from the directory containing Dockerfile & worker.py
+# Ensure script runs from the directory containing Dockerfile & code_generation_orchestrator/worker.py
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
@@ -57,17 +57,18 @@ if [ "${STATUS}" != "SUCCESS" ]; then
 fi
 echo "Cloud Build completed successfully."
 
-# 2. Update the Cloud Run Job template with the new container image (using 8Gi RAM to prevent OOM)
+# 2. Deploy or update the Cloud Run Job template with the new container image (using 8Gi RAM to prevent OOM)
 echo ""
-echo "[2/3] Updating Cloud Run Job (${JOB_NAME})..."
-gcloud run jobs update "${JOB_NAME}" \
+echo "[2/3] Deploying Cloud Run Job (${JOB_NAME})..."
+gcloud run jobs deploy "${JOB_NAME}" \
   --image="${IMAGE_NAME}" \
   --region="${REGION}" \
   --project="${PROJECT_ID}" \
   --memory=8Gi \
   --cpu=2 \
   --service-account="${EXEC_SA}" \
-  --remove-env-vars=GIT_TOKEN \
+  --set-env-vars="GOOGLE_CLOUD_LOCATION=global,MODEL_NAME=gemini-3.5-flash" \
+  --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
   --quiet
 
 # 3. Deploy the latest local Cloud Workflow definition (workflow.yaml)

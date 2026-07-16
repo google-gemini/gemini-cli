@@ -5,7 +5,7 @@ set -e
 
 # Use the provided project ID or default to the one in your .env
 PROJECT_ID=${1:-"gcli-intern-project-2026"}
-SA_NAME="test-workflow-sa"
+SA_NAME="triaged-issue-ingestion"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 echo "=========================================================="
@@ -63,16 +63,16 @@ for ROLE in "${EXEC_SA_ROLES[@]}"; do
 done
 
 # Grant access to the specific Secret Manager secret used by Cloud Workflow (NOT the Job)
-echo "Granting secretAccessor on test-github-push-key to ${SA_EMAIL}..."
-gcloud secrets add-iam-policy-binding test-github-push-key \
+echo "Granting secretAccessor on PR_GEN_GITHUB_PUSH_KEY to ${SA_EMAIL}..."
+gcloud secrets add-iam-policy-binding PR_GEN_GITHUB_PUSH_KEY \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="roles/secretmanager.secretAccessor" \
   --project="${PROJECT_ID}" \
   --quiet
 
-# Explicitly revoke secretAccessor on test-github-push-key from ${EXEC_SA_EMAIL} to enforce isolation
-echo "Ensuring ${EXEC_SA_EMAIL} does NOT have secretAccessor on test-github-push-key..."
-gcloud secrets remove-iam-policy-binding test-github-push-key \
+# Explicitly revoke secretAccessor on PR_GEN_GITHUB_PUSH_KEY from ${EXEC_SA_EMAIL} to enforce isolation
+echo "Ensuring ${EXEC_SA_EMAIL} does NOT have secretAccessor on PR_GEN_GITHUB_PUSH_KEY..."
+gcloud secrets remove-iam-policy-binding PR_GEN_GITHUB_PUSH_KEY \
   --member="serviceAccount:${EXEC_SA_EMAIL}" \
   --role="roles/secretmanager.secretAccessor" \
   --project="${PROJECT_ID}" \

@@ -12,10 +12,10 @@ metadata:
   labels:
     cloud.googleapis.com/location: us-central1
     run.googleapis.com/lastUpdatedTime: '2026-07-13T20:33:31.403340Z'
-  name: jetski-worker-job
+  name: pr-gen-job
   namespace: '279944320243'
   resourceVersion: AAZWhADyp4Y
-  selfLink: /apis/run.googleapis.com/v1/namespaces/279944320243/jobs/jetski-worker-job
+  selfLink: /apis/run.googleapis.com/v1/namespaces/279944320243/jobs/pr-gen-job
   uid: 4526de07-d63c-420d-b0f2-88bd70e8a1a4
 spec:
   template:
@@ -41,7 +41,7 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: GEMINI_API_KEY
-            image: us-central1-docker.pkg.dev/gcli-intern-project-2026/jetski-repo/jetski-worker:latest
+            image: us-central1-docker.pkg.dev/gcli-intern-project-2026/pr-gen-repo/jetski-worker:latest
             resources:
               limits:
                 cpu: '2'

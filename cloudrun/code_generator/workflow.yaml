@@ -7,7 +7,7 @@ main:
     - init:
         assign:
           - project_id: 'gcli-intern-project-2026'
-          - job_name: "jetski-worker-job" # The Cloud Run Job name
+          - job_name: "pr-gen-job" # The Cloud Run Job name
           - job_location: "us-central1"
           - repo_url: "https://github.com/joneba-google/gemini-cli-clone"
           
@@ -20,7 +20,7 @@ main:
     - get_github_token:
         call: googleapis.secretmanager.v1.projects.secrets.versions.access
         args:
-          name: '${"projects/" + project_id + "/secrets/test-github-push-key/versions/latest"}'
+          name: '${"projects/" + project_id + "/secrets/PR_GEN_GITHUB_PUSH_KEY/versions/latest"}'
         result: secret_response
 
     - decode_github_token:
