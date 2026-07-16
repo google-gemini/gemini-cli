@@ -21,6 +21,7 @@ import {
   type StreamEvent,
   stripToolCallIdPrefixes,
   type HistoryTurn,
+  coalesceConsecutiveRoles,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -3135,6 +3136,64 @@ describe('GeminiChat', () => {
       const stripped = stripToolCallIdPrefixes(contents);
       expect(stripped[0].parts![0].functionCall!.id).toBe('call_123');
       expect(stripped[1].parts![0].functionResponse!.id).toBe('call_123');
+    });
+  });
+
+  describe('coalesceConsecutiveRoles', () => {
+    it('should return empty history if empty array is passed', () => {
+      expect(coalesceConsecutiveRoles([])).toEqual([]);
+    });
+
+    it('should not modify history when roles alternate correctly', () => {
+      const history: HistoryTurn[] = [
+        { id: '1', content: { role: 'user', parts: [{ text: 'hello' }] } },
+        { id: '2', content: { role: 'model', parts: [{ text: 'hi' }] } },
+        {
+          id: '3',
+          content: { role: 'user', parts: [{ text: 'how are you?' }] },
+        },
+      ];
+      expect(coalesceConsecutiveRoles(history)).toEqual(history);
+    });
+
+    it('should coalesce consecutive user turns', () => {
+      const history: HistoryTurn[] = [
+        { id: '1', content: { role: 'user', parts: [{ text: 'hello' }] } },
+        { id: '2', content: { role: 'user', parts: [{ text: 'world' }] } },
+      ];
+      expect(coalesceConsecutiveRoles(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'hello' }, { text: 'world' }],
+          },
+        },
+      ]);
+    });
+
+    it('should handle undefined or missing parts gracefully', () => {
+      const history: HistoryTurn[] = [
+        { id: '1', content: { role: 'user' } },
+        { id: '2', content: { role: 'user', parts: [{ text: 'world' }] } },
+      ];
+      expect(coalesceConsecutiveRoles(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'world' }],
+          },
+        },
+      ]);
+    });
+
+    it('should not coalesce turns if roles are undefined', () => {
+      const history: HistoryTurn[] = [
+        { id: '1', content: { parts: [{ text: 'hello' }] } },
+        { id: '2', content: { parts: [{ text: 'world' }] } },
+      ];
+      expect(coalesceConsecutiveRoles(history)).toEqual(history);
     });
   });
 });
