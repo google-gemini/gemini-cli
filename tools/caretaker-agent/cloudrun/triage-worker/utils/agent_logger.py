@@ -1,10 +1,20 @@
 import json
 import datetime
 import os
+import uuid
 from google.cloud import storage
 from google.antigravity.types import Text
 
 BUCKET_NAME = os.environ.get("TRIAGE_DEBUG_LOGS_BUCKET")
+_storage_client = None
+
+
+def _get_storage_client() -> storage.Client:
+    global _storage_client
+    if _storage_client is None:
+        _storage_client = storage.Client()
+    return _storage_client
+
 
 def upload_to_bucket(repository: str, issue_number: str | int, payload: str) -> None:
     """
@@ -15,12 +25,13 @@ def upload_to_bucket(repository: str, issue_number: str | int, payload: str) -> 
             print("[LOGIC] Warning: Missing TRIAGE_DEBUG_LOGS_BUCKET, skipping GCS upload.")
         return
     try:
-        storage_client = storage.Client()
+        storage_client = _get_storage_client()
         bucket = storage_client.bucket(BUCKET_NAME)
         
         timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         safe_repo = str(repository).replace("/", "_") if repository else "unknown"
-        blob_name = f"{safe_repo}/issue_{issue_number}_{timestamp}_debug.log"
+        unique_id = uuid.uuid4().hex[:8]
+        blob_name = f"{safe_repo}/issue_{issue_number}_{timestamp}_{unique_id}_debug.log"
         
         blob = bucket.blob(blob_name)
         blob.upload_from_string(payload, content_type="text/plain")

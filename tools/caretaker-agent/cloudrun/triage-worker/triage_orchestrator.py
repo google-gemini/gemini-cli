@@ -53,7 +53,7 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
             system_instructions=system_instructions,
             skills_paths=[skills_dir],
             api_key=os.environ.get("GEMINI_API_KEY"),
-            workspaces=[target_cwd, current_dir],
+            workspaces=[target_cwd, skills_dir],
             policies=policies,
         )
 

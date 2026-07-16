@@ -140,7 +140,7 @@ class TestIntegrationMain(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    def test_main_ok_quality_flow(self, mock_send_label, mock_triage):
+    def test_ok_quality_flow(self, mock_send_label, mock_triage):
         """Verifies end-to-end flow for OK quality issues."""
         self.stored_data = {
             "status": "UNTRIAGED",
@@ -178,7 +178,7 @@ class TestIntegrationMain(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_comment_action")
-    def test_main_needs_info_flow(self, mock_send_comment, mock_triage):
+    def test_needs_info_flow(self, mock_send_comment, mock_triage):
         """Verifies end-to-end flow for NEEDS_INFO issues."""
         self.stored_data = {
             "status": "UNTRIAGED",
@@ -215,7 +215,7 @@ class TestIntegrationMain(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    def test_main_auto_close_flows(self, mock_send_label, mock_triage):
+    def test_auto_close_flows(self, mock_send_label, mock_triage):
         """Verifies end-to-end flow for auto-closed issues."""
         for quality in ["SPAM", "EMPTY", "FEATURE"]:
             self.mock_store.acquire_lock.reset_mock()
@@ -254,7 +254,7 @@ class TestIntegrationMain(unittest.TestCase):
             self.assertIsNone(self.stored_data["lock"]["holder"])
 
     @patch("main.process_issue_triage")
-    def test_main_validation_failure_triggers_retry(self, mock_triage):
+    def test_validation_failure_triggers_retry(self, mock_triage):
         """Verifies retry state transition when validation fails."""
         self.stored_data = {
             "status": "UNTRIAGED",
@@ -276,6 +276,23 @@ class TestIntegrationMain(unittest.TestCase):
         )
         self.assertEqual(self.stored_data["status"], "UNTRIAGED")
         self.assertIsNone(self.stored_data["lock"]["holder"])
+
+    def test_max_attempts_escalates_to_needs_human(self):
+        """Verifies escalation to NEEDS_HUMAN when triage_attempts >= 2."""
+        self.stored_data = {
+            "status": "UNTRIAGED",
+            "triage_attempts": 2,
+            "lock": {"holder": None, "expires_at": None},
+        }
+
+        with self.assertRaises(SystemExit) as ctx:
+            main()
+
+        self.assertEqual(ctx.exception.code, 0)
+        self.mock_store.acquire_lock.assert_called_once_with(
+            "owner", "repo", 42, "test-workflow-exec-101"
+        )
+        self.assertEqual(self.stored_data["status"], "NEEDS_HUMAN")
 
 
 if __name__ == "__main__":
