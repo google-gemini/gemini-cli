@@ -637,6 +637,9 @@ describe('runNonInteractive', () => {
 
   it('should exit when max prompt turns are exceeded', async () => {
     vi.mocked(mockConfig.getMaxPromptTurns).mockReturnValue(0);
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([{ type: GeminiEventType.MaxPromptTurns }]),
+    );
     await expect(
       runNonInteractive({
         config: mockConfig,

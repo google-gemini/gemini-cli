@@ -316,12 +316,6 @@ export async function runNonInteractive(
         ) {
           handleMaxTurnsExceededError(config);
         }
-        if (
-          config.getMaxPromptTurns() >= 0 &&
-          turnCount > config.getMaxPromptTurns()
-        ) {
-          handleMaxPromptTurnsExceededError(config);
-        }
         const toolCallRequests: ToolCallRequestInfo[] = [];
 
         const responseStream = geminiClient.sendMessageStream(
@@ -391,16 +385,7 @@ export async function runNonInteractive(
             }
             warnings.push(message);
           } else if (event.type === GeminiEventType.MaxPromptTurns) {
-            const message = 'Maximum prompt turns exceeded';
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.ERROR,
-                timestamp: new Date().toISOString(),
-                severity: 'error',
-                message,
-              });
-            }
-            warnings.push(message);
+            handleMaxPromptTurnsExceededError(config);
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {

@@ -922,7 +922,7 @@ export class GeminiClient {
     const hooksEnabled = this.config.getEnableHooks();
     const messageBus = this.context.messageBus;
 
-    if (this.lastPromptId !== prompt_id) {
+    if (prompt_id !== this.lastPromptId) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;

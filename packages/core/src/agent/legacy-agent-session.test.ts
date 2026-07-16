@@ -749,37 +749,6 @@ describe('LegacyAgentSession', () => {
   });
 
   describe('stream - max turns', () => {
-    it('emits agent_end with max_turns when the session turn limit is exceeded', async () => {
-      const configMock = deps.config.getMaxPromptTurns as ReturnType<
-        typeof vi.fn
-      >;
-      configMock.mockReturnValue(0);
-
-      const sendMock = deps.client.sendMessageStream as ReturnType<
-        typeof vi.fn
-      >;
-      sendMock.mockReturnValue(
-        makeStream([
-          { type: GeminiEventType.Content, value: 'should not be reached' },
-        ]),
-      );
-
-      const session = new LegacyAgentSession(deps);
-      await session.send(makeMessageSend('hi'));
-      const events = await collectEvents(session);
-
-      const streamEnd = events.find(
-        (e): e is AgentEvent<'agent_end'> => e.type === 'agent_end',
-      );
-      expect(streamEnd?.reason).toBe('max_turns');
-      expect(streamEnd?.data).toEqual({
-        code: 'MAX_PROMPT_TURNS_EXCEEDED',
-        maxTurns: 0,
-        turnCount: 0,
-      });
-      expect(sendMock).not.toHaveBeenCalled();
-    });
-
     it('treats GeminiClient MaxSessionTurns as a terminal max_turns stream end', async () => {
       const sendMock = deps.client.sendMessageStream as ReturnType<
         typeof vi.fn
