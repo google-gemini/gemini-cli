@@ -421,13 +421,13 @@ To debug the CLI's React-based UI, you can use React DevTools.
 
 On macOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `permissive-open`
 profile (see `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) that
-restricts writes to the project folder but otherwise allows all other operations
-and outbound network traffic ("open") by default. You can switch to a
-`strict-open` profile (see
-`packages/cli/src/utils/sandbox-macos-strict-open.sb`) that restricts both reads
-and writes to the working directory while allowing outbound network traffic by
-setting `SEATBELT_PROFILE=strict-open` in your environment or `.env` file.
-Available built-in profiles are `permissive-{open,proxied}`,
+denies operations by default and confines writes to the project folder (and a
+few other paths), while still allowing broad file reads, process execution, and
+outbound network traffic ("open"). You can switch to a `strict-open` profile
+(see `packages/cli/src/utils/sandbox-macos-strict-open.sb`) that restricts both
+reads and writes to the working directory while allowing outbound network
+traffic by setting `SEATBELT_PROFILE=strict-open` in your environment or `.env`
+file. Available built-in profiles are `permissive-{open,proxied}`,
 `restrictive-{open,proxied}`, and `strict-{open,proxied}` (see below for proxied
 networking). You can also switch to a custom profile
 `SEATBELT_PROFILE=<profile>` if you also create a file

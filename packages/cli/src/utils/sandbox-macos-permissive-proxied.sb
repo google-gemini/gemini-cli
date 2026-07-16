@@ -1,10 +1,91 @@
 (version 1)
 
-;; allow everything by default
-(allow default)
+;; -----------------------------------------------------------------------------
+;; permissive-proxied: (deny default) with an explicit allow-list.
+;;
+;; SECURITY: this profile previously began with (allow default) and only added
+;; (deny file-write*). Under allow-default every operation that was not
+;; explicitly denied stayed permitted -- including file-mount/file-unmount and
+;; Launch Services/launchd IPC -- which allowed a full sandbox escape
+;; (CVE-2023-32364 class): mount a devfs, assemble an app bundle out of symlinks
+;; to dodge the quarantine xattr, then `open` it so launchd spawns an
+;; UNSANDBOXED process with the user's privileges. See
+;; https://gergelykalman.com/CVE-2023-32364-a-macOS-sandbox-escape-by-mounting.html
+;; and https://issuetracker.google.com/issues/481259817.
+;;
+;; The profile now denies everything by default and re-enables only what normal
+;; developer workflows require, modeled on the deny-default restrictive-proxied
+;; profile. It deliberately does NOT allow file-mount/file-unmount or Launch
+;; Services/launchd mach services, so the devfs-mount escape stays closed.
+;; "permissive" still means broad reads and writes confined to the same paths as
+;; before (project dir, temp/cache, and a few dotdirs); outbound network is
+;; restricted to the proxy.
+;; -----------------------------------------------------------------------------
+(deny default)
 
-;; deny all writes EXCEPT under specific paths
-(deny file-write*)
+;; allow reading files from anywhere on host
+(allow file-read*)
+
+;; allow exec/fork (children inherit policy)
+(allow process-exec)
+(allow process-fork)
+
+;; allow signals to self, e.g. SIGPIPE on write to closed pipe
+(allow signal (target self))
+
+;; allow read access to specific information about system
+;; from https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=7b3962fe2e5fc9e2ee58000dc8fbf3429d84d3bd
+(allow sysctl-read
+  (sysctl-name "hw.activecpu")
+  (sysctl-name "hw.busfrequency_compat")
+  (sysctl-name "hw.byteorder")
+  (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat")
+  (sysctl-name "hw.cpufamily")
+  (sysctl-name "hw.cpufrequency_compat")
+  (sysctl-name "hw.cputype")
+  (sysctl-name "hw.l1dcachesize_compat")
+  (sysctl-name "hw.l1icachesize_compat")
+  (sysctl-name "hw.l2cachesize_compat")
+  (sysctl-name "hw.l3cachesize_compat")
+  (sysctl-name "hw.logicalcpu_max")
+  (sysctl-name "hw.machine")
+  (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.nperflevels")
+  (sysctl-name "hw.optional.arm.FEAT_BF16")
+  (sysctl-name "hw.optional.arm.FEAT_DotProd")
+  (sysctl-name "hw.optional.arm.FEAT_FCMA")
+  (sysctl-name "hw.optional.arm.FEAT_FHM")
+  (sysctl-name "hw.optional.arm.FEAT_FP16")
+  (sysctl-name "hw.optional.arm.FEAT_I8MM")
+  (sysctl-name "hw.optional.arm.FEAT_JSCVT")
+  (sysctl-name "hw.optional.arm.FEAT_LSE")
+  (sysctl-name "hw.optional.arm.FEAT_RDM")
+  (sysctl-name "hw.optional.arm.FEAT_SHA512")
+  (sysctl-name "hw.optional.armv8_2_sha512")
+  (sysctl-name "hw.packages")
+  (sysctl-name "hw.pagesize_compat")
+  (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "hw.tbfrequency_compat")
+  (sysctl-name "hw.vectorunit")
+  (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfilesperproc")
+  (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease")
+  (sysctl-name "kern.ostype")
+  (sysctl-name "kern.osvariant_status")
+  (sysctl-name "kern.osversion")
+  (sysctl-name "kern.secure_kernel")
+  (sysctl-name "kern.usrstack64")
+  (sysctl-name "kern.version")
+  (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name-prefix "hw.perflevel")
+)
+
+;; allow writes to specific paths (unchanged from the previous permissive-open
+;; allow-list). Writes stay confined to these paths; note that ~/.gitconfig and
+;; other HOME dotfiles are intentionally NOT writable, since writing git config
+;; (aliases, core.pager, core.fsmonitor, ...) is itself a code-execution vector.
 (allow file-write*
     (subpath (param "TARGET_DIR"))
     (subpath (param "TMP_DIR"))
@@ -21,16 +102,54 @@
     (literal "/dev/stdout")
     (literal "/dev/stderr")
     (literal "/dev/null")
+    (literal "/dev/ptmx")
+    (regex #"^/dev/ttys[0-9]*$")
 )
 
+;; allow the mach services that default macOS developer workflows need under
+;; (deny default). restrictive-open/-proxied whitelist only com.apple.sysmond,
+;; which is not enough for DNS, TLS validation, and user/group lookups relied on
+;; by npm, git, https, web-fetch, node module resolution, and pty. This set is
+;; modeled on the vetted deny-default profile in
+;; packages/core/src/sandbox/macos/baseProfile.ts. It intentionally EXCLUDES
+;; Launch Services / launchd (e.g. com.apple.coreservices.launchservicesd) so the
+;; sandbox-escape path above stays closed.
+(allow mach-lookup
+    ;; process listing (e.g. pgrep)
+    (global-name "com.apple.sysmond")
+    ;; user / group / host info lookups (getpwuid, getaddrinfo, os.userInfo)
+    (global-name "com.apple.system.opendirectoryd.libinfo")
+    (global-name "com.apple.system.opendirectoryd.membership")
+    (global-name "com.apple.bsd.dirhelper")
+    ;; DNS resolution for npm / git / https / web-fetch
+    (global-name "com.apple.mDNSResponder")
+    (global-name "com.apple.mDNSResponderHelper")
+    (global-name "com.apple.SystemConfiguration.DNSConfiguration")
+    (global-name "com.apple.SystemConfiguration.configd")
+    (global-name "com.apple.networkd")
+    ;; TLS certificate validation for https (git / curl / Secure Transport)
+    (global-name "com.apple.trustd")
+    (global-name "com.apple.trustd.agent")
+    (global-name "com.apple.ocspd")
+    (global-name "com.apple.SecurityServer")
+)
+
+;; allow the kernel-control sockets used by the DNS / network-configuration stack
+(allow system-socket
+    (require-all
+        (socket-domain AF_SYSTEM)
+        (socket-protocol 2)
+    )
+)
+
+;; enable terminal access required by ink
+;; fixes setRawMode EPERM failure (at node:tty:81:24)
+(allow file-ioctl (regex #"^/dev/tty.*"))
+
 ;; deny all inbound network traffic EXCEPT on debugger port
-(deny network-inbound)
 (allow network-inbound (local ip "localhost:9229"))
 
 ;; deny all outbound network traffic EXCEPT through proxy on localhost:8877
 ;; set `GEMINI_SANDBOX_PROXY_COMMAND=<command>` to run proxy alongside sandbox
 ;; proxy must listen on :::8877 (see docs/examples/proxy-script.md)
-(deny network-outbound)
 (allow network-outbound (remote tcp "localhost:8877"))
-
-(allow network-bind (local ip "*:*"))
