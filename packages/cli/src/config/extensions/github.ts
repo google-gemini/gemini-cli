@@ -66,9 +66,35 @@ export async function cloneFromGit(
 
     await git.fetch(remotes[0].name, refToFetch);
 
-    // After fetching, checkout FETCH_HEAD to get the content of the fetched ref.
+    // Resolve FETCH_HEAD to its absolute commit SHA first to bypass any local branch named 'FETCH_HEAD'.
+    const targetSha = (await git.revparse(['FETCH_HEAD'])).trim();
+
+    // After fetching, checkout the resolved SHA to get the content of the fetched ref.
     // This results in a detached HEAD state, which is fine for this purpose.
-    await git.checkout('FETCH_HEAD');
+    await git.checkout(targetSha);
+
+    // Verify checkout integrity
+    const checkedOutSha = (await git.revparse(['HEAD'])).trim();
+    if (checkedOutSha !== targetSha) {
+      throw new Error(
+        `Security verification failed: checked out SHA (${checkedOutSha}) does not match the target SHA (${targetSha}).`,
+      );
+    }
+
+    // If a specific ref was pinned and looks like a SHA, verify that the checked-out commit matches it.
+    if (installMetadata.ref) {
+      const refLower = installMetadata.ref.toLowerCase();
+      // Match only full-length SHA-1 (40 characters) or SHA-256 (64 characters) hashes.
+      // This prevents short hex-only branch/tag names (e.g. ticket numbers or 'deadbeef') from triggering false-positive security errors.
+      const hexRegex = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+      if (hexRegex.test(refLower)) {
+        if (!checkedOutSha.toLowerCase().startsWith(refLower)) {
+          throw new Error(
+            `Security verification failed: checked out SHA (${checkedOutSha}) does not match the requested pin (${installMetadata.ref}).`,
+          );
+        }
+      }
+    }
   } catch (error) {
     throw new Error(
       `Failed to clone Git repository from ${installMetadata.source} ${getErrorMessage(error)}`,
