@@ -88,7 +88,7 @@ export async function cloneFromGit(
       // This prevents short hex-only branch/tag names (e.g. ticket numbers or 'deadbeef') from triggering false-positive security errors.
       const hexRegex = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
       if (hexRegex.test(refLower)) {
-        if (!checkedOutSha.toLowerCase().startsWith(refLower)) {
+        if (checkedOutSha.toLowerCase() !== refLower) {
           throw new Error(
             `Security verification failed: checked out SHA (${checkedOutSha}) does not match the requested pin (${installMetadata.ref}).`,
           );
