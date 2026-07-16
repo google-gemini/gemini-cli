@@ -1,6 +1,6 @@
-# Preview release: v0.51.0-preview.0
+# Preview release: v0.52.0-preview.0
 
-Released: July 8, 2026
+Released: July 16, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -13,53 +13,62 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- **Caretaker Cloud Run Services**: Implemented a Cloud Run webhook ingestion
-  service and egress service skeleton to support advanced caretaker features.
-- **Enhanced Security & Sandbox Hardening**: Enforced a case-insensitive
-  sensitive path blocklist and VS Code human-in-the-loop (HITL) checks, resolved
-  a directory escape vulnerability in the memory import processor, and marked
-  `~/.gitconfig` as read-only within the macOS sandbox.
-- **Improved Thought Leakage and Escape Handling**: Resolved potential thought
-  leakage by stripping thinking/thought processes from scrubbed history turns,
-  and ensured escape sequences in string literals are correctly preserved for
-  modern models.
-- **Robust Path & API Updates**: Enhanced defensive path resolution for
-  at-reference files, and updated the Vertex AI base URL configuration to
-  support the latest API updates.
+- **Caretaker Triage & Egress Services**: Added triage worker core foundational
+  modules, implemented the main worker execution loop, and created an egress
+  action publisher. Additionally, implemented the Octokit GitHub Action handler
+  for the egress service to support automated caretaker operations.
+- **Improved Error and Privacy Feedback**: Added a clear message when the active
+  user account lacks a Code Assist tier, and enriched shared project quota limit
+  errors with setup instructions.
+- **Core Tool and Path Handling**: Simplified Plan Mode's write policy to
+  support relative paths, bypassed LLM correction for JSON and IPYNB files in
+  `write_file` and `replace` tools, and excluded transient CI configuration
+  files from the workspace context.
+- **Server and Dependency Updates**: Ensured task cancellation successfully
+  aborts the execution loop in the Agent-to-Agent server, and upgraded the
+  `google-auth-library` dependency to version 10.9.0.
 
 ## What's Changed
 
-- Changelog for v0.50.0-preview.1 by @gemini-cli-robot in
-  [#28150](https://github.com/google-gemini/gemini-cli/pull/28150)
-- Fix no_proxy test by @jerrylin3321 in
-  [#28131](https://github.com/google-gemini/gemini-cli/pull/28131)
-- chore(release): bump version to 0.51.0-nightly.20260625.g3fbf93e26 by
+- Refactor: exclude transient CI configuration files from workspace context by
+  @DavidAPierce in
+  [#28216](https://github.com/google-gemini/gemini-cli/pull/28216)
+- feat(caretaker-triage): add triage worker core foundational modules by
+  @chadd28 in [#28163](https://github.com/google-gemini/gemini-cli/pull/28163)
+- feat(caretaker-egress): implement octokit github action handler for egress
+  service by @chadd28 in
+  [#28303](https://github.com/google-gemini/gemini-cli/pull/28303)
+- chore(release): bump version to 0.52.0-nightly.20260707.g27a3da3e8 by
   @gemini-cli-robot in
-  [#28151](https://github.com/google-gemini/gemini-cli/pull/28151)
-- Vertex base url update by @DavidAPierce in
-  [#28145](https://github.com/google-gemini/gemini-cli/pull/28145)
-- fix(security): enforce case-insensitive sensitive path blocklist and vscode
-  hitl by @luisfelipe-alt in
-  [#27966](https://github.com/google-gemini/gemini-cli/pull/27966)
-- fix(core-tools): resolve defensive path resolution for at-reference files and
-  fix macOS tests by @luisfelipe-alt in
-  [#28053](https://github.com/google-gemini/gemini-cli/pull/28053)
-- feat(caretaker): implement Cloud Run webhook ingestion service by @chadd28 in
-  [#28015](https://github.com/google-gemini/gemini-cli/pull/28015)
-- fix(core): resolve symbolic link directory escape in memory import processor
-  by @luisfelipe-alt in
-  [#28233](https://github.com/google-gemini/gemini-cli/pull/28233)
-- feat(caretaker): egress cloud run service skeleton by @chadd28 in
-  [#28167](https://github.com/google-gemini/gemini-cli/pull/28167)
-- fix(sandbox): make ~/.gitconfig read-only in the macOS sandbox by
+  [#28323](https://github.com/google-gemini/gemini-cli/pull/28323)
+- Changelog for v0.51.0-preview.0 by @gemini-cli-robot in
+  [#28320](https://github.com/google-gemini/gemini-cli/pull/28320)
+- Changelog for v0.50.0 by @gemini-cli-robot in
+  [#28322](https://github.com/google-gemini/gemini-cli/pull/28322)
+- fix(core-tools): bypass LLM correction for JSON and IPYNB files in write_file
+  and replace by @amelidev in
+  [#28223](https://github.com/google-gemini/gemini-cli/pull/28223)
+- fix(core): use unambiguous previous intent label in fallback summary by
+  @amelidev in [#28343](https://github.com/google-gemini/gemini-cli/pull/28343)
+- feat(caretaker-triage): implement main worker execution loop and egress action
+  publisher by @chadd28 in
+  [#28306](https://github.com/google-gemini/gemini-cli/pull/28306)
+- fix(privacy): show a clear message when the account has no Code Assist tier by
   @ompatel-aiml in
-  [#28221](https://github.com/google-gemini/gemini-cli/pull/28221)
-- fix(core): preserve escape sequences in string literals for modern models by
+  [#28304](https://github.com/google-gemini/gemini-cli/pull/28304)
+- fix(core): enrich shared project quota limit errors with setup hint by
+  @amelidev in [#28391](https://github.com/google-gemini/gemini-cli/pull/28391)
+- fix(a2a-server): ensure task cancellation aborts execution loop by
   @luisfelipe-alt in
-  [#28299](https://github.com/google-gemini/gemini-cli/pull/28299)
-- fix(core): strip thoughts from scrubbed history turns and resolve thought
-  leakage by @amelidev in
-  [#27971](https://github.com/google-gemini/gemini-cli/pull/27971)
+  [#28316](https://github.com/google-gemini/gemini-cli/pull/28316)
+- fix(core): simplify plan mode write policy to support relative paths by
+  @DavidAPierce in
+  [#28398](https://github.com/google-gemini/gemini-cli/pull/28398)
+- feat(core): Bump node google-auth-library version to 10.9.0 by @jerrylin3321
+  in [#28385](https://github.com/google-gemini/gemini-cli/pull/28385)
+- chore/release: bump version to 0.52.0-nightly.20260715.gfa975395b by
+  @gemini-cli-robot in
+  [#28402](https://github.com/google-gemini/gemini-cli/pull/28402)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.50.0-preview.1...v0.51.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.51.0-preview.0...v0.52.0-preview.0
