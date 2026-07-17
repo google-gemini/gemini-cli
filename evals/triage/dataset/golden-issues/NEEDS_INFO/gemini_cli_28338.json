@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28338,
+  "issue_title": "Unable to complete a chat",
+  "issue_body": "### What happened?\n\n\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nChat to complete in re: to codebase\n\n### Client information\n\n\n* **CLI Version:** 0.50.0\n* **Git Commit:** 8d9733d53\n* **Session ID:** 7be4530e-0924-4cba-a96a-6dc3653d0d47\n* **Operating System:** darwin v24.16.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 2.38 GB\n* **Terminal Name:** iTerm2 3.6.11\n* **Terminal Background:** #15191e\n* **Kitty Keyboard Protocol:** Supported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 0,
+  "target_version": "172ff92c345194c8c87ea781ca01fa0eb91fbb1a",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Created at 2026-07-09T15:32:32Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

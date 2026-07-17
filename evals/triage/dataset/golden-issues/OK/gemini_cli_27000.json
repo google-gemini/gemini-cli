@@ -1,0 +1,40 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27000,
+  "issue_title": "Request contains an invalid argument.",
+  "issue_body": "### What happened?\n\n> AMD Ryzen 9 9950X vs AMD Ryzen 9 9950X3D vs AMD Ryzen 9 9950X3D2 ?\n\n\u2715 [API Error: [{\n    \"error\": {\n      \"code\": 400,\n      \"message\": \"Request contains an invalid argument.\",\n      \"errors\": [\n        {\n          \"message\": \"Request contains an invalid argument.\",\n          \"domain\": \"global\",\n          \"reason\": \"badRequest\"\n        }\n      ],\n      \"status\": \"INVALID_ARGUMENT\"\n    }\n  }\n  ]]\n\n\n\n\n### What did you expect to happen?\n\ngive me a comparison.\n\n### Client information\n\n\n* **CLI Version:** 0.42.0\n* **Git Commit:** 68e2196d5\n* **Session ID:** 0d1c96b8-ad32-4df5-bcae-3359aa2f9a4f\n* **Operating System:** linux v20.19.2\n* **Sandbox Environment:** no sandbox\n* **Model Version:** gemini-3.1-pro-preview\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 274.7 MB\n* **Terminal Name:** VTE(8001)\n* **Terminal Background:** #002b36\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 27007,
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "the generic invalid argument error requires significant exploratory debugging to diagnose. It serves as an excellent test of diagnostic skill, as a developer must trace the packages/core codebase to discover that a missing model alias in defaultModelConfigs.ts is causing the thinking module to fail API validation.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#27000",
+    "summary": {
+      "problem": "Attempting to prompt Gemini 3.1 models (like 'gemini-3.1-pro-preview') results in an 'INVALID_ARGUMENT (400)' API Error.",
+      "root_cause": "The Gemini 3.1 models were absent from the alias configurations registry in 'DEFAULT_MODEL_CONFIGS'. When thinking was enabled without mapping the models to the 'chat-base-3' configuration template, they were requested without the required 'thinkingLevel' (e.g. 'HIGH') parameter, prompting the API to reject the request.",
+      "context": "The Google Generative AI API strictly requires a valid 'thinkingLevel' when making requests to Gemini 3.1 thinking-capable models. The config resolution structure should map these models to extend 'chat-base-3' to inherit appropriate defaults."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/config/defaultModelConfigs.ts"
+      ],
+      "steps": [
+        "Open 'packages/core/src/config/defaultModelConfigs.ts'.",
+        "Inside the global `DEFAULT_MODEL_CONFIGS` configuration registry, add mappings for: 'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-customtools', and 'gemini-3.1-flash-lite-preview'.",
+        "Set the 'extends' property for these three model configuration objects to 'chat-base-3', ensuring 'generateContentConfig.thinkingConfig.thinkingLevel' defaults to 'HIGH' for all requests under these models."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/config/models.test.ts",
+      "expected_behavior": "Resolving configs for the Gemini 3.1 models ('gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-customtools', 'gemini-3.1-flash-lite-preview') will include 'thinkingLevel' in their resolved parameters.",
+      "verification_steps": [
+        "Add unit tests in 'packages/core/src/config/models.test.ts' that assert modelConfigService.getResolvedConfig resolves with a defined 'thinkingLevel' inside the 'thinkingConfig' block of 'generateContentConfig' for 'PREVIEW_GEMINI_3_1_MODEL', 'PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL', and 'PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL'.",
+        "Execute 'npm run test core' to verify that model configuration mapping successfully passes."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "target_version": "456d1aec74d1d2668837c7485b35e98d23651418",
+  "golden_spec_rationale": "The documentation file 'docs/reference/configuration.md', the schema metadata file 'schemas/settings.schema.json', and the golden test data mock JSON files 'packages/core/src/services/test-data/resolved-aliases.golden.json' and 'packages/core/src/services/test-data/resolved-aliases-retry.golden.json' were pruned because they are non-source files (docs, specifications, or generated mock fixtures) and are not strictly required to resolve the runtime config bug in the CLI."
+}

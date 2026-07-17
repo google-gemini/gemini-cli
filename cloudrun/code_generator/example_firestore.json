@@ -1,8 +1,7 @@
 {
-  "expected": {
-    "effort": "SMALL",
-    "quality": "OK"
-  },
+  "status": "TRIAGED",
+  "firestore_id": "github_google-gemini_gemini-cli_25693",
+  "triage_attempts": 0,
   "workable_spec": {
     "implementation_plan": {
       "files_to_modify": [
@@ -35,16 +34,18 @@
       ]
     }
   },
-  "github_metadata": {
-    "issue_number": 25693,
-    "issue_url": "https://github.com/google-gemini/gemini-cli/issues/25693",
-    "owner": "google-gemini",
-    "pr_url": "https://github.com/google-gemini/gemini-cli/pull/25728",
-    "repo": "gemini-cli",
-    "target_version": "main"
+  "lock": {
+    "holder": null,
+    "expires_at": null
   },
-  "input": {
-    "body": "--- title: \"[Bug] Skills discovery fails when `description` in `SKILL.md` frontmatter is a single line\" labels: [\"area/extensions\", \"status/need-triage\"] --- ### Description The Gemini CLI skill discovery mechanism fails to recognize local skills in `.agents/skills/` or `.gemini/skills/` if the `description` field in the `SKILL.md` YAML frontmatter is written as a single line. Changing the description to a multi-line block (using the YAML `>` operator) immediately resolves the issue and allows the skill to be discovered by `/skills list`. ### Steps to Reproduce 1. Create a folder `.agents/skills/test-skill/`. 2. Create a `SKILL.md` with the following content: ```markdown --- name: test-skill description: A single line description that is relatively long and contains some punctuation. --- # Test Skill Content here. ``` 3. Run `gemini chat` and type `/skills list`. 4. **Actual Result**: `test-skill` is missing from the list. 5. Modify `SKILL.md` to use multi-line YAML scalar: ```markdown --- name: test-skill description: > A multi-line description that is relatively long and contains some punctuation. --- # Test Skill Content here. ``` 6. Run `/skills list` again. 7. **Expected Result**: `test-skill` should be visible in both cases. Currently, it only works with the multi-line format. ### Environment - OS: Windows 11 (PowerShell 7) - Gemini CLI Version: 0.38.2 - Runtime: Node.js / Bun ### Additional Context This bug significantly impacts the developer experience as many users intuitively write short, single-line descriptions. The workaround (using `>`) suggests a specific issue in how the CLI parses YAML frontmatter in `SKILL.md` files during the initial scanning phase.",
-    "title": "[Bug] Skills discovery fails when 'description' in SKILL.md frontmatter is a single line"
-  }
+  "created_at": "2026-07-16T20:00:00Z",
+  "updated_at": "2026-07-16T20:00:00Z",
+  "github_metadata": {
+    "owner": "google-gemini",
+    "repo": "gemini-cli",
+    "issue_number": 25693,
+    "title": "[Bug] Skills discovery fails when 'description' in SKILL.md frontmatter is a single line",
+    "pr_url": ""
+  },
+  "failure_error": ""
 }

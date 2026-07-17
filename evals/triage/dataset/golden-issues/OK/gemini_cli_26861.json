@@ -1,0 +1,39 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26861,
+  "issue_title": "When I close a session, I get the message...",
+  "issue_body": "### What happened?\n\nWhen I close a session, I get the message \"To resume this session: gemini --resume 'bla bla bla bla'\", which is incorrect because it produces the error \"Error resuming session: Invalid session identifier \"'bla bla bla'\". To solve this, you need to remove the parentheses. Please fix this issue so that the message is written without the parentheses when closing a session, or make it work with the parentheses. I won't be returning to this forum anymore, so don't ask any questions.\n\n### What did you expect to happen?\n\nProblem Solving\n\n### Client information\n\nCLI Version                              0.41.2\nGit Commit                               b0c7a1722\nModel                                    Auto (Gemini 3)\nSandbox                                  no sandbox\nOS                                       win32\nAuth Method                              Signed in with Google\nTier                                     Gemini Code Assist in Google One AI Pro\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 26892,
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "This PR was not actually merged, but it still looked like a good example.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26861",
+    "summary": {
+      "problem": "When closing a session, the resume session message is printed with unnecessary quoting on Windows/PowerShell (or resolveSession fails to parse session IDs wrapped in quotes), preventing users from copy-pasting the resume command on Windows.",
+      "root_cause": "The SessionSummaryDisplay component wraps the session ID in redundant double quotes on Windows (or resolveSession does not strip enclosing quotes from command line arguments passed literally on Windows CMD).",
+      "context": "Removing the redundant quote wrapping in the UI, or making the resolver quote-tolerant, resolves the issue."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/ui/components/SessionSummaryDisplay.tsx (or packages/cli/src/utils/sessionUtils.ts)"
+      ],
+      "steps": [
+        "Either: Remove the conditional isWindows double-quote wrapping in SessionSummaryDisplay.tsx and output the escaped session ID directly.",
+        "Or: Update resolveSession inside packages/cli/src/utils/sessionUtils.ts to detect and strip matching enclosing single or double quotes from the input argument."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/components/SessionSummaryDisplay.test.tsx (or packages/cli/src/utils/sessionUtils.test.ts)",
+      "expected_behavior": "The printed resume command displays without redundant quotes on Windows, or resolveSession successfully loads a session ID enclosed in single or double quotes.",
+      "verification_steps": [
+        "Either: Assert that SessionSummaryDisplay renders the resume command without surrounding double quotes on Windows.",
+        "Or: Add a unit test in packages/cli/src/utils/sessionUtils.test.ts verifying that resolveSession successfully loads a session ID wrapped in single or double quotes."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "target_version": "11a9edc808d8bbc40ac7cf4db0c3fe03e2bcdf4a",
+  "golden_spec_rationale": "The human PR modified SessionSummaryDisplay.tsx to remove quotes in printed output. However, modifying resolveSession() in packages/cli/src/utils/sessionUtils.ts is a valid, more robust input-parsing fix that strips quotes from arguments (needed when copy-pasting on Windows CMD). Both approaches fully solve the defect, so the golden spec accepts either file location."
+}

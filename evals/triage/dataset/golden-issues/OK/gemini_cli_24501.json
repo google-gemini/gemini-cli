@@ -1,0 +1,44 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24501,
+  "issue_title": "fix(browser): analyze_screenshot fails with computer-use models due to missing tool declaration and response parsing",
+  "issue_body": "## Bug\n\nThe `analyze_screenshot` tool in the browser agent fails to return useful visual analysis when using the default `gemini-2.5-computer-use-preview-10-2025` model.\n\n### Root Cause\n\nThe computer-use model is an agentic action model that returns `functionCall` parts (e.g., `open_web_browser`, `click_at`) instead of text analysis. The current code:\n\n1. **Missing `computerUse` tool declaration** \u2014 The API requires this declaration for computer-use models, resulting in `400 INVALID_ARGUMENT` errors\n2. **No `functionCall` extraction** \u2014 The response parsing only checks for `text` parts, so any `functionCall` parts are silently dropped, producing \"Empty visual analysis response\" errors\n3. **No model family detection** \u2014 The `computerUse` declaration should only be included for computer-use models, not for standard vision models like `gemini-2.0-flash`\n\n### Expected Behavior\n\n`analyze_screenshot` should:\n- Include the `computerUse` tool declaration with `excludedPredefinedFunctions` for computer-use models to force text-only analysis\n- Handle both `text` and `functionCall` response parts defensively\n- Allow the `visualModel` setting to accept any vision-capable model, with computer-use specific handling applied automatically\n\n### Parent Issue\n\nPart of #15956\n",
+  "pr_number": 24502,
+  "target_version": "40b73c9447c7f0008bc39f35ceb15ca3cea7e5fd",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created by automated script. Selected because it tests the agent's ability to conditionally adapt API request parameters based on model family types and parse complex FunctionCall/Text response structures.",
+  "golden_spec_rationale": "The files packages/cli/src/config/settingsSchema.ts, packages/core/src/config/config.ts, and schemas/settings.schema.json were pruned from files_to_modify because they only perform secondary documentation, JSDoc, and JSON schema metadata description updates for the visualModel configuration and do not impact the actual screenshot analysis execution or model family detection logic.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24501",
+    "summary": {
+      "problem": "The analyze_screenshot tool in the browser agent fails to return useful visual analysis and encounters 400 INVALID_ARGUMENT or empty visual analysis response errors when configured with computer-use models like gemini-2.5-computer-use-preview-10-2025.",
+      "root_cause": "Computer-use models expect a computerUse tool declaration in every request, which is currently missing. Standard response parsing only handles text parts, silently discarding the functionCall parts returned by computer-use models. Additionally, there is no logic to detect whether the model is a computer-use model vs. a standard vision model.",
+      "context": "Computer-use models require a specific computerUse tool environment configuration but can be constrained to text-only outputs by listing their predefined browser action functions (like click_at, open_web_browser) in the excludedPredefinedFunctions property of the tool declaration."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/agents/browser/modelAvailability.ts",
+        "packages/core/src/agents/browser/analyzeScreenshot.ts"
+      ],
+      "steps": [
+        "In packages/core/src/agents/browser/modelAvailability.ts, define and export a pattern constant COMPUTER_USE_MODEL_PATTERN = /^gemini-.*-computer-use-/ and a boolean helper function isComputerUseModel(model: string) that tests model against COMPUTER_USE_MODEL_PATTERN.",
+        "In packages/core/src/agents/browser/analyzeScreenshot.ts, import isComputerUseModel from modelAvailability.ts and Environment from @google/genai.",
+        "In packages/core/src/agents/browser/analyzeScreenshot.ts, within AnalyzeScreenshotInvocation.execute, determine if the configured visualModel is a computer-use model. If so, build a tools array containing the computerUse declaration with environment set to Environment.ENVIRONMENT_BROWSER and excludedPredefinedFunctions set to ['open_web_browser', 'click_at', 'key_combination', 'drag_and_drop'].",
+        "Pass the conditionally generated tools array into the generateContent option configuration block if it was created.",
+        "Revise response parsing within AnalyzeScreenshotInvocation.execute to compile parts from response.candidates[0].content.parts. Safely filter for both text parts and functionCall parts. Map text parts directly, and map functionCall parts to the format 'Action: {name} with args {args}' (using JSON.stringify for arguments if they exist). Join all parts with newline characters to compute the final responseText."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/agents/browser/analyzeScreenshot.test.ts",
+      "expected_behavior": "The analyze_screenshot tool should correctly identify computer-use models, pass the required computerUse tool definition with action exclusions to the Gemini API, and successfully parse both text and functionCall response parts. For standard vision models, the tool definition should be excluded entirely.",
+      "verification_steps": [
+        "Add a unit test 'omits computerUse tools for non-computer-use models' that passes 'gemini-2.0-flash' as the configured model and validates that contentGenerator.generateContent is called without a tools array in its configuration.",
+        "Update the existing positive test case to verify that when configured with a computer-use model, contentGenerator.generateContent receives a tools argument including the computerUse configuration containing browser environment and excluded functions.",
+        "Run unit tests with: npm test -w @google/gemini-cli-core -- src/agents/browser/analyzeScreenshot.test.ts"
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

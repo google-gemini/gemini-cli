@@ -7,6 +7,7 @@
     "start": "node -r dotenv/config -r ts-node/register publish_test_message.ts"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/pubsub": "^4.7.0",
     "dotenv": "^17.4.2"
   },

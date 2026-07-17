@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27852,
+  "issue_title": "Weird loop",
+  "issue_body": "### What happened?\n\nasked for a barebone implementations, gemini cli entered on loop\n\n### What did you expect to happen?\n\nto follow my instructions, but it didn't.\n\n### Client information\n\n\n* **CLI Version:** 0.46.0\n* **Git Commit:** 85b0c55c1\n* **Session ID:** 17474dd7-653b-4942-ad3e-7715523f2a2c\n* **Operating System:** darwin v22.13.1\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto-gemini-3\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 683.2 MB\n* **Terminal Name:** xterm.js(6.1.0-beta.213)\n* **Terminal Background:** #292d3e\n* **Kitty Keyboard Protocol:** Supported\n* **IDE Client:** IDE\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\nneed to force close, loosing the debug tool.",
+  "pr_number": 0,
+  "target_version": "5d4af9f812bb08750e5a14ee66dd4c1f7a90b13c",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Missing prompt details, reproduction steps, and debug logs for the reported loop. Classified as NEEDS_INFO.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

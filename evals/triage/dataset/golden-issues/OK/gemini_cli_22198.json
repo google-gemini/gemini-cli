@@ -1,0 +1,41 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 22198,
+  "issue_title": "Fix path where tracker tasks are stored",
+  "issue_body": "Currently they are not within the session directory but outside it. Confirm they are created in the right place.",
+  "pr_number": 22382,
+  "target_version": "24933a90d03fc82b31767fbae98f403b07a34712",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created at 2026-03-12T18:48:06Z by automated generate_golden_issue.py. Note: This issue has a very short description, which might be flagged as NEEDS_INFO. We will need to investigate prompt tolerances for short but clear/direct issues in the future.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#22198",
+    "summary": {
+      "problem": "Tracker tasks are currently stored outside the session directory, which can lead to collisions across multiple concurrent sessions.",
+      "root_cause": "The `getProjectTempTrackerDir` method in the `Storage` class did not check if a `sessionId` was active, always returning the base tracker directory path under the project temp directory.",
+      "context": "Updating `getProjectTempTrackerDir` to incorporate `this.sessionId` when available ensures that tracker tasks are kept isolated within the correct session-specific folder."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/config/storage.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/config/storage.ts`, modify the `getProjectTempTrackerDir` function under the `Storage` class.",
+        "Add a conditional check to see if `this.sessionId` exists.",
+        "If `this.sessionId` is present, return `path.join(this.getProjectTempDir(), this.sessionId, 'tracker')`.",
+        "Otherwise, return the default fallback path `path.join(this.getProjectTempDir(), 'tracker')`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/config/storage.test.ts",
+      "expected_behavior": "When `sessionId` is set in the `Storage` class, `getProjectTempTrackerDir` should output a session-specific tracker directory path. When `sessionId` is absent, it should output the base tracker directory path.",
+      "verification_steps": [
+        "Add a test case in `packages/core/src/config/storage.test.ts` to assert that `getProjectTempTrackerDir` of `storage` without `sessionId` returns `~/.gemini/tmp/<identifier>/tracker`.",
+        "Add a second test case in `packages/core/src/config/storage.test.ts` to assert that `getProjectTempTrackerDir` of `storage` instantiated with a `sessionId` returns `~/.gemini/tmp/<identifier>/<sessionId>/tracker`."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

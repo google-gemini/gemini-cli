@@ -1,0 +1,41 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 23410,
+  "issue_title": "GeminiCLI.com Feedback:Is it SYSTEM.md or system.md ?",
+  "issue_body": "### URL of the page with the issue\n\nhttps://geminicli.com/docs/cli/system-prompt/\n\n### What is the problem?\n\nIs it SYSTEM.md or system.md ? There are both forms mentioned and it's confusing\n\nsee `Best practices: SYSTEM.md vs GEMINI.md` -- suddenly system.md becomes SYSTEM.md . Why ?\n\n### What did you expect to happen?\n\nI'd expect system.md to be always in the same letter case *or* explicilt mentioning case won't matter (it does)\n\n### Additional context\n\n_No response_",
+  "pr_number": 25414,
+  "target_version": "4b2091d4022c55cbb93227506771fcb8143f1cfb",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Clean doc-only bug: tests if candidate workers accurately understand documentation fixes rather than proposing source code changes.",
+  "golden_spec_rationale": "The file `docs/cli/system-prompt.md` was pruned because it is a documentation markdown file. Documentation markdown files are strictly excluded from the `files_to_modify` array, which must contain only primary source code files.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#23410",
+    "summary": {
+      "problem": "The documentation page at https://geminicli.com/docs/cli/system-prompt/ inconsistently refers to the system prompt file as both SYSTEM.md and system.md, causing confusion about the correct case on case-sensitive filesystems.",
+      "root_cause": "The file `docs/cli/system-prompt.md` contained uppercase `SYSTEM.md` references in both code examples and text descriptions, whereas the actual default filename is lowercase `system.md` under `.gemini/system.md`.",
+      "context": "GEMINI.md is correctly uppercase and must remain uppercase, while SYSTEM.md must be consistently lowercase system.md."
+    },
+    "implementation_plan": {
+      "files_to_modify": [],
+      "steps": [
+        "In `docs/cli/system-prompt.md`, under the custom file example, change `GEMINI_SYSTEM_MD=~/prompts/SYSTEM.md gemini` to use lowercase `GEMINI_SYSTEM_MD=~/prompts/system.md gemini`.",
+        "In `docs/cli/system-prompt.md`, change the section header `## Best practices: SYSTEM.md vs GEMINI.md` to `## Best practices: system.md vs GEMINI.md`.",
+        "In `docs/cli/system-prompt.md`, change the bullet `- SYSTEM.md (firmware):` to `- system.md (firmware):`.",
+        "In `docs/cli/system-prompt.md`, under the GEMINI.md bullet, change `relies on SYSTEM.md` to `relies on system.md`.",
+        "In `docs/cli/system-prompt.md`, change the occurrence `Keep SYSTEM.md minimal but complete` to `Keep system.md minimal but complete`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "All references to the system prompt markdown file in `docs/cli/system-prompt.md` consistently refer to lowercase `system.md`, while references to `GEMINI.md` remain uppercase.",
+      "verification_steps": [
+        "Open `docs/cli/system-prompt.md`.",
+        "Confirm that every instance of SYSTEM.md has been replaced with system.md.",
+        "Verify that capitalization of GEMINI.md has not been altered."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28106,
+  "issue_title": "[Performance] Severe 50s+ startup delay on Windows due to eager execSync in EditorSettingsManager during ESM import",
+  "issue_body": "When starting up Gemini CLI on Windows, it initially took just over 1 minute and 30 seconds. Through an interactive local session, Gemini CLI itself successfully identified the root cause of this slowness and created a patch to optimize performance. With the patch applied, startup now takes only 20 to 30 seconds (though it is still slightly slower than the macOS side). Hopefully, this detailed report will help troubleshoot and officially resolve this bottleneck for all Windows users.\n\n### Description\nOn Windows environments (especially enterprise-managed with active security/endpoint protection software), starting the Gemini CLI experiences a severe startup delay of 50 seconds to over 1 minute.\n\n### Cause\nUpon importing the main interactive UI module (`interactiveCli-*.js`), the `EditorSettingsManager` is eagerly instantiated at the top-level:\n\n```javascript\nvar editorSettingsManager = new EditorSettingsManager();\n```\n\nIts constructor eagerly loops through all 16+ defined editors in `EDITOR_DISPLAY_NAMES` and synchronously calls `hasValidEditorCommand(type)`:\n\n```javascript\n// Inside EditorSettingsManager constructor\n...editorTypes.map((type) => {\n  const hasEditor = hasValidEditorCommand(type); // synchronously calls execSync('where.exe ...')\n  ...\n})\n```\n\nEach call to `execSync('where.exe <editor>')` spawns a child process. Since process creation on Windows (particularly with enterprise endpoint monitoring and antivirus scanning) takes roughly 1 to 3 seconds per invocation, sequentially querying 16+ editors during ESM module evaluation blocks the main thread for **50+ seconds** before the terminal UI can even draw its first frame.\n\n### Evidence (V8 CPU Profiler Call Tree)\nBelow is the captured call tree from a V8 CPU profile showing the absolute bottleneck. Over 31 seconds of CPU self-time is spent entirely in sequential `spawnSync` calls triggered directly by the module-scope instantiation of `EditorSettingsManager`:\n\n```text\n--- TOP 20 NODES BY SELF TIME ---\nSelf: 31335 samples | Func: spawnSync | Location: node:internal/child_process:1127:18\n\n--- TOP 20 NODES BY TOTAL TIME ---\nTotal: 31342 samples | Func: (anonymous) | Location: .../interactiveCli-*.js:0:0\nTotal: 31337 samples | Func: hasValidEditorCommand | Location: .../chunk-*.js:286662:30\nTotal: 31337 samples | Func: EditorSettingsManager | Location: .../interactiveCli-*.js:14997:13\nTotal: 31337 samples | Func: (anonymous) | Location: .../interactiveCli-*.js:15007:25\nTotal: 31336 samples | Func: (anonymous) | Location: .../chunk-*.js:286663:40\nTotal: 31336 samples | Func: commandExists | Location: .../chunk-*.js:286620:22\nTotal: 31336 samples | Func: execSync | Location: node:child_process:987:17\n```\n\n### Environment\n- **OS**: Windows 10/11\n- **Node.js**: v24.x (reproduces on any Node v20+ ESM setup)\n- **System Context**: Secure enterprise environments with active real-time EDR/Antivirus intercepting process creation.\n\n### Proposed Solution (Lazy Loading)\nAvoid executing synchronous subprocesses during module scope evaluation. We can easily compute the available editors lazily on the first request to `getAvailableEditorDisplays()` to completely bypass this startup bottleneck:\n\n```typescript\nexport class EditorSettingsManager {\n  private availableEditors: EditorSettings[] | null = null;\n\n  getAvailableEditorDisplays(): EditorSettings[] {\n    if (!this.availableEditors) {\n      const editorTypes = Object.keys(EDITOR_DISPLAY_NAMES).sort() as EditorType[];\n      this.availableEditors = [\n        { name: \"None\", type: \"not_set\", disabled: false },\n        ...editorTypes.map((type) => {\n          const hasEditor = hasValidEditorCommand(type);\n          const isAllowedInSandbox = allowEditorTypeInSandbox(type);\n          let labelSuffix = !isAllowedInSandbox ? \" (Not available in sandbox)\" : \"\";\n          labelSuffix = !hasEditor ? \" (Not installed)\" : labelSuffix;\n          return {\n            name: EDITOR_DISPLAY_NAMES[type] + labelSuffix,\n            type,\n            disabled: !hasEditor || !isAllowedInSandbox\n          };\n        })\n      ];\n    }\n    return this.availableEditors;\n  }\n}\n```\n\n### Verification\nAfter applying the proposed lazy loading patch to `EditorSettingsManager`, the ESM module evaluation/import time of the interactive CLI bundle dropped instantly from **over 52 seconds to just 38 milliseconds** (a 1,300x speedup), and the overall startup completed flawlessly.\n\n---\n_*Note: This diagnostic analysis, profiling verification, and issue report were fully investigated and written by Gemini CLI (powered by Gemini) during an interactive local optimization session._",
+  "pr_number": 28144,
+  "target_version": "d845bc5d45adad7d7664d9790e5cdbe3ccf1de0d",
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "Created at 2026-06-23T06:52:48Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28106",
+    "summary": {
+      "problem": "Gemini CLI experiences severe startup delays of 50 seconds to over 1.5 minutes on Windows during the ESM import of the main interactive UI module.",
+      "root_cause": "The module-level eager instantiation of `EditorSettingsManager` runs its constructor immediately, looping through over 16 editor types and calling `hasValidEditorCommand(type)` synchronously via `execSync`. Spawning serial subprocesses at module scope blocks the terminal loop from drawing.",
+      "context": "Probing for available editors is only needed for the settings dialog (`EditorSettingsDialog.tsx`), not at application startup."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/ui/editors/editorSettingsManager.ts"
+      ],
+      "steps": [
+        "Change `class EditorSettingsManager` to `export class EditorSettingsManager`.",
+        "Modify the `availableEditors` private property signature to `availableEditors: EditorDisplay[] | null = null`.",
+        "Create a new private method `computeAvailableEditors(): EditorDisplay[]`.",
+        "Refactor the original `constructor` body into `computeAvailableEditors` and return the matching editor array structure, including \"None\" at start and detecting/mapping each editor type.",
+        "Remove the class `constructor` or leave it empty.",
+        "Update `getAvailableEditorDisplays()` to check if `this.availableEditors` is null. If null, invoke `this.computeAvailableEditors()` to lazily populate and cache the list before returning it."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/editors/editorSettingsManager.test.ts",
+      "expected_behavior": "Instantiating `EditorSettingsManager` must not run editor validation. The editor list should be computed on first invocation of `getAvailableEditorDisplays()` and cached for successive calls.",
+      "verification_steps": [
+        "Import `EditorSettingsManager` and verify no probing functions are called on instantiation.",
+        "Call `getAvailableEditorDisplays()` once and verify mock editor commands are queried sequentially.",
+        "Call `getAvailableEditorDisplays()` a second time and assert that original cached array instance is returned without repeating editor queries.",
+        "Verify 'None' is sorted first in the list, and check uninstalled or sandbox-blocked editor objects have correct suffix label and `disabled: true` values."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

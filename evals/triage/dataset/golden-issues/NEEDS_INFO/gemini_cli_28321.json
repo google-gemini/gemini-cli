@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28321,
+  "issue_title": "Proplem reached limitts",
+  "issue_body": "gemini theres proplem when i send hi all limited are closed and also doesnt respons quikly #/\n\n- [ ] /",
+  "pr_number": 0,
+  "target_version": "b31b755bbf89303159f03a36fbb899c6f7e57511",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Vague user report regarding rate limits / latency with no CLI version, OS, error logs, or reproduction steps.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

@@ -36,11 +36,12 @@ if TRIAGE_WORKER_DIR not in sys.path:
 from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-# Disable GCS Cloud Storage logging upload during local evaluation runs
-os.environ["GCS_LOGGING"] = "OFF"
+# Store agent execution trajectory logs locally under evals/triage/results/logs/ during evaluation runs
+os.environ["GCS_LOGGING"] = "LOCAL"
 
 from cloudrun.triage_worker.triage_orchestrator import process_issue_triage
 from judge import evaluate_categorization, judge_workable_spec
+from tools.summary import calculate_and_print_summary
 
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset", "golden-issues")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -58,7 +59,7 @@ def ensure_base_repository() -> str:
         print(f"[EVAL] Target repository missing at {TARGET_REPO_DIR}. Cloning google-gemini/gemini-cli...")
         subprocess.run(["git", "clone", "https://github.com/google-gemini/gemini-cli.git", TARGET_REPO_DIR], check=True)
     else:
-        subprocess.run(["git", "fetch", "--all"], cwd=TARGET_REPO_DIR, capture_output=True)
+        subprocess.run(["git", "fetch", "--all", "--tags"], cwd=TARGET_REPO_DIR, capture_output=True)
     return TARGET_REPO_DIR
 
 
@@ -142,19 +143,17 @@ def test_single_issue(item: Dict[str, Any], worker_id: int, dry_run: bool) -> Di
         execution_time_seconds = round(time.time() - start_time, 2)
         
         if not success:
-            print(f"  ❌ [Issue #{issue_num}] Triage execution failed: {raw_output}")
-            return {"success": False, "issue_number": issue_num, "error": raw_output}
+            raise RuntimeError(f"Triage execution failed: {raw_output}")
             
         try:
             result = json.loads(raw_output)
-        except Exception as e:
+        except Exception as parse_err:
             # Fallback: sanitize invalid JSON single-quote escapes (\' -> ')
             try:
-                cleaned_output = re.sub(r"(?<!\\)\\'", "'", raw_output)
+                cleaned_output = re.sub(r"\\'", "'", raw_output)
                 result = json.loads(cleaned_output)
             except Exception:
-                print(f"  ❌ [Issue #{issue_num}] Failed to parse JSON output: {e}")
-                return {"success": False, "issue_number": issue_num, "error": str(e)}
+                raise ValueError(f"Failed to parse JSON output: {parse_err}") from parse_err
 
         metadata = result.get("triage_metadata", {})
         predicted_spec = result.get("workable_spec", {})
@@ -186,6 +185,25 @@ def test_single_issue(item: Dict[str, Any], worker_id: int, dry_run: bool) -> Di
             elif spec_grade.get("judge_reasoning"):
                 print(f"    • Judge Reasoning: {spec_grade['judge_reasoning']}")
 
+        # Immediately write per-issue result JSON if run issues_dir is active
+        issues_dir = os.environ.get("LOCAL_LOG_DIR")
+        if issues_dir and os.path.exists(issues_dir):
+            file_path = os.path.join(issues_dir, f"gemini_cli_{issue_num}.json")
+            record = {
+                "issue_number": issue_num,
+                "execution_time_seconds": execution_time_seconds,
+                "categorization": cat_eval,
+                "predicted": {"metadata": metadata, "workable_spec": predicted_spec},
+                "expected": {
+                    "quality": item.get("expected_quality"),
+                    "effort": item.get("expected_effort"),
+                    "workable_spec": item.get("expected_workable_spec", {})
+                },
+                "judge_evaluation": spec_grade
+            }
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2)
+
         return {
             "success": True,
             "issue_number": issue_num,
@@ -196,47 +214,29 @@ def test_single_issue(item: Dict[str, Any], worker_id: int, dry_run: bool) -> Di
             "cat_eval": cat_eval,
             "spec_grade": spec_grade
         }
+    except Exception as e:
+        err_msg = f"{e}"
+        print(f"  ❌ [Issue #{issue_num}] Worker execution failed: {err_msg}")
+        
+        issues_dir = os.environ.get("LOCAL_LOG_DIR")
+        if issues_dir and os.path.exists(issues_dir):
+            file_path = os.path.join(issues_dir, f"gemini_cli_{issue_num}.json")
+            err_record = {
+                "issue_number": issue_num,
+                "error": err_msg,
+                "judge_evaluation": {
+                    "reasoning": {"error": f"Worker execution error: {err_msg}"}
+                }
+            }
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(err_record, f, indent=2)
+
+        return {"success": False, "issue_number": issue_num, "error": err_msg}
     finally:
         cleanup_worker_worktree(worker_id)
 
 
-# =====================================================================
-# Result Persistence & Reporting
-# =====================================================================
 
-def save_run_results(run_summary: Dict[str, Any], issue_results: List[Dict[str, Any]]) -> str:
-    """Saves structured per-issue and summary evaluation results locally under evals/triage/results/."""
-    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(RESULTS_DIR, "runs", f"run_{timestamp_str}")
-    issues_dir = os.path.join(run_dir, "issues")
-    os.makedirs(issues_dir, exist_ok=True)
-
-    for res in issue_results:
-        issue_num = res.get("issue_number")
-        file_path = os.path.join(issues_dir, f"gemini_cli_{issue_num}.json")
-        record = {
-            "issue_number": issue_num,
-            "execution_time_seconds": res.get("execution_time_seconds", 0.0),
-            "categorization": res.get("cat_eval", {}),
-            "predicted": {
-                "metadata": res.get("predicted_metadata", {}),
-                "workable_spec": res.get("predicted_spec", {})
-            },
-            "expected": {
-                "quality": res.get("item", {}).get("expected_quality"),
-                "effort": res.get("item", {}).get("expected_effort"),
-                "workable_spec": res.get("item", {}).get("expected_workable_spec", {})
-            },
-            "judge_evaluation": res.get("spec_grade", {})
-        }
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(record, f, indent=2)
-
-    summary_path = os.path.join(run_dir, "summary.json")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        json.dump(run_summary, f, indent=2)
-
-    return run_dir
 
 
 # =====================================================================
@@ -259,6 +259,18 @@ def run_evaluation_suite(
     if not dry_run:
         ensure_base_repository()
 
+    run_dir = None
+    issues_dir = None
+    if save and not dry_run:
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(RESULTS_DIR, "runs", f"run_{timestamp_str}")
+        issues_dir = os.path.join(run_dir, "issues")
+        os.makedirs(issues_dir, exist_ok=True)
+        os.environ["GCS_LOGGING"] = "LOCAL"
+        os.environ["LOCAL_LOG_DIR"] = issues_dir
+    else:
+        os.environ["GCS_LOGGING"] = "OFF"
+
     print(f"\n========================================================")
     print(f"  Gemini CLI Triage Worker Benchmark Suite (Git Worktrees)")
     print(f"========================================================")
@@ -268,17 +280,15 @@ def run_evaluation_suite(
     if note:
         print(f"[EVAL] Run Note: '{note}'")
     print(f"[EVAL] Parallel Workers: {concurrency}.")
-    print(f"[EVAL] Save Results: {save}.\n")
+    print(f"[EVAL] Save Results: {save}.")
+    if run_dir:
+        print(f"[EVAL] Run Output Folder: {run_dir}/\n")
+    else:
+        print(f"[EVAL] [--no-save] Skipping disk persistence.\n")
 
     start_timestamp = datetime.datetime.now().isoformat()
 
-    total_quality_matches = 0
-    total_effort_matches = 0
-    total_effort_tested = 0
-    spec_pass_rates: List[float] = []
-    execution_times: List[float] = []
-    total_tested = 0
-    issue_results: List[Dict[str, Any]] = []
+    results = []
 
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         future_to_issue = {
@@ -289,62 +299,63 @@ def run_evaluation_suite(
             res = future.result()
             if not res.get("success") or res.get("dry_run"):
                 continue
-            total_tested += 1
-            issue_results.append(res)
-
-            exec_time = res.get("execution_time_seconds", 0.0)
-            execution_times.append(exec_time)
-
-            cat_eval = res.get("cat_eval", {})
-            if cat_eval.get("quality_match"):
-                total_quality_matches += 1
-            
-            total_effort_tested += 1
-            if cat_eval.get("effort_match"):
-                total_effort_matches += 1
-                
-            grade = res.get("spec_grade", {})
-            if grade and "spec_score_pct" in grade:
-                spec_pass_rates.append(grade.get("spec_score_pct", 0.0))
+            results.append(res)
 
     end_timestamp = datetime.datetime.now().isoformat()
 
-    if not dry_run and total_tested > 0:
-        avg_spec_pass_rate = round(sum(spec_pass_rates) / len(spec_pass_rates), 1) if spec_pass_rates else 0.0
-        avg_exec_time = round(sum(execution_times) / len(execution_times), 2) if execution_times else 0.0
+    if not dry_run:
+        calculate_and_print_summary(
+            results,
+            note=note,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            run_dir=run_dir
+        )
 
-        run_summary = {
-            "start_timestamp": start_timestamp,
-            "end_timestamp": end_timestamp,
-            "note": note or "",
-            "total_tested": total_tested,
-            "workable_spec_count": len(spec_pass_rates),
-            "quality_categorization_rate": total_quality_matches / total_tested if total_tested else 0,
-            "effort_categorization_rate": total_effort_matches / total_effort_tested if total_effort_tested else 0,
-            "avg_workable_spec_pass_rate_pct": avg_spec_pass_rate,
-            "avg_execution_time_seconds": avg_exec_time
-        }
 
-        print(f"\n========================================================")
-        print(f"  EVALUATION SUMMARY REPORT")
-        print(f"========================================================")
-        print(f"  Total Tested Issues:          {total_tested}")
-        if note:
-            print(f"  Run Note:                     {note}")
-        print(f"  Quality Categorization Match: {total_quality_matches}/{total_tested} ({total_quality_matches/total_tested*100:.1f}%)")
-        if total_effort_tested > 0:
-            print(f"  Effort Categorization Match:  {total_effort_matches}/{total_effort_tested} ({total_effort_matches/total_effort_tested*100:.1f}%)")
-        if spec_pass_rates:
-            print(f"  Workable Spec Count:          {len(spec_pass_rates)} (OK quality issues)")
-            print(f"  Avg Spec Checklist Pass Rate: {avg_spec_pass_rate:.1f}%")
-        print(f"  Avg Execution Time:           {avg_exec_time:.2f}s")
-        print(f"========================================================")
+def rejudge_failed_run(target_run: str) -> None:
+    """Re-evaluates only judge-errored issues from a previous run directory (or 'latest')."""
+    if target_run == "latest":
+        runs = sorted(glob.glob(os.path.join(RESULTS_DIR, "runs", "run_*")))
+        if not runs:
+            print("❌ No existing run directories found under evals/triage/results/runs/.")
+            return
+        run_dir = runs[-1]
+    else:
+        run_dir = target_run if os.path.exists(target_run) else os.path.join(RESULTS_DIR, "runs", target_run)
 
-        if save:
-            saved_path = save_run_results(run_summary, issue_results)
-            print(f"📁 Saved structured run results to: {saved_path}/\n")
-        else:
-            print("ℹ️ [--no-save] Skipped persisting run results to disk.\n")
+    issues_dir = os.path.join(run_dir, "issues")
+    if not os.path.exists(issues_dir):
+        print(f"❌ Run issues directory not found: {issues_dir}")
+        return
+
+    issue_files = [f for f in sorted(glob.glob(os.path.join(issues_dir, "gemini_cli_*.json"))) if "debug" not in f]
+    rejudged = 0
+    print(f"\n[RE-JUDGE] Scanning {len(issue_files)} issue(s) in {os.path.basename(run_dir)} for judge errors...")
+
+    for file_path in issue_files:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            reasoning = data.get("judge_evaluation", {}).get("reasoning", {})
+            if isinstance(reasoning, dict) and "error" in reasoning:
+                issue_num = data.get("issue_number")
+                pred = data.get("predicted", {}).get("workable_spec", {})
+                gold = data.get("expected", {}).get("workable_spec", {})
+
+                if pred and gold:
+                    print(f"  • Re-evaluating Issue #{issue_num}...")
+                    spec_grade = judge_workable_spec(pred, gold)
+                    data["judge_evaluation"] = spec_grade
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2)
+                    rejudged += 1
+                    print(f"    -> Score: {spec_grade.get('total_points', 0)}/8 ({spec_grade.get('spec_score_pct', 0)}%)\n")
+        except Exception as e:
+            print(f"  ❌ Error re-judging {file_path}: {e}")
+
+    print(f"✅ Completed re-judging {rejudged} failed issue(s).\n")
 
 
 def main() -> None:
@@ -354,8 +365,13 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Skip LLM calls and test dataset loading")
     parser.add_argument("--note", type=str, default=None, help="Optional description note for this evaluation run (saved in summary.json)")
     parser.add_argument("--save", action=argparse.BooleanOptionalAction, default=True, help="Persist structured evaluation run results to disk under evals/triage/results/ (default: True, use --no-save to skip)")
+    parser.add_argument("--rejudge-failed", type=str, default=None, help="Re-evaluate only judge-errored specs in a previous run directory or 'latest' without re-running agents")
 
     args = parser.parse_args()
+
+    if args.rejudge_failed:
+        rejudge_failed_run(args.rejudge_failed)
+        return
     
     filter_issues = None
     if args.issues:

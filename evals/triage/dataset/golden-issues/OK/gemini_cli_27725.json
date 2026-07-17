@@ -1,0 +1,41 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27725,
+  "issue_title": "Calendar - Invalid input: expected record, received array",
+  "issue_body": "### What happened?\n\nTool: mcp_google_workspace_calendar_listEvents\n  Error Message: Invalid input: expected record, received array\n  Description: The calendar.listEvents tool consistently fails with an \"Invalid input\" error related to structuredContent, preventing the listing of any calendar events. This issue persists even after clearing authentication.\n\n[bug-report-history-1780840526875.json](https://github.com/user-attachments/files/28682463/bug-report-history-1780840526875.json)\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nI asked gemini CLI \"what meetings do I have tomorrow?\" and got the answer: \"I apologize, but I am still unable to retrieve your meetings for tomorrow due to the persistent internal error with the calendar tool. I am encountering the same \"Invalid input: expected record, received array\" error, which prevents me from accessing any event information.\"\n\n### Client information\n\n\n* **CLI Version:** 0.45.2\n* **Git Commit:** dfa8394ca\n* **Session ID:** 97b3e930-b6b0-4824-88f9-1eba5a4f2f76\n* **Operating System:** darwin v26.0.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto-gemini-2.5\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 252.5 MB\n* **Terminal Name:** iTerm2 3.6.11\n* **Terminal Background:** #15191e\n* **Kitty Keyboard Protocol:** Supported\n\n\n### Login information\n\nI installed gemini extensions install https://github.com/gemini-cli-extensions/workspace and then started an interactive session.  It opened a webpage that asked me to log in using my google ID.\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 27730,
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "This is a currently opened issue with a unreviewed PR, but quality passes the eye test.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#27725",
+    "summary": {
+      "problem": "The calendar.listEvents tool consistently fails with an \"Invalid input: expected record, received array\" error related to structuredContent when trying to return listing results.",
+      "root_cause": "The McpComplianceTransport wrapper parses text content returned by MCP servers to populates result.structuredContent. When the response is a JSON array (such as calendar event lists), this assignment fails downstream schema validation, which strictly expects a key-value record/object wrapper rather than a JSON array.",
+      "context": "McpComplianceTransport intercepts and handles message formatting anomalies from MCP servers, but it incorrectly allowed JSON arrays to be set as structuredContent."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/tools/mcp-compliance-transport.ts"
+      ],
+      "steps": [
+        "Define an `isRecord(value: unknown): value is Record<string, unknown>` helper function to identify non-null, non-array objects.",
+        "Locate the text content parsing block within the `McpComplianceTransport` class.",
+        "Update the try-catch block where `JSON.parse` is executed to first check `isRecord(parsed)` before assigning the value to `result.structuredContent`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/tools/mcp-compliance-transport.test.ts",
+      "expected_behavior": "When an MCP tool response containing a JSON array is processed, it should not populate structuredContent, preventing downstream verification schema errors while keeping the text content array intact.",
+      "verification_steps": [
+        "Add a test case named 'should NOT use JSON arrays as structuredContent' to packages/core/src/tools/mcp-compliance-transport.test.ts.",
+        "Mock a response with stringified array content and verify that complianceTransport leaves structuredContent undefined and preserves the initial text representation.",
+        "Run the test suite using `vitest`."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "target_version": "f40498db644ac570a4bba90bb8711239d802ddc6",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

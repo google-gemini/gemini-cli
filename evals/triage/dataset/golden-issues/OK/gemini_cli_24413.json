@@ -1,0 +1,39 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24413,
+  "issue_title": "fix(core): use dynamic CLI version for IDE client instead of hardcoded '1.0.0'",
+  "issue_body": "**Description:**\nCurrently, the `IdeClient` initialization in `packages/core/src/ide/ide-client.ts` hardcodes the `version` string to `'1.0.0'` in both HTTP and STDIO connection establishment methods. These lines are marked with `// TODO(#3487): use the CLI version here.`. This hardcoding prevents the IDE client from properly reporting its actual integration version, which could cause compatibility checking issues down the line.\n\n**Expected Behavior:**\nThe IDE client should report the actual, dynamic version of the Gemini CLI when establishing connections, resolving TODO #3487.",
+  "pr_number": 24414,
+  "target_version": "607180bfb223185dd415162f199fb7db7d1f5cd5",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created by automated script. Selected because it is a very clean, direct single-file bug fix resolving a TODO by importing a dynamic version helper utility.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#24413",
+    "summary": {
+      "problem": "The IdeClient initialization in packages/core/src/ide/ide-client.ts hardcodes the version string to '1.0.0' in both HTTP and STDIO connection establishment methods.",
+      "root_cause": "The client version parameter is static ('1.0.0') instead of being resolved dynamically using the getVersion helper function.",
+      "context": "The hardcoded string lines were marked with '// TODO(#3487): use the CLI version here.'. Using the hardcoded version prevents the IDE client from properly reporting its actual integration version."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/ide/ide-client.ts"
+      ],
+      "steps": [
+        "Import getVersion from '../utils/version.js' into packages/core/src/ide/ide-client.ts.",
+        "In the HTTP client initialization block for StreamableHTTPClientTransport, replace version: '1.0.0' with version: await getVersion().",
+        "In the STDIO client initialization block for StdioClientTransport, replace version: '1.0.0' with version: await getVersion()."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "The IDE client reports the actual dynamically retrieved CLI version using getVersion() during HTTP and STDIO connection setups.",
+      "verification_steps": [
+        "Verify that getVersion is successfully imported and called using await during Client instantiation under StreamableHTTPClientTransport and StdioClientTransport."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

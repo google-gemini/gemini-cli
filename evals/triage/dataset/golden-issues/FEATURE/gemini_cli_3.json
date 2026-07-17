@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 3,
+  "issue_title": "Feature Request: Custom UI color themes (--theme cyan)",
+  "issue_body": "### Description\nRequesting the ability to customize the terminal UI color scheme.\nCurrently, the CLI uses fixed ANSI blue/magenta colors for prompts and borders.\n\n### Proposed Solution\nAdd a configuration option `ui.theme: \"cyan\"` (or CLI flag `--theme cyan`) supporting preset color palettes (e.g. `cyan`, `dracula`, `solarized-light`).\n\n### Use Case\nImproves readability for developers using light-background terminal themes or custom accessibility color profiles.",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Custom handcrafted FEATURE issue created by Chad. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "Feature request issue; quality is FEATURE.",
+  "expected_workable_spec": {}
+}

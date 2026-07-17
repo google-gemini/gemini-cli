@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28312,
+  "issue_title": "[Antigravity/Gemini] Autonomous agent self-prompts from Phase 2 Design into Phase 3 Implementation during long single-turn execution",
+  "issue_body": "When given a bounded Architecture & Design prompt ('Design a production-ready engine... Include database schema, state machine... Work fully autonomously until done'), the model interprets 'Work fully autonomously until done' and 'Include... example execution traces' as authorization to write working prototype code (.py) and unit tests (unittest), rather than terminating when the required .sql schema and .md design documents are complete. When the system automatically injects mid-session CHECKPOINT truncation summaries, the tendency to jump across SDLC boundaries intensifies.",
+  "pr_number": 0,
+  "target_version": "b31b755bbf89303159f03a36fbb899c6f7e57511",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "General LLM/prompt boundary behavior report without a specific codebase bug, PR, or actionable code change.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

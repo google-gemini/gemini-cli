@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28324,
+  "issue_title": "npx https://github.com/google-gemini/gemini-cli",
+  "issue_body": "",
+  "pr_number": 0,
+  "target_version": "172ff92c345194c8c87ea781ca01fa0eb91fbb1a",
+  "expected_quality": "EMPTY",
+  "expected_effort": "",
+  "notes": "Created at 2026-07-08T23:57:07Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

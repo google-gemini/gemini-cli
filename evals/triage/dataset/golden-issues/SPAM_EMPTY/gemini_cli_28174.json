@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28174,
+  "issue_title": "Elastic api 1",
+  "issue_body": "- I can't say anything, I have until Monday night and I just realized a few strange things, so I probably won't sleep until Monday night and I'll try everything.()",
+  "pr_number": 0,
+  "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+  "expected_quality": "SPAM",
+  "expected_effort": "",
+  "notes": "Created at 2026-06-27T12:26:46Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

@@ -1,0 +1,39 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28115,
+  "issue_title": "Nightly Release Failed for v0.49.0-nightly.20260624.g6e0bd68e4 on 2026-06-24",
+  "issue_body": "The nightly-release workflow failed. See the full run for details: https://github.com/google-gemini/gemini-cli/actions/runs/28067292241\n\n```text\n> @google/gemini-cli-core@0.49.0-nightly.20260624.g6e0bd68e4 bundle:browser-mcp\n> node scripts/bundle-browser-mcp.mjs\n\nError: Could not resolve \"dotenv\"\n    packages/cli/src/config/settings.ts:10:24:\n      10 │ import * as dotenv from 'dotenv';\n         ╵                         ~~~~~~~~\n\nError: Could not resolve \"comment-json\"\n    packages/cli/src/utils/commentJson.ts:8:33:\n      8 │ import { parse, stringify } from 'comment-json';\n        ╵                                  ~~~~~~~~~~~~~~\n\nError: Could not resolve \"tinygradient\"\n    packages/cli/src/ui/themes/theme.ts:17:25:\n      17 │ import tinygradient from 'tinygradient';\n         ╵                          ~~~~~~~~~~~~~~\n\ngemini.js build failed: Error: Build failed with 19 errors:\npackages/cli/src/commands/extensions/utils.ts:14:20: ERROR: Could not resolve \"prompts\"\npackages/cli/src/config/extensions/extensionSettings.ts:9:24: ERROR: Could not resolve \"dotenv\"\n\nnpm error code 1\nnpm error command sh -c husky && npm run bundle\nError: Process completed with exit code 1.\n```",
+  "pr_number": 28116,
+  "target_version": "6e0bd68e4599c32cc3d8e554e64d97c6984f1a35",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created on July 1, 2026. Note: Currently (as of July 1) the agent has no capability of opening external URL links to inspect nightly CI failure logs. Added log snippet to issue_body for now; automated CI log link scraping will be a Post-MVP feature.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28115",
+    "summary": {
+      "problem": "The nightly release workflow failed during the verify-release action setup.",
+      "root_cause": "The integration tests setup ran `npm ci` which triggered post-install or lifecycle scripts of dependencies. These scripts failed in the isolated action environment, causing the entire workflow to fail.",
+      "context": "The verify-release Github Action installs dependencies for integration tests prior to running them against the built NPM package."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        ".github/actions/verify-release/action.yml"
+      ],
+      "steps": [
+        "Open the GitHub Action configuration file at `.github/actions/verify-release/action.yml`.",
+        "Locate the step named 'Install dependencies for integration tests'.",
+        "Modify the `run` command of this step from `npm ci` to `npm ci --ignore-scripts`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "The integration test dependencies install successfully without running any lifecycle or post-install scripts.",
+      "verification_steps": [
+        "Trigger or simulate the workflow locally or in a test run to ensure 'Install dependencies for integration tests' step executes `npm ci --ignore-scripts` and completes successfully."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

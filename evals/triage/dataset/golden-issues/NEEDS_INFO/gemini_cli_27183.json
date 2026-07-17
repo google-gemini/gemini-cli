@@ -1,0 +1,13 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27183,
+  "issue_title": "Absolutely useless",
+  "issue_body": "### What happened?\n\n[bug-report-history-1779037725185.json](https://github.com/user-attachments/files/27904244/bug-report-history-1779037725185.json)\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nMy instructions were very clear. It failed to action over and over again, burned all my tokens across my API and broke the budget on my billing account. This wasn't a difficult request. It wasted hours of time and also my money. This is just one session of many, I still haven't achieved the objective.\n\n### Client information\n\n\n* **CLI Version:** 0.42.0\n* **Git Commit:** 68e2196d5\n* **Session ID:** 4062b028-ceee-4ad3-9341-70884cccdfae\n* **Operating System:** win32 v26.1.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** gemini-3.1-flash-lite-preview\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 342.8 MB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #0c0c0c\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\nI've used both Google Account and API key here, it wasted my entire API billing and broke my budget. It also maxed out most of my Google account. On 3.1-flash-lite-preview it just wastes my time and gets it wrong every time\n\n### Anything else we need to know?\n\nThis is really bad, I want to like Gemini but everybody tells me to use Claude.",
+  "pr_number": 0,
+  "target_version": "77e65c0db5986c559051c1b031a303dfb4829ad1",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Created at 2026-05-17T17:12:48Z",
+  "expected_workable_spec": {}
+}

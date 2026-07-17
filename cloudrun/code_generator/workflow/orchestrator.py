@@ -1,8 +1,23 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Iterative Bug-Fixing and Evaluation Orchestrator State Machine.
 
 Coordinates repository cloning, branch setup, execution of Google Antigravity
 Coding and Evaluator Agents, ESLint static analysis, and deterministic regression
-preflight checks. If fully approved, pushes the code and submits a GitHub PR.
+preflight checks. Manages Firestore dual-lock validation and lifecycle state
+transitions (COMMIT_GENERATION, PR_EVALUATION_PENDING, NEEDS_HUMAN).
 """
 
 import json
@@ -18,6 +33,14 @@ from command_executor import CommandExecutor, CommandExecutionError
 from github_client import GitHubClient, GitHubClientError
 from agent_runner import AgentRunner, AgentRunnerError
 from preflight_filter import PreflightFilter
+from db import (
+    acquire_lock,
+    release_lock,
+    mark_pr_created,
+    mark_needs_human,
+    ClaimAction,
+    IssueStatus,
+)
 
 
 class OrchestrationError(Exception):
@@ -58,7 +81,7 @@ class Orchestrator:
                 shutil.rmtree(self.config.eval_dir)
             except OSError as e:
                 logging.warning("Failed to remove evaluation directory: %s. Overwriting.", e)
-        os.makedirs(self.config.eval_dir, exist_ok=True)
+            os.makedirs(self.config.eval_dir, exist_ok=True)
 
     def _sync_or_clone_repository(self) -> None:
         """Clones the target git repo or synchronizes it back to clean main branch."""
@@ -120,8 +143,37 @@ class Orchestrator:
         issue_id = firestore_doc.get("workable_spec", {}).get("issue_id")
         github_metadata = firestore_doc.get("github_metadata", {})
         issue_num = github_metadata.get("issue_number")
+        owner = github_metadata.get("owner")
+        repo = github_metadata.get("repo")
+        doc_id = firestore_doc.get("firestore_id") or self.config.firestore_id
+
         if not issue_num:
             raise OrchestrationError("Issue number is missing in Firestore metadata.")
+
+        # --- STEP 1, 2, 3: Concurrency Dual-Lock Validation & COMMIT_GENERATION State Update ---
+        execution_id = self.config.execution_id
+        logging.info("Validating concurrency dual-lock in Firestore for issue #%s...", issue_num)
+        claim_action = acquire_lock(
+            lock_holder=execution_id,
+            doc_id=doc_id,
+            owner=owner,
+            repo=repo,
+            issue_number=issue_num,
+            lock_duration_sec=900,  # 15 minutes
+            target_status=IssueStatus.COMMIT_GENERATION.value,
+        )
+
+        if claim_action == ClaimAction.SKIP:
+            logging.info(
+                "Lock validation: another worker is working on this issue or issue is in terminal state. Exiting cleanly."
+            )
+            return
+
+        if claim_action == ClaimAction.NEEDS_HUMAN:
+            logging.warning(
+                "Triage attempts exceeded maximum allowed limit. Issue moved to NEEDS_HUMAN. Exiting."
+            )
+            sys.exit(1)
 
         branch_name = f"ssr-agent-{issue_num}"
 
@@ -198,13 +250,55 @@ class Orchestrator:
         # --- POST LOOP RESOLUTION ---
         if approved:
             logging.info("=== PATCH APPROVED ===")
-            if commit_line_count > 200:
-                logging.error("Verdict: APPROVED but modified line size (%s) exceeds 200 limit.", commit_line_count)
+            if commit_line_count > 500:
+                logging.error(
+                    "Verdict: APPROVED but modified line size (%s) exceeds 500 limit. Moving to NEEDS_HUMAN.",
+                    commit_line_count,
+                )
+                try:
+                    mark_needs_human(
+                        lock_holder=execution_id,
+                        reason=f"Commit modifications ({commit_line_count} lines) exceed 500 lines limit.",
+                        doc_id=doc_id,
+                        owner=owner,
+                        repo=repo,
+                        issue_number=issue_num,
+                    )
+                except Exception as e:
+                    logging.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
                 sys.exit(2)
             else:
-                await self._submit_pull_request(issue_num, issue_id, branch_name)
+                pr_url = await self._submit_pull_request(issue_num, issue_id, branch_name)
+                try:
+                    mark_pr_created(
+                        lock_holder=execution_id,
+                        pr_url=pr_url or "",
+                        doc_id=doc_id,
+                        owner=owner,
+                        repo=repo,
+                        issue_number=issue_num,
+                        status=IssueStatus.PR_EVALUATION_PENDING.value,
+                    )
+                except Exception as e:
+                    logging.error("Failed to update Firestore status to PR_EVALUATION_PENDING: %s", e)
         else:
-            logging.error("=== PR REJECTED (Exceeded max loop attempts %s) ===", self.config.max_attempts)
+            logging.error(
+                "=== PR REJECTED (Exceeded max loop attempts %s) ===",
+                self.config.max_attempts,
+            )
+            try:
+                release_lock(
+                    lock_holder=execution_id,
+                    success=False,
+                    doc_id=doc_id,
+                    owner=owner,
+                    repo=repo,
+                    issue_number=issue_num,
+                    status=IssueStatus.NEEDS_HUMAN.value,
+                    failure_error=f"PR rejected after exceeding max loop attempts ({self.config.max_attempts}).",
+                )
+            except Exception as e:
+                logging.error("Failed to release Firestore lock on rejection: %s", e)
             sys.exit(1)
 
     async def _run_code_generation(self, iteration: int) -> None:
@@ -212,16 +306,19 @@ class Orchestrator:
         logging.info("Starting Code Generation Agent...")
         if iteration == 1:
             prompt = (
-                "Fix the bug described in firestore_doc.json following the implementation plan "
-                "and implement tests matching the testing strategy. "
-                "You are running in a headless sandbox environment. If you need to verify your changes, "
-                "run the test suite directly using your run_command tool (e.g. npm test). "
-                "Do NOT ask for permission or validation in the chat; execute commands directly."
+                "Fix the bug described in firestore_doc.json. "
+                "CRITICAL: You MUST use file editing tools (such as replace_file_content or write_file) "
+                "to apply the code modifications to the target files in implementation_plan.files_to_modify "
+                "and add the requested test assertions to testing_strategy.test_file. "
+                "Do NOT conclude your session after only viewing files or running baseline tests without making edits. "
+                "You are running in a headless sandbox environment. Execute any necessary test commands "
+                "using your run_command tool (e.g. npx vitest run <test_file>). Do NOT ask for permission in the chat."
             )
             prompt_file = "bug_fixer_prompt.md"
         else:
             prompt = (
                 "Use the feedback in pr_feedback.md to address the remaining issues in the code and tests. "
+                "CRITICAL: You MUST apply file modifications to the codebase using replace_file_content or write_file. "
                 "Original spec is at firestore_doc.json. "
                 "You are running in a headless sandbox environment. Execute any necessary test or build commands "
                 "directly using your run_command tool. Do NOT ask for permission in the chat."
@@ -440,8 +537,12 @@ class Orchestrator:
 
     async def _submit_pull_request(
         self, issue_num: int | str, issue_id: str, branch_name: str
-    ) -> None:
-        """Amends commit message, pushes feature branch, and publishes a GitHub PR."""
+    ) -> str | None:
+        """Amends commit message, pushes feature branch, and publishes a GitHub PR.
+
+        Returns:
+            The HTML URL of the created PR, or None if token is missing.
+        """
         logging.info("Proceeding with git push and pull request submission...")
         
         pr_details_file = os.path.join(self.config.eval_repo_path, "pr_details.md")
@@ -515,14 +616,15 @@ class Orchestrator:
 
             client = GitHubClient(owner=owner, repo=repo_name, token=self.config.git_token)
             try:
-                client.create_pull_request(
+                pr_url = client.create_pull_request(
                     branch_name=branch_name,
                     title=pr_title,
                     body=pr_body,
                 )
+                return pr_url
             except GitHubClientError as e:
                 logging.error("Pull request submission failed: %s", e)
                 sys.exit(3)
         else:
             logging.warning("GitHub token not configured. Skipping PR creation.")
-            sys.exit(0)
+            return None

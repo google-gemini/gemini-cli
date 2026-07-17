@@ -1,0 +1,45 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28001,
+  "issue_title": "Nightly Release Failed for v0.48.0-nightly.20260618.g4d3dcdce1 on 2026-06-18",
+  "issue_body": "The nightly-release workflow failed. See the full run for details: https://github.com/google-gemini/gemini-cli/actions/runs/27729673284\n\n### Actions Workflow Log Output:\n```text\nRun ./.github/actions/npm-auth-token\nRun AUTH_TOKEN=\"${INPUTS_GITHUB_TOKEN}\"\nRun npm publish \\\nnpm error No workspaces found:\nnpm error   --workspace=\nnpm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-06-18T01_47_11_864Z-debug-0.log\nError: Process completed with exit code 1.\n```",
+  "pr_number": 28016,
+  "target_version": "7ef3b4e1fc9dfef5ca15fef855a0fdd696369c14",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created on July 1, 2026. Note: Currently (as of July 1) the agent has no capability of opening external URL links to inspect nightly CI failure logs. Added log snippet to issue_body for now; automated CI log link scraping will be a Post-MVP feature.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28001",
+    "summary": {
+      "problem": "The Nightly Release workflow failed during the publish step for scheduled runs because the necessary package variables were empty.",
+      "root_cause": "The workflow was recently changed to run in the `internal` environment rather than `prod`. The `internal` environment does not have repository variables configured for `CLI_PACKAGE_NAME`, `CORE_PACKAGE_NAME`, `A2A_PACKAGE_NAME`, `NPM_REGISTRY_PUBLISH_URL`, `NPM_REGISTRY_URL`, and `NPM_REGISTRY_SCOPE`, resulting in empty package names in `npm publish` and causing the step to fail.",
+      "context": "Adding default fallback values within the Actions workflow prevents the publish from failing when these environment-specific variables are missing."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        ".github/workflows/release-nightly.yml"
+      ],
+      "steps": [
+        "Open `.github/workflows/release-nightly.yml`.",
+        "Under the action parameters where packages and registry details are configured, provide fallbacks using the logic-OR `||` operator in Github Actions expression syntax.",
+        "Change `npm-registry-publish-url` from `${{ vars.NPM_REGISTRY_PUBLISH_URL }}` to `${{ vars.NPM_REGISTRY_PUBLISH_URL || 'https://registry.npmjs.org/' }}`.",
+        "Change `npm-registry-url` from `${{ vars.NPM_REGISTRY_URL }}` to `${{ vars.NPM_REGISTRY_URL || 'https://registry.npmjs.org/' }}`.",
+        "Change `npm-registry-scope` from `${{ vars.NPM_REGISTRY_SCOPE }}` to `${{ vars.NPM_REGISTRY_SCOPE || '@google' }}`.",
+        "Change `cli-package-name` from `${{ vars.CLI_PACKAGE_NAME }}` to `${{ vars.CLI_PACKAGE_NAME || '@google/gemini-cli' }}`.",
+        "Change `core-package-name` from `${{ vars.CORE_PACKAGE_NAME }}` to `${{ vars.CORE_PACKAGE_NAME || '@google/gemini-cli-core' }}`.",
+        "Change `a2a-package-name` from `${{ vars.A2A_PACKAGE_NAME }}` to `${{ vars.A2A_PACKAGE_NAME || '@google/gemini-cli-a2a-server' }}`."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "The workflow evaluated package variables fallback cleanly to their default values, allowing successful execution of npm publish commands even when repository parameters are empty.",
+      "verification_steps": [
+        "Verify workflow syntax in `.github/workflows/release-nightly.yml` to confirm standard expression structures.",
+        "Ensure fallbacks resolve properly when corresponding `vars` are undefined."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

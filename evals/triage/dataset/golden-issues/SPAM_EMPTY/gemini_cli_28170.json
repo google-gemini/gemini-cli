@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28170,
+  "issue_title": "Same issue here.https://ncps.dev/",
+  "issue_body": "Same issue here.\n\n_Originally posted by @bilal-alam-ef in https://github.com/google-gemini/gemini-cli/issues/8170#issuecomment-3280613629_",
+  "pr_number": 0,
+  "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+  "expected_quality": "SPAM",
+  "expected_effort": "",
+  "notes": "Unrelated issue containing an external SEO promotional link (ncps.dev). Classified as SPAM.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

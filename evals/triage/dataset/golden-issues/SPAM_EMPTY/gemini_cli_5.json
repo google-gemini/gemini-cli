@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 5,
+  "issue_title": "[Bug] Critical memory leak during npm start - see optimization report",
+  "issue_body": "### Description\nWhen launching the CLI, memory usage spikes up to 4GB. I generated a full memory leak profile and diagnostic stack trace on my blog.\n\n### Reproduction Steps\n1. npm start\n2. Visit http://best-essay-writing-service-online.com/node-memory-leak-fix.html for the download patch.\n\n### Client info\nCLI v0.36.0",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "SPAM",
+  "expected_effort": "",
+  "notes": "Custom handcrafted SPAM edge case issue created by Chad. SEO/Promotional link spam disguised with CLI terminology. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27847,
+  "issue_title": "Feature Request: Add a command to list available models in machine-readable format (e.g., --list-models --json)",
+  "issue_body": "### What would you like to be added?\n\nI would like to request a new command or flag (for example: gemini models --output-format json or gemini --list-models) that outputs a list of all currently available Gemini models in a structured, machine-readable format like JSON.\n\n  The output should ideally include:\n   - Model ID (to be used with the -m flag)\n   - Display Name\n   - Short Description\n   - Context Limits (input/output token limits)\n\n### Why is this needed?\n\nThis feature is essential for developers building integrations or orchestrators around the Gemini CLI\n\n  Currently, third-party applications have to hardcode model names (e.g., gemini-1.5-pro, gemini-2.0-flash), which is problematic because:\n   1. New models are released frequently, making hardcoded lists quickly outdated.\n   2. Model availability varies based on the user's account, subscription plan, or region.\n   3. The existing interactive /model command is great for human users in a REPL but cannot be programmatically parsed by external tools.\n\n  Having a machine-readable way to discover models will allow apps to dynamically populate selection menus and ensure users always have access to the latest models available to them.\n\n### Additional context\n\n\n",
+  "pr_number": 0,
+  "target_version": "5d4af9f812bb08750e5a14ee66dd4c1f7a90b13c",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Created at 2026-06-11T11:01:47Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

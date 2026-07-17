@@ -1,0 +1,43 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27674,
+  "issue_title": "Files and folders specified in .gitignore are passed to session_context",
+  "issue_body": "### What happened?\n\nWhen starting a session, gemini cli will create a session_context and pass files and folders in the project.\nHowever, it passes files/folders that is specified in .gitignore and should be ignored.\n\nFor example, I have set cache folders (such as __pycache__, ruff_cache) to be ignored in .gitignore, but those folders are still included in the session_context.\n\n```\n<session_context>\nThis is the Gemini CLI. We are setting up the context for our chat.\nToday's date is Friday, June 5, 2026 (formatted according to the user's locale).\nMy operating system is: darwin\nThe project's temporary directory is: /Users/user/.gemini/tmp/api\n- **Workspace Directories:**\n  - /project-folder\n- **Directory Structure:**\n\nShowing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (200 items) was reached.\n\n/project-folder\n\u251c\u2500\u2500\u2500.env.sample\n\u251c\u2500\u2500\u2500.gitignore\n\u251c\u2500\u2500\u2500AGENTS.md\n\u251c\u2500\u2500\u2500poetry.lock\n\u251c\u2500\u2500\u2500pyproject.toml\n\u251c\u2500\u2500\u2500README.md\n\u251c\u2500\u2500\u2500.git/...\n\u251c\u2500\u2500\u2500.github/\n\u2502   \u2514\u2500\u2500\u2500workflows/\n\u2502       \u251c\u2500\u2500\u2500\n\u251c\u2500\u2500\u2500.mypy_cache/...\n\u251c\u2500\u2500\u2500.pytest_cache/...\n\u251c\u2500\u2500\u2500.ruff_cache/...\n\u251c\u2500\u2500\u2500.venv/...\n\u251c\u2500\u2500\u2500src/\n\u2502   \u2514\u2500\u2500\u2500foo/\n\u2502       \u251c\u2500\u2500\u2500__init__.py\n\u2502       \u251c\u2500\u2500\u2500__pycache__/...\n\u2502       \u251c\u2500\u2500\u2500\n\u2502\n\n</session_context>\n```\n\n### What did you expect to happen?\n\nFolders and files specified in .gitignore should not be passed to context.\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\nRun `gemini` to enter the interactive CLI, then run the `/about` command.\n\n```console\n> /about\nGemini CLI Info:\n- Version: 0.45.1\n- OS: darwin\n- Sandbox: no sandbox\n- Model: auto\n- Auth Type: gemini-api-key\n- GCP Project: \n- IDE Client: \n- User Email: Unknown\n- Tier: Unknown\n```\n\n</details>\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 27678,
+  "target_version": "4196596f7f48c0c397776f0cb7862c88d8fae91e",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Excellent, highly-localized golden issue. Even though PR #27678 was closed, it passes the eye test and has clean, targeted changes in getFolderStructure.ts and environmentContext.ts.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#27674",
+    "summary": {
+      "problem": "Folders and files specified in .gitignore are being included as truncated folders in the chatbot session context instead of being completely omitted.",
+      "root_cause": "The directory context formatter `getDirectoryContextString` in `environmentContext.ts` calls `getFolderStructure`, which by default always appends ignored directories as truncated paths to the context tree representation. There is no configuration option to exclude them entirely.",
+      "context": "The session context contains a summary of workspace files. Including ignored folders like node_modules or cache files wastes token budget and exposes irrelevant info. The CLI core needs a flag to omit ignored directories from the folder structure tree."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/getFolderStructure.ts",
+        "packages/core/src/utils/environmentContext.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/getFolderStructure.ts`, add an optional boolean field `showIgnoredFolders` to `FolderStructureOptions` interface.",
+        "In `getFolderStructure()`, set `showIgnoredFolders` default value to `true` in the merged options to maintain existing behavior for other parts of the CLI.",
+        "In the `readFullStructure()` directory traversal logic, check if a folder is ignored via `isIgnored` or is in `options.ignoredFolders`. If `options.showIgnoredFolders` is false, call `continue` to completely skip writing this directory entry into the tree hierarchy.",
+        "In `packages/core/src/utils/environmentContext.ts`, call `getFolderStructure` with `{ showIgnoredFolders: false }` inside `getDirectoryContextString` to filter out ignored directories from the initial session_context."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/utils/getFolderStructure.test.ts",
+      "expected_behavior": "When generating workspace folder layout with `showIgnoredFolders: false`, the returned structure string has no reference to ignored folders, whereas caller with default options still shows them truncated with '...'.",
+      "verification_steps": [
+        "Add a regression unit test in `packages/core/src/utils/getFolderStructure.test.ts` within the '.gitignore' suite to assert that folders excluded by workspace `.gitignore` are not contained in the output string if `showIgnoredFolders: false` is supplied.",
+        "Update the mock assertion in `packages/core/src/utils/environmentContext.test.ts` to verify that `getFolderStructure` is called with `{ showIgnoredFolders: false }` when generating directory context strings.",
+        "Run `npm run test --workspace @google/gemini-cli-core` or vitest to ensure all tests pass successfully."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

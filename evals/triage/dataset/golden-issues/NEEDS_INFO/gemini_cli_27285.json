@@ -1,0 +1,13 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27285,
+  "issue_title": "Gemini suddenly lost the ability to edit a single Python file",
+  "issue_body": "### What happened?\n\n\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n[bug-report-history-1779226553868.json](https://github.com/user-attachments/files/28031710/bug-report-history-1779226553868.json)\n\n### What did you expect to happen?\n\nA simple edit. It prepared a multi-edit that ran three simultaneous replace strings that created a bunch of junk.\n\n### Client information\n\n\n* **CLI Version:** 0.42.0\n* **Git Commit:** 68e2196d5\n* **Session ID:** 6e791b12-1a3c-4b12-accc-1f384ec9c882\n* **Operating System:** win32 v24.2.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto-gemini-3\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 508.4 MB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #0c0c0c\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\nGoogle Account, normal subscription $20/mo\n\n### Anything else we need to know?\n\nVery disappointed at Gemini's speed, halting after edits without SAYING anything, and generally making unhelpful or damaging edits to a very simple file.",
+  "pr_number": null,
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "generic complaint, user did not provide enough details to generate a workable spec",
+  "expected_workable_spec": {},
+  "target_version": "57c42a5c4042c23482ea48687f2c3af3d57a095f"
+}

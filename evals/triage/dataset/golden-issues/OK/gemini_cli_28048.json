@@ -1,0 +1,40 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28048,
+  "issue_title": "docs(hooks): LLMResponse `usageMetadata` in the reference omits `promptTokenCount` and `candidatesTokenCount` (the hook receives all three)",
+  "issue_body": "### What happened?\n\nIn the hooks reference, the **Stable Model API** documents `LLMResponse.usageMetadata` as a single-field object:\n\n`docs/hooks/reference.md` (line ~328, under `**LLMResponse**:`):\n\n```typescript\n\"usageMetadata\": { \"totalTokenCount\": number }\n```\n\nBut the hook-facing translator actually forwards **three** token fields, not one. `packages/core/src/hooks/hookTranslator.ts` `toHookLLMResponse()` (lines ~404-410) builds:\n\n```ts\nusageMetadata: sdkResponse.usageMetadata\n  ? {\n      promptTokenCount: sdkResponse.usageMetadata.promptTokenCount,\n      candidatesTokenCount: sdkResponse.usageMetadata.candidatesTokenCount,\n      totalTokenCount: sdkResponse.usageMetadata.totalTokenCount,\n    }\n  : undefined,\n```\n\nand the exported `LLMResponse` interface in the same file (lines ~60-63) declares all three as well:\n\n```ts\nusageMetadata?: {\n  promptTokenCount?: number;\n  candidatesTokenCount?: number;\n  totalTokenCount?: number;\n};\n```\n\nSo an `AfterModel` (or `BeforeModel`) hook receives `promptTokenCount` and `candidatesTokenCount` in addition to `totalTokenCount`, yet the reference \u2014 which is explicitly presented as the *stable* model API hooks can rely on (\"Gemini CLI uses these structures to ensure hooks don't break across SDK updates\") \u2014 lists only `totalTokenCount`.\n\n### What did you expect to happen?\n\nThe documented stable schema should match the fields the hook actually receives, i.e.:\n\n```typescript\n\"usageMetadata\": {\n  \"promptTokenCount\": number,\n  \"candidatesTokenCount\": number,\n  \"totalTokenCount\": number\n}\n```\n\n### Why this matters\n\nWe hit this while building a cross-platform hook/MCP middleware adapter. `AfterModel.usageMetadata` is the one host-native token-usage signal a hook can read, so we want the exact field list to record accurate per-turn usage. Going by the reference alone, an integrator would assume only `totalTokenCount` is available and would not read the input/output token breakdown that the code is already handing them. (The per-chunk firing cadence of `AfterModel` is already correctly noted in `docs/hooks/best-practices.md`, so this is purely the field list in the schema.)\n\nThis is the same omission class \u2014 but a different surface \u2014 from #27985 (ACP `PromptResponse` usage), which is about the ACP path, not the hooks `LLMResponse` stable-API schema; cross-referencing for context only.\n\n### Proposed fix\n\nA one-block edit to `docs/hooks/reference.md`: expand the `usageMetadata` schema under `**LLMResponse**:` to list `promptTokenCount`, `candidatesTokenCount`, and `totalTokenCount`, matching `hookTranslator.ts` `toHookLLMResponse()` and the exported `LLMResponse` interface.\n\nHappy to open the docs PR if a maintainer confirms this is the intended stable surface (I understand per CONTRIBUTING that the issue comes first).\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\nThis is a documentation/code-consistency report based on the current `main` (`docs/hooks/reference.md` and `packages/core/src/hooks/hookTranslator.ts`), not a runtime fault, so a `/about` capture is not applicable. Platform: N/A (docs).\n\n</details>",
+  "pr_number": 28057,
+  "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Simple doc update - tests if LLM can find where it is.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28048",
+    "summary": {
+      "problem": "In the hooks reference documentation, LLMResponse.usageMetadata is documented as an object containing only totalTokenCount, missing promptTokenCount and candidatesTokenCount which the hook actually receives in practice.",
+      "root_cause": "The schema definition for LLMResponse under LLMResponse.usageMetadata in docs/hooks/reference.md was not updated to reflect promptTokenCount and candidatesTokenCount properties which are already populated in packages/core/src/hooks/hookTranslator.ts.",
+      "context": "The hooks Reference guarantees structure stability to prevent hooks breaking on SDK updates. Integrators rely on the reference schema and would miss out on prompt and candidate token metrics without correct documentation."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "docs/hooks/reference.md"
+      ],
+      "steps": [
+        "Open docs/hooks/reference.md and locate the **LLMResponse** schema definition block around line 325-333.",
+        "Replace the line `\"usageMetadata\": { \"totalTokenCount\": number }` with the expanded usageMetadata configuration containing promptTokenCount, candidatesTokenCount, and totalTokenCount.",
+        "Ensure the final format exactly defines promptTokenCount, candidatesTokenCount, and totalTokenCount properties in the JSON/TypeScript block style."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "The usageMetadata schema block documented in docs/hooks/reference.md accurately describes all three token field properties.",
+      "verification_steps": [
+        "Manually review the markdown file docs/hooks/reference.md to ensure structure correctness and matching field definitions.",
+        "Confirm that promptTokenCount, candidatesTokenCount, and totalTokenCount are spelled identically to hookTranslator.ts."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

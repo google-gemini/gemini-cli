@@ -1,0 +1,37 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28251,
+  "issue_title": "isTrustedSystemPath rejects binaries in /nix/store, causing catastrophic fallback to GrepTool",
+  "issue_body": "**Disclaimer:**\n*This issue and root-cause analysis were generated with the assistance of an LLM (`gemini-3.1-pro-preview`) acting as a local CLI agent. The LLM was used to investigate a hanging process in an automated AI review pipeline. It autonomously read through local crash logs, traced the failure to a missing `rg` fallback, inspected the `gemini-cli` bundled source code (`chunk-RCJSF5RP.js`, `chunk-6ZHP2EJW.js`), and wrote test scripts to verify the behavior of `isExecutable` and the `PATH` environment inside the Nix subshell. This write-up synthesizes those findings.*\n\n**Description:**\nWhen using `gemini-cli` on a system managed by Nix (e.g. NixOS, `nix-darwin`, or `devenv`), the CLI successfully resolves the absolute path for required binaries like `rg` (Ripgrep) to `/nix/store/.../bin/rg`.\n\nHowever, the internal `isTrustedSystemPath()` validation function relies on a hardcoded allowlist of Unix prefixes (like `/usr/bin`, `/usr/local/bin`, `/opt/homebrew/bin`). Because `/nix/store` is missing from this list, `gemini-cli` rejects the executable.\n\n**Impact:**\nInstead of continuing to search the `PATH` for a trusted binary (like a fallback Homebrew installation), `gemini-cli` immediately gives up. In the case of Ripgrep, it logs:\n`Ripgrep is not available. Falling back to GrepTool.`\n\nThe fallback `GrepTool` relies on standard `grep`, which does not respect `.gitignore` rules. In large projects (e.g. Rust projects with a `target/` directory, or JS projects with `node_modules/`), this causes the agent to hang indefinitely as standard `grep` attempts to recursively crawl gigabytes of binary artifacts and untracked files.\n\n**Expected Behavior:**\n1. `/nix/store` should be added to the `trustedPrefixes` array in `isTrustedSystemPath()` for Unix platforms, as it is the standard path for read-only, immutable packages managed by Nix.\n2. (Optional but recommended) If the first resolved binary is rejected by trust policies, the resolution logic should continue iterating through the remaining `PATH` directories rather than immediately failing.",
+  "pr_number": 28256,
+  "target_version": "f7af4e5180cf92eea8190e383fd5daeeb2578c2d",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Clean, highly targeted environment bug: rejects Nix package manager paths (/nix/store), causing catastrophic fallback to GrepTool and agent hangs on large repos. Excellent SMALL effort benchmark testing whether candidate workers can accurately pinpoint path security validation in packages/core/src/utils/paths.ts without hallucinating unrelated tool files.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28251",
+    "summary": {
+      "problem": "When running on systems utilizing the Nix package manager (such as NixOS, nix-darwin, or devenv), gemini-cli attempts to resolve absolute binary paths like 'rg' (Ripgrep) to paths under '/nix/store/.../bin/rg'. Since the internal validation function rejects these paths because they are not on the trusted system path list, the CLI falls back to GrepTool (standard grep), which ignores .gitignore rules and hangs indefinitely in large repositories.",
+      "root_cause": "The isTrustedSystemPath() function in packages/core/src/utils/paths.ts uses a hardcoded array of trusted path prefixes that lacks support for the '/nix/store' directory.",
+      "context": "The Nix package manager installs all read-only, immutable packages under '/nix/store'. Adding this path to the trusted lists avoids catastrophic GrepTool fallbacks."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/paths.ts"
+      ],
+      "steps": [
+        "Add the directory path '/nix/store' to the trustedPrefixes array inside the isTrustedSystemPath() function in packages/core/src/utils/paths.ts."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/utils/paths.test.ts",
+      "expected_behavior": "Paths starting with '/nix/store' are trusted by isTrustedSystemPath() on Darwin (macOS) and Linux systems.",
+      "verification_steps": [
+        "Add a new unit test in packages/core/src/utils/paths.test.ts testing isTrustedSystemPath() with '/nix/store/abc123def456-ripgrep-14.1.0/bin/rg' and '/nix/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-ripgrep-14.1.0/bin/rg' under both darwin and linux mockPlatform scopes to ensure they return true."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

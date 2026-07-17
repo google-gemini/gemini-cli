@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 24541,
+  "issue_title": "enable 'Other' option for yesno question type",
+  "issue_body": "### What would you like to be added?\n\nThe `yesno` question type in the `ask-user` tool should support an optional \"Other\" feedback field, similar to the `choice` question type. This allows users to provide nuanced feedback or additional context when a simple \"Yes\" or \"No\" is insufficient.\n\n### Why is this needed?\n\nStrictly binary \"Yes/No\" choices can be too restrictive for developers who want to express \"Yes, but...\" or \"No, because...\". Enabling the \"Other\" option provides a more flexible communication channel between the agent and the user without requiring a full `text` question when the primary intent is still a binary decision.\n\n### Additional context\n\nThis enhancement has been implemented and verified locally. It involves:\n1. Updating `AskUserDialog.tsx` to enable the \"Other\" option for `yesno` questions.\n2. Updating core types and tool definitions to document the new capability.\n3. Adding UI tests to verify the custom feedback flow for `yesno` questions.\n",
+  "pr_number": 0,
+  "target_version": "b80234aa3ecf75d71dbf1e136f5c1aafe43b3545",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Created at 2026-04-02T17:27:15Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

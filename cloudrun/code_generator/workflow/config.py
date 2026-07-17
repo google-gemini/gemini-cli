@@ -25,6 +25,7 @@ class Config:
         )
         self.git_token: str | None = os.environ.get("GIT_TOKEN")
         self.firestore_doc_raw: str | None = os.environ.get("FIRESTORE_DOC")
+        self.execution_id: str | None = os.environ.get("EXECUTION_ID")
 
         # Google Cloud Platform configuration
         self.project_id: str = os.environ.get(

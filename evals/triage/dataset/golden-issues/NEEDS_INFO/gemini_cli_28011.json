@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28011,
+  "issue_title": "gimini infinit thinking loop",
+  "issue_body": "### What happened?\n\ngimini start thinkin adn never stopes it likea loop even when i close teh tb and \nlunch it again\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nstop he loop and start the ask \n\n### Client information\n\n\n* **CLI Version:** 0.47.0\n* **Git Commit:** 927170fca\n* **Session ID:** 0759ad84-f6b8-43f3-9c92-897f3c93c448\n* **Operating System:** win32 v24.12.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** gemini-3-flash-preview\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 390.9 MB\n* **Terminal Name:** xterm.js(6.1.0-beta.285)\n* **Terminal Background:** #1e1e1e\n* **Kitty Keyboard Protocol:** Supported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 0,
+  "target_version": "4d3dcdce1f03f6048bc65383b795ab4701da950b",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "We expect a triage comment specifically asking for the chat history JSON or the prompt/tools that led to the loop.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

@@ -1,0 +1,47 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25566,
+  "issue_title": "bug report requested by app.",
+  "issue_body": "### What happened?\n\n                                                                                                                      \u2502\n\u2502 \u2139  Detected terminal background color: #0c0c0c                                                                       \u2502\n\u2502                                                                                                                      \u2502\n\u2502 \u2716  =========================================                                                                         \u2502\n\u2502    This is an unexpected error. Please file a bug report using the /bug tool.                                       \u2588\u2502\n\u2502    CRITICAL: Unhandled Promise Rejection!                                                                           \u2588\u2502\n\u2502    =========================================                                                                        \u2588\u2502\n\u2502    Reason: Error: Custom plans directory 'c:\\csc\\ops\\plans\\' resolves to 'c:\\csc\\ops\\plans', which is outside the   \u2588\u2502\n\u2502    project root 'C:\\Users\\davey'.                                                                                   \u2588\u2502\n\u2502    Stack trace:                                                                                                     \u2588\u2502\n\u2502    Error: Custom plans directory 'c:\\csc\\ops\\plans\\' resolves to 'c:\\csc\\ops\\plans', which is outside the project   \u2588\u2502\n\u2502    root 'C:\\Users\\davey'.                                                                                           \u2588\u2502\n\u2502        at _Storage.getPlansDir                                                                                      \u2588\u2502\n\u2502    (file:///C:/Users/davey/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-ETUADTWF.js:42413:15)   \u2588\u2502\n\u2502        at Config._initialize                                                                                        \u2588\u2502\n\u2502    (file:///C:/Users/davey/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:350264:37)  \u2588\u2502\n\u2502        at async                                                                                                     \u2588\u2502\n\u2502    file:///C:/Users/davey/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/interactiveCli-EOCVNM6H.js:4791\u2588\u2502\n\u2502    6:9                                                                                                              \u2588\u2502\n\u2502 \u2139  Authenticated via \"oauth-personal\". \n\n### What did you expect to happen?\n\nthe console did not respond, pressed tab twice and got the above message.  no reply needed.  good day\n\n### Client information\n\n\n* **CLI Version:** 0.38.1\n* **Git Commit:** 7f5580034\n* **Session ID:** 538581cd-6a49-407c-bf62-1e23a174c08b\n* **Operating System:** win32 v24.13.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** gemini-2.5-flash-lite\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 275.5 MB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #0c0c0c\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 26560,
+  "target_version": "469092a72cbe368b69df25c0caeefbc911b6d6fd",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Excellent SMALL effort benchmark: direct stack trace in issue body (Config._initialize) allows 1-step symbol deduction to packages/core/src/config/config.ts with a localized 10-line try/catch fallback fix.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25566",
+    "summary": {
+      "problem": "The CLI crashes on startup with an unhandled promise rejection when a custom plans directory is configured outside the project root.",
+      "root_cause": "Config._initialize() in packages/core/src/config/config.ts calls this.storage.getPlansDir() directly without catching validation errors thrown when the custom plans directory is outside the project root.",
+      "context": "When custom plans directory validation fails in getPlansDir(), Config initialization crashes. Catching the error allows logging a warning and falling back to the default project temporary directory instead of crashing."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/config/config.ts"
+      ],
+      "steps": [
+        "Identify the block where layout/plans directory is retrieved under config.ts (inside initialization where this.planEnabled is true).",
+        "Wrap the call to this.storage.getPlansDir() in a try-catch block.",
+        "In the catch block, get the error message and call coreEvents.emitFeedback with a warning type, referencing the custom plans directory invalidation and the error message.",
+        "Reset the custom plans directory by calling this.storage.setCustomPlansDir(undefined).",
+        "Set plansDir to the fallback plans directory by invoking this.storage.getPlansDir() a second time inside/after the catch block."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/config/config.test.ts",
+      "expected_behavior": "When retrieving the custom plans directory throws an error, the Config initialize method handles the error gracefully by logging a warning, falling back to the default directory, and adding the default directory to the workspace context.",
+      "verification_steps": [
+        "Create a test case 'should gracefully fallback to default plans directory if retrieving custom directory throw an error' in packages/core/src/config/config.test.ts.",
+        "Spy on coreEvents.emitFeedback.",
+        "Instantiate a Config with a plan directory set outside the project root.",
+        "Call config.initialize() and assert that no error is thrown.",
+        "Verify that config.storage.getPlansDir() falls back to a plan directory contained in the default project temp folder and does not contain the outside path.",
+        "Assert that coreEvents.emitFeedback was called with 'warning' and a string containing 'Invalid custom plans directory'.",
+        "Assert that the workspaceContext contains the fallback plans directory."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

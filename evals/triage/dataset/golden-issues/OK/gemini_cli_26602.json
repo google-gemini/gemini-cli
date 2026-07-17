@@ -1,0 +1,47 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26602,
+  "issue_title": "ci: Issue Triage workflows fail with Argument list too long",
+  "issue_body": "### What happened?\n\nBoth the `Gemini Scheduled Issue Triage` and `Gemini Automated Issue Triage` workflows are failing with an `Argument list too long` error. This occurs because the workflows load potentially huge JSON arrays or text of untriaged issues (which include issue bodies) directly into bash environment variables during their respective issue fetching and preparation steps.\n\n### What did you expect to happen?\n\nThe workflows should be able to safely fetch and process untriaged issues without exceeding the operating system's maximum environment variable size limits, enabling the Gemini issue analysis steps to process them successfully.\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\nAutomated GitHub Actions environment.\n\n</details>\n\n### Login information\n\nGitHub Actions using a GitHub App token and GCP Workload Identity Federation.\n\n### Anything else we need to know?\n\nThe workflows are also encountering an \"untrusted directory\" error due to changes in how `run-gemini-cli` evaluates workspaces in headless mode.",
+  "pr_number": 26603,
+  "target_version": "7fb5146c6b084888b38dea05af6a4e95ea48810a",
+  "expected_quality": "OK",
+  "expected_effort": "LARGE",
+  "notes": "Advanced LARGE effort CI/CD benchmark: tests if candidate workers can diagnose GitHub Actions runner ARG_MAX (E2BIG) limits, refactor workflow env vars into filesystem JSON/markdown outputs, enable read_file in coreTools, and set GEMINI_CLI_TRUST_WORKSPACE across multiple workflow files.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26602",
+    "summary": {
+      "problem": "Both the 'Gemini Scheduled Issue Triage' and 'Gemini Automated Issue Triage' GitHub Action workflows fail with an 'Argument list too long' error due to passing huge JSON arrays or text of untriaged issues directly into bash environment variables during their respective execution steps. They also hit an 'untrusted directory' workspace validation error in headless environments.",
+      "root_cause": "The workflows loaded full issue bodies and JSON sets directly through GitHub env contexts and environment variables (ISSUE_TITLE, ISSUE_BODY, ISSUES_TO_TRIAGE), which exceeded system limits on the maximum size of environment variables. Also, run-gemini-cli headless workspace evaluation demands setting GEMINI_CLI_TRUST_WORKSPACE.",
+      "context": "To solve this without losing access to issue bodies, issue contexts and data must be persisted to the filesystem ('issue_context.md' and 'issues_to_triage.json'). The 'read_file' tool can then be added to the gemini-cli config so the model reads the details direct from disk instead of via env variables."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        ".github/workflows/gemini-automated-issue-triage.yml",
+        ".github/workflows/gemini-scheduled-issue-triage.yml"
+      ],
+      "steps": [
+        "In .github/workflows/gemini-automated-issue-triage.yml, insert a 'Prepare Issue Data' step before 'Run Gemini Issue Analysis'. Write the ISSUE_TITLE and ISSUE_BODY into a file named 'issue_context.md'.",
+        "In .github/workflows/gemini-automated-issue-triage.yml, under 'Run Gemini Issue Analysis', add the environment variable GEMINI_CLI_TRUST_WORKSPACE: 'true' and remove the direct ISSUE_TITLE/ISSUE_BODY environment variables.",
+        "In .github/workflows/gemini-automated-issue-triage.yml, add 'read_file' to the 'coreTools' array within the gemini_config block.",
+        "In .github/workflows/gemini-automated-issue-triage.yml, update the prompt to instruct the assistant to read 'issue_context.md' using 'read_file' rather than parsing env variables in step 1.",
+        "In .github/workflows/gemini-scheduled-issue-triage.yml, modify 'Get issue from event' to write the filtered issue contents directly to 'issues_to_triage.json' instead of saving outputs dynamically to an environment variable, and output 'has_issues=true'.",
+        "In .github/workflows/gemini-scheduled-issue-triage.yml, in 'Find untriaged issues', output gh command responses to JSON files 'no_area_issues.json', 'no_kind_issues.json', and 'no_priority_issues.json'. Merge them using 'jq' to output 'issues_to_triage.json'. Conditionally set 'has_issues' to 'true' or 'false' depending on the generated json array's length.",
+        "In .github/workflows/gemini-scheduled-issue-triage.yml, under'Run Gemini Issue Analysis', change the conditional execution check to evaluate 'steps.get_issue_from_event.outputs.has_issues == 'true' || steps.find_issues.outputs.has_issues == 'true''.",
+        "In .github/workflows/gemini-scheduled-issue-triage.yml, add 'read_file' to the coreTools array, configure GEMINI_CLI_TRUST_WORKSPACE: 'true', and delete the ISSUES_TO_TRIAGE environment variable.",
+        "In .github/workflows/gemini-scheduled-issue-triage.yml, update steps 2 and 3 of the analysis prompt to instruct the assistant to read the file 'issues_to_triage.json' via 'read_file'."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "Automated and Scheduled triage GitHub action workflows complete successfully without hitting argument list length limits or untrusted workspace errors, and successfully query, format, and apply labels to issues.",
+      "verification_steps": [
+        "In a live repository or test Fork, trigger 'Gemini Automated Issue Triage' via dispatch or issue creation.",
+        "Trigger 'Gemini Scheduled Issue Triage' and verify issues_to_triage.json is written, gemini-cli successfully resolves labels, and labels are processed."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

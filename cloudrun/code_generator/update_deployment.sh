@@ -22,7 +22,7 @@ WORKFLOW_NAME="pr-gen-workflow"
 WORKFLOW_SA="triaged-issue-ingestion@${PROJECT_ID}.iam.gserviceaccount.com"
 EXEC_SA="code-gen-job-execution-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# Ensure script runs from the directory containing Dockerfile & code_generation_orchestrator/worker.py
+# Ensure script runs from the directory containing Dockerfile & workflow/worker.py
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
@@ -67,7 +67,7 @@ gcloud run jobs deploy "${JOB_NAME}" \
   --memory=8Gi \
   --cpu=2 \
   --service-account="${EXEC_SA}" \
-  --set-env-vars="GOOGLE_CLOUD_LOCATION=global,MODEL_NAME=gemini-3.5-flash" \
+  --set-env-vars="GOOGLE_CLOUD_LOCATION=global,MODEL_NAME=gemini-3.5-flash,FIRESTORE_DATABASE=test-gcli-db-clone,FIRESTORE_COLLECTION=test_issues" \
   --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" \
   --quiet
 

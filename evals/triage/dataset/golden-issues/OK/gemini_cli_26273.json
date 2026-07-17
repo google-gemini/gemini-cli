@@ -1,0 +1,38 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26273,
+  "issue_title": "Gemini Extension can't be installed from ssh repository",
+  "issue_body": "### What happened?\n\nTrying to install an extension from a repository that uses an SSH URL, the extension is not installed.\n\nCommand:\n```gemini extensions install ssh://url.domain.com```\n\nError:\n```Install source not found.```\n\n### What did you expect to happen?\n\nThe extension should be downloaded and installed, since the ssh key is already available.\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\n```console\n> /about\nAbout Gemini CLI\n\nCLI Version: 0.40.0\nGit Commit: 3d5bdc052\nModel: Auto (Gemini 3)\nSandbox: no sandbox\nOS: linux\nAuth Method: Signed in with Google\nTier: Gemini Code Assist Enterprise\n```\n\n</details>\n\n### Login information\n\nGoogle Account\n\n### Anything else we need to know?\n\nCurrently, the installation process filters the allowed URL, which doesn't include URLs with `ssh://` prefix (on `packages/cli/src/config/extension-manager.ts`).\nIs there any reason why `ssh://` prefix is not allowed? Can we enable it as well?",
+  "pr_number": 26274,
+  "target_version": "8a3fde4c334b433fee45aeaeebb69905ec85162d",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Simple fix - good to test. Doesn't have a test file though. It should its fine if the triage-worker adds a test but this should be looked at more closely.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26273",
+    "summary": {
+      "problem": "Installing an extension from a git repository with an SSH URL (e.g., 'ssh://url.domain.com') fails with an 'Install source not found' error.",
+      "root_cause": "The `inferInstallMetadata` function in `packages/cli/src/config/extension-manager.ts` does not check for the 'ssh://' protocol prefix when filtering and validating permitted installation URLs.",
+      "context": "The installation process restricts URL schemas to specific prefixes (such as git@, sso://, github:, gitlab:). Adding 'ssh://' logic allows the extension manager to handle standard SSH git repositories."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/config/extension-manager.ts"
+      ],
+      "steps": [
+        "Identify the prefix checks inside the `inferInstallMetadata` function in `packages/cli/src/config/extension-manager.ts`.",
+        "Add `source.startsWith('ssh://')` as an additional logical OR condition in the conditional block that matches valid repository URL prefixes."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "A URL starting with 'ssh://' should be matched by the prefix filtering check in `inferInstallMetadata` and returned as a valid source option.",
+      "verification_steps": [
+        "Execute `gemini extensions install ssh://url.domain.com` and verify that the installation source validation successfully identifies 'ssh://url.domain.com' as a valid metadata source without throwing the 'Install source not found' error."
+      ],
+      "framework": "N/A"
+    }
+  },
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue."
+}

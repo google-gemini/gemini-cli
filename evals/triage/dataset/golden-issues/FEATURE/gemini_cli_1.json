@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 1,
+  "issue_title": "Feature Request: Add --export-format markdown option for chat history exports",
+  "issue_body": "### Description\nIt would be super helpful if Gemini CLI supported exporting chat session histories directly into Markdown format.\nCurrently, exported session logs are stored as raw JSON under `~/.gemini/tmp/`.\n\n### Proposed Solution\nAdd a `--export-format <format>` flag (supporting `json` and `markdown`) to `gemini export` so users can easily share readable conversation notes in documentation or GitHub PRs.\n\n### Use Case\nThis would save time when embedding agent logs into team documentation or pull request descriptions.",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Custom handcrafted FEATURE issue created by Chad. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "Feature request issue; quality is FEATURE.",
+  "expected_workable_spec": {}
+}

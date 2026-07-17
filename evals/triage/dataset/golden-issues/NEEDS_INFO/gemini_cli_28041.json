@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28041,
+  "issue_title": "API key is not persisted across sessions",
+  "issue_body": "When connecting gemini-cli to an API key, the key is asked again the next time gemini-cli is launched. The CLI should store the status/info across sessions to avoid prompting the user repeatedly.",
+  "pr_number": 0,
+  "target_version": "6613e129de7ab58a09b7cd4a13127195b24da8ab",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Missing OS, authentication method, and configuration file permissions details. Classified as NEEDS_INFO.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

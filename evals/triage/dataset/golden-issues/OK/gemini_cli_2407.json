@@ -1,0 +1,48 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 2407,
+  "issue_title": "/privacy: Error loading Opt-in settings: User does not have a current tier",
+  "issue_body": "### What happened?\n\n/privacy is not working properly with licensed gmail auth + google_cloud_project set.\n\n![Image](https://github.com/user-attachments/assets/643384e7-cea7-401e-8783-45fae37e35e3)\n\n### What did you expect to happen?\n\n`/slash` without errors.\n\n### Client information\n\n\n*   **CLI Version:** 0.1.7\n*   **Git Commit:** 55cc809\n*   **Operating System:** linux v22.17.0\n*   **Sandbox Environment:** no sandbox\n*   **Model Version:** gemini-2.5-pro\n*   **Memory Usage:** 168.9 MB\n\n\n### Login information\n\nGoogle Account + GOOGLE_CLOUD_PROJECT\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 28304,
+  "target_version": "15a9429b69bd4c72514678ac17c88087f7ab9d48",
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "Great OK candidate: clean UX bug with self-contained React hook + UI component ground-truth fix.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#2407",
+    "summary": {
+      "problem": "Running `/privacy` on accounts without a consumer Code Assist tier surfaces a confusing error message 'User does not have a current tier' or 'Could not determine user tier' instead of displaying a clear, actionable notice.",
+      "root_cause": "The `/privacy` workflow expects a valid consumer Code Assist tier to be active, causing `usePrivacySettings` hook and related helpers to throw raw errors for unresolved tiers, missing oauth context, or missing project IDs, rather than gracefully intercepting them and exposing a dedicated UI state.",
+      "context": "The command `/privacy` is used for managing data collection opt-in settings. On enterprise, Workspace, or OAuth-based logins without a specified Google Cloud project, this prompt is not applicable."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/ui/hooks/usePrivacySettings.ts",
+        "packages/cli/src/ui/privacy/CloudFreePrivacyNotice.tsx"
+      ],
+      "steps": [
+        "Create a custom `TierUnavailableError` extending `Error` to signal that the current account configuration lacks a consumer Code Assist tier.",
+        "Modify helper `getCodeAssistServerOrFail(config)` in `usePrivacySettings.ts` to throw `TierUnavailableError` when there is no OAuth context or when `server.projectId` is undefined.",
+        "Define an `isTierUnavailableError` helper in `usePrivacySettings.ts` that returns true if the error is an instance of `TierUnavailableError` or has a message matching the case-insensitive regex `/does not have a current tier/i`.",
+        "In `usePrivacySettings` hook, if `server.userTier` is undefined, immediately set `privacyState.isTierUnavailable` to true, `isLoading` to false, and return early.",
+        "In `usePrivacySettings` loading and updating routines, catch errors and check if they are tier-unavailable errors using the helper. If so, update `isTierUnavailable` to true, set `isLoading` to false, and handle it gracefully without setting the error string.",
+        "In `CloudFreePrivacyNotice.tsx`, update the keypress listener so that if `privacyState.isTierUnavailable` is true, pressing 'escape' triggers the exit action.",
+        "In `CloudFreePrivacyNotice.tsx`, render a specific UI block when `privacyState.isTierUnavailable` is true. The UI must inform the user that data collection opt-in is not available, mention Google Workspace / enterprise accounts, guide them to set the `GOOGLE_CLOUD_PROJECT` environment variable, provide the documentation URL, and prompt them to press Esc to exit."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/ui/hooks/usePrivacySettings.test.tsx",
+      "expected_behavior": "When `/privacy` is run under an account or configuration without a consumer Code Assist tier, the UI gracefully displays a clear explanation of why the settings are inapplicable, guides users with instructions about `GOOGLE_CLOUD_PROJECT`, and allows exiting with the 'Esc' key without showing any raw red error dialogs.",
+      "verification_steps": [
+        "Verify `usePrivacySettings` hook sets `isTierUnavailable` to true when OAuth is not being used, with no error set.",
+        "Verify `usePrivacySettings` hook sets `isTierUnavailable` to true when the CodeAssistServer lacks a project ID.",
+        "Verify `usePrivacySettings` hook reports `isTierUnavailable` when `getCodeAssistGlobalUserSetting` throws the specific backend error containing 'User does not have a current tier'.",
+        "Verify unexpected errors (such as network issues) are still handled as standard errors with the error string populated.",
+        "Verify that `CloudFreePrivacyNotice` renders the specific help text including 'GOOGLE_CLOUD_PROJECT' when `privacyState.isTierUnavailable` is true, and properly triggers `onExit` when Esc is pressed."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

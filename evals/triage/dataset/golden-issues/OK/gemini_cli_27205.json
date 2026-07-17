@@ -1,0 +1,39 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27205,
+  "issue_title": "GEMINI CLI aggressively scans .venv in custom skills (ignores .gitignore / .geminiignore)",
+  "issue_body": "### What happened?\n\nWhen developing a custom skill inside the `.gemini/skills/` directory using Python and a package manager like `uv` (which creates a local `.venv` folder), the Gemini CLI automatically maps and shares the entire `.venv` directory with the model.\n\nAny attempts to ignore this folder using standard `.gitignore` or `.geminiignore` files placed directly in the skill directory (or its subdirectories) are completely ignored by the CLI parser.\n\nExample project\n\n[GeminiCliTestBench.zip](https://github.com/user-attachments/files/27958810/GeminiCliTestBench.zip)\n\n```\nResources to be shared with the model:                                                                                 \nShowing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were      \nignored, or the display limit (200 items) was reached.                                                                 \n                                                                                                                       \nC:\\Users\\...\\.gemini\\skills\\my-skill\\                                         \n\u251c\u2500\u2500\u2500SKILL.md                                                                                                           \n\u2514\u2500\u2500\u2500scripts\\                                                                                                           \n    \u251c\u2500\u2500\u2500main.py                                                                                                  \n    \u251c\u2500\u2500\u2500pyproject.toml                                                                                                 \n    \u251c\u2500\u2500\u2500uv.lock                                                                                                        \n    \u2514\u2500\u2500\u2500.venv\\                                                                                                         \n        \u251c\u2500\u2500\u2500.gitignore                                                                                                 \n        \u251c\u2500\u2500\u2500.lock                                                                                                      \n        \u251c\u2500\u2500\u2500CACHEDIR.TAG \n        ...\n```\n\n#### Impact\n\n* Token waste: Sending thousands of irrelevant library files to the LLM context.\n* Performance issue: Unnecessary local file mapping slows down the execution. \n* UX degradation: The terminal log hits the 200 items limit instantly, obscuring the actual relevant source files from the user's view.\n\n### What did you expect to happen?\n\nThe CLI should evaluate the skill context efficiently. It should either:\n\n* Ignore common heavy development directories by default (.venv, node_modules, __pycache__, .git).\n* Explicitly respect `.gitignore` or `.geminiignore` rules located within the skill's root directory.\n\n### Client information\n\nEnvironment:\n\n* OS: Windows (but likely affects all OS)\n* Tooling: Python / uv\n\nClient Information:\n\n```console\nCLI Version                              0.42.0                                                                      \nGit Commit                               68e2196d5                                                                   \nModel                                    Auto (Gemini 3)                                                             \nSandbox                                  no sandbox                                                                  \nOS                                       win32                                                                       \nAuth Method                              Signed in with Google (jan.krakora@valeo.com)                               \nTier                                     Gemini Code Assist Standard                                                 \nGCP Project                              valeo-cp2384-dev          \n```\n\n\n\n### Login information\n\nGoogle Account\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 28149,
+  "target_version": "3fbf93e26fd3ed6f9273f4e87c02786b9c73690b",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Fix custom skills .venv scanning to respect .gitignore/.geminiignore. Modifies packages/core/src/skills/activate-skill.ts.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#27205",
+    "summary": {
+      "problem": "Gemini CLI automatically maps and shares the entire local `.venv` directory (and other ignored directories) inside custom skills regardless of `.gitignore` or `.geminiignore` rules.",
+      "root_cause": "In `activate-skill.ts`, `getFolderStructure(path.dirname(skillLocation))` was being invoked without passing a `fileService` option. Without a `fileService`, the utility does not apply `.gitignore` or `.geminiignore` filtering and only falls back to a minimal set of hardcodedignored folders.",
+      "context": "Other parts of the system, like the workspace folder structure builders in `environmentContext.ts`, properly pass `{ fileService: config.getFileService() }` to ensure ignored patterns are respected."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/tools/activate-skill.ts"
+      ],
+      "steps": [
+        "Locate the invocation of `getFolderStructure(path.dirname(skillLocation))` inside the `ActivateSkillToolInvocation` class.",
+        "Pass `{ fileService: this.config.getFileService() }` as the second argument to the `getFolderStructure` function call to enable `.gitignore` and `.geminiignore` parsing."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/tools/activate-skill.test.ts",
+      "expected_behavior": "When custom skills are activated, standard ignored paths such as `.venv` are not shared with the model.",
+      "verification_steps": [
+        "Add a unit test verifying that `ActivateSkillTool` calls `getFolderStructure` with the `fileService` retrieved from the config object.",
+        "Assert that `getFolderStructure` is called with the skill path and an options object containing `fileService: mockFileService`."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

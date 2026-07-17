@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 4,
+  "issue_title": "a",
+  "issue_body": "",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "EMPTY",
+  "expected_effort": "",
+  "notes": "Custom handcrafted EMPTY issue created by Chad. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

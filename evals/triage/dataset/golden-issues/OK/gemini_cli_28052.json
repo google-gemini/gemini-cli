@@ -1,0 +1,37 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28052,
+  "issue_title": "Bug: Trailing '.' in antigravity.google URL in error message causes link to not load",
+  "issue_body": "## Bug Report: Trailing `.` in `antigravity.google` URL causes link to not load\n\n### Description\n\nWhen signing in with Google fails in Gemini CLI, the error message displays a URL with an **extra trailing period (`.`)** appended to it. This makes the URL invalid and it fails to load in a browser.\n\n### Steps to Reproduce\n\n1. Run `gemini` CLI\n2. Select **\"Sign in with Google\"** from the authentication options\n3. Observe the error message displayed\n4. Try to open the URL shown in the error message\n\n### Current Behavior\n\nThe error message reads:\n\n> Failed to sign in. Message: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: `https://antigravity.google.`\n\nThe URL is `https://antigravity.google.` \u2014 note the **extra trailing period** at the end. When clicked or copied into a browser, it resolves to `https://antigravity.google.` which is an invalid domain and does not load.\n\n### Expected Behavior\n\nThe URL should be:\n\n```\nhttps://antigravity.google\n```\n\n(without the trailing period)\n\n### Environment\n\n- Gemini CLI version: v0.47.0\n\n### Additional Context\n\nThe trailing `.` is likely a punctuation character from the sentence that has been accidentally included in the URL string in the source code. The fix would be to remove the trailing period from the URL in the error message.",
+  "pr_number": 28054,
+  "target_version": "f8541cf7a2912e8a99ee21445195c87780912cac",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created at 2026-06-19T21:18:20Z",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#28052",
+    "summary": {
+      "problem": "Failed to sign in error message displays a URL with an extra trailing period ('https://antigravity.google.'), making the URL invalid and causing it to fail to load in a browser.",
+      "root_cause": "The interactive sign-in error rendering does not strip trailing punctuation like sentence-ending periods from URLs before presenting them in the clickable CLI error message.",
+      "context": "To keep CLI error reports clean and links clickable, we need a URL cleanup (either targeted in useAuth.ts or centrally in getErrorMessage inside errors.ts) that strips sentence-ending periods from URLs before presenting them to users."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/errors.ts (or packages/cli/src/ui/auth/useAuth.ts)"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/errors.ts` (or `packages/cli/src/ui/auth/useAuth.ts`), sanitize or strip trailing periods from URLs in error messages before returning/displaying them to users."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/utils/errors.test.ts (or packages/cli/src/ui/auth/useAuth.test.tsx)",
+      "expected_behavior": "When a sign-in error with a trailing period URL occurs, the URL trailing period is removed correctly in the final CLI error message.",
+      "verification_steps": [
+        "In `packages/core/src/utils/errors.test.ts` (or `packages/cli/src/ui/auth/useAuth.test.tsx`), add a unit test in the `getErrorMessage` describe block verifying that error messages with trailing period URLs ('https://antigravity.google.') are sanitized to 'https://antigravity.google'."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "golden_spec_rationale": "The human PR modified useAuth.ts, but modifying getErrorMessage() in packages/core/src/utils/errors.ts is also a valid alternative centralized fix that is global (reviewed manually by Chad)."
+}

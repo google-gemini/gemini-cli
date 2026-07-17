@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 7,
+  "issue_title": "[Bug] GCP Vertex AI streaming responses drop connections on HTTP/2 proxy",
+  "issue_body": "### Description\nWhen using `gemini` with Vertex AI backend over an internal corporate HTTP/2 proxy, long streaming responses drop midway with a socket hangup error.\n\n### Steps to Reproduce\n1. Set `GOOGLE_GENAI_USE_VERTEXAI=true`\n2. Run `gemini -p \"Generate large architecture document\"`\n\n### Actual Behavior\nStream drops after 30 seconds with `FetchError: socket hang up`.\n\n### Expected Behavior\nResponse streams to completion over proxy connection.",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Custom handcrafted NEEDS_INFO edge case issue created by Chad. Enterprise proxy streaming bug lacking Node runtime version and HTTP_PROXY/HTTPS_PROXY env settings. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

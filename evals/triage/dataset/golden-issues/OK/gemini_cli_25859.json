@@ -1,0 +1,46 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 25859,
+  "issue_title": "Windows: Regression - run_shell_command strips double quotes",
+  "issue_body": "### Description\nOn Windows, `run_shell_command` incorrectly strips double quotes from commands, even when they are properly enclosed in single quotes or escaped. This breaks any tool that requires quoted arguments (Node.js, JDT, JSON parsers).\n\n### Steps to Reproduce\nRun the following command via Gemini CLI on Windows:\n`!node -e 'console.log(\"test\")'`\n\n**Expected behavior:**\nOutput: `test`\n\n**Actual behavior:**\n```\nReferenceError: test is not defined\n    at [eval]:1:13\n```\nThe CLI strips the double quotes around `test`, so Node receives `console.log(test)` instead of `console.log(\"test\")`.\n\n### Technical Root Cause\nThe issue is caused by wrapping commands in `powershell.exe -NoProfile -Command \"...\"`. \nWhen the outer wrapper is a double-quoted string, internal double quotes are lost or mangled during the process spawn on Windows.\n\n### Suggested Fix\nUse **`-EncodedCommand`** for Windows shell execution. \nEncoding the command string as Base64 (UTF-16LE) is the only reliable way to ensure that complex strings and quotes are preserved exactly as intended by the model.\n\n### Environment\n- OS: Windows 10/11\n- Gemini CLI Version: 0.39.0 (Latest Stable)",
+  "pr_number": 25900,
+  "target_version": "055e0f64524217fefb1a3d7c8b0fceef7ed14867",
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "Created at 2026-04-23T07:44:07Z. NOTE: This benchmark issue is a bit shaky / unrealistic. The human PR fix required refactoring resolveExecutable from async to sync in shell-utils.ts, adding a pwsh.exe (PowerShell 7) fallback, and updating ripGrep.ts. Since pwsh.exe is not mentioned in the issue body or pre-fix codebase, single-prompt triage agents predictably anchor on the user's Base64 -EncodedCommand suggestion or target shellExecutionService.ts instead.",
+  "golden_spec_rationale": "The file `packages/cli/src/ui/components/SessionSummaryDisplay.tsx` was pruned from `files_to_modify` because its modification was a secondary, opportunistic refactoring to simplify component shell checking. `packages/core/src/tools/ripGrep.ts` was also pruned because it was only modified due to a cascading function signature change (removing await after resolveExecutable became synchronous), rather than a requirement to resolve the Windows quote-stripping defect.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#25859",
+    "summary": {
+      "problem": "On Windows, `run_shell_command` incorrectly strips double quotes from commands, even when properly enclosed or escaped, breaking tools that require quoted arguments (such as Node.js, JDT, or JSON parsers).",
+      "root_cause": "`run_shell_command` defaults to executing commands via Windows PowerShell 5.1 (`powershell.exe`), which drops inline double quotes when passing arguments to native executables. PowerShell 7 (`pwsh.exe`) supports standards-compliant argument passing (via `$PSNativeCommandArgumentPassing = 'Windows'`) and does not exhibit this regression.",
+      "context": "The issue is resolved by updating `getShellConfiguration` in `shell-utils.ts` to prefer `pwsh.exe` from `PATH` over `powershell.exe` on Windows. To achieve this synchronously within `getShellConfiguration`, the `resolveExecutable` utility has to be refactored to run synchronously via `fs.accessSync` instead of `fs.promises.access`."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/utils/shell-utils.ts",
+        "packages/core/src/services/shellExecutionService.ts",
+        "packages/core/src/tools/ripGrep.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/shell-utils.ts`, refactor `resolveExecutable` from asynchronous to synchronous by replacing asynchronous `fs.promises.access` with synchronous `fs.accessSync(filePath, fs.constants.X_OK)`. Create an internal helper `isExecutable(filePath: string): boolean` to handle the try-catch block around `fs.accessSync`.",
+        "In `packages/core/src/utils/shell-utils.ts`, modify `getShellConfiguration()` on Windows to attempt to resolve `pwsh.exe` using the newly synchronous `resolveExecutable('pwsh.exe')` helper before falling back to `powershell.exe`.",
+        "If `pwsh.exe` is resolved successfully, return a `ShellConfiguration` pointing to the absolute path of `pwsh.exe` with `argsPrefix: ['-NoProfile', '-Command']` and `shell: 'powershell'`.",
+        "In `packages/core/src/services/shellExecutionService.ts`, update the reference to `resolveExecutable` to invoke it synchronously rather than awaiting its result.",
+        "In `packages/core/src/tools/ripGrep.ts`, update the reference to `resolveExecutable` inside `resolveRipgrepPath()` to invoke it synchronously rather than awaiting its result."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/services/shellExecutionService.windows.integration.test.ts",
+      "expected_behavior": "When executing commands with embedded double quotes on a Windows machine where PowerShell 7 (`pwsh.exe`) is installed, the quotes are preserved exactly as intended by the model and correctly processed by child processes (e.g. `node -e`).",
+      "verification_steps": [
+        "Add synchronous environment stubbing and mock path tests in `packages/core/src/utils/shell-utils.test.ts` to verify the order of shell selection and path-extension checks on Windows.",
+        "Execute automated Integration tests in `packages/core/src/services/shellExecutionService.windows.integration.test.ts` on a Windows target, asserting that complex commands such as `node -e 'console.log(\"preserved\")'` execute successfully and output `preserved` with exit code 0.",
+        "Ensure the full unit test suite passes successfully and no regressions are introduced in other platforms.",
+        "Verify that `resolveRipgrepPath` successfully resolves system ripgrep using the synchronous `resolveExecutable` logic."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 2,
+  "issue_title": "Feature Request: Support text-to-speech (--tts) playback for model responses",
+  "issue_body": "### Description\nI would love to have a text-to-speech (TTS) playback option built into the CLI for hands-free workflow sessions.\n\n### Proposed Solution\nAdd a `--tts` or `--audio-output` flag when launching `gemini`. When enabled, the CLI would stream audio playback of the model's generated text response using native system audio APIs.\n\n### Use Case\nUseful when listening to long code reviews or architectural summaries while multi-tasking.",
+  "pr_number": 0,
+  "target_version": "main",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Custom handcrafted FEATURE issue created by Chad. Note: Issue IDs 1-99 are custom made by Chad for benchmark testing.",
+  "golden_spec_rationale": "Feature request issue; quality is FEATURE.",
+  "expected_workable_spec": {}
+}

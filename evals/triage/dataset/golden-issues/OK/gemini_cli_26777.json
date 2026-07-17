@@ -1,0 +1,46 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 26777,
+  "issue_title": "Title: getRipgrepPath() never falls back to system PATH \u2014 ripgrep unavailable despite being installed",
+  "issue_body": "**Environment:**\n  gemini --version  \n# \u2192 0.41.1 (git e1a54496d)                                                                                                 \n  rg --version      \n# \u2192 ripgrep 15.1.0 \u2713                    \n  OS: Windows 11, win32\n  - Install method: npm install -g @google/gemini-cli\n  - ripgrep: installed via winget install BurntSushi.ripgrep.MSVC (in system PATH, rg --version works)\n\n  Bug:\n  getRipgrepPath() in bundle/chunk-NET4RIEQ.js only checks two paths relative to its own bundle dir:\n  vendor/ripgrep/rg-win32-x64.exe\n  ../../vendor/ripgrep/rg-win32-x64.exe\n  Neither path contains the bundled binary after a standard npm install -g. System PATH is never consulted. Result: \"Ripgrep is not available.\n  Falling back to GrepTool.\" even when rg is installed and functional.\n\n  Repro:\n  npm install -g @google/gemini-cli\n  winget install BurntSushi.ripgrep.MSVC\n  gemini -p \"test\"\n  # \u2192 \"Ripgrep is not available. Falling back to GrepTool.\"\n  rg --version\n  # \u2192 ripgrep 15.1.0 \u2713\n\n  Expected: Fall back to where rg (Windows) / which rg (Unix) when bundled binary not found.\n\n  Suggested fix:\n  async function getRipgrepPath() {\n    // ... existing candidate paths ...\n    for (const candidate of candidatePaths) {\n      if (await fileExists(candidate)) return candidate;\n    }\n    // Fallback: check system PATH\n    try {\n      const { execFileSync } = require('child_process');\n      const found = process.platform === 'win32'\n        ? execFileSync('where', ['rg'], { encoding: 'utf8' }).split('\\n')[0].trim()\n        : execFileSync('which', ['rg'], { encoding: 'utf8' }).trim();\n      if (found && await fileExists(found)) return found;\n    } catch (_) {}\n    return null;\n  }\n\n  Workaround: Copy system rg to bundle/vendor/ripgrep/rg-win32-x64.exe inside the Gemini CLI install dir.",
+  "pr_number": 26868,
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "Use this issue with CAUTION: a more complicated PR with size=large. The actual issue was labeled with effort/small but the PR was much larger so I put expected effort to MEDIUM.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#26777",
+    "summary": {
+      "problem": "getRipgrepPath() does not consult the system PATH when looking for a ripgrep executable, causing it to fail to find 'rg' and fall back to GrepTool even when 'rg' is installed on the user's system.",
+      "root_cause": "The getRipgrepPath() implementation only checks two hardcoded paths relative to the bundle's directory structure (vendor/ripgrep/rg-win32-x64.exe and ../../vendor/ripgrep/rg-win32-x64.exe). If bundled binaries are missing, it returns null without searching the system's PATH environment variable.",
+      "context": "The fallback should resolve external executables when the bundled binary is absent. However, to prevent Remote Code Execution (RCE) and Search Path Interruption, the system PATH fallback must validate the resolved binary paths (e.g. check resolvesToRealPath is trusted using isTrustedSystemPath, and strictly reject any executables resolved from the current working directory)."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/tools/ripGrep.ts"
+      ],
+      "steps": [
+        "Replace getRipgrepPath() with an exported resolveRipgrepPath() function in packages/core/src/tools/ripGrep.ts.",
+        "Include the existing fallback array containing path.resolve(__dirname, 'vendor/ripgrep', binName) and path.resolve(__dirname, '../../vendor/ripgrep', binName).",
+        "If none of these bundled files exist, carry out a system search fallback using resolveExecutable('rg') from ../utils/shell-utils.js.",
+        "Ensure the resolved path is safe to execute by: resolving to its real canonical path via resolveToRealPath; checking that it does not point inside the current working directory; validating that isTrustedSystemPath(realPath) is true or that the real path falls under standard MacOS Homebrew Cellar paths (/opt/homebrew/Cellar and /usr/local/Cellar).",
+        "If the resolved path is both present and vetted as safe, return it. Otherwise, return null from resolveRipgrepPath().",
+        "Refactor any dependent tools/checks inside packages/core/src/tools/ripGrep.ts to use the new resolveRipgrepPath() function instead of old canUseRipgrep() or ensureRgPath()."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/tools/ripGrep.test.ts",
+      "expected_behavior": "resolveRipgrepPath() falls back to system PATH when bundled binary files are missing and accepts trusted executables, while safely rejecting untrusted paths or binaries located in the current working directory.",
+      "verification_steps": [
+        "Create a test suite in packages/core/src/tools/ripGrep.test.ts mocking fileExists to return false for the bundled paths.",
+        "Mock resolveExecutable to return a trusted path (e.g., /usr/bin/rg) and verify resolveRipgrepPath resolves it.",
+        "Mock resolveExecutable to return a path inside the current working directory (e.g., process.cwd() + '/rg') and verify resolveRipgrepPath rejects it (returns null).",
+        "On Windows, mock standard Windows directories (SystemRoot, ProgramFiles) and verify resolveRipgrepPath correctly identifies a safe path and rejects untrusted paths (e.g., inside Downloads directory).",
+        "Execute unit tests via vitest command inside packages/core/src/tools/ripGrep.test.ts."
+      ],
+      "framework": "Vitest"
+    }
+  },
+  "target_version": "c987b99394a318e55095a18b8c1066a66edd91c7",
+  "golden_spec_rationale": "The source files 'packages/core/src/config/config.ts' and 'packages/core/src/sandbox/utils/commandSafety.ts' modified in the PR were pruned from files_to_modify. Redesigning caching inside 'Config' to satisfy global state lint rules and concurrency concerns is an internal architectural cleanup. Decoupling command safety checks for absolute system paths in 'commandSafety.ts' is a secondary sandbox security alignment. Only 'packages/core/src/tools/ripGrep.ts' is strictly required to implement the fallback search for ripgrep in the system PATH."
+}

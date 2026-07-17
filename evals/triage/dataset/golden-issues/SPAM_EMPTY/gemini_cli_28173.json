@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28173,
+  "issue_title": "This issue has been automatically marked as stale due to 60 days of inactivity. It will be closed in 14 days if no further activity occurs.",
+  "issue_body": "This issue has been automatically marked as stale due to 60 days of inactivity. It will be closed in 14 days if no further activity occurs.\n\n_Originally posted by @github-actions in https://github.com/google-gemini/gemini-cli/issues/4191#issuecomment-3477151488_",
+  "pr_number": 0,
+  "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+  "expected_quality": "SPAM",
+  "expected_effort": "",
+  "notes": "Automated stale bot comment cross-posted as an issue. Classified as SPAM.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

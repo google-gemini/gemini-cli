@@ -6,17 +6,9 @@ metadata:
     run.googleapis.com/client-version: 575.0.1
     run.googleapis.com/creator: joneba@google.com
     run.googleapis.com/lastModifier: joneba@google.com
-    run.googleapis.com/operation-id: 8fdc12d7-ac9f-46ad-a895-700bce0b68f8
-  creationTimestamp: '2026-07-06T18:32:57.626061Z'
-  generation: 27
   labels:
     cloud.googleapis.com/location: us-central1
-    run.googleapis.com/lastUpdatedTime: '2026-07-13T20:33:31.403340Z'
   name: pr-gen-job
-  namespace: '279944320243'
-  resourceVersion: AAZWhADyp4Y
-  selfLink: /apis/run.googleapis.com/v1/namespaces/279944320243/jobs/pr-gen-job
-  uid: 4526de07-d63c-420d-b0f2-88bd70e8a1a4
 spec:
   template:
     metadata:
@@ -24,8 +16,6 @@ spec:
         run.googleapis.com/client-name: gcloud
         run.googleapis.com/client-version: 575.0.1
         run.googleapis.com/execution-environment: gen2
-      labels:
-        client.knative.dev/nonce: wet_jif_fev
     spec:
       taskCount: 1
       template:
@@ -36,6 +26,10 @@ spec:
               value: global
             - name: MODEL_NAME
               value: gemini-3.5-flash
+            - name: FIRESTORE_DATABASE
+              value: test-gcli-db-clone
+            - name: FIRESTORE_COLLECTION
+              value: test_issues
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:

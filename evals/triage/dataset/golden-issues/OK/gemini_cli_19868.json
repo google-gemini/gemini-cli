@@ -1,0 +1,44 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 19868,
+  "issue_title": "\"context.fileFiltering.customIgnoreFilePaths\" setting breaks file completion when using @",
+  "issue_body": "### What happened?\n\nText completion for files and directories no longer work when typing `@` after having [context.fileFiltering.customIgnoreFilePaths](https://geminicli.com/docs/reference/configuration/#the-gemini-directory-in-your-project:~:text=context.fileFiltering.customIgnoreFilePaths) setting added to settings.json\n\n<img width=\"1040\" height=\"842\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/dee92d78-fbf4-40df-bdd2-7c0d84dc33cd\" />\n\nRelated to https://github.com/google-gemini/gemini-cli/pull/16487 ?\n\n### What did you expect to happen?\n\nPath completion to work after typing @\n\n<img width=\"372\" height=\"248\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/23bc401c-3384-4511-b177-c1654e47e94c\" />\n\n(works after removing fileFiltering from setting)\n\nRemoving this fixes the issue:\n```\n \"context\": {\n     \"fileFiltering\": {\n       \"customIgnoreFilePaths\": [\n         \"node_modules/\"\n```\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\nRun `gemini` to enter the interactive CLI, then run the `/about` command.\n\n```console\n> /about\n\u2502 About Gemini CLI                                                                                   \u2502\n\u2502                                                                                                    \u2502\n\u2502 CLI Version                       0.29.5                                                           \u2502\n\u2502 Git Commit                        2ef872e73                                                         \u2502\n\u2502 Model                             Auto (Gemini 3)                                                  \u2502\n\u2502 Sandbox                           no sandbox                                                       \u2502\n\u2502 OS                                darwin                                                           \u2502\n\u2502 Auth Method                       Logged in with Google (REDACTED @gmail.com)                      \u2502\n\u2502 Tier                              Gemini Code Assist in Google One AI Pro\n```\n\n</details>\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n\nHere is my full settings\n\n<details>\n<summary>settings.json</summary>\n\n```json\n{\n  \"security\": {\n    \"auth\": {\n      \"selectedType\": \"oauth-personal\"\n    },\n    \"enablePermanentToolApproval\": true\n  },\n  \"ui\": {\n    \"showStatusInTitle\": true,\n    \"showModelInfoInChat\": true,\n    \"inlineThinkingMode\": \"full\",\n    \"showMemoryUsage\": true,\n    \"loadingPhrases\": \"off\",\n    \"showCitations\": true,\n    \"accessibility\": {\n      \"enableLoadingPhrases\": false\n    }\n  },\n  \"general\": {\n    \"enableNotifications\": true,\n    \"previewFeatures\": true,\n    \"preferredEditor\": \"vscode\",\n    \"vimMode\": false,\n    \"checkpointing\": {\n      \"enabled\": true\n    }\n  },\n  \"context\": {\n    \"fileName\": [\"GEMINI.md\", \"AGENTS.md\"],\n    \"fileFiltering\": {\n      \"respectGitIgnore\": false,\n      \"customIgnoreFilePaths\": [\n        \"node_modules/\",\n        \"temp/\",\n        \"cache/\"\n      ]\n    }\n  },\n  \"skills\": {\n    \"enabled\": true\n  },\n  \"experimental\": {\n    \"modelSteering\": true\n  },\n  \"privacy\": {\n    \"usageStatisticsEnabled\": false\n  }\n}\n```\n\n</details>",
+  "pr_number": 19898,
+  "target_version": "36a7fa089c1e883a3294e377af1d844373b82695",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created at 2026-02-22T00:39:13Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#19868",
+    "summary": {
+      "problem": "Text completion for files and directories breaks when using `@` after adding directories (such as `node_modules/`, `temp/`, `cache/`) to the `context.fileFiltering.customIgnoreFilePaths` setting in settings.json.",
+      "root_cause": "The `getIgnoreFilePaths()` function in `IgnoreFileParser` used `fs.existsSync()` which returns `true` for directories. Subsequently, `loadIgnoreRules()` in `ignore.ts` attempted to read these directories as files using `fs.readFileSync()`, resulting in a crash with an uncaught `EISDIR` error. Additionally, `fileDiscoveryService.ts` checked the existence of gitignore without verifying it was a file.",
+      "context": "Typing `@` triggers file completion inside the interactive CLI. When loading ignore rules for file filtering, the application crashes under EISDIR if any paths in `customIgnoreFilePaths` point to directories instead of files."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/services/fileDiscoveryService.ts",
+        "packages/core/src/utils/filesearch/ignore.ts",
+        "packages/core/src/utils/ignoreFileParser.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/services/fileDiscoveryService.ts`, modify the checking logic for `.gitignore` file mapping. Replace `fs.existsSync(gitIgnorePath)` with a call to `fs.statSync(gitIgnorePath, { throwIfNoEntry: false })` and check `stat?.isFile()` to ensure we only push the path if it is a file.",
+        "In `packages/core/src/utils/filesearch/ignore.ts`, wrap the `fs.readFileSync(filePath, 'utf8')` inside a `try-catch` block within the loop inside `loadIgnoreRules()` to defensively skip reading files that cannot be read (e.g., directories or permission errors).",
+        "In `packages/core/src/utils/ignoreFileParser.ts`, update `getIgnoreFilePaths()` to replace the `fs.existsSync(filePath)` filter check with `fs.statSync(filePath, { throwIfNoEntry: false })?.isFile() ?? false` to filter out directory paths from custom ignore settings."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/core/src/services/fileDiscoveryService.test.ts",
+      "expected_behavior": "The CLI should successfully complete file and directory names when typing `@`, even when directories such as `node_modules`, `temp`, or `cache` are set under `context.fileFiltering.customIgnoreFilePaths` in the settings, without throwing an EISDIR or other crash.",
+      "verification_steps": [
+        "Add a unit test in `fileDiscoveryService.test.ts` named 'should exclude directories from getIgnoreFilePaths (#19868)' which creates a directory `node_modules`, instantiates `FileDiscoveryService` with `customIgnoreFilePaths: ['node_modules']`, and asserts that the directory is excluded from `getIgnoreFilePaths()`.",
+        "Add a unit test named 'should exclude directories from getAllIgnoreFilePaths (#19868)' which asserts the directory `node_modules` is excluded from `getAllIgnoreFilePaths()` while still containing `.gitignore`.",
+        "Add a unit test named 'should not crash when customIgnoreFilePaths contains directory names (#19868)' asserting that instantiating `FileDiscoveryService` with `node_modules/`, `temp/`, and `cache/` does not throw an error.",
+        "Verify all tests pass by running: `npm test -w @google/gemini-cli-core -- src/services/fileDiscoveryService.test.ts`"
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

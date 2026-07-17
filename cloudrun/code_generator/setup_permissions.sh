@@ -19,6 +19,7 @@ ROLES=(
   "roles/workflows.invoker"         # Allowed to start/invoke workflows (Eventarc Trigger)
   "roles/monitoring.metricWriter"   # Allowed to write metrics (Eventarc Trigger)
   "roles/run.developer"             # Allowed to execute Cloud Run Jobs
+  "roles/datastore.user"            # Allowed to read/write Firestore from Workflow
 )
 
 for ROLE in "${ROLES[@]}"; do
@@ -52,6 +53,7 @@ EXEC_SA_ROLES=(
   "roles/storage.objectViewer"
   "roles/developerconnect.readTokenAccessor"
   "roles/cloudaicompanion.user"       # Required for Gemini/Antigravity SDK companion tools
+  "roles/datastore.user"              # Required for Firestore lock and status updates
 )
 
 for ROLE in "${EXEC_SA_ROLES[@]}"; do

@@ -1,0 +1,13 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27508,
+  "issue_title": "Xbox gift card code damage",
+  "issue_body": "### What would you like to be added?\n\nCheck code \n\n### Why is this needed?\n\nIt's unused code \n\n### Additional context\n\nUse my serial number to get the code ",
+  "pr_number": null,
+  "expected_quality": "SPAM",
+  "expected_effort": "",
+  "notes": "Automatically added via fetch_github_info.py",
+  "expected_workable_spec": {},
+  "target_version": "5cac7c10fa9ff34e99553057631727c95c1e99f8"
+}

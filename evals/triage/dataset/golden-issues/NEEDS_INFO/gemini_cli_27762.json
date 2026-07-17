@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27762,
+  "issue_title": "Stuck on thinking",
+  "issue_body": "### What happened?\n\nThe bot is just stuck on thinking for to long , spent over 7 Minutes on a task that takes 1 to 2 minutes, Just fix its thinking speed or whatever.\n\n### What did you expect to happen?\n\nWrite code faster\n\n### Client information\n\n<details>\n<summary>Client Information</summary>\n\nRun `gemini` to enter the interactive CLI, then run the `/about` command.\n\n```console\n> /about\n# paste output here\n```\n\n</details>\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 0,
+  "target_version": "0567b25a2688d6e753fa8b6061a5f6b323542712",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Unclear performance report with empty client/about output and no prompt or session logs. Classified as NEEDS_INFO.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

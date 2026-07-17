@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28097,
+  "issue_title": "error",
+  "issue_body": "### What happened?\n\n\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\n? Expecting not to be broken.\n\n### Client information\n\n\n* **CLI Version:** 0.47.0\n* **Git Commit:** 927170fca\n* **Session ID:** 4e9a5145-b9a9-4075-a8de-c3c0afe00ef9\n* **Operating System:** linux v24.14.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** gemma-4-31b-it\n* **Auth Type:** gemini-api-key\n* **Memory Usage:** 587.7 MB\n* **Terminal Name:** VTE(7600)\n* **Terminal Background:** #000000\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 0,
+  "target_version": "be7ba2c22adf095880b81da26f1afcc48520eebc",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Created at 2026-06-22T16:39:49Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

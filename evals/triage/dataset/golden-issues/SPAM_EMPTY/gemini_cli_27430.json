@@ -1,0 +1,13 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27430,
+  "issue_title": "npm install -g @google/gemini-cli",
+  "issue_body": "",
+  "pr_number": null,
+  "expected_quality": "EMPTY",
+  "expected_effort": "",
+  "notes": "Automatically added via fetch_github_info.py",
+  "expected_workable_spec": {},
+  "target_version": "630ecc21b94e747ef6b7e1356db42327a1f93dd9"
+}

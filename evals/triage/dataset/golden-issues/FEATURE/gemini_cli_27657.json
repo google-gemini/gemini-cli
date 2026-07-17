@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27657,
+  "issue_title": "Implement Telegram channel compatibility for Antigravity session control",
+  "issue_body": "## Overview\nImplement integration with the `tg-relay` daemon to support driving Antigravity sessions and resolving tool confirmations remotely via Telegram.\n\n## Acceptance criteria\n- [x] Route inbound Telegram channel messages (notified via `notifications/claude/channel`) into the main CLI user input loop\n- [x] Serialize message metadata as attributes on the `<channel>` wrapper tag to support channel features (e.g., heartbeats)\n- [x] Subscribe to the `TOOL_CONFIRMATION_REQUEST` bus and forward requests to all connected channel MCP clients as `notifications/claude/channel/permission_request`\n- [x] Route decision replies (`notifications/claude/channel/permission`) back to the main confirmation message bus to resolve interactive allow/deny queries\n\n## Tests\n- [x] Unit tests for MCP client notification schemas and event routing\n- [x] Unit tests for client manager subscribing to the tool confirmation bus and publishing decisions\n\n## Verification\n- [x] Build passes with no type errors\n- [x] ESlint checks and typechecks run successfully with no errors or warnings",
+  "pr_number": 0,
+  "target_version": "4196596f7f48c0c397776f0cb7862c88d8fae91e",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "Feature Request: Telegram channel compatibility for Antigravity session control.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

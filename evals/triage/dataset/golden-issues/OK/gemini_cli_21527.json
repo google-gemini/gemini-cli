@@ -1,0 +1,39 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 21527,
+  "issue_title": "Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/typescript-expert EISDIR: illegal operation on a directory, read \u2502 \u2502 \u26a0 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/web-performance-optimization EISDIR: ille",
+  "issue_body": "### What happened?\n\nFailed to check if file is binary: /home/sumeet/korl-webapp-next/skills/typescript-expert EISDIR: illegal operation on a directory, read \u2502 \u2502 \u26a0 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/web-performance-optimization EISDIR: illegal operation on a directory, read \u2502 \u2502 \u26a0 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/zustand-store-ts EISDIR: illegal operation on a directory, read \u2502 \u2502 \u26a0 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/zod-validation-expert EISDIR: illegal operation on a directory, read \u2502 \u2502 \u26a0 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/secrets-management EISDIR: illegal operation on a directory, read \u2502 \u2502 \u2716 ========================================= \u2502 \u2502 This is an unexpected error. Please file a bug report using the /bug tool. \u2502 \u2502 CRITICAL: Unhandled Promise Rejection! \u2502 \u2502 ========================================= \u2502 \u2502 Reason: RangeError: Maximum call stack size exceeded \u2502 \u2502 Stack trace: \u2502 \u2502 RangeError: Maximum call stack size exceeded \u2502 \u2502 at handleAtCommand \u2502 \u2502 (file:///home/sumeet/.local/share/pnpm/global/5/.pnpm/@google+gemini-cli@0.33.0-preview.4/node_modules/@google/gemini-cli/bundle/gemini.js:490394:25) \u2502 \u2502 at async file:///home/sumeet/.local/share/pnpm/global/5/.pnpm/@google+gemini-cli@0.33.0-preview.4/node_modules/@google/gemini-cli/bundle/gemini.js:550511:35 \u2502 \u2502 at async file:///home/sumeet/.local/share/pnpm/global/5/.pnpm/@google+gemini-cli@0.33.0-preview.4/node_modules/@google/gemini-cli/bundle/gemini.js:550992:50 \u2502 \u2502 at async file:///home/sumeet/.local/share/pnpm/global/5/.pnpm/@google+gemini-cli@0.33.0-preview.4/node_modules/@google/gemini-cli/bundle/gemini.js:285981:14\n\n[ACTION REQUIRED] \ud83d\udcce PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.\n\n### What did you expect to happen?\n\nnot crash?\n\n### Client information\n\n\n* **CLI Version:** 0.33.0-preview.4\n* **Git Commit:** c316fc6c5\n* **Session ID:** bde44fce-0938-4373-a320-a6ab5fed2543\n* **Operating System:** linux v23.7.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto-gemini-3\n* **Auth Type:** gemini-api-key\n* **Memory Usage:** 1.46 GB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #202124\n* **Kitty Keyboard Protocol:** Unsupported\n* **IDE Client:** Cursor\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 27041,
+  "target_version": "456d1aec74d1d2668837c7485b35e98d23651418",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "Created at 2026-03-07T04:34:52Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#21527",
+    "summary": {
+      "problem": "The CLI crashes with EISDIR errors (illegal operation on a directory, read) and RangeError: Maximum call stack size exceeded when directories are mistakenly treated and read as binary or normal text files.",
+      "root_cause": "The helper function `isBinaryFile` in `fileUtils.ts` invoked the `isbinaryfile` library directly on folders without checking if they were actually directories. Concurrently, the file processor utility `read-many-files.ts` verified existence using `fsPromises.access`, which resolves successfully for directories, causing folders to be parsed as files.",
+      "context": "This error occurs during processes that read files (like the read-many-files tool or processing @-mentions) when directory structures are targeted."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/tools/read-many-files.ts",
+        "packages/core/src/utils/fileUtils.ts"
+      ],
+      "steps": [
+        "In `packages/core/src/utils/fileUtils.ts`, within the `isBinaryFile` function, retrieve the file statistics first using `await fsPromises.stat(filePath)`. If the path is not a file (`!stats.isFile()`), immediately return `false`. Otherwise, pass the size parameter to the library function: `return await isBinaryFileCheck(filePath, stats.size)`.",
+        "In `packages/core/src/tools/read-many-files.ts`, locate the path existence check block. Replace `await fsPromises.access(fullPath)` with `const st = await fsPromises.stat(fullPath)`. Update the mapping to check `exists = st.isFile();` so directories are rejected as candidates."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "N/A",
+      "expected_behavior": "Selected paths representing directories are ignored cleanly without causing file-reading errors, preventing the CLI from crashing with 'EISDIR: illegal operation on a directory, read'.",
+      "verification_steps": [
+        "Verify manually by executing the CLI and passing directory paths instead of files to the reading/referencing tools, confirming that directories are safely ignored and do not yield EISDIR or RangeError exceptions."
+      ],
+      "framework": "N/A"
+    }
+  }
+}

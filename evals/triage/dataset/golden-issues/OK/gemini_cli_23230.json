@@ -1,0 +1,40 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 23230,
+  "issue_title": "exiting plan mode does not switch model",
+  "issue_body": "### What happened?\n\nWith the appropriate setting enabled, gemini is supposed to switch to gemini-3-flash-preview after the plan is confirmed, but it doesnt, unless the immediate post plan actions are interrupted and a new message is sent.\n\n### What did you expect to happen?\n\nA switch to gemini-3-flash-preview directly after the exit plan mode tool is run.\n\n### Client information\n\n* **CLI Version:** 0.34.0\n* **Operating System:** win32 v25.2.1\n* **Sandbox Environment:** no sandbox\n\n\n### Login information\n\n API key\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 23885,
+  "target_version": "49534209f29d6c9643eb15b8d041f4dadfc5b20a",
+  "expected_quality": "OK",
+  "expected_effort": "MEDIUM",
+  "notes": "Created by automated script. Selected because it is a medium-difficulty integration bug testing state coordination between the Config manager and the GeminiClient, using integration-level test cases.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#23230",
+    "summary": {
+      "problem": "With plan mode enabled, gemini does not switch to gemini-3-flash-preview immediately after exiting plan mode / confirmation, remaining stuck on the Pro model unless immediate post-plan actions are interrupted.",
+      "root_cause": "The GeminiClient caches the active model decision in currentSequenceModel to maintain model consistency during multi-turn sequences. Exiting Plan Mode transitions the agent's mode but fails to clear this cached model, causing the client to stick with the Pro/Planner model instead of switching to the Flash model.",
+      "context": "The transition between plan and execution modes triggers either isPlanModeTransition or isYoloModeTransition inside Config. Resetting currentSequenceModel during this transition allows the client to choose the correct model for the subsequent step."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/core/src/core/client.ts",
+        "packages/core/src/config/config.ts"
+      ],
+      "steps": [
+        "In packages/core/src/core/client.ts, add a public method clearCurrentSequenceModel(): void to the GeminiClient class that resets this.currentSequenceModel to null.",
+        "In packages/core/src/config/config.ts, where the approval mode transition check is performed (specifically in isPlanModeTransition || isYoloModeTransition), invoke clearCurrentSequenceModel() on this._geminiClient if it is initialized."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "integration-tests/plan-mode.test.ts",
+      "expected_behavior": "Immediately after exiting plan mode, the agent's subsequent request model switches from a 'pro' model to a 'flash' model.",
+      "verification_steps": [
+        "Run the plan-mode integration test using: npm run test:integration:sandbox:none -- integration-tests/plan-mode.test.ts",
+        "Assert that proRequests (requests with a model attribute containing 'pro') occurs at least once during plan mode, and flashRequests (requests with a model attribute containing 'flash') occurs at least once after exit_plan_mode is executed inside the sequence."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

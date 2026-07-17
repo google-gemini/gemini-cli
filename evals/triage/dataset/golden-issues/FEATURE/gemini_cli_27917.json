@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27917,
+  "issue_title": "feat: Support GDC air-gapped Service Identity after auth library update",
+  "issue_body": "### Description\nThe recent update to the underlying auth library in `google-cloud-node` ([PR #8428](https://github.com/googleapis/google-cloud-node/pull/8428)) introduces changes that we need to adapt to in order to properly support GDC air-gapped Service Identity.\n\n### Motivation\nWith the auth library updates, we should implement the corresponding changes in `gemini-cli` to ensure seamless integration and functionality for users working in GDC air-gapped environments.\n\n### Proposed changes\n* Update the relevant authentication logic in `packages/core` to utilize the new Service Identity capabilities introduced in the upstream library.\n* Add any necessary configuration parameters or documentation for users operating in these environments.\n",
+  "pr_number": 0,
+  "target_version": "9e5599c323f12df36672794332df5ae16e6125d5",
+  "expected_quality": "FEATURE",
+  "expected_effort": "",
+  "notes": "GDC air-gapped Service Identity request tagged with feat:. Explicitly categorized as FEATURE with empty workable spec.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

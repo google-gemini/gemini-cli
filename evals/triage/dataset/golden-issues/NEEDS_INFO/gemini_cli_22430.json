@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 22430,
+  "issue_title": "Terrible Update",
+  "issue_body": "### What happened?\n\nThe CLI after the last update is terrible. A task is starting and then getting aborted for no reason and the limits are being consumed very quickly for no tasks, and the file edits are making the CLI look messy.\n\n### What did you expect to happen?\n\nA reliable cli\n\n### Client information\n\n\n* **CLI Version:** 0.33.1\n* **Git Commit:** f59f9e931\n* **Session ID:** 5202538c-b3fe-4b39-99d9-0d2a95813835\n* **Operating System:** win32 v24.13.0\n* **Sandbox Environment:** no sandbox\n* **Model Version:** auto-gemini-3\n* **Auth Type:** oauth-personal\n* **Memory Usage:** 746.7 MB\n* **Terminal Name:** Unknown\n* **Terminal Background:** #0c0c0c\n* **Kitty Keyboard Protocol:** Unsupported\n\n\n### Login information\n\n_No response_\n\n### Anything else we need to know?\n\n_No response_",
+  "pr_number": 0,
+  "target_version": "9f7691fd882fdfb94259a83b6d4499e9b612cf81",
+  "expected_quality": "NEEDS_INFO",
+  "expected_effort": "",
+  "notes": "Created at 2026-03-14T13:29:02Z by automated generate_golden_issue.py",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}

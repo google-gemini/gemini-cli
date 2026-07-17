@@ -1,0 +1,44 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 27985,
+  "issue_title": "ACP: PromptResponse usage omits cached/thought tokens, inflating client cost estimates",
+  "issue_body": "### What\n\nWhen running as an ACP server (`gemini --acp`), the token usage reported for a prompt turn only includes **input** and **output** tokens. The **cached** and **thought/reasoning** token counts are dropped \u2014 even though Gemini's `usageMetadata` provides them and the CLI already consumes them elsewhere (telemetry, UI, chat recording).\n\nIn `packages/cli/src/acp/acpSession.ts`, the `GeminiEventType.Finished` handler reads only `promptTokenCount` and `candidatesTokenCount`:\n\n```ts\nconst usage = event.value.usageMetadata;\nif (usage) {\n  turnInputTokens = usage.promptTokenCount ?? turnInputTokens;\n  turnOutputTokens = usage.candidatesTokenCount ?? turnOutputTokens;\n}\n```\n\n`cachedContentTokenCount` and `thoughtsTokenCount` are never read, and the emitted `_meta.quota.token_count` contains only `input_tokens` / `output_tokens`. By contrast, these fields *are* read in `packages/core/src/agent/event-translator.ts`, `packages/core/src/telemetry/types.ts`, and `packages/core/src/services/chatRecordingService.ts` \u2014 so the data is available; only the ACP path discards it.\n\n### Why it matters\n\nACP clients that estimate cost from token counts treat **all** input tokens as uncached, because the cached count is absent/`0`. For long agentic sessions where most of the prompt is cached turn-to-turn, this **overstates the estimated cost by ~3\u00d7** relative to the real (cached) spend.\n\nWe hit this analyzing OpenHands eval runs through the Gemini CLI ACP harness: every instance reports `cache_read_tokens = 0`, so the token-based cost estimate is ~3\u00d7 the actual proxy bill (the underlying spend already benefits from caching \u2014 only the *reporting* is wrong).\n\n### Relationship to #24280\n\nThis is related to but distinct from #24280 (\u201cpopulate the standard `PromptResponse.usage` field\u201d). That issue's proposed payload lists only `input_tokens` / `output_tokens` / `total_tokens`, so implementing it as written would **not** close the cache-token gap. The standard ACP `Usage` type already has `cachedReadTokens` and `thoughtTokens` fields \u2014 they just need to be populated.\n\n### Proposed fix\n\nIn `acpSession.ts`, also capture `usageMetadata.cachedContentTokenCount` and `usageMetadata.thoughtsTokenCount`, and populate the standard ACP `PromptResponse.usage` field (`inputTokens`, `outputTokens`, `cachedReadTokens`, `thoughtTokens`, `totalTokens`). This aligns Gemini CLI with Claude Agent ACP / Codex ACP and lets any ACP client read accurate usage without Gemini-specific `_meta.quota` parsing. The existing `_meta.quota` payload can be kept for backward compatibility.\n\nI have a small PR ready for this.\n",
+  "pr_number": 27986,
+  "target_version": "f741d0328209b92a46571ba1d565e6c56fb4f32d",
+  "expected_quality": "OK",
+  "expected_effort": "SMALL",
+  "notes": "ACP PromptResponse usageMetadata fix in acpSession.ts. Clean 1-file fix. Note: Associated PR #27986 was closed, but passes eye test as a valid, high-quality issue.",
+  "golden_spec_rationale": "No source files were pruned; all PR modifications directly address the reported issue.",
+  "expected_workable_spec": {
+    "issue_id": "google-gemini/gemini-cli#27985",
+    "summary": {
+      "problem": "When running as an ACP server, the per-turn token usage reported only includes input and output tokens, omitting cached and thought/reasoning token counts, which inflates client cost estimates.",
+      "root_cause": "In packages/cli/src/acp/acpSession.ts, the handler for GeminiEventType.Finished only retrieves promptTokenCount and candidatesTokenCount from the Gemini usageMetadata, discarding cachedContentTokenCount and thoughtsTokenCount. Additionally, the standard ACP PromptResponse.usage field is not populated.",
+      "context": "Clients using the Gemini ACP harness (like OpenHands) miscalculate actual spend by assuming 0 cached read tokens, overstating costs by ~3x. Populating the standard PromptResponse.usage field allows ACP clients to obtain accurate estimates. The existing _meta.quota field must be preserved for backward compatibility."
+    },
+    "implementation_plan": {
+      "files_to_modify": [
+        "packages/cli/src/acp/acpSession.ts"
+      ],
+      "steps": [
+        "Initialize accumulators totalCachedTokens and totalThoughtTokens alongside totalInputTokens and totalOutputTokens inside Session.prompt.",
+        "Implement a helper function buildUsage() to construct the standard acp.Usage payload schema containing inputTokens, outputTokens, cachedReadTokens (assigned from totalCachedTokens), thoughtTokens (assigned from totalThoughtTokens), and totalTokens (calculated as totalInputTokens + totalOutputTokens + totalThoughtTokens).",
+        "Introduce turnCachedTokens and turnThoughtTokens variables inside the session turn loop, initializing them to 0.",
+        "Under GeminiEventType.Finished, extract cachedContentTokenCount and thoughtsTokenCount from usageMetadata and assign them to turnCachedTokens and turnThoughtTokens respectively.",
+        "Add turnCachedTokens and turnThoughtTokens to totalCachedTokens and totalThoughtTokens cumulative properties upon completing a turn.",
+        "Incorporate the usage property into all PromptResponse return statements throughout Session.prompt using the buildUsage function."
+      ]
+    },
+    "testing_strategy": {
+      "test_file": "packages/cli/src/acp/acpSession.test.ts",
+      "expected_behavior": "PromptResponse includes a populated standard usage field with inputTokens, outputTokens, cachedReadTokens, thoughtTokens, and totalTokens matching the accumulated usageMetadata.",
+      "verification_steps": [
+        "Run unit tests with: npx vitest run src/acp/acpSession.test.ts",
+        "Add the 'reports token usage in the standard ACP usage field (incl. cached and thought tokens)' test case inside packages/cli/src/acp/acpSession.test.ts.",
+        "Mock sendMessageStream to yield a GeminiEventType.Finished event with promptTokenCount: 1000, candidatesTokenCount: 200, cachedContentTokenCount: 800, and thoughtsTokenCount: 50, and assert that prompt returns the expected usage values."
+      ],
+      "framework": "Vitest"
+    }
+  }
+}

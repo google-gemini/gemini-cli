@@ -1,0 +1,14 @@
+{
+  "owner": "google-gemini",
+  "repo": "gemini-cli",
+  "issue_number": 28212,
+  "issue_title": "Smrupchusakdi859@gmail.com\u200b",
+  "issue_body": "",
+  "pr_number": 0,
+  "target_version": "ae0a3aa7b928cc73bb09604bb9c2c020e6b647db",
+  "expected_quality": "EMPTY",
+  "expected_effort": "",
+  "notes": "Completely empty issue body containing only an email address in title. Classified as EMPTY.",
+  "golden_spec_rationale": "",
+  "expected_workable_spec": {}
+}
