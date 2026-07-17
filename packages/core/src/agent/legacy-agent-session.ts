@@ -64,6 +64,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
   private _activeStreamId?: string;
   private _abortController = new AbortController();
   private _nextStreamIdOverride?: string;
+  private _activePromptId: string = '';
 
   private readonly _client: GeminiClient;
   private readonly _scheduler: Scheduler;
@@ -183,7 +184,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
       const responseStream = this._client.sendMessageStream(
         currentParts,
         this._abortController.signal,
-        this._promptId,
+        this._activePromptId,
         undefined,
         currentDisplayContent,
       );
@@ -340,6 +341,9 @@ export class LegacyAgentProtocol implements AgentProtocol {
     this._abortController = new AbortController();
     this._agentEndEmitted = false;
     this._activeStreamId = this._translationState.streamId;
+    this._activePromptId =
+      this._promptId ||
+      `legacy-prompt-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   }
 
   private _ensureAgentStart(): void {
