@@ -137,7 +137,9 @@ export class LoopDetectionService {
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
+  private previousToolCallKey: string | null = null;
   private toolCallRepetitionCount: number = 0;
+  private alternatingRepetitionCount: number = 0;
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -315,11 +317,22 @@ export class LoopDetectionService {
     const key = this.getToolCallKey(toolCall);
     if (this.lastToolCallKey === key) {
       this.toolCallRepetitionCount++;
-    } else {
-      this.lastToolCallKey = key;
+      this.alternatingRepetitionCount = 1;
+    } else if (this.previousToolCallKey === key) {
+      this.alternatingRepetitionCount++;
       this.toolCallRepetitionCount = 1;
+    } else {
+      this.toolCallRepetitionCount = 1;
+      this.alternatingRepetitionCount = 1;
     }
-    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+
+    this.previousToolCallKey = this.lastToolCallKey;
+    this.lastToolCallKey = key;
+
+    if (
+      this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD ||
+      this.alternatingRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD
+    ) {
       return true;
     }
     return false;
@@ -740,7 +753,9 @@ export class LoopDetectionService {
 
   private resetToolCallCount(): void {
     this.lastToolCallKey = null;
+    this.previousToolCallKey = null;
     this.toolCallRepetitionCount = 0;
+    this.alternatingRepetitionCount = 0;
   }
 
   private resetContentTracking(resetHistory = true): void {

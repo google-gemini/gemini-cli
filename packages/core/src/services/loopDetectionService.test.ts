@@ -175,6 +175,51 @@ describe('LoopDetectionService', () => {
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
+
+    it('should detect an alternating tool call loop (exploit vector)', () => {
+      const eventA = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_a.txt',
+      });
+      const eventB = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_b.txt',
+      });
+
+      let loopCount = 0;
+      for (let i = 0; i < 15; i++) {
+        const currentEvent = i % 2 === 0 ? eventA : eventB;
+        const result = service.addAndCheck(currentEvent);
+        if (result.count > 0) {
+          loopCount = result.count;
+        }
+      }
+
+      expect(loopCount).toBeGreaterThan(0);
+    });
+
+    it('should not detect loops for non-looping alternating sequences that vary', () => {
+      const eventA = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_a.txt',
+      });
+      const eventB = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_b.txt',
+      });
+      const eventC = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_c.txt',
+      });
+
+      // Run some alternating calls, then break the pattern with eventC
+      for (let i = 0; i < 4; i++) {
+        expect(service.addAndCheck(i % 2 === 0 ? eventA : eventB).count).toBe(
+          0,
+        );
+      }
+      expect(service.addAndCheck(eventC).count).toBe(0);
+      for (let i = 0; i < 4; i++) {
+        expect(service.addAndCheck(i % 2 === 0 ? eventA : eventB).count).toBe(
+          0,
+        );
+      }
+    });
   });
 
   describe('Content Loop Detection', () => {
