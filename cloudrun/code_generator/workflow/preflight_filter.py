@@ -8,6 +8,8 @@ test failures).
 import logging
 import re
 
+_ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\\[0-?]*[ -/]*[@-~])")
+
 
 class PreflightFilter:
     """Utility class to filter ANSI characters and analyze test suite results."""
@@ -22,8 +24,7 @@ class PreflightFilter:
         Returns:
             The sanitized string without escape sequences.
         """
-        ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\\[0-?]*[ -/]*[@-~])")
-        return ansi_escape.sub("", text)
+        return _ANSI_ESCAPE_RE.sub("", text)
 
     @classmethod
     def should_ignore_preflight_failure(

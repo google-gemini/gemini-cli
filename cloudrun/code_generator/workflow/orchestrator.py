@@ -20,6 +20,7 @@ preflight checks. Manages Firestore dual-lock validation and lifecycle state
 transitions (COMMIT_GENERATION, PR_EVALUATION_PENDING, NEEDS_HUMAN).
 """
 
+import base64
 import json
 import logging
 import os
@@ -379,14 +380,25 @@ class Orchestrator:
             logging.error("Failed to sync code into Evaluation workspace: %s", e)
             return "NEEDS_REVISION"
 
-        # Install node dependencies inside the evaluation sandbox workspace
-        logging.info("Installing node dependencies inside evaluation workspace...")
-        try:
-            npm_install_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3'
-            CommandExecutor.run(npm_install_cmd, self.config.eval_repo_path)
-        except CommandExecutionError as e:
-            logging.error("Failed to install NPM packages in evaluation sandbox: %s", e)
-            return "NEEDS_REVISION"
+        # Reuse existing node_modules from PR workspace via symlink to avoid redundant npm ci installs
+        pr_node_modules = os.path.join(self.config.pr_repo_path, "node_modules")
+        eval_node_modules = os.path.join(self.config.eval_repo_path, "node_modules")
+        if os.path.exists(pr_node_modules) and not os.path.exists(eval_node_modules):
+            logging.info("Symlinking node_modules from PR repository to evaluation workspace...")
+            try:
+                os.symlink(pr_node_modules, eval_node_modules)
+            except OSError as e:
+                logging.warning("Failed to symlink node_modules: %s. Falling back to npm install.", e)
+
+        # Fallback to installing node dependencies if node_modules is missing
+        if not os.path.exists(eval_node_modules):
+            logging.info("Installing node dependencies inside evaluation workspace...")
+            try:
+                npm_install_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3'
+                CommandExecutor.run(npm_install_cmd, self.config.eval_repo_path)
+            except CommandExecutionError as e:
+                logging.error("Failed to install NPM packages in evaluation sandbox: %s", e)
+                return "NEEDS_REVISION"
 
         # Persist changes diff file
         diff_eval_path = os.path.join(self.config.eval_repo_path, "changes.diff")
@@ -584,17 +596,21 @@ class Orchestrator:
             except CommandExecutionError as e:
                 logging.error("Failed to amend git commit message: %s", e)
 
-        # Re-configure push URL if GitHub token is present
+        # Push branch securely using in-memory auth headers (force pushes are supported to override prior retries)
+        git_env = os.environ.copy()
         if self.config.git_token:
-            auth_url = self.config.repo_url.replace("https://", f"https://x-access-token:{self.config.git_token}@")
-            try:
-                CommandExecutor.run(f"git remote set-url origin {auth_url}", self.config.pr_repo_path)
-            except CommandExecutionError as e:
-                logging.warning("Failed to configure remote URL: %s", e)
+            auth_bytes = f"x-access-token:{self.config.git_token}".encode("utf-8")
+            auth_b64 = base64.b64encode(auth_bytes).decode("utf-8")
+            git_env["GIT_CONFIG_COUNT"] = "1"
+            git_env["GIT_CONFIG_KEY_0"] = "http.extraHeader"
+            git_env["GIT_CONFIG_VALUE_0"] = f"AUTHORIZATION: basic {auth_b64}"
 
-        # Push branch (force pushes are supported to override prior retries)
         try:
-            CommandExecutor.run(f"git push -f origin HEAD:refs/heads/{branch_name}", self.config.pr_repo_path)
+            CommandExecutor.run(
+                f"git push -f origin HEAD:refs/heads/{branch_name}",
+                cwd=self.config.pr_repo_path,
+                env=git_env,
+            )
             logging.info("Branch push to remote succeeded.")
         except CommandExecutionError as e:
             logging.error("Failed to push git branch: %s", e)
