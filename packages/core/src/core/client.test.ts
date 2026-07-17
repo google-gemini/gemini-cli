@@ -1601,7 +1601,7 @@ ${JSON.stringify(
       ]);
     });
 
-    it('should limit recursive turns for untracked prompts (falsy or missing prompt_id) using untracked-prompt fallback', async () => {
+    it('should reset recursive turns for independent untracked prompts (falsy or missing prompt_id) using dynamic fallback IDs', async () => {
       // Arrange
       const { checkNextSpeaker } = await import(
         '../utils/nextSpeakerChecker.js'
@@ -1621,13 +1621,16 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
+      // With max limit of 3, separate untracked prompts should not accumulate turn counts
       vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(3);
       client['sessionTurnCount'] = 0;
       client['promptTurnCount'] = 0;
       client['lastPromptId'] = '';
 
-      // Run 3 recursive turns with falsy prompt_id
-      for (let i = 0; i < 3; i++) {
+      // Run 5 separate independent untracked prompts
+      for (let i = 0; i < 5; i++) {
+        // Artificially wait 1ms to ensure timestamp difference
+        await new Promise((resolve) => setTimeout(resolve, 1));
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -1641,20 +1644,53 @@ ${JSON.stringify(
           type: GeminiEventType.MaxPromptTurns,
         });
       }
+    });
 
-      // The 4th call with empty prompt_id should exceed the limit of 3
-      const streamExceeded = client.sendMessageStream(
+    it('should limit internal recursive turns for untracked prompts when nextSpeaker is model', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      vi.mocked(checkNextSpeaker).mockResolvedValue({
+        next_speaker: 'model',
+        reasoning: 'needs more turns',
+      });
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Limit to 3 prompt turns
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(3);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      // Run sendMessageStream with falsy prompt_id
+      const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
-        '',
+        '', // empty prompt_id
       );
-      const eventsExceeded = [];
-      for await (const event of streamExceeded) {
-        eventsExceeded.push(event);
+
+      const events = [];
+      for await (const event of stream) {
+        events.push(event);
       }
-      expect(eventsExceeded).toEqual([
-        { type: GeminiEventType.MaxPromptTurns },
-      ]);
+
+      // It should execute 3 turns recursively and then yield MaxPromptTurns on the 4th
+      expect(events).toContainEqual({
+        type: GeminiEventType.MaxPromptTurns,
+      });
     });
 
     it('should not limit turns when maxPromptTurns is set to -1 (unlimited)', async () => {
