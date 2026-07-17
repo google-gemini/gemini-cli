@@ -1601,6 +1601,62 @@ ${JSON.stringify(
       ]);
     });
 
+    it('should limit recursive turns for untracked prompts (falsy or missing prompt_id) using untracked-prompt fallback', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      vi.mocked(checkNextSpeaker).mockResolvedValue(null);
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      vi.spyOn(client['config'], 'getMaxPromptTurns').mockReturnValue(3);
+      client['sessionTurnCount'] = 0;
+      client['promptTurnCount'] = 0;
+      client['lastPromptId'] = '';
+
+      // Run 3 recursive turns with falsy prompt_id
+      for (let i = 0; i < 3; i++) {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          '',
+        );
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.MaxPromptTurns,
+        });
+      }
+
+      // The 4th call with empty prompt_id should exceed the limit of 3
+      const streamExceeded = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        '',
+      );
+      const eventsExceeded = [];
+      for await (const event of streamExceeded) {
+        eventsExceeded.push(event);
+      }
+      expect(eventsExceeded).toEqual([
+        { type: GeminiEventType.MaxPromptTurns },
+      ]);
+    });
+
     it('should not limit turns when maxPromptTurns is set to -1 (unlimited)', async () => {
       // Arrange
       const mockStream = (async function* () {

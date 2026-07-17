@@ -922,20 +922,20 @@ export class GeminiClient {
     const hooksEnabled = this.config.getEnableHooks();
     const messageBus = this.context.messageBus;
 
-    if (prompt_id !== this.lastPromptId) {
-      this.loopDetector.reset(prompt_id, partListUnionToString(request));
+    const effectivePromptId = prompt_id || 'untracked-prompt';
+    if (effectivePromptId !== this.lastPromptId) {
+      this.loopDetector.reset(
+        effectivePromptId,
+        partListUnionToString(request),
+      );
       this.hookStateMap.delete(this.lastPromptId);
-      this.lastPromptId = prompt_id;
+      this.lastPromptId = effectivePromptId;
       this.currentSequenceModel = null;
       this.promptTurnCount = 0;
       this.initialPromptTurns = turns;
     }
 
-    if (!prompt_id) {
-      this.promptTurnCount = 1;
-    } else {
-      this.promptTurnCount++;
-    }
+    this.promptTurnCount++;
 
     const configMax = this.config.getMaxPromptTurns();
 
