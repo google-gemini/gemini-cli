@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.52.0-nightly.20260707.g27a3da3e8",
+  "version": "0.52.0-nightly.20260715.gfa975395b",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.52.0-nightly.20260707.g27a3da3e8"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.52.0-nightly.20260715.gfa975395b"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -95,8 +95,10 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "0.16.1",
+    "@modelcontextprotocol/sdk": "1.23.0",
     "read-package-up": "11.0.0",
     "@octokit/rest": "22.0.0",
+    "@types/express": "5.0.3",
     "@types/marked": "5.0.2",
     "@types/mime-types": "3.0.1",
     "@types/minimatch": "5.1.2",
@@ -121,6 +123,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
+    "express": "5.1.0",
     "glob": "12.0.0",
     "globals": "16.0.0",
     "google-artifactregistry-auth": "3.4.0",
