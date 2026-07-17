@@ -1235,7 +1235,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.isModelSteeringEnabled(),
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
-    this.maxSessionTurns = params.maxSessionTurns ?? 15;
+this.maxSessionTurns = params.maxSessionTurns;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
