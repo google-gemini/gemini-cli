@@ -136,10 +136,7 @@ export class LoopDetectionService {
   private userPrompt = '';
 
   // Tool call tracking
-  private lastToolCallKey: string | null = null;
-  private previousToolCallKey: string | null = null;
-  private toolCallRepetitionCount: number = 0;
-  private alternatingRepetitionCount: number = 0;
+  private toolCallHistory: string[] = [];
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -315,26 +312,39 @@ export class LoopDetectionService {
 
   private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
     const key = this.getToolCallKey(toolCall);
-    if (this.lastToolCallKey === key) {
-      this.toolCallRepetitionCount++;
-      this.alternatingRepetitionCount = 1;
-    } else if (this.previousToolCallKey === key) {
-      this.alternatingRepetitionCount++;
-      this.toolCallRepetitionCount = 1;
-    } else {
-      this.toolCallRepetitionCount = 1;
-      this.alternatingRepetitionCount = 1;
+    this.toolCallHistory.push(key);
+
+    // Keep history at a reasonable limit (e.g., maximum of 50 entries)
+    if (this.toolCallHistory.length > 50) {
+      this.toolCallHistory = this.toolCallHistory.slice(-50);
     }
 
-    this.previousToolCallKey = this.lastToolCallKey;
-    this.lastToolCallKey = key;
+    const n = this.toolCallHistory.length;
+    const R = TOOL_CALL_LOOP_THRESHOLD; // 5
 
-    if (
-      this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD ||
-      this.alternatingRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD
-    ) {
-      return true;
+    // Check for repeating patterns of cycle length k from 1 to 5
+    for (let k = 1; k <= 5; k++) {
+      const requiredLength = k * R;
+      if (n >= requiredLength) {
+        const cycle = this.toolCallHistory.slice(-k);
+        let isPatternMatch = true;
+
+        for (let i = 0; i < requiredLength; i++) {
+          const indexFromEnd = requiredLength - i;
+          const actualKey = this.toolCallHistory[n - indexFromEnd];
+          const expectedKey = cycle[i % k];
+          if (actualKey !== expectedKey) {
+            isPatternMatch = false;
+            break;
+          }
+        }
+
+        if (isPatternMatch) {
+          return true;
+        }
+      }
     }
+
     return false;
   }
 
@@ -752,10 +762,7 @@ export class LoopDetectionService {
   }
 
   private resetToolCallCount(): void {
-    this.lastToolCallKey = null;
-    this.previousToolCallKey = null;
-    this.toolCallRepetitionCount = 0;
-    this.alternatingRepetitionCount = 0;
+    this.toolCallHistory = [];
   }
 
   private resetContentTracking(resetHistory = true): void {

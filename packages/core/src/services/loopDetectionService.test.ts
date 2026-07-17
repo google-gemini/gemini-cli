@@ -176,7 +176,7 @@ describe('LoopDetectionService', () => {
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
-    it('should detect an alternating tool call loop (exploit vector)', () => {
+    it('should detect an alternating tool call loop (cycle of length 2)', () => {
       const eventA = createToolCallRequestEvent('read_file', {
         file_path: 'loop_a.txt',
       });
@@ -188,6 +188,48 @@ describe('LoopDetectionService', () => {
       for (let i = 0; i < 15; i++) {
         const currentEvent = i % 2 === 0 ? eventA : eventB;
         const result = service.addAndCheck(currentEvent);
+        if (result.count > 0) {
+          loopCount = result.count;
+        }
+      }
+
+      expect(loopCount).toBeGreaterThan(0);
+    });
+
+    it('should detect a cyclic tool call loop of length 3', () => {
+      const eventA = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_a.txt',
+      });
+      const eventB = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_b.txt',
+      });
+      const eventC = createToolCallRequestEvent('read_file', {
+        file_path: 'loop_c.txt',
+      });
+
+      let loopCount = 0;
+      const sequence = [eventA, eventB, eventC];
+      for (let i = 0; i < 20; i++) {
+        const result = service.addAndCheck(sequence[i % 3]);
+        if (result.count > 0) {
+          loopCount = result.count;
+        }
+      }
+
+      expect(loopCount).toBeGreaterThan(0);
+    });
+
+    it('should detect a cyclic tool call loop of length 5', () => {
+      const e1 = createToolCallRequestEvent('t', { id: 1 });
+      const e2 = createToolCallRequestEvent('t', { id: 2 });
+      const e3 = createToolCallRequestEvent('t', { id: 3 });
+      const e4 = createToolCallRequestEvent('t', { id: 4 });
+      const e5 = createToolCallRequestEvent('t', { id: 5 });
+
+      let loopCount = 0;
+      const sequence = [e1, e2, e3, e4, e5];
+      for (let i = 0; i < 30; i++) {
+        const result = service.addAndCheck(sequence[i % 5]);
         if (result.count > 0) {
           loopCount = result.count;
         }
