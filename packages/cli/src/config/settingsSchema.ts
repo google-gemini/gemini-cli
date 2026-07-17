@@ -1082,7 +1082,7 @@ const SETTINGS_SCHEMA = {
         label: 'Max Session Turns',
         category: 'Model',
         requiresRestart: false,
-        default: 15,
+        default: -1,
         description:
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,

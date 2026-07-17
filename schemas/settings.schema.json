@@ -701,8 +701,8 @@
         "maxSessionTurns": {
           "title": "Max Session Turns",
           "description": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.",
-          "markdownDescription": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `15`",
-          "default": 15,
+          "markdownDescription": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `-1`",
+          "default": -1,
           "type": "number"
         },
         "summarizeToolOutput": {
