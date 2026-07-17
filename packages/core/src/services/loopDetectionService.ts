@@ -314,9 +314,9 @@ export class LoopDetectionService {
     const key = this.getToolCallKey(toolCall);
     this.toolCallHistory.push(key);
 
-    // Keep history at a reasonable limit (e.g., maximum of 50 entries)
-    if (this.toolCallHistory.length > 50) {
-      this.toolCallHistory = this.toolCallHistory.slice(-50);
+    const maxRequiredLength = 5 * TOOL_CALL_LOOP_THRESHOLD;
+    if (this.toolCallHistory.length > maxRequiredLength) {
+      this.toolCallHistory = this.toolCallHistory.slice(-maxRequiredLength);
     }
 
     const n = this.toolCallHistory.length;
