@@ -129,10 +129,11 @@ export function resolveToolName(
   registry: ToolRegistry,
   name: string,
 ): string | undefined {
-  if (!name) {
+  const normalizedName = name.trim();
+  if (!normalizedName) {
     return undefined;
   }
-  return registry.aliasLookup.get(name);
+  return registry.aliasLookup.get(normalizedName);
 }
 
 export function getToolsByCategory(

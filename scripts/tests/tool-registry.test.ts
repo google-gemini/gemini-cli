@@ -73,6 +73,10 @@ describe('tool-registry', () => {
       );
     });
 
+    it('trims whitespace around tool names', () => {
+      expect(resolveToolName(registry, ' grep_search ')).toBe('grep_search');
+    });
+
     it('returns undefined for unknown tool names', () => {
       expect(resolveToolName(registry, 'nonexistent_tool')).toBeUndefined();
     });
