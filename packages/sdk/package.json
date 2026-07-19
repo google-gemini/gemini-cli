@@ -22,13 +22,26 @@
     "dist"
   ],
   "dependencies": {
+    "@google-cloud/logging": "11.3.0",
     "@google/gemini-cli-core": "file:../core",
+    "@grpc/grpc-js": "1.14.4",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.220.0",
+    "@opentelemetry/sdk-trace-base": "2.9.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "ajv": "8.20.0",
+    "js-yaml": "4.3.0",
+    "picomatch": "4.0.5",
+    "shell-quote": "1.10.0",
+    "simple-git": "3.36.0",
+    "undici": "7.28.0",
+    "ws": "8.21.1",
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.1"
   },
   "devDependencies": {
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"
