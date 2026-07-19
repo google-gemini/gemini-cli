@@ -9,6 +9,7 @@ import {
   Compute,
   GoogleAuth,
   type Credentials,
+  type OAuth2ClientOptions,
 } from 'google-auth-library';
 import {
   describe,
@@ -1604,6 +1605,84 @@ describe('oauth2', () => {
         // Third call, after clearing cache, should create a new client
         await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
         expect(OAuth2Client).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('transporter fetch implementation', () => {
+      const primeCachedClient = async () => {
+        const mockOAuth2Client = {
+          setCredentials: vi.fn(),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          getTokenInfo: vi.fn().mockResolvedValue({}),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        // Seed a cached token so getOauthClient takes the fast path. It still
+        // builds the OAuth2Client first, which is the part we want to inspect.
+        const credsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+        await fs.promises.writeFile(
+          credsPath,
+          JSON.stringify({ refresh_token: 'token' }),
+        );
+      };
+
+      const getTransporterOptions = () => {
+        const options = vi.mocked(OAuth2Client).mock
+          .calls[0][0] as OAuth2ClientOptions;
+        return options.transporterOptions as
+          | { proxy?: string; fetchImplementation?: unknown }
+          | undefined;
+      };
+
+      it('uses the native fetch implementation when no proxy is configured', async () => {
+        const mockConfigNoProxy = {
+          getNoBrowser: () => false,
+          getProxy: () => undefined,
+          isBrowserLaunchSuppressed: () => false,
+          getAcpMode: () => false,
+          isInteractive: () => true,
+        } as unknown as Config;
+        await primeCachedClient();
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNoProxy);
+
+        const transporterOptions = getTransporterOptions();
+        expect(transporterOptions?.proxy).toBeUndefined();
+        expect(typeof transporterOptions?.fetchImplementation).toBe('function');
+      });
+
+      it('keeps the default (node-fetch) implementation when a proxy is configured', async () => {
+        await primeCachedClient();
+
+        // mockConfig already points at a proxy.
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        const transporterOptions = getTransporterOptions();
+        expect(transporterOptions?.proxy).toBe('http://test.proxy.com:8080');
+        expect(transporterOptions?.fetchImplementation).toBeUndefined();
+      });
+
+      it('respects the GEMINI_OAUTH_USE_NODE_FETCH escape hatch', async () => {
+        vi.stubEnv('GEMINI_OAUTH_USE_NODE_FETCH', '1');
+        const mockConfigNoProxy = {
+          getNoBrowser: () => false,
+          getProxy: () => undefined,
+          isBrowserLaunchSuppressed: () => false,
+          getAcpMode: () => false,
+          isInteractive: () => true,
+        } as unknown as Config;
+        await primeCachedClient();
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNoProxy);
+
+        const transporterOptions = getTransporterOptions();
+        expect(transporterOptions?.fetchImplementation).toBeUndefined();
       });
     });
   });
