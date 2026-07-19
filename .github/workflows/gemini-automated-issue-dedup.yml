@@ -28,7 +28,10 @@ jobs:
     if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       vars.TRIAGE_DEDUPLICATE_ISSUES != '' &&
-      (github.event_name == 'issues' ||
+      ((github.event_name == 'issues' &&
+        (github.event.issue.author_association == 'OWNER' ||
+         github.event.issue.author_association == 'MEMBER' ||
+         github.event.issue.author_association == 'COLLABORATOR')) ||
        github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'issue_comment' &&
        contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
@@ -62,7 +65,7 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_deduplication'
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_TOKEN: ''
           ISSUE_TITLE: '${{ github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.issue.body }}'
           ISSUE_NUMBER: '${{ github.event.issue.number }}'
