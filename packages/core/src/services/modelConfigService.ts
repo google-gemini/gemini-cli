@@ -629,8 +629,12 @@ export class ModelConfigService {
     override: ModelConfigServiceConfig | undefined,
   ): ModelConfigServiceConfig {
     return ModelConfigService.genericDeepMerge(
+      // structuredClone the base first: genericDeepMerge copies the first
+      // object's nested values by reference, so any default the override does
+      // not touch (e.g. aliases) would otherwise be shared with — and mutable
+      // through — the global DEFAULT_MODEL_CONFIGS.
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      base as Record<string, unknown>,
+      structuredClone(base) as Record<string, unknown>,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       override as Record<string, unknown> | undefined,
     ) as ModelConfigServiceConfig;

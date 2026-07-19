@@ -1271,4 +1271,24 @@ describe('ModelConfigService.mergeConfigs', () => {
 
     expect(base).toEqual(snapshot);
   });
+
+  it('does not leak later mutations of the merged result into the base defaults', () => {
+    const base: ModelConfigServiceConfig = {
+      aliases: { a: alias('model-a') },
+    };
+    const snapshot = structuredClone(base);
+
+    const merged = ModelConfigService.mergeConfigs(base, {
+      aliases: { b: alias('model-b') },
+    });
+
+    // 'a' is a default the override never touches, so the merged result must
+    // own a fresh copy of it rather than sharing the base's reference —
+    // otherwise mutating the result writes through to the global defaults.
+    const mergedAlias = merged.aliases?.['a'];
+    expect(mergedAlias).toBeDefined();
+    mergedAlias!.modelConfig.model = 'mutated';
+
+    expect(base).toEqual(snapshot);
+  });
 });
