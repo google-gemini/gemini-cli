@@ -27,7 +27,7 @@
     "zod-to-json-schema": "3.25.1"
   },
   "devDependencies": {
-    "typescript": "5.8.3",
+    "typescript": "7.0.2",
     "vitest": "3.2.4"
   },
   "engines": {

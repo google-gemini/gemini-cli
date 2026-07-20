@@ -82,7 +82,7 @@
     "@types/ws": "8.5.10",
     "@types/yargs": "17.0.32",
     "@xterm/headless": "5.5.0",
-    "typescript": "5.8.3",
+    "typescript": "7.0.2",
     "vitest": "3.2.4"
   },
   "engines": {
