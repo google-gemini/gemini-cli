@@ -49,10 +49,11 @@ import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
 
 function validateWorkspacePath(workspacePath?: string): string {
-  if (!workspacePath) {
+  const trimmed = workspacePath?.trim();
+  if (!trimmed) {
     return process.env['CODER_AGENT_WORKSPACE_PATH'] ?? process.cwd();
   }
-  return resolveToRealPath(workspacePath);
+  return resolveToRealPath(trimmed);
 }
 
 /**
