@@ -1,0 +1,67 @@
+# Google Cloud Workflow invoked by the Ingestion Layer to run a Cloud Run Job, 
+# publishing to a Pub/Sub DLQ on failure.
+
+main:
+  params: [event]
+  steps:
+    - init:
+        assign:
+          - project_id: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+          - job_name: "triage-worker"
+          - job_location: "us-west1"
+          - base64_data: ${event.data.message.data}
+          - workflow_exec_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - dlq_topic: ${"projects/" + project_id + "/topics/incoming-issues-dlq"}
+    - run_processing_job:
+        try:
+          call: googleapis.run.v1.namespaces.jobs.run
+          args:
+            name: ${"namespaces/" + project_id + "/jobs/" + job_name}
+            location: ${job_location}
+            body:
+              overrides:
+                containerOverrides:
+                  env:
+                    - { name: "ISSUE_DETAILS", value: "${base64_data}" } 
+                    - { name: "WORKFLOW_EXECUTION_ID", value: "${workflow_exec_id}" }
+          result: job_execution
+        retry:
+          predicate: ${retry_predicate}
+          max_retries: 1
+          backoff:
+            # wait 5 seconds before the retry
+            initial_delay: 5
+            max_delay: 60
+            multiplier: 2
+        except:
+          as: error
+          steps:
+            - publish_to_dlq:
+                call: googleapis.pubsub.v1.projects.topics.publish
+                args:
+                  topic: ${dlq_topic}
+                  body:
+                    messages:
+                      - data: ${base64_data}
+                        attributes:
+                          error: ${error.message}
+                          workflow_id: ${workflow_exec_id}
+                          origin: "workflow_failure"
+            - workflow_failed:
+                raise: ${"Terminal failure. DLQ message sent. Error is " + error.message}
+                
+    - success_log:
+        return: 
+          status: "SUCCESS"
+          job_details:
+            name: ${job_name}
+            execution_id: ${job_execution.metadata.name}
+            region: ${job_location}
+          log_view_url: ${"https://console.cloud.google.com/run/jobs/executions/details/" + job_location + "/" + job_execution.metadata.name + "?project=" + project_id}
+
+# retry on any error returned from the Cloud Run Job
+retry_predicate:
+  params: [e]
+  steps:
+    - check_retry:
+        return: true
