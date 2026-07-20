@@ -73,8 +73,9 @@ def main() -> None:
         success, raw_output = process_issue_triage(payload)
     except Exception as e:
         print(f"[WORKER] Triage process failed with exception: {e}")
-        success, raw_output = False, ""
+        success, raw_output = False, f"Exception during triage execution: {e}"
     
+    error_message = None
     if success:
         try:
             triage_result = json.loads(raw_output)
@@ -137,13 +138,15 @@ def main() -> None:
                 
         except Exception as e:
             print(f"[WORKER] Validation failed: {e}")
-            success = False
+            success, error_message = False, f"Validation Error: {e}"
+    else:
+        error_message = raw_output
     
     # If an exception happens in json.loads or validate_triage_result 
     # If LLM inference itself fails inside process_issue_triage
     if not success:
         release_action = store.release_lock(
-            owner, repo, issue_number, lock_holder, success=False
+            owner, repo, issue_number, lock_holder, success=False, error=error_message
         )
         sys.exit(1 if release_action == ReleaseAction.RETRY else 0)
 

@@ -272,7 +272,12 @@ class TestIntegrationMain(unittest.TestCase):
             "owner", "repo", 42, "test-workflow-exec-101"
         )
         self.mock_store.release_lock.assert_called_once_with(
-            "owner", "repo", 42, "test-workflow-exec-101", success=False
+            "owner",
+            "repo",
+            42,
+            "test-workflow-exec-101",
+            success=False,
+            error="Validation Error: Invalid or missing 'effort_estimate': HUGE",
         )
         self.assertEqual(self.stored_data["status"], "UNTRIAGED")
         self.assertIsNone(self.stored_data["lock"]["holder"])

@@ -163,7 +163,7 @@ class TestMainExecutionLoop(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 1)
         self.mock_store.release_lock.assert_called_once_with(
-            "owner", "repo", 42, "exec-123", success=False
+            "owner", "repo", 42, "exec-123", success=False, error="LLM failed"
         )
 
 
