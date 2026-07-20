@@ -112,7 +112,7 @@
     "chrome-devtools-mcp": "0.19.0",
     "msw": "2.3.4",
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "4.1.10"
   },
   "engines": {
     "node": ">=20"
