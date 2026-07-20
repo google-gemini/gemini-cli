@@ -131,15 +131,31 @@
     "@typescript-eslint/parser": "8.31.1",
     "@vscode/vsce": "3.6.0",
     "esbuild": "0.25.3",
-    "eslint": "9.25.1",
+    "eslint": "^9.25.1",
     "npm-run-all2": "8.0.2",
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "^3.2.7"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.23.0",
+    "@google-cloud/logging": "11.3.0",
+    "@google-cloud/storage": "^5.18.3",
+    "@grpc/grpc-js": "1.14.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.220.0",
+    "@opentelemetry/sdk-metrics": "2.9.0",
+    "@opentelemetry/sdk-trace-base": "2.9.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "ajv": "8.20.0",
     "cors": "2.8.5",
     "express": "5.1.0",
+    "js-yaml": "4.3.0",
+    "picomatch": "4.0.5",
+    "shell-quote": "1.10.0",
+    "simple-git": "3.36.0",
+    "systeminformation": "5.32.0",
+    "tar": "7.5.20",
+    "undici": "7.28.0",
+    "ws": "8.21.1",
     "zod": "3.25.76"
   }
 }

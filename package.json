@@ -95,8 +95,7 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "0.16.1",
-    "@modelcontextprotocol/sdk": "1.23.0",
-    "read-package-up": "11.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "22.0.0",
     "@types/express": "5.0.3",
     "@types/marked": "5.0.2",
@@ -109,7 +108,7 @@
     "@types/react-dom": "19.2.0",
     "@types/shell-quote": "1.7.5",
     "@types/ws": "8.18.1",
-    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/coverage-v8": "^3.2.7",
     "@vitest/eslint-plugin": "1.3.4",
     "asciichart": "1.5.25",
     "cross-env": "7.0.3",
@@ -117,7 +116,7 @@
     "domexception": "4.0.0",
     "esbuild": "0.25.0",
     "esbuild-plugin-wasm": "1.1.0",
-    "eslint": "9.24.0",
+    "eslint": "^9.39.5",
     "eslint-config-prettier": "10.1.2",
     "eslint-plugin-headers": "1.3.3",
     "eslint-plugin-import": "2.32.0",
@@ -138,22 +137,48 @@
     "prettier": "3.5.3",
     "react-devtools-core": "6.1.2",
     "react-dom": "19.2.4",
+    "read-package-up": "11.0.0",
     "semver": "7.7.2",
     "strip-ansi": "7.1.2",
     "ts-prune": "0.10.3",
     "tsx": "4.20.3",
     "typescript": "5.8.3",
     "typescript-eslint": "8.30.1",
-    "vitest": "3.2.4",
+    "vitest": "^3.2.7",
     "yargs": "17.7.2"
   },
   "dependencies": {
+    "@google-cloud/logging": "11.3.0",
+    "@google-cloud/storage": "^5.18.3",
+    "@grpc/grpc-js": "1.14.4",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.220.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.220.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.220.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.220.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.220.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.220.0",
+    "@opentelemetry/instrumentation-http": "0.220.0",
+    "@opentelemetry/otlp-exporter-base": "0.220.0",
+    "@opentelemetry/resources": "2.9.0",
+    "@opentelemetry/sdk-logs": "0.220.0",
+    "@opentelemetry/sdk-metrics": "2.9.0",
+    "@opentelemetry/sdk-node": "0.220.0",
+    "@opentelemetry/sdk-trace-base": "2.9.0",
+    "@opentelemetry/sdk-trace-node": "2.9.0",
+    "ajv": "8.20.0",
     "ink": "npm:@jrichman/ink@6.6.9",
+    "js-yaml": "4.3.0",
     "latest-version": "9.0.0",
     "node-fetch-native": "1.6.7",
+    "picomatch": "4.0.5",
     "proper-lockfile": "4.1.2",
     "punycode": "2.3.1",
-    "simple-git": "3.28.0"
+    "shell-quote": "1.10.0",
+    "simple-git": "^3.36.0",
+    "systeminformation": "5.32.0",
+    "tar": "7.5.20",
+    "undici": "7.28.0",
+    "ws": "8.21.1"
   },
   "optionalDependencies": {
     "@github/keytar": "7.10.6",
@@ -176,5 +201,17 @@
     "*.{json,md}": [
       "prettier --write"
     ]
-  }
+  },
+  "description": "[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml) [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml) [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli) [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE) [![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)",
+  "bugs": {
+    "url": "https://github.com/google-gemini/gemini-cli/issues"
+  },
+  "homepage": "https://github.com/google-gemini/gemini-cli#readme",
+  "main": "esbuild.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
