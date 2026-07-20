@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
   AuthType,
@@ -35,6 +36,212 @@ import {
 import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import { type AgentSettings, CoderAgentEvent } from '../types.js';
+
+export const envStorage = new AsyncLocalStorage<TaskEnv>();
+
+const deletedKeysSymbol = Symbol('deletedKeys');
+export const cwdSymbol = Symbol('cwd');
+
+export interface TaskEnv extends Record<string, string | undefined> {
+  [deletedKeysSymbol]?: Set<string>;
+  [cwdSymbol]?: string;
+}
+
+// Set up a Proxy on process.env to intercept reads and writes, isolating environment variables per task
+const originalEnv = process.env;
+const envProxy = new Proxy(originalEnv, {
+  get(target, prop) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore();
+      if (taskEnv) {
+        const deleted = taskEnv[deletedKeysSymbol];
+        if (deleted?.has(prop)) {
+          return undefined;
+        }
+        if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
+          return taskEnv[prop];
+        }
+      }
+      return target[prop];
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    return target[prop as any];
+  },
+  has(target, prop) {
+    if (typeof prop === 'string') {
+      const taskEnv = envStorage.getStore();
+      if (taskEnv) {
+        const deleted = taskEnv[deletedKeysSymbol];
+        if (deleted?.has(prop)) {
+          return false;
+        }
+        if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
+          return true;
+        }
+      }
+      return prop in target;
+    }
+    return prop in target;
+  },
+  set(target, prop, value) {
+    if (typeof prop === 'string') {
+      if (
+        prop === '__proto__' ||
+        prop === 'constructor' ||
+        prop === 'prototype'
+      ) {
+        return false;
+      }
+      const taskEnv = envStorage.getStore();
+      if (taskEnv) {
+        taskEnv[deletedKeysSymbol]?.delete(prop);
+        taskEnv[prop] = String(value);
+        return true;
+      }
+      target[prop] = String(value);
+      return true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+    target[prop as any] = value;
+    return true;
+  },
+  deleteProperty(target, prop) {
+    if (typeof prop === 'string') {
+      if (
+        prop === '__proto__' ||
+        prop === 'constructor' ||
+        prop === 'prototype'
+      ) {
+        return false;
+      }
+      const taskEnv = envStorage.getStore();
+      if (taskEnv) {
+        delete taskEnv[prop];
+        (taskEnv[deletedKeysSymbol] ??= new Set()).add(prop);
+        return true;
+      }
+      delete target[prop];
+      return true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    return delete target[prop as any];
+  },
+  ownKeys(target) {
+    const taskEnv = envStorage.getStore();
+    if (taskEnv) {
+      const keys = new Set<string | symbol>([
+        ...Object.getOwnPropertyNames(target),
+        ...Object.getOwnPropertySymbols(target),
+        ...Object.keys(taskEnv),
+      ]);
+      taskEnv[deletedKeysSymbol]?.forEach((key) => {
+        keys.delete(key);
+      });
+      return Array.from(keys);
+    }
+    return [
+      ...Object.getOwnPropertyNames(target),
+      ...Object.getOwnPropertySymbols(target),
+    ];
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    const taskEnv = envStorage.getStore();
+    if (taskEnv && typeof prop === 'string') {
+      const deleted = taskEnv[deletedKeysSymbol];
+      if (deleted?.has(prop)) {
+        return undefined;
+      }
+      if (Object.prototype.hasOwnProperty.call(taskEnv, prop)) {
+        return {
+          value: taskEnv[prop],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+    }
+    return Object.getOwnPropertyDescriptor(target, prop);
+  },
+  defineProperty(target, prop, descriptor) {
+    if (typeof prop === 'string') {
+      if (
+        prop === '__proto__' ||
+        prop === 'constructor' ||
+        prop === 'prototype'
+      ) {
+        return false;
+      }
+      const taskEnv = envStorage.getStore();
+      if (taskEnv) {
+        taskEnv[deletedKeysSymbol]?.delete(prop);
+        taskEnv[prop] =
+          descriptor.value !== undefined ? String(descriptor.value) : undefined;
+        return true;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    Object.defineProperty(target, prop as any, descriptor);
+    return true;
+  },
+});
+
+Object.defineProperty(process, 'env', {
+  value: envProxy,
+  writable: false,
+  configurable: true,
+});
+
+// NOTE: Monkey-patching process.cwd and process.chdir via AsyncLocalStorage is a robust way
+// to simulate workspace isolation in a concurrent server. However, please be aware of a critical
+// limitation: Node.js native C++ APIs (such as fs.readFileSync, fs.writeFile, etc.) and child
+// process spawning APIs (like child_process.spawn) resolve relative paths using the OS-level
+// working directory of the process, NOT the JS-level process.cwd() function.
+// To prevent cross-task interference, all file paths in the core package must be resolved to
+// absolute paths using path.resolve/path.join relative to config.getTargetDir() or config.getCwd()
+// before being passed to native APIs.
+const originalCwd = process.cwd;
+process.cwd = function () {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv && taskEnv[cwdSymbol]) {
+    return taskEnv[cwdSymbol];
+  }
+  return originalCwd.call(process);
+};
+
+const originalChdir = process.chdir;
+process.chdir = function (directory: string) {
+  const taskEnv = envStorage.getStore();
+  if (taskEnv) {
+    const resolved = path.resolve(process.cwd(), directory);
+    try {
+      const stats = fs.statSync(resolved);
+      if (!stats.isDirectory()) {
+        const err = new Error(
+          "ENOTDIR: not a directory, chdir '" + resolved + "'",
+        );
+        (err as NodeJS.ErrnoException).code = 'ENOTDIR';
+        throw err;
+      }
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'ENOENT'
+      ) {
+        const chdirErr = new Error(
+          "ENOENT: no such file or directory, chdir '" + resolved + "'",
+        );
+        (chdirErr as NodeJS.ErrnoException).code = 'ENOENT';
+        throw chdirErr;
+      }
+      throw err;
+    }
+    taskEnv[cwdSymbol] = resolved;
+    return;
+  }
+  return originalChdir.call(process, directory);
+};
 
 export function getEnv(key: string): string | undefined {
   return process.env[key];

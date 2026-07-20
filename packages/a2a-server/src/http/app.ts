@@ -208,6 +208,9 @@ export async function createApp() {
       isHeadless: isHeadlessMode(),
     });
 
+    // Change the global working directory to the workspace root during startup
+    process.chdir(workspaceRoot);
+
     // Load environment globally for the server startup
     const globalEnv = await loadEnvironment(isTrusted ?? false, workspaceRoot);
     // Only assign safe server-config variables to process.env to prevent credential leakage

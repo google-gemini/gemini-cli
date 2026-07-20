@@ -41,6 +41,10 @@ vi.mock('../config/config.js', () => ({
   loadEnvironment: vi.fn(),
   setIsTrusted: vi.fn().mockReturnValue(false),
   setTargetDir: vi.fn().mockReturnValue('/tmp'),
+  envStorage: {
+    run: (env: Record<string, string>, cb: () => unknown) => cb(),
+  },
+  cwdSymbol: Symbol('cwd'),
 }));
 
 vi.mock('../config/settings.js', () => ({
