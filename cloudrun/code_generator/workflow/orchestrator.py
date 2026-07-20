@@ -224,8 +224,8 @@ class Orchestrator:
 
             if verdict in ["APPROVED", "PASS"]:
                 logging.info("Evaluator approved the patch. Launching deterministic regression pre-flights...")
-                # approved = await self._run_regression_checks()
-                approved = True
+                approved = await self._run_regression_checks()
+                # approved = True
                 
                 if approved:
                     try:
