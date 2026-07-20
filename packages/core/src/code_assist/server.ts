@@ -86,6 +86,10 @@ export class CodeAssistServer implements ContentGenerator {
     readonly config?: Config,
   ) {}
 
+  getEffectiveSessionId(): string | undefined {
+    return this.config?.getSessionId() ?? this.sessionId;
+  }
+
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
@@ -117,7 +121,7 @@ export class CodeAssistServer implements ContentGenerator {
           req,
           userPromptId,
           this.projectId,
-          this.sessionId,
+          this.getEffectiveSessionId(),
           enabledCreditTypes,
         ),
         req.config?.abortSignal,
@@ -204,7 +208,7 @@ export class CodeAssistServer implements ContentGenerator {
         req,
         userPromptId,
         this.projectId,
-        this.sessionId,
+        this.getEffectiveSessionId(),
         undefined,
       ),
       req.config?.abortSignal,
@@ -224,7 +228,7 @@ export class CodeAssistServer implements ContentGenerator {
       translatedResponse,
       streamingLatency,
       req.config?.abortSignal,
-      this.sessionId, // Use sessionId as trajectoryId
+      this.getEffectiveSessionId(), // Use sessionId as trajectoryId
     );
 
     if (response.remainingCredits) {
