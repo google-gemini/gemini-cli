@@ -99,6 +99,7 @@ import {
   EmptyWalletMenuShownEvent,
   CreditPurchaseClickEvent,
 } from './billingEvents.js';
+import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -153,11 +154,23 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
+    let skill_name: string | undefined;
+    if (
+      event.function_name === ACTIVATE_SKILL_TOOL_NAME &&
+      event.function_args
+    ) {
+      const nameVal = event.function_args['name'];
+      if (typeof nameVal === 'string') {
+        skill_name = nameVal;
+      }
+    }
+
     recordToolCallMetrics(config, event.duration_ms, {
       function_name: event.function_name,
       success: event.success,
       decision: event.decision,
       tool_type: event.tool_type,
+      skill_name,
     });
 
     if (event.metadata) {
