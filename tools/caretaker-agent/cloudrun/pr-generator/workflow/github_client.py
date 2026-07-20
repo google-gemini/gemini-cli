@@ -74,7 +74,7 @@ class GitHubClient:
             "Sending Pull Request creation request for branch: %s", branch_name
         )
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req,timeout=60) as response:
                 response_payload = json.loads(response.read().decode("utf-8"))
                 pr_url: str = response_payload.get("html_url", "")
                 logging.info(

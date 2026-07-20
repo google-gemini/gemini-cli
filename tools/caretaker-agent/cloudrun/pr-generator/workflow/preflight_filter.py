@@ -9,6 +9,8 @@ import logging
 import re
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\\[0-?]*[ -/]*[@-~])")
+_FAIL_PATH_RE = re.compile(r"FAIL\s+(\S+)")
+_TEST_FAILED_COUNT_RE = re.compile(r"Tests:?\s*(\d+)\s+failed")
 
 
 class PreflightFilter:
@@ -45,8 +47,8 @@ class PreflightFilter:
         raw_output = (stdout or "") + "\n" + (stderr or "")
         clean_output = cls.strip_ansi(raw_output)
 
-        # Regex search for failing files of format "FAIL src/..."
-        failing_files = set(re.findall(r"FAIL\s+(src/[^\s>]+)", clean_output))
+        # Regex search for failing files of format "FAIL [path]"
+        failing_files = set(_FAIL_PATH_RE.findall(clean_output))
         logging.info("Analyzing failing test files: %s", failing_files)
 
         allowed_failures = {
@@ -58,16 +60,20 @@ class PreflightFilter:
             logging.info("No failing test files matched.")
             return False
 
-        # If failures exist that are not inside our allowed list, we cannot ignore
-        if not failing_files.issubset(allowed_failures):
+        # If failures exist that do not match our allowed failure suffixes, we cannot ignore
+        unapproved_failures = {
+            f for f in failing_files
+            if not any(f.endswith(allowed) for allowed in allowed_failures)
+        }
+        if unapproved_failures:
             logging.warning(
                 "Unapproved test failures detected: %s",
-                failing_files - allowed_failures,
+                unapproved_failures,
             )
             return False
 
         # Find total test failure count summary in JEST style output: e.g. "Tests: 3 failed, 4 passed"
-        match = re.search(r"Tests\s+(\d+)\s+failed", clean_output)
+        match = _TEST_FAILED_COUNT_RE.search(clean_output)
         if not match:
             logging.warning("No standard test failure count summary found.")
             return False

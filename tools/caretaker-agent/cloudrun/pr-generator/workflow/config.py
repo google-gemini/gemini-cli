@@ -53,7 +53,6 @@ class Config:
 
         # Global environment variables to trust the CLI
         os.environ["GEMINI_CLI_WORKSPACE_TRUSTED"] = "true"
-        os.environ["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
 
     def load_and_validate_firestore_doc(self) -> dict[str, Any]:
         """Parses and validates the Firestore JSON input specification.
