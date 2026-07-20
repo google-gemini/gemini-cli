@@ -1,10 +1,11 @@
 """Google Antigravity SDK Agent Runner and Context Management.
 
 Provides execution wrappers for executing Coding and Evaluator AI Agents using
-the Google Antigravity SDK. Includes thread-safe working directory controls
+the Google Antigravity SDK. Includes serialized working directory controls
 and automatic local sandbox approvals.
 """
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -33,6 +34,20 @@ def working_directory(path: str | os.PathLike) -> Iterator[None]:
         os.chdir(original_cwd)
 
 
+# Permitted tool allowlist for headless sandbox operations
+ALLOWED_SANDBOX_TOOLS = {
+    # Reading tools
+    "view_file",
+    "read_file",
+    # File writing & editing tools
+    "replace_file_content",
+    "multi_replace_file_content",
+    "write_file",
+    "write_to_file",
+    # Command execution
+    "run_command",
+}
+
 # Registering global agent hooks for local sandbox tool calls
 try:
     from google.antigravity import Agent, LocalAgentConfig, hooks, policy
@@ -42,9 +57,12 @@ except ImportError:
 if hooks is not None:
     @hooks.pre_tool_call_decide
     def auto_approve_all_tools(context, tool_call) -> str:
-        """Automatically approves local sandbox tool execution in headless mode."""
-        logging.debug("Auto-approving sandbox tool call: %s", tool_call.name)
-        return "PROCEED"
+        """Only auto-approves safe, allowlisted tools in headless mode."""
+        if tool_call.name in ALLOWED_SANDBOX_TOOLS:
+            logging.debug("Auto-approving allowlisted sandbox tool call: %s", tool_call.name)
+            return "PROCEED"
+        logging.warning("Rejecting non-allowlisted tool call: %s", tool_call.name)
+        return "REJECT"
 
 
 class AgentRunnerError(Exception):
@@ -54,23 +72,25 @@ class AgentRunnerError(Exception):
 class AgentRunner:
     """Manages AI Agent setups and coordinates conversation execution loops."""
 
+    _cwd_lock: asyncio.Lock | None = None
+
     def __init__(
         self,
         project_id: str,
-        location: str,
-        model_name: str,
+        location: str = "global",
+        model_name: str = "gemini-3.5-flash",
         script_dir: str | None = None,
     ) -> None:
         """Initializes the runner with target Vertex AI details.
 
         Args:
             project_id: Target Google Cloud Platform Project ID.
-            location: Regional location of Vertex AI services.
+            location: Global endpoint location of Vertex AI services (default: "global").
             model_name: Base LLM version string.
             script_dir: Directory containing system/prompt markdown files.
         """
         self.project_id = project_id
-        self.location = location
+        self.location = location or "global"
         self.model_name = model_name
         self.script_dir = script_dir or os.path.dirname(
             os.path.abspath(__file__)
@@ -85,7 +105,11 @@ class AgentRunner:
         Returns:
             The text content if file exists, else None.
         """
-        path = os.path.join(self.script_dir, filename)
+        path = os.path.abspath(os.path.join(self.script_dir, filename))
+        if not path.startswith(os.path.abspath(self.script_dir)):
+            logging.warning("Path traversal attempt detected in prompt loading: %s", filename)
+            return None
+
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -151,62 +175,68 @@ class AgentRunner:
         stdout_list: list[str] = []
         thinking_list: list[str] = []
 
+        if AgentRunner._cwd_lock is None:
+            AgentRunner._cwd_lock = asyncio.Lock()
+
         try:
             # We change CWD to the repo workspace because the Antigravity SDK Agent
             # interacts relative to the current working process directory.
-            with working_directory(repo_path):
-                async with Agent(config) as agent:
-                    logging.info(
-                        "[%s] Sending initial task prompt to conversation loop...",
-                        role
-                    )
-                    await agent.conversation.send(prompt)
-
-                    step_contents: dict[int, str] = {}
-                    step_thoughts: dict[int, str] = {}
-                    printed_steps: set[tuple[int, str]] = set()
-
-                    async for step in agent.conversation.receive_steps():
-                        if step.content:
-                            step_contents[step.step_index] = step.content
-
-                        # Retrieve thoughts if available via standard properties
-                        thinking = getattr(step, "thinking", None) or getattr(
-                            step, "thinking_delta", None
+            # Since os.chdir is process-wide, we must serialize execution to prevent
+            # concurrent tasks from corrupting the CWD.
+            async with AgentRunner._cwd_lock:
+                with working_directory(repo_path):
+                    async with Agent(config) as agent:
+                        logging.info(
+                            "[%s] Sending initial task prompt to conversation loop...",
+                            role,
                         )
-                        if thinking:
-                            step_thoughts[step.step_index] = str(thinking)
+                        await agent.conversation.send(prompt)
 
-                        step_key = (step.step_index, str(step.status))
-                        if step_key not in printed_steps:
-                            printed_steps.add(step_key)
-                            logging.info(
-                                "[%s Step %s] Type: %s (Source: %s, Status: %s)",
-                                role,
-                                step.step_index,
-                                step.type,
-                                step.source,
-                                step.status,
-                            )
+                        step_contents: dict[int, str] = {}
+                        step_thoughts: dict[int, str] = {}
+                        printed_steps: set[tuple[int, str]] = set()
+
+                        async for step in agent.conversation.receive_steps():
                             if step.content:
-                                logging.info("[%s Content]: %s", role, step.content)
+                                step_contents[step.step_index] = step.content
+
+                            # Retrieve thoughts if available via standard properties
+                            thinking = getattr(step, "thinking", None) or getattr(
+                                step, "thinking_delta", None
+                            )
                             if thinking:
-                                logging.debug("[%s Thinking]: %s", role, thinking)
-                            if step.tool_calls:
-                                for call in step.tool_calls:
-                                    logging.info(
-                                        "[%s Tool Call]: %s with args %s",
-                                        role,
-                                        call.name,
-                                        call.args,
-                                    )
+                                step_thoughts[step.step_index] = str(thinking)
 
-                    # Accumulate outputs
-                    for step_idx in sorted(step_contents.keys()):
-                        stdout_list.append(step_contents[step_idx])
+                            step_key = (step.step_index, str(step.status))
+                            if step_key not in printed_steps:
+                                printed_steps.add(step_key)
+                                logging.info(
+                                    "[%s Step %s] Type: %s (Source: %s, Status: %s)",
+                                    role,
+                                    step.step_index,
+                                    step.type,
+                                    step.source,
+                                    step.status,
+                                )
+                                if step.content:
+                                    logging.info("[%s Content]: %s", role, step.content)
+                                if thinking:
+                                    logging.debug("[%s Thinking]: %s", role, thinking)
+                                if step.tool_calls:
+                                    for call in step.tool_calls:
+                                        logging.info(
+                                            "[%s Tool Call]: %s with args %s",
+                                            role,
+                                            call.name,
+                                            call.args,
+                                        )
 
-                    for step_idx in sorted(step_thoughts.keys()):
-                        thinking_list.append(step_thoughts[step_idx])
+                        # Accumulate outputs
+                        for step_idx in sorted(step_contents.keys()):
+                            stdout_list.append(step_contents[step_idx])
+
+                        for step_idx in sorted(step_thoughts.keys()):
+                            thinking_list.append(step_thoughts[step_idx])
 
             full_output = "\n".join(stdout_list)
             if thinking_list:

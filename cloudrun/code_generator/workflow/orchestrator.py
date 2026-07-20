@@ -30,7 +30,12 @@ import sys
 from typing import Any
 
 from config import Config
-from command_executor import CommandExecutor, CommandExecutionError
+from command_executor import (
+    CommandExecutor,
+    CommandExecutionError,
+    sanitize_identifier,
+    sanitize_relative_path,
+)
 from github_client import GitHubClient, GitHubClientError
 from agent_runner import AgentRunner, AgentRunnerError
 from preflight_filter import PreflightFilter
@@ -92,10 +97,10 @@ class Orchestrator:
         if repo_exists:
             logging.info("Repository already exists locally. Syncing with remote origin/main...")
             try:
-                CommandExecutor.run("git reset --hard HEAD", self.config.pr_repo_path)
-                CommandExecutor.run("git clean -fd", self.config.pr_repo_path)
-                CommandExecutor.run("git checkout main", self.config.pr_repo_path)
-                CommandExecutor.run("git pull origin main", self.config.pr_repo_path)
+                CommandExecutor.run(["git", "reset", "--hard", "HEAD"], self.config.pr_repo_path)
+                CommandExecutor.run(["git", "clean", "-fd"], self.config.pr_repo_path)
+                CommandExecutor.run(["git", "checkout", "main"], self.config.pr_repo_path)
+                CommandExecutor.run(["git", "pull", "origin", "main"], self.config.pr_repo_path)
             except CommandExecutionError as e:
                 logging.warning("Repository sync failed: %s. Re-cloning from scratch.", e)
                 try:
@@ -107,13 +112,13 @@ class Orchestrator:
         if not repo_exists:
             logging.info("Cloning repository %s into %s", self.config.repo_url, self.config.pr_dir)
             try:
-                CommandExecutor.run(f"git clone {self.config.repo_url} {self.config.repo_name}", self.config.pr_dir)
+                CommandExecutor.run(["git", "clone", self.config.repo_url, self.config.repo_name], self.config.pr_dir)
             except CommandExecutionError as e:
                 raise OrchestrationError(f"Failed to clone repository: {e}") from e
 
             # Establish safe bot git identity
-            CommandExecutor.run('git config user.name "Jetski Bot"', self.config.pr_repo_path)
-            CommandExecutor.run('git config user.email "jetski-bot@google.com"', self.config.pr_repo_path)
+            CommandExecutor.run(["git", "config", "user.name", "Jetski Bot"], self.config.pr_repo_path)
+            CommandExecutor.run(["git", "config", "user.email", "jetski-bot@google.com"], self.config.pr_repo_path)
 
             # Ignore agent/orch file writes to prevent pollution of git status
             exclude_file = os.path.join(self.config.pr_repo_path, ".git", "info", "exclude")
@@ -176,12 +181,12 @@ class Orchestrator:
             )
             sys.exit(1)
 
-        branch_name = f"ssr-agent-{issue_num}"
+        branch_name = f"ssr-agent-{sanitize_identifier(str(issue_num))}"
 
         # Sync repository and check out target branch
         self._sync_or_clone_repository()
         try:
-            CommandExecutor.run(f"git checkout -B {branch_name} origin/main", self.config.pr_repo_path)
+            CommandExecutor.run(["git", "checkout", "-B", branch_name, "origin/main"], self.config.pr_repo_path)
         except CommandExecutionError as e:
             raise OrchestrationError(f"Failed to checkout feature branch {branch_name}: {e}") from e
 
@@ -344,13 +349,13 @@ class Orchestrator:
         """
         logging.info("Staging workspace modifications and soft-committing...")
         try:
-            CommandExecutor.run("git add .", self.config.pr_repo_path)
-            CommandExecutor.run("git reset --soft origin/main", self.config.pr_repo_path)
+            CommandExecutor.run(["git", "add", "."], self.config.pr_repo_path)
+            CommandExecutor.run(["git", "reset", "--soft", "origin/main"], self.config.pr_repo_path)
             
-            git_status = CommandExecutor.run("git status --porcelain", self.config.pr_repo_path)
+            git_status = CommandExecutor.run(["git", "status", "--porcelain"], self.config.pr_repo_path)
             if git_status:
                 commit_msg = f"[SSR Agent] Issue Fix: issues/{issue_num}"
-                CommandExecutor.run(f'git commit -m "{commit_msg}" --allow-empty --no-verify', self.config.pr_repo_path)
+                CommandExecutor.run(["git", "commit", "-m", commit_msg, "--allow-empty", "--no-verify"], self.config.pr_repo_path)
             else:
                 logging.info("No modifications staged against origin/main in this iteration.")
                 if iteration == 1:
@@ -358,7 +363,7 @@ class Orchestrator:
                     sys.exit(1)
                 return None
 
-            return CommandExecutor.run("git diff origin/main", self.config.pr_repo_path)
+            return CommandExecutor.run(["git", "diff", "origin/main"], self.config.pr_repo_path)
         except CommandExecutionError as e:
             logging.error("Failed to stage iteration commit or generate diff: %s", e)
             return None
@@ -453,17 +458,23 @@ class Orchestrator:
         try:
             git_diff_cmd = 'git diff origin/main... --name-only --diff-filter=d -- "*.ts" "*.tsx" "*.js" "*.jsx"'
             changed_files_out = CommandExecutor.run(git_diff_cmd, self.config.eval_repo_path).strip()
-            changed_files = [f for f in changed_files_out.split("\n") if f]
+            changed_files = []
+            for f in changed_files_out.split("\n"):
+                safe_path = sanitize_relative_path(f)
+                if safe_path:
+                    changed_files.append(safe_path)
         except CommandExecutionError as e:
             logging.warning("Failed to retrieve changed files list from git: %s", e)
             changed_files = []
 
         if changed_files:
-            quoted_files = " ".join(f'"{f}"' for f in changed_files)
-            logging.info("Targeting ESLint against modified files: %s", quoted_files)
-            eslint_cmd = f'NODE_OPTIONS="--max-old-space-size=4096" npx eslint {quoted_files} --max-warnings 0'
+            logging.info("Targeting ESLint against modified files: %s", changed_files)
+            eslint_cmd = ["npx", "eslint"] + changed_files + ["--max-warnings", "0"]
+            eslint_env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=4096"}
             try:
-                lint_result = CommandExecutor.run(eslint_cmd, self.config.eval_repo_path)
+                lint_result = CommandExecutor.run(
+                    eslint_cmd, self.config.eval_repo_path, env=eslint_env
+                )
                 with open(linter_output_path, "w", encoding="utf-8") as f:
                     f.write(f"ESLint check succeeded. Output:\n{lint_result}")
                 logging.info("ESLint static checks passed. Stored results.")
@@ -592,7 +603,7 @@ class Orchestrator:
         # Amend current Git commit with the recommended title if available
         if recommended_commit_msg:
             try:
-                CommandExecutor.run(f'git commit --amend -m "{recommended_commit_msg}" --no-verify', self.config.pr_repo_path)
+                CommandExecutor.run(["git", "commit", "--amend", "-m", recommended_commit_msg, "--no-verify"], self.config.pr_repo_path)
             except CommandExecutionError as e:
                 logging.error("Failed to amend git commit message: %s", e)
 
@@ -607,7 +618,7 @@ class Orchestrator:
 
         try:
             CommandExecutor.run(
-                f"git push -f origin HEAD:refs/heads/{branch_name}",
+                ["git", "push", "-f", "origin", f"HEAD:refs/heads/{branch_name}"],
                 cwd=self.config.pr_repo_path,
                 env=git_env,
             )

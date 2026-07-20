@@ -210,6 +210,8 @@ def _acquire_lock_tx(
             doc_ref,
             {
                 "status": IssueStatus.NEEDS_HUMAN.value,
+                "lock.holder": None,
+                "lock.expires_at": None,
                 "updated_at": firestore.SERVER_TIMESTAMP,
             },
         )
