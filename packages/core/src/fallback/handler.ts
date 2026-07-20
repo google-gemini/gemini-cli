@@ -164,7 +164,7 @@ async function processIntent(
     case 'retry_always':
       // Rotate the session ID to ensure the backend treats the retried request
       // as a brand-new session, preventing stateful model-switching errors.
-      config.setSessionId(createSessionId());
+      config.rotateSessionId(createSessionId());
       config.activateFallbackMode(fallbackModel, failedModel);
       return true;
 

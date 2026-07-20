@@ -157,7 +157,7 @@ export class CodeAssistServer implements ContentGenerator {
           translatedResponse,
           streamingLatency,
           req.config?.abortSignal,
-          server.sessionId, // Use sessionId as trajectoryId
+          server.getEffectiveSessionId(), // Use sessionId as trajectoryId
         );
 
         if (response.consumedCredits) {

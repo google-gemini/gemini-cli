@@ -1858,6 +1858,19 @@ export class Config implements McpContext, AgentLoopContext {
     }
   }
 
+  rotateSessionId(sessionId: string): void {
+    const previousPlansDir = this.storage.isInitialized()
+      ? this.storage.getPlansDir()
+      : undefined;
+
+    this._sessionId = sessionId;
+    this.storage.setSessionId(sessionId);
+
+    if (previousPlansDir) {
+      this.refreshSessionScopedPlansDirectory(previousPlansDir);
+    }
+  }
+
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
   }
