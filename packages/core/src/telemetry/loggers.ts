@@ -161,7 +161,10 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     ) {
       const nameVal = event.function_args['name'];
       if (typeof nameVal === 'string') {
-        skill_name = nameVal;
+        const trimmed = nameVal.trim();
+        if (trimmed !== '') {
+          skill_name = trimmed;
+        }
       }
     }
 
