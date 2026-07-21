@@ -23,7 +23,7 @@ class Config:
         self.repo_url: str = os.environ.get(
             "REPO_URL", "https://github.com/joneba-google/gemini-cli-clone"
         )
-        self.git_token: str | None = os.environ.get("GIT_TOKEN")
+        self.git_token: str | None = os.environ.pop("GIT_TOKEN", None)
         self.firestore_doc_raw: str | None = os.environ.get("FIRESTORE_DOC")
         self.firestore_id: str | None = (
             os.environ.get("FIRESTORE_ID") or os.environ.get("firestore_id")
