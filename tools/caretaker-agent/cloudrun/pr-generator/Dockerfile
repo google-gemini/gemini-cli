@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Set the workspace directory where the repository will be cloned
+# 2. Create non-root system user and establish working directory
+RUN useradd -m -u 1000 appuser
+
 WORKDIR /app
 
 # 3. Install Python dependencies including google-cloud-firestore
@@ -24,9 +26,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Set it globally inside the container build (or inject via Cloud Run Environment Variables)
 ENV GEMINI_API_KEY=""
 
-# 4. Copy the pipeline orchestration script and prompts
-COPY workflow/ /app/workflow/
-COPY agent_prompts/ /app/agent_prompts/
+# 4. Copy the pipeline orchestration script and prompts with non-root ownership
+COPY --chown=appuser:appuser workflow/ /app/workflow/
+COPY --chown=appuser:appuser agent_prompts/ /app/agent_prompts/
 
-# 5. Execute script directly
+# 5. Switch to unprivileged user
+USER appuser
+
+# 6. Execute script directly
 ENTRYPOINT ["python", "/app/workflow/worker.py"]
