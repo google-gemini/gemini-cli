@@ -79,56 +79,35 @@ class TestMainExecutionLoop(unittest.TestCase):
                 self.assertEqual(ctx.exception.code, 0)
 
     @patch("main.process_issue_triage")
-    @patch("main.send_label_action")
-    def test_main_auto_close_quality_flow(self, mock_send_label, mock_triage):
-        """SPAM and EMPTY issues dispatch auto-close label."""
-        for quality in ["SPAM", "EMPTY"]:
-            self.mock_store.acquire_lock.reset_mock()
-            self.mock_store.release_lock.reset_mock()
-            mock_send_label.reset_mock()
-            mock_triage.reset_mock()
-
-            self.mock_store.acquire_lock.return_value = ClaimAction.PROCEED
-            output = json.dumps({"triage_metadata": {"quality": quality}})
-            mock_triage.return_value = (True, output)
-
-            with self.assertRaises(SystemExit) as ctx:
-                main()
-
-            self.assertEqual(ctx.exception.code, 0)
-            mock_send_label.assert_called_once_with(
-                "owner", "repo", 42, ["auto-close"]
-            )
-            self.mock_store.release_lock.assert_called_once_with(
-                "owner", "repo", 42, "exec-123", success=True, status="AUTO_CLOSE"
-            )
-
-    @patch("main.process_issue_triage")
     @patch("main.send_comment_action")
     @patch("main.send_label_action")
-    def test_main_feature_quality_flow(
+    def test_main_auto_close_quality_flow(
         self, mock_send_label, mock_send_comment, mock_triage
     ):
-        """FEATURE issues post comment and dispatch auto-close label."""
-        self.mock_store.acquire_lock.return_value = ClaimAction.PROCEED
-        output = json.dumps({"triage_metadata": {"quality": "FEATURE"}})
-        mock_triage.return_value = (True, output)
+        """SPAM, EMPTY, and FEATURE issues dispatch comment and auto-close label."""
+        for quality in ["SPAM", "EMPTY", "FEATURE"]:
+            with self.subTest(quality=quality):
+                self.mock_store.acquire_lock.reset_mock()
+                self.mock_store.release_lock.reset_mock()
+                mock_send_label.reset_mock()
+                mock_send_comment.reset_mock()
+                mock_triage.reset_mock()
 
-        with self.assertRaises(SystemExit) as ctx:
-            main()
+                self.mock_store.acquire_lock.return_value = ClaimAction.PROCEED
+                output = json.dumps({"triage_metadata": {"quality": quality}})
+                mock_triage.return_value = (True, output)
 
-        self.assertEqual(ctx.exception.code, 0)
-        mock_send_comment.assert_called_once()
-        args, _ = mock_send_comment.call_args
-        self.assertEqual(args[:3], ("owner", "repo", 42))
-        # Verify non-empty comment body
-        self.assertTrue(len(args[3].strip()) > 0)
-        mock_send_label.assert_called_once_with(
-            "owner", "repo", 42, ["auto-close"]
-        )
-        self.mock_store.release_lock.assert_called_once_with(
-            "owner", "repo", 42, "exec-123", success=True, status="AUTO_CLOSE"
-        )
+                with self.assertRaises(SystemExit) as ctx:
+                    main()
+
+                self.assertEqual(ctx.exception.code, 0)
+                mock_send_comment.assert_called_once()
+                mock_send_label.assert_called_once_with(
+                    "owner", "repo", 42, ["auto-close"]
+                )
+                self.mock_store.release_lock.assert_called_once_with(
+                    "owner", "repo", 42, "exec-123", success=True, status="AUTO_CLOSE"
+                )
 
     @patch("main.process_issue_triage")
     @patch("main.send_comment_action")

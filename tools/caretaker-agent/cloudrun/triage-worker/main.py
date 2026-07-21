@@ -84,19 +84,24 @@ def main() -> None:
             workable_spec = triage_result.get("workable_spec", {})
             
             if quality in ["SPAM", "EMPTY", "FEATURE"]:
-                print(f"[WORKER] Quality: {quality}. Applying auto-close label.")
+                print(f"[WORKER] Quality: {quality}. Leaving comment and applying auto-close label.")
                 if quality == "FEATURE":
-                    send_comment_action(
-                        owner,
-                        repo,
-                        issue_number,
+                    comment = (
                         "Thank you for bringing this to our attention. Right now, our "
                         "engineering team is focusing all resources on critical system "
                         "maintenance and core stability. Because of this, we don't have "
                         "immediate plans to address this specific issue. If you believe "
-                        "this issue was misclassified, feel free to reopen it.",
+                        "this issue was misclassified, feel free to reopen it."
+                    )
+                else: # SPAM or EMPTY
+                    comment = (
+                        "Thank you for reaching out. We are closing this issue as it does "
+                        "not contain a discernible description or actionable bug report for "
+                        "our team to investigate. If you believe this was closed in error, "
+                        "please feel free to open a new issue with complete reproduction details."
                     )
 
+                send_comment_action(owner, repo, issue_number, comment)
                 send_label_action(owner, repo, issue_number, ["auto-close"])
                 store.release_lock(
                     owner,
