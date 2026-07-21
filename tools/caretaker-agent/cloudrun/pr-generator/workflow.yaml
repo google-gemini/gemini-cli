@@ -26,16 +26,6 @@ main:
           - condition: '${not text.match_regex(doc_id, "^[a-zA-Z0-9_-]+$")}'
             raise: '${"Security Exception: Invalid or unsafe firestore_id format: " + string(doc_id)}'
 
-    - get_github_token:
-        call: googleapis.secretmanager.v1.projects.secrets.versions.access
-        args:
-          name: '${"projects/" + project_id + "/secrets/PR_GEN_GITHUB_PUSH_KEY/versions/latest"}'
-        result: secret_response
-
-    - decode_github_token:
-        assign:
-          - git_token: '${text.decode(base64.decode(secret_response.payload.data))}'
-
     - run_job:
         try:
           call: googleapis.run.v1.namespaces.jobs.run
@@ -52,14 +42,12 @@ main:
                         value: '${repo_url}'
                       - name: "USE_ADC"
                         value: "true"
-                      - name: "GIT_TOKEN"
-                        value: '${git_token}'
                       - name: "EXECUTION_ID"
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
                       - name: "GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID"
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
             connector_params:
-              timeout: 3600
+              timeout: 7200
           result: job_result
         except:
           as: e

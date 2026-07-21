@@ -35,6 +35,11 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: GEMINI_API_KEY
+            - name: GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: PR_GEN_GITHUB_PUSH_KEY
             image: us-central1-docker.pkg.dev/gcli-intern-project-2026/pr-gen-repo/jetski-worker:latest
             resources:
               limits:
