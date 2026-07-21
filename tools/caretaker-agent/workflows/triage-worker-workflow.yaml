@@ -1,5 +1,5 @@
 # Google Cloud Workflow invoked by the Ingestion Layer to run a Cloud Run Job,
-# publishing to a Pub/Sub DLQ on failure.
+# writing to Firestore and publishing to a Pub/Sub DLQ on failure.
 
 main:
   params: ['event']
@@ -7,11 +7,18 @@ main:
     - init:
         assign:
           - project_id: '${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}'
+          - database_id: '${sys.get_env("FIRESTORE_DATABASE")}'
+          - collection_name: '${sys.get_env("FIRESTORE_COLLECTION")}'
           - job_name: 'triage-worker'
           - job_location: 'us-west1'
           - base64_data: '${event.data.message.data}'
           - workflow_exec_id: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
           - dlq_topic: '${"projects/" + project_id + "/topics/incoming-issues-dlq"}'
+          - payload: '${json.decode(text.decode(base64.decode(base64_data)))}'
+          - owner: '${text.split(payload.repository, "/")[0]}'
+          - repo: '${text.split(payload.repository, "/")[1]}'
+          - issue_number: '${payload.issue_number}'
+          - doc_id: '${"github_" + owner + "_" + repo + "_" + string(issue_number)}'
     - run_processing_job:
         try:
           call: 'googleapis.run.v1.namespaces.jobs.run'
@@ -38,6 +45,29 @@ main:
         except:
           as: 'error'
           steps:
+            - update_firestore_needs_human:
+                call: 'googleapis.firestore.v1.projects.databases.documents.patch'
+                args:
+                  name: '${"projects/" + project_id + "/databases/" + database_id + "/documents/" + collection_name + "/" + doc_id}'
+                  updateMask:
+                    fieldPaths:
+                      - 'status'
+                      - 'error'
+                      - 'lock.holder'
+                      - 'lock.expires_at'
+                  body:
+                    fields:
+                      status:
+                        stringValue: 'NEEDS_HUMAN'
+                      error:
+                        stringValue: '${"Job cancelled or crashed terminally: " + error.message}'
+                      lock:
+                        mapValue:
+                          fields:
+                            holder:
+                              nullValue: 'NULL_VALUE'
+                            expires_at:
+                              nullValue: 'NULL_VALUE'
             - publish_to_dlq:
                 call: 'googleapis.pubsub.v1.projects.topics.publish'
                 args:
@@ -50,7 +80,7 @@ main:
                           workflow_id: '${workflow_exec_id}'
                           origin: 'workflow_failure'
             - workflow_failed:
-                raise: '${"Terminal failure. DLQ message sent. Error is " + error.message}'
+                raise: '${"Terminal failure. DLQ message sent and Firestore updated. Error is " + error.message}'
 
     - success_log:
         return:
