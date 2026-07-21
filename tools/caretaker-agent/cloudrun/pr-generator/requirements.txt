@@ -1,0 +1,5 @@
+google-antigravity
+pydantic
+google-cloud-firestore
+google-genai>=2.0.0
+google-cloud-aiplatform>=1.159.0

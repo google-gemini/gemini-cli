@@ -22,9 +22,10 @@ RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-# 3. Install Python dependencies including google-cloud-firestore
+# 3. Install Python dependencies using requirements.txt for optimized build layer caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir google-antigravity pydantic google-cloud-firestore "google-genai>=2.0.0" "google-cloud-aiplatform>=1.159.0"
+    pip install --no-cache-dir -r requirements.txt
 
 # Set it globally inside the container build (or inject via Cloud Run Environment Variables)
 ENV GEMINI_API_KEY=""
