@@ -45,6 +45,6 @@ spec:
               limits:
                 cpu: '2'
                 memory: 8Gi
-          maxRetries: 3
+          maxRetries: 2
           serviceAccountName: code-gen-job-execution-sa@gcli-intern-project-2026.iam.gserviceaccount.com
           timeoutSeconds: '3600'
