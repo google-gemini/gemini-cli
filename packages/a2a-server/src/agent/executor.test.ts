@@ -21,6 +21,17 @@ vi.mock('../utils/path_utils.js', () => ({
 }));
 
 // Mocks for constructor dependencies
+vi.mock('@google/gemini-cli-core', () => ({
+  GeminiEventType: {
+    PRIMARY_TURN_STARTED: 'PRIMARY_TURN_STARTED',
+    SECONDARY_TURN_STARTED: 'SECONDARY_TURN_STARTED',
+  },
+  SimpleExtensionLoader: vi.fn(),
+  checkPathTrust: vi.fn().mockReturnValue({ isTrusted: false }),
+  isHeadlessMode: vi.fn().mockReturnValue(true),
+  resolveToRealPath: vi.fn().mockImplementation((p) => p),
+}));
+
 vi.mock('../config/config.js', () => ({
   loadConfig: vi.fn().mockReturnValue({
     getSessionId: () => 'test-session',
@@ -30,6 +41,10 @@ vi.mock('../config/config.js', () => ({
   loadEnvironment: vi.fn(),
   setIsTrusted: vi.fn().mockReturnValue(false),
   setTargetDir: vi.fn().mockReturnValue('/tmp'),
+  envStorage: {
+    run: (env: Record<string, string>, cb: () => unknown) => cb(),
+  },
+  cwdSymbol: Symbol('cwd'),
 }));
 
 vi.mock('../config/settings.js', () => ({
