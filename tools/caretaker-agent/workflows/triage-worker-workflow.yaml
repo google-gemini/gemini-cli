@@ -55,6 +55,7 @@ main:
                       - 'error'
                       - 'lock.holder'
                       - 'lock.expires_at'
+                      - 'updated_at'
                   body:
                     fields:
                       status:
@@ -68,6 +69,8 @@ main:
                               nullValue: 'NULL_VALUE'
                             expires_at:
                               nullValue: 'NULL_VALUE'
+                      updated_at:
+                        timestampValue: '${sys.now()}'
             - publish_to_dlq:
                 call: 'googleapis.pubsub.v1.projects.topics.publish'
                 args:
