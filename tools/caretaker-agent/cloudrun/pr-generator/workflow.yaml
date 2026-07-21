@@ -10,7 +10,6 @@ main:
           - collection_name: 'test_issues'
           - job_name: "pr-gen-job" # The Cloud Run Job name
           - job_location: "us-central1"
-          - repo_url: "https://github.com/joneba-google/gemini-cli-clone"
           - workflow_execution_id: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
           
           # Decode Pub/Sub message
@@ -18,6 +17,7 @@ main:
           - firestore_doc_str: '${text.decode(pubsub_message_bytes)}'
           - firestore_doc: '${json.decode(firestore_doc_str)}'
           - doc_id: '${firestore_doc.firestore_id}'
+          - repo_url: '${"https://github.com/" + firestore_doc.github_metadata.owner + "/" + firestore_doc.github_metadata.repo}'
           - status: "STARTED"
           - error_details: null
 
