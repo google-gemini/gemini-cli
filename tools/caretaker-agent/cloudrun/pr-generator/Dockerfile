@@ -4,15 +4,18 @@
 
 FROM python:3.11-slim
 
-# 1. Install system utilities (git and nodejs are required for repository and test execution)
+# 1. Install system utilities (git and bubblewrap are required for repository and sandbox execution)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    curl \
     ca-certificates \
     bubblewrap \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy Node.js 20 and npm directly from the official node:20-slim image
+COPY --from=node:20-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:20-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # 2. Create non-root system user and establish working directory
 RUN useradd -m -u 1000 appuser
