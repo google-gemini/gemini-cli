@@ -113,6 +113,19 @@ function getUseEncryptedStorageFlag() {
   return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
 }
 
+/**
+ * Determines whether the given credentials object represents ADC credentials.
+ */
+function isAdcCredentials(
+  credentials: unknown,
+): credentials is JWTInput & { type: string } {
+  if (credentials && typeof credentials === 'object' && 'type' in credentials) {
+    const type = credentials.type;
+    return typeof type === 'string' && type !== 'authorized_user';
+  }
+  return false;
+}
+
 async function initOauthClient(
   authType: AuthType,
   config: Config,
@@ -140,40 +153,7 @@ async function initOauthClient(
     return client;
   }
 
-  const credentialsList = await fetchCachedCredentialsList();
-
-  // 1. Try BYOID credentials first
-  for (const credentials of credentialsList) {
-    if (
-      credentials &&
-      typeof credentials === 'object' &&
-      'type' in credentials &&
-      (credentials.type === 'external_account_authorized_user' ||
-        credentials.type === 'service_account')
-    ) {
-      try {
-        const auth = new GoogleAuth({
-          scopes: OAUTH_SCOPE,
-        });
-        const byoidClient = auth.fromJSON({
-          ...credentials,
-          refresh_token: credentials.refresh_token ?? undefined,
-        });
-        const token = await byoidClient.getAccessToken();
-        if (token) {
-          debugLogger.debug(`Created ${credentials.type} auth client.`);
-          return byoidClient;
-        }
-      } catch (error) {
-        debugLogger.debug(
-          `BYOID credentials verification failed:`,
-          getErrorMessage(error),
-        );
-      }
-    }
-  }
-
-  // 2. Try GOOGLE_CLOUD_ACCESS_TOKEN override
+  // 1. Try GOOGLE_CLOUD_ACCESS_TOKEN override first if configured
   if (
     process.env['GOOGLE_GENAI_USE_GCA'] &&
     process.env['GOOGLE_CLOUD_ACCESS_TOKEN']
@@ -186,16 +166,32 @@ async function initOauthClient(
     return client;
   }
 
-  // 3. Try standard cached credentials
-  for (const credentials of credentialsList) {
-    const isByoid =
-      credentials &&
-      typeof credentials === 'object' &&
-      'type' in credentials &&
-      (credentials.type === 'external_account_authorized_user' ||
-        credentials.type === 'service_account');
+  const credentialsList = await fetchCachedCredentialsList();
 
-    if (!isByoid && credentials) {
+  // 2. Iterate sequentially over the credentials list in their natural priority order
+  for (const credentials of credentialsList) {
+    if (isAdcCredentials(credentials)) {
+      try {
+        const auth = new GoogleAuth({
+          scopes: OAUTH_SCOPE,
+        });
+        const adcClient = auth.fromJSON({
+          ...credentials,
+          refresh_token: credentials.refresh_token ?? undefined,
+        });
+        const response = await adcClient.getAccessToken();
+        const token = response.token ?? null;
+        if (token) {
+          debugLogger.debug('Created ' + credentials.type + ' auth client.');
+          return adcClient;
+        }
+      } catch (error) {
+        debugLogger.debug(
+          'ADC credentials verification failed:',
+          getErrorMessage(error),
+        );
+      }
+    } else if (credentials) {
       const client = createBaseOAuth2Client();
       client.setCredentials(credentials as Credentials);
       try {
@@ -217,13 +213,15 @@ async function initOauthClient(
             }
           }
           debugLogger.log('Loaded cached credentials.');
-          await triggerPostAuthCallbacks(credentials as Credentials);
+          await triggerPostAuthCallbacks(
+            client.credentials || (credentials as Credentials),
+          );
 
           return client;
         }
       } catch (error) {
         debugLogger.debug(
-          `Cached credentials are not valid:`,
+          'Cached credentials are not valid:',
           getErrorMessage(error),
         );
       }
@@ -695,18 +693,27 @@ export function getAvailablePort(): Promise<number> {
 async function fetchCachedCredentialsList(): Promise<
   Array<Credentials | JWTInput>
 > {
+  const credentialsList: Array<Credentials | JWTInput> = [];
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    const creds = await OAuthCredentialStorage.loadCredentials();
-    return creds ? [creds] : [];
+    try {
+      const creds = await OAuthCredentialStorage.loadCredentials();
+      if (creds) {
+        credentialsList.push(creds);
+      }
+    } catch (error) {
+      debugLogger.debug(
+        'Failed to load credentials from encrypted storage:',
+        error,
+      );
+    }
   }
 
   const pathsToTry = [
-    Storage.getOAuthCredsPath(),
+    ...(!useEncryptedStorage ? [Storage.getOAuthCredsPath()] : []),
     process.env['GOOGLE_APPLICATION_CREDENTIALS'],
   ].filter((p): p is string => !!p);
 
-  const credentialsList: Array<Credentials | JWTInput> = [];
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
