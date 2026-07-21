@@ -64,21 +64,13 @@ for ROLE in "${EXEC_SA_ROLES[@]}"; do
     --quiet
 done
 
-# Grant access to the specific Secret Manager secret used by Cloud Workflow (NOT the Job)
-echo "Granting secretAccessor on PR_GEN_GITHUB_PUSH_KEY to ${SA_EMAIL}..."
+# Grant access to the PR_GEN_GITHUB_PUSH_KEY secret used directly by Cloud Run Job via secretKeyRef
+echo "Granting secretAccessor on PR_GEN_GITHUB_PUSH_KEY to ${EXEC_SA_EMAIL}..."
 gcloud secrets add-iam-policy-binding PR_GEN_GITHUB_PUSH_KEY \
-  --member="serviceAccount:${SA_EMAIL}" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project="${PROJECT_ID}" \
-  --quiet
-
-# Explicitly revoke secretAccessor on PR_GEN_GITHUB_PUSH_KEY from ${EXEC_SA_EMAIL} to enforce isolation
-echo "Ensuring ${EXEC_SA_EMAIL} does NOT have secretAccessor on PR_GEN_GITHUB_PUSH_KEY..."
-gcloud secrets remove-iam-policy-binding PR_GEN_GITHUB_PUSH_KEY \
   --member="serviceAccount:${EXEC_SA_EMAIL}" \
   --role="roles/secretmanager.secretAccessor" \
   --project="${PROJECT_ID}" \
-  --quiet || true
+  --quiet
 
 # Grant access to the GEMINI_API_KEY secret used by Cloud Run Job
 echo "Granting secretAccessor on GEMINI_API_KEY to ${EXEC_SA_EMAIL}..."

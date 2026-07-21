@@ -1,6 +1,6 @@
 {
   "status": "TRIAGED",
-  "firestore_id": "github_google-gemini_gemini-cli_25693",
+  "firestore_id": "github_joneba-google_gemini-cli-clone_25693",
   "triage_attempts": 0,
   "workable_spec": {
     "implementation_plan": {
@@ -15,7 +15,7 @@
         "Add a fallback mechanism in `parseFrontmatter` to treat non-string YAML values (like numbers or booleans) as strings by falling back to the simple parser, preventing parsing failures."
       ]
     },
-    "issue_id": "google-gemini/gemini-cli#25693",
+    "issue_id": "joneba-google/gemini-cli-clone#25693",
     "summary": {
       "context": "This issue resides within the core skill loading and parsing mechanism of the Gemini CLI, specifically in how it reads and interprets the YAML frontmatter of `SKILL.md` files to extract skill metadata (name, description).",
       "problem": "The Gemini CLI skill discovery mechanism fails to recognize local skills when the 'description' field in SKILL.md YAML frontmatter is a single line, or when the file contains invisible characters like UTF-8 BOM, or has trailing spaces after frontmatter markers.",
@@ -41,8 +41,8 @@
   "created_at": "2026-07-16T20:00:00Z",
   "updated_at": "2026-07-16T20:00:00Z",
   "github_metadata": {
-    "owner": "google-gemini",
-    "repo": "gemini-cli",
+    "owner": "joneba-google",
+    "repo": "gemini-cli-clone",
     "issue_number": 25693,
     "title": "[Bug] Skills discovery fails when 'description' in SKILL.md frontmatter is a single line",
     "pr_url": ""
