@@ -128,6 +128,7 @@ def _create_issue_tx(
             "status": IssueStatus.UNTRIAGED.value,
             "firestore_id": resolved_id,
             "triage_attempts": 0,
+            "generation_attempts": 0,
             "workable_spec": {},
             "lock": {
                 "holder": None,
@@ -195,14 +196,14 @@ def _acquire_lock_tx(
 
     data = snapshot.to_dict() or {}
     current_status = data.get("status")
-    attempts = data.get("triage_attempts", 0)
+    attempts = data.get("generation_attempts", 0)
 
-    # Early exit for terminal states
-    if current_status in [
-        IssueStatus.NEEDS_INFO.value,
-        IssueStatus.NEEDS_HUMAN.value,
-        IssueStatus.AUTO_CLOSE.value,
-    ]:
+    # Only allow PR generation to start for TRIAGED issues or recovering COMMIT_GENERATION jobs
+    allowed_start_states = {
+        IssueStatus.TRIAGED.value,
+        IssueStatus.COMMIT_GENERATION.value,
+    }
+    if current_status not in allowed_start_states:
         return ClaimAction.SKIP
 
     if attempts >= 2:
@@ -237,7 +238,7 @@ def _acquire_lock_tx(
         doc_ref,
         {
             "status": target_status,
-            "triage_attempts": new_attempts,
+            "generation_attempts": new_attempts,
             "lock.holder": lock_holder,
             "lock.expires_at": new_expires_at,
             "updated_at": firestore.SERVER_TIMESTAMP,
@@ -309,9 +310,10 @@ def _release_lock_tx(
         transaction.update(doc_ref, updates)
         return ReleaseAction.COMPLETE
     else:
-        attempts = data.get("triage_attempts", 0)
+        target_status = status if status else IssueStatus.TRIAGED.value
+        attempts = data.get("generation_attempts", 0)
         if attempts < 2:
-            updates["status"] = IssueStatus.UNTRIAGED.value
+            updates["status"] = target_status
             transaction.update(doc_ref, updates)
             return ReleaseAction.RETRY
         else:
