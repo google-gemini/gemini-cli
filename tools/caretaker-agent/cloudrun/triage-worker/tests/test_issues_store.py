@@ -49,6 +49,8 @@ class TestIssuesStore(unittest.TestCase):
         self.transaction.update.assert_called_once()
         args, _ = self.transaction.update.call_args
         self.assertEqual(args[1]["status"], "NEEDS_HUMAN")
+        self.assertIsNone(args[1]["lock.holder"])
+        self.assertIsNone(args[1]["lock.expires_at"])
 
     def test_acquire_lock_active_lock_by_other_holder(self):
         """acquire lock when active lock held by another worker should skip"""
