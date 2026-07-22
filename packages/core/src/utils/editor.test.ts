@@ -39,6 +39,10 @@ vi.mock('child_process', () => ({
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
 }));
 
+vi.mock('./headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+
 const originalPlatform = process.platform;
 
 describe('editor utils', () => {
