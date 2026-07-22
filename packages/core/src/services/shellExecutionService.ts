@@ -139,6 +139,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  env?: Record<string, string>;
 }
 
 /**
@@ -461,9 +462,10 @@ export class ShellExecutionService {
     const spawnArgs = [...argsPrefix, finalCommand];
 
     // 2. Prepare Environment
+    const sourceEnv = shellExecutionConfig.env ?? process.env;
     const gitConfigKeys: string[] = [];
     if (!isInteractive) {
-      for (const key in process.env) {
+      for (const key in sourceEnv) {
         if (key.startsWith('GIT_CONFIG_')) {
           gitConfigKeys.push(key);
         }
@@ -479,7 +481,7 @@ export class ShellExecutionService {
       ],
     };
 
-    const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+    const sanitizedEnv = sanitizeEnvironment(sourceEnv, sanitizationConfig);
 
     const baseEnv: Record<string, string | undefined> = {
       ...sanitizedEnv,
@@ -493,7 +495,7 @@ export class ShellExecutionService {
     if (!isInteractive) {
       // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
       for (const key of gitConfigKeys) {
-        baseEnv[key] = process.env[key];
+        baseEnv[key] = sourceEnv[key];
       }
 
       const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
