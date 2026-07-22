@@ -4,11 +4,10 @@
 
 FROM python:3.11-slim
 
-# 1. Install system utilities (git and bubblewrap are required for repository and sandbox execution)
+# 1. Install system utilities (git is required for repository operations)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
-    bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Node.js 20 and npm directly from the official node:20-slim image
@@ -27,8 +26,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Set it globally inside the container build (or inject via Cloud Run Environment Variables)
-ENV GEMINI_API_KEY=""
 
 # 4. Copy the pipeline orchestration script and prompts with non-root ownership
 COPY --chown=appuser:appuser workflow/ /app/workflow/

@@ -1,34 +1,34 @@
 # Google Cloud Workflow that triggers Cloud Run Job and updates Firestore on failure.
 
 main:
-  params: [event]
+  params: ['event']
   steps:
     - init:
         assign:
           - project_id: '${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}'
-          - database_id: 'test-gcli-db-clone'
-          - collection_name: 'test_issues'
-          - job_name: "pr-gen-job" # The Cloud Run Job name
-          - job_location: "us-central1"
+          - database_id: '${default(sys.get_env("FIRESTORE_DATABASE"), "gcli-db")}'
+          - collection_name: '${default(sys.get_env("FIRESTORE_COLLECTION"), "issues")}'
+          - job_name: 'pr-gen-job' # The Cloud Run Job name
+          - job_location: 'us-central1'
           - workflow_execution_id: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
-          
+
           # Decode Pub/Sub message
           - pubsub_message_bytes: '${base64.decode(event.data.message.data)}'
           - firestore_doc_str: '${text.decode(pubsub_message_bytes)}'
           - firestore_doc: '${json.decode(firestore_doc_str)}'
           - doc_id: '${firestore_doc.firestore_id}'
           - repo_url: '${"https://github.com/" + firestore_doc.github_metadata.owner + "/" + firestore_doc.github_metadata.repo}'
-          - status: "STARTED"
+          - status: 'STARTED'
           - error_details: null
 
     - validate_doc_id:
         switch:
-          - condition: '${not text.match_regex(doc_id, "^[a-zA-Z0-9_-]+$")}'
+          - condition: '${not text.match_regex(doc_id, "^[a-zA-Z0-9_.-]+$")}'
             raise: '${"Security Exception: Invalid or unsafe firestore_id format: " + string(doc_id)}'
 
     - run_job:
         try:
-          call: googleapis.run.v1.namespaces.jobs.run
+          call: 'googleapis.run.v1.namespaces.jobs.run'
           args:
             name: '${"namespaces/" + project_id + "/jobs/" + job_name}'
             location: '${job_location}'
@@ -36,66 +36,66 @@ main:
               overrides:
                 containerOverrides:
                   - env:
-                      - name: "FIRESTORE_DOC"
+                      - name: 'FIRESTORE_DOC'
                         value: '${firestore_doc_str}'
-                      - name: "REPO_URL"
+                      - name: 'REPO_URL'
                         value: '${repo_url}'
-                      - name: "USE_ADC"
-                        value: "true"
-                      - name: "EXECUTION_ID"
+                      - name: 'USE_ADC'
+                        value: 'true'
+                      - name: 'EXECUTION_ID'
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
-                      - name: "GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID"
+                      - name: 'GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID'
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
             connector_params:
               timeout: 7200
-          result: job_result
+          result: 'job_result'
         except:
-          as: e
+          as: 'e'
           steps:
             - handle_job_error:
                 assign:
-                  - status: "NEEDS_HUMAN"
+                  - status: 'NEEDS_HUMAN'
                   - error_details: '${e}'
             - update_firestore_on_failure:
                 try:
-                  call: googleapis.firestore.v1.projects.databases.documents.patch
+                  call: 'googleapis.firestore.v1.projects.databases.documents.patch'
                   args:
                     name: '${"projects/" + project_id + "/databases/" + database_id + "/documents/" + collection_name + "/" + doc_id}'
                     updateMask:
                       fieldPaths:
-                        - "status"
-                        - "failure_error"
-                        - "lock.holder"
-                        - "lock.expires_at"
+                        - 'status'
+                        - 'failure_error'
+                        - 'lock.holder'
+                        - 'lock.expires_at'
                     body:
                       fields:
                         status:
-                          stringValue: "NEEDS_HUMAN"
+                          stringValue: 'NEEDS_HUMAN'
                         failure_error:
                           stringValue: '${"Workflow Execution " + sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID") + " failed: " + json.encode_to_string(error_details)}'
                         lock:
                           mapValue:
                             fields:
                               holder:
-                                nullValue: "NULL_VALUE"
+                                nullValue: 'NULL_VALUE'
                               expires_at:
-                                nullValue: "NULL_VALUE"
+                                nullValue: 'NULL_VALUE'
                 except:
-                  as: fs_err
+                  as: 'fs_err'
                   steps:
                     - log_firestore_error:
                         assign:
                           - firestore_error: '${fs_err}'
-                next: handle_failure
-        next: mark_completed
+                next: 'handle_failure'
+        next: 'mark_completed'
 
     - handle_failure:
         return: '${"Failed: " + json.encode_to_string(error_details)}'
 
     - mark_completed:
         assign:
-          - status: "COMPLETED"
-        next: finish
+          - status: 'COMPLETED'
+        next: 'finish'
 
     - finish:
         return: '${status}'

@@ -1,50 +1,50 @@
-apiVersion: run.googleapis.com/v1
-kind: Job
+apiVersion: 'run.googleapis.com/v1'
+kind: 'Job'
 metadata:
   annotations:
-    run.googleapis.com/client-name: gcloud
-    run.googleapis.com/client-version: 575.0.1
-    run.googleapis.com/creator: joneba@google.com
-    run.googleapis.com/lastModifier: joneba@google.com
+    run.googleapis.com/client-name: 'gcloud'
+    run.googleapis.com/client-version: '575.0.1'
+    run.googleapis.com/creator: 'joneba@google.com'
+    run.googleapis.com/lastModifier: 'joneba@google.com'
   labels:
-    cloud.googleapis.com/location: us-central1
-  name: pr-gen-job
+    cloud.googleapis.com/location: 'us-central1'
+  name: 'pr-gen-job'
 spec:
   template:
     metadata:
       annotations:
-        run.googleapis.com/client-name: gcloud
-        run.googleapis.com/client-version: 575.0.1
-        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/client-name: 'gcloud'
+        run.googleapis.com/client-version: '575.0.1'
+        run.googleapis.com/execution-environment: 'gen2'
     spec:
       taskCount: 1
       template:
         spec:
           containers:
-          - env:
-            - name: GOOGLE_CLOUD_LOCATION
-              value: global
-            - name: MODEL_NAME
-              value: gemini-3.5-flash
-            - name: FIRESTORE_DATABASE
-              value: test-gcli-db-clone
-            - name: FIRESTORE_COLLECTION
-              value: test_issues
-            - name: GEMINI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: GEMINI_API_KEY
-            - name: GIT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: PR_GEN_GITHUB_PUSH_KEY
-            image: us-central1-docker.pkg.dev/gcli-intern-project-2026/pr-gen-repo/jetski-worker:latest
-            resources:
-              limits:
-                cpu: '2'
-                memory: 8Gi
+            - env:
+                - name: 'GOOGLE_CLOUD_LOCATION'
+                  value: 'global'
+                - name: 'MODEL_NAME'
+                  value: 'gemini-3.5-flash'
+                - name: 'FIRESTORE_DATABASE'
+                  value: 'test-gcli-db-clone'
+                - name: 'FIRESTORE_COLLECTION'
+                  value: 'test_issues'
+                - name: 'GEMINI_API_KEY'
+                  valueFrom:
+                    secretKeyRef:
+                      key: 'latest'
+                      name: 'GEMINI_API_KEY'
+                - name: 'GIT_TOKEN'
+                  valueFrom:
+                    secretKeyRef:
+                      key: 'latest'
+                      name: 'PR_GEN_GITHUB_PUSH_KEY'
+              image: 'us-central1-docker.pkg.dev/gcli-intern-project-2026/pr-gen-repo/jetski-worker:latest'
+              resources:
+                limits:
+                  cpu: '2'
+                  memory: '8Gi'
           maxRetries: 2
-          serviceAccountName: code-gen-job-execution-sa@gcli-intern-project-2026.iam.gserviceaccount.com
+          serviceAccountName: 'code-gen-job-execution-sa@gcli-intern-project-2026.iam.gserviceaccount.com'
           timeoutSeconds: '3600'
