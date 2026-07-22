@@ -70,6 +70,9 @@ export class SlashCommandConflictHandler {
     this.flushTimeout = null;
     const conflicts = [...this.pendingConflicts];
     this.pendingConflicts = [];
+    // Reset the dedupe set after each flush so that a conflict which disappears
+    // and then reappears will trigger a fresh notification (issue #24333).
+    this.notifiedConflicts.clear();
 
     if (conflicts.length === 0) {
       return;
