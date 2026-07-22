@@ -1119,6 +1119,16 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
         unit: '%',
       },
+      autoCompressOnOverflow: {
+        type: 'boolean',
+        label: 'Auto-Compress on Context Overflow',
+        category: 'Model',
+        requiresRestart: false,
+        default: false,
+        description:
+          'When the context window is about to overflow, automatically compress the chat history and retry the prompt instead of stopping with an error.',
+        showInDialog: true,
+      },
       disableLoopDetection: {
         type: 'boolean',
         label: 'Disable Loop Detection',
