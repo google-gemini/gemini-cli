@@ -678,6 +678,18 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3.5-flash"
         }
       },
+      "gemini-3.6-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.6-flash"
+        }
+      },
+      "gemini-3.5-flash-lite": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.5-flash-lite"
+        }
+      },
       "gemma-4-31b-it": {
         "extends": "chat-base-3",
         "modelConfig": {
@@ -706,6 +718,18 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "base",
         "modelConfig": {
           "model": "gemini-3.5-flash"
+        }
+      },
+      "gemini-3.6-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.6-flash"
+        }
+      },
+      "gemini-3.5-flash-lite-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.5-flash-lite"
         }
       },
       "classifier": {
@@ -964,6 +988,26 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": true
         }
       },
+      "gemini-3.6-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.5-flash-lite": {
+        "tier": "flash-lite",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
       "gemini-2.5-pro": {
         "tier": "pro",
         "family": "gemini-2.5",
@@ -1148,6 +1192,12 @@ their corresponding top-level category object in your `settings.json` file.
             "target": "gemini-3-flash-preview"
           }
         ]
+      },
+      "gemini-3.6-flash": {
+        "default": "gemini-3.6-flash"
+      },
+      "gemini-3.5-flash-lite": {
+        "default": "gemini-3.5-flash-lite"
       },
       "gemini-2.5-flash": {
         "default": "gemini-2.5-flash",
