@@ -235,6 +235,7 @@ export function resolveModel(
   if (
     useGemini3_5Flash &&
     isFlashModel(resolved) &&
+    resolved !== DEFAULT_GEMINI_3_6_FLASH_MODEL &&
     normalizedModel !== PREVIEW_GEMINI_FLASH_MODEL
   ) {
     return DEFAULT_GEMINI_FLASH_MODEL;

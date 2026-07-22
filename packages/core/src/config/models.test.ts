@@ -18,6 +18,8 @@ import {
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
@@ -434,6 +436,12 @@ describe('resolveModel', () => {
       expect(resolveModel(DEFAULT_GEMINI_MODEL)).toBe(DEFAULT_GEMINI_MODEL);
       expect(resolveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_MODEL,
+      );
+      expect(resolveModel(DEFAULT_GEMINI_3_6_FLASH_MODEL)).toBe(
+        DEFAULT_GEMINI_3_6_FLASH_MODEL,
+      );
+      expect(resolveModel(DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL)).toBe(
+        DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL,
       );
       expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
