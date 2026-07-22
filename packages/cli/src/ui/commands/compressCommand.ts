@@ -7,6 +7,8 @@
 import { MessageType, type HistoryItemCompression } from '../types.js';
 import { CommandKind, type SlashCommand } from './types.js';
 
+let activeAbortController: AbortController | null = null;
+
 export const compressCommand: SlashCommand = {
   name: 'compress',
   altNames: ['summarize', 'compact'],
@@ -38,6 +40,12 @@ export const compressCommand: SlashCommand = {
 
     ui.setPendingItem(pendingMessage);
 
+    // Create an AbortController so the compression can be cancelled
+    // (e.g. when the user starts a new prompt or presses Escape).
+    const abortController = new AbortController();
+    activeAbortController = abortController;
+    const signal = abortController.signal;
+
     void (async () => {
       try {
         const promptId = `compress-${Date.now()}`;
@@ -45,7 +53,15 @@ export const compressCommand: SlashCommand = {
           await context.services.agentContext?.geminiClient?.tryCompressChat(
             promptId,
             true,
+            signal,
           );
+
+        // If cancelled while the network request was in flight, bail out
+        // silently — the UI is no longer waiting for this result.
+        if (signal.aborted) {
+          return;
+        }
+
         if (compressed) {
           ui.addItem(
             {
@@ -69,6 +85,10 @@ export const compressCommand: SlashCommand = {
           );
         }
       } catch (e) {
+        // Swallow abort errors — they are expected when the user cancels.
+        if (signal.aborted) {
+          return;
+        }
         ui.addItem(
           {
             type: MessageType.ERROR,
@@ -79,8 +99,22 @@ export const compressCommand: SlashCommand = {
           Date.now(),
         );
       } finally {
+        if (activeAbortController === abortController) {
+          activeAbortController = null;
+        }
         ui.setPendingItem(null);
       }
     })();
   },
 };
+
+/**
+ * Aborts any in-flight compression started by the `/compress` command.
+ * Call this when the user cancels a turn or starts a new prompt.
+ */
+export function abortActiveCompression(): void {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+}

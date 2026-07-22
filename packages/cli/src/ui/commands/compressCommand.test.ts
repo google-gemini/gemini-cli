@@ -10,7 +10,7 @@ import {
   type GeminiClient,
 } from '@google/gemini-cli-core';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { compressCommand } from './compressCommand.js';
+import { compressCommand, abortActiveCompression } from './compressCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 
@@ -29,6 +29,8 @@ describe('compressCommand', () => {
         },
       },
     });
+    // Reset any leftover abort controller from a previous test.
+    abortActiveCompression();
   });
 
   it('should do nothing if a compression is already pending', async () => {
@@ -54,7 +56,7 @@ describe('compressCommand', () => {
     expect(mockTryCompressChat).not.toHaveBeenCalled();
   });
 
-  it('should set pending item, call tryCompressChat, and add result on success', async () => {
+  it('should set pending item, call tryCompressChat with AbortSignal, and add result on success', async () => {
     const compressedResult: ChatCompressionInfo = {
       originalTokenCount: 200,
       compressionStatus: CompressionStatus.COMPRESSED,
@@ -78,6 +80,7 @@ describe('compressCommand', () => {
     expect(mockTryCompressChat).toHaveBeenCalledWith(
       expect.stringMatching(/^compress-\d+$/),
       true,
+      expect.any(AbortSignal),
     );
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
@@ -134,6 +137,63 @@ describe('compressCommand', () => {
     await compressCommand.action!(context, '');
     await new Promise((r) => setTimeout(r, 0));
     expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
+  });
+
+  it('should silently bail out if aborted during compression', async () => {
+    // Make tryCompressChat hang until we manually abort.
+    let resolveCompress: (value: ChatCompressionInfo | null) => void;
+    mockTryCompressChat.mockReturnValue(
+      new Promise<ChatCompressionInfo | null>((resolve) => {
+        resolveCompress = resolve;
+      }),
+    );
+
+    await compressCommand.action!(context, '');
+
+    // Abort while the compression is still in flight.
+    abortActiveCompression();
+
+    // Now let the promise resolve — the UI should NOT be updated with the result.
+    resolveCompress!({
+      originalTokenCount: 200,
+      compressionStatus: CompressionStatus.COMPRESSED,
+      newTokenCount: 100,
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // addItem should NOT have been called with a COMPRESSION result
+    // (only setPendingItem(null) in the finally block).
+    const addItemCalls = (context.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls;
+    const compressionResults = addItemCalls.filter(
+      ([item]: [{ type: string }]) => item.type === MessageType.COMPRESSION,
+    );
+    expect(compressionResults).toHaveLength(0);
+  });
+
+  it('should swallow errors when aborted', async () => {
+    // Make tryCompressChat reject after abort.
+    mockTryCompressChat.mockImplementation(
+      (_id: string, _force: boolean, signal: AbortSignal) => new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            reject(
+              new DOMException('The operation was aborted.', 'AbortError'),
+            );
+          });
+        }),
+    );
+
+    await compressCommand.action!(context, '');
+    abortActiveCompression();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // No error item should be added.
+    const addItemCalls = (context.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls;
+    const errorItems = addItemCalls.filter(
+      ([item]: [{ type: string }]) => item.type === MessageType.ERROR,
+    );
+    expect(errorItems).toHaveLength(0);
   });
 
   describe('metadata', () => {
