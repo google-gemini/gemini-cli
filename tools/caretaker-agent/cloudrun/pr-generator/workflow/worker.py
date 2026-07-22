@@ -13,18 +13,21 @@ from orchestrator import Orchestrator, OrchestrationError
 
 
 class IgnoreRawWsMsgFilter(logging.Filter):
+    """Filter to ignore raw websocket messages in the log output."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         return "RAW WS MSG" not in record.getMessage()
 
 
 def setup_logging() -> None:
     """Sets up the root logger with a standardized format."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.addFilter(IgnoreRawWsMsgFilter())
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=[handler],
     )
-    logging.getLogger().addFilter(IgnoreRawWsMsgFilter())
 
 
 async def main() -> None:

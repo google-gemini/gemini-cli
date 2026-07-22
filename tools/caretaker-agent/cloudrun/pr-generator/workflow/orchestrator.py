@@ -38,8 +38,7 @@ from command_executor import (
 )
 from github_client import GitHubClient, GitHubClientError
 from agent_runner import AgentRunner, AgentRunnerError
-from preflight_filter import PreflightFilter
-from db import (
+from db.db_interface import (
     acquire_lock,
     release_lock,
     mark_pr_created,
@@ -47,6 +46,7 @@ from db import (
     ClaimAction,
     IssueStatus,
 )
+from preflight_filter import PreflightFilter
 
 
 class OrchestrationError(Exception):
@@ -177,121 +177,138 @@ class Orchestrator:
 
         if claim_action == ClaimAction.NEEDS_HUMAN:
             logging.warning(
-                "Triage attempts exceeded maximum allowed limit. Issue moved to NEEDS_HUMAN. Exiting."
+                "Generation attempts exceeded maximum allowed limit. Issue moved to NEEDS_HUMAN. Exiting cleanly."
             )
-            sys.exit(1)
+            return
 
-        branch_name = f"ssr-agent-{sanitize_identifier(str(issue_num))}"
-
-        # Sync repository and check out target branch
-        self._sync_or_clone_repository()
         try:
-            CommandExecutor.run(["git", "checkout", "-B", branch_name, "origin/main"], self.config.pr_repo_path)
-        except CommandExecutionError as e:
-            raise OrchestrationError(f"Failed to checkout feature branch {branch_name}: {e}") from e
+            branch_name = f"ssr-agent-{sanitize_identifier(str(issue_num))}"
 
-        # Install project NPM dependencies inside PR workspace
-        logging.info("Installing node dependencies inside PR repository workspace...")
-        try:
-            npm_install_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3'
-            CommandExecutor.run(npm_install_cmd, self.config.pr_repo_path)
-        except CommandExecutionError as e:
-            raise OrchestrationError(f"Failed to install NPM dependencies in PR workspace: {e}") from e
+            # Sync repository and check out target branch
+            self._sync_or_clone_repository()
+            try:
+                # TODO: Add logic to fetch and checkout the existing branch if responding to user feedback
+                CommandExecutor.run(["git", "checkout", "-B", branch_name, "origin/main"], self.config.pr_repo_path)
+            except CommandExecutionError as e:
+                raise OrchestrationError(f"Failed to checkout feature branch {branch_name}: {e}") from e
 
-        # Persist the specifications file inside the PR repo workspace
-        spec_pr_path = os.path.join(self.config.pr_repo_path, "firestore_doc.json")
-        try:
-            with open(spec_pr_path, "w", encoding="utf-8") as f:
-                json.dump(firestore_doc, f, indent=2)
-        except IOError as e:
-            raise OrchestrationError(f"Failed to save firestore_doc.json to workspace: {e}") from e
+            # Install project NPM dependencies inside PR workspace
+            logging.info("Installing node dependencies inside PR repository workspace...")
+            try:
+                npm_install_cmd = 'NODE_OPTIONS="--max-old-space-size=4096" npm ci --no-audit --no-fund --maxsockets 3'
+                CommandExecutor.run(npm_install_cmd, self.config.pr_repo_path)
+            except CommandExecutionError as e:
+                raise OrchestrationError(f"Failed to install NPM dependencies in PR workspace: {e}") from e
 
-        approved = False
-        loop_count = 0
-        verdict = "NEEDS_REVISION"
-        commit_line_count = 0
+            # Persist the specifications file inside the PR repo workspace
+            spec_pr_path = os.path.join(self.config.pr_repo_path, "firestore_doc.json")
+            try:
+                with open(spec_pr_path, "w", encoding="utf-8") as f:
+                    json.dump(firestore_doc, f, indent=2)
+            except IOError as e:
+                raise OrchestrationError(f"Failed to save firestore_doc.json to workspace: {e}") from e
 
-        while loop_count < self.config.max_attempts and not approved:
-            loop_count += 1
-            logging.info("=== Starting Iteration %s/%s ===", loop_count, self.config.max_attempts)
+            approved = False
+            loop_count = 0
+            verdict = "NEEDS_REVISION"
+            commit_line_count = 0
 
-            # --- PHASE 1: CODE GENERATION ---
-            await self._run_code_generation(loop_count)
+            while loop_count < self.config.max_attempts and not approved:
+                loop_count += 1
+                logging.info("=== Starting Iteration %s/%s ===", loop_count, self.config.max_attempts)
 
-            # Consolidate edits and generate diff
-            diff_content = self._prepare_iteration_commit(issue_num, loop_count)
-            if not diff_content:
-                # No changes detected in code generation
-                continue
+                # --- PHASE 1: CODE GENERATION ---
+                await self._run_code_generation(loop_count)
 
-            # --- PHASE 2: EVALUATION ---
-            verdict = await self._run_evaluation(diff_content, firestore_doc)
+                # Consolidate edits and generate diff
+                diff_content = self._prepare_iteration_commit(issue_num, loop_count)
+                if not diff_content:
+                    # No changes detected in code generation
+                    continue
 
-            if verdict in ["APPROVED", "PASS"]:
-                logging.info("Evaluator approved the patch. Launching deterministic regression pre-flights...")
-                approved = await self._run_regression_checks()
-                # approved = True
-                
-                if approved:
+                # --- PHASE 2: EVALUATION ---
+                verdict = await self._run_evaluation(diff_content, firestore_doc)
+
+                if verdict in ["APPROVED", "PASS"]:
+                    logging.info("Evaluator approved the patch. Launching deterministic regression pre-flights...")
+                    approved = await self._run_regression_checks()
+                    
+                    if approved:
+                        try:
+                            diff_stat = CommandExecutor.run("git diff --stat origin/main", self.config.pr_repo_path)
+                            logging.info("Diff Stat summary:\n%s", diff_stat)
+                            lines = diff_stat.split("\n")
+                            last_line = lines[-1] if lines else ""
+                            insertions = re.search(r"(\d+)\s+insertion", last_line)
+                            deletions = re.search(r"(\d+)\s+deletion", last_line)
+                            
+                            if insertions:
+                                commit_line_count += int(insertions.group(1))
+                            if deletions:
+                                commit_line_count += int(deletions.group(1))
+                            logging.info("Total modifications line count: %s", commit_line_count)
+                        except Exception as e:
+                            logging.warning("Failed to parse modifications line count: %s", e)
+
+                # If iteration wasn't approved, synchronize feedback to the coding workspace
+                if not approved:
+                    self._save_feedback_to_coding_workspace()
+
+            # --- POST LOOP RESOLUTION ---
+            if approved:
+                logging.info("=== PATCH APPROVED ===")
+                if commit_line_count > 500:
+                    logging.error(
+                        "Verdict: APPROVED but modified line size (%s) exceeds 500 limit. Moving to NEEDS_HUMAN.",
+                        commit_line_count,
+                    )
                     try:
-                        diff_stat = CommandExecutor.run("git diff --stat origin/main", self.config.pr_repo_path)
-                        logging.info("Diff Stat summary:\n%s", diff_stat)
-                        lines = diff_stat.split("\n")
-                        last_line = lines[-1] if lines else ""
-                        insertions = re.search(r"(\d+)\s+insertion", last_line)
-                        deletions = re.search(r"(\d+)\s+deletion", last_line)
-                        
-                        if insertions:
-                            commit_line_count += int(insertions.group(1))
-                        if deletions:
-                            commit_line_count += int(deletions.group(1))
-                        logging.info("Total modifications line count: %s", commit_line_count)
+                        mark_needs_human(
+                            lock_holder=execution_id,
+                            reason=f"Commit modifications ({commit_line_count} lines) exceed 500 lines limit.",
+                            doc_id=doc_id,
+                            owner=owner,
+                            repo=repo,
+                            issue_number=issue_num,
+                        )
                     except Exception as e:
-                        logging.warning("Failed to parse modifications line count: %s", e)
-
-            # If iteration wasn't approved, synchronize feedback to the coding workspace
-            if not approved:
-                self._save_feedback_to_coding_workspace()
-
-        # --- POST LOOP RESOLUTION ---
-        if approved:
-            logging.info("=== PATCH APPROVED ===")
-            if commit_line_count > 500:
+                        logging.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
+                    return
+                else:
+                    pr_url = await self._submit_pull_request(issue_num, issue_id, branch_name)
+                    try:
+                        mark_pr_created(
+                            lock_holder=execution_id,
+                            pr_url=pr_url or "",
+                            doc_id=doc_id,
+                            owner=owner,
+                            repo=repo,
+                            issue_number=issue_num,
+                            status=IssueStatus.PR_EVALUATION_PENDING.value,
+                        )
+                    except Exception as e:
+                        logging.error("Failed to update Firestore status to PR_EVALUATION_PENDING: %s", e)
+            else:
                 logging.error(
-                    "Verdict: APPROVED but modified line size (%s) exceeds 500 limit. Moving to NEEDS_HUMAN.",
-                    commit_line_count,
+                    "=== PR REJECTED (Exceeded max loop attempts %s) ===",
+                    self.config.max_attempts,
                 )
                 try:
-                    mark_needs_human(
+                    release_lock(
                         lock_holder=execution_id,
-                        reason=f"Commit modifications ({commit_line_count} lines) exceed 500 lines limit.",
+                        success=False,
                         doc_id=doc_id,
                         owner=owner,
                         repo=repo,
                         issue_number=issue_num,
+                        status=IssueStatus.NEEDS_HUMAN.value,
+                        failure_error=f"PR rejected after exceeding max loop attempts ({self.config.max_attempts}).",
                     )
                 except Exception as e:
-                    logging.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
-                sys.exit(2)
-            else:
-                pr_url = await self._submit_pull_request(issue_num, issue_id, branch_name)
-                try:
-                    mark_pr_created(
-                        lock_holder=execution_id,
-                        pr_url=pr_url or "",
-                        doc_id=doc_id,
-                        owner=owner,
-                        repo=repo,
-                        issue_number=issue_num,
-                        status=IssueStatus.PR_EVALUATION_PENDING.value,
-                    )
-                except Exception as e:
-                    logging.error("Failed to update Firestore status to PR_EVALUATION_PENDING: %s", e)
-        else:
-            logging.error(
-                "=== PR REJECTED (Exceeded max loop attempts %s) ===",
-                self.config.max_attempts,
-            )
+                    logging.error("Failed to release Firestore lock on rejection: %s", e)
+                return
+        except Exception as e:
+            logging.error("Orchestrator pipeline failed: %s. Releasing lock.", e)
             try:
                 release_lock(
                     lock_holder=execution_id,
@@ -300,12 +317,11 @@ class Orchestrator:
                     owner=owner,
                     repo=repo,
                     issue_number=issue_num,
-                    status=IssueStatus.NEEDS_HUMAN.value,
-                    failure_error=f"PR rejected after exceeding max loop attempts ({self.config.max_attempts}).",
+                    failure_error=str(e),
                 )
-            except Exception as e:
-                logging.error("Failed to release Firestore lock on rejection: %s", e)
-            sys.exit(1)
+            except Exception as db_err:
+                logging.error("Failed to release lock on error: %s", db_err)
+            raise
 
     async def _run_code_generation(self, iteration: int) -> None:
         """Runs the Google Antigravity Coding Agent to fix the bug."""
@@ -360,7 +376,7 @@ class Orchestrator:
                 logging.info("No modifications staged against origin/main in this iteration.")
                 if iteration == 1:
                     logging.error("Failed to generate any code changes in the first iteration. Aborting.")
-                    sys.exit(1)
+                    raise OrchestrationError("Failed to generate any code changes in the first iteration.")
                 return None
 
             return CommandExecutor.run(["git", "diff", "origin/main"], self.config.pr_repo_path)
@@ -469,7 +485,14 @@ class Orchestrator:
 
         if changed_files:
             logging.info("Targeting ESLint against modified files: %s", changed_files)
-            eslint_cmd = ["npx", "eslint"] + changed_files + ["--max-warnings", "0"]
+            eslint_cmd = [
+                "npx",
+                "eslint",
+                "--max-warnings",
+                "0",
+                "--no-error-on-unmatched-pattern",
+                "--no-warn-ignored",
+            ] + changed_files
             eslint_env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=4096"}
             try:
                 lint_result = CommandExecutor.run(
@@ -625,7 +648,7 @@ class Orchestrator:
             logging.info("Branch push to remote succeeded.")
         except CommandExecutionError as e:
             logging.error("Failed to push git branch: %s", e)
-            sys.exit(3)
+            raise OrchestrationError(f"Failed to push git branch: {e}") from e
 
         # Submit Pull Request
         if self.config.git_token:
@@ -651,7 +674,7 @@ class Orchestrator:
                 return pr_url
             except GitHubClientError as e:
                 logging.error("Pull request submission failed: %s", e)
-                sys.exit(3)
+                raise OrchestrationError(f"Pull request submission failed: {e}") from e
         else:
             logging.warning("GitHub token not configured. Skipping PR creation.")
             return None
