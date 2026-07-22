@@ -568,15 +568,18 @@ ${authUrl}
       return token.accessToken;
     }
 
-    // Try to refresh if we have a refresh token
-    if (token.refreshToken && config.clientId && credentials.tokenUrl) {
+    // Try to refresh if we have a refresh token. Fall back to the client ID
+    // persisted during dynamic client registration when the static config
+    // does not provide one.
+    const clientId = config.clientId ?? credentials.clientId;
+    if (token.refreshToken && clientId && credentials.tokenUrl) {
       try {
         debugLogger.log(
           `Refreshing expired token for MCP server: ${serverName}`,
         );
 
         const newTokenResponse = await this.refreshAccessToken(
-          config,
+          { ...config, clientId },
           token.refreshToken,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
@@ -597,7 +600,7 @@ ${authUrl}
         await this.tokenStorage.saveToken(
           serverName,
           newToken,
-          config.clientId,
+          clientId,
           credentials.tokenUrl,
           credentials.mcpServerUrl,
         );
@@ -636,7 +639,7 @@ ${authUrl}
       if (current.refreshToken && clientId && credentials.tokenUrl) {
         try {
           const newTokenResponse = await this.refreshAccessToken(
-            config,
+            { ...config, clientId },
             current.refreshToken,
             credentials.tokenUrl,
             credentials.mcpServerUrl,
