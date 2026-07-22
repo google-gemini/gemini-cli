@@ -18,6 +18,26 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.51.0 - 2026-07-16
+
+- **Caretaker Services:** Implemented caretaker webhook ingestion services and
+  egress service skeleton on Cloud Run to support advanced automation and
+  external event orchestration
+  ([#28015](https://github.com/google-gemini/gemini-cli/pull/28015),
+  [#28167](https://github.com/google-gemini/gemini-cli/pull/28167) by @chadd28).
+- **Security & Sandbox Hardening:** Enforced case-insensitive sensitive path
+  validation and resolved symbolic link directory escape in the memory import
+  processor to improve execution security
+  ([#27966](https://github.com/google-gemini/gemini-cli/pull/27966),
+  [#28233](https://github.com/google-gemini/gemini-cli/pull/28233) by
+  @luisfelipe-alt).
+- **Core Stability and Reasoning Safety:** Prevented internal thought leakage by
+  stripping thought processes from scrubbed history turns and preserved escape
+  sequences in string literals for modern models
+  ([#27971](https://github.com/google-gemini/gemini-cli/pull/27971) by
+  @amelidev, [#28299](https://github.com/google-gemini/gemini-cli/pull/28299) by
+  @luisfelipe-alt).
+
 ## Announcements: v0.50.0 - 2026-07-08
 
 - **Tool Registry Discovery:** Introduced tool registry discovery capabilities
