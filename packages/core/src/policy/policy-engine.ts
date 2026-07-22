@@ -121,7 +121,14 @@ function ruleMatches(
   if (rule.toolName !== undefined) {
     // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"
     if (rule.toolName === '*') {
-      // Match all tools
+      if (
+        'excludeMcp' in rule &&
+        rule.excludeMcp &&
+        (serverName !== undefined ||
+          (toolCall.name && isMcpToolName(toolCall.name)))
+      ) {
+        return false;
+      }
     } else if (isWildcardPattern(rule.toolName)) {
       if (
         !toolCall.name ||

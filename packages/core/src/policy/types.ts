@@ -137,6 +137,11 @@ export interface PolicyRule {
   mcpName?: string;
 
   /**
+   * If true, this rule will not match any MCP tools.
+   */
+  excludeMcp?: boolean;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */

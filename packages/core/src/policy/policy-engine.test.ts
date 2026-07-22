@@ -3800,6 +3800,37 @@ describe('PolicyEngine', () => {
         ).decision,
       ).toBe(PolicyDecision.ALLOW);
     });
+
+    it('should respect excludeMcp and not match MCP tools on wildcard rule', async () => {
+      const engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*',
+            excludeMcp: true,
+            decision: PolicyDecision.DENY,
+          },
+        ],
+        defaultDecision: PolicyDecision.ALLOW,
+      });
+
+      const builtInResult = await engine.check(
+        { name: 'read_file', args: {} },
+        undefined,
+      );
+      expect(builtInResult.decision).toBe(PolicyDecision.DENY);
+
+      const mcpServerResult = await engine.check(
+        { name: 'mcp_my-server_my-tool', args: {} },
+        'my-server',
+      );
+      expect(mcpServerResult.decision).toBe(PolicyDecision.ALLOW);
+
+      const mcpPrefixResult = await engine.check(
+        { name: 'mcp_my-server_my-tool', args: {} },
+        undefined,
+      );
+      expect(mcpPrefixResult.decision).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('additional_permissions', () => {

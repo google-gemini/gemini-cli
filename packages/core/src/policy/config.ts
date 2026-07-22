@@ -554,6 +554,7 @@ export async function createPolicyEngineConfig(
     // at a slightly lower priority than the explicit allows.
     rules.push({
       toolName: '*',
+      excludeMcp: true,
       decision: PolicyDecision.DENY,
       priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
       source: 'Settings (Core Tools Allowlist Enforcement)',
