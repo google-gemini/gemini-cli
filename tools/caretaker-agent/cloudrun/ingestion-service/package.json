@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@google-cloud/firestore": "^7.7.0",
-    "@google-cloud/pubsub": "^4.4.0",
+    "@google-cloud/firestore": "^8.7.0",
+    "@google-cloud/pubsub": "^5.3.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.2.0"
