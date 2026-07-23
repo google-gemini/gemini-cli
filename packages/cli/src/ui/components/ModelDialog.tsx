@@ -229,11 +229,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         title: getDisplayString(DEFAULT_GEMINI_MODEL),
         key: DEFAULT_GEMINI_MODEL,
       },
-      {
-        value: DEFAULT_GEMINI_3_5_FLASH_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_3_5_FLASH_MODEL),
-        key: DEFAULT_GEMINI_3_5_FLASH_MODEL,
-      },
+      ...(DEFAULT_GEMINI_3_5_FLASH_MODEL !== DEFAULT_GEMINI_FLASH_MODEL
+        ? [
+            {
+              value: DEFAULT_GEMINI_3_5_FLASH_MODEL,
+              title: getDisplayString(DEFAULT_GEMINI_3_5_FLASH_MODEL),
+              key: DEFAULT_GEMINI_3_5_FLASH_MODEL,
+            },
+          ]
+        : []),
       {
         value: DEFAULT_GEMINI_3_6_FLASH_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_3_6_FLASH_MODEL),
