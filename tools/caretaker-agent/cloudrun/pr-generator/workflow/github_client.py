@@ -76,11 +76,11 @@ class GitHubClient:
         try:
             with urllib.request.urlopen(req,timeout=60) as response:
                 response_payload = json.loads(response.read().decode("utf-8"))
-                pr_url: str = response_payload.get("html_url", "")
+                pr_number: str = str(response_payload.get("number", response_payload.get("html_url", "")))
                 logging.info(
-                    "Pull Request created successfully! URL: %s", pr_url
+                    "Pull Request created successfully! PR Number: %s", pr_number
                 )
-                return pr_url
+                return pr_number
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8") if e.fp else "No body content"
             logging.error(
