@@ -8,7 +8,13 @@ from utils.agent_logger import (
 from google.antigravity import Agent, LocalAgentConfig
 from google.antigravity.hooks.policy import allow, deny
 
-def process_issue_triage(payload: dict) -> tuple[bool, str]:
+# Use "gemini-pro-latest" and "gemini-flash-latest"
+MODEL_NAME = "gemini-flash-latest"
+
+def process_issue_triage(
+    payload: dict,
+    target_cwd: str,
+) -> tuple[bool, str]:
     """
     LLM inference via Antigravity SDK.
     """
@@ -21,10 +27,9 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
     system_prompt_path = os.path.join(
         current_dir, ".gemini", "triage_orchestrator.md"
     )
-    target_cwd = os.environ.get("TARGET_CWD", "/opt/gemini-cli")
     gcs_logging = os.environ.get("GCS_LOGGING", "GCS").upper()
 
-    policies = [
+    triage_policies = [
         # Deny all tools by default
         deny("*"), 
         
@@ -36,12 +41,12 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
         allow("activate_skill"),
         allow("finish")
     ]
-    
+
     with open(system_prompt_path, "r", encoding="utf-8") as f:
-        system_instructions = f.read()
+        triage_instructions = f.read()
 
     skills_dir = os.path.join(current_dir, ".gemini", "skills")
-    prompt = (
+    issue_prompt = (
         f"Repository: {repo_name}\n"
         f"Issue Number: {issue_num}\n"
         f"Title: {title}\n"
@@ -49,22 +54,18 @@ def process_issue_triage(payload: dict) -> tuple[bool, str]:
     )
 
     async def run_triage():
-        config = LocalAgentConfig(
-            system_instructions=system_instructions,
+        triage_config = LocalAgentConfig(
+            system_instructions=triage_instructions,
             skills_paths=[skills_dir],
             api_key=os.environ.get("GEMINI_API_KEY"),
             workspaces=[target_cwd, skills_dir],
-            policies=policies,
+            policies=triage_policies,
+            model=MODEL_NAME,
         )
 
-        print(
-            f"[LOGIC] [Issue #{issue_num}] Initializing Antigravity Agent..."
-        )
-        async with Agent(config) as agent:
-            print(
-                f"[LOGIC] [Issue #{issue_num}] Sending triage request..."
-            )
-            response = await agent.chat(prompt)
+        print(f"[LOGIC] [Issue #{issue_num}] Running Triage Worker...")
+        async with Agent(triage_config) as agent:
+            response = await agent.chat(issue_prompt)
             
             # Resolve all execution chunks (thoughts, tool calls, and results)
             resolved_chunks = await response.resolve()

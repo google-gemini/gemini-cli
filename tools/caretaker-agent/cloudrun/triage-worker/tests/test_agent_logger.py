@@ -42,7 +42,7 @@ class TestAgentLogger(unittest.TestCase):
     def test_process_issue_triage_error(self, mock_agent, mock_upload):
         """Verifies error handling and GCS upload on SDK failures."""
         mock_agent.return_value.__aenter__.side_effect = Exception("API Error")
-        success, raw_output = process_issue_triage({"issue_number": 42})
+        success, raw_output = process_issue_triage({"issue_number": 42}, target_cwd="/opt/gemini-cli")
         self.assertFalse(success)
         self.assertIn("API Error", raw_output)
         mock_upload.assert_called_once()
