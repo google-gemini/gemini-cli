@@ -18,6 +18,26 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.52.0 - 2026-07-22
+
+- **Caretaker Triage & Egress Services:** Implemented the core triage worker
+  foundational modules, main worker execution loops, and egress action
+  publishers alongside the octokit GitHub Action handler for egress services
+  ([#28163](https://github.com/google-gemini/gemini-cli/pull/28163),
+  [#28306](https://github.com/google-gemini/gemini-cli/pull/28306) by @chadd28).
+- **Core Tool Enhancements:** Bypassed LLM correction for JSON and IPYNB files
+  in `write_file` and `replace` tools, and simplified plan mode write policy to
+  support relative paths
+  ([#28223](https://github.com/google-gemini/gemini-cli/pull/28223) by
+  @amelidev, [#28398](https://github.com/google-gemini/gemini-cli/pull/28398) by
+  @DavidAPierce).
+- **Auth & Privacy Improvements:** Displayed clear error messages when user
+  account has no Code Assist tier, and bumped `google-auth-library` to version
+  10.9.0 ([#28304](https://github.com/google-gemini/gemini-cli/pull/28304) by
+  @ompatel-aiml,
+  [#28385](https://github.com/google-gemini/gemini-cli/pull/28385) by
+  @jerrylin3321).
+
 ## Announcements: v0.50.0 - 2026-07-08
 
 - **Tool Registry Discovery:** Introduced tool registry discovery capabilities
