@@ -119,16 +119,23 @@ app.post('/webhook', limiter, async (req, res) => {
   );
   const sanitizedBody = `<untrusted_context>\n${escapedBody}\n</untrusted_context>`;
 
+  const rawTitle = payload.issue.title || '';
+  const escapedTitle = rawTitle.replace(
+    /<\/untrusted_context>/g,
+    '\\</untrusted_context>',
+  );
+  const sanitizedTitle = `<untrusted_context>\n${escapedTitle}\n</untrusted_context>`;
+
   const processedData = {
     issue_number: issueNumber,
     repository,
     sender: payload.sender?.login,
     body: sanitizedBody,
-    title: payload.issue.title,
+    title: sanitizedTitle,
   };
 
   const [owner, repo] = repository.split('/');
-  const title = processedData.title || '';
+  const title = rawTitle;
 
   try {
     const created = await issuesStore.createIssue(
