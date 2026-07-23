@@ -968,7 +968,7 @@ export class GeminiChat {
 
     const model = this.context.config.getModel();
     if (isGemini2Model(model) || supportsModernFeatures(model)) {
-      return stripThoughts(history);
+      return coalesceConsecutiveRoles(stripThoughts(history));
     }
 
     return history;
@@ -1526,7 +1526,7 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
 
       const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
       return {
-        id: turn.id,
+        ...turn,
         content: {
           ...turn.content,
           parts: nonThoughtParts,
