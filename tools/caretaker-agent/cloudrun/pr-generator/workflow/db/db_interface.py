@@ -117,8 +117,8 @@ def _create_issue_tx(
     repo: str,
     issue_number: int,
     title: str,
-    pr_url: str = "",
-    failure_error: str = "",
+    pr_number: str = "",
+    error: str = "",
     doc_id: str | None = None,
 ) -> bool:
     snapshot = doc_ref.get(transaction=transaction)
@@ -126,7 +126,6 @@ def _create_issue_tx(
         resolved_id = doc_id or doc_ref.id
         new_issue = {
             "status": IssueStatus.UNTRIAGED.value,
-            "firestore_id": resolved_id,
             "triage_attempts": 0,
             "generation_attempts": 0,
             "workable_spec": {},
@@ -141,9 +140,9 @@ def _create_issue_tx(
                 "repo": repo,
                 "issue_number": issue_number,
                 "title": title,
-                "pr_url": pr_url,
+                "pr_number": pr_number,
             },
-            "failure_error": failure_error,
+            "error": error,
         }
         transaction.set(doc_ref, new_issue)
         return True
@@ -155,8 +154,8 @@ def create_issue(
     repo: str,
     issue_number: int,
     title: str,
-    pr_url: str = "",
-    failure_error: str = "",
+    pr_number: str = "",
+    error: str = "",
     doc_id: str | None = None,
 ) -> bool:
     """Initializes a new issue document in a transaction."""
@@ -169,8 +168,8 @@ def create_issue(
         repo,
         issue_number,
         title,
-        pr_url,
-        failure_error,
+        pr_number,
+        error,
         doc_id,
     )
 
@@ -275,8 +274,8 @@ def _release_lock_tx(
     lock_holder: str,
     success: bool,
     status: str | None = None,
-    pr_url: str | None = None,
-    failure_error: str | None = None,
+    pr_number: str | None = None,
+    error: str | None = None,
     workable_spec: dict[str, Any] | None = None,
 ) -> ReleaseAction:
     """Transactional logic to release the lock and update status."""
@@ -296,11 +295,11 @@ def _release_lock_tx(
         "updated_at": firestore.SERVER_TIMESTAMP,
     }
 
-    if pr_url is not None:
-        updates["github_metadata.pr_url"] = pr_url
+    if pr_number is not None:
+        updates["github_metadata.pr_number"] = pr_number
 
-    if failure_error is not None:
-        updates["failure_error"] = failure_error
+    if error is not None:
+        updates["error"] = error
 
     if success:
         if status:
@@ -330,8 +329,8 @@ def release_lock(
     repo: str | None = None,
     issue_number: int | str | None = None,
     status: str | None = None,
-    pr_url: str | None = None,
-    failure_error: str | None = None,
+    pr_number: str | None = None,
+    error: str | None = None,
     workable_spec: dict[str, Any] | None = None,
 ) -> ReleaseAction:
     """Releases the processing lock for an issue and updates status."""
@@ -343,22 +342,22 @@ def release_lock(
         lock_holder,
         success,
         status,
-        pr_url,
-        failure_error,
+        pr_number,
+        error,
         workable_spec,
     )
 
 
 def mark_pr_created(
     lock_holder: str,
-    pr_url: str,
+    pr_number: str,
     doc_id: str | None = None,
     owner: str | None = None,
     repo: str | None = None,
     issue_number: int | str | None = None,
     status: str = IssueStatus.PR_EVALUATION_PENDING.value,
 ) -> ReleaseAction:
-    """Moves issue to PR_EVALUATION_PENDING, records pr_url, and releases lock."""
+    """Moves issue to PR_EVALUATION_PENDING, records pr_number, and releases lock."""
     return release_lock(
         lock_holder=lock_holder,
         success=True,
@@ -367,7 +366,7 @@ def mark_pr_created(
         repo=repo,
         issue_number=issue_number,
         status=status,
-        pr_url=pr_url,
+        pr_number=pr_number,
     )
 
 
@@ -379,7 +378,7 @@ def mark_needs_human(
     repo: str | None = None,
     issue_number: int | str | None = None,
 ) -> ReleaseAction:
-    """Moves issue to NEEDS_HUMAN, records failure_error, and releases lock."""
+    """Moves issue to NEEDS_HUMAN, records error, and releases lock."""
     return release_lock(
         lock_holder=lock_holder,
         success=False,
@@ -388,7 +387,7 @@ def mark_needs_human(
         repo=repo,
         issue_number=issue_number,
         status=IssueStatus.NEEDS_HUMAN.value,
-        failure_error=reason,
+        error=reason,
     )
 
 
@@ -412,17 +411,17 @@ def update_status(
     owner: str | None = None,
     repo: str | None = None,
     issue_number: int | str | None = None,
-    pr_url: str | None = None,
-    failure_error: str | None = None,
+    pr_number: str | None = None,
+    error: str | None = None,
 ) -> None:
-    """Updates issue status, PR URL, and failure error using FIRESTORE_ID."""
+    """Updates issue status, PR number, and error message using FIRESTORE_ID."""
     doc_ref = get_issue_ref(owner=owner, repo=repo, issue_number=issue_number, doc_id=doc_id)
     updates: dict[str, Any] = {
         "status": status,
         "updated_at": firestore.SERVER_TIMESTAMP,
     }
-    if pr_url is not None:
-        updates["github_metadata.pr_url"] = pr_url
-    if failure_error is not None:
-        updates["failure_error"] = failure_error
+    if pr_number is not None:
+        updates["github_metadata.pr_number"] = pr_number
+    if error is not None:
+        updates["error"] = error
     doc_ref.update(updates)
