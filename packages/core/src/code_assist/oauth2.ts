@@ -126,11 +126,11 @@ function isAdcCredentials(
   return false;
 }
 
-let saveCredentialsPromise = Promise.resolve();
+const savePromises = new WeakMap<OAuth2Client, Promise<void>>();
 
-async function saveCredentials(tokens: Credentials): Promise<void> {
-  const previousPromise = saveCredentialsPromise;
-  saveCredentialsPromise = (async () => {
+async function saveCredentials(client: OAuth2Client, tokens: Credentials): Promise<void> {
+  const previousPromise = savePromises.get(client) || Promise.resolve();
+  const currentPromise = (async () => {
     try {
       await previousPromise;
     } catch {
@@ -142,7 +142,8 @@ async function saveCredentials(tokens: Credentials): Promise<void> {
       await cacheCredentials(tokens);
     }
   })();
-  return saveCredentialsPromise;
+  savePromises.set(client, currentPromise);
+  return currentPromise;
 }
 
 async function initOauthClient(
