@@ -22,6 +22,6 @@
     "supertest": "^7.1.4",
     "tsx": "^4.9.3",
     "typescript": "^5.4.5",
-    "vitest": "^1.6.0"
+    "vitest": "^3.2.4"
   }
 }
