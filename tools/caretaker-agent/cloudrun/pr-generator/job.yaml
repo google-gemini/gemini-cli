@@ -1,11 +1,6 @@
 apiVersion: 'run.googleapis.com/v1'
 kind: 'Job'
 metadata:
-  annotations:
-    run.googleapis.com/client-name: 'gcloud'
-    run.googleapis.com/client-version: '575.0.1'
-    run.googleapis.com/creator: 'joneba@google.com'
-    run.googleapis.com/lastModifier: 'joneba@google.com'
   labels:
     cloud.googleapis.com/location: 'us-central1'
   name: 'pr-gen-job'
@@ -27,14 +22,9 @@ spec:
                 - name: 'MODEL_NAME'
                   value: 'gemini-3.5-flash'
                 - name: 'FIRESTORE_DATABASE'
-                  value: 'test-gcli-db-clone'
+                  value: 'gcli-db'
                 - name: 'FIRESTORE_COLLECTION'
-                  value: 'test_issues'
-                - name: 'GEMINI_API_KEY'
-                  valueFrom:
-                    secretKeyRef:
-                      key: 'latest'
-                      name: 'GEMINI_API_KEY'
+                  value: 'issues'
                 - name: 'GIT_TOKEN'
                   valueFrom:
                     secretKeyRef:

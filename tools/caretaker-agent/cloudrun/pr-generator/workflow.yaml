@@ -16,7 +16,7 @@ main:
           - pubsub_message_bytes: '${base64.decode(event.data.message.data)}'
           - firestore_doc_str: '${text.decode(pubsub_message_bytes)}'
           - firestore_doc: '${json.decode(firestore_doc_str)}'
-          - doc_id: '${firestore_doc.firestore_id}'
+          - doc_id: '${"github_" + firestore_doc.github_metadata.owner + "_" + firestore_doc.github_metadata.repo + "_" + string(firestore_doc.github_metadata.issue_number)}'
           - repo_url: '${"https://github.com/" + firestore_doc.github_metadata.owner + "/" + firestore_doc.github_metadata.repo}'
           - status: 'STARTED'
           - error_details: null
@@ -46,6 +46,8 @@ main:
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
                       - name: 'GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID'
                         value: '${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}'
+                      - name: 'FIRESTORE_ID'
+                        value: '${doc_id}'
             connector_params:
               timeout: 7200
           result: 'job_result'
@@ -64,14 +66,14 @@ main:
                     updateMask:
                       fieldPaths:
                         - 'status'
-                        - 'failure_error'
+                        - 'error'
                         - 'lock.holder'
                         - 'lock.expires_at'
                     body:
                       fields:
                         status:
                           stringValue: 'NEEDS_HUMAN'
-                        failure_error:
+                        error:
                           stringValue: '${"Workflow Execution " + sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID") + " failed: " + json.encode_to_string(error_details)}'
                         lock:
                           mapValue:
