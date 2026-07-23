@@ -439,9 +439,9 @@ async function initOauthClient(
     await triggerPostAuthCallbacks(client.credentials);
   }
 
-  // Ensure any background credential saving from the `tokens` event is complete
+  // Ensure any background credential saving from the tokens event is complete
   // before indicating success and returning the client.
-  await saveCredentialsPromise;
+  await savePromises.get(client);
   return client;
 }
 
