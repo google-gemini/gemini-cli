@@ -521,7 +521,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
-      await saveCredentialsPromise;
+      await savePromises.get(client);
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
