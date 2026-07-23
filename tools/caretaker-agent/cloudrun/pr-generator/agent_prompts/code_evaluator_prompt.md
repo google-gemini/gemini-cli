@@ -87,6 +87,7 @@ Follow these guidelines to construct the content:
     *   Do NOT use generic summaries like "Fix bug" or "Implement spec".
 
 #### 2. PR Description Guidelines
+*   **Issue Number & URL**: You MUST explicitly write `fixes #<issue_number>` and include the Original Issue URL constructed from `github_metadata` (e.g., `https://github.com/<owner>/<repo>/issues/<issue_number>`) at the top of the PR description details.
 *   **Context & Problem**: Read the fields in `workable_spec.summary` (specifically `problem` and `root_cause`) to write a clear, 1-2 sentence description explaining the issue and its root cause.
 *   **Detailed Changes**: Observe the actual changes from the `changes.diff` file. Summarize what modifications were made (which files were updated and what was added/fixed).
 *   **Verification**: Mention the specific verification tests that were executed and passed (e.g., Vitest unit tests).
