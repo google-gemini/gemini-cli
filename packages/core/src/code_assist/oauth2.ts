@@ -611,7 +611,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
-            await saveCredentialsPromise;
+            await savePromises.get(client);
 
             // Retrieve and cache Google Account ID during authentication
             try {
