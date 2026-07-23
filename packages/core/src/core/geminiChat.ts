@@ -1518,18 +1518,20 @@ export function coalesceConsecutiveRoles(
 }
 
 export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
-  return history.map((turn) => {
-    if (!turn.content.parts) return turn;
-    const hasThought = turn.content.parts.some((p) => p && p.thought);
-    if (!hasThought) return turn;
+  return history
+    .map((turn) => {
+      if (!turn.content.parts) return turn;
+      const hasThought = turn.content.parts.some((p) => p && p.thought);
+      if (!hasThought) return turn;
 
-    const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
-    return {
-      id: turn.id,
-      content: {
-        ...turn.content,
-        parts: nonThoughtParts,
-      },
-    };
-  });
+      const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+      return {
+        id: turn.id,
+        content: {
+          ...turn.content,
+          parts: nonThoughtParts,
+        },
+      };
+    })
+    .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
 }

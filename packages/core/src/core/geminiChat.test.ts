@@ -22,6 +22,7 @@ import {
   stripToolCallIdPrefixes,
   type HistoryTurn,
   coalesceConsecutiveRoles,
+  stripThoughts,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -2338,6 +2339,30 @@ describe('GeminiChat', () => {
         text: 'actual conversational response',
       });
     });
+
+    it('should completely filter out model turns that end up with empty parts after stripping thoughts', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'internal monologue', thought: true } as unknown as Part,
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      // Since the model turn contains only a thought part, it should be filtered out entirely.
+      expect(turns).toHaveLength(1);
+      expect(turns[0].content.role).toBe('user');
+    });
   });
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
@@ -3250,6 +3275,71 @@ describe('GeminiChat', () => {
         { id: '2', content: { parts: [{ text: 'world' }] } },
       ];
       expect(coalesceConsecutiveRoles(history)).toEqual(history);
+    });
+  });
+
+  describe('stripThoughts', () => {
+    it('should return empty history if empty array is passed', () => {
+      expect(stripThoughts([])).toEqual([]);
+    });
+
+    it('should strip thought parts and keep the turn if other parts remain', () => {
+      const history: HistoryTurn[] = [
+        {
+          id: '1',
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'internal monologue', thought: true } as unknown as Part,
+              { text: 'visible response' },
+            ],
+          },
+        },
+      ];
+      expect(stripThoughts(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'model',
+            parts: [{ text: 'visible response' }],
+          },
+        },
+      ]);
+    });
+
+    it('should completely remove a turn if all its parts are thought parts', () => {
+      const history: HistoryTurn[] = [
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'hello' }],
+          },
+        },
+        {
+          id: '2',
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'internal monologue', thought: true } as unknown as Part,
+            ],
+          },
+        },
+      ];
+      expect(stripThoughts(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'hello' }],
+          },
+        },
+      ]);
+    });
+
+    it('should preserve turns that do not have parts arrays', () => {
+      const history: HistoryTurn[] = [{ id: '1', content: { role: 'user' } }];
+      expect(stripThoughts(history)).toEqual(history);
     });
   });
 });
