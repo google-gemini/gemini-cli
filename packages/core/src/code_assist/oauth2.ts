@@ -126,6 +126,25 @@ function isAdcCredentials(
   return false;
 }
 
+let saveCredentialsPromise = Promise.resolve();
+
+async function saveCredentials(tokens: Credentials): Promise<void> {
+  const previousPromise = saveCredentialsPromise;
+  saveCredentialsPromise = (async () => {
+    try {
+      await previousPromise;
+    } catch {
+      // ignore previous errors
+    }
+    if (getUseEncryptedStorageFlag()) {
+      await OAuthCredentialStorage.saveCredentials(tokens);
+    } else {
+      await cacheCredentials(tokens);
+    }
+  })();
+  return saveCredentialsPromise;
+}
+
 async function initOauthClient(
   authType: AuthType,
   config: Config,
@@ -138,15 +157,9 @@ async function initOauthClient(
         proxy: config.getProxy(),
       },
     });
-    const useEncryptedStorage = getUseEncryptedStorageFlag();
 
     client.on('tokens', async (tokens: Credentials) => {
-      if (useEncryptedStorage) {
-        await OAuthCredentialStorage.saveCredentials(tokens);
-      } else {
-        await cacheCredentials(tokens);
-      }
-
+      await saveCredentials(tokens);
       await triggerPostAuthCallbacks(tokens);
     });
 
@@ -425,6 +438,9 @@ async function initOauthClient(
     await triggerPostAuthCallbacks(client.credentials);
   }
 
+  // Ensure any background credential saving from the `tokens` event is complete
+  // before indicating success and returning the client.
+  await saveCredentialsPromise;
   return client;
 }
 
@@ -450,6 +466,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
       code_challenge_method: CodeChallengeMethod.S256,
       code_challenge: codeVerifier.codeChallenge,
       state,
+      prompt: 'consent',
     });
     writeToStdout(
       'Please visit the following URL to authorize the application:\n\n' +
@@ -503,6 +520,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
+      await saveCredentialsPromise;
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
@@ -547,6 +565,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
     access_type: 'offline',
     scope: OAUTH_SCOPE,
     state,
+    prompt: 'consent',
   });
 
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
@@ -591,6 +610,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
+            await saveCredentialsPromise;
 
             // Retrieve and cache Google Account ID during authentication
             try {
