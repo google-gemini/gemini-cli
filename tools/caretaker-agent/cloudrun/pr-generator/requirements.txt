@@ -1,5 +1,6 @@
 google-antigravity>=0.1.0
+protobuf>=7.35.0
 pydantic
 google-cloud-firestore>=2.15.0, <3.0.0
+google-cloud-storage>=2.14.0
 google-genai>=2.0.0
-google-cloud-aiplatform>=1.159.0
