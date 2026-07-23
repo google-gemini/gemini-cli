@@ -151,7 +151,9 @@ class Orchestrator:
         issue_num = github_metadata.get("issue_number")
         owner = github_metadata.get("owner")
         repo = github_metadata.get("repo")
-        doc_id = firestore_doc.get("firestore_id") or self.config.firestore_id
+        doc_id = self.config.firestore_id or (
+            f"github_{owner}_{repo}_{issue_num}" if owner and repo and issue_num else None
+        )
 
         if not issue_num:
             raise OrchestrationError("Issue number is missing in Firestore metadata.")
@@ -275,11 +277,11 @@ class Orchestrator:
                         logging.error("Failed to update Firestore status to NEEDS_HUMAN: %s", e)
                     return
                 else:
-                    pr_url = await self._submit_pull_request(issue_num, issue_id, branch_name)
+                    pr_number = await self._submit_pull_request(issue_num, issue_id, branch_name)
                     try:
                         mark_pr_created(
                             lock_holder=execution_id,
-                            pr_url=pr_url or "",
+                            pr_number=pr_number or "",
                             doc_id=doc_id,
                             owner=owner,
                             repo=repo,
@@ -302,7 +304,7 @@ class Orchestrator:
                         repo=repo,
                         issue_number=issue_num,
                         status=IssueStatus.NEEDS_HUMAN.value,
-                        failure_error=f"PR rejected after exceeding max loop attempts ({self.config.max_attempts}).",
+                        error=f"PR rejected after exceeding max loop attempts ({self.config.max_attempts}).",
                     )
                 except Exception as e:
                     logging.error("Failed to release Firestore lock on rejection: %s", e)
@@ -317,7 +319,7 @@ class Orchestrator:
                     owner=owner,
                     repo=repo,
                     issue_number=issue_num,
-                    failure_error=str(e),
+                    error=str(e),
                 )
             except Exception as db_err:
                 logging.error("Failed to release lock on error: %s", db_err)
@@ -439,6 +441,8 @@ class Orchestrator:
             "Do NOT run the linter yourself; the linter has already been run and its results are "
             "saved in linter_output.txt. You MUST read linter_output.txt to determine if there are lint issues. "
             "You MUST output verdict.json to verdict.json in the format {\"verdict\": \"APPROVED\" | \"NEEDS_REVISION\"}. "
+            "If approved, create pr_details.md containing the recommended commit message and PR description details "
+            "(explicitly writing 'fixes #<issue_number>' and including the original issue URL https://github.com/<owner>/<repo>/issues/<issue_number>). "
             "If verification (linter or static inspection) fails or needs revision, output detailed feedback to pr_feedback.md."
         )
 
@@ -666,12 +670,12 @@ class Orchestrator:
 
             client = GitHubClient(owner=owner, repo=repo_name, token=self.config.git_token)
             try:
-                pr_url = client.create_pull_request(
+                pr_number = client.create_pull_request(
                     branch_name=branch_name,
                     title=pr_title,
                     body=pr_body,
                 )
-                return pr_url
+                return pr_number
             except GitHubClientError as e:
                 logging.error("Pull request submission failed: %s", e)
                 raise OrchestrationError(f"Pull request submission failed: {e}") from e
