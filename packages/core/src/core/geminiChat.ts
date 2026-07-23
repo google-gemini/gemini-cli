@@ -683,9 +683,12 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
-    const scrubbedHistory = this.context.config.isContextManagementEnabled()
+    let scrubbedHistory = this.context.config.isContextManagementEnabled()
       ? scrubHistory([...requestHistory])
       : [...requestHistory];
+
+    // Always coalesce consecutive roles to prevent 400 Bad Request errors
+    scrubbedHistory = coalesceConsecutiveRoles(scrubbedHistory);
 
     const scrubbedContents = scrubbedHistory.map((h) => h.content);
 
@@ -1471,4 +1474,32 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       return newPart;
     }),
   }));
+}
+
+export function coalesceConsecutiveRoles(
+  history: HistoryTurn[],
+): HistoryTurn[] {
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.content.role && last.content.role === turn.content.role) {
+      const hasParts = last.content.parts || turn.content.parts;
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: hasParts
+            ? [...(last.content.parts || []), ...(turn.content.parts || [])]
+            : undefined,
+        },
+      };
+    } else {
+      result.push({
+        id: turn.id,
+        content: { ...turn.content },
+      });
+    }
+  }
+  return result;
 }
