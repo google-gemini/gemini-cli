@@ -118,6 +118,7 @@ describe('BaseLlmClient', () => {
         getResolvedConfig: vi
           .fn()
           .mockImplementation(({ model }) => makeResolvedModelConfig(model)),
+        resolveModelId: vi.fn((model: string) => model),
       } as unknown as ModelConfigService,
       getModelAvailabilityService: vi
         .fn()
@@ -128,6 +129,9 @@ describe('BaseLlmClient', () => {
       getMaxAttempts: vi.fn().mockReturnValue(3),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      hasGemini35FlashGAAccess: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
