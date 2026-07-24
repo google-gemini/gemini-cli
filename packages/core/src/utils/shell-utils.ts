@@ -1092,6 +1092,10 @@ export function detectCommandSubstitution(command: string): boolean {
   return detectBashSubstitution(command);
 }
 
+const BASH_SAFE_VARS = new Set(['_']);
+const PS_SAFE_VARS = new Set(['true', 'false', 'null', 'args', '_']);
+const VAR_NAME_RE = /[a-zA-Z_]\w*/y;
+
 function detectBashSubstitution(command: string): boolean {
   let inSingleQuote = false;
   let inDoubleQuote = false;
@@ -1124,8 +1128,26 @@ function detectBashSubstitution(command: string): boolean {
         continue;
       }
     }
-    if (char === '$' && command[i + 1] === '(') {
-      return true;
+    if (char === '$' && i + 1 < command.length) {
+      const next = command[i + 1];
+      // Block $() command substitution
+      if (next === '(') {
+        return true;
+      }
+      // Block ${VAR} variable expansion
+      if (next === '{') {
+        return true;
+      }
+      // Block $VAR variable expansion ($ followed by letter or underscore)
+      // Allow known-safe bash automatic variables: $_ (last argument)
+      if (/[a-zA-Z_]/.test(next)) {
+        VAR_NAME_RE.lastIndex = i + 1;
+        const varMatch = VAR_NAME_RE.exec(command);
+        const varName = varMatch ? varMatch[0] : '';
+        if (!BASH_SAFE_VARS.has(varName)) {
+          return true;
+        }
+      }
     }
     if (
       !inDoubleQuote &&
@@ -1171,8 +1193,29 @@ function detectPowerShellSubstitution(command: string): boolean {
       i += 2;
       continue;
     }
-    if (char === '$' && command[i + 1] === '(') {
-      return true;
+    if (char === '$' && i + 1 < command.length) {
+      const next = command[i + 1];
+      // Block $() subexpression
+      if (next === '(') {
+        return true;
+      }
+      // Block ${...} braced variable expansion (e.g. ${env:GITHUB_TOKEN})
+      if (next === '{') {
+        return true;
+      }
+      // Block $VAR bare variable expansion (e.g. $env:GEMINI_API_KEY)
+      // Allow known-safe PowerShell automatic variables
+      if (/[a-zA-Z_]/.test(next)) {
+        VAR_NAME_RE.lastIndex = i + 1;
+        const varMatch = VAR_NAME_RE.exec(command);
+        const varName = varMatch ? varMatch[0].toLowerCase() : '';
+        if (
+          !PS_SAFE_VARS.has(varName) ||
+          command[i + 1 + varName.length] === ':'
+        ) {
+          return true;
+        }
+      }
     }
     if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
       return true;

@@ -24,6 +24,7 @@ import {
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
+  detectCommandSubstitution,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -674,5 +675,202 @@ describe('resolveExecutable', () => {
     mockPlatform.mockReturnValue('linux');
 
     expect(resolveExecutable('anything')).toBeUndefined();
+  });
+});
+
+describe('detectCommandSubstitution', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describe('should block variable expansion on both platforms', () => {
+    it.each([
+      'echo $GITHUB_TOKEN',
+      'echo $GOOGLE_CLOUD_ACCESS_TOKEN',
+      'echo $ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+      'echo $GEMINI_API_KEY',
+      'echo ${GITHUB_TOKEN}',
+      'echo ${GOOGLE_CLOUD_ACCESS_TOKEN}',
+      'echo "value=$GITHUB_TOKEN"',
+      'echo "hello $USER"',
+      'cat $HOME/.ssh/id_rsa',
+    ])('blocks on both bash and PowerShell: %s', (cmd) => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+    });
+  });
+
+  describe('should block bash-specific substitution', () => {
+    it.each([
+      'echo $(whoami)',
+      'echo `whoami`',
+      'cat <(ls)',
+      'diff <(cat a) >(cat b)',
+    ])('blocks: %s', (cmd) => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+    });
+  });
+
+  describe('should block PowerShell-specific variable syntax', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    it.each([
+      'Write-Output $env:GEMINI_API_KEY',
+      'Write-Output $env:GITHUB_TOKEN',
+      'echo $env:GOOGLE_CLOUD_ACCESS_TOKEN',
+      'echo ${env:GEMINI_API_KEY}',
+      'echo ${env:GITHUB_TOKEN}',
+      'Write-Output "token=$env:GEMINI_API_KEY"',
+      'echo "DUPLICATE_ISSUES_CSV=$env:TOKEN" >> file',
+    ])('blocks: %s', (cmd) => {
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+    });
+  });
+
+  describe('should block PowerShell subexpressions', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    it.each(['echo $(Get-Process)', 'Write-Output @(1,2,3)'])(
+      'blocks: %s',
+      (cmd) => {
+        expect(detectCommandSubstitution(cmd)).toBe(true);
+      },
+    );
+  });
+
+  describe('should allow safe commands on both platforms', () => {
+    it.each([
+      'echo hello world',
+      'echo 42',
+      "echo 'literal $VAR not expanded'",
+    ])('allows on both bash and PowerShell: %s', (cmd) => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution(cmd)).toBe(false);
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+      expect(detectCommandSubstitution(cmd)).toBe(false);
+    });
+  });
+
+  describe('should allow safe bash-specific commands', () => {
+    it.each(['ls -la /tmp', 'cat /etc/hostname', 'grep -r "pattern" .'])(
+      'allows: %s',
+      (cmd) => {
+        mockPlatform.mockReturnValue('linux');
+        expect(detectCommandSubstitution(cmd)).toBe(false);
+      },
+    );
+  });
+
+  describe('should allow safe PowerShell-specific commands', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    it.each([
+      'Get-ChildItem C:\\Users',
+      'Write-Output "hello world"',
+      "echo 'literal $env:VAR not expanded'",
+      'dir C:\\temp',
+    ])('allows: %s', (cmd) => {
+      expect(detectCommandSubstitution(cmd)).toBe(false);
+    });
+  });
+
+  it('should allow escaped dollar in double quotes (bash)', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(detectCommandSubstitution('echo "price is \\$5"')).toBe(false);
+  });
+
+  it('should allow dollar at end of string on both platforms', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(detectCommandSubstitution('echo cost is $')).toBe(false);
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+    expect(detectCommandSubstitution('echo cost is $')).toBe(false);
+  });
+
+  it('should allow backtick-escaped dollar (PowerShell)', () => {
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+    expect(detectCommandSubstitution('echo `$env:VAR')).toBe(false);
+  });
+
+  it('should allow $VAR inside single quotes on both platforms', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(detectCommandSubstitution("echo '$USER'")).toBe(false);
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+    expect(detectCommandSubstitution("echo '$env:SECRET'")).toBe(false);
+  });
+
+  describe('should allow bash safe automatic variables', () => {
+    it('allows $_ (last argument)', () => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution('echo $_')).toBe(false);
+    });
+
+    it('allows $_ followed by space', () => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution('echo $_ something')).toBe(false);
+    });
+
+    it('blocks $_SECRET (not an exact match)', () => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution('echo $_SECRET')).toBe(true);
+    });
+
+    it('blocks $_1 (not an exact match)', () => {
+      mockPlatform.mockReturnValue('linux');
+      expect(detectCommandSubstitution('echo $_1')).toBe(true);
+    });
+  });
+
+  describe('should allow PowerShell safe automatic variables', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    it.each([
+      'Write-Output $true',
+      'Write-Output $True',
+      'Write-Output $TRUE',
+      'Write-Output $false',
+      'Write-Output $FALSE',
+      'Write-Output $null',
+      'Write-Output $Null',
+      'ForEach-Object { $_ }',
+      'echo $args',
+      'echo $ARGS',
+    ])('allows: %s', (cmd) => {
+      expect(detectCommandSubstitution(cmd)).toBe(false);
+    });
+
+    it.each([
+      'echo $trueVar',
+      'echo $_FOO',
+      'echo $TOKEN',
+      'echo $env:SECRET',
+      'echo $nullify',
+      'echo $true:SECRET',
+    ])('blocks: %s', (cmd) => {
+      expect(detectCommandSubstitution(cmd)).toBe(true);
+    });
   });
 });
