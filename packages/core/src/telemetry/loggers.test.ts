@@ -52,6 +52,7 @@ import {
   logOnboardingSuccess,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
+import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_REQUEST,
@@ -1473,6 +1474,124 @@ describe('loggers', () => {
         2,
         'removed',
         { function_name: 'test-function' },
+      );
+    });
+
+    it('should log a tool call with skill_name for activate_skill', () => {
+      const tool = new EditTool(mockConfig, createMockMessageBus());
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: ACTIVATE_SKILL_TOOL_NAME,
+          args: {
+            name: '  test-skill  ',
+          },
+          callId: 'test-call-id',
+          isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
+        },
+        response: {
+          callId: 'test-call-id',
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: {
+            fileDiff: 'diff',
+            fileName: 'file.txt',
+            filePath: 'file.txt',
+            originalContent: 'old content',
+            newContent: 'new content',
+            diffStat: {
+              model_added_lines: 0,
+              model_removed_lines: 0,
+              model_added_chars: 0,
+              model_removed_chars: 0,
+              user_added_lines: 0,
+              user_removed_lines: 0,
+              user_added_chars: 0,
+              user_removed_chars: 0,
+            },
+          },
+          error: undefined,
+          errorType: undefined,
+          contentLength: 13,
+        },
+        tool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 100,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      };
+      const event = new ToolCallEvent(call);
+
+      logToolCall(mockConfig, event);
+
+      expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        100,
+        {
+          function_name: ACTIVATE_SKILL_TOOL_NAME,
+          success: true,
+          decision: ToolCallDecision.ACCEPT,
+          tool_type: 'native',
+          skill_name: 'test-skill',
+        },
+      );
+    });
+
+    it('should not log skill_name if name argument is whitespace-only for activate_skill', () => {
+      const tool = new EditTool(mockConfig, createMockMessageBus());
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: ACTIVATE_SKILL_TOOL_NAME,
+          args: {
+            name: '   ',
+          },
+          callId: 'test-call-id',
+          isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
+        },
+        response: {
+          callId: 'test-call-id',
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: {
+            fileDiff: 'diff',
+            fileName: 'file.txt',
+            filePath: 'file.txt',
+            originalContent: 'old content',
+            newContent: 'new content',
+            diffStat: {
+              model_added_lines: 0,
+              model_removed_lines: 0,
+              model_added_chars: 0,
+              model_removed_chars: 0,
+              user_added_lines: 0,
+              user_removed_lines: 0,
+              user_added_chars: 0,
+              user_removed_chars: 0,
+            },
+          },
+          error: undefined,
+          errorType: undefined,
+          contentLength: 13,
+        },
+        tool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 100,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      };
+      const event = new ToolCallEvent(call);
+
+      logToolCall(mockConfig, event);
+
+      expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        100,
+        {
+          function_name: ACTIVATE_SKILL_TOOL_NAME,
+          success: true,
+          decision: ToolCallDecision.ACCEPT,
+          tool_type: 'native',
+          skill_name: undefined,
+        },
       );
     });
 

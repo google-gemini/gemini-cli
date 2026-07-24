@@ -118,6 +118,7 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
+      skill_name?: string;
     },
   },
   [API_REQUEST_COUNT]: {
@@ -401,6 +402,7 @@ const HISTOGRAM_DEFINITIONS = {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       function_name: string;
+      skill_name?: string;
     },
   },
   [API_REQUEST_LATENCY]: {
@@ -889,10 +891,15 @@ export function recordToolCallMetrics(
     ...attributes,
   };
   toolCallCounter.add(1, metricAttributes);
-  toolCallLatencyHistogram.record(durationMs, {
+
+  const histogramAttributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     function_name: attributes.function_name,
-  });
+  };
+  if (attributes.skill_name !== undefined) {
+    histogramAttributes['skill_name'] = attributes.skill_name;
+  }
+  toolCallLatencyHistogram.record(durationMs, histogramAttributes);
 }
 
 export function recordCustomTokenUsageMetrics(
