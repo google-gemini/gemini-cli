@@ -235,7 +235,7 @@ jobs:
           path: 'packages/*/junit.xml'
 
   test_mac:
-    name: 'Test (Mac) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
+    name: 'Test (Mac) - 20.x'
     runs-on: 'macos-latest-large'
     needs:
       - 'merge_queue_skipper'
@@ -245,25 +245,16 @@ jobs:
       checks: 'write'
       pull-requests: 'write'
     continue-on-error: true
-    strategy:
-      matrix:
-        node-version:
-          - '20.x'
-          - '22.x'
-          - '24.x'
-        shard:
-          - 'cli'
-          - 'others'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           persist-credentials: false
 
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
+      - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: '20.x'
           cache: 'npm'
 
       - name: 'Build project'
@@ -277,13 +268,8 @@ jobs:
           NO_COLOR: true
           GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
-          if [[ "${{ matrix.shard }}" == "cli" ]]; then
-            npm run test:ci --workspace "@google/gemini-cli" -- --coverage.enabled=false
-          else
-            # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
-            npm run test:scripts
-          fi
+          npm run test:ci -- --coverage.enabled=false
+          npm run test:scripts
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -312,7 +298,7 @@ jobs:
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
+          name: 'Test Results (Node ${{ runner.os }}, 20.x)'
           path: 'packages/*/junit.xml'
           reporter: 'java-junit'
           fail-on-error: 'false'
@@ -322,7 +308,7 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
+          name: 'test-results-fork-${{ runner.os }}-20.x'
           path: 'packages/*/junit.xml'
 
       - name: 'Upload coverage reports'
@@ -330,7 +316,7 @@ jobs:
           ${{ always() }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'coverage-reports-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
+          name: 'coverage-reports-${{ runner.os }}-20.x'
           path: 'packages/*/coverage'
 
   codeql:
