@@ -5,6 +5,7 @@
  */
 
 import type { Config } from '../config/config.js';
+import { createSessionId } from '../utils/session.js';
 import {
   openBrowserSecurely,
   shouldLaunchBrowser,
@@ -161,8 +162,9 @@ async function processIntent(
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
-      // TODO(telemetry): Implement generic fallback event logging. Existing
-      // logFlashFallback is specific to a single Model.
+      // Rotate the session ID to ensure the backend treats the retried request
+      // as a brand-new session, preventing stateful model-switching errors.
+      config.rotateSessionId(createSessionId());
       config.activateFallbackMode(fallbackModel, failedModel);
       return true;
 
