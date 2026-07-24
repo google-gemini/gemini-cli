@@ -70,6 +70,7 @@ import type {
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
+  HistoryItemCompression,
 } from '../types.js';
 import {
   StreamingState,
@@ -1345,6 +1346,52 @@ export const useGeminiStream = (
       const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
+      if (
+        isMoreThan25PercentUsed &&
+        settings.merged.model.autoCompressOnOverflow
+      ) {
+        addItem({
+          type: 'info',
+          text: `Context window limit reached (${remainingTokenCount.toLocaleString()} tokens left). Auto-compressing history — your prompt will be ready to re-send after compression completes.`,
+        });
+
+        void (async () => {
+          try {
+            const promptId = `auto-compress-overflow-${Date.now()}`;
+            const compressed = await geminiClient.tryCompressChat(
+              promptId,
+              true,
+            );
+            if (compressed) {
+              addItem({
+                type: MessageType.COMPRESSION,
+                compression: {
+                  isPending: false,
+                  originalTokenCount: compressed.originalTokenCount,
+                  newTokenCount: compressed.newTokenCount,
+                  compressionStatus: compressed.compressionStatus,
+                },
+              } as HistoryItemCompression);
+              addItem({
+                type: 'info',
+                text: 'Auto-compression complete. Please re-send your prompt.',
+              });
+            } else {
+              addItem({
+                type: 'info',
+                text: 'Auto-compression failed. Use `/compress` manually or reduce your message size.',
+              });
+            }
+          } catch {
+            addItem({
+              type: 'info',
+              text: 'Auto-compression encountered an error. Use `/compress` manually.',
+            });
+          }
+        })();
+        return;
+      }
+
       let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
       if (isMoreThan25PercentUsed) {
@@ -1357,7 +1404,7 @@ export const useGeminiStream = (
         text,
       });
     },
-    [addItem, onCancelSubmit, config],
+    [addItem, onCancelSubmit, config, settings, geminiClient],
   );
 
   const handleChatModelEvent = useCallback(

@@ -721,6 +721,13 @@
           "default": 0.5,
           "type": "number"
         },
+        "autoCompressOnOverflow": {
+          "title": "Auto-Compress on Context Overflow",
+          "description": "When the context window is about to overflow, automatically compress the chat history and retry the prompt instead of stopping with an error.",
+          "markdownDescription": "When the context window is about to overflow, automatically compress the chat history and retry the prompt instead of stopping with an error.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disableLoopDetection": {
           "title": "Disable Loop Detection",
           "description": "Disable automatic detection and prevention of infinite loops.",
