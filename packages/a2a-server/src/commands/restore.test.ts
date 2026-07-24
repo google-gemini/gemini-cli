@@ -84,6 +84,24 @@ describe('RestoreCommand', () => {
     expect(result.data).toEqual([restoreContent]);
   });
 
+  it.each([
+    '../../../etc/passwd',
+    '../secrets',
+    '../../.gemini/settings.json',
+  ])(
+    'should reject path-traversal input escaping the checkpoint directory: %s',
+    async (traversalInput) => {
+      const command = new RestoreCommand();
+      const result = await command.execute(mockConfig, [traversalInput]);
+      expect(result.data).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Invalid checkpoint name: ${traversalInput}`,
+      });
+      expect(mockFs.readFile).not.toHaveBeenCalled();
+    },
+  );
+
   it('should show "file not found" error for a non-existent checkpoint', async () => {
     const command = new RestoreCommand();
     const error = new Error('File not found');

@@ -52,6 +52,26 @@ export class RestoreCommand implements Command {
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
       const filePath = path.join(checkpointDir, selectedFile);
 
+      // Prevent path traversal: ensure the resolved file path stays inside
+      // the checkpoint directory. `path.join` alone does not defend against
+      // inputs like `../../etc/passwd`; a `path.resolve` + `startsWith` guard
+      // rejects any input that would escape `checkpointDir`.
+      const resolvedFilePath = path.resolve(filePath);
+      const resolvedCheckpointDir = path.resolve(checkpointDir);
+      if (
+        resolvedFilePath !== resolvedCheckpointDir &&
+        !resolvedFilePath.startsWith(resolvedCheckpointDir + path.sep)
+      ) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: `Invalid checkpoint name: ${argsStr}`,
+          },
+        };
+      }
+
       let data: string;
       try {
         data = await fs.readFile(filePath, 'utf-8');
