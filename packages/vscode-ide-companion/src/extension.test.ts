@@ -131,6 +131,39 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  it('registers every created Disposable into context.subscriptions (no leaked commands/listeners)', async () => {
+    // Tag each created Disposable so we can verify it actually landed in
+    // context.subscriptions. The bug (#27790) wrapped two registrations in a
+    // stray parenthesis pair, turning them into a comma expression whose value
+    // was only the last operand — so the `gemini.diff.accept` command and the
+    // `onDidChangeWorkspaceFolders` listener were created but never tracked
+    // for disposal.
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (id: string) =>
+        ({ command: id, dispose: vi.fn() }) as unknown as vscode.Disposable,
+    );
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockImplementation(
+      () =>
+        ({
+          kind: 'onDidChangeWorkspaceFolders',
+          dispose: vi.fn(),
+        }) as unknown as vscode.Disposable,
+    );
+
+    await activate(context);
+
+    // Some mocked VS Code APIs return `undefined` by default in the test
+    // environment, so `context.subscriptions` can contain `undefined` entries.
+    // Guard property access with optional chaining to avoid a TypeError.
+    const pushed = context.subscriptions as Array<
+      { command?: string; kind?: string } | undefined
+    >;
+    expect(pushed.some((d) => d?.command === 'gemini.diff.accept')).toBe(true);
+    expect(pushed.some((d) => d?.kind === 'onDidChangeWorkspaceFolders')).toBe(
+      true,
+    );
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
