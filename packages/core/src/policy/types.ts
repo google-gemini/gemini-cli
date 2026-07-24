@@ -137,6 +137,16 @@ export interface PolicyRule {
   mcpName?: string;
 
   /**
+   * If true, this rule only matches built-in tools and never matches MCP
+   * tools, even when `toolName` is the wildcard `'*'`. Use this to scope a
+   * blanket rule (e.g. a default-deny for an allowlist) to built-in tools
+   * without also excluding MCP tools, which should remain governed by their
+   * own trust/allow mechanisms (`mcpServers.<name>.trust`, `mcp.allowed`,
+   * `mcp.autoAllowInHeadless`).
+   */
+  builtinOnly?: boolean;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */
