@@ -69,25 +69,46 @@ interface SandboxIndicatorProps {
   isTrustedFolder: boolean | undefined;
 }
 
+function getSandboxDisplayString(
+  sandbox: string | undefined,
+  sandboxEnabled: boolean,
+  isTrustedFolder: boolean | undefined,
+): string {
+  if (isTrustedFolder === false) {
+    return 'untrusted';
+  }
+
+  if (sandbox) {
+    if (sandbox === 'sandbox-exec') {
+      const profile = process.env['SEATBELT_PROFILE'] || 'permissive-open';
+      return `macOS seatbelt (${profile})`;
+    }
+    return 'current process';
+  }
+
+  if (sandboxEnabled) {
+    return 'all tools';
+  }
+
+  return 'no sandbox';
+}
+
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
   const config = useConfig();
   const sandboxEnabled = config.getSandboxEnabled();
-  if (isTrustedFolder === false) {
-    return <Text color={theme.status.warning}>untrusted</Text>;
-  }
-
   const sandbox = process.env['SANDBOX'];
-  if (sandbox) {
-    return <Text color={theme.status.warning}>current process</Text>;
-  }
+  const displayString = getSandboxDisplayString(
+    sandbox,
+    sandboxEnabled,
+    isTrustedFolder,
+  );
 
-  if (sandboxEnabled) {
-    return <Text color={theme.status.warning}>all tools</Text>;
-  }
+  const color =
+    displayString === 'no sandbox' ? theme.status.error : theme.status.warning;
 
-  return <Text color={theme.status.error}>no sandbox</Text>;
+  return <Text color={color}>{displayString}</Text>;
 };
 
 const CorgiIndicator: React.FC = () => (
@@ -308,11 +329,11 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'sandbox': {
-        let str = 'no sandbox';
-        const sandbox = process.env['SANDBOX'];
-        if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox) str = 'current process';
-        else if (config.getSandboxEnabled()) str = 'all tools';
+        const str = getSandboxDisplayString(
+          process.env['SANDBOX'],
+          config.getSandboxEnabled(),
+          isTrustedFolder,
+        );
 
         addCol(
           id,
