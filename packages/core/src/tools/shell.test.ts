@@ -151,6 +151,7 @@ describe('ShellTool', () => {
       },
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
+      getAllowCommandSubstitution: vi.fn().mockReturnValue(false),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
