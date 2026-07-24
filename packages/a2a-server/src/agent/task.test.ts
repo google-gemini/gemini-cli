@@ -752,4 +752,107 @@ describe('Task', () => {
       expect(changed3).toBe(true);
     });
   });
+
+  describe('getProposedContent (CRLF Line Ending Normalization)', () => {
+    it('should successfully replace LF-based strings in CRLF-based files', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const os = await import('node:os');
+
+      const mockConfig = createMockConfig({
+        getTargetDir: () => os.tmpdir(),
+        validatePathAccess: () => null,
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const tempFile = path.resolve(os.tmpdir(), 'crlf_test_file.txt');
+      const crlfContent = 'line1\r\nline2\r\nline3\r\n';
+      fs.writeFileSync(tempFile, crlfContent, 'utf8');
+
+      try {
+        const oldString = 'line2\n';
+        const newString = 'line2-optimized\n';
+
+        const result = await task['getProposedContent'](
+          tempFile,
+          oldString,
+          newString,
+        );
+
+        expect(result).toContain('line2-optimized');
+        expect(result).not.toContain('\r\n'); // It should be normalized to LF
+      } finally {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      }
+    });
+
+    it('should successfully replace CRLF-based strings in CRLF-based files by normalizing all to LF', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const os = await import('node:os');
+
+      const mockConfig = createMockConfig({
+        getTargetDir: () => os.tmpdir(),
+        validatePathAccess: () => null,
+      });
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const tempFile = path.resolve(
+        os.tmpdir(),
+        'crlf_test_file_crlf_inputs.txt',
+      );
+      const crlfContent = 'line1\r\nline2\r\nline3\r\n';
+      fs.writeFileSync(tempFile, crlfContent, 'utf8');
+
+      try {
+        const oldString = 'line2\r\n';
+        const newString = 'line2-optimized\r\n';
+
+        const result = await task['getProposedContent'](
+          tempFile,
+          oldString,
+          newString,
+        );
+
+        expect(result).toContain('line2-optimized');
+        expect(result).not.toContain('\r\n'); // It should be normalized to LF
+      } finally {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      }
+    });
+  });
 });

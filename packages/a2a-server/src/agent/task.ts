@@ -666,12 +666,15 @@ export class Task {
     }
 
     try {
-      const currentContent = await fs.readFile(resolvedPath, 'utf8');
+      const rawContent = await fs.readFile(resolvedPath, 'utf8');
+      const currentContent = rawContent.replace(/\r\n/g, '\n');
+      const normalizedOldString = old_string.replace(/\r\n/g, '\n');
+      const normalizedNewString = new_string.replace(/\r\n/g, '\n');
       return this._applyReplacement(
         currentContent,
-        old_string,
-        new_string,
-        old_string === '' && currentContent === '',
+        normalizedOldString,
+        normalizedNewString,
+        normalizedOldString === '' && currentContent === '',
       );
     } catch (err) {
       if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
