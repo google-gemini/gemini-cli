@@ -617,6 +617,29 @@ export class ModelConfigService {
     ) as GenerateContentConfig;
   }
 
+  /**
+   * Deep-merges a partial `override` config over a `base` config so that user
+   * overrides augment—rather than obliterate—nested defaults. Object maps
+   * (`aliases`, `modelDefinitions`, etc.) are merged recursively, while arrays
+   * (e.g. `overrides`) are replaced wholesale so a user can fully override them.
+   * A missing `override` returns the base config unchanged.
+   */
+  static mergeConfigs(
+    base: ModelConfigServiceConfig,
+    override: ModelConfigServiceConfig | undefined,
+  ): ModelConfigServiceConfig {
+    return ModelConfigService.genericDeepMerge(
+      // structuredClone the base first: genericDeepMerge copies the first
+      // object's nested values by reference, so any default the override does
+      // not touch (e.g. aliases) would otherwise be shared with — and mutable
+      // through — the global DEFAULT_MODEL_CONFIGS.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      structuredClone(base) as Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      override as Record<string, unknown> | undefined,
+    ) as ModelConfigServiceConfig;
+  }
+
   private static genericDeepMerge(
     ...objects: Array<Record<string, unknown> | undefined>
   ): Record<string, unknown> {

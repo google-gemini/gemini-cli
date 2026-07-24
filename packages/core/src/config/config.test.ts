@@ -2496,7 +2496,7 @@ describe('BaseLlmClient Lifecycle', () => {
   });
 });
 
-describe('Generation Config Merging (HACK)', () => {
+describe('Generation Config Merging', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
@@ -2572,17 +2572,20 @@ describe('Generation Config Merging (HACK)', () => {
       }
     ).config;
 
-    // Assert that the user's aliases are present
-    expect(serviceConfig.aliases).toEqual(userAliases);
-    // Assert that the default overrides are present
+    // The user's new alias is added on top of the defaults, which are
+    // preserved (previously, providing any alias obliterated the defaults).
+    expect(serviceConfig.aliases).toEqual({
+      ...DEFAULT_MODEL_CONFIGS.aliases,
+      ...userAliases,
+    });
+    // The user did not provide overrides, so the defaults remain.
     expect(serviceConfig.overrides).toEqual(DEFAULT_MODEL_CONFIGS.overrides);
   });
 
-  it('should use user-provided aliases if they exist', () => {
+  it('deep-merges a user alias that overrides a default, preserving the rest', () => {
+    const [defaultAliasKey] = Object.keys(DEFAULT_MODEL_CONFIGS.aliases ?? {});
     const userAliases = {
-      'my-alias': {
-        modelConfig: { model: 'my-model' },
-      },
+      [defaultAliasKey]: { modelConfig: { model: 'my-model' } },
     };
 
     const params: ConfigParameters = {
@@ -2599,8 +2602,14 @@ describe('Generation Config Merging (HACK)', () => {
       }
     ).config;
 
-    // Assert that the user's aliases are used, not the defaults
-    expect(serviceConfig.aliases).toEqual(userAliases);
+    // The overridden alias reflects the user's model...
+    expect(serviceConfig.aliases?.[defaultAliasKey]?.modelConfig?.model).toBe(
+      'my-model',
+    );
+    // ...while every other default alias is still present.
+    for (const key of Object.keys(DEFAULT_MODEL_CONFIGS.aliases ?? {})) {
+      expect(serviceConfig.aliases?.[key]).toBeDefined();
+    }
   });
 
   it('should use default generation config if none is provided', () => {

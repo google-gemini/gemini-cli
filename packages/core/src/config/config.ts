@@ -1141,51 +1141,15 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
 
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
-    let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig) {
-      // Ensure user-defined model definitions augment, not replace, the defaults.
-      const mergedModelDefinitions = {
-        ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
-        ...modelConfigServiceConfig.modelDefinitions,
-      };
-      const mergedModelIdResolutions = {
-        ...DEFAULT_MODEL_CONFIGS.modelIdResolutions,
-        ...modelConfigServiceConfig.modelIdResolutions,
-      };
-      const mergedClassifierIdResolutions = {
-        ...DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
-        ...modelConfigServiceConfig.classifierIdResolutions,
-      };
-      const mergedModelChains = {
-        ...DEFAULT_MODEL_CONFIGS.modelChains,
-        ...modelConfigServiceConfig.modelChains,
-      };
-
-      modelConfigServiceConfig = {
-        // Preserve other user settings like customAliases
-        ...modelConfigServiceConfig,
-        // Apply defaults for aliases and overrides if they are not provided
-        aliases:
-          modelConfigServiceConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
-        overrides:
-          modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
-        // Use the merged model definitions
-        modelDefinitions: mergedModelDefinitions,
-        modelIdResolutions: mergedModelIdResolutions,
-        classifierIdResolutions: mergedClassifierIdResolutions,
-        modelChains: mergedModelChains,
-      };
-    }
-
+    // Deep-merge the user's model config over the built-in defaults so that a
+    // partial user config (e.g. just a custom alias or only `overrides`)
+    // augments the defaults instead of replacing entire nested sections and
+    // silently dropping the default model aliases. See #28264.
     this.modelConfigService = new ModelConfigService(
-      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+      ModelConfigService.mergeConfigs(
+        DEFAULT_MODEL_CONFIGS,
+        params.modelConfigServiceConfig,
+      ),
     );
 
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
