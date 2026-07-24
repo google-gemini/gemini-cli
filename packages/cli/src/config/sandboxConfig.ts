@@ -132,6 +132,16 @@ export async function loadSandboxConfig(
   let sandboxValue: boolean | string | null | undefined;
   let allowedPaths: string[] = [];
   let networkAccess = true;
+  let setHostname = settings.tools?.sandboxSetHostname ?? true;
+
+  // Environment variable override
+  const envSetHostname = process.env['GEMINI_CLI_SANDBOX_SET_HOSTNAME']?.toLowerCase().trim();
+  if (envSetHostname === 'false') {
+    setHostname = false;
+  } else if (envSetHostname === 'true') {
+    setHostname = true;
+  }
+
   let customImage: string | undefined;
 
   if (
@@ -143,6 +153,9 @@ export async function loadSandboxConfig(
     sandboxValue = config.enabled ? (config.command ?? true) : false;
     allowedPaths = config.allowedPaths ?? [];
     networkAccess = config.networkAccess ?? true;
+    if (config.setHostname !== undefined) {
+      setHostname = config.setHostname;
+    }
     customImage = config.image;
   } else if (typeof sandboxOption !== 'object' || sandboxOption === null) {
     sandboxValue = sandboxOption;
@@ -163,6 +176,13 @@ export async function loadSandboxConfig(
     command === 'lxc';
 
   return command && (image || isNative)
-    ? { enabled: true, allowedPaths, networkAccess, command, image }
+    ? {
+        enabled: true,
+        allowedPaths,
+        networkAccess,
+        command,
+        image,
+        setHostname,
+      }
     : undefined;
 }
