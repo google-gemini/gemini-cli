@@ -190,7 +190,129 @@ describe('mcp-client', () => {
       });
       expect(mockedClient.listTools).toHaveBeenCalledWith(
         {},
-        expect.objectContaining({ timeout: 600000, progressReporter: client }),
+        expect.objectContaining({ timeout: 10000, progressReporter: client }),
+      );
+    });
+
+    it('should use a short discovery timeout for tools/list when no per-server timeout is configured', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testFunction',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getToolsByServer: vi.fn().mockReturnValue([]),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        getResourcesByServer: vi.fn().mockReturnValue([]),
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({ timeout: 10000 }),
+      );
+    });
+
+    it('should honor an explicit per-server timeout for tools/list discovery', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testFunction',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getToolsByServer: vi.fn().mockReturnValue([]),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        getResourcesByServer: vi.fn().mockReturnValue([]),
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command', timeout: 45000 },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({ timeout: 45000 }),
       );
     });
 
@@ -1785,6 +1907,9 @@ describe('mcp-client', () => {
         expect.anything(),
         expect.objectContaining({
           signal: expect.any(AbortSignal),
+          // The configured per-server timeout must still be forwarded on the
+          // refresh path, not discarded when a signal is also passed.
+          timeout: 50,
         }),
       );
 
