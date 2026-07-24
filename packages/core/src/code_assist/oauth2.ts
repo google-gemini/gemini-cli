@@ -12,6 +12,7 @@ import {
   type Credentials,
   type AuthClient,
   type JWTInput,
+  type OAuth2ClientOptions,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -113,6 +114,41 @@ function getUseEncryptedStorageFlag() {
   return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
 }
 
+type TransporterOptions = OAuth2ClientOptions['transporterOptions'];
+
+// gaxios (pulled in through google-auth-library) picks its fetch by looking for
+// a browser `window.fetch`. That check never passes in Node, so it always falls
+// back to node-fetch@2, even on Node versions that already have a global fetch.
+//
+// On some headless VPSes node-fetch chokes on the token-exchange response and
+// throws "Invalid response body while trying to fetch
+// https://oauth2.googleapis.com/token: Premature close", which makes login
+// impossible. The exact same request succeeds via curl and Node's built-in
+// fetch, so we just point gaxios at the native fetch instead.
+//
+// We only do this when there's no proxy. gaxios routes proxies through a Node
+// http(s) agent that native fetch doesn't understand, so proxied setups keep
+// using node-fetch. GEMINI_OAUTH_USE_NODE_FETCH=1 forces the old behaviour if
+// the native path ever misbehaves somewhere.
+function getOauthTransporterOptions(
+  proxy: string | undefined,
+): TransporterOptions {
+  const options = { proxy } as NonNullable<TransporterOptions>;
+
+  const nativeFetch = globalThis.fetch;
+  if (
+    !proxy &&
+    typeof nativeFetch === 'function' &&
+    process.env['GEMINI_OAUTH_USE_NODE_FETCH'] !== '1'
+  ) {
+    // Bind it so undici's fetch keeps its own `this`, then cast to the type
+    // gaxios expects.
+    options.fetchImplementation = nativeFetch.bind(
+      globalThis,
+    ) as NonNullable<TransporterOptions>['fetchImplementation'];
+  }
+
+  return options;
 /**
  * Determines whether the given credentials object represents ADC credentials.
  */
@@ -150,6 +186,12 @@ async function initOauthClient(
       await triggerPostAuthCallbacks(tokens);
     });
 
+  const client = new OAuth2Client({
+    clientId: OAUTH_CLIENT_ID,
+    clientSecret: OAUTH_CLIENT_SECRET,
+    transporterOptions: getOauthTransporterOptions(config.getProxy()),
+  });
+  const useEncryptedStorage = getUseEncryptedStorageFlag();
     return client;
   }
 
