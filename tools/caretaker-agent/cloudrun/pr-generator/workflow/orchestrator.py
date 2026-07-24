@@ -239,7 +239,7 @@ class Orchestrator:
                         try:
                             diff_stat = CommandExecutor.run("git diff --stat origin/main", self.config.pr_repo_path)
                             logging.info("Diff Stat summary:\n%s", diff_stat)
-                            lines = diff_stat.split("\n")
+                            lines = diff_stat.strip().split("\n")
                             last_line = lines[-1] if lines else ""
                             insertions = re.search(r"(\d+)\s+insertion", last_line)
                             deletions = re.search(r"(\d+)\s+deletion", last_line)
@@ -617,7 +617,7 @@ class Orchestrator:
 
                 # Parse recommended PR Description (case-insensitive)
                 desc_match = re.search(
-                    r"##\s*PR\s*Description\r?\n\s*(.+)",
+                    r"##\s*PR\s*Description\r?\n\s*(.+?)(?=\r?\n##|$)",
                     details_content,
                     re.IGNORECASE | re.DOTALL,
                 )
