@@ -22,6 +22,7 @@ import {
   stripToolCallIdPrefixes,
   type HistoryTurn,
   coalesceConsecutiveRoles,
+  stripThoughts,
 } from './geminiChat.js';
 import {
   type CompletedToolCall,
@@ -2282,6 +2283,110 @@ describe('GeminiChat', () => {
         text: 'actual conversational response',
       });
     });
+
+    it('should completely filter out thought parts from getHistoryTurns when context management is disabled but model is gemini-2/modern', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'internal monologue', thought: true } as unknown as Part,
+            { text: 'actual conversational response' },
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      expect(turns).toHaveLength(2);
+      const modelTurn = turns[1];
+      expect(modelTurn.content.parts).toHaveLength(1);
+      expect(modelTurn.content.parts![0]).toEqual({
+        text: 'actual conversational response',
+      });
+    });
+
+    it('should completely filter out thought parts from getHistoryTurns when model supports modern features', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-3.1-pro-preview');
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'internal monologue', thought: true } as unknown as Part,
+            { text: 'actual conversational response' },
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      expect(turns).toHaveLength(2);
+      const modelTurn = turns[1];
+      expect(modelTurn.content.parts).toHaveLength(1);
+      expect(modelTurn.content.parts![0]).toEqual({
+        text: 'actual conversational response',
+      });
+    });
+
+    it('should completely filter out model turns that end up with empty parts after stripping thoughts', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'internal monologue', thought: true } as unknown as Part,
+          ],
+        },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      // Since the model turn contains only a thought part, it should be filtered out entirely.
+      expect(turns).toHaveLength(1);
+      expect(turns[0].content.role).toBe('user');
+    });
+
+    it('should coalesce consecutive user turns when an intermediate model turn is stripped', () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'Question 1' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'thinking...', thought: true } as unknown as Part],
+        },
+        { role: 'user', parts: [{ text: 'Question 2' }] },
+      ]);
+
+      const turns = chat.getHistoryTurns(true);
+
+      // The model turn contains only a thought part, so it is stripped.
+      // The two adjacent user turns must be coalesced into one user turn.
+      expect(turns).toHaveLength(1);
+      expect(turns[0].content.role).toBe('user');
+      expect(turns[0].content.parts).toHaveLength(2);
+      expect(turns[0].content.parts![0].text).toBe('Question 1');
+      expect(turns[0].content.parts![1].text).toBe('Question 2');
+    });
   });
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
@@ -3194,6 +3299,96 @@ describe('GeminiChat', () => {
         { id: '2', content: { parts: [{ text: 'world' }] } },
       ];
       expect(coalesceConsecutiveRoles(history)).toEqual(history);
+    });
+  });
+
+  describe('stripThoughts', () => {
+    it('should return empty history if empty array is passed', () => {
+      expect(stripThoughts([])).toEqual([]);
+    });
+
+    it('should strip thought parts and keep the turn if other parts remain', () => {
+      const history: HistoryTurn[] = [
+        {
+          id: '1',
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'internal monologue', thought: true } as unknown as Part,
+              { text: 'visible response' },
+            ],
+          },
+        },
+      ];
+      expect(stripThoughts(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'model',
+            parts: [{ text: 'visible response' }],
+          },
+        },
+      ]);
+    });
+
+    it('should completely remove a turn if all its parts are thought parts', () => {
+      const history: HistoryTurn[] = [
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'hello' }],
+          },
+        },
+        {
+          id: '2',
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'internal monologue', thought: true } as unknown as Part,
+            ],
+          },
+        },
+      ];
+      expect(stripThoughts(history)).toEqual([
+        {
+          id: '1',
+          content: {
+            role: 'user',
+            parts: [{ text: 'hello' }],
+          },
+        },
+      ]);
+    });
+
+    it('should preserve turns that do not have parts arrays', () => {
+      const history: HistoryTurn[] = [{ id: '1', content: { role: 'user' } }];
+      expect(stripThoughts(history)).toEqual(history);
+    });
+
+    it('should preserve top-level metadata when stripping thoughts', () => {
+      const history: HistoryTurn[] = [
+        {
+          id: '1',
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'internal monologue', thought: true } as unknown as Part,
+              { text: 'visible response' },
+            ],
+          },
+          // top-level turn metadata
+          timestamp: '2026-07-23T00:00:00.000Z',
+          metadata: { some: 'value' },
+        } as unknown as HistoryTurn,
+      ];
+      const stripped = stripThoughts(history);
+      expect(stripped).toHaveLength(1);
+      expect(stripped[0]).toHaveProperty(
+        'timestamp',
+        '2026-07-23T00:00:00.000Z',
+      );
+      expect(stripped[0]).toHaveProperty('metadata', { some: 'value' });
     });
   });
 });

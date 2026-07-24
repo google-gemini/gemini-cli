@@ -795,7 +795,7 @@ describe('Task', () => {
         );
 
         expect(result).toContain('line2-optimized');
-        expect(result).not.toContain('\r\n'); // It should be normalized to LF
+        expect(result).toContain('\r\n'); // It should preserve the original CRLF line endings
       } finally {
         if (fs.existsSync(tempFile)) {
           fs.unlinkSync(tempFile);
@@ -847,7 +847,7 @@ describe('Task', () => {
         );
 
         expect(result).toContain('line2-optimized');
-        expect(result).not.toContain('\r\n'); // It should be normalized to LF
+        expect(result).toContain('\r\n'); // It should preserve the original CRLF line endings
       } finally {
         if (fs.existsSync(tempFile)) {
           fs.unlinkSync(tempFile);
