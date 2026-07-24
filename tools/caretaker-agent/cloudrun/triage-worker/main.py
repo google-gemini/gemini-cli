@@ -84,8 +84,9 @@ def main() -> None:
         sys.exit(0)
         
     print(f"[WORKER] Starting triage for issue #{issue_number}...")
+    target_cwd = os.environ.get("TARGET_CWD", "/opt/gemini-cli")
     try:
-        success, raw_output = process_issue_triage(payload)
+        success, raw_output = process_issue_triage(payload, target_cwd)
     except Exception as e:
         print(f"[WORKER] Triage process failed with exception: {e}")
         success, raw_output = False, ""
