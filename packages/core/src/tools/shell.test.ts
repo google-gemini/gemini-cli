@@ -20,11 +20,13 @@ const mockHomedir = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 const mockShellBackground = vi.hoisted(() => vi.fn());
+const mockShellOnExit = vi.hoisted(() => vi.fn());
 
 vi.mock('../services/shellExecutionService.js', () => ({
   ShellExecutionService: {
     execute: mockShellExecutionService,
     background: mockShellBackground,
+    onExit: mockShellOnExit,
   },
 }));
 
