@@ -26,6 +26,40 @@ policies.
     the CLI will use an available fallback model for the current turn or the
     remainder of the session.
 
+### Numerical Routing Configuration
+
+When the `auto` model alias is used, the CLI calculates a "complexity score"
+(from 1 to 100) for your prompt and routes the request to an appropriate model.
+
+By default, the CLI uses a hardcoded threshold (typically splitting between
+`flash` and `pro` models). However, you can completely customize this routing
+logic using `numericalRules` in your `settings.json` file.
+
+This allows you to define tiers. For example, you can route simple queries to a
+local model or Flash, and complex queries to Pro.
+
+**Example `settings.json` configuration:**
+
+```json
+{
+  "routing": {
+    "numericalRules": [
+      { "maxScore": 10, "model": "local-gemma" },
+      { "maxScore": 30, "model": "gemini-2.5-flash-lite" },
+      { "maxScore": 80, "model": "gemini-3-flash" },
+      { "maxScore": 100, "model": "gemini-3-pro" }
+    ]
+  }
+}
+```
+
+- **`maxScore`**: The maximum complexity score (inclusive) for which this rule
+  applies.
+- **`model`**: The model ID or alias to use.
+
+The CLI will evaluate the rules in ascending order of their `maxScore` and use
+the first one that matches the calculated score.
+
 ### Local Model Routing (Experimental)
 
 Gemini CLI supports using a local model for routing decisions. When configured,
