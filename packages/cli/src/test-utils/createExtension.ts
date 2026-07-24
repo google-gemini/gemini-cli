@@ -27,6 +27,7 @@ export function createExtension({
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
   themes = undefined as CustomTheme[] | undefined,
+  packageJson = undefined as Record<string, unknown> | undefined,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
@@ -54,6 +55,12 @@ export function createExtension({
     fs.writeFileSync(
       path.join(extDir, INSTALL_METADATA_FILENAME),
       JSON.stringify(installMetadata),
+    );
+  }
+  if (packageJson) {
+    fs.writeFileSync(
+      path.join(extDir, 'package.json'),
+      JSON.stringify(packageJson),
     );
   }
   return extDir;
