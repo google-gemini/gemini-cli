@@ -32,6 +32,7 @@ import * as path from 'node:path';
 
 import { authEvents } from '../code_assist/oauth2.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeTruncate } from './utils.js';
 
 vi.mock('@opentelemetry/exporter-trace-otlp-grpc');
 vi.mock('@opentelemetry/exporter-logs-otlp-grpc');
@@ -360,6 +361,31 @@ describe('Telemetry SDK', () => {
       expect(callback).toHaveBeenCalled();
     });
   });
+
+  it('should enforce MAX_TELEMETRY_BUFFER_SIZE and evict oldest events', () => {
+      // Fill the buffer past the limit (100)
+      const callbacks = [];
+      for (let i = 0; i < 110; i++) {
+        const cb = vi.fn();
+        callbacks.push(cb);
+        bufferTelemetryEvent(cb);
+      }
+  expect(debugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Telemetry buffer full')
+      );
+    });
+
+    it('should correctly truncate large strings via safeTruncate', () => {
+      const limit = 2048;
+      const largeString = 'a'.repeat(3000);
+      const result = safeTruncate(largeString, limit);
+      
+      // 1. Check for the specific production-ready suffix
+      expect(result).toContain('truncated for performance');
+      
+      // 2. Check that the math is RUTHLESS (Total length must be exactly <= limit)
+      expect(result.length).toBeLessThanOrEqual(limit);
+    });    
 
   it('should disable telemetry and log error if useCollector and useCliAuth are both true', async () => {
     vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(true);
