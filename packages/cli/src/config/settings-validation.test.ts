@@ -327,6 +327,73 @@ describe('settings-validation', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should accept customThemes with border.focused color override', () => {
+      // Regression test for #25689: border.focused is defined in the
+      // schema but was missing from the CustomTheme TypeScript interface.
+      const validSettings = {
+        ui: {
+          theme: 'MyTheme',
+          customThemes: {
+            MyTheme: {
+              type: 'custom',
+              name: 'MyTheme',
+              border: {
+                default: '#333333',
+                focused: '#00FF00',
+              },
+            },
+          },
+        },
+      };
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept customThemes with ui.active and ui.focus color overrides', () => {
+      // Regression test for #25689: ui.active and ui.focus are used in
+      // theme.ts to color active elements and focused borders, but were
+      // missing from the validation schema, causing "Unrecognized key"
+      // errors due to additionalProperties: false.
+      const validSettings = {
+        ui: {
+          theme: 'MyTheme',
+          customThemes: {
+            MyTheme: {
+              type: 'custom',
+              name: 'MyTheme',
+              ui: {
+                active: '#0000FF',
+                focus: '#00FF00',
+                comment: '#808080',
+                symbol: '#CCCCCC',
+              },
+            },
+          },
+        },
+      };
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject customThemes with unknown properties in ui', () => {
+      const invalidSettings = {
+        ui: {
+          theme: 'MyTheme',
+          customThemes: {
+            MyTheme: {
+              type: 'custom',
+              name: 'MyTheme',
+              ui: {
+                notAValidProperty: '#FF0000',
+              },
+            },
+          },
+        },
+      };
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+    });
+
     describe('type casting', () => {
       it('should cast "true" and "false" strings to booleans', () => {
         const settings = {
