@@ -414,4 +414,86 @@ describe('Auto Routing Fallback Integration', () => {
       'Pro success',
     );
   });
+
+  it('should rotate session ID on fallback and retry successfully with the Flash model', async () => {
+    const originalSessionId = 'test-session-rotate-id';
+    config = new Config({
+      sessionId: originalSessionId,
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: PREVIEW_GEMINI_MODEL_AUTO,
+    });
+
+    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+
+    client = new BaseLlmClient(
+      fakeGenerator,
+      config,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+
+    let attemptsPro = 0;
+    let attemptsFlash = 0;
+
+    const mockGoogleApiError = {
+      code: 429,
+      message:
+        'Automatically switching from gemini-2.5-pro to gemini-2.5-flash for faster responses for the remainder of this session. Possible reasons for this are...',
+      details: [],
+    };
+
+    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
+      async (params) => {
+        if (params.model === PREVIEW_GEMINI_MODEL) {
+          attemptsPro++;
+          throw new RetryableQuotaError(
+            'Quota exceeded for Pro',
+            mockGoogleApiError,
+            0,
+          );
+        } else if (params.model === PREVIEW_GEMINI_FLASH_MODEL) {
+          attemptsFlash++;
+          return {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Flash success after rotation' }],
+                },
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        }
+        throw new Error(`Unexpected model: ${params.model}`);
+      },
+    );
+
+    config.setFallbackModelHandler(
+      async (_failed, _fallback, _error): Promise<FallbackIntent | null> =>
+        'retry_always', // Approve switch to Flash
+    );
+
+    const promise = client.generateContent({
+      modelConfigKey: { model: PREVIEW_GEMINI_MODEL, isChatModel: true },
+      contents: [{ role: 'user', parts: [{ text: 'test query' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'test-prompt',
+      role: LlmRole.UTILITY_TOOL,
+    });
+
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    // Verify it resolved to Flash success instead of failing with Please submit a new query
+    expect(result.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Flash success after rotation',
+    );
+    expect(attemptsPro).toBe(3);
+    expect(attemptsFlash).toBe(1);
+
+    // Verify session ID has been rotated
+    expect(config.getSessionId()).not.toBe(originalSessionId);
+    expect(config.getSessionId()).toBeDefined();
+  });
 });

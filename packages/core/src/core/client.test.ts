@@ -212,7 +212,7 @@ describe('Gemini Client (client.ts)', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
-      getModel: vi.fn().mockReturnValue('test-model'),
+      getModel: vi.fn().mockReturnValue('gemini-1.5-pro'),
       getUserTier: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       getApiKey: vi.fn().mockReturnValue('test-key'),
