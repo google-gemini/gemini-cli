@@ -18,6 +18,9 @@ import {
   decodeTagName,
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
+  resolveToRealPath,
+  isSubpath,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -31,7 +34,7 @@ import { convertToRestPayload } from '@google/gemini-cli-core';
 
 const CHECKPOINT_MENU_GROUP = 'checkpoints';
 
-const getSavedChatTags = async (
+export const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
@@ -45,16 +48,34 @@ const getSavedChatTags = async (
     const file_tail = '.json';
     const files = await fsPromises.readdir(geminiDir);
     const chatDetails: ChatDetail[] = [];
+    const realGeminiDir = resolveToRealPath(geminiDir);
 
-    for (const file of files) {
+    const statPromises = files.map(async (file) => {
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
-        const filePath = path.join(geminiDir, file);
-        const stats = await fsPromises.stat(filePath);
-        const tagName = file.slice(file_head.length, -file_tail.length);
-        chatDetails.push({
-          name: decodeTagName(tagName),
-          mtime: stats.mtime.toISOString(),
-        });
+        try {
+          const filePath = resolveToRealPath(path.join(geminiDir, file));
+          if (!isSubpath(realGeminiDir, filePath)) {
+            return null;
+          }
+          const stats = await fsPromises.stat(filePath);
+          if (stats.isFile()) {
+            const tagName = file.slice(file_head.length, -file_tail.length);
+            return {
+              name: decodeTagName(tagName),
+              mtime: stats.mtime.toISOString(),
+            };
+          }
+        } catch (e) {
+          debugLogger.debug(`Failed to stat checkpoint file ${file}:`, e);
+        }
+      }
+      return null;
+    });
+
+    const results = await Promise.all(statPromises);
+    for (const result of results) {
+      if (result) {
+        chatDetails.push(result);
       }
     }
 

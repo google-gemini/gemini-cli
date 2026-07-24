@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, type Mock } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -12,6 +12,17 @@ import type { Content } from '@google/genai';
 import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
+// ... (rest of imports)
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    resolveToRealPath: vi.fn((p: string) => p),
+    isSubpath: vi.fn(() => true),
+    EDITOR_OPTIONS: actual.EDITOR_OPTIONS || [],
+  };
+});
 import { chatCommand, debugCommand } from './chatCommand.js';
 import {
   serializeHistoryToMarkdown,
@@ -60,6 +71,7 @@ describe('chatCommand', () => {
   };
 
   beforeEach(() => {
+    mockExport.mockClear();
     mockGetHistory = vi.fn().mockReturnValue([]);
     mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
@@ -119,15 +131,15 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.readdir.mockResolvedValue(fakeFiles as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
-          return { mtime: date1 } as Stats;
-        }
-        return { mtime: date2 } as Stats;
-      });
+      (mockFs.readdir as unknown as Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as Mock).mockImplementation(
+        async (path: string): Promise<Stats> => {
+          if (path.endsWith('test1.json')) {
+            return { mtime: date1, isFile: () => true } as unknown as Stats;
+          }
+          return { mtime: date2, isFile: () => true } as unknown as Stats;
+        },
+      );
 
       await listCommand?.action?.(mockContext, '');
 
@@ -141,6 +153,39 @@ describe('chatCommand', () => {
           {
             name: 'test2',
             mtime: date2.toISOString(),
+          },
+        ],
+      });
+    });
+
+    it('should ignore directories matching the checkpoint pattern', async () => {
+      const fakeFiles = ['checkpoint-file.json', 'checkpoint-directory.json'];
+      const date = new Date();
+
+      (mockFs.readdir as unknown as Mock).mockResolvedValue(fakeFiles);
+      (mockFs.stat as unknown as Mock).mockImplementation(
+        async (filePath: string): Promise<Stats> => {
+          if (filePath.endsWith('file.json')) {
+            return {
+              mtime: date,
+              isFile: () => true,
+            } as unknown as Stats;
+          }
+          return {
+            mtime: date,
+            isFile: () => false,
+          } as unknown as Stats;
+        },
+      );
+
+      await listCommand?.action?.(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: 'chat_list',
+        chats: [
+          {
+            name: 'file',
+            mtime: date.toISOString(),
           },
         ],
       });
@@ -347,6 +392,7 @@ describe('chatCommand', () => {
           (async (_: string): Promise<Stats> =>
             ({
               mtime: new Date(),
+              isFile: () => true,
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
 
@@ -366,9 +412,12 @@ describe('chatCommand', () => {
           path: string,
         ): Promise<Stats> => {
           if (path.endsWith('test1.json')) {
-            return { mtime: date } as Stats;
+            return { mtime: date, isFile: () => true } as Stats;
           }
-          return { mtime: new Date(date.getTime() + 1000) } as Stats;
+          return {
+            mtime: new Date(date.getTime() + 1000),
+            isFile: () => true,
+          } as Stats;
         }) as unknown as typeof fsPromises.stat);
 
         const result = await resumeCommand?.completion?.(mockContext, '');
@@ -427,6 +476,7 @@ describe('chatCommand', () => {
           (async (_: string): Promise<Stats> =>
             ({
               mtime: new Date(),
+              isFile: () => true,
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
 
@@ -699,10 +749,6 @@ Hi there!`;
 
       beforeEach(() => {
         mockGetLatestApiRequest = vi.fn();
-        if (!mockContext.services.agentContext!.config) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mockContext.services.agentContext!.config as any) = {};
-        }
         mockContext.services.agentContext!.config.getLatestApiRequest =
           mockGetLatestApiRequest;
         vi.spyOn(process, 'cwd').mockReturnValue('/project/root');

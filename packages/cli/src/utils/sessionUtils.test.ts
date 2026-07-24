@@ -11,6 +11,7 @@ import {
   formatRelativeTime,
   SessionError,
   convertSessionToHistoryFormats,
+  getAllSessionFiles,
 } from './sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
@@ -1094,5 +1095,68 @@ describe('convertSessionToHistoryFormats', () => {
     } else {
       throw new Error('Expected tool_group history item');
     }
+  });
+});
+
+describe('getAllSessionFiles', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = path.join(process.cwd(), '.tmp-test-get-all-sessions');
+    await fs.mkdir(tmpDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  it('should list only session files and ignore directories', async () => {
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Create a valid session file
+    const sessionId = randomUUID();
+    const sessionFile = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`;
+    await fs.writeFile(
+      path.join(chatsDir, sessionFile),
+      JSON.stringify({ sessionId, projectHash: 'abc', messages: [] }),
+    );
+
+    // Create a directory matching the session pattern
+    const sessionDir = `${SESSION_FILE_PREFIX}2024-01-01T11-00-directory.json`;
+    await fs.mkdir(path.join(chatsDir, sessionDir), { recursive: true });
+
+    const sessions = await getAllSessionFiles(chatsDir);
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].fileName).toBe(sessionFile);
+  });
+
+  it('should include symbolic links to files', async () => {
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Create a valid session file
+    const sessionId = randomUUID();
+    const sessionFile = `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`;
+    const sessionPath = path.join(chatsDir, sessionFile);
+    await fs.writeFile(
+      sessionPath,
+      JSON.stringify({ sessionId, projectHash: 'abc', messages: [] }),
+    );
+
+    // Create a symlink to it
+    const symlinkFile = `${SESSION_FILE_PREFIX}2024-01-01T12-00-symlink.json`;
+    const symlinkPath = path.join(chatsDir, symlinkFile);
+    await fs.symlink(sessionPath, symlinkPath);
+
+    const sessions = await getAllSessionFiles(chatsDir);
+
+    expect(sessions).toHaveLength(2);
+    expect(sessions.map((s) => s.fileName)).toContain(symlinkFile);
   });
 });
