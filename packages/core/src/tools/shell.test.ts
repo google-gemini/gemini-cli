@@ -49,6 +49,8 @@ import {
   ShellTool,
   OUTPUT_UPDATE_INTERVAL_MS,
   LIVE_OUTPUT_MAX_BUFFER_CHARS,
+  MAX_LLM_OUTPUT_BYTES,
+  truncateLlmOutput,
 } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
@@ -1864,5 +1866,39 @@ EOF`;
       });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
+  });
+});
+
+describe('truncateLlmOutput', () => {
+  it('returns output unchanged when within the byte bound', () => {
+    const small = 'hello world';
+    expect(truncateLlmOutput(small)).toBe(small);
+    expect(truncateLlmOutput('')).toBe('');
+  });
+
+  it('bounds output above the cap and keeps it within the limit', () => {
+    const huge = 'x'.repeat(MAX_LLM_OUTPUT_BYTES * 2);
+    const result = truncateLlmOutput(huge);
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(
+      MAX_LLM_OUTPUT_BYTES,
+    );
+    expect(result).toContain('shell output truncated');
+  });
+
+  it('preserves head and tail content', () => {
+    const body = 'y'.repeat(MAX_LLM_OUTPUT_BYTES * 2);
+    const result = truncateLlmOutput(`HEAD_MARKER${body}TAIL_MARKER`);
+    expect(result.startsWith('HEAD_MARKER')).toBe(true);
+    expect(result.endsWith('TAIL_MARKER')).toBe(true);
+  });
+
+  it('does not split multi-byte characters and stays within the bound', () => {
+    const emoji = '😀'.repeat(MAX_LLM_OUTPUT_BYTES); // 4 bytes each
+    const result = truncateLlmOutput(emoji);
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(
+      MAX_LLM_OUTPUT_BYTES,
+    );
+    // No replacement characters from a mid-codepoint cut.
+    expect(result).not.toContain('�');
   });
 });
