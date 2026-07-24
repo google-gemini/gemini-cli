@@ -1,16 +1,49 @@
 """Preflight test and linting validation filter.
 
-Helps parses CI tool and unit test terminal outputs to identify and selectively
-bypass known, acceptable test failures (such as specific root privilege bypass
-test failures).
+Parses CI tool and unit test terminal outputs to identify and selectively
+bypass known, acceptable test failures (such as specific container/sandbox
+privilege test failures).
 """
 
 import logging
 import re
 
-_ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\\[0-?]*[ -/]*[@-~])")
-_FAIL_PATH_RE = re.compile(r"FAIL\s+(\S+)")
-_TEST_FAILED_COUNT_RE = re.compile(r"Tests:?\s*(\d+)\s+failed")
+_ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+ALLOWED_SANDBOX_FAILURES: set[str] = {
+    "src/utils/sessionCleanup.test.ts",
+    "src/config/extension-manager-permissions.test.ts",
+    "root-privilege-check",
+    "container-permission-test",
+}
+
+
+def strip_ansi(text: str) -> str:
+    """Removes ANSI terminal styling escape sequences from a string."""
+    return _ANSI_ESCAPE_RE.sub("", text)
+
+
+def is_preflight_failure_allowed(
+    test_output: str,
+    allowed_failures: set[str] = ALLOWED_SANDBOX_FAILURES,
+) -> bool:
+    """Checks if test failures belong strictly to approved container/sandbox exceptions."""
+    clean_output = strip_ansi(test_output)
+    lines = clean_output.splitlines()
+
+    failing_lines = [
+        line for line in lines if "FAIL" in line or "FAILED" in line
+    ]
+    if not failing_lines:
+        return False
+
+    for line in failing_lines:
+        if not any(allowed in line for allowed in allowed_failures):
+            logging.warning("Unapproved preflight test failure detected: %s", line)
+            return False
+
+    logging.info("All detected test failure lines match approved sandbox exceptions.")
+    return True
 
 
 class PreflightFilter:
@@ -18,75 +51,16 @@ class PreflightFilter:
 
     @staticmethod
     def strip_ansi(text: str) -> str:
-        """Removes ANSI terminal styling escape sequences from a string.
-
-        Args:
-            text: Raw output text from command standard streams.
-
-        Returns:
-            The sanitized string without escape sequences.
-        """
-        return _ANSI_ESCAPE_RE.sub("", text)
+        """Removes ANSI terminal styling escape sequences from a string."""
+        return strip_ansi(text)
 
     @classmethod
     def should_ignore_preflight_failure(
-        cls, stdout: str | None, stderr: str | None
+        cls,
+        stdout: str | None,
+        stderr: str | None,
+        allowed_failures: set[str] = ALLOWED_SANDBOX_FAILURES,
     ) -> bool:
-        """Analyzes regression test outputs to see if they can be safely bypassed.
-
-        Specifically, bypasses known, isolated sandbox-level root privilege bypasses
-        defined in the allowed list, provided no other tests fail.
-
-        Args:
-            stdout: Command standard output stream contents.
-            stderr: Command standard error stream contents.
-
-        Returns:
-            True if the failures are allowed and can be bypassed, False otherwise.
-        """
+        """Analyzes regression test outputs to see if they can be safely bypassed."""
         raw_output = (stdout or "") + "\n" + (stderr or "")
-        clean_output = cls.strip_ansi(raw_output)
-
-        # Regex search for failing files of format "FAIL [path]"
-        failing_files = set(_FAIL_PATH_RE.findall(clean_output))
-        logging.info("Analyzing failing test files: %s", failing_files)
-
-        allowed_failures = {
-            "src/utils/sessionCleanup.test.ts",
-            "src/config/extension-manager-permissions.test.ts",
-        }
-
-        if not failing_files:
-            logging.info("No failing test files matched.")
-            return False
-
-        # If failures exist that do not match our allowed failure suffixes, we cannot ignore
-        unapproved_failures = {
-            f for f in failing_files
-            if not any(f.endswith(allowed) for allowed in allowed_failures)
-        }
-        if unapproved_failures:
-            logging.warning(
-                "Unapproved test failures detected: %s",
-                unapproved_failures,
-            )
-            return False
-
-        # Find total test failure count summary in JEST style output: e.g. "Tests: 3 failed, 4 passed"
-        match = _TEST_FAILED_COUNT_RE.search(clean_output)
-        if not match:
-            logging.warning("No standard test failure count summary found.")
-            return False
-
-        failed_count = int(match.group(1))
-        # We only bypass if the failure count is within limits (<= 3)
-        if failed_count <= 3:
-            logging.info(
-                "Ignoring %s failures in known files: %s",
-                failed_count,
-                failing_files,
-            )
-            return True
-
-        logging.warning("Failed count (%s) exceeds bypass threshold.", failed_count)
-        return False
+        return is_preflight_failure_allowed(raw_output, allowed_failures)

@@ -41,7 +41,7 @@ class GitHubClient:
             body: Body description markdown of the Pull Request.
 
         Returns:
-            The HTML URL of the successfully created Pull Request.
+            The PR number of the successfully created Pull Request as a string.
 
         Raises:
             GitHubClientError: If the HTTP request fails or token is missing.
@@ -81,16 +81,15 @@ class GitHubClient:
                     "Pull Request created successfully! PR Number: %s", pr_number
                 )
                 return pr_number
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode("utf-8") if e.fp else "No body content"
-            logging.error(
-                "Failed to create Pull Request. HTTP %s: %s",
-                e.code,
-                err_body
-            )
-            raise GitHubClientError(
-                f"GitHub API Error (HTTP {e.code}): {err_body}"
-            ) from e
+        except urllib.error.URLError as e:
+            if isinstance(e, urllib.error.HTTPError):
+                err_body = e.read().decode("utf-8") if e.fp else "No body content"
+                err_msg = f"HTTP {e.code}: {err_body}"
+            else:
+                err_msg = f"Network Error: {getattr(e, 'reason', e)}"
+
+            logging.error("Failed to create Pull Request: %s", err_msg)
+            raise GitHubClientError(f"GitHub API Error: {err_msg}") from e
         except Exception as e:
             logging.exception("Encountered unexpected error during PR creation.")
             raise GitHubClientError(

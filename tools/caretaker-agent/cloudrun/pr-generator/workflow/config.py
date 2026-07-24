@@ -38,7 +38,10 @@ class Config:
         self.model_name: str = os.environ.get("MODEL_NAME", "gemini-3.5-flash")
 
         # Global runtime settings
-        self.max_attempts: int = int(os.environ.get("MAX_ATTEMPTS", "5"))
+        try:
+            self.max_attempts: int = max(int(os.environ.get("MAX_ATTEMPTS", "5")), 1)
+        except ValueError:
+            self.max_attempts = 5
 
         # Workspace directory configuration
         self.tmp_dir: str = "/tmp"

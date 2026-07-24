@@ -7,6 +7,7 @@ and input sanitizers to prevent injection attacks and capture process output cle
 import logging
 import os
 import re
+import shlex
 import subprocess
 
 
@@ -75,13 +76,15 @@ class CommandExecutor:
         cmd: str | list[str],
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        timeout: float = 3600.0,
     ) -> str:
-        """Executes a system command or shell pipeline, capturing output and errors.
+        """Executes a command safely using direct argument lists without shell invocation.
 
         Args:
-            cmd: The shell command string or list of argument tokens to execute.
+            cmd: The command string or list of argument tokens to execute.
             cwd: The directory path in which to run the command. Defaults to CWD.
             env: Custom environment variable dictionary to pass to the process.
+            timeout: Maximum allowed duration in seconds. Defaults to 3600.0s.
 
         Returns:
             The trimmed stdout string from the command process.
@@ -90,18 +93,34 @@ class CommandExecutor:
             CommandExecutionError: If the process exits with a non-zero status.
         """
         active_cwd = cwd or os.getcwd()
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        exec_env = os.environ.copy()
+        if env:
+            exec_env.update(env)
+
+        # Convert string commands into argument tokens, parsing inline KEY=VAL env prefixes
+        if isinstance(cmd, str):
+            tokens = shlex.split(cmd)
+            args: list[str] = []
+            for token in tokens:
+                if "=" in token and not args:
+                    k, v = token.split("=", 1)
+                    exec_env[k] = v
+                else:
+                    args.append(token)
+        else:
+            args = list(cmd)
+
+        cmd_str = " ".join(args)
         logging.info("Executing command: %s (CWD: %s)", cmd_str, active_cwd)
 
-        use_shell = isinstance(cmd, str)
         try:
             result = subprocess.run(
-                cmd,
-                shell=use_shell,
-                cwd=cwd,
-                env=env,
+                args,
+                cwd=active_cwd,
+                env=exec_env,
                 capture_output=True,
                 text=True,
+                timeout=timeout,
                 check=False,
             )
 
@@ -114,10 +133,12 @@ class CommandExecutor:
                     cmd_str,
                     result.returncode,
                 )
-                logging.error("Stdout:\n%s", stdout_str)
-                logging.error("Stderr:\n%s", stderr_str)
+                if stdout_str:
+                    logging.error("Stdout:\n%s", stdout_str)
+                if stderr_str:
+                    logging.error("Stderr:\n%s", stderr_str)
                 raise CommandExecutionError(
-                    cmd=cmd,
+                    cmd=args,
                     returncode=result.returncode,
                     stdout=stdout_str,
                     stderr=stderr_str,
