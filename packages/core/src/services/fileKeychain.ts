@@ -27,8 +27,10 @@ export class FileKeychain implements Keychain {
   }
 
   private encrypt(text: string): string {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv, {
+      authTagLength: 16,
+    });
 
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -48,10 +50,19 @@ export class FileKeychain implements Keychain {
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
+    if (iv.length !== 12 && iv.length !== 16) {
+      throw new Error('Invalid IV length: Must be 12 or 16 bytes');
+    }
+
+    if (authTag.length !== 16) {
+      throw new Error('Invalid authentication tag length: Must be 16 bytes');
+    }
+
     const decipher = crypto.createDecipheriv(
       'aes-256-gcm',
       this.encryptionKey,
       iv,
+      { authTagLength: 16 },
     );
     decipher.setAuthTag(authTag);
 
@@ -67,29 +78,28 @@ export class FileKeychain implements Keychain {
   }
 
   private async loadData(): Promise<Record<string, Record<string, string>>> {
+    let data: string;
     try {
-      const data = await fs.readFile(this.tokenFilePath, 'utf-8');
+      data = await fs.readFile(this.tokenFilePath, 'utf-8');
+    } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'ENOENT') {
+        return {};
+      }
+      throw error;
+    }
+
+    try {
       const decrypted = this.decrypt(data);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(decrypted) as Record<string, Record<string, string>>;
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const err = error as NodeJS.ErrnoException & { message?: string };
-      if (err.code === 'ENOENT') {
-        return {};
-      }
-      if (
-        err.message?.includes('Invalid encrypted data format') ||
-        err.message?.includes(
-          'Unsupported state or unable to authenticate data',
-        )
-      ) {
-        throw new Error(
-          `Corrupted credentials file detected at: ${this.tokenFilePath}\n` +
-            `Please delete or rename this file to resolve the issue.`,
-        );
-      }
-      throw error;
+      console.error('Failed to decrypt or parse credentials:', error);
+      throw new Error(
+        `Corrupted credentials file detected at: ${this.tokenFilePath}\n` +
+          `Please delete or rename this file to resolve the issue.`,
+      );
     }
   }
 
