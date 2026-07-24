@@ -119,7 +119,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files to minimize token usage and simplify reviews.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files to minimize token usage and simplify reviews. WARNING: Do NOT use this tool if the file contains massive literal text sequences (like a 6000+ character string, large arrays, or inline base64 images), as LLMs are prone to corrupting or truncating such sequences during a full file rewrite. Use the '${EDIT_TOOL_NAME}' tool instead.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -129,7 +129,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         [WRITE_FILE_PARAM_CONTENT]: {
           description:
-            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'. WARNING: Do not use this tool to rewrite files containing massive literal text blocks (e.g., inline base64 images or >6000 character strings) because you may corrupt them. Use the replace tool instead.",
           type: 'string',
         },
       },

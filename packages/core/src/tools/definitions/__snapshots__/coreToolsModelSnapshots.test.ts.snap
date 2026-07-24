@@ -667,12 +667,12 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 {
   "description": "Writes content to a specified file in the local filesystem.
 
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response. WARNING: Do NOT use this tool if the file contains massive literal text sequences (like a 6000+ character string, large arrays, or inline base64 images), as LLMs are prone to corrupting or truncating such sequences during a full file rewrite. Use the 'replace' tool instead.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content.",
+        "description": "The content to write to the file. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide complete literal content. WARNING: Do not use this tool to rewrite files containing massive literal text blocks (e.g., inline base64 images or >6000 character strings) because you may corrupt them. Use the replace tool instead.",
         "type": "string",
       },
       "file_path": {
@@ -1439,12 +1439,12 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files to minimize token usage and simplify reviews.",
+  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files to minimize token usage and simplify reviews. WARNING: Do NOT use this tool if the file contains massive literal text sequences (like a 6000+ character string, large arrays, or inline base64 images), as LLMs are prone to corrupting or truncating such sequences during a full file rewrite. Use the 'replace' tool instead.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
       "content": {
-        "description": "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
+        "description": "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'. WARNING: Do not use this tool to rewrite files containing massive literal text blocks (e.g., inline base64 images or >6000 character strings) because you may corrupt them. Use the replace tool instead.",
         "type": "string",
       },
       "file_path": {
