@@ -68,6 +68,7 @@ export class SimulationHarness {
 
     this.env = new ContextEnvironmentImpl(
       () => mockLlmClient,
+      () => 'mock-model',
       'sim-prompt',
       'sim-session',
       mockTempDir,

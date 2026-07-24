@@ -116,6 +116,7 @@ export async function initializeContextManager(
 
   const env = new ContextEnvironmentImpl(
     () => config.getBaseLlmClient(),
+    () => config.getActiveModel(),
     config.getSessionId(),
     lastPromptId,
     logDir,

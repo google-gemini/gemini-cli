@@ -19,6 +19,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
 
   constructor(
     private readonly llmClientProvider: () => BaseLlmClient,
+    private readonly activeModel: () => string,
     readonly sessionId: string,
     readonly promptId: string,
     readonly traceDir: string,
@@ -36,5 +37,9 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
 
   get llmClient(): BaseLlmClient {
     return this.llmClientProvider();
+  }
+
+  get model(): string {
+    return this.activeModel();
   }
 }
