@@ -13,6 +13,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ProjectRegistry } from './projectRegistry.js';
 import { lock } from 'proper-lockfile';
+import {
+  normalizePath as normalizePathUtil,
+  resolveToRealPath,
+} from '../utils/paths.js';
 
 vi.mock('proper-lockfile');
 
@@ -23,11 +27,7 @@ describe('ProjectRegistry', () => {
   let baseDir2: string;
 
   function normalizePath(p: string): string {
-    let resolved = path.resolve(p);
-    if (os.platform() === 'win32') {
-      resolved = resolved.toLowerCase();
-    }
-    return resolved;
+    return normalizePathUtil(resolveToRealPath(p));
   }
 
   beforeEach(() => {
@@ -434,5 +434,21 @@ describe('ProjectRegistry', () => {
     const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
     expect(data.projects[normalizePath(projectPath)]).toBe('my-project');
     expect(Object.values(data.projects)).not.toContain('../../etc/passwd');
+  });
+
+  it('resolves symlinks to the same short ID', async () => {
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    const realDir = path.join(tempDir, 'real-project');
+    fs.mkdirSync(realDir);
+
+    const symlinkDir = path.join(tempDir, 'symlink-project');
+    fs.symlinkSync(realDir, symlinkDir, 'dir');
+
+    const id1 = await registry.getShortId(realDir);
+    const id2 = await registry.getShortId(symlinkDir);
+
+    expect(id1).toBe(id2);
   });
 });

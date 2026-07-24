@@ -33,6 +33,14 @@ export type ConnectionConfig = {
   stdio?: StdioConfig;
 };
 
+function splitWorkspacePaths(paths: string): string[] {
+  if (process.platform === 'win32') {
+    return paths.split(';');
+  } else {
+    return paths.split(/:(?!\/\/)/);
+  }
+}
+
 export function validateWorkspacePath(
   ideWorkspacePath: string | undefined,
   cwd: string,
@@ -51,8 +59,7 @@ export function validateWorkspacePath(
     };
   }
 
-  const ideWorkspacePaths = ideWorkspacePath
-    .split(path.delimiter)
+  const ideWorkspacePaths = splitWorkspacePaths(ideWorkspacePath)
     .map((p) => resolveToRealPath(p))
     .filter((e) => !!e);
   const realCwd = resolveToRealPath(cwd);
