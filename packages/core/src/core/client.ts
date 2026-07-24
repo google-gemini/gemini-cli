@@ -77,6 +77,8 @@ import {
 import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
+// Real-world time budget (ms) to protect against zero-latency event flooding
+const DEFAULT_TIME_BUDGET_MS = 5000;
 
 type BeforeAgentHookReturn =
   | {
@@ -617,6 +619,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     displayContent?: PartListUnion,
+    deadlineMs?: number,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -744,6 +747,12 @@ export class GeminiClient {
     // Re-initialize turn with fresh history
     turn = new Turn(this.getChat(), prompt_id);
 
+    const now = Date.now();
+    if (deadlineMs !== undefined && now > deadlineMs) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
     const loopResult = await this.loopDetector.turnStarted(signal);
     if (loopResult.count > 1) {
       yield { type: GeminiEventType.LoopDetected };
@@ -759,6 +768,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         displayContent,
+        deadlineMs,
       );
     }
 
@@ -810,6 +820,13 @@ export class GeminiClient {
     let loopDetectedAbort = false;
     let loopRecoverResult: { detail?: string } | undefined;
     for await (const event of resultStream) {
+      // Enforce time budget while iterating noisy/fast event streams
+      if (deadlineMs !== undefined && Date.now() > deadlineMs) {
+        yield { type: GeminiEventType.LoopDetected };
+        loopDetectedAbort = true;
+        break;
+      }
+
       const loopResult = this.loopDetector.addAndCheck(event);
       if (loopResult.count > 1) {
         yield { type: GeminiEventType.LoopDetected };
@@ -852,6 +869,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         displayContent,
+        deadlineMs,
       );
     }
     if (isError) {
@@ -899,6 +917,8 @@ export class GeminiClient {
             prompt_id,
             boundedTurns - 1,
             displayContent,
+            false,
+            deadlineMs,
           );
           return turn;
         }
@@ -914,6 +934,7 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
+    outerDeadlineMs?: number,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     this.config.resetTurn();
 
@@ -958,6 +979,12 @@ export class GeminiClient {
     }
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
+    // Establish deadline for this top-level call (or inherit from parent)
+    const deadline =
+      outerDeadlineMs !== undefined
+        ? outerDeadlineMs
+        : Date.now() + DEFAULT_TIME_BUDGET_MS;
+
     let turn = new Turn(this.getChat(), prompt_id);
     let continuationHandled = false;
 
@@ -968,6 +995,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         displayContent,
+        deadline,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -1030,6 +1058,7 @@ export class GeminiClient {
             boundedTurns - 1,
             displayContent,
             true, // stopHookActive: signal retry to AfterAgent hooks
+            deadline,
           );
         }
       }
@@ -1273,6 +1302,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     displayContent?: PartListUnion,
+    deadlineMs?: number,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
     this.loopDetector.clearDetection();
@@ -1294,6 +1324,8 @@ export class GeminiClient {
       prompt_id,
       boundedTurns - 1,
       displayContent,
+      false,
+      deadlineMs,
     );
   }
 }
