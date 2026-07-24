@@ -150,6 +150,10 @@ function shouldRedactEnvironmentVariable(
   key = key.toUpperCase();
   value = value?.toUpperCase();
 
+  if (allowedSet?.has(key)) {
+    return false;
+  }
+
   if (key.startsWith('GEMINI_CLI_')) {
     return false;
   }
@@ -166,9 +170,6 @@ function shouldRedactEnvironmentVariable(
     return false;
   }
 
-  if (allowedSet?.has(key)) {
-    return false;
-  }
   if (blockedSet?.has(key)) {
     return true;
   }

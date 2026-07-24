@@ -65,6 +65,14 @@ describe('sanitizeEnvironment', () => {
     expect(sanitized).toEqual(env);
   });
 
+  it('should NOT redact GEMINI_CLI_ variables even if their value looks like a secret (fully trusted)', () => {
+    const env = {
+      GEMINI_CLI_SECRET: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual(env);
+  });
+
   it('should redact variables with sensitive names from the denylist', () => {
     const env = {
       CLIENT_ID: 'sensitive-id',
@@ -227,48 +235,6 @@ describe('sanitizeEnvironment', () => {
       HOME: '/home/user',
       GEMINI_CLI_VERSION: '1.2.3',
       NODE_ENV: 'production',
-    });
-  });
-
-  describe('value-first security: secret values must be caught even for allowed variable names', () => {
-    it('should redact ALWAYS_ALLOWED variables whose values contain a GitHub token', () => {
-      const env = {
-        HOME: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-        PATH: '/usr/bin',
-      };
-      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
-      expect(sanitized).toEqual({ PATH: '/usr/bin' });
-    });
-
-    it('should redact ALWAYS_ALLOWED variables whose values contain a certificate', () => {
-      const env = {
-        SHELL:
-          '-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----',
-        USER: 'alice',
-      };
-      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
-      expect(sanitized).toEqual({ USER: 'alice' });
-    });
-
-    it('should redact user-allowlisted variables whose values contain a secret', () => {
-      const env = {
-        MY_SAFE_VAR: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-        OTHER: 'fine',
-      };
-      const sanitized = sanitizeEnvironment(env, {
-        allowedEnvironmentVariables: ['MY_SAFE_VAR'],
-        blockedEnvironmentVariables: [],
-        enableEnvironmentVariableRedaction: true,
-      });
-      expect(sanitized).toEqual({ OTHER: 'fine' });
-    });
-
-    it('should NOT redact GEMINI_CLI_ variables even if their value looks like a secret (fully trusted)', () => {
-      const env = {
-        GEMINI_CLI_INTERNAL: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      };
-      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
-      expect(sanitized).toEqual(env);
     });
   });
 

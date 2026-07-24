@@ -2,7 +2,8 @@ name: '🧠 Gemini CLI Bot: Brain'
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Every 24 hours
+    - cron: '0 0 * * *' # Nightly (Strategic Metrics)
+    - cron: '0 */4 * * *' # Every 4 hours (Issue Fixing)
   issue_comment:
     types: ['created']
   workflow_dispatch:
@@ -26,7 +27,16 @@ on:
       enable_prs:
         description: 'Enable PRs (automatically promote changes to PRs)'
         type: 'boolean'
-        default: false
+        default: true
+      mandate:
+        description: 'Mandate to execute'
+        type: 'choice'
+        options:
+          - 'auto'
+          - 'issue-fixer'
+          - 'metrics'
+          - 'interactive'
+        default: 'auto'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || github.ref }}'
@@ -36,11 +46,11 @@ jobs:
   reasoning:
     name: 'Brain (Reasoning Layer)'
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 60
     if: |
       github.repository == 'google-gemini/gemini-cli' && (
         github.event_name == 'schedule' ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive != 'true') ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive == 'true') ||
+        (github.event_name == 'workflow_dispatch') ||
         (github.event_name == 'issue_comment' && github.event.comment.user.login != 'gemini-cli[bot]' && contains(github.event.comment.body, '@gemini-cli') && contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association))
       )
     # The reasoning phase is strictly readonly.
@@ -48,45 +58,58 @@ jobs:
       contents: 'read'
       issues: 'read'
       actions: 'read'
+      pull-requests: 'read'
+    outputs:
+      sha: '${{ steps.get_sha.outputs.sha }}'
+      target_sha: '${{ steps.get_target_sha.outputs.sha }}'
+      patch_base_sha: '${{ steps.generate_patch.outputs.patch_base_sha }}'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
-      - name: 'Determine Checkout Ref'
-        id: 'determine_ref'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
-        run: |
-          REF="${{ github.ref }}"
-          if [ -n "$ISSUE_NUMBER" ]; then
-            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
-            if [ -n "$PR_HEAD" ]; then
-              REF="$PR_HEAD"
-            fi
-          fi
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-
-      - name: 'Checkout'
+      - name: 'Checkout Branch (Agent Code)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ steps.determine_ref.outputs.ref }}'
+          ref: '${{ github.ref }}'
+          path: 'agent-code'
           fetch-depth: 0
           persist-credentials: false
+
+      - name: 'Get Current SHA'
+        id: 'get_sha'
+        working-directory: 'agent-code'
+        run: 'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: 'agent-code/package-lock.json'
 
       - name: 'Install dependencies'
+        working-directory: 'agent-code'
         run: 'npm ci'
 
       - name: 'Build Gemini CLI'
+        working-directory: 'agent-code'
         run: 'npm run bundle'
+
+      - name: 'Checkout Main (Target Repo)'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: 'main'
+          path: 'repo-target'
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 'Get Target SHA'
+        id: 'get_target_sha'
+        working-directory: 'repo-target'
+        run: 'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"'
 
       - name: 'Download Previous State'
         env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           if [ "${{ github.event.inputs.clear_memory }}" = "true" ]; then
@@ -95,19 +118,19 @@ jobs:
           fi
 
           # Find the last successful run of this workflow
-          LAST_RUN_ID=$(gh run list --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          LAST_RUN_ID=$(gh run list -R "${{ github.repository }}" --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
 
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
 
             # Download brain memory to a temp dir so we can selectively restore only persistent state
             mkdir -p .temp_brain_data
-            gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
+            gh run download "$LAST_RUN_ID" -R "${{ github.repository }}" -n brain-data -D .temp_brain_data || echo "brain-data not found"
 
             # Restore only persistent memory files
-            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
-            mkdir -p tools/gemini-cli-bot/history/
-            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv tools/gemini-cli-bot/history/ 2>/dev/null || true
+            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md repo-target/tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
+            mkdir -p repo-target/tools/gemini-cli-bot/history/
+            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv repo-target/tools/gemini-cli-bot/history/ 2>/dev/null || true
             rm -rf .temp_brain_data
           else
             echo "No previous successful run found."
@@ -115,25 +138,62 @@ jobs:
 
       - name: 'Collect Current Metrics'
         env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        working-directory: 'agent-code'
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
       - name: 'Run Brain Phases'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
-          ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
+          GEMINI_CLI_HOME: '../agent-code/tools/gemini-cli-bot'
+          ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'true' }}"
           TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
+          # Enable detailed activity logging for debugging
+          GEMINI_TELEMETRY_ENABLED: 'true'
+          GEMINI_TELEMETRY_LOG_PROMPTS: 'true'
+          GEMINI_TELEMETRY_OUTFILE: 'brain-telemetry.json'
+          GEMINI_DEBUG_LOG_FILE: 'brain-debug.log'
+          GH_PAGER: ''
+        working-directory: 'repo-target'
         run: |
-          PROMPT_PATH="tools/gemini-cli-bot/brain/scheduled.md"
-          if [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
-            PROMPT_PATH="tools/gemini-cli-bot/brain/interactive.md"
-            export ENABLE_PRS="true"
+          # Determine intent and prompt
+          MANDATE_INPUT="${{ github.event.inputs.mandate || 'auto' }}"
+
+          # Initialize defaults
+          PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/scheduled.md"
+          MANDATE="Your specific mandate for this run: Implement surgical fixes for repository issues (issue-fixer skill)."
+
+          # Resolve Mandate and Prompt File
+          if [ "$MANDATE_INPUT" = "issue-fixer" ]; then
+             echo "Trigger: Manual Override (issue-fixer)"
+             MANDATE="Your specific mandate for this run: Implement surgical fixes for repository issues (issue-fixer skill)."
+          elif [ "$MANDATE_INPUT" = "metrics" ]; then
+             echo "Trigger: Manual Override (metrics)"
+             MANDATE="Your specific mandate for this run: Analyze repository metrics to identify bottlenecks and self-evolve (metrics skill)."
+          elif [ "$MANDATE_INPUT" = "interactive" ]; then
+             echo "Trigger: Manual Override (interactive)"
+             PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/interactive.md"
+             MANDATE="Your specific mandate for this run: Respond to the user request in <untrusted_context>."
+          elif [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
+            echo "Trigger: Issue/PR Comment or Interactive Dispatch"
+            PROMPT_FILE="../agent-code/tools/gemini-cli-bot/brain/interactive.md"
+            MANDATE="Your specific mandate for this run: Respond to the user request in <untrusted_context>."
+          elif [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then
+            echo "Trigger: Nightly Schedule (Metrics)"
+            MANDATE="Your specific mandate for this run: Analyze repository metrics to identify bottlenecks and self-evolve (metrics skill)."
+          else
+            echo "Trigger: Scheduled or Manual Dispatch (Default: Issue-Fixer)"
           fi
 
+          echo "Selected Prompt: $PROMPT_FILE"
+          echo "Selected Mandate: $MANDATE"
+
+          # Prepare Context if available
           touch trigger_context.md
           if [ -n "$TRIGGER_ISSUE_NUMBER" ]; then
             echo "<untrusted_context>" > trigger_context.md
@@ -151,16 +211,18 @@ jobs:
             echo "</untrusted_context>" >> trigger_context.md
           fi
 
-          if [ "$ENABLE_PRS" = "true" ]; then
-            echo "**System Directive**: PR creation is ENABLED for this run. You MUST activate the **'prs' skill** to stage your changes and generate a \`pr-description.md\` file if you are proposing fixes." >> trigger_context.md
-            echo "**CRITICAL System Directive**: You MUST ONLY propose and implement a **SINGLE** improvement or fix per run. Bundling unrelated changes (e.g., a documentation update and a script fix, or a metrics update and a logic fix) into a single PR is STRICTLY FORBIDDEN and will result in immediate rejection during the critique phase. If you identify multiple issues, pick the most impactful one and ignore the others for now." >> trigger_context.md
-          else
-            echo "**System Directive**: PR creation is DISABLED for this run. You MUST NOT stage files or attempt to create a PR description." >> trigger_context.md
+          # Pass PR Enablement Directive
+          PR_DIRECTIVE="PR creation is DISABLED. You MUST NOT stage files."
+          if [ "${{ github.event.inputs.enable_prs || 'true' }}" = "true" ] || [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_DIRECTIVE="PR creation is ENABLED. You MUST activate the 'prs' skill to stage changes if proposing fixes."
           fi
-          echo "" >> trigger_context.md
 
-          cat trigger_context.md "$PROMPT_PATH" > combined_prompt.md
-          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
+          # Assemble final prompt: Context + Base Brain + Specific Mandate
+          echo "System: $PR_DIRECTIVE" > combined_prompt.md
+          cat trigger_context.md "$PROMPT_FILE" >> combined_prompt.md
+          echo -e "\n\n# MANDATE FOR THIS RUN\n$MANDATE" >> combined_prompt.md
+
+          node ../agent-code/bundle/gemini.js --policy ../agent-code/tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat combined_prompt.md)"
 
           if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
             echo "Agent failed to respond. Generating fallback error message."
@@ -171,17 +233,20 @@ jobs:
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        working-directory: 'repo-target'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          GEMINI_CLI_HOME: 'tools/gemini-cli-bot'
+          GEMINI_CLI_HOME: '../agent-code/tools/gemini-cli-bot'
+          GH_PAGER: ''
         run: |
           if git diff --staged --quiet; then
              echo "No changes staged. Skipping critique."
              echo "[APPROVED]" > critique_result.txt
           else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
+             node ../agent-code/bundle/gemini.js --policy ../agent-code/tools/gemini-cli-bot/ci-policy.toml --prompt="$(cat ../agent-code/tools/gemini-cli-bot/.gemini/skills/critique/SKILL.md)" 2>&1 | tee critique_output.log
 
              if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
                echo "[APPROVED]" > critique_result.txt
@@ -192,29 +257,45 @@ jobs:
           fi
 
       - name: 'Generate Patch'
+        id: 'generate_patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
+        working-directory: 'repo-target'
         run: |
           touch bot-changes.patch
           touch pr-description.md
+          touch pr-labels.txt
+          touch branch-name.txt
+          touch issue-comment.md
+          touch pr-comment.md
+          echo "patch_base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -f critique_result.txt ] && grep -q "\[APPROVED\]" critique_result.txt && ! grep -q "\[REJECTED\]" critique_result.txt; then
              git diff --staged > bot-changes.patch
           else
              echo "Critique did not approve. Skipping patch generation."
           fi
 
+      - name: 'Stage Artifacts'
+        if: 'always()'
+        run: |
+          mkdir -p staged-artifacts/tools/gemini-cli-bot/history
+          cp repo-target/tools/gemini-cli-bot/lessons-learned.md staged-artifacts/tools/gemini-cli-bot/ 2>/dev/null || true
+          cp repo-target/tools/gemini-cli-bot/history/*.csv staged-artifacts/tools/gemini-cli-bot/history/ 2>/dev/null || true
+          cp repo-target/brain-telemetry.json staged-artifacts/ 2>/dev/null || true
+          cp repo-target/brain-debug.log staged-artifacts/ 2>/dev/null || true
+          cp repo-target/bot-changes.patch staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-description.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/branch-name.txt staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-comment.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-number.txt staged-artifacts/ 2>/dev/null || true
+          cp repo-target/issue-comment.md staged-artifacts/ 2>/dev/null || true
+          cp repo-target/pr-labels.txt staged-artifacts/ 2>/dev/null || true
+
       - name: 'Archive Brain Data'
+        if: 'always()'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'brain-data'
-          path: |
-            tools/gemini-cli-bot/lessons-learned.md
-            tools/gemini-cli-bot/history/*.csv
-            bot-changes.patch
-            pr-description.md
-            branch-name.txt
-            pr-comment.md
-            pr-number.txt
-            issue-comment.md
+          path: 'staged-artifacts/'
           retention-days: 90
 
   publish:
@@ -241,25 +322,10 @@ jobs:
           permission-pull-requests: 'write'
           permission-issues: 'write'
 
-      - name: 'Determine Checkout Ref'
-        id: 'determine_ref'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
-        run: |
-          REF="main"
-          if [ -n "$ISSUE_NUMBER" ]; then
-            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
-            if [ -n "$PR_HEAD" ]; then
-              REF="$PR_HEAD"
-            fi
-          fi
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ steps.determine_ref.outputs.ref }}'
+          ref: '${{ needs.reasoning.outputs.patch_base_sha || needs.reasoning.outputs.target_sha }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -282,27 +348,27 @@ jobs:
 
             BRANCH_NAME="bot/productivity-updates-$(date +'%Y%m%d%H%M%S')-${{ github.run_id }}"
             if [ -f "${{ runner.temp }}/brain-data/branch-name.txt" ]; then
-              BRANCH_NAME=$(cat "${{ runner.temp }}/brain-data/branch-name.txt")
+              FILE_BRANCH=$(cat "${{ runner.temp }}/brain-data/branch-name.txt" | tr -d '[:space:]')
+              if [ -n "$FILE_BRANCH" ] && [ "$FILE_BRANCH" != "bot/" ]; then
+                BRANCH_NAME="$FILE_BRANCH"
+              fi
             fi
 
             if [[ ! "$BRANCH_NAME" =~ ^bot/ ]]; then
-              echo "Error: Branch name '$BRANCH_NAME' does not start with 'bot/'. Safety abort."
-              exit 1
+              echo "Warning: Branch name '$BRANCH_NAME' does not start with 'bot/'. Prepending 'bot/' for safety."
+              BRANCH_NAME="bot/$BRANCH_NAME"
             fi
 
             git checkout -B "$BRANCH_NAME"
-            git apply "${{ runner.temp }}/brain-data/bot-changes.patch"
+            git apply --3way --ignore-whitespace "${{ runner.temp }}/brain-data/bot-changes.patch"
             git add .
 
+            PR_TITLE="🤖 Gemini Bot Maintenance Update"
             if [ -s "${{ runner.temp }}/brain-data/pr-description.md" ]; then
               git commit -F "${{ runner.temp }}/brain-data/pr-description.md"
-            else
-              git commit -m "🤖 Gemini Bot Productivity Optimizations"
-            fi
-
-            PR_TITLE="🤖 Gemini Bot Productivity Optimizations"
-            if [ -s "${{ runner.temp }}/brain-data/pr-description.md" ]; then
               PR_TITLE=$(head -n 1 "${{ runner.temp }}/brain-data/pr-description.md")
+            else
+              git commit -m "$PR_TITLE"
             fi
 
             if ! git push origin "$BRANCH_NAME" --force; then
@@ -324,6 +390,14 @@ jobs:
                 gh pr create --draft --title "$PR_TITLE" --body-file "${{ runner.temp }}/brain-data/pr-description.md" --head "$NEW_BRANCH_NAME" --base main || \
                 gh pr create --draft --title "🤖 Gemini Bot Productivity Optimizations" --body "Automated changes generated by Gemini CLI Bot." --head "$NEW_BRANCH_NAME" --base main
               fi
+            fi
+
+            if [ -s "${{ runner.temp }}/brain-data/pr-labels.txt" ]; then
+              while IFS= read -r label; do
+                if [ -n "$label" ]; then
+                  gh pr edit "$BRANCH_NAME" --add-label "$label" || true
+                fi
+              done < "${{ runner.temp }}/brain-data/pr-labels.txt"
             fi
           fi
 
