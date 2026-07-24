@@ -1,0 +1,6 @@
+interface:
+  display_name: "Gemini Cli"
+  short_description: "Repo-specific patterns and workflows for gemini-cli"
+  default_prompt: "Use the gemini-cli repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
