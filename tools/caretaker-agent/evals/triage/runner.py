@@ -6,6 +6,9 @@ checks categorization match, evaluates Workable Specs,
 and persists structured results under evals/triage/results/.
 
 Uses Git Worktrees for 100% thread-safe parallel checkouts across different commit SHAs.
+
+CLI Usage:
+  python3 -m evals.triage.runner --issues 1,2,3 --concurrency 5 --note "test run" --no-save
 """
 
 import os
