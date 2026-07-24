@@ -91,6 +91,9 @@ describe('github.ts', () => {
 
     it('should clone, fetch and checkout a repo', async () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockGit.revparse.mockResolvedValue(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
 
       await cloneFromGit(
         {
@@ -107,7 +110,93 @@ describe('github.ts', () => {
         ['--depth', '1'],
       );
       expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
-      expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+      expect(mockGit.revparse).toHaveBeenCalledWith(['FETCH_HEAD']);
+      expect(mockGit.checkout).toHaveBeenCalledWith(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
+      expect(mockGit.revparse).toHaveBeenCalledWith(['HEAD']);
+    });
+
+    it('should throw error if checked out SHA does not match target SHA', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      // First call for FETCH_HEAD, second call for HEAD
+      mockGit.revparse
+        .mockResolvedValueOnce('a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2')
+        .mockResolvedValueOnce('different_malicious_sha');
+
+      await expect(
+        cloneFromGit(
+          {
+            type: 'git',
+            source: 'https://github.com/owner/repo.git',
+            ref: 'v1.0.0',
+          },
+          '/dest',
+        ),
+      ).rejects.toThrow(
+        'Security verification failed: checked out SHA (different_malicious_sha) does not match the target SHA (a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2)',
+      );
+    });
+
+    it('should throw error if checked out SHA does not match pinned SHA', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockGit.revparse.mockResolvedValue(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
+
+      await expect(
+        cloneFromGit(
+          {
+            type: 'git',
+            source: 'https://github.com/owner/repo.git',
+            ref: 'e9f8d7c6b5a4e9f8d7c6b5a4e9f8d7c6b5a4e9f8', // Pinned SHA
+          },
+          '/dest',
+        ),
+      ).rejects.toThrow(
+        'Security verification failed: checked out SHA (a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2) does not match the requested pin (e9f8d7c6b5a4e9f8d7c6b5a4e9f8d7c6b5a4e9f8)',
+      );
+    });
+
+    it('should succeed if checked out SHA matches pinned SHA', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockGit.revparse.mockResolvedValue(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
+
+      await cloneFromGit(
+        {
+          type: 'git',
+          source: 'https://github.com/owner/repo.git',
+          ref: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', // Pinned SHA matching
+        },
+        '/dest',
+      );
+
+      expect(mockGit.checkout).toHaveBeenCalledWith(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
+    });
+
+    it('should succeed and skip SHA validation if ref is a hex-like branch/tag shorter than 40 characters', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockGit.revparse.mockResolvedValue(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
+
+      await cloneFromGit(
+        {
+          type: 'git',
+          source: 'https://github.com/owner/repo.git',
+          ref: 'deadbeef', // Looks like hex but is shorter than 40 chars (e.g. branch/tag)
+        },
+        '/dest',
+      );
+
+      // Verify that checkout was still called with the resolved target SHA from FETCH_HEAD
+      expect(mockGit.checkout).toHaveBeenCalledWith(
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      );
     });
 
     it('should throw if no remotes found', async () => {
