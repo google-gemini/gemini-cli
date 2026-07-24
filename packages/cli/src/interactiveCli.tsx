@@ -38,6 +38,7 @@ import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
 import { computeTerminalTitle } from './utils/windowTitle.js';
+import { shouldEnableMouseEvents } from './ui/utils/mouseEvents.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -70,7 +71,10 @@ export async function startInteractiveUI(
     config.getUseAlternateBuffer(),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer;
+  const mouseEventsEnabled = shouldEnableMouseEvents(
+    useAlternateBuffer,
+    settings.merged.ui.mouseEvents,
+  );
   if (mouseEventsEnabled) {
     enableMouseEvents();
     registerCleanup(() => {
