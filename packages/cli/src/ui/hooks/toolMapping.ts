@@ -11,6 +11,7 @@ import {
   debugLogger,
   CoreToolCallStatus,
   type SubagentActivityItem,
+  isFileDiff,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemToolGroup,
@@ -107,6 +108,16 @@ export function mapToDisplay(
       }
     }
 
+    const hasDensePayload = !!(
+      outputFile ||
+      (resultDisplay && isFileDiff(resultDisplay)) ||
+      confirmationDetails?.type === 'edit' ||
+      (typeof resultDisplay === 'object' &&
+        resultDisplay !== null &&
+        'summary' in resultDisplay &&
+        'payload' in resultDisplay)
+    );
+
     return {
       ...baseDisplayProperties,
       status: call.status,
@@ -125,6 +136,7 @@ export function mapToDisplay(
       subagentHistory: hasSubagentHistory(call)
         ? call.subagentHistory
         : undefined,
+      hasDensePayload,
     };
   });
 
