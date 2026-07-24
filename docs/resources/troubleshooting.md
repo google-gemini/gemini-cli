@@ -85,10 +85,28 @@ topics on:
     - If you installed `gemini` globally, check that your `npm` global binary
       directory is in your `PATH`. You can update Gemini CLI using the command
       `npm install -g @google/gemini-cli@latest`.
+    - On Windows, restart your terminal after installing so that `PATH` changes
+      take effect, and confirm that your npm global directory (typically
+      `%AppData%\npm`) is on your `PATH`. You can find the directory by running
+      `npm config get prefix`.
     - If you are running `gemini` from source, ensure you are using the correct
       command to invoke it (for example, `node packages/cli/dist/index.js ...`).
       To update Gemini CLI, pull the latest changes from the repository, and
       then rebuild using the command `npm run build`.
+
+- **Error:
+  `gemini.ps1 cannot be loaded because running scripts is disabled on this system`
+  (Windows PowerShell).**
+
+  - **Cause:** PowerShell's default `Restricted` execution policy prevents the
+    `gemini.ps1` shim that npm creates from running.
+  - **Solution:** Allow locally created scripts to run for your user account:
+    ```powershell
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+    ```
+    Then restart PowerShell and run `gemini` again. Alternatively, run Gemini
+    CLI with `npx @google/gemini-cli`, which does not depend on the PowerShell
+    shim.
 
 - **Error: `MODULE_NOT_FOUND` or import errors.**
 
