@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { customDeepMerge } from './deepMerge.js';
+import { customDeepMerge, type MergeableObject } from './deepMerge.js';
 import { MergeStrategy } from '../config/settingsSchema.js';
 
 describe('customDeepMerge', () => {
@@ -236,5 +236,48 @@ describe('customDeepMerge', () => {
     const getMergeStrategy = () => undefined;
     const result = customDeepMerge(getMergeStrategy, target, source);
     expect(result).toEqual({ a: 1 });
+  });
+
+  it('should handle self-referential objects without stack overflow', () => {
+    const circular: MergeableObject = { a: 1 };
+    circular['self'] = circular;
+    const getMergeStrategy = () => undefined;
+
+    expect(() =>
+      customDeepMerge(getMergeStrategy, { existing: true }, circular),
+    ).not.toThrow();
+
+    const result = customDeepMerge(getMergeStrategy, {}, circular);
+    expect(result['a']).toBe(1);
+    // The cycle is reproduced inside the cloned structure rather than pointing
+    // back to the original source object (a fully independent clone).
+    expect(result['self']).toBe(result);
+    expect(result['self']).not.toBe(circular);
+  });
+
+  it('should handle indirect (mutual) circular references', () => {
+    const a: MergeableObject = { name: 'a' };
+    const b: MergeableObject = { name: 'b' };
+    a['b'] = b;
+    b['a'] = a; // a -> b -> a
+    const getMergeStrategy = () => undefined;
+
+    const result = customDeepMerge(getMergeStrategy, {}, a);
+    // The mutual cycle is reproduced within the clone (a -> b -> a), not shared
+    // with the original source objects.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['b']['a']).toBe(result);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['b']['a']).not.toBe(a);
+  });
+
+  it('should still merge shared but non-circular references normally', () => {
+    // The same nested object referenced twice is a DAG, not a cycle, and must
+    // still be merged (the cycle guard must not short-circuit it).
+    const shared = { x: 1 };
+    const source = { first: shared, second: shared };
+    const getMergeStrategy = () => undefined;
+    const result = customDeepMerge(getMergeStrategy, {}, source);
+    expect(result).toEqual({ first: { x: 1 }, second: { x: 1 } });
   });
 });
