@@ -277,6 +277,7 @@ class LocalSubagentProtocol implements AgentProtocol {
           this._makeEvent('tool_request', {
             requestId: callId,
             name,
+            status: 'executing',
             args,
           }),
         ];
@@ -292,6 +293,7 @@ class LocalSubagentProtocol implements AgentProtocol {
           this._makeEvent('tool_response', {
             requestId,
             name,
+            status: 'succeeded',
             content: [{ type: 'text', text: output }],
           }),
         ];

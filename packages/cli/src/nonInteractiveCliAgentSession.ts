@@ -193,6 +193,7 @@ export async function runNonInteractive({
 
     let errorToHandle: unknown | undefined;
     let scheduler: Scheduler | undefined;
+    let session: LegacyAgentSession | undefined;
     let abortSession = () => {};
     try {
       consolePatcher.patch();
@@ -296,7 +297,7 @@ export async function runNonInteractive({
       }
 
       // Create LegacyAgentSession — owns the agentic loop
-      const session = new LegacyAgentSession({
+      session = new LegacyAgentSession({
         client: geminiClient,
         scheduler,
         config,
@@ -305,7 +306,7 @@ export async function runNonInteractive({
 
       // Wire Ctrl+C to session abort
       abortSession = () => {
-        void session.abort();
+        void session?.abort();
       };
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
@@ -640,6 +641,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      session?.dispose();
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);

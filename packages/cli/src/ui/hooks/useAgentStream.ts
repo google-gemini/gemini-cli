@@ -224,14 +224,17 @@ export const useAgentStream = ({
               if (tc.callId !== event.requestId) return tc;
 
               const legacyState = event._meta?.legacyState;
-              const evtStatus = legacyState?.status;
-
               let status = tc.status;
-              if (evtStatus === 'executing')
+              if (event.status === 'executing')
                 status = CoreToolCallStatus.Executing;
-              else if (evtStatus === 'error') status = CoreToolCallStatus.Error;
-              else if (evtStatus === 'success')
+              else if (event.status === 'pending_input')
+                status = CoreToolCallStatus.AwaitingApproval;
+              else if (event.status === 'errored')
+                status = CoreToolCallStatus.Error;
+              else if (event.status === 'succeeded')
                 status = CoreToolCallStatus.Success;
+              else if (event.status === 'aborted')
+                status = CoreToolCallStatus.Cancelled;
 
               const display = event.display?.result;
               const liveOutput =
@@ -272,11 +275,16 @@ export const useAgentStream = ({
               const resultDisplay =
                 displayContentToString(display) ?? tc.resultDisplay;
 
+              let status = CoreToolCallStatus.Success;
+              if (event.status === 'errored') status = CoreToolCallStatus.Error;
+              else if (event.status === 'aborted')
+                status = CoreToolCallStatus.Cancelled;
+              else if (event.status === 'succeeded')
+                status = CoreToolCallStatus.Success;
+
               return {
                 ...tc,
-                status: event.isError
-                  ? CoreToolCallStatus.Error
-                  : CoreToolCallStatus.Success,
+                status,
                 display: event.display
                   ? { ...tc.display, ...event.display }
                   : tc.display,

@@ -235,6 +235,7 @@ export function translateEvent(
         makeEvent('tool_request', state, {
           requestId: event.value.callId,
           name: event.value.name,
+          status: 'pending',
           args: event.value.args,
           display: event.value.display,
         }),
@@ -257,6 +258,7 @@ export function translateEvent(
         makeEvent('tool_response', state, {
           requestId: event.value.callId,
           name: state.pendingToolNames.get(event.value.callId) ?? 'unknown',
+          status: event.value.error ? 'errored' : 'succeeded',
           content: event.value.error
             ? [{ type: 'text', text: event.value.error.message }]
             : geminiPartsToContentParts(event.value.responseParts),
