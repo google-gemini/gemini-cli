@@ -55,3 +55,10 @@ body:
     attributes:
       label: 'Anything else we need to know?'
       description: 'Add any other context about the problem here.'
+
+  - type: 'checkboxes'
+    id: 'contribute'
+    attributes:
+      label: 'Contribution'
+      options:
+        - label: 'I want to contribute to this issue if it is approved.'
