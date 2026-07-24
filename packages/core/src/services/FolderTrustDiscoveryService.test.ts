@@ -174,4 +174,198 @@ describe('FolderTrustDiscoveryService', () => {
       'This project contains custom agents.',
     );
   });
+
+  it('should discover hooks and skills in an extension root using default directories', async () => {
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'default-extension',
+        version: '1.0.0',
+      }),
+    );
+
+    const skillsDir = path.join(tempDir, 'skills');
+    await fs.mkdir(path.join(skillsDir, 'test-skill'), { recursive: true });
+    await fs.writeFile(path.join(skillsDir, 'test-skill', 'SKILL.md'), 'body');
+
+    const hooksDir = path.join(tempDir, 'hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'default-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.skills).toContain('test-skill');
+    expect(results.hooks).toContain('default-hook');
+  });
+
+  it('should discover hooks and skills in an extension root using custom directories', async () => {
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'custom-extension',
+        version: '1.0.0',
+        hooksDir: 'claude-hooks',
+        skillsDir: 'claude-skills',
+      }),
+    );
+
+    const skillsDir = path.join(tempDir, 'claude-skills');
+    await fs.mkdir(path.join(skillsDir, 'test-skill'), { recursive: true });
+    await fs.writeFile(path.join(skillsDir, 'test-skill', 'SKILL.md'), 'body');
+
+    const hooksDir = path.join(tempDir, 'claude-hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'custom-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.skills).toContain('test-skill');
+    expect(results.hooks).toContain('custom-hook');
+  });
+
+  it('should preserve hooks discovered from settings and extension manifests', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [{ command: 'project-hook' }],
+        },
+        // Keep settings parsing noticeably slower than extension hook discovery
+        // to consistently exercise concurrent merge behavior.
+        metadata: 'x'.repeat(5_000_000),
+      }),
+    );
+
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'combined-hooks-extension',
+        version: '1.0.0',
+      }),
+    );
+    const hooksDir = path.join(tempDir, 'hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'extension-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.hooks).toContain('project-hook');
+    expect(results.hooks).toContain('extension-hook');
+  });
+
+  it('should deduplicate hooks discovered from settings and extension manifests', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [{ command: 'shared-hook' }],
+        },
+      }),
+    );
+
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'deduped-hooks-extension',
+        version: '1.0.0',
+      }),
+    );
+    const hooksDir = path.join(tempDir, 'hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'shared-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const discoveryService = FolderTrustDiscoveryService as unknown as {
+      [key: string]: unknown;
+    };
+    const originalDiscoverExtensionHooks = (
+      discoveryService['discoverExtensionHooks'] as (
+        ...args: unknown[]
+      ) => Promise<void>
+    ).bind(FolderTrustDiscoveryService);
+
+    Object.defineProperty(discoveryService, 'discoverExtensionHooks', {
+      configurable: true,
+      value: async (...args: unknown[]) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return originalDiscoverExtensionHooks(...args);
+      },
+    });
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    Object.defineProperty(discoveryService, 'discoverExtensionHooks', {
+      configurable: true,
+      value: originalDiscoverExtensionHooks,
+    });
+
+    expect(results.hooks).toEqual(['shared-hook']);
+  });
 });
