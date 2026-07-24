@@ -152,14 +152,16 @@ describe('activate', () => {
 
     await activate(context);
 
-    const pushed = context.subscriptions as Array<{
-      command?: string;
-      kind?: string;
-    }>;
-    expect(pushed.some((d) => d.command === 'gemini.diff.accept')).toBe(true);
-    expect(
-      pushed.some((d) => d.kind === 'onDidChangeWorkspaceFolders'),
-    ).toBe(true);
+    // Some mocked VS Code APIs return `undefined` by default in the test
+    // environment, so `context.subscriptions` can contain `undefined` entries.
+    // Guard property access with optional chaining to avoid a TypeError.
+    const pushed = context.subscriptions as Array<
+      { command?: string; kind?: string } | undefined
+    >;
+    expect(pushed.some((d) => d?.command === 'gemini.diff.accept')).toBe(true);
+    expect(pushed.some((d) => d?.kind === 'onDidChangeWorkspaceFolders')).toBe(
+      true,
+    );
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
