@@ -13,6 +13,9 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_MODEL,
+  DEFAULT_GEMINI_3_6_FLASH_MODEL,
+  DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -309,6 +312,26 @@ export function buildAvailableModels(
     {
       value: DEFAULT_GEMINI_FLASH_MODEL,
       title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+    },
+    // Always surface gemini-3.5-flash as a selectable option so users can
+    // manually choose it even when it is not yet their default Flash model.
+    // Deduplicate against DEFAULT_GEMINI_FLASH_MODEL in case the feature flag
+    // has already promoted 3.5-flash to the default.
+    ...(DEFAULT_GEMINI_3_5_FLASH_MODEL !== DEFAULT_GEMINI_FLASH_MODEL
+      ? [
+          {
+            value: DEFAULT_GEMINI_3_5_FLASH_MODEL,
+            title: getDisplayString(DEFAULT_GEMINI_3_5_FLASH_MODEL),
+          },
+        ]
+      : []),
+    {
+      value: DEFAULT_GEMINI_3_6_FLASH_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_3_6_FLASH_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_3_5_FLASH_LITE_MODEL),
     },
     {
       value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
