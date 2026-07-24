@@ -17,7 +17,7 @@ import datetime
 from pathlib import Path
 from os.path import abspath, dirname
 from typing import Any, Dict, List, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 
@@ -163,7 +163,7 @@ def run_suite(
 
     results = []
 
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+    with ProcessPoolExecutor(max_workers=concurrency) as executor:
         future_to_issue = {
             executor.submit(eval_issue, item, worker_id=i % concurrency): item 
             for i, item in enumerate(issues)

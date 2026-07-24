@@ -46,7 +46,7 @@ def load_issues(filter_issues: Optional[List[int]] = None) -> List[Dict[str, Any
 
 def prep_payload(item: Dict[str, Any]) -> Dict[str, Any]:
     """Preprocesses and wraps title & body to simulate production Ingestion Layer safety encapsulation."""
-    raw_body = item.get("issue_body", "")
+    raw_body = item.get("issue_body") or ""
     escaped_body = raw_body.replace("</untrusted_context>", "\\</untrusted_context>")
     sanitized_body = f"<untrusted_context>\n{escaped_body}\n</untrusted_context>"
 
