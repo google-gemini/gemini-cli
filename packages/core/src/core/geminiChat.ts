@@ -69,6 +69,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { delay } from '../utils/delay.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -630,7 +631,7 @@ export class GeminiChat {
                   error: errorType,
                   model,
                 });
-                await new Promise((res) => setTimeout(res, delayMs));
+                await delay(delayMs, signal);
                 continue;
               }
             }
@@ -723,7 +724,25 @@ export class GeminiChat {
     // Track initial active model to detect fallback changes
     const initialActiveModel = this.context.config.getActiveModel();
 
+    // The @google/genai SDK adds abort listeners to the signal passed in
+    // GenerateContentConfig but never removes them. When the same signal is
+    // reused across retry attempts this causes listener accumulation that
+    // triggers MaxListenersExceededWarning. Create a child AbortController
+    // per API call so the SDK's listeners are isolated to short-lived
+    // signals. Manually link the parent signal to propagate cancellation
+    // while maintaining Node.js >=20.0.0 compatibility.
     const apiCall = async () => {
+      const callAbortController = new AbortController();
+      let onAbort: (() => void) | undefined;
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          callAbortController.abort();
+        } else {
+          onAbort = () => callAbortController.abort();
+          abortSignal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+      const callSignal = callAbortController.signal;
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
       const hasAccessToPreview =
@@ -767,7 +786,7 @@ export class GeminiChat {
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: callSignal,
       };
 
       let contentsToUse: Content[] =
@@ -861,15 +880,33 @@ export class GeminiChat {
 
       const finalContents = stripToolCallIdPrefixes(contentsToUse);
 
-      return this.context.config.getContentGenerator().generateContentStream(
-        {
-          model: modelToUse,
-          contents: finalContents,
-          config,
-        },
-        prompt_id,
-        role,
-      );
+      const streamGenerator = await this.context.config
+        .getContentGenerator()
+        .generateContentStream(
+          {
+            model: modelToUse,
+            contents: finalContents,
+            config,
+          },
+          prompt_id,
+          role,
+        );
+
+      // Wrap the generator to abort the child controller after the stream
+      // is fully consumed. This cleans up the SDK's abort listeners from
+      // the child signal, preventing listener accumulation across retries.
+      async function* wrappedStream(): AsyncGenerator<GenerateContentResponse> {
+        try {
+          yield* streamGenerator;
+        } finally {
+          if (onAbort && abortSignal) {
+            abortSignal.removeEventListener('abort', onAbort);
+          }
+          callAbortController.abort();
+        }
+      }
+
+      return wrappedStream();
     };
 
     const onPersistent429Callback = async (
