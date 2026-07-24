@@ -18,6 +18,10 @@ import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
 
+function stripTrailingPeriodsFromUrls(message: string): string {
+  return message.replace(/(https?:\/\/\S+)\.(?=\s|$)/g, '$1');
+}
+
 export async function validateAuthMethodWithSettings(
   authType: AuthType,
   settings: LoadedSettings,
@@ -153,7 +157,8 @@ export const useAuthCommand = (
           // Show the error message directly without "Failed to login" prefix
           onAuthError(getErrorMessage(e));
         } else {
-          onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
+          const message = stripTrailingPeriodsFromUrls(getErrorMessage(e));
+          onAuthError(`Failed to sign in. Message: ${message}`);
         }
       }
     })();

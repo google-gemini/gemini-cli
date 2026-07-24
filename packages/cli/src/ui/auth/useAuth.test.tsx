@@ -315,6 +315,23 @@ describe('useAuth', () => {
       expect(result.current.authState).toBe(AuthState.Updating);
     });
 
+    it('should remove a trailing period from URLs in sign-in errors', async () => {
+      const { result } = await renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await act(async () => {
+        deferredRefreshAuth.reject(
+          new Error('Migrate to https://antigravity.google.'),
+        );
+      });
+
+      expect(result.current.authError).toBe(
+        'Failed to sign in. Message: Migrate to https://antigravity.google',
+      );
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
+
     it('should handle ProjectIdRequiredError without "Failed to login" prefix', async () => {
       const projectIdError = new ProjectIdRequiredError();
       const { result } = await renderHook(() =>
