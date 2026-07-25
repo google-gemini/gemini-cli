@@ -1,0 +1,8 @@
+# CODEOWNERS - TITULARIDAD INMUTABLE
+# Folio: SC360-2026-07-03-085034-AMP
+# Licencia: ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-0005
+
+* @alfreddlove83
+*.md @alfreddlove83
+.devcontainer/ @alfreddlove83
+.github/ @alfreddlove83
