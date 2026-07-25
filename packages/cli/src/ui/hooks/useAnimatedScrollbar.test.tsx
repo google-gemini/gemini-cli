@@ -25,33 +25,35 @@ describe('useAnimatedScrollbar', () => {
     vi.useRealTimers();
   });
 
-  it('should not increment debugNumAnimatedComponents when not focused', () => {
-    render(<TestComponent isFocused={false} />);
+  it('should not increment debugNumAnimatedComponents when not focused', async () => {
+    await render(<TestComponent isFocused={false} />);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
 
-  it('should not increment debugNumAnimatedComponents on initial mount even if focused', () => {
-    render(<TestComponent isFocused={true} />);
+  it('should not increment debugNumAnimatedComponents on initial mount even if focused', async () => {
+    await render(<TestComponent isFocused={true} />);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
 
-  it('should increment debugNumAnimatedComponents when becoming focused', () => {
-    const { rerender } = render(<TestComponent isFocused={false} />);
+  it('should increment debugNumAnimatedComponents when becoming focused', async () => {
+    const { rerender } = await render(<TestComponent isFocused={false} />);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
     rerender(<TestComponent isFocused={true} />);
     expect(debugState.debugNumAnimatedComponents).toBe(1);
   });
 
-  it('should decrement debugNumAnimatedComponents when becoming unfocused', () => {
-    const { rerender } = render(<TestComponent isFocused={false} />);
+  it('should decrement debugNumAnimatedComponents when becoming unfocused', async () => {
+    const { rerender } = await render(<TestComponent isFocused={false} />);
     rerender(<TestComponent isFocused={true} />);
     expect(debugState.debugNumAnimatedComponents).toBe(1);
     rerender(<TestComponent isFocused={false} />);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
 
-  it('should decrement debugNumAnimatedComponents on unmount', () => {
-    const { rerender, unmount } = render(<TestComponent isFocused={false} />);
+  it('should decrement debugNumAnimatedComponents on unmount', async () => {
+    const { rerender, unmount } = await render(
+      <TestComponent isFocused={false} />,
+    );
     rerender(<TestComponent isFocused={true} />);
     expect(debugState.debugNumAnimatedComponents).toBe(1);
     unmount();
@@ -59,7 +61,7 @@ describe('useAnimatedScrollbar', () => {
   });
 
   it('should decrement debugNumAnimatedComponents after animation finishes', async () => {
-    const { rerender } = render(<TestComponent isFocused={false} />);
+    const { rerender } = await render(<TestComponent isFocused={false} />);
     rerender(<TestComponent isFocused={true} />);
     expect(debugState.debugNumAnimatedComponents).toBe(1);
 
@@ -80,7 +82,7 @@ describe('useAnimatedScrollbar', () => {
     let currentTime = 1000;
     dateSpy.mockImplementation(() => currentTime);
 
-    const { rerender } = render(<TestComponent isFocused={false} />);
+    const { rerender } = await render(<TestComponent isFocused={false} />);
 
     // Start animation. This captures start = 1000.
     rerender(<TestComponent isFocused={true} />);

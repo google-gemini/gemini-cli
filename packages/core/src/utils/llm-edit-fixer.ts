@@ -10,6 +10,7 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
 import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
 const GENERATE_JSON_TIMEOUT_MS = 40000; // 40 seconds
@@ -102,11 +103,18 @@ async function generateJsonWithTimeout<T>(
       ...params,
       // The operation will be aborted if either the original signal is aborted
       // or if the timeout is reached.
-      abortSignal: AbortSignal.any([
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      abortSignal: (
+        AbortSignal as unknown as {
+          any: (signals: Array<AbortSignal | undefined>) => AbortSignal;
+        }
+      ).any([
         params.abortSignal ?? new AbortController().signal,
         timeoutSignal,
       ]),
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as T;
   } catch (err) {
     debugLogger.debug(
@@ -180,6 +188,7 @@ export async function FixLLMEditWithInstruction(
       systemInstruction: EDIT_SYS_PROMPT,
       promptId,
       maxAttempts: 1,
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     },
     GENERATE_JSON_TIMEOUT_MS,
   );

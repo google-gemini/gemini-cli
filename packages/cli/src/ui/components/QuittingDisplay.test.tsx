@@ -12,6 +12,15 @@ import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('../contexts/SettingsContext.js', () => ({
+  useSettings: () => ({
+    merged: {
+      ui: {
+        inlineThinkingMode: 'off',
+      },
+    },
+  }),
+}));
 vi.mock('../hooks/useTerminalSize.js');
 vi.mock('./HistoryItemDisplay.js', async () => {
   const { Text } = await vi.importActual('ink');
@@ -30,15 +39,16 @@ describe('QuittingDisplay', () => {
     mockUseTerminalSize.mockReturnValue({ rows: 20, columns: 80 });
   });
 
-  it('renders nothing when no quitting messages', () => {
+  it('renders nothing when no quitting messages', async () => {
     mockUseUIState.mockReturnValue({
       quittingMessages: null,
     } as unknown as UIState);
-    const { lastFrame } = render(<QuittingDisplay />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, unmount } = await render(<QuittingDisplay />);
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders quitting messages', () => {
+  it('renders quitting messages', async () => {
     const mockMessages = [
       { id: '1', type: 'user', content: 'Goodbye' },
       { id: '2', type: 'model', content: 'See you later' },
@@ -47,8 +57,9 @@ describe('QuittingDisplay', () => {
       quittingMessages: mockMessages,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<QuittingDisplay />);
+    const { lastFrame, unmount } = await render(<QuittingDisplay />);
     expect(lastFrame()).toContain('Goodbye');
     expect(lastFrame()).toContain('See you later');
+    unmount();
   });
 });

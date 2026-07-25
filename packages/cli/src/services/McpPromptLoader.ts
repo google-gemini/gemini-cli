@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  getErrorMessage,
+  getMCPServerPrompts,
+  type Config,
+} from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
@@ -44,6 +47,7 @@ export class McpPromptLoader implements ICommandLoader {
           name: commandName,
           description: prompt.description || `Invoke prompt ${prompt.name}`,
           kind: CommandKind.MCP_PROMPT,
+          mcpServerName: serverName,
           autoExecute: !prompt.arguments || prompt.arguments.length === 0,
           subCommands: [
             {
@@ -154,16 +158,15 @@ export class McpPromptLoader implements ICommandLoader {
               return [];
             }
             const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
-            let promptInputs =
+            const parsedInputs =
               indexOfFirstSpace === 0
                 ? {}
                 : this.parseArgs(
                     invocation.raw.substring(indexOfFirstSpace),
                     prompt.arguments,
                   );
-            if (promptInputs instanceof Error) {
-              promptInputs = {};
-            }
+            const promptInputs =
+              parsedInputs instanceof Error ? {} : parsedInputs;
 
             const providedArgNames = Object.keys(promptInputs);
             const unusedArguments =

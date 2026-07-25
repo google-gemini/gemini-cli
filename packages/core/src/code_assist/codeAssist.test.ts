@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,6 +15,7 @@ import {
 } from './codeAssist.js';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
+import { ModelMappingContentGenerator } from '../core/modelMappingContentGenerator.js';
 import { UserTierId } from './types.js';
 
 // Mock dependencies
@@ -22,11 +23,15 @@ vi.mock('./oauth2.js');
 vi.mock('./setup.js');
 vi.mock('./server.js');
 vi.mock('../core/loggingContentGenerator.js');
+vi.mock('../core/modelMappingContentGenerator.js');
 
 const mockedGetOauthClient = vi.mocked(getOauthClient);
 const mockedSetupUser = vi.mocked(setupUser);
 const MockedCodeAssistServer = vi.mocked(CodeAssistServer);
 const MockedLoggingContentGenerator = vi.mocked(LoggingContentGenerator);
+const MockedModelMappingContentGenerator = vi.mocked(
+  ModelMappingContentGenerator,
+);
 
 describe('codeAssist', () => {
   beforeEach(() => {
@@ -43,6 +48,8 @@ describe('codeAssist', () => {
     const mockUserData = {
       projectId: 'test-project',
       userTier: UserTierId.FREE,
+      userTierName: 'free-tier-name',
+      hasOnboardedPreviously: false,
     };
 
     it('should create a server for LOGIN_WITH_GOOGLE', async () => {
@@ -62,7 +69,8 @@ describe('codeAssist', () => {
       );
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
-        mockValidationHandler,
+        mockConfig,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -70,7 +78,9 @@ describe('codeAssist', () => {
         httpOptions,
         'session-123',
         'free-tier',
+        'free-tier-name',
         undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -91,7 +101,8 @@ describe('codeAssist', () => {
       );
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
-        mockValidationHandler,
+        mockConfig,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -99,7 +110,9 @@ describe('codeAssist', () => {
         httpOptions,
         undefined, // No session ID
         'free-tier',
+        'free-tier-name',
         undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -169,6 +182,48 @@ describe('codeAssist', () => {
 
       const server = getCodeAssistServer(mockConfig);
       expect(server).toBeUndefined();
+    });
+
+    it('should unwrap and return the server if it is wrapped in a ModelMappingContentGenerator', () => {
+      const mockServer = new MockedCodeAssistServer({} as never, '', {});
+      const mockMapper = new MockedModelMappingContentGenerator(
+        {} as never,
+        {},
+      );
+      vi.spyOn(mockMapper, 'getWrapped').mockReturnValue(mockServer);
+
+      const mockConfig = {
+        getContentGenerator: () => mockMapper,
+      } as unknown as Config;
+
+      const server = getCodeAssistServer(mockConfig);
+      expect(server).toBe(mockServer);
+      expect(mockMapper.getWrapped).toHaveBeenCalled();
+    });
+
+    it('should recursively unwrap multiple layers of LoggingContentGenerator and ModelMappingContentGenerator', () => {
+      const mockServer = new MockedCodeAssistServer({} as never, '', {});
+      const mockLogger = new MockedLoggingContentGenerator(
+        {} as never,
+        {} as never,
+      );
+      const mockMapper = new MockedModelMappingContentGenerator(
+        {} as never,
+        {},
+      );
+
+      // Mapper wraps Logger wraps Server
+      vi.spyOn(mockMapper, 'getWrapped').mockReturnValue(mockLogger);
+      vi.spyOn(mockLogger, 'getWrapped').mockReturnValue(mockServer);
+
+      const mockConfig = {
+        getContentGenerator: () => mockMapper,
+      } as unknown as Config;
+
+      const server = getCodeAssistServer(mockConfig);
+      expect(server).toBe(mockServer);
+      expect(mockMapper.getWrapped).toHaveBeenCalled();
+      expect(mockLogger.getWrapped).toHaveBeenCalled();
     });
   });
 });

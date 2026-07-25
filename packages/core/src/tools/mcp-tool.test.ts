@@ -5,12 +5,22 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+} from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import type { ToolResult } from './tools.js';
-import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  formatMcpToolName,
+} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import {
@@ -43,23 +53,23 @@ const createSdkResponse = (
 
 describe('generateValidName', () => {
   it('should return a valid name for a simple function', () => {
-    expect(generateValidName('myFunction')).toBe('myFunction');
+    expect(generateValidName('myFunction')).toBe('mcp_myFunction');
   });
 
   it('should replace invalid characters with underscores', () => {
     expect(generateValidName('invalid-name with spaces')).toBe(
-      'invalid-name_with_spaces',
+      'mcp_invalid-name_with_spaces',
     );
   });
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'xxxxxxxxxxxxxxxxxxxxxxxxxxxx___xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'mcp_xxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
   it('should handle names with only invalid characters', () => {
-    expect(generateValidName('!@#$%^&*()')).toBe('__________');
+    expect(generateValidName('!@#$%^&*()')).toBe('mcp___________');
   });
 
   it.each([
@@ -72,6 +82,34 @@ describe('generateValidName', () => {
       expect(generateValidName('a'.repeat(length)).length).toBe(expected);
     },
   );
+});
+
+describe('formatMcpToolName', () => {
+  it('should format a fully qualified name', () => {
+    expect(formatMcpToolName('github', 'list_repos')).toBe(
+      'mcp_github_list_repos',
+    );
+  });
+
+  it('should handle global wildcards', () => {
+    expect(formatMcpToolName('*')).toBe('mcp_*');
+  });
+
+  it('should handle tool-level wildcards', () => {
+    expect(formatMcpToolName('github', '*')).toBe('mcp_github_*');
+  });
+
+  it('should handle both server and tool wildcards', () => {
+    expect(formatMcpToolName('*', '*')).toBe('mcp_*');
+  });
+
+  it('should handle undefined toolName as a tool-level wildcard', () => {
+    expect(formatMcpToolName('github')).toBe('mcp_github_*');
+  });
+
+  it('should format explicitly global wildcard with specific tool', () => {
+    expect(formatMcpToolName('*', 'list_repos')).toBe('mcp_*_list_repos');
+  });
 });
 
 describe('DiscoveredMCPTool', () => {
@@ -110,12 +148,71 @@ describe('DiscoveredMCPTool', () => {
 
   describe('constructor', () => {
     it('should set properties correctly', () => {
-      expect(tool.name).toBe(serverToolName);
-      expect(tool.schema.name).toBe(serverToolName);
+      expect(tool.name).toBe('mcp_mock-mcp-server_actual-server-tool-name');
+      expect(tool.schema.name).toBe(
+        'mcp_mock-mcp-server_actual-server-tool-name',
+      );
       expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toBeUndefined();
-      expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
+      expect(tool.schema.parametersJsonSchema).toEqual({
+        ...inputSchema,
+        properties: {
+          ...(inputSchema['properties'] as Record<string, unknown>),
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
+        },
+      });
       expect(tool.serverToolName).toBe(serverToolName);
+    });
+  });
+
+  describe('getDisplayTitle and getExplanation', () => {
+    const commandTool = new DiscoveredMCPTool(
+      mockCallableToolInstance,
+      serverName,
+      serverToolName,
+      baseDescription,
+      {
+        type: 'object',
+        properties: { command: { type: 'string' }, path: { type: 'string' } },
+        required: ['command'],
+      },
+      createMockMessageBus(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+
+    it('should return command as title if it exists', () => {
+      const invocation = commandTool.build({ command: 'ls -la' });
+      expect(invocation.getDisplayTitle?.()).toBe('ls -la');
+    });
+
+    it('should return displayName if command does not exist', () => {
+      const invocation = tool.build({ param: 'testValue' });
+      expect(invocation.getDisplayTitle?.()).toBe(tool.displayName);
+    });
+
+    it('should return stringified json for getExplanation', () => {
+      const params = { command: 'ls -la', path: '/' };
+      const invocation = commandTool.build(params);
+      expect(invocation.getExplanation?.()).toBe(safeJsonStringify(params));
+    });
+
+    it('should truncate and summarize long json payloads for getExplanation', () => {
+      const longString = 'a'.repeat(600);
+      const params = { command: 'echo', text: longString, other: 'value' };
+      const invocation = commandTool.build(params);
+      const explanation = invocation.getExplanation?.() ?? '';
+      expect(explanation).toMatch(
+        /^\[Payload omitted due to length with parameters: command, text, other\]$/,
+      );
     });
   });
 
@@ -143,9 +240,9 @@ describe('DiscoveredMCPTool', () => {
       mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
 
       const invocation = tool.build(params);
-      const toolResult: ToolResult = await invocation.execute(
-        new AbortController().signal,
-      );
+      const toolResult: ToolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockCallTool).toHaveBeenCalledWith([
         { name: serverToolName, args: params },
@@ -155,7 +252,9 @@ describe('DiscoveredMCPTool', () => {
         mockToolSuccessResultObject,
       );
       expect(toolResult.llmContent).toEqual([
-        { text: stringifiedResponseContent },
+        {
+          text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+        },
       ]);
       expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
     });
@@ -165,9 +264,9 @@ describe('DiscoveredMCPTool', () => {
       const mockMcpToolResponsePartsEmpty: Part[] = [];
       mockCallTool.mockResolvedValue(mockMcpToolResponsePartsEmpty);
       const invocation = tool.build(params);
-      const toolResult: ToolResult = await invocation.execute(
-        new AbortController().signal,
-      );
+      const toolResult: ToolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.returnDisplay).toBe('```json\n[]\n```');
       expect(toolResult.llmContent).toEqual([
         { text: '[Error: Could not parse tool response]' },
@@ -181,7 +280,7 @@ describe('DiscoveredMCPTool', () => {
 
       const invocation = tool.build(params);
       await expect(
-        invocation.execute(new AbortController().signal),
+        invocation.execute({ abortSignal: new AbortController().signal }),
       ).rejects.toThrow(expectedError);
     });
 
@@ -198,6 +297,7 @@ describe('DiscoveredMCPTool', () => {
           baseDescription,
           inputSchema,
           createMockMessageBus(),
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -226,8 +326,9 @@ describe('DiscoveredMCPTool', () => {
           functionCall,
         )} with response: ${safeJsonStringify(mockMcpToolResponseParts)}`;
         const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
-
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
         expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
         expect(result.llmContent).toBe(expectedErrorMessage);
         expect(result.returnDisplay).toContain(
@@ -244,6 +345,7 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         createMockMessageBus(),
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -271,8 +373,9 @@ describe('DiscoveredMCPTool', () => {
         functionCall,
       )} with response: ${safeJsonStringify(mockMcpToolResponseParts)}`;
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
       expect(result.llmContent).toBe(expectedErrorMessage);
       expect(result.returnDisplay).toContain(
@@ -293,6 +396,7 @@ describe('DiscoveredMCPTool', () => {
           baseDescription,
           inputSchema,
           createMockMessageBus(),
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -326,15 +430,16 @@ describe('DiscoveredMCPTool', () => {
         mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
 
         const invocation = tool.build(params);
-        const toolResult = await invocation.execute(
-          new AbortController().signal,
-        );
-
+        const toolResult = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
         const stringifiedResponseContent = JSON.stringify(
           mockToolSuccessResultObject,
         );
         expect(toolResult.llmContent).toEqual([
-          { text: stringifiedResponseContent },
+          {
+            text: `<untrusted_context>\n${stringifiedResponseContent}\n</untrusted_context>`,
+          },
         ]);
         expect(toolResult.returnDisplay).toBe(stringifiedResponseContent);
       },
@@ -351,10 +456,15 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       // 1. Assert that the llmContent sent to the scheduler is a clean Part array.
-      expect(toolResult.llmContent).toEqual([{ text: successMessage }]);
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: `<untrusted_context>\n${successMessage}\n</untrusted_context>`,
+        },
+      ]);
 
       // 2. Assert that the display output is the simple text message.
       expect(toolResult.returnDisplay).toBe(successMessage);
@@ -380,8 +490,9 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
         {
           text: `[Tool '${serverToolName}' provided the following audio data with mime-type: audio/mp3]`,
@@ -412,8 +523,9 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
         {
           text: 'Resource Link: My Resource at file:///path/to/thing',
@@ -442,10 +554,13 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
-        { text: 'This is the text content.' },
+        {
+          text: '<untrusted_context>\nThis is the text content.\n</untrusted_context>',
+        },
       ]);
       expect(toolResult.returnDisplay).toBe('This is the text content.');
     });
@@ -468,8 +583,9 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
         {
           text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
@@ -503,12 +619,13 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
-        { text: 'First part.' },
+        { text: '<untrusted_context>\nFirst part.\n</untrusted_context>' },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
         {
           inlineData: {
@@ -516,7 +633,7 @@ describe('DiscoveredMCPTool', () => {
             data: 'BASE64_IMAGE_DATA',
           },
         },
-        { text: 'Second part.' },
+        { text: '<untrusted_context>\nSecond part.\n</untrusted_context>' },
       ]);
       expect(toolResult.returnDisplay).toBe(
         'First part.\n[Image: image/jpeg]\nSecond part.',
@@ -535,9 +652,12 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
-      expect(toolResult.llmContent).toEqual([{ text: 'Valid part.' }]);
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(toolResult.llmContent).toEqual([
+        { text: '<untrusted_context>\nValid part.\n</untrusted_context>' },
+      ]);
       expect(toolResult.returnDisplay).toBe(
         'Valid part.\n[Unknown content type: future_block]',
       );
@@ -573,16 +693,21 @@ describe('DiscoveredMCPTool', () => {
       );
 
       const invocation = tool.build(params);
-      const toolResult = await invocation.execute(new AbortController().signal);
-
+      const toolResult = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(toolResult.llmContent).toEqual([
-        { text: 'Here is a resource.' },
+        {
+          text: '<untrusted_context>\nHere is a resource.\n</untrusted_context>',
+        },
         {
           text: 'Resource Link: My Resource at file:///path/to/resource',
         },
-        { text: 'Embedded text content.' },
         {
-          text: `[Tool '${serverToolName}' provided the following image data with mime-type: image/jpeg]`,
+          text: '<untrusted_context>\nEmbedded text content.\n</untrusted_context>',
+        },
+        {
+          text: "[Tool 'actual-server-tool-name' provided the following image data with mime-type: image/jpeg]",
         },
         {
           inlineData: {
@@ -607,9 +732,9 @@ describe('DiscoveredMCPTool', () => {
 
         const invocation = tool.build(params);
 
-        await expect(invocation.execute(controller.signal)).rejects.toThrow(
-          'Tool call aborted',
-        );
+        await expect(
+          invocation.execute({ abortSignal: controller.signal }),
+        ).rejects.toThrow('Tool call aborted');
 
         // Tool should not be called if signal is already aborted
         expect(mockCallTool).not.toHaveBeenCalled();
@@ -639,7 +764,7 @@ describe('DiscoveredMCPTool', () => {
         );
 
         const invocation = tool.build(params);
-        const promise = invocation.execute(controller.signal);
+        const promise = invocation.execute({ abortSignal: controller.signal });
 
         // Abort after a short delay to simulate cancellation during execution
         setTimeout(() => controller.abort(), ABORT_DELAY);
@@ -658,9 +783,13 @@ describe('DiscoveredMCPTool', () => {
         );
 
         const invocation = tool.build(params);
-        const result = await invocation.execute(controller.signal);
+        const result = await invocation.execute({
+          abortSignal: controller.signal,
+        });
 
-        expect(result.llmContent).toEqual([{ text: 'Success' }]);
+        expect(result.llmContent).toEqual([
+          { text: '<untrusted_context>\nSuccess\n</untrusted_context>' },
+        ]);
         expect(result.returnDisplay).toBe('Success');
         expect(mockCallTool).toHaveBeenCalledWith([
           { name: serverToolName, args: params },
@@ -676,7 +805,9 @@ describe('DiscoveredMCPTool', () => {
         );
 
         const invocation = tool.build(params);
-        const result = await invocation.execute(controller.signal);
+        const result = await invocation.execute({
+          abortSignal: controller.signal,
+        });
 
         expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
         expect(result.returnDisplay).toContain(
@@ -693,9 +824,9 @@ describe('DiscoveredMCPTool', () => {
 
         const invocation = tool.build(params);
 
-        await expect(invocation.execute(controller.signal)).rejects.toThrow(
-          expectedError,
-        );
+        await expect(
+          invocation.execute({ abortSignal: controller.signal }),
+        ).rejects.toThrow(expectedError);
       });
 
       it.each([
@@ -729,12 +860,12 @@ describe('DiscoveredMCPTool', () => {
 
           if (expectError) {
             try {
-              await invocation.execute(controller.signal);
-            } catch (_error) {
+              await invocation.execute({ abortSignal: controller.signal });
+            } catch {
               // Expected error
             }
           } else {
-            await invocation.execute(controller.signal);
+            await invocation.execute({ abortSignal: controller.signal });
           }
 
           // Verify cleanup by aborting after execution
@@ -755,6 +886,7 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         createMockMessageBus(),
         true,
+        undefined,
         undefined,
         { isTrustedFolder: () => true } as any,
         undefined,
@@ -901,6 +1033,7 @@ describe('DiscoveredMCPTool', () => {
         bus,
         trust,
         undefined,
+        undefined,
         mockConfig(isTrusted) as any,
         undefined,
         undefined,
@@ -925,6 +1058,112 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+
+    it('should wrap text output in <untrusted_context> tags', async () => {
+      const params = { param: 'testValue' };
+      const invocation = tool.build(params);
+
+      const mockMcpToolResponseParts: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: { content: [{ type: 'text', text: 'Hello from MCP' }] },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValueOnce(mockMcpToolResponseParts);
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toEqual([
+        { text: '<untrusted_context>\nHello from MCP\n</untrusted_context>' },
+      ]);
+    });
+  });
+});
+
+describe('MCP Tool Naming Regression Fixes', () => {
+  describe('generateValidName', () => {
+    it('should replace spaces with underscores', () => {
+      expect(generateValidName('My Tool')).toBe('mcp_My_Tool');
+    });
+
+    it('should allow colons', () => {
+      expect(generateValidName('namespace:tool')).toBe('mcp_namespace:tool');
+    });
+
+    it('should ensure name starts with a letter or underscore', () => {
+      expect(generateValidName('valid_tool_name')).toBe('mcp_valid_tool_name');
+      expect(generateValidName('alsoValid-123.name')).toBe(
+        'mcp_alsoValid-123.name',
+      );
+      expect(generateValidName('another:valid:name')).toBe(
+        'mcp_another:valid:name',
+      );
+    });
+
+    it('should handle very long names by truncating in the middle', () => {
+      const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result).toMatch(/^mcp_a{26}\.\.\.b{30}$/);
+    });
+
+    it('should handle very long names starting with a digit', () => {
+      const longName = '1' + 'a'.repeat(80);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result.startsWith('mcp_1')).toBe(true);
+    });
+  });
+
+  describe('DiscoveredMCPTool qualified names', () => {
+    it('should generate a valid qualified name even with spaces in server name', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        'My Server',
+        'my-tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('mcp_My_Server_my-tool');
+    });
+
+    it('should handle long server and tool names in qualified name', () => {
+      const serverName = 'a'.repeat(40);
+      const toolName = 'b'.repeat(40);
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        serverName,
+        toolName,
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn.length).toBeLessThanOrEqual(63);
+      expect(qn).toContain('...');
+    });
+
+    it('should handle server names starting with digits', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        '123-server',
+        'tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('mcp_123-server_tool');
     });
   });
 });

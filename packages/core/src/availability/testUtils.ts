@@ -21,10 +21,11 @@ export function createAvailabilityServiceMock(
     markHealthy: vi.fn(),
     markRetryOncePerTurn: vi.fn(),
     consumeStickyAttempt: vi.fn(),
-    snapshot: vi.fn(),
+    snapshot: vi.fn().mockReturnValue({ available: true }),
     resetTurn: vi.fn(),
     selectFirstAvailable: vi.fn().mockReturnValue(selection),
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return service as unknown as ModelAvailabilityService;
 }

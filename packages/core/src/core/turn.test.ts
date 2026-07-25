@@ -5,15 +5,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type {
-  ServerGeminiToolCallRequestEvent,
-  ServerGeminiErrorEvent,
+import {
+  Turn,
+  GeminiEventType,
+  type ServerGeminiToolCallRequestEvent,
+  type ServerGeminiErrorEvent,
 } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
 import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
-import type { GeminiChat } from './geminiChat.js';
-import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import {
+  InvalidStreamError,
+  StreamEventType,
+  type GeminiChat,
+} from './geminiChat.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -43,6 +47,12 @@ describe('Turn', () => {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
+    context: { config: { isContextManagementEnabled: () => boolean } };
+    loopContext?: {
+      toolRegistry: {
+        getTool: (name: string) => unknown;
+      };
+    };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -52,6 +62,16 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
       maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
+      context: {
+        config: {
+          isContextManagementEnabled: () => false,
+        },
+      },
+      loopContext: {
+        toolRegistry: {
+          getTool: vi.fn().mockReturnValue(undefined),
+        },
+      },
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);
@@ -102,6 +122,9 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
+        'main',
+        undefined,
+        undefined,
       );
 
       expect(events).toEqual([
@@ -149,7 +172,7 @@ describe('Turn', () => {
       expect(event1.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event1.value).toEqual(
         expect.objectContaining({
-          callId: 'fc1',
+          callId: 'tool1__fc1',
           name: 'tool1',
           args: { arg1: 'val1' },
           isClientInitiated: false,
@@ -167,7 +190,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^tool2-\d{13}-\w{10,}$/),
+        expect.stringMatching(/^tool2__tool2_\d{13}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);
@@ -258,7 +281,10 @@ describe('Turn', () => {
       const errorEvent = events[0] as ServerGeminiErrorEvent;
       expect(errorEvent.type).toBe(GeminiEventType.Error);
       expect(errorEvent.value).toEqual({
-        error: { message: 'API Error', status: undefined },
+        error: {
+          message: 'API Error',
+          status: undefined,
+        },
       });
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).toHaveBeenCalledWith(
@@ -300,22 +326,22 @@ describe('Turn', () => {
       // Assertions for each specific tool call event
       const event1 = events[0] as ServerGeminiToolCallRequestEvent;
       expect(event1.value).toMatchObject({
-        callId: 'fc1',
-        name: 'undefined_tool_name',
+        callId: 'generic_tool__fc1',
+        name: 'generic_tool',
         args: { arg1: 'val1' },
       });
 
       const event2 = events[1] as ServerGeminiToolCallRequestEvent;
       expect(event2.value).toMatchObject({
-        callId: 'fc2',
+        callId: 'tool2__fc2',
         name: 'tool2',
         args: {},
       });
 
       const event3 = events[2] as ServerGeminiToolCallRequestEvent;
       expect(event3.value).toMatchObject({
-        callId: 'fc3',
-        name: 'undefined_tool_name',
+        callId: 'generic_tool__fc3',
+        name: 'generic_tool',
         args: {},
       });
     });
@@ -832,7 +858,7 @@ describe('Turn', () => {
       expect(toolCallEvent).toMatchObject({
         type: GeminiEventType.ToolCallRequest,
         value: expect.objectContaining({
-          callId: 'fc1',
+          callId: 'ReadFile__fc1',
           name: 'ReadFile',
           args: { path: 'file.txt' },
         }),

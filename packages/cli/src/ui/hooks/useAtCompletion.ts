@@ -4,12 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
-import type { Config, FileSearch } from '@google/gemini-cli-core';
-import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
-import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import * as path from 'node:path';
+import {
+  FileSearchFactory,
+  escapePath,
+  FileDiscoveryService,
+  type Config,
+  type FileSearch,
+} from '@google/gemini-cli-core';
+import {
+  MAX_SUGGESTIONS_TO_SHOW,
+  type Suggestion,
+} from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
 
@@ -161,12 +169,14 @@ async function searchResourceCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (candidate: ResourceSuggestionCandidate) => candidate.searchKey,
   });
-  const results = await fzf.find(normalizedPattern, {
-    limit: MAX_SUGGESTIONS_TO_SHOW * 3,
-  });
-  return results.map(
-    (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const results: Array<{ item: ResourceSuggestionCandidate }> = await fzf.find(
+    normalizedPattern,
+    {
+      limit: MAX_SUGGESTIONS_TO_SHOW * 3,
+    },
   );
+  return results.map((result) => result.item.suggestion);
 }
 
 async function searchAgentCandidates(
@@ -183,10 +193,14 @@ async function searchAgentCandidates(
   const fzf = new AsyncFzf(candidates, {
     selector: (s: Suggestion) => s.label,
   });
-  const results = await fzf.find(normalizedPattern, {
-    limit: MAX_SUGGESTIONS_TO_SHOW,
-  });
-  return results.map((r: { item: Suggestion }) => r.item);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const results: Array<{ item: Suggestion }> = await fzf.find(
+    normalizedPattern,
+    {
+      limit: MAX_SUGGESTIONS_TO_SHOW,
+    },
+  );
+  return results.map((r) => r.item);
 }
 
 export function useAtCompletion(props: UseAtCompletionProps): void {
@@ -199,7 +213,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions,
   } = props;
   const [state, dispatch] = useReducer(atCompletionReducer, initialState);
-  const fileSearch = useRef<FileSearch | null>(null);
+  const fileSearchMap = useRef<Map<string, FileSearch>>(new Map());
+  const initEpoch = useRef(0);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -211,9 +226,49 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions(state.isLoading);
   }, [state.isLoading, setIsLoadingSuggestions]);
 
-  useEffect(() => {
+  const disposeFileSearchers = useCallback(async () => {
+    const searchers = [...fileSearchMap.current.values()];
+    fileSearchMap.current.clear();
+    initEpoch.current += 1;
+
+    const closePromises: Array<Promise<void>> = [];
+    for (const searcher of searchers) {
+      if (searcher.close) {
+        closePromises.push(searcher.close());
+      }
+    }
+    await Promise.all(closePromises);
+  }, []);
+
+  const resetFileSearchState = useCallback(() => {
+    void disposeFileSearchers();
     dispatch({ type: 'RESET' });
-  }, [cwd, config]);
+  }, [disposeFileSearchers]);
+
+  useEffect(() => {
+    resetFileSearchState();
+  }, [cwd, config, resetFileSearchState]);
+
+  useEffect(() => {
+    const workspaceContext = config?.getWorkspaceContext?.();
+    if (!workspaceContext) return;
+
+    const unsubscribe =
+      workspaceContext.onDirectoriesChanged(resetFileSearchState);
+
+    return unsubscribe;
+  }, [config, resetFileSearchState]);
+
+  useEffect(
+    () => () => {
+      void disposeFileSearchers();
+      searchAbortController.current?.abort();
+      if (slowSearchTimer.current) {
+        clearTimeout(slowSearchTimer.current);
+      }
+    },
+    [disposeFileSearchers],
+  );
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
@@ -246,37 +301,65 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   // The "Worker" that performs async operations based on status.
   useEffect(() => {
     const initialize = async () => {
+      const currentEpoch = initEpoch.current;
       try {
-        const searcher = FileSearchFactory.create({
-          projectRoot: cwd,
-          ignoreDirs: [],
-          useGitignore:
-            config?.getFileFilteringOptions()?.respectGitIgnore ?? true,
-          useGeminiignore:
-            config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
-          cache: true,
-          cacheTtl: 30, // 30 seconds
-          enableRecursiveFileSearch:
-            config?.getEnableRecursiveFileSearch() ?? true,
-          enableFuzzySearch:
-            config?.getFileFilteringEnableFuzzySearch() ?? true,
-          maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
-        });
-        await searcher.initialize();
-        fileSearch.current = searcher;
+        const directories = config
+          ?.getWorkspaceContext?.()
+          ?.getDirectories() ?? [cwd];
+
+        const initPromises: Array<Promise<void>> = [];
+
+        for (const dir of directories) {
+          if (fileSearchMap.current.has(dir)) continue;
+
+          const searcher = FileSearchFactory.create({
+            projectRoot: dir,
+            ignoreDirs: [],
+            fileDiscoveryService: new FileDiscoveryService(
+              dir,
+              config?.getFileFilteringOptions(),
+            ),
+            cache: true,
+            cacheTtl: 30,
+            enableFileWatcher:
+              config?.getFileFilteringOptions()?.enableFileWatcher ?? false,
+            enableRecursiveFileSearch:
+              config?.getEnableRecursiveFileSearch() ?? true,
+            enableFuzzySearch:
+              config?.getFileFilteringEnableFuzzySearch() ?? true,
+            maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
+          });
+
+          initPromises.push(
+            searcher.initialize().then(() => {
+              if (initEpoch.current === currentEpoch) {
+                fileSearchMap.current.set(dir, searcher);
+              }
+            }),
+          );
+        }
+
+        await Promise.all(initPromises);
+
+        if (initEpoch.current !== currentEpoch) return;
+
         dispatch({ type: 'INITIALIZE_SUCCESS' });
         if (state.pattern !== null) {
           dispatch({ type: 'SEARCH', payload: state.pattern });
         }
-      } catch (_) {
-        dispatch({ type: 'ERROR' });
+      } catch {
+        if (initEpoch.current === currentEpoch) {
+          dispatch({ type: 'ERROR' });
+        }
       }
     };
 
     const search = async () => {
-      if (!fileSearch.current || state.pattern === null) {
+      if (fileSearchMap.current.size === 0 || state.pattern === null) {
         return;
       }
+
+      const currentPattern = state.pattern;
 
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
@@ -306,10 +389,26 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       })();
 
       try {
-        const results = await fileSearch.current.search(state.pattern, {
-          signal: controller.signal,
-          maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
-        });
+        const directories = config
+          ?.getWorkspaceContext?.()
+          ?.getDirectories() ?? [cwd];
+        const cwdRealpath = directories[0];
+
+        const allSearchPromises = [...fileSearchMap.current.entries()].map(
+          async ([dir, searcher]): Promise<string[]> => {
+            const results = await searcher.search(currentPattern, {
+              signal: controller.signal,
+              maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
+            });
+
+            if (dir !== cwdRealpath) {
+              return results.map((p: string) => path.join(dir, p));
+            }
+            return results;
+          },
+        );
+
+        const allResults = await Promise.all(allSearchPromises);
 
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
@@ -319,7 +418,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           return;
         }
 
-        const fileSuggestions = results.map((p) => ({
+        const mergedResults = allResults.flat();
+
+        const fileSuggestions = mergedResults.map((p) => ({
           label: p,
           value: escapePath(p),
         }));
@@ -327,7 +428,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         const resourceCandidates = buildResourceCandidates(config);
         const resourceSuggestions = (
           await searchResourceCandidates(
-            state.pattern ?? '',
+            currentPattern ?? '',
             resourceCandidates,
           )
         ).map((suggestion) => ({
@@ -338,9 +439,14 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
         const agentCandidates = buildAgentCandidates(config);
         const agentSuggestions = await searchAgentCandidates(
-          state.pattern ?? '',
+          currentPattern ?? '',
           agentCandidates,
         );
+
+        // Re-check after resource/agent searches which are not abort-aware
+        if (controller.signal.aborted) {
+          return;
+        }
 
         const combinedSuggestions = [
           ...agentSuggestions,

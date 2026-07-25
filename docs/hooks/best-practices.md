@@ -167,6 +167,8 @@ try {
 Run hook scripts manually with sample JSON input to verify they behave as
 expected before hooking them up to the CLI.
 
+**macOS/Linux**
+
 ```bash
 # Create test input
 cat > test-input.json << 'EOF'
@@ -187,7 +189,30 @@ cat test-input.json | .gemini/hooks/my-hook.sh
 
 # Check exit code
 echo "Exit code: $?"
+```
 
+**Windows (PowerShell)**
+
+```powershell
+# Create test input
+@"
+{
+  "session_id": "test-123",
+  "cwd": "C:\\temp\\test",
+  "hook_event_name": "BeforeTool",
+  "tool_name": "write_file",
+  "tool_input": {
+    "file_path": "test.txt",
+    "content": "Test content"
+  }
+}
+"@ | Out-File -FilePath test-input.json -Encoding utf8
+
+# Test the hook
+Get-Content test-input.json | .\.gemini\hooks\my-hook.ps1
+
+# Check exit code
+Write-Host "Exit code: $LASTEXITCODE"
 ```
 
 ### Check exit codes
@@ -333,13 +358,17 @@ tool_name=$(echo "$input" | jq -r '.tool_name')
 
 ### Make scripts executable
 
-Always make hook scripts executable:
+Always make hook scripts executable on macOS/Linux:
 
 ```bash
 chmod +x .gemini/hooks/*.sh
 chmod +x .gemini/hooks/*.js
 
 ```
+
+**Windows Note**: On Windows, PowerShell scripts (`.ps1`) don't use `chmod`, but
+you may need to ensure your execution policy allows them to run (for example,
+`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`).
 
 ### Version control
 
@@ -372,12 +401,12 @@ git add .gemini/settings.json
 Understanding where hooks come from and what they can do is critical for secure
 usage.
 
-| Hook Source                   | Description                                                                                                                |
-| :---------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| **System**                    | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
-| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                         |
-| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
-| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
+| Hook Source                   | Description                                                                                                                       |
+| :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| **System**                    | Configured by system administrators (for example, `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
+| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                                |
+| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                                   |
+| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                              |
 
 #### Project Hook Security
 
@@ -393,9 +422,10 @@ When you open a project with hooks defined in `.gemini/settings.json`:
 5. **Trust**: The hook is marked as "trusted" for this project.
 
 > **Modification detection**: If the `command` string of a project hook is
-> changed (e.g., by a `git pull`), its identity changes. Gemini CLI will treat
-> it as a **new, untrusted hook** and warn you again. This prevents malicious
-> actors from silently swapping a verified command for a malicious one.
+> changed (for example, by a `git pull`), its identity changes. Gemini CLI will
+> treat it as a **new, untrusted hook** and warn you again. This prevents
+> malicious actors from silently swapping a verified command for a malicious
+> one.
 
 ### Risks
 
@@ -412,17 +442,17 @@ When you open a project with hooks defined in `.gemini/settings.json`:
 **Verify the source** of any project hooks or extensions before enabling them.
 
 - For open-source projects, a quick review of the hook scripts is recommended.
-- For extensions, ensure you trust the author or publisher (e.g., verified
-  publishers, well-known community members).
+- For extensions, ensure you trust the author or publisher (for example,
+  verified publishers, well-known community members).
 - Be cautious with obfuscated scripts or compiled binaries from unknown sources.
 
 #### Sanitize environment
 
-Hooks inherit the environment of the Gemini CLI process, which may include
-sensitive API keys. Gemini CLI provides a
-[redaction system](/docs/get-started/configuration#environment-variable-redaction)
-that automatically filters variables matching sensitive patterns (e.g., `KEY`,
-`TOKEN`).
+Hooks inherit the environment of Gemini CLI process, which may include sensitive
+API keys. Gemini CLI provides a
+[redaction system](../reference/configuration.md#environment-variable-redaction)
+that automatically filters variables matching sensitive patterns (for example,
+`KEY`, `TOKEN`).
 
 > **Disabled by Default**: Environment redaction is currently **OFF by
 > default**. We strongly recommend enabling it if you are running third-party
@@ -480,6 +510,9 @@ has execution permissions:
 ls -la .gemini/hooks/my-hook.sh
 chmod +x .gemini/hooks/my-hook.sh
 ```
+
+**Windows Note**: On Windows, ensure your execution policy allows running
+scripts (for example, `Get-ExecutionPolicy`).
 
 **Verify script path:** Ensure the path in `settings.json` resolves correctly.
 

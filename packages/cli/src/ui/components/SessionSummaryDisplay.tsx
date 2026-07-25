@@ -6,6 +6,13 @@
 
 import type React from 'react';
 import { StatsDisplay } from './StatsDisplay.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import {
+  escapeShellArg,
+  isWindows,
+  type ShellType,
+} from '@google/gemini-cli-core';
 
 interface SessionSummaryDisplayProps {
   duration: string;
@@ -13,6 +20,33 @@ interface SessionSummaryDisplayProps {
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
-}) => (
-  <StatsDisplay title="Agent powering down. Goodbye!" duration={duration} />
-);
+}) => {
+  const { stats } = useSessionStats();
+  const config = useConfig();
+  const shell: ShellType = isWindows() ? 'powershell' : 'bash';
+
+  const worktreeSettings = config.getWorktreeSettings();
+
+  const escapedSessionId = escapeShellArg(stats.sessionId, shell);
+  const footerSessionId =
+    isWindows() &&
+    !escapedSessionId.startsWith('"') &&
+    !escapedSessionId.startsWith("'")
+      ? `"${escapedSessionId}"`
+      : escapedSessionId;
+  let footer = `To resume this session: gemini --resume ${footerSessionId}`;
+
+  if (worktreeSettings) {
+    footer =
+      `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${footerSessionId}\n` +
+      `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+  }
+
+  return (
+    <StatsDisplay
+      title="Agent powering down. Goodbye!"
+      duration={duration}
+      footer={footer}
+    />
+  );
+};

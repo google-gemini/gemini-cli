@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
   OAuth2Client,
   Compute,
   CodeChallengeMethod,
   GoogleAuth,
+  type Credentials,
+  type AuthClient,
+  type JWTInput,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -45,6 +47,7 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const authEvents = new EventEmitter();
 
@@ -57,6 +60,10 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
     client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
+    quota_project_id:
+      process.env['GOOGLE_CLOUD_QUOTA_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'],
   };
 
   // Execute all registered post-authentication callbacks.
@@ -106,44 +113,52 @@ function getUseEncryptedStorageFlag() {
   return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
 }
 
+/**
+ * Determines whether the given credentials object represents ADC credentials.
+ */
+function isAdcCredentials(
+  credentials: unknown,
+): credentials is JWTInput & { type: string } {
+  if (credentials && typeof credentials === 'object' && 'type' in credentials) {
+    const type = credentials.type;
+    return typeof type === 'string' && type !== 'authorized_user';
+  }
+  return false;
+}
+
 async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  const credentials = await fetchCachedCredentials();
+  function createBaseOAuth2Client(): OAuth2Client {
+    const client = new OAuth2Client({
+      clientId: OAUTH_CLIENT_ID,
+      clientSecret: OAUTH_CLIENT_SECRET,
+      transporterOptions: {
+        proxy: config.getProxy(),
+      },
+    });
+    const useEncryptedStorage = getUseEncryptedStorageFlag();
 
-  if (
-    credentials &&
-    (credentials as { type?: string }).type ===
-      'external_account_authorized_user'
-  ) {
-    const auth = new GoogleAuth({
-      scopes: OAUTH_SCOPE,
+    client.on('tokens', async (tokens: Credentials) => {
+      if (useEncryptedStorage) {
+        await OAuthCredentialStorage.saveCredentials(tokens);
+      } else {
+        await cacheCredentials(tokens);
+      }
+
+      await triggerPostAuthCallbacks(tokens);
     });
-    const byoidClient = auth.fromJSON({
-      ...credentials,
-      refresh_token: credentials.refresh_token ?? undefined,
-    });
-    const token = await byoidClient.getAccessToken();
-    if (token) {
-      debugLogger.debug('Created BYOID auth client.');
-      return byoidClient;
-    }
+
+    return client;
   }
 
-  const client = new OAuth2Client({
-    clientId: OAUTH_CLIENT_ID,
-    clientSecret: OAUTH_CLIENT_SECRET,
-    transporterOptions: {
-      proxy: config.getProxy(),
-    },
-  });
-  const useEncryptedStorage = getUseEncryptedStorageFlag();
-
+  // 1. Try GOOGLE_CLOUD_ACCESS_TOKEN override first if configured
   if (
     process.env['GOOGLE_GENAI_USE_GCA'] &&
     process.env['GOOGLE_CLOUD_ACCESS_TOKEN']
   ) {
+    const client = createBaseOAuth2Client();
     client.setCredentials({
       access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
@@ -151,48 +166,69 @@ async function initOauthClient(
     return client;
   }
 
-  client.on('tokens', async (tokens: Credentials) => {
-    if (useEncryptedStorage) {
-      await OAuthCredentialStorage.saveCredentials(tokens);
-    } else {
-      await cacheCredentials(tokens);
-    }
+  const credentialsList = await fetchCachedCredentialsList();
 
-    await triggerPostAuthCallbacks(tokens);
-  });
-
-  if (credentials) {
-    client.setCredentials(credentials as Credentials);
-    try {
-      // This will verify locally that the credentials look good.
-      const { token } = await client.getAccessToken();
-      if (token) {
-        // This will check with the server to see if it hasn't been revoked.
-        await client.getTokenInfo(token);
-
-        if (!userAccountManager.getCachedGoogleAccount()) {
-          try {
-            await fetchAndCacheUserInfo(client);
-          } catch (error) {
-            // Non-fatal, continue with existing auth.
-            debugLogger.warn(
-              'Failed to fetch user info:',
-              getErrorMessage(error),
-            );
-          }
+  // 2. Iterate sequentially over the credentials list in their natural priority order
+  for (const credentials of credentialsList) {
+    if (isAdcCredentials(credentials)) {
+      try {
+        const auth = new GoogleAuth({
+          scopes: OAUTH_SCOPE,
+        });
+        const adcClient = auth.fromJSON({
+          ...credentials,
+          refresh_token: credentials.refresh_token ?? undefined,
+        });
+        const response = await adcClient.getAccessToken();
+        const token = response.token ?? null;
+        if (token) {
+          debugLogger.debug('Created ' + credentials.type + ' auth client.');
+          return adcClient;
         }
-        debugLogger.log('Loaded cached credentials.');
-        await triggerPostAuthCallbacks(credentials as Credentials);
-
-        return client;
+      } catch (error) {
+        debugLogger.debug(
+          'ADC credentials verification failed:',
+          getErrorMessage(error),
+        );
       }
-    } catch (error) {
-      debugLogger.debug(
-        `Cached credentials are not valid:`,
-        getErrorMessage(error),
-      );
+    } else if (credentials) {
+      const client = createBaseOAuth2Client();
+      client.setCredentials(credentials as Credentials);
+      try {
+        // This will verify locally that the credentials look good.
+        const { token } = await client.getAccessToken();
+        if (token) {
+          // This will check with the server to see if it hasn't been revoked.
+          await client.getTokenInfo(token);
+
+          if (!userAccountManager.getCachedGoogleAccount()) {
+            try {
+              await fetchAndCacheUserInfo(client);
+            } catch (error) {
+              // Non-fatal, continue with existing auth.
+              debugLogger.warn(
+                'Failed to fetch user info:',
+                getErrorMessage(error),
+              );
+            }
+          }
+          debugLogger.log('Loaded cached credentials.');
+          await triggerPostAuthCallbacks(
+            client.credentials || (credentials as Credentials),
+          );
+
+          return client;
+        }
+      } catch (error) {
+        debugLogger.debug(
+          'Cached credentials are not valid:',
+          getErrorMessage(error),
+        );
+      }
     }
   }
+
+  const client = createBaseOAuth2Client();
 
   // In Google Compute Engine based environments (including Cloud Shell), we can
   // use Application Default Credentials (ADC) provided via its metadata server
@@ -222,6 +258,13 @@ async function initOauthClient(
   }
 
   if (config.isBrowserLaunchSuppressed()) {
+    if (!config.isInteractive()) {
+      throw new FatalAuthenticationError(
+        'Manual authorization is required but the current session is non-interactive. ' +
+          'Please run the Gemini CLI in an interactive terminal to log in, ' +
+          'provide a GEMINI_API_KEY, or ensure Application Default Credentials are configured.',
+      );
+    }
     let success = false;
     const maxRetries = 2;
     // Enter alternate buffer
@@ -269,13 +312,20 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    // In ACP mode, we skip the interactive consent and directly open the browser
+    if (!config.getAcpMode()) {
+      const userConsent = await getConsentForOauth('');
+      if (!userConsent) {
+        throw new FatalCancellationError('Authentication cancelled by user.');
+      }
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message:
-        `\n\nCode Assist login required.\n` +
-        `Attempting to open authentication page in your browser.\n` +
+        `\n\nAttempting to open authentication page in your browser.\n` +
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
     });
     try {
@@ -314,8 +364,9 @@ async function initOauthClient(
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new FatalAuthenticationError(
             'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
@@ -336,8 +387,10 @@ async function initOauthClient(
 
       // Note that SIGINT might not get raised on Ctrl+C in raw mode
       // so we also need to look for Ctrl+C directly in stdin.
+      // Only match a lone 0x03 byte — some terminals (e.g. Ghostty) embed
+      // 0x03 inside multi-byte escape sequences, causing false cancellations.
       stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
+        if (data.length === 1 && data[0] === 0x03) {
           reject(
             new FatalCancellationError('Authentication cancelled by user.'),
           );
@@ -353,6 +406,9 @@ async function initOauthClient(
         cancellationPromise,
       ]);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (sigIntHandler) {
         process.removeListener('SIGINT', sigIntHandler);
       }
@@ -401,17 +457,37 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
-    const code = await new Promise<string>((resolve, _) => {
+    let authTimeoutId: NodeJS.Timeout | undefined;
+    const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
         output: createWorkingStdio().stdout,
         terminal: true,
       });
 
+      const abortController = new AbortController();
+      authTimeoutId = setTimeout(() => {
+        abortController.abort(
+          new FatalAuthenticationError(
+            'Authorization timed out after 5 minutes.',
+          ),
+        );
+      }, 300000); // 5 minute timeout
+      authTimeoutId.unref();
+
+      const onAbort = () => {
+        rl.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
+
       rl.question('Enter the authorization code: ', (code) => {
+        abortController.signal.removeEventListener('abort', onAbort);
         rl.close();
         resolve(code.trim());
       });
+    }).finally(() => {
+      if (authTimeoutId) clearTimeout(authTimeoutId);
     });
 
     if (!code) {
@@ -484,6 +560,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               'OAuth callback not received. Unexpected request: ' + req.url,
             ),
           );
+          return;
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
@@ -596,8 +673,10 @@ export function getAvailablePort(): Promise<number> {
       }
       const server = net.createServer();
       server.listen(0, () => {
-        const address = server.address()! as net.AddressInfo;
-        port = address.port;
+        const address = server.address();
+        if (address && typeof address === 'object') {
+          port = address.port;
+        }
       });
       server.on('listening', () => {
         server.close();
@@ -611,23 +690,41 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
-async function fetchCachedCredentials(): Promise<
-  Credentials | JWTInput | null
+async function fetchCachedCredentialsList(): Promise<
+  Array<Credentials | JWTInput>
 > {
+  const credentialsList: Array<Credentials | JWTInput> = [];
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    return OAuthCredentialStorage.loadCredentials();
+    try {
+      const creds = await OAuthCredentialStorage.loadCredentials();
+      if (creds) {
+        credentialsList.push(creds);
+      }
+    } catch (error) {
+      debugLogger.debug(
+        'Failed to load credentials from encrypted storage:',
+        error,
+      );
+    }
   }
 
   const pathsToTry = [
-    Storage.getOAuthCredsPath(),
+    ...(!useEncryptedStorage ? [Storage.getOAuthCredsPath()] : []),
     process.env['GOOGLE_APPLICATION_CREDENTIALS'],
   ].filter((p): p is string => !!p);
 
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
-      return JSON.parse(keyFileString);
+      const parsed: unknown = JSON.parse(keyFileString);
+      const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
+        typeof val === 'object' && val !== null;
+      if (isOAuthCreds(parsed)) {
+        credentialsList.push(parsed);
+      } else {
+        throw new Error('Invalid credentials format');
+      }
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(
@@ -637,7 +734,7 @@ async function fetchCachedCredentials(): Promise<
     }
   }
 
-  return null;
+  return credentialsList;
 }
 
 export function clearOauthClientCache() {
@@ -686,6 +783,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userInfo = await response.json();
     await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {

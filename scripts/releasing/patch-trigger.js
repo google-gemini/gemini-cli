@@ -115,6 +115,7 @@ async function main() {
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
   const forceSkipTests =
     argv.forceSkipTests || process.env.FORCE_SKIP_TESTS === 'true';
+  const runId = process.env.GITHUB_RUN_ID || '0';
 
   if (!headRef) {
     throw new Error(
@@ -264,7 +265,7 @@ async function main() {
     console.log(`Commenting on original PR ${originalPr}...`);
     const npmTag = channel === 'stable' ? 'latest' : 'preview';
 
-    const commentBody = `🚀 **Patch Release Started!**
+    const commentBody = `🚀 **[Step 3/4] Patch Release ${environment === 'prod' ? 'Waiting for Approval' : 'Triggered'}!**
 
 **📋 Release Details:**
 - **Environment**: \`${environment}\`
@@ -273,10 +274,11 @@ async function main() {
 - **Hotfix PR**: Merged ✅
 - **Release Branch**: [\`${releaseRef}\`](https://github.com/${context.repo.owner}/${context.repo.repo}/tree/${releaseRef})
 
-**⏳ Status:** The patch release is now running. You'll receive another update when it completes.
+**⏳ Status:** The patch release has been triggered${environment === 'prod' ? ' and is waiting for deployment approval. Please visit the specific workflow run link below and approve the deployment' : ''}. You'll receive another update when it completes.
 
 **🔗 Track Progress:**
-- [View release workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions)`;
+- [View release workflow history](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/${workflowId})
+- [This trigger workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId})`;
 
     if (!testMode) {
       let tempDir;

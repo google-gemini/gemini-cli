@@ -7,13 +7,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   coreEvents,
-  type Config,
-  type ResumedSessionData,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
-import type { Part } from '@google/genai';
+import type {
+  HistoryTurn,
+  Config,
+  ResumedSessionData,
+} from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
+import type { Part } from '@google/genai';
 
 interface UseSessionResumeParams {
   config: Config;
@@ -53,7 +57,9 @@ export function useSessionResume({
   const loadHistoryForResume = useCallback(
     async (
       uiHistory: HistoryItemWithoutId[],
-      clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+      clientHistory: Array<
+        { role: 'user' | 'model'; parts: Part[] } | HistoryTurn
+      >,
       resumedData: ResumedSessionData,
     ) => {
       // Wait for the client.
@@ -70,6 +76,17 @@ export function useSessionResume({
           historyManagerRef.current.addItem(item, index, true);
         });
         refreshStaticRef.current(); // Force Static component to re-render with the updated history.
+
+        // Restore directories from the resumed session
+        if (
+          resumedData.conversation.directories &&
+          resumedData.conversation.directories.length > 0
+        ) {
+          const workspaceContext = config.getWorkspaceContext();
+          // Add back any directories that were saved in the session
+          // but filter out ones that no longer exist
+          workspaceContext.addDirectories(resumedData.conversation.directories);
+        }
 
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
@@ -102,7 +119,7 @@ export function useSessionResume({
       );
       void loadHistoryForResume(
         historyData.uiHistory,
-        historyData.clientHistory,
+        convertSessionToClientHistory(resumedSessionData.conversation.messages),
         resumedSessionData,
       );
     }

@@ -1,0 +1,6 @@
+[[safety_checker]]
+toolName = "*"
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "conseca"

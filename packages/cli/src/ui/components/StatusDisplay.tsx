@@ -11,9 +11,8 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
-import { HookStatusDisplay } from './HookStatusDisplay.js';
 
-interface StatusDisplayProps {
+export interface StatusDisplayProps {
   hideContextSummary: boolean;
 }
 
@@ -28,48 +27,6 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
   }
 
-  if (uiState.ctrlCPressedOnce) {
-    return (
-      <Text color={theme.status.warning}>Press Ctrl+C again to exit.</Text>
-    );
-  }
-
-  if (uiState.warningMessage) {
-    return <Text color={theme.status.warning}>{uiState.warningMessage}</Text>;
-  }
-
-  if (uiState.ctrlDPressedOnce) {
-    return (
-      <Text color={theme.status.warning}>Press Ctrl+D again to exit.</Text>
-    );
-  }
-
-  if (uiState.showEscapePrompt) {
-    const isPromptEmpty = uiState.buffer.text.length === 0;
-    const hasHistory = uiState.history.length > 0;
-
-    if (isPromptEmpty && !hasHistory) {
-      return null;
-    }
-
-    return (
-      <Text color={theme.text.secondary}>
-        Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
-      </Text>
-    );
-  }
-
-  if (uiState.queueErrorMessage) {
-    return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
-  }
-
-  if (
-    uiState.activeHooks.length > 0 &&
-    settings.merged.hooksConfig.notifications
-  ) {
-    return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
-  }
-
   if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
@@ -81,6 +38,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
           config.getMcpClientManager()?.getBlockedMcpServers() ?? []
         }
         skillCount={config.getSkillManager().getDisplayableSkills().length}
+        backgroundProcessCount={uiState.backgroundTaskCount}
       />
     );
   }

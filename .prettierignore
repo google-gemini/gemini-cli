@@ -21,3 +21,6 @@ junit.xml
 Thumbs.db
 .pytest_cache
 **/SKILL.md
+packages/sdk/test-data/*.json
+*.mdx
+packages/vscode-ide-companion/NOTICES.txt

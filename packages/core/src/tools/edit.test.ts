@@ -33,6 +33,14 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+}));
+
 import {
   describe,
   it,
@@ -55,6 +63,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -75,7 +84,10 @@ describe('EditTool', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
+    const rawTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'edit-tool-test-'),
+    );
+    tempDir = fs.realpathSync(rawTempDir);
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
@@ -98,6 +110,7 @@ describe('EditTool', () => {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
+      getProjectRoot: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
@@ -122,6 +135,29 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      isPlanMode: vi.fn(() => false),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
     (mockConfig.getApprovalMode as Mock).mockClear();
@@ -350,6 +386,255 @@ describe('EditTool', () => {
       expect(result.newContent).toBe(expectedContent);
       expect(result.occurrences).toBe(1);
     });
+
+    it('should perform a fuzzy replacement when exact match fails but similarity is high', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Typo: missing comma after true
+      const oldString =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      expect(result.newContent).toBe(newString);
+    });
+
+    it('should NOT perform a fuzzy replacement when similarity is below threshold', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Completely different string
+      const oldString = 'function somethingElse() {\n  return false;\n}';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should NOT perform a fuzzy replacement when the complexity (length * size) is too high', async () => {
+      // 2000 chars
+      const longString = 'a'.repeat(2000);
+
+      // Create a file with enough lines to trigger the complexity limit
+      // Complexity = Lines * Length^2
+      // Threshold = 500,000,000
+      // 2000^2 = 4,000,000.
+      // Need > 125 lines. Let's use 200 lines.
+      const lines = Array(200).fill(longString);
+      const content = lines.join('\n');
+
+      // Mismatch at the end (making it a fuzzy match candidate)
+      const oldString = longString + 'c';
+      const newString = 'replacement';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // Should return 0 occurrences because fuzzy match is skipped
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
+      const content = `
+function doIt() {
+  console.log("hello");
+}
+
+function doIt() {
+  console.log("hello");
+}
+`;
+      // old_string uses single quotes, file uses double.
+      // This is a fuzzy match (quote difference).
+      const oldString = `
+function doIt() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function doIt() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      const expectedContent = `
+function doIt() {
+  console.log("bye");
+}
+
+function doIt() {
+  console.log("bye");
+}
+`;
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should preserve trailing newlines in flexible replacement (regression)', async () => {
+      const content = '  line1\n  line2\n  line3\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          old_string: 'line1\nline2',
+          new_string: 'line1-replaced\nline2-replaced',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe(
+        '  line1-replaced\n  line2-replaced\n  line3\n',
+      );
+    });
+
+    it('should correctly increment loop index in flexible replacement when allow_multiple is true (regression)', async () => {
+      const content = '  match1\n  match2\n  match1\n  match2\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          old_string: 'match1\nmatch2',
+          new_string: 'replaced1\nreplaced2\nreplaced3',
+          allow_multiple: true,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      expect(result.newContent).toBe(
+        '  replaced1\n  replaced2\n  replaced3\n  replaced1\n  replaced2\n  replaced3\n',
+      );
+    });
+
+    it('should correctly rebase indentation in flexible replacement without double-indenting', async () => {
+      const content = '    if (a) {\n        foo();\n    }\n';
+      // old_string and new_string are unindented. They should be rebased to 4-space.
+      const oldString = 'if (a) {\n    foo();\n}';
+      const newString = 'if (a) {\n    bar();\n}';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      // foo() was at 8 spaces (4 base + 4 indent).
+      // newString has bar() at 4 spaces (0 base + 4 indent).
+      // Rebased to 4 base, it should be 4 + 4 = 8 spaces.
+      const expectedContent = '    if (a) {\n        bar();\n    }\n';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should correctly rebase indentation in fuzzy replacement without double-indenting', async () => {
+      const content =
+        '    const myConfig = {\n      enableFeature: true,\n      retries: 3\n    };';
+      // Typo: missing comma. old_string/new_string are unindented.
+      const fuzzyOld =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const fuzzyNew =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: fuzzyOld,
+          new_string: fuzzyNew,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.strategy).toBe('fuzzy');
+      const expectedContent =
+        '    const myConfig = {\n      enableFeature: false,\n      retries: 5\n    };';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
+      const content = '\n  function oldFunc() {\n    // some code\n  }';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: 'function  oldFunc() {\n    // some code\n  }', // Two spaces after function to trigger regex
+          new_string: 'function newFunc() {\n  // new code\n}', // Unindented
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The blank line at the start should be preserved as-is,
+      // and the discovered indentation (2 spaces) should be applied to each line.
+      const expectedContent = '\n  function newFunc() {\n    // new code\n  }';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should NOT insert extra newlines in flexible replacement when old_string starts with a blank line (regression)', async () => {
+      const content = '  // some comment\n\n  function oldFunc() {}';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: '\nfunction oldFunc() {}',
+          new_string: '\n  function newFunc() {}', // Include desired indentation
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The blank line at the start is preserved, and the new block is inserted.
+      const expectedContent = '  // some comment\n\n  function newFunc() {}';
+      expect(result.newContent).toBe(expectedContent);
+    });
   });
 
   describe('validateToolParams', () => {
@@ -370,8 +655,77 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /must be within one of the workspace directories/,
+      expect(tool.validateToolParams(params)).toMatch(/Path not in workspace/);
+    });
+
+    it('should reject omission placeholder in new_string when old_string does not contain that placeholder', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: 'old content',
+        new_string: '(rest of methods ...)',
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should reject new_string when it contains an additional placeholder not present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: '(rest of methods ...)',
+        new_string: `(rest of methods ...)
+(unchanged code ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should allow omission placeholders when all are already present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: `(rest of methods ...)
+(unchanged code ...)`,
+        new_string: `(unchanged code ...)
+(rest of methods ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should allow normal code that contains placeholder text in a string literal', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.ts'),
+        instruction: 'Update string literal',
+        old_string: 'const msg = "old";',
+        new_string: 'const msg = "(rest of methods ...)";',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should sanitize null bytes in absolute path during validation', () => {
+      const badPath = path.resolve(rootDir, 'test\0.txt');
+      const params: EditToolParams = {
+        file_path: badPath,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should sanitize null bytes in absolute path during invocation setup', () => {
+      const badPath = path.resolve(rootDir, 'test\0.txt');
+      const invocation = tool.build({
+        file_path: badPath,
+        instruction: 'test',
+        old_string: 'old',
+        new_string: 'new',
+      });
+      expect((invocation as any).resolvedPath).toBe(
+        path.resolve(rootDir, 'test.txt'),
       );
     });
   });
@@ -405,9 +759,9 @@ describe('EditTool', () => {
           throw abortError;
         });
 
-      await expect(invocation.execute(abortController.signal)).rejects.toBe(
-        abortError,
-      );
+      await expect(
+        invocation.execute({ abortSignal: abortController.signal }),
+      ).rejects.toBe(abortError);
 
       calculateSpy.mockRestore();
     });
@@ -424,9 +778,22 @@ describe('EditTool', () => {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.display).toEqual(
+        expect.objectContaining({
+          name: 'Edit',
+          resultSummary: expect.stringContaining('added'),
+          result: expect.objectContaining({
+            type: 'diff',
+            beforeText: initialContent,
+            afterText: newContent,
+          }),
+        }),
+      );
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
       const display = result.returnDisplay as FileDiff;
       expect(display.fileDiff).toMatch(initialContent);
@@ -447,7 +814,9 @@ describe('EditTool', () => {
         new_string: 'replacement',
       };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toMatch(/0 occurrences found for old_string/);
       expect(result.returnDisplay).toMatch(
         /Failed to edit, could not find the string to replace./,
@@ -478,7 +847,9 @@ describe('EditTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toMatch(/Successfully modified file/);
@@ -498,7 +869,7 @@ describe('EditTool', () => {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContent);
@@ -514,7 +885,7 @@ describe('EditTool', () => {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
@@ -542,7 +913,9 @@ describe('EditTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(
         ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
@@ -586,7 +959,7 @@ describe('EditTool', () => {
         .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Assert that the file was read twice (initial read, then re-read for hash comparison).
       expect(readTextFileSpy).toHaveBeenCalledTimes(2);
@@ -648,13 +1021,15 @@ describe('EditTool', () => {
           instruction: 'test',
           ...params,
         });
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
         expect(result.error?.type).toBe(expectedError);
       },
     );
   });
 
-  describe('expected_replacements', () => {
+  describe('allow_multiple', () => {
     const testFile = 'replacements_test.txt';
     let filePath: string;
 
@@ -664,46 +1039,82 @@ describe('EditTool', () => {
 
     it.each([
       {
-        name: 'succeed when occurrences match expected_replacements',
+        name: 'succeed when allow_multiple is true and there are multiple occurrences',
         content: 'foo foo foo',
-        expected: 3,
+        allow_multiple: true,
         shouldSucceed: true,
         finalContent: 'bar bar bar',
       },
       {
-        name: 'fail when occurrences do not match expected_replacements',
-        content: 'foo foo foo',
-        expected: 2,
-        shouldSucceed: false,
+        name: 'succeed when allow_multiple is true and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: true,
+        shouldSucceed: true,
+        finalContent: 'bar',
       },
       {
-        name: 'default to 1 expected replacement if not specified',
-        content: 'foo foo',
-        expected: undefined,
+        name: 'fail when allow_multiple is false and there are multiple occurrences',
+        content: 'foo foo foo',
+        allow_multiple: false,
         shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'default to 1 expected replacement if allow_multiple not specified',
+        content: 'foo foo',
+        allow_multiple: undefined,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'succeed when allow_multiple is false and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: false,
+        shouldSucceed: true,
+        finalContent: 'bar',
+      },
+      {
+        name: 'fail when allow_multiple is true but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: true,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+      },
+      {
+        name: 'fail when allow_multiple is false but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: false,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
       },
     ])(
       'should $name',
-      async ({ content, expected, shouldSucceed, finalContent }) => {
+      async ({
+        content,
+        allow_multiple,
+        shouldSucceed,
+        finalContent,
+        expectedError,
+      }) => {
         fs.writeFileSync(filePath, content, 'utf8');
         const params: EditToolParams = {
           file_path: filePath,
           instruction: 'Replace all foo with bar',
           old_string: 'foo',
           new_string: 'bar',
-          ...(expected !== undefined && { expected_replacements: expected }),
+          ...(allow_multiple !== undefined && { allow_multiple }),
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
 
         if (shouldSucceed) {
           expect(result.error).toBeUndefined();
           if (finalContent)
             expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
         } else {
-          expect(result.error?.type).toBe(
-            ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-          );
+          expect(result.error?.type).toBe(expectedError);
         }
       },
     );
@@ -838,7 +1249,9 @@ describe('EditTool', () => {
           ai_proposed_content: '',
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
 
         if (
           result.returnDisplay &&
@@ -891,7 +1304,9 @@ describe('EditTool', () => {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
       expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
@@ -912,9 +1327,151 @@ describe('EditTool', () => {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
+
+    it('should NOT call FixLLMEditWithInstruction for .json files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'test.json');
+      fs.writeFileSync(filePath, '{"key": "value"}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace value',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('should NOT call FixLLMEditWithInstruction for .ipynb files even when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'notebook.ipynb');
+      fs.writeFileSync(filePath, '{"cells": []}', 'utf8');
+
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace cell',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-disabled-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
+    });
+  });
+
+  describe('plan mode', () => {
+    it('should allow edits to plans directory when isPlanMode is true', async () => {
+      const mockProjectTempDir = path.join(tempDir, 'project');
+      fs.mkdirSync(mockProjectTempDir);
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+        mockProjectTempDir,
+      );
+
+      const plansDir = path.join(mockProjectTempDir, 'plans');
+      fs.mkdirSync(plansDir);
+
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+      vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
+
+      const filePath = 'test-file.txt';
+      const planFilePath = path.join(plansDir, filePath);
+      const initialContent = 'some initial content';
+      fs.writeFileSync(planFilePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace initial with new',
+        old_string: 'initial',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+
+      // Verify plan file is written with new content
+      expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
+
+      fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
 });

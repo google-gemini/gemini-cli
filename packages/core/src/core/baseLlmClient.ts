@@ -13,15 +13,23 @@ import type {
   GenerateContentConfig,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ContentGenerator } from './contentGenerator.js';
-import type { AuthType } from './contentGenerator.js';
+import type { ContentGenerator, AuthType } from './contentGenerator.js';
 import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { logMalformedJsonResponse } from '../telemetry/loggers.js';
-import { MalformedJsonResponseEvent } from '../telemetry/types.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import {
+  logMalformedJsonResponse,
+  logNetworkRetryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  MalformedJsonResponseEvent,
+  LlmRole,
+  NetworkRetryAttemptEvent,
+} from '../telemetry/types.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
+import { coreEvents } from '../utils/events.js';
+import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
@@ -52,6 +60,10 @@ export interface GenerateJsonOptions {
    */
   promptId: string;
   /**
+   * The role of the LLM call.
+   */
+  role: LlmRole;
+  /**
    * The maximum number of attempts for the request.
    */
   maxAttempts?: number;
@@ -77,6 +89,10 @@ export interface GenerateContentOptions {
    */
   promptId: string;
   /**
+   * The role of the LLM call.
+   */
+  role: LlmRole;
+  /**
    * The maximum number of attempts for the request.
    */
   maxAttempts?: number;
@@ -93,6 +109,12 @@ interface _CommonGenerateOptions {
     responseJsonSchema: Record<string, unknown>;
     responseMimeType: string;
   };
+}
+
+export interface CountTokenOptions {
+  modelConfigKey?: ModelConfigKey;
+  contents: Content[];
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -115,6 +137,7 @@ export class BaseLlmClient {
       systemInstruction,
       abortSignal,
       promptId,
+      role,
       maxAttempts,
     } = options;
 
@@ -130,7 +153,7 @@ export class BaseLlmClient {
         // We don't use the result, just check if it's valid JSON
         JSON.parse(this.cleanJsonResponse(text, model));
         return false; // It's valid, don't retry
-      } catch (_e) {
+      } catch {
         return true; // It's not valid, retry
       }
     };
@@ -150,12 +173,19 @@ export class BaseLlmClient {
       },
       shouldRetryOnContent,
       'generateJson',
+      role,
     );
 
     // If we are here, the content is valid (not empty and parsable).
-    return JSON.parse(
+    const parsed: unknown = JSON.parse(
       this.cleanJsonResponse(getResponseText(result)!.trim(), model),
     );
+    const isRecord = (val: unknown): val is Record<string, unknown> =>
+      typeof val === 'object' && val !== null && !Array.isArray(val);
+    if (isRecord(parsed)) {
+      return parsed;
+    }
+    throw new Error('Invalid JSON response format from LLM');
   }
 
   async generateEmbedding(texts: string[]): Promise<number[][]> {
@@ -206,6 +236,23 @@ export class BaseLlmClient {
     return text;
   }
 
+  async countTokens(
+    options: CountTokenOptions,
+  ): Promise<{ totalTokens: number }> {
+    const model = options.modelConfigKey
+      ? this.config.modelConfigService.getResolvedConfig(options.modelConfigKey)
+          .model
+      : this.config.getActiveModel();
+    const result = await this.contentGenerator.countTokens({
+      model,
+      contents: options.contents,
+      config: options.abortSignal
+        ? { abortSignal: options.abortSignal }
+        : undefined,
+    });
+    return { totalTokens: result.totalTokens || 0 };
+  }
+
   async generateContent(
     options: GenerateContentOptions,
   ): Promise<GenerateContentResponse> {
@@ -215,6 +262,7 @@ export class BaseLlmClient {
       systemInstruction,
       abortSignal,
       promptId,
+      role,
       maxAttempts,
     } = options;
 
@@ -234,6 +282,7 @@ export class BaseLlmClient {
       },
       shouldRetryOnContent,
       'generateContent',
+      role,
     );
   }
 
@@ -241,6 +290,7 @@ export class BaseLlmClient {
     options: _CommonGenerateOptions,
     shouldRetryOnContent: (response: GenerateContentResponse) => boolean,
     errorContext: 'generateJson' | 'generateContent',
+    role: LlmRole = LlmRole.UTILITY_TOOL,
   ): Promise<GenerateContentResponse> {
     const {
       modelConfigKey,
@@ -267,19 +317,22 @@ export class BaseLlmClient {
       () => currentModel,
     );
 
+    let initialActiveModel = this.config.getActiveModel();
+
     try {
       const apiCall = () => {
         // Ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
         const activeModel = this.config.getActiveModel();
-        if (activeModel !== currentModel) {
-          currentModel = activeModel;
+        if (activeModel !== initialActiveModel) {
+          initialActiveModel = activeModel;
           // Re-resolve config if model changed during retry
-          const { generateContentConfig } =
+          const { model: resolvedModel, generateContentConfig } =
             this.config.modelConfigService.getResolvedConfig({
               ...modelConfigKey,
               model: activeModel,
             });
+          currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
         }
         const finalConfig: GenerateContentConfig = {
@@ -293,7 +346,11 @@ export class BaseLlmClient {
           config: finalConfig,
           contents,
         };
-        return this.contentGenerator.generateContent(requestParams, promptId);
+        return this.contentGenerator.generateContent(
+          requestParams,
+          promptId,
+          role,
+        );
       };
 
       return await retryWithBackoff(apiCall, {
@@ -307,6 +364,34 @@ export class BaseLlmClient {
           : undefined,
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) => {
+          const actualMaxAttempts =
+            getAvailabilityContext()?.policy.maxAttempts ??
+            maxAttempts ??
+            DEFAULT_MAX_ATTEMPTS;
+          const modelName = getDisplayString(currentModel);
+          const errorType = getRetryErrorType(error);
+
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts: actualMaxAttempts,
+            delayMs,
+            error: errorType,
+            model: modelName,
+          });
+
+          logNetworkRetryAttempt(
+            this.config,
+            new NetworkRetryAttemptEvent(
+              attempt,
+              actualMaxAttempts,
+              errorType,
+              delayMs,
+              modelName,
+            ),
+          );
+        },
       });
     } catch (error) {
       if (abortSignal?.aborted) {

@@ -57,10 +57,14 @@
  * // Returns: '{"safe":"data"}'
  */
 export function stableStringify(obj: unknown): string {
-  const stringify = (currentObj: unknown, ancestors: Set<unknown>): string => {
+  const stringify = (
+    currentObj: unknown,
+    ancestors: Set<unknown>,
+    isTopLevel = false,
+  ): string => {
     // Handle primitives and null
-    if (currentObj === undefined) {
-      return 'null'; // undefined in arrays becomes null in JSON
+    if (currentObj === undefined || typeof currentObj === 'symbol') {
+      return 'null'; // undefined and symbols in arrays become null in JSON
     }
     if (currentObj === null) {
       return 'null';
@@ -89,7 +93,10 @@ export function stableStringify(obj: unknown): string {
           if (jsonValue === null) {
             return 'null';
           }
-          return stringify(jsonValue, ancestors);
+          // The result of toJSON is effectively a new object graph, but it
+          // takes the place of the current node, so we preserve the top-level
+          // status of the current node.
+          return stringify(jsonValue, ancestors, isTopLevel);
         } catch {
           // If toJSON throws, treat as a regular object
         }
@@ -97,11 +104,15 @@ export function stableStringify(obj: unknown): string {
 
       if (Array.isArray(currentObj)) {
         const items = currentObj.map((item) => {
-          // undefined and functions in arrays become null
-          if (item === undefined || typeof item === 'function') {
+          // undefined, functions and symbols in arrays become null
+          if (
+            item === undefined ||
+            typeof item === 'function' ||
+            typeof item === 'symbol'
+          ) {
             return 'null';
           }
-          return stringify(item, ancestors);
+          return stringify(item, ancestors, false);
         });
         return '[' + items.join(',') + ']';
       }
@@ -111,10 +122,25 @@ export function stableStringify(obj: unknown): string {
       const pairs: string[] = [];
 
       for (const key of sortedKeys) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const value = (currentObj as Record<string, unknown>)[key];
-        // Skip undefined and function values in objects (per JSON spec)
-        if (value !== undefined && typeof value !== 'function') {
-          pairs.push(JSON.stringify(key) + ':' + stringify(value, ancestors));
+        // Skip undefined, function and symbol values in objects (per JSON spec)
+        if (
+          value !== undefined &&
+          typeof value !== 'function' &&
+          typeof value !== 'symbol'
+        ) {
+          let pairStr =
+            JSON.stringify(key) + ':' + stringify(value, ancestors, false);
+
+          if (isTopLevel) {
+            // We use a null byte (\0) to denote structural boundaries.
+            // This is safe because any literal \0 in the user's data will
+            // be escaped by JSON.stringify into "\u0000" before reaching here.
+            pairStr = '\0' + pairStr + '\0';
+          }
+
+          pairs.push(pairStr);
         }
       }
 
@@ -124,5 +150,5 @@ export function stableStringify(obj: unknown): string {
     }
   };
 
-  return stringify(obj, new Set());
+  return stringify(obj, new Set(), true);
 }

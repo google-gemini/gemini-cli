@@ -12,6 +12,7 @@ export interface AnsiToken {
   underline: boolean;
   dim: boolean;
   inverse: boolean;
+  isUninitialized: boolean;
   fg: string;
   bg: string;
 }
@@ -34,12 +35,12 @@ export const enum ColorMode {
 }
 
 class Cell {
-  private readonly cell: IBufferCell | null;
-  private readonly x: number;
-  private readonly y: number;
-  private readonly cursorX: number;
-  private readonly cursorY: number;
-  private readonly attributes: number = 0;
+  private cell: IBufferCell | null = null;
+  private x = 0;
+  private y = 0;
+  private cursorX = 0;
+  private cursorY = 0;
+  private attributes: number = 0;
   fg = 0;
   bg = 0;
   fgColorMode: ColorMode = ColorMode.DEFAULT;
@@ -52,11 +53,22 @@ class Cell {
     cursorX: number,
     cursorY: number,
   ) {
+    this.update(cell, x, y, cursorX, cursorY);
+  }
+
+  update(
+    cell: IBufferCell | null,
+    x: number,
+    y: number,
+    cursorX: number,
+    cursorY: number,
+  ) {
     this.cell = cell;
     this.x = x;
     this.y = y;
     this.cursorX = cursorX;
     this.cursorY = cursorY;
+    this.attributes = 0;
 
     if (!cell) {
       return;
@@ -115,6 +127,12 @@ class Cell {
     return this.cell?.getChars() || ' ';
   }
 
+  isUninitialized(): boolean {
+    return this.cell
+      ? this.cell.getCode() === 0 && this.cell.isAttributeDefault()
+      : true;
+  }
+
   isAttribute(attribute: Attribute): boolean {
     return (this.attributes & attribute) !== 0;
   }
@@ -126,36 +144,51 @@ class Cell {
       this.bg === other.bg &&
       this.fgColorMode === other.fgColorMode &&
       this.bgColorMode === other.bgColorMode &&
-      this.isCursor() === other.isCursor()
+      this.isCursor() === other.isCursor() &&
+      this.isUninitialized() === other.isUninitialized()
     );
   }
 }
 
-export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
+export function serializeTerminalToObject(
+  terminal: Terminal,
+  startLine?: number,
+  endLine?: number,
+): AnsiOutput {
   const buffer = terminal.buffer.active;
   const cursorX = buffer.cursorX;
-  const cursorY = buffer.cursorY;
+  const absoluteCursorY = buffer.baseY + buffer.cursorY;
   const defaultFg = '';
   const defaultBg = '';
 
   const result: AnsiOutput = [];
 
-  for (let y = 0; y < terminal.rows; y++) {
-    const line = buffer.getLine(buffer.viewportY + y);
+  // Reuse cell instances
+  const lastCell = new Cell(null, -1, -1, cursorX, absoluteCursorY);
+  const currentCell = new Cell(null, -1, -1, cursorX, absoluteCursorY);
+
+  const effectiveStart = startLine ?? buffer.viewportY;
+  const effectiveEnd = endLine ?? buffer.viewportY + terminal.rows;
+
+  const cellBuffer = terminal.buffer.active.getNullCell();
+
+  for (let y = effectiveStart; y < effectiveEnd; y++) {
+    const line = buffer.getLine(y);
     const currentLine: AnsiLine = [];
     if (!line) {
       result.push(currentLine);
       continue;
     }
 
-    let lastCell = new Cell(null, -1, -1, cursorX, cursorY);
+    // Reset lastCell for new line
+    lastCell.update(null, -1, -1, cursorX, absoluteCursorY);
     let currentText = '';
 
     for (let x = 0; x < terminal.cols; x++) {
-      const cellData = line.getCell(x);
-      const cell = new Cell(cellData || null, x, y, cursorX, cursorY);
+      const cellData = line.getCell(x, cellBuffer);
+      currentCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
 
-      if (x > 0 && !cell.equals(lastCell)) {
+      if (x > 0 && !currentCell.equals(lastCell)) {
         if (currentText) {
           const token: AnsiToken = {
             text: currentText,
@@ -165,6 +198,7 @@ export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
             dim: lastCell.isAttribute(Attribute.dim),
             inverse:
               lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
+            isUninitialized: lastCell.isUninitialized(),
             fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
             bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
           };
@@ -172,8 +206,10 @@ export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
         }
         currentText = '';
       }
-      currentText += cell.getChars();
-      lastCell = cell;
+      currentText += currentCell.getChars();
+      // Copy state from currentCell to lastCell. Since we can't easily deep copy
+      // without allocating, we just update lastCell with the same data.
+      lastCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
     }
 
     if (currentText) {
@@ -184,6 +220,7 @@ export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
         underline: lastCell.isAttribute(Attribute.underline),
         dim: lastCell.isAttribute(Attribute.dim),
         inverse: lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
+        isUninitialized: lastCell.isUninitialized(),
         fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
         bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
       };
@@ -191,6 +228,23 @@ export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
     }
 
     result.push(currentLine);
+  }
+
+  // Remove trailing empty lines
+  while (result.length > 0) {
+    const lastLine = result[result.length - 1];
+    const lineY = effectiveStart + result.length - 1;
+
+    // A line is empty if all its tokens are marked as uninitialized and it has no cursor
+    const isEmpty =
+      lastLine.every((token) => token.isUninitialized && !token.inverse) &&
+      lineY !== absoluteCursorY;
+
+    if (isEmpty) {
+      result.pop();
+    } else {
+      break;
+    }
   }
 
   return result;

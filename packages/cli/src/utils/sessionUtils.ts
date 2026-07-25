@@ -4,18 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
 import {
+  checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  CoreToolCallStatus,
+  type Storage,
+  type ConversationRecord,
+  type MessageRecord,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
+import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -56,10 +58,14 @@ export class SessionError extends Error {
   /**
    * Creates an error for when a session identifier is invalid.
    */
-  static invalidSessionIdentifier(identifier: string): SessionError {
+  static invalidSessionIdentifier(
+    identifier: string,
+    chatsDir?: string,
+  ): SessionError {
+    const dirInfo = chatsDir ? ` in ${chatsDir}` : '';
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
     );
   }
 }
@@ -132,15 +138,6 @@ export interface SessionSelectionResult {
   sessionData: ConversationRecord;
   displayInfo: string;
 }
-
-/**
- * Checks if a session has at least one user or assistant (gemini) message.
- * Sessions with only system messages (info, error, warning) are considered empty.
- * @param messages - The array of message records to check
- * @returns true if the session has meaningful content
- */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
 
 /**
  * Cleans and sanitizes message content for display by:
@@ -245,35 +242,58 @@ export const getAllSessionFiles = async (
   try {
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
-      .filter((f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'))
+      .filter(
+        (f) =>
+          f.startsWith(SESSION_FILE_PREFIX) &&
+          (f.endsWith('.json') || f.endsWith('.jsonl')),
+      )
       .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
-          const content: ConversationRecord = JSON.parse(
-            await fs.readFile(filePath, 'utf8'),
-          );
+          const content = await loadConversationRecord(filePath, {
+            metadataOnly: !options.includeFullContent,
+          });
+          if (!content) {
+            return { fileName: file, sessionInfo: null };
+          }
 
           // Validate required fields
-          if (
-            !content.sessionId ||
-            !content.messages ||
-            !Array.isArray(content.messages) ||
-            !content.startTime ||
-            !content.lastUpdated
-          ) {
+          if (!content.sessionId) {
             // Missing required fields - treat as corrupted
             return { fileName: file, sessionInfo: null };
           }
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!hasUserOrAssistantMessage(content.messages)) {
+          const fileTimestamp =
+            !content.startTime || !content.lastUpdated
+              ? (
+                  await fs.stat(filePath).catch(() => undefined)
+                )?.mtime.toISOString()
+              : undefined;
+          const fallbackTimestamp = fileTimestamp ?? new Date().toISOString();
+          const startTime =
+            content.startTime || content.lastUpdated || fallbackTimestamp;
+          const lastUpdated =
+            content.lastUpdated || content.startTime || fallbackTimestamp;
+
+          // Skip sessions with no resumable conversation content, including
+          // startup-only, system-only, command-only, and internal-context-only
+          // sessions.
+          if (!content.hasResumableContent) {
             return { fileName: file, sessionInfo: null };
           }
 
-          const firstUserMessage = extractFirstUserMessage(content.messages);
+          // Skip subagent sessions - these are implementation details of a tool call
+          // and shouldn't be surfaced for resumption in the main agent history.
+          if (content.kind === 'subagent') {
+            return { fileName: file, sessionInfo: null };
+          }
+
+          const firstUserMessage = content.firstUserMessage
+            ? cleanMessage(content.firstUserMessage)
+            : extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
             ? file.includes(currentSessionId.slice(0, 8))
             : false;
@@ -298,11 +318,11 @@ export const getAllSessionFiles = async (
 
           const sessionInfo: SessionInfo = {
             id: content.sessionId,
-            file: file.replace('.json', ''),
+            file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
-            startTime: content.startTime,
-            lastUpdated: content.lastUpdated,
-            messageCount: content.messages.length,
+            startTime,
+            lastUpdated,
+            messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
               : firstUserMessage,
@@ -387,17 +407,44 @@ export const getSessionFiles = async (
  * Utility class for session discovery and selection.
  */
 export class SessionSelector {
-  constructor(private config: Config) {}
+  constructor(private storage: Storage) {}
+
+  /**
+   * Checks if a session with the given ID already exists on disk.
+   */
+  async sessionExists(id: string): Promise<boolean> {
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+
+    // The filename format is `session-<TIMESTAMP>-<ID_SLICE(0,8)>.jsonl`
+    const shortId = id.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+    );
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (sessionData && sessionData.sessionId === id) {
+          return true;
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    return false;
+  }
 
   /**
    * Lists all available sessions for the current project.
    */
   async listSessions(): Promise<SessionInfo[]> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    return getSessionFiles(chatsDir, this.config.getSessionId());
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    return getSessionFiles(chatsDir);
   }
 
   /**
@@ -408,6 +455,7 @@ export class SessionSelector {
    * @throws Error if the session is not found or identifier is invalid
    */
   async findSession(identifier: string): Promise<SessionInfo> {
+    const trimmedIdentifier = identifier.trim();
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
@@ -422,24 +470,25 @@ export class SessionSelector {
 
     // Try to find by UUID first
     const sessionByUuid = sortedSessions.find(
-      (session) => session.id === identifier,
+      (session) => session.id === trimmedIdentifier,
     );
     if (sessionByUuid) {
       return sessionByUuid;
     }
 
     // Parse as index number (1-based) - only allow numeric indexes
-    const index = parseInt(identifier, 10);
+    const index = parseInt(trimmedIdentifier, 10);
     if (
       !isNaN(index) &&
-      index.toString() === identifier &&
+      index.toString() === trimmedIdentifier &&
       index > 0 &&
       index <= sortedSessions.length
     ) {
       return sortedSessions[index - 1];
     }
 
-    throw SessionError.invalidSessionIdentifier(identifier);
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    throw SessionError.invalidSessionIdentifier(trimmedIdentifier, chatsDir);
   }
 
   /**
@@ -450,12 +499,13 @@ export class SessionSelector {
    */
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
     let selectedSession: SessionInfo;
+    const trimmedResumeArg = resumeArg.trim();
 
-    if (resumeArg === RESUME_LATEST) {
+    if (trimmedResumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw SessionError.noSessionsFound();
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -467,7 +517,7 @@ export class SessionSelector {
       selectedSession = sessions[sessions.length - 1];
     } else {
       try {
-        selectedSession = await this.findSession(resumeArg);
+        selectedSession = await this.findSession(trimmedResumeArg);
       } catch (error) {
         // SessionError already has detailed messages - just rethrow
         if (error instanceof SessionError) {
@@ -475,7 +525,7 @@ export class SessionSelector {
         }
         // Wrap unexpected errors with context
         throw new Error(
-          `Failed to find session "${resumeArg}": ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to find session "${trimmedResumeArg}": ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -489,22 +539,25 @@ export class SessionSelector {
   private async selectSession(
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
-      const sessionData: ConversationRecord = JSON.parse(
-        await fs.readFile(sessionPath, 'utf8'),
-      );
+      const sessionData = await loadConversationRecord(sessionPath);
+      if (!sessionData) {
+        throw new Error('Failed to load session data');
+      }
+      const normalizedSessionData = {
+        ...sessionData,
+        startTime: sessionData.startTime || sessionInfo.startTime,
+        lastUpdated: sessionData.lastUpdated || sessionInfo.lastUpdated,
+      };
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,
-        sessionData,
+        sessionData: normalizedSessionData,
         displayInfo,
       };
     } catch (error) {
@@ -513,4 +566,105 @@ export class SessionSelector {
       );
     }
   }
+}
+
+/**
+ * Converts session/conversation data into UI history format.
+ */
+export function convertSessionToHistoryFormats(
+  messages: ConversationRecord['messages'],
+): {
+  uiHistory: HistoryItemWithoutId[];
+} {
+  const uiHistory: HistoryItemWithoutId[] = [];
+
+  for (const msg of messages) {
+    // Add thoughts if present
+    if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
+      for (const thought of msg.thoughts) {
+        uiHistory.push({
+          type: 'thinking',
+          thought: {
+            subject: thought.subject,
+            description: thought.description,
+          },
+        });
+      }
+    }
+
+    // Add the message only if it has content
+    const displayContentString = msg.displayContent
+      ? partListUnionToString(msg.displayContent)
+      : undefined;
+    const contentString = partListUnionToString(msg.content);
+    const uiText = displayContentString || contentString;
+
+    // Skip internal context messages in the UI history
+    const trimmedText = uiText.trim();
+    if (
+      trimmedText.startsWith('<session_context>') ||
+      trimmedText.startsWith('<hook_context>')
+    ) {
+      continue;
+    }
+
+    if (trimmedText) {
+      let messageType: MessageType;
+      switch (msg.type) {
+        case 'user':
+          messageType = MessageType.USER;
+          break;
+        case 'info':
+          messageType = MessageType.INFO;
+          break;
+        case 'error':
+          messageType = MessageType.ERROR;
+          break;
+        case 'warning':
+          messageType = MessageType.WARNING;
+          break;
+        case 'gemini':
+          messageType = MessageType.GEMINI;
+          break;
+        default:
+          checkExhaustive(msg);
+          messageType = MessageType.GEMINI;
+          break;
+      }
+
+      uiHistory.push({
+        type: messageType,
+        text: uiText,
+      });
+    }
+
+    // Add tool calls if present
+    if (
+      msg.type !== 'user' &&
+      'toolCalls' in msg &&
+      msg.toolCalls &&
+      msg.toolCalls.length > 0
+    ) {
+      uiHistory.push({
+        type: 'tool_group',
+        tools: msg.toolCalls.map((tool) => ({
+          callId: tool.id,
+          name: tool.displayName || tool.name,
+          args: tool.args,
+          description: tool.description || '',
+          renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
+          status:
+            tool.status === 'success'
+              ? CoreToolCallStatus.Success
+              : CoreToolCallStatus.Error,
+          resultDisplay: tool.resultDisplay,
+          confirmationDetails: undefined,
+        })),
+      });
+    }
+  }
+
+  return {
+    uiHistory,
+  };
 }

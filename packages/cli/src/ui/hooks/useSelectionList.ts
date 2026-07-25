@@ -6,8 +6,9 @@
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { useKeyMatchers } from './useKeyMatchers.js';
 
 export interface SelectionListItem<T> {
   key: string;
@@ -30,6 +31,7 @@ export interface UseSelectionListOptions<T> {
   showNumbers?: boolean;
   wrapAround?: boolean;
   focusKey?: string;
+  priority?: boolean;
 }
 
 export interface UseSelectionListResult {
@@ -212,8 +214,7 @@ function selectionListReducer(
     case 'INITIALIZE': {
       const { initialIndex, items, wrapAround } = action.payload;
       const activeKey =
-        initialIndex === state.initialIndex &&
-        state.activeIndex !== state.initialIndex
+        initialIndex === state.initialIndex
           ? state.items[state.activeIndex]?.key
           : undefined;
 
@@ -288,7 +289,9 @@ export function useSelectionList<T>({
   showNumbers = false,
   wrapAround = true,
   focusKey,
+  priority,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
+  const keyMatchers = useKeyMatchers();
   const baseItems = toBaseItems(items);
 
   const [state, dispatch] = useReducer(selectionListReducer, {
@@ -397,17 +400,17 @@ export function useSelectionList<T>({
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({ type: 'MOVE_DOWN' });
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
-        return;
+        return true;
       }
 
       // Handle numeric input for quick selection
@@ -426,7 +429,7 @@ export function useSelectionList<T>({
           numberInputTimer.current = setTimeout(() => {
             numberInputRef.current = '';
           }, NUMBER_INPUT_TIMEOUT_MS);
-          return;
+          return true;
         }
 
         if (targetIndex >= 0 && targetIndex < itemsLength) {
@@ -455,12 +458,17 @@ export function useSelectionList<T>({
           // Number is out of bounds
           numberInputRef.current = '';
         }
+        return true;
       }
+      return false;
     },
-    [dispatch, itemsLength, showNumbers],
+    [dispatch, itemsLength, showNumbers, keyMatchers],
   );
 
-  useKeypress(handleKeypress, { isActive: !!(isFocused && itemsLength > 0) });
+  useKeypress(handleKeypress, {
+    isActive: !!(isFocused && itemsLength > 0),
+    priority,
+  });
 
   const setActiveIndex = (index: number) => {
     dispatch({

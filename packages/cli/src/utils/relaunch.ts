@@ -5,10 +5,14 @@
  */
 
 import { spawn } from 'node:child_process';
-import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import {
+  RELAUNCH_EXIT_CODE,
+  getSpawnConfig,
+  getScriptArgs,
+} from './processUtils.js';
 import {
   writeToStderr,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
@@ -16,7 +20,7 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
     try {
       const exitCode = await runner();
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
+      if (process.platform === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
     } catch (error) {
@@ -34,38 +38,38 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
 export async function relaunchAppInChildProcess(
   additionalNodeArgs: string[],
   additionalScriptArgs: string[],
-  remoteAdminSettings?: FetchAdminControlsResponse,
+  remoteAdminSettings?: AdminControlsSettings,
 ) {
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return;
   }
 
-  const runner = () => {
-    // process.argv is [node, script, ...args]
-    // We want to construct [ ...nodeArgs, script, ...scriptArgs]
-    const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+  let latestAdminSettings = remoteAdminSettings;
 
-    const nodeArgs = [
-      ...process.execArgv,
-      ...additionalNodeArgs,
-      script,
+  const runner = () => {
+    const scriptArgs = getScriptArgs();
+    const { spawnArgs, env: newEnv } = getSpawnConfig(additionalNodeArgs, [
       ...additionalScriptArgs,
       ...scriptArgs,
-    ];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    ]);
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
 
-    const child = spawn(process.execPath, nodeArgs, {
+    const child = spawn(process.execPath, spawnArgs, {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: newEnv,
     });
 
-    if (remoteAdminSettings) {
-      child.send({ type: 'admin-settings', settings: remoteAdminSettings });
+    if (latestAdminSettings) {
+      child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
+
+    child.on('message', (msg: { type?: string; settings?: unknown }) => {
+      if (msg.type === 'admin-settings-update' && msg.settings) {
+        latestAdminSettings = msg.settings as AdminControlsSettings;
+      }
+    });
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

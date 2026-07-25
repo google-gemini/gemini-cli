@@ -6,7 +6,6 @@
 
 import type { EventEmitter } from 'node:events';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
-import { refreshServerHierarchicalMemory } from './memoryDiscovery.js';
 
 export abstract class ExtensionLoader {
   // Assigned in `start`.
@@ -75,6 +74,21 @@ export abstract class ExtensionLoader {
       await this.config.getMcpClientManager()!.startExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
 
+      // Register policy rules and checkers
+      if (extension.rules || extension.checkers) {
+        const policyEngine = this.config.getPolicyEngine();
+        if (extension.rules) {
+          for (const rule of extension.rules) {
+            policyEngine.addRule(rule);
+          }
+        }
+        if (extension.checkers) {
+          for (const checker of extension.checkers) {
+            policyEngine.addChecker(checker);
+          }
+        }
+      }
+
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
@@ -110,9 +124,11 @@ export abstract class ExtensionLoader {
       // Wait until all extensions are done starting and stopping before we
       // reload memory, this is somewhat expensive and also busts the context
       // cache, we want to only do it once.
-      await refreshServerHierarchicalMemory(this.config);
+      await this.config.getMemoryContextManager()?.refresh();
+      this.config.getGeminiClient().updateSystemInstruction();
       await this.config.getHookSystem()?.initialize();
       await this.config.getAgentRegistry().reload();
+      await this.config.reloadSkills();
     }
   }
 
@@ -124,7 +140,7 @@ export abstract class ExtensionLoader {
     extension: GeminiCLIExtension,
   ): Promise<void> {
     if (extension.excludeTools && extension.excludeTools.length > 0) {
-      const geminiClient = this.config?.getGeminiClient();
+      const geminiClient = this.config?.geminiClient;
       if (geminiClient?.isInitialized()) {
         await geminiClient.setTools();
       }
@@ -166,6 +182,27 @@ export abstract class ExtensionLoader {
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
+
+      // Unregister policy rules and checkers
+      if (extension.rules || extension.checkers) {
+        const policyEngine = this.config.getPolicyEngine();
+        const sources = new Set<string>();
+        if (extension.rules) {
+          for (const rule of extension.rules) {
+            if (rule.source) sources.add(rule.source);
+          }
+        }
+        if (extension.checkers) {
+          for (const checker of extension.checkers) {
+            if (checker.source) sources.add(checker.source);
+          }
+        }
+
+        for (const source of sources) {
+          policyEngine.removeRulesBySource(source);
+          policyEngine.removeCheckersBySource(source);
+        }
+      }
 
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call

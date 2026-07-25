@@ -119,7 +119,7 @@ export async function canLoadServer(
   }
 
   // 2. Allowlist check
-  if (config.allowedList && config.allowedList.length > 0) {
+  if (config.allowedList !== undefined) {
     const { found, deprecationWarning } = isInSettingsList(
       normalizedId,
       config.allowedList,
@@ -358,6 +358,7 @@ export class McpServerEnablementManager {
   private async readConfig(): Promise<McpServerEnablementConfig> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(content) as McpServerEnablementConfig;
     } catch (error) {
       if (

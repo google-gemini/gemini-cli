@@ -8,18 +8,14 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
-import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
+import { longAsciiLogo } from './AsciiArt.js';
 import * as semanticColors from '../semantic-colors.js';
-import * as terminalSetup from '../utils/terminalSetup.js';
 import { Text } from 'ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');
 vi.mock('../hooks/useSnowfall.js', () => ({
   useSnowfall: vi.fn((art) => art),
-}));
-vi.mock('../utils/terminalSetup.js', () => ({
-  getTerminalProgram: vi.fn(),
 }));
 vi.mock('ink-gradient', () => {
   const MockGradient = ({ children }: { children: React.ReactNode }) => (
@@ -41,15 +37,14 @@ vi.mock('ink', async () => {
 describe('<Header />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue(null);
   });
 
-  it('renders the long logo on a wide terminal', () => {
+  it('renders the long logo on a wide terminal', async () => {
     vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
       columns: 120,
       rows: 20,
     });
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
         children: longAsciiLogo,
@@ -58,25 +53,9 @@ describe('<Header />', () => {
     );
   });
 
-  it('uses the IDE logo when running in an IDE', () => {
-    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
-      columns: 120,
-      rows: 20,
-    });
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
-
-    render(<Header version="1.0.0" nightly={false} />);
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: longAsciiLogoIde,
-      }),
-      undefined,
-    );
-  });
-
-  it('renders custom ASCII art when provided', () => {
+  it('renders custom ASCII art when provided', async () => {
     const customArt = 'CUSTOM ART';
-    render(
+    await render(
       <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
     );
     expect(Text).toHaveBeenCalledWith(
@@ -87,28 +66,17 @@ describe('<Header />', () => {
     );
   });
 
-  it('renders custom ASCII art as is when running in an IDE', () => {
-    const customArt = 'CUSTOM ART';
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
-    render(
-      <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
-    );
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: customArt,
-      }),
-      undefined,
-    );
-  });
-
-  it('displays the version number when nightly is true', () => {
-    render(<Header version="1.0.0" nightly={true} />);
+  it('displays the version number when nightly is true', async () => {
+    await render(<Header version="1.0.0" nightly={true} />);
     const textCalls = (Text as Mock).mock.calls;
-    expect(textCalls[1][0].children.join('')).toBe('v1.0.0');
+    const versionText = Array.isArray(textCalls[1][0].children)
+      ? textCalls[1][0].children.join('')
+      : textCalls[1][0].children;
+    expect(versionText).toBe('v1.0.0');
   });
 
-  it('does not display the version number when nightly is false', () => {
-    render(<Header version="1.0.0" nightly={false} />);
+  it('does not display the version number when nightly is false', async () => {
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Text).not.toHaveBeenCalledWith(
       expect.objectContaining({
         children: 'v1.0.0',
@@ -128,16 +96,20 @@ describe('<Header />', () => {
       },
       background: {
         primary: '',
+        message: '',
+        input: '',
+        focus: '',
         diff: { added: '', removed: '' },
       },
       border: {
         default: '',
-        focused: '',
       },
       ui: {
         comment: '',
         symbol: '',
+        active: '',
         dark: '',
+        focus: '',
         gradient: undefined,
       },
       status: {
@@ -147,7 +119,7 @@ describe('<Header />', () => {
       },
     });
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
     expect(textCalls[0][0]).toHaveProperty('color', '#123456');
@@ -159,7 +131,7 @@ describe('<Header />', () => {
       ui: { gradient: [singleColor] },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
     expect(textCalls.length).toBe(1);
@@ -172,7 +144,7 @@ describe('<Header />', () => {
       ui: { gradient: gradientColors },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    await render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).toHaveBeenCalledWith(
       expect.objectContaining({
         colors: gradientColors,

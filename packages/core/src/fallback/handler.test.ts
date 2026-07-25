@@ -44,6 +44,7 @@ vi.mock('../telemetry/index.js', () => ({
 }));
 vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
+  shouldLaunchBrowser: vi.fn().mockReturnValue(true),
 }));
 
 // Mock debugLogger to prevent console pollution and allow spying
@@ -58,7 +59,6 @@ vi.mock('../utils/debugLogger.js', () => ({
 const MOCK_PRO_MODEL = DEFAULT_GEMINI_MODEL;
 const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
 const AUTH_OAUTH = AuthType.LOGIN_WITH_GOOGLE;
-const AUTH_API_KEY = AuthType.USE_GEMINI;
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -67,6 +67,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setActiveModel: vi.fn(),
     setModel: vi.fn(),
     activateFallbackMode: vi.fn(),
+    rotateSessionId: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
       createAvailabilityServiceMock({
         selectedModel: FALLBACK_MODEL,
@@ -75,9 +76,9 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     ),
     getActiveModel: vi.fn(() => MOCK_PRO_MODEL),
     getModel: vi.fn(() => MOCK_PRO_MODEL),
-    getPreviewFeatures: vi.fn(() => false),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    getHasAccessToPreviewModel: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
 
@@ -129,19 +130,8 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should return null immediately if authType is not OAuth', async () => {
-      const result = await handleFallback(
-        policyConfig,
-        MOCK_PRO_MODEL,
-        AUTH_API_KEY,
-      );
-      expect(result).toBeNull();
-      expect(policyHandler).not.toHaveBeenCalled();
-    });
-
     it('uses availability selection with correct candidates when enabled', async () => {
       // Direct mock manipulation since it's already a vi.fn()
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -202,6 +192,7 @@ describe('handleFallback', () => {
         expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
         expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
+          undefined,
         );
       } finally {
         chainSpy.mockRestore();
@@ -210,7 +201,6 @@ describe('handleFallback', () => {
 
     it('does not wrap around to upgrade candidates if the current model was selected at the end (e.g. by router)', async () => {
       // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -219,6 +209,9 @@ describe('handleFallback', () => {
         selectedModel: MOCK_PRO_MODEL,
         skipped: [],
       });
+      // Mock activeModel to be unavailable so the utility bypass heuristic is skipped
+      vi.mocked(availability.snapshot).mockReturnValue({ available: false });
+
       policyHandler.mockResolvedValue('retry_once');
 
       await handleFallback(
@@ -241,13 +234,13 @@ describe('handleFallback', () => {
         skipped: [],
       });
       policyHandler.mockResolvedValue('retry_once');
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getActiveModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(policyConfig.getModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL_AUTO,
       );
+      vi.mocked(policyConfig.getHasAccessToPreviewModel).mockReturnValue(true);
 
       const result = await handleFallback(
         policyConfig,
@@ -363,6 +356,8 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
+      // Mock activeModel to be unavailable so the utility bypass heuristic is skipped
+      vi.mocked(availability.snapshot).mockReturnValue({ available: false });
 
       const result = await handleFallback(
         policyConfig,
@@ -395,6 +390,7 @@ describe('handleFallback', () => {
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
         FALLBACK_MODEL,
+        undefined,
       );
       // TODO: add logging expect statement
     });

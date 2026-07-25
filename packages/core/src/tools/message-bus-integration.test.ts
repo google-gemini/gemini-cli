@@ -57,10 +57,10 @@ class TestToolInvocation extends BaseToolInvocation<TestParams, TestResult> {
     abortSignal: AbortSignal,
   ): Promise<false> {
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       return false;
     }
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error('Tool execution denied by policy');
     }
     return false;

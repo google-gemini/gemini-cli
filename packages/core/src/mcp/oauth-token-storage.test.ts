@@ -23,10 +23,14 @@ vi.mock('node:fs', () => ({
   },
 }));
 
-vi.mock('node:path', () => ({
-  dirname: vi.fn(),
-  join: vi.fn(),
-}));
+vi.mock('node:path', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:path')>();
+  return {
+    ...actual,
+    dirname: vi.fn(),
+    join: vi.fn(),
+  };
+});
 
 vi.mock('../config/storage.js', () => ({
   Storage: {
@@ -40,14 +44,14 @@ vi.mock('../utils/events.js', () => ({
   },
 }));
 
-const mockHybridTokenStorage = {
+const mockHybridTokenStorage = vi.hoisted(() => ({
   listServers: vi.fn(),
   setCredentials: vi.fn(),
   getCredentials: vi.fn(),
   deleteCredentials: vi.fn(),
   clearAll: vi.fn(),
   getAllCredentials: vi.fn(),
-};
+}));
 vi.mock('./token-storage/hybrid-token-storage.js', () => ({
   HybridTokenStorage: vi.fn(() => mockHybridTokenStorage),
 }));
@@ -186,6 +190,38 @@ describe('MCPOAuthTokenStorage', () => {
         expect(savedData).toHaveLength(1);
         expect(savedData[0].token.accessToken).toBe('new_access_token');
         expect(savedData[0].serverName).toBe('existing-server');
+      });
+
+      it('should merge existing refresh token when new payload lacks one', async () => {
+        const existingCredentials: OAuthCredentials = {
+          ...mockCredentials,
+          serverName: 'existing-server',
+          token: {
+            ...mockToken,
+            refreshToken: 'old-refresh-token',
+          },
+        };
+        vi.mocked(fs.readFile).mockResolvedValue(
+          JSON.stringify([existingCredentials]),
+        );
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+        const newToken: OAuthToken = {
+          accessToken: 'new_access_token',
+          expiresAt: Date.now() + ONE_HR_MS,
+          tokenType: 'Bearer',
+        }; // missing refreshToken
+
+        await tokenStorage.saveToken('existing-server', newToken);
+
+        const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+        const savedData = JSON.parse(
+          writeCall[1] as string,
+        ) as OAuthCredentials[];
+
+        expect(savedData).toHaveLength(1);
+        expect(savedData[0].token.accessToken).toBe('new_access_token');
+        expect(savedData[0].token.refreshToken).toBe('old-refresh-token'); // successfully merged
       });
 
       it('should handle write errors gracefully', async () => {
@@ -441,6 +477,55 @@ describe('MCPOAuthTokenStorage', () => {
       );
       expect(path.dirname).toHaveBeenCalled();
       expect(fs.mkdir).toHaveBeenCalled();
+    });
+
+    it('should merge existing refresh token when new payload lacks one in encrypted storage', async () => {
+      const serverName = 'server1';
+      const now = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      const existingCredentials: OAuthCredentials = {
+        serverName,
+        token: {
+          ...mockToken,
+          refreshToken: 'old-refresh-token',
+        },
+        updatedAt: now,
+      };
+
+      mockHybridTokenStorage.getCredentials.mockResolvedValue(
+        existingCredentials,
+      );
+
+      const newToken: OAuthToken = {
+        accessToken: 'new_access_token',
+        expiresAt: Date.now() + ONE_HR_MS,
+        tokenType: 'Bearer',
+      };
+
+      await tokenStorage.saveToken(
+        serverName,
+        newToken,
+        'clientId',
+        'tokenUrl',
+        'mcpUrl',
+      );
+
+      const expectedCredential: OAuthCredentials = {
+        serverName,
+        token: {
+          ...newToken,
+          refreshToken: 'old-refresh-token',
+        },
+        clientId: 'clientId',
+        tokenUrl: 'tokenUrl',
+        mcpServerUrl: 'mcpUrl',
+        updatedAt: now,
+      };
+
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith(
+        expectedCredential,
+      );
     });
 
     it('should use HybridTokenStorage to get credentials', async () => {

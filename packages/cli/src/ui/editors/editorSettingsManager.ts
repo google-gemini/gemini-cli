@@ -6,7 +6,7 @@
 
 import {
   allowEditorTypeInSandbox,
-  checkHasEditorType,
+  hasValidEditorCommand,
   type EditorType,
   EDITOR_DISPLAY_NAMES,
 } from '@google/gemini-cli-core';
@@ -21,6 +21,7 @@ class EditorSettingsManager {
   private readonly availableEditors: EditorDisplay[];
 
   constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const editorTypes = Object.keys(
       EDITOR_DISPLAY_NAMES,
     ).sort() as EditorType[];
@@ -31,7 +32,7 @@ class EditorSettingsManager {
         disabled: false,
       },
       ...editorTypes.map((type) => {
-        const hasEditor = checkHasEditorType(type);
+        const hasEditor = hasValidEditorCommand(type);
         const isAllowedInSandbox = allowEditorTypeInSandbox(type);
 
         let labelSuffix = !isAllowedInSandbox

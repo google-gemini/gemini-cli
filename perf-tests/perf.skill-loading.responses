@@ -1,0 +1,2 @@
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"0"}],"role":"model"},"finishReason":"STOP","index":0}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Hello! I'm ready to assist you with your project."}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":10,"totalTokenCount":15,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}

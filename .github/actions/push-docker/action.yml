@@ -18,11 +18,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      env:
-        JSON_INPUTS: '${{ toJSON(inputs) }}'
-      run: 'echo "$JSON_INPUTS"'
     - name: 'Checkout'
       uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
       with:
@@ -52,8 +47,10 @@ runs:
       id: 'branch_name'
       shell: 'bash'
       run: |
-        REF_NAME="${{ inputs.ref-name }}"
+        REF_NAME="${INPUTS_REF_NAME}"
         echo "name=${REF_NAME%/merge}" >> $GITHUB_OUTPUT
+      env:
+        INPUTS_REF_NAME: '${{ inputs.ref-name }}'
     - name: 'Build and Push the Docker Image'
       uses: 'docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83' # ratchet:docker/build-push-action@v6
       with:

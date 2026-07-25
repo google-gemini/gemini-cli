@@ -41,7 +41,10 @@ function getInitialTrustState(
     };
   }
 
-  const { isTrusted, source } = isWorkspaceTrusted(settings.merged);
+  const { isTrusted, source } = isWorkspaceTrusted(
+    settings.merged,
+    process.cwd(),
+  );
 
   const isInheritedTrust =
     isTrusted &&
@@ -85,21 +88,25 @@ export const usePermissionsModifyTrust = (
   );
   const [needsRestart, setNeedsRestart] = useState(false);
 
-  const isFolderTrustEnabled = !!settings.merged.security.folderTrust.enabled;
+  const isFolderTrustEnabled =
+    settings.merged.security.folderTrust.enabled ?? true;
 
   const updateTrustLevel = useCallback(
-    (trustLevel: TrustLevel) => {
+    async (trustLevel: TrustLevel) => {
       // If we are not editing the current workspace, the logic is simple:
       // just save the setting and exit. No restart or warnings are needed.
       if (!isCurrentWorkspace) {
         const folders = loadTrustedFolders();
-        folders.setValue(cwd, trustLevel);
+        await folders.setValue(cwd, trustLevel);
         onExit();
         return;
       }
 
       // All logic below only applies when editing the current workspace.
-      const wasTrusted = isWorkspaceTrusted(settings.merged).isTrusted;
+      const wasTrusted = isWorkspaceTrusted(
+        settings.merged,
+        process.cwd(),
+      ).isTrusted;
 
       // Create a temporary config to check the new trust status without writing
       const currentConfig = loadTrustedFolders().user.config;
@@ -107,6 +114,7 @@ export const usePermissionsModifyTrust = (
 
       const { isTrusted, source } = isWorkspaceTrusted(
         settings.merged,
+        process.cwd(),
         newConfig,
       );
 
@@ -132,8 +140,8 @@ export const usePermissionsModifyTrust = (
       } else {
         const folders = loadTrustedFolders();
         try {
-          folders.setValue(cwd, trustLevel);
-        } catch (_e) {
+          await folders.setValue(cwd, trustLevel);
+        } catch {
           coreEvents.emitFeedback(
             'error',
             'Failed to save trust settings. Your changes may not persist.',
@@ -145,13 +153,13 @@ export const usePermissionsModifyTrust = (
     [cwd, settings.merged, onExit, addItem, isCurrentWorkspace],
   );
 
-  const commitTrustLevelChange = useCallback(() => {
+  const commitTrustLevelChange = useCallback(async () => {
     if (pendingTrustLevel) {
       const folders = loadTrustedFolders();
       try {
-        folders.setValue(cwd, pendingTrustLevel);
+        await folders.setValue(cwd, pendingTrustLevel);
         return true;
-      } catch (_e) {
+      } catch {
         coreEvents.emitFeedback(
           'error',
           'Failed to save trust settings. Your changes may not persist.',

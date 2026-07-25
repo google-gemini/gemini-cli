@@ -12,10 +12,12 @@ import { isUserActive } from './activity-detector.js';
 import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 import {
   recordMemoryUsage,
+  recordCpuUsage,
   MemoryMetricType,
   isPerformanceMonitoringActive,
 } from './metrics.js';
 import { RateLimiter } from './rate-limiter.js';
+import { captureHeapSnapshot } from './heap-snapshot.js';
 
 export interface MemorySnapshot {
   timestamp: number;
@@ -37,6 +39,7 @@ export class MemoryMonitor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private lastSnapshot: MemorySnapshot | null = null;
+  private lastCpuUsage: NodeJS.CpuUsage | null = null;
   private monitoringInterval: number = 10000;
   private highWaterMarkTracker: HighWaterMarkTracker;
   private rateLimiter: RateLimiter;
@@ -189,6 +192,13 @@ export class MemoryMonitor {
       });
       recordMemoryUsage(config, snapshot.rss, {
         memory_type: MemoryMetricType.RSS,
+        component: context,
+      });
+
+      // Record delta CPU usage (in microseconds)
+      const cpuUsage = process.cpuUsage(this.lastCpuUsage ?? undefined);
+      this.lastCpuUsage = process.cpuUsage();
+      recordCpuUsage(config, cpuUsage.user + cpuUsage.system, {
         component: context,
       });
     }
@@ -375,6 +385,14 @@ export class MemoryMonitor {
    */
   resetHighWaterMarks(): void {
     this.highWaterMarkTracker.resetAllHighWaterMarks();
+  }
+
+  /**
+   * Capture a V8 heap snapshot for memory diagnostics.
+   * @returns The absolute path to the generated .heapsnapshot file, or null if it failed.
+   */
+  captureHeapSnapshot(): string | null {
+    return captureHeapSnapshot();
   }
 
   /**

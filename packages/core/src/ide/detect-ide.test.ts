@@ -28,6 +28,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PRODUCT', '');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
   });
@@ -100,6 +101,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.vscode);
   });
 
@@ -107,11 +109,21 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
+  });
+
+  it('should detect positron when POSITRON is set', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '1');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.positron);
   });
 
   it('should detect AntiGravity', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
@@ -126,6 +138,21 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'sublime');
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
+  });
+
+  it('should detect Zed via ZED_SESSION_ID', () => {
+    vi.stubEnv('ZED_SESSION_ID', 'test-session-id');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect Zed via TERM_PROGRAM', () => {
+    vi.stubEnv('TERM_PROGRAM', 'Zed');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect XCode via XCODE_VERSION_ACTUAL', () => {
+    vi.stubEnv('XCODE_VERSION_ACTUAL', '1500');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.xcode);
   });
 
   it('should detect JetBrains IDE via TERMINAL_EMULATOR', () => {
@@ -196,6 +223,7 @@ describe('detectIde with ideInfoFromFile', () => {
     vi.stubEnv('TERM_PRODUCT', '');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
   });
@@ -212,6 +240,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { displayName: 'Custom IDE' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );
@@ -221,6 +250,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { name: 'custom-ide' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );

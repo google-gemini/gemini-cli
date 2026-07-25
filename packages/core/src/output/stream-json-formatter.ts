@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { JsonStreamEvent, StreamStats } from './types.js';
+import type {
+  JsonStreamEvent,
+  ModelStreamStats,
+  StreamStats,
+} from './types.js';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
 
 /**
@@ -31,7 +35,7 @@ export class StreamJsonFormatter {
 
   /**
    * Converts SessionMetrics to simplified StreamStats format.
-   * Aggregates token counts across all models.
+   * Includes per-model token breakdowns and aggregated totals.
    * @param metrics - The session metrics from telemetry
    * @param durationMs - The session duration in milliseconds
    * @returns Simplified stats for streaming output
@@ -40,20 +44,35 @@ export class StreamJsonFormatter {
     metrics: SessionMetrics,
     durationMs: number,
   ): StreamStats {
-    let totalTokens = 0;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cached = 0;
-    let input = 0;
+    const { totalTokens, inputTokens, outputTokens, cached, input, models } =
+      Object.entries(metrics.models).reduce(
+        (acc, [modelName, modelMetrics]) => {
+          const modelStats: ModelStreamStats = {
+            total_tokens: modelMetrics.tokens.total,
+            input_tokens: modelMetrics.tokens.prompt,
+            output_tokens: modelMetrics.tokens.candidates,
+            cached: modelMetrics.tokens.cached,
+            input: modelMetrics.tokens.input,
+          };
 
-    // Aggregate token counts across all models
-    for (const modelMetrics of Object.values(metrics.models)) {
-      totalTokens += modelMetrics.tokens.total;
-      inputTokens += modelMetrics.tokens.prompt;
-      outputTokens += modelMetrics.tokens.candidates;
-      cached += modelMetrics.tokens.cached;
-      input += modelMetrics.tokens.input;
-    }
+          acc.models[modelName] = modelStats;
+          acc.totalTokens += modelStats.total_tokens;
+          acc.inputTokens += modelStats.input_tokens;
+          acc.outputTokens += modelStats.output_tokens;
+          acc.cached += modelStats.cached;
+          acc.input += modelStats.input;
+
+          return acc;
+        },
+        {
+          totalTokens: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cached: 0,
+          input: 0,
+          models: {} as Record<string, ModelStreamStats>,
+        },
+      );
 
     return {
       total_tokens: totalTokens,
@@ -63,6 +82,7 @@ export class StreamJsonFormatter {
       input,
       duration_ms: durationMs,
       tool_calls: metrics.tools.totalCalls,
+      models,
     };
   }
 }

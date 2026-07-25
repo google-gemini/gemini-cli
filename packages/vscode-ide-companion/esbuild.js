@@ -48,6 +48,12 @@ async function main() {
     },
     define: {
       'import.meta.url': 'import_meta.url',
+      'process.env.NODE_ENV': JSON.stringify(
+        production ? 'production' : 'development',
+      ),
+    },
+    alias: {
+      punycode: 'punycode/',
     },
     plugins: [
       /* add to the end of plugins array */

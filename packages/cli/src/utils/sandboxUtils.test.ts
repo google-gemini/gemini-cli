@@ -143,6 +143,95 @@ describe('sandboxUtils', () => {
       expect(await shouldUseCurrentUserInSandbox()).toBe(true);
     });
 
+    it('should return true on NixOS', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue('ID=nixos\n');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(true);
+    });
+
+    it('should return true on NixOS with quotes', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue('ID="nixos"\n');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(true);
+    });
+
+    it('should return true on Ubuntu with single quotes', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue("ID='ubuntu'\n");
+      expect(await shouldUseCurrentUserInSandbox()).toBe(true);
+    });
+
+    it('should return true on Arch Linux', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue('ID=arch\n');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(true);
+    });
+
+    it('should return false on unrecognized Linux and warn on UID mismatch', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue('ID=unknown\n');
+      vi.mocked(os.userInfo).mockReturnValue({
+        uid: 1234,
+        username: 'test',
+        gid: 1234,
+        shell: '/bin/bash',
+        homedir: '/home/test',
+      });
+
+      const { debugLogger } = await import('@google/gemini-cli-core');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(false);
+      expect(debugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Host UID mismatch detected (current UID: 1234)',
+        ),
+      );
+    });
+
+    it('should return true on Pop!_OS (via ID_LIKE)', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue(
+        'ID=pop\nID_LIKE="ubuntu debian"\n',
+      );
+      expect(await shouldUseCurrentUserInSandbox()).toBe(true);
+    });
+
+    it('should return false and NOT warn for host root user (UID 0)', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockResolvedValue('ID=unknown\n');
+      vi.mocked(os.userInfo).mockReturnValue({
+        uid: 0,
+        username: 'root',
+        gid: 0,
+        shell: '/bin/bash',
+        homedir: '/root',
+      });
+
+      const { debugLogger } = await import('@google/gemini-cli-core');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(false);
+      expect(debugLogger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Host UID mismatch detected'),
+      );
+    });
+
+    it('should warn and return false if /etc/os-release is unreadable', async () => {
+      delete process.env['SANDBOX_SET_UID_GID'];
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(readFile).mockRejectedValue(new Error('EACCES'));
+
+      const { debugLogger } = await import('@google/gemini-cli-core');
+      expect(await shouldUseCurrentUserInSandbox()).toBe(false);
+      expect(debugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Could not read /etc/os-release'),
+      );
+    });
+
     it('should return false on non-Linux', async () => {
       delete process.env['SANDBOX_SET_UID_GID'];
       vi.mocked(os.platform).mockReturnValue('darwin');

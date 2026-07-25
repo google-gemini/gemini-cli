@@ -8,6 +8,16 @@ import * as path from 'node:path';
 import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
 
+/**
+ * Represents a set of keys that will be considered invalid while unmarshalling
+ * JSON in recursivelyHydrateStrings.
+ */
+const UNMARSHALL_KEY_IGNORE_LIST: Set<string> = new Set<string>([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
@@ -24,7 +34,7 @@ export type JsonValue =
   | JsonArray;
 
 export type VariableContext = {
-  [key in keyof typeof VARIABLE_SCHEMA]?: string;
+  [key: string]: string | undefined;
 };
 
 export function validateVariables(
@@ -33,7 +43,7 @@ export function validateVariables(
 ) {
   for (const key in schema) {
     const definition = schema[key];
-    if (definition.required && !variables[key as keyof VariableContext]) {
+    if (definition.required && !variables[key]) {
       throw new Error(`Missing required variable: ${key}`);
     }
   }
@@ -42,31 +52,42 @@ export function validateVariables(
 export function hydrateString(str: string, context: VariableContext): string {
   validateVariables(context, VARIABLE_SCHEMA);
   const regex = /\${(.*?)}/g;
-  return str.replace(regex, (match, key) =>
-    context[key as keyof VariableContext] == null
-      ? match
-      : (context[key as keyof VariableContext] as string),
-  );
+  return str.replace(regex, (match, key) => {
+    const val = context[key];
+    return val == null ? match : String(val);
+  });
 }
 
-export function recursivelyHydrateStrings(
-  obj: JsonValue,
+export function recursivelyHydrateStrings<T>(
+  obj: T,
   values: VariableContext,
-): JsonValue {
+): T {
   if (typeof obj === 'string') {
-    return hydrateString(obj, values);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return hydrateString(obj, values) as unknown as T;
   }
   if (Array.isArray(obj)) {
-    return obj.map((item) => recursivelyHydrateStrings(item, values));
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (obj as unknown[]).map((item) =>
+      recursivelyHydrateStrings(item, values),
+    ) as unknown as T;
   }
   if (typeof obj === 'object' && obj !== null) {
-    const newObj: JsonObject = {};
+    const newObj: Record<string, unknown> = {};
     for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        newObj[key] = recursivelyHydrateStrings(obj[key], values);
+      if (
+        !UNMARSHALL_KEY_IGNORE_LIST.has(key) &&
+        Object.prototype.hasOwnProperty.call(obj, key)
+      ) {
+        newObj[key] = recursivelyHydrateStrings(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (obj as Record<string, unknown>)[key],
+          values,
+        );
       }
     }
-    return newObj;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return newObj as T;
   }
   return obj;
 }

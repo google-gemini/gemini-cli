@@ -12,6 +12,7 @@ import {
   beforeEach,
   afterEach,
   type MockInstance,
+  type Mock,
 } from 'vitest';
 import {
   main,
@@ -19,47 +20,66 @@ import {
   validateDnsResolutionOrder,
   startInteractiveUI,
   getNodeMemoryArgs,
+  resolveSessionId,
 } from './gemini.js';
+import {
+  loadCliConfig,
+  parseArguments,
+  type CliArgs,
+} from './config/config.js';
+import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
+import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
+import { start_sandbox } from './utils/sandbox.js';
+import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
-import { type CliArgs } from './config/config.js';
+import { loadSettings, type LoadedSettings } from './config/settings.js';
 import {
-  type LoadedSettings,
-  type Settings,
-  createTestMergedSettings,
-} from './config/settings.js';
+  createMockConfig,
+  createMockSettings,
+} from './test-utils/mockConfig.js';
 import { appEvents, AppEvent } from './utils/events.js';
-
-function createMockSettings(
-  overrides: Record<string, unknown> = {},
-): LoadedSettings {
-  const merged = createTestMergedSettings(
-    (overrides['merged'] as Partial<Settings>) || {},
-  );
-
-  return {
-    system: { settings: {} },
-    systemDefaults: { settings: {} },
-    user: { settings: {} },
-    workspace: { settings: {} },
-    errors: [],
-    ...overrides,
-    merged,
-  } as unknown as LoadedSettings;
-}
 import {
   type Config,
   type ResumedSessionData,
+  type StartupWarning,
+  type ConversationRecord,
+  WarningPriority,
   debugLogger,
   coreEvents,
+  AuthType,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
+import { runNonInteractive } from './nonInteractiveCli.js';
+import { SessionSelector, SessionError } from './utils/sessionUtils.js';
 
+// Hoisted constants and mocks
 const performance = vi.hoisted(() => ({
   now: vi.fn(),
 }));
 vi.stubGlobal('performance', performance);
+
+const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
+vi.mock('./nonInteractiveCli.js', () => ({
+  runNonInteractive: runNonInteractiveSpy,
+}));
+
+const terminalNotificationMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  buildRunEventNotificationContent: vi.fn(() => ({
+    title: 'Session complete',
+    body: 'done',
+    subtitle: 'Run finished',
+  })),
+}));
+vi.mock('./utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationMocks.notifyViaTerminal,
+  buildRunEventNotificationContent:
+    terminalNotificationMocks.buildRunEventNotificationContent,
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -67,6 +87,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     recordSlowRender: vi.fn(),
+    logUserPrompt: vi.fn(),
     writeToStdout: vi.fn((...args) =>
       process.stdout.write(
         ...(args as Parameters<typeof process.stdout.write>),
@@ -94,6 +115,31 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
     getVersion: vi.fn(() => Promise.resolve('1.0.0')),
+    startupProfiler: {
+      start: vi.fn(() => ({
+        end: vi.fn(),
+      })),
+      flush: vi.fn(),
+    },
+    ClearcutLogger: {
+      getInstance: vi.fn(() => ({
+        logStartSessionEvent: vi.fn().mockResolvedValue(undefined),
+        logEndSessionEvent: vi.fn().mockResolvedValue(undefined),
+        logUserPrompt: vi.fn(),
+        addDefaultFields: vi.fn((data) => data),
+      })),
+      clearInstance: vi.fn(),
+    },
+    coreEvents: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...actual.coreEvents,
+      emitFeedback: vi.fn(),
+      emitConsoleLog: vi.fn(),
+      listenerCount: vi.fn().mockReturnValue(0),
+      on: vi.fn(),
+      off: vi.fn(),
+      drainBacklogs: vi.fn(),
+    },
   };
 });
 
@@ -152,21 +198,22 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
 }));
 
 vi.mock('./config/config.js', () => ({
-  loadCliConfig: vi.fn().mockResolvedValue({
-    getSandbox: vi.fn(() => false),
-    getQuestion: vi.fn(() => ''),
-    isInteractive: () => false,
-    setTerminalBackground: vi.fn(),
-    storage: {
-      getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-    },
-  } as unknown as Config),
-  parseArguments: vi.fn().mockResolvedValue({}),
+  loadCliConfig: vi.fn().mockImplementation(async () => createMockConfig()),
+  parseArguments: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
+  }),
   isDebugMode: vi.fn(() => false),
+  getRequestedWorktreeName: vi.fn(() => undefined),
+  getWorktreeArg: vi.fn(() => undefined),
 }));
 
 vi.mock('read-package-up', () => ({
   readPackageUp: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
     packageJson: { name: 'test-pkg', version: 'test-version' },
     path: '/fake/path/package.json',
   }),
@@ -188,18 +235,34 @@ vi.mock('./utils/events.js', async (importOriginal) => {
   };
 });
 
+import * as readStdinModule from './utils/readStdin.js';
+
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
 }));
 
 vi.mock('./utils/relaunch.js', () => ({
-  relaunchAppInChildProcess: vi.fn(),
-  relaunchOnExitCode: vi.fn(),
+  relaunchAppInChildProcess: vi.fn().mockResolvedValue(undefined),
+  relaunchOnExitCode: vi.fn(async (fn) => {
+    await fn();
+  }),
 }));
 
 vi.mock('./config/sandboxConfig.js', () => ({
-  loadSandboxConfig: vi.fn(),
+  loadSandboxConfig: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
+    command: 'docker',
+    image: 'test-image',
+  }),
+}));
+
+vi.mock('./deferred.js', () => ({
+  runDeferredCommand: vi.fn().mockResolvedValue(undefined),
+  setDeferredCommand: vi.fn(),
+  defer: vi.fn((m) => m),
 }));
 
 vi.mock('./ui/utils/mouse.js', () => ({
@@ -208,48 +271,66 @@ vi.mock('./ui/utils/mouse.js', () => ({
   isIncompleteMouseSequence: vi.fn(),
 }));
 
-const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
-vi.mock('./nonInteractiveCli.js', () => ({
-  runNonInteractive: runNonInteractiveSpy,
+vi.mock('./validateNonInterActiveAuth.js', () => ({
+  validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
+}));
+
+vi.mock('./config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
 }));
 
 describe('gemini.tsx main function', () => {
-  let originalEnvGeminiSandbox: string | undefined;
-  let originalEnvSandbox: string | undefined;
+  let originalIsTTY: boolean | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
     [];
 
   beforeEach(() => {
     // Store and clear sandbox-related env variables to ensure a consistent test environment
-    originalEnvGeminiSandbox = process.env['GEMINI_SANDBOX'];
-    originalEnvSandbox = process.env['SANDBOX'];
-    delete process.env['GEMINI_SANDBOX'];
-    delete process.env['SANDBOX'];
+    vi.stubEnv('GEMINI_SANDBOX', '');
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('SHPOOL_SESSION_NAME', '');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
 
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
+
+    originalIsTTY = process.stdin.isTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
   });
 
   afterEach(() => {
-    // Restore original env variables
-    if (originalEnvGeminiSandbox !== undefined) {
-      process.env['GEMINI_SANDBOX'] = originalEnvGeminiSandbox;
-    } else {
-      delete process.env['GEMINI_SANDBOX'];
-    }
-    if (originalEnvSandbox !== undefined) {
-      process.env['SANDBOX'] = originalEnvSandbox;
-    } else {
-      delete process.env['SANDBOX'];
-    }
-
     const currentListeners = process.listeners('unhandledRejection');
     currentListeners.forEach((listener) => {
       if (!initialUnhandledRejectionListeners.includes(listener)) {
         process.removeListener('unhandledRejection', listener);
       }
     });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
+
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  it('should suppress AbortError and not open debug console', async () => {
+    const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+    const debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
+    const abortError = new DOMException(
+      'The operation was aborted.',
+      'AbortError',
+    );
+
+    setupUnhandledRejectionHandler();
+    process.emit('unhandledRejection', abortError, Promise.resolve());
+
+    await new Promise(process.nextTick);
+
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Suppressed unhandled AbortError'),
+    );
   });
 
   it('should log unhandled promise rejections and open debug console on first error', async () => {
@@ -327,15 +408,30 @@ describe('initializeOutputListenersAndFlush', () => {
 describe('getNodeMemoryArgs', () => {
   let osTotalMemSpy: MockInstance;
   let v8GetHeapStatisticsSpy: MockInstance;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalConfig: any;
 
   beforeEach(() => {
     osTotalMemSpy = vi.spyOn(os, 'totalmem');
     v8GetHeapStatisticsSpy = vi.spyOn(v8, 'getHeapStatistics');
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+
+    originalConfig = process.config;
+    Object.defineProperty(process, 'config', {
+      value: {
+        ...originalConfig,
+        variables: { ...originalConfig?.variables, v8_enable_sandbox: 1 },
+      },
+      configurable: true,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(process, 'config', {
+      value: originalConfig,
+      configurable: true,
+    });
   });
 
   it('should return empty array if GEMINI_CLI_NO_RELAUNCH is set', () => {
@@ -348,8 +444,10 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 8 * 1024 * 1024 * 1024, // 8GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 8GB. No relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual([]);
+    // Target is 50% of 16GB = 8GB. Current is 8GB. Relaunch needed for EPT size only.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+    ]);
   });
 
   it('should return memory args if current heap limit is insufficient', () => {
@@ -357,8 +455,11 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 4 * 1024 * 1024 * 1024, // 4GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual(['--max-old-space-size=8192']);
+    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed for both.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+      '--max-old-space-size=8192',
+    ]);
   });
 
   it('should log debug info when isDebugMode is true', () => {
@@ -379,6 +480,8 @@ describe('getNodeMemoryArgs', () => {
 
 describe('gemini.tsx main function kitty protocol', () => {
   let originalEnvNoRelaunch: string | undefined;
+  let originalIsTTY: boolean | undefined;
+  let originalIsRaw: boolean | undefined;
   let setRawModeSpy: MockInstance<
     (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
   >;
@@ -395,14 +498,12 @@ describe('gemini.tsx main function kitty protocol', () => {
     }
     setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
 
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true,
-      configurable: true,
-    });
-    Object.defineProperty(process.stdin, 'isRaw', {
-      value: false,
-      configurable: true,
-    });
+    originalIsTTY = process.stdin.isTTY;
+    originalIsRaw = process.stdin.isRaw;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isRaw = false;
   });
 
   afterEach(() => {
@@ -412,56 +513,21 @@ describe('gemini.tsx main function kitty protocol', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isRaw = originalIsRaw;
     vi.restoreAllMocks();
   });
 
   it('should call setRawMode and detectCapabilities when isInteractive is true', async () => {
-    const { terminalCapabilityManager } = await import(
-      './ui/utils/terminalCapabilityManager.js'
-    );
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => true,
-      getQuestion: () => '',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      initialize: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({
-        subscribe: vi.fn(),
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
       }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      getToolRegistry: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getExtensions: () => [],
-      getUsageStatisticsEnabled: () => false,
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-    } as unknown as Config);
+    );
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: {
@@ -480,6 +546,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       query: undefined,
       yolo: undefined,
       approvalMode: undefined,
+      policy: undefined,
+      adminPolicy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -489,6 +557,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useWriteTodos: undefined,
       resume: undefined,
+      sessionId: undefined,
       listSessions: undefined,
       deleteSession: undefined,
       outputFormat: undefined,
@@ -497,6 +566,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
+      skipTrust: undefined,
     });
 
     await act(async () => {
@@ -509,15 +579,69 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
   });
 
+  it('should call process.stdin.resume when isInteractive is true to protect against implicit Node pause', async () => {
+    const resumeSpy = vi.spyOn(process.stdin, 'resume');
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      query: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      policy: undefined,
+      adminPolicy: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useWriteTodos: undefined,
+      resume: undefined,
+      sessionId: undefined,
+      listSessions: undefined,
+      deleteSession: undefined,
+      outputFormat: undefined,
+      fakeResponses: undefined,
+      recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
+      isCommand: undefined,
+      skipTrust: undefined,
+    });
+
+    await act(async () => {
+      await main();
+    });
+
+    expect(resumeSpy).toHaveBeenCalledTimes(1);
+    resumeSpy.mockRestore();
+  });
+
   it.each([
     { flag: 'listExtensions' },
     { flag: 'listSessions' },
     { flag: 'deleteSession', value: 'session-id' },
   ])('should handle --$flag flag', async ({ flag, value }) => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
     const { listSessions, deleteSession } = await import('./utils/sessions.js');
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -539,35 +663,30 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const mockConfig = {
+    const mockConfig = createMockConfig({
       isInteractive: () => false,
       getQuestion: () => '',
-      getSandbox: () => false,
-      getDebugMode: () => false,
+      getSandbox: () => undefined,
       getListExtensions: () => flag === 'listExtensions',
       getListSessions: () => flag === 'listSessions',
       getDeleteSession: () => (flag === 'deleteSession' ? value : undefined),
-      getExtensions: () => [{ name: 'ext1' }],
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      refreshAuth: vi.fn(),
-    } as unknown as Config;
+      getExtensions: () => [
+        {
+          name: 'ext1',
+          id: 'ext1',
+          version: '1.0.0',
+          isActive: true,
+          path: '/path/to/ext1',
+          contextFiles: [],
+        },
+      ],
+    });
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
     vi.mock('./utils/sessions.js', () => ({
@@ -602,13 +721,7 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle sandbox activation', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSandboxConfig } = await import('./config/sandboxConfig.js');
-    const { start_sandbox } = await import('./utils/sandbox.js');
-    const { relaunchOnExitCode } = await import('./utils/relaunch.js');
-    const { loadSettings } = await import('./config/settings.js');
+    vi.stubEnv('SANDBOX', '');
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
@@ -616,6 +729,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       });
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -623,7 +739,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       createMockSettings({
         merged: {
           advanced: {},
-          security: { auth: {} },
+          security: { auth: { selectedType: 'google' } },
           ui: {},
         },
         workspace: { settings: {} },
@@ -632,76 +748,20 @@ describe('gemini.tsx main function kitty protocol', () => {
       }),
     );
 
-    const mockConfig = {
+    const mockConfig = createMockConfig({
       isInteractive: () => false,
       getQuestion: () => '',
-      getSandbox: () => true,
-      getDebugMode: () => false,
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getExtensions: () => [],
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      refreshAuth: vi.fn(),
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      getToolRegistry: () => ({ getAllTools: () => [] }),
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-model',
-      getCoreTools: () => [],
-      getApprovalMode: () => 'default',
-      getPreviewFeatures: () => false,
-      getTargetDir: () => '/',
-      getUsageStatisticsEnabled: () => false,
-      getTelemetryEnabled: () => false,
-      getTelemetryTarget: () => 'none',
-      getTelemetryOtlpEndpoint: () => '',
-      getTelemetryOtlpProtocol: () => 'grpc',
-      getTelemetryLogPromptsEnabled: () => false,
-      getContinueOnFailedApiCall: () => false,
-      getShellToolInactivityTimeout: () => 0,
-      getTruncateToolOutputThreshold: () => 0,
-      getUseRipgrep: () => false,
-      getUseWriteTodos: () => false,
-      getHooks: () => undefined,
-      getExperiments: () => undefined,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getFolderTrust: () => false,
-      getPendingIncludeDirectories: () => [],
-      getWorkspaceContext: () => ({ getDirectories: () => ['/'] }),
-      getModelAvailabilityService: () => ({
-        reset: vi.fn(),
-        resetTurn: vi.fn(),
-      }),
-      getBaseLlmClient: () => ({}),
-      getGeminiClient: () => ({}),
-      getContentGenerator: () => ({}),
-      isTrustedFolder: () => true,
-      isYoloModeDisabled: () => true,
-      isPlanEnabled: () => false,
-      isEventDrivenSchedulerEnabled: () => false,
-    } as unknown as Config;
+      getSandbox: () =>
+        createMockSandboxConfig({ command: 'docker', image: 'test-image' }),
+    });
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
-    vi.mocked(loadSandboxConfig).mockResolvedValue({
-      command: 'docker',
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(relaunchOnExitCode).mockImplementation(async (fn) => {
-      await fn();
-    });
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -718,10 +778,6 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should log warning when theme is not found', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi
       .spyOn(debugLogger, 'warn')
@@ -746,44 +802,18 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => 'test',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getToolRegistry: vi.fn(),
-      getExtensions: () => [],
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getUsageStatisticsEnabled: () => false,
-      refreshAuth: vi.fn(),
-      setTerminalBackground: vi.fn(),
-      getRemoteAdminSettings: () => undefined,
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test',
+        getSandbox: () => undefined,
+      }),
+    );
 
     vi.spyOn(themeManager, 'setActiveTheme').mockReturnValue(false);
 
@@ -803,19 +833,14 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
-    const { SessionSelector } = await import('./utils/sessionUtils.js');
-    vi.mocked(SessionSelector).mockImplementation(
-      () =>
-        ({
-          resolveSession: vi
-            .fn()
-            .mockRejectedValue(new Error('Session not found')),
-        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    );
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(new Error('Session not found')),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
 
     const processExitSpy = vi
       .spyOn(process, 'exit')
@@ -834,47 +859,19 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
       resume: 'session-id',
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => true,
-      getQuestion: () => '',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getToolRegistry: vi.fn(),
-      getExtensions: () => [],
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getUsageStatisticsEnabled: () => false,
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
 
     try {
       await main();
@@ -891,11 +888,61 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
+  it('should start normally with a warning when no sessions found for resume', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        resolveSession: vi
+          .fn()
+          .mockRejectedValue(SessionError.noSessionsFound()),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
     );
-    const { loadSettings } = await import('./config/settings.js');
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      promptInteractive: false,
+      resume: 'latest',
+    } as unknown as CliArgs);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    await main();
+
+    // Should NOT have crashed
+    expect(processExitSpy).not.toHaveBeenCalled();
+    // Should NOT have emitted a feedback error
+    expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session'),
+    );
+    processExitSpy.mockRestore();
+    emitFeedbackSpy.mockRestore();
+  });
+
+  it.skip('should log error when cleanupExpiredSessions fails', async () => {
     const { cleanupExpiredSessions } = await import(
       './utils/sessionCleanup.js'
     );
@@ -921,46 +968,18 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => 'test',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getToolRegistry: vi.fn(),
-      getExtensions: () => [],
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getUsageStatisticsEnabled: () => false,
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test',
+        getSandbox: () => undefined,
+      }),
+    );
 
     // The mock is already set up at the top of the test
 
@@ -980,16 +999,17 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should read from stdin in non-interactive mode', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
-    const { readStdin } = await import('./utils/readStdin.js');
+    vi.stubEnv('SANDBOX', 'true');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
         throw new MockProcessExitError(code);
       });
+
+    const readStdinSpy = vi
+      .spyOn(readStdinModule, 'readStdin')
+      .mockResolvedValue('stdin-data');
 
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
@@ -1001,54 +1021,22 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => 'test-question',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      initialize: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getProjectRoot: () => '/',
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getToolRegistry: vi.fn(),
-      getExtensions: () => [],
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getUsageStatisticsEnabled: () => false,
-      refreshAuth: vi.fn(),
-      setTerminalBackground: vi.fn(),
-      getRemoteAdminSettings: () => undefined,
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    vi.mock('./utils/readStdin.js', () => ({
-      readStdin: vi.fn().mockResolvedValue('stdin-data'),
-    }));
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test-question',
+        getSandbox: () => undefined,
+      }),
+    );
 
     // Mock stdin to be non-TTY
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -1059,24 +1047,190 @@ describe('gemini.tsx main function kitty protocol', () => {
       delete process.env['GEMINI_API_KEY'];
     }
 
-    expect(readStdin).toHaveBeenCalled();
+    expect(readStdinSpy).toHaveBeenCalled();
     // In this test setup, runNonInteractive might be called on the mocked module,
     // but we need to ensure we are checking the correct spy instance.
     // Since vi.mock is hoisted, runNonInteractiveSpy is defined early.
-    expect(runNonInteractiveSpy).toHaveBeenCalled();
-    const callArgs = runNonInteractiveSpy.mock.calls[0][0];
-    expect(callArgs.input).toBe('test-question');
+    expect(runNonInteractive).toHaveBeenCalled();
+    const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
+    expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    expect(
+      terminalNotificationMocks.buildRunEventNotificationContent,
+    ).not.toHaveBeenCalled();
+    expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true,
-      configurable: true,
+  });
+});
+
+describe('resolveSessionId', () => {
+  it('should return a new session ID when neither resume nor sessionId is provided', async () => {
+    const { sessionId, resumedSessionData } = await resolveSessionId(
+      undefined,
+      undefined,
+    );
+    expect(sessionId).toBeDefined();
+    expect(resumedSessionData).toBeUndefined();
+  });
+
+  it('should import from session file when sessionFile is provided', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
     });
+
+    const coreModule = await import('@google/gemini-cli-core');
+    vi.spyOn(coreModule, 'loadConversationRecord').mockResolvedValueOnce({
+      sessionId: 'old-session-id',
+      projectHash: 'hash',
+      startTime: 'time',
+      lastUpdated: 'time',
+      messages: [
+        { type: 'info', content: 'Old info', id: '1' },
+        { type: 'user', content: 'Hello', id: '2' },
+        { type: 'gemini', content: 'Hi', id: '3' },
+        { type: 'error', content: 'Old error', id: '4' },
+        { type: 'user', id: '5' }, // Missing content
+        null, // Null object
+        { type: 'unknown', content: 'Something', id: '6' }, // Unknown type
+      ],
+    } as unknown as ConversationRecord);
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      const { sessionId, resumedSessionData } = await resolveSessionId(
+        undefined,
+        undefined,
+        'dummy-session.json',
+      );
+
+      expect(sessionId).toBeDefined();
+      expect(sessionId).not.toBe('old-session-id'); // A new session ID should be created
+      expect(resumedSessionData).toBeDefined();
+      expect(resumedSessionData?.conversation.sessionId).toBe(sessionId); // Overwritten
+
+      // Verify messages: should have 1 info (the new import confirmation) + 2 valid conversation messages
+      // Invalid messages (missing content, null, unknown type) and transient messages should be filtered out.
+      expect(resumedSessionData?.conversation.messages).toHaveLength(3);
+      expect(resumedSessionData?.conversation.messages![0]).toMatchObject({
+        type: 'info',
+        content: expect.stringContaining('Imported session from'),
+      });
+      expect(resumedSessionData?.conversation.messages![1]).toMatchObject({
+        type: 'user',
+        content: 'Hello',
+      });
+      expect(resumedSessionData?.conversation.messages![2]).toMatchObject({
+        type: 'gemini',
+        content: 'Hi',
+      });
+
+      expect(resumedSessionData?.filePath).toContain(sessionId.slice(0, 8)); // New path
+    } catch (e) {
+      if (e instanceof MockProcessExitError) {
+        throw new Error(
+          'process.exit called with: ' +
+            JSON.stringify(emitFeedbackSpy.mock.calls),
+        );
+      }
+      throw e;
+    } finally {
+      emitFeedbackSpy.mockRestore();
+      processExitSpy.mockRestore();
+    }
+  });
+
+  it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(true),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId(undefined, 'existing-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Session ID "existing-id" already exists'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
+  });
+
+  it('should return provided sessionId when it does not exist', async () => {
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(SessionSelector).mockImplementation(function () {
+      return {
+        sessionExists: vi.fn().mockResolvedValue(false),
+      } as unknown as InstanceType<typeof SessionSelector>;
+    });
+    const { sessionId, resumedSessionData } = await resolveSessionId(
+      undefined,
+      'new-id',
+    );
+    expect(sessionId).toBe('new-id');
+    expect(resumedSessionData).toBeUndefined();
+  });
+
+  it('should exit with FATAL_INPUT_ERROR when explicit resume session is missing', async () => {
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId('explicit-session-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session:'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
   });
 });
 
 describe('gemini.tsx main function exit codes', () => {
   let originalEnvNoRelaunch: string | undefined;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(() => {
     originalEnvNoRelaunch = process.env['GEMINI_CLI_NO_RELAUNCH'];
@@ -1086,6 +1240,8 @@ describe('gemini.tsx main function exit codes', () => {
     });
     // Mock stderr to avoid cluttering output
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    originalIsTTY = process.stdin.isTTY;
   });
 
   afterEach(() => {
@@ -1094,27 +1250,26 @@ describe('gemini.tsx main function exit codes', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
     vi.restoreAllMocks();
   });
 
   it('should exit with 42 for invalid input combination (prompt-interactive with non-TTY)', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
-    vi.mocked(loadCliConfig).mockResolvedValue({} as Config);
+    vi.mocked(loadCliConfig).mockResolvedValue(createMockConfig());
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: true,
     } as unknown as CliArgs);
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
 
     try {
       await main();
@@ -1125,19 +1280,21 @@ describe('gemini.tsx main function exit codes', () => {
     }
   });
 
-  it('should exit with 41 for auth failure during sandbox setup', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
+  it('should exit with 41 for validateAuthMethod failure during sandbox setup', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
     );
-    const { loadSettings } = await import('./config/settings.js');
-    const { loadSandboxConfig } = await import('./config/sandboxConfig.js');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadSandboxConfig).mockResolvedValue({} as any);
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
-      getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
-      isInteractive: vi.fn().mockReturnValue(true),
-    } as unknown as Config);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockResolvedValue(undefined),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: {
@@ -1145,10 +1302,45 @@ describe('gemini.tsx main function exit codes', () => {
         },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
-    vi.mock('./config/auth.js', () => ({
-      validateAuthMethod: vi.fn().mockReturnValue(null),
-    }));
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    const authModule = await import('./config/auth.js');
+    vi.mocked(authModule.validateAuthMethod).mockResolvedValueOnce(
+      'Auth method invalid',
+    );
+
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(41);
+    }
+  });
+
+  it('should exit with 41 for auth failure during sandbox setup', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
 
     try {
       await main();
@@ -1160,65 +1352,37 @@ describe('gemini.tsx main function exit codes', () => {
   });
 
   it('should exit with 42 for session resume failure', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test',
+        getSandbox: () => undefined,
+      }),
     );
-    const { loadSettings } = await import('./config/settings.js');
-
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => 'test',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      initialize: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      getToolRegistry: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getExtensions: () => [],
-      getUsageStatisticsEnabled: () => false,
-      getRemoteAdminSettings: () => undefined,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-      refreshAuth: vi.fn(),
-    } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       resume: 'invalid-session',
     } as unknown as CliArgs);
 
-    vi.mock('./utils/sessionUtils.js', () => ({
-      SessionSelector: vi.fn().mockImplementation(() => ({
-        resolveSession: vi
-          .fn()
-          .mockRejectedValue(new Error('Session not found')),
-      })),
-    }));
+    vi.mock('./utils/sessionUtils.js', async (importOriginal) => {
+      const original =
+        await importOriginal<typeof import('./utils/sessionUtils.js')>();
+      return {
+        ...original,
+        SessionSelector: vi.fn().mockImplementation(() => ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(new Error('Session not found')),
+        })),
+      };
+    });
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -1233,59 +1397,25 @@ describe('gemini.tsx main function exit codes', () => {
   });
 
   it('should exit with 42 for no input provided', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
     );
-    const { loadSettings } = await import('./config/settings.js');
-
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => '',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      initialize: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      getToolRegistry: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getExtensions: () => [],
-      getUsageStatisticsEnabled: () => false,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-      refreshAuth: vi.fn(),
-      getRemoteAdminSettings: () => undefined,
-    } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true, // Simulate TTY so it doesn't try to read stdin
-      configurable: true,
-    });
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -1300,59 +1430,29 @@ describe('gemini.tsx main function exit codes', () => {
   });
 
   it('should validate and refresh auth in non-interactive mode when no auth type is selected but env var is present', async () => {
-    const { loadCliConfig, parseArguments } = await import(
-      './config/config.js'
-    );
-    const { loadSettings } = await import('./config/settings.js');
-    const { AuthType } = await import('@google/gemini-cli-core');
-
     const refreshAuthSpy = vi.fn();
-
-    vi.mocked(loadCliConfig).mockResolvedValue({
-      isInteractive: () => false,
-      getQuestion: () => 'test prompt',
-      getSandbox: () => false,
-      getDebugMode: () => false,
-      getListExtensions: () => false,
-      getListSessions: () => false,
-      getDeleteSession: () => undefined,
-      getMcpServers: () => ({}),
-      getMcpClientManager: vi.fn(),
-      initialize: vi.fn(),
-      getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
-      getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
-      getPolicyEngine: vi.fn(),
-      getMessageBus: () => ({ subscribe: vi.fn() }),
-      getEnableHooks: () => false,
-      getHookSystem: () => undefined,
-      getToolRegistry: vi.fn(),
-      getContentGeneratorConfig: vi.fn(),
-      getModel: () => 'gemini-pro',
-      getEmbeddingModel: () => 'embedding-001',
-      getApprovalMode: () => 'default',
-      getCoreTools: () => [],
-      getTelemetryEnabled: () => false,
-      getTelemetryLogPromptsEnabled: () => false,
-      getFileFilteringRespectGitIgnore: () => true,
-      getOutputFormat: () => 'text',
-      getExtensions: () => [],
-      getUsageStatisticsEnabled: () => false,
-      setTerminalBackground: vi.fn(),
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
-      },
-      refreshAuth: refreshAuthSpy,
-      getRemoteAdminSettings: () => undefined,
-    } as unknown as Config);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test prompt',
+        getSandbox: () => undefined,
+        refreshAuth: refreshAuthSpy,
+      }),
+    );
+    vi.mocked(validateNonInteractiveAuth).mockResolvedValue(
+      AuthType.USE_GEMINI,
+    );
 
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { security: { auth: { selectedType: undefined } }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
 
     runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
 
@@ -1412,25 +1512,127 @@ describe('validateDnsResolutionOrder', () => {
   });
 });
 
+describe('project hooks loading based on trust', () => {
+  let loadCliConfig: Mock;
+  let loadSettings: Mock;
+  let parseArguments: Mock;
+
+  beforeEach(async () => {
+    // Dynamically import and get the mocked functions
+    const configModule = await import('./config/config.js');
+    loadCliConfig = vi.mocked(configModule.loadCliConfig);
+    parseArguments = vi.mocked(configModule.parseArguments);
+    parseArguments.mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      startupMessages: [],
+    });
+
+    const settingsModule = await import('./config/settings.js');
+    loadSettings = vi.mocked(settingsModule.loadSettings);
+
+    vi.clearAllMocks();
+    // Mock the main function's dependencies to isolate the config loading part
+    vi.mock('./nonInteractiveCli.js', () => ({
+      runNonInteractive: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as unknown as (
+      code?: string | number | null,
+    ) => never);
+
+    // Default mock implementation for loadCliConfig
+    loadCliConfig.mockResolvedValue(
+      createMockConfig({
+        getQuestion: vi.fn().mockReturnValue('test question'),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should load project hooks when workspace is trusted', async () => {
+    const hooks = { 'before-model': 'echo "trusted"' };
+    loadSettings.mockReturnValue(
+      createMockSettings({
+        workspace: {
+          isTrusted: true,
+          settings: { hooks },
+        },
+        merged: {
+          security: { auth: { selectedType: 'google' } },
+        },
+      }),
+    );
+
+    await main();
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        projectHooks: hooks,
+      }),
+    );
+  });
+
+  it('should NOT load project hooks when workspace is not trusted', async () => {
+    loadSettings.mockReturnValue(
+      createMockSettings({
+        workspace: {
+          isTrusted: false,
+          settings: {},
+        },
+        merged: {
+          security: { auth: { selectedType: 'google' } },
+        },
+      }),
+    );
+
+    await main();
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        projectHooks: undefined,
+      }),
+    );
+  });
+});
+
 describe('startInteractiveUI', () => {
   // Mock dependencies
-  const mockConfig = {
+  const mockConfig = createMockConfig({
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
     getDebugMode: () => false,
-  } as unknown as Config;
+    getUseAlternateBuffer: () => true,
+  });
   const mockSettings = {
     merged: {
       ui: {
         hideWindowTitle: false,
         useAlternateBuffer: true,
+        incrementalRendering: true,
+      },
+      general: {
+        debugKeystrokeLogging: false,
       },
     },
   } as LoadedSettings;
-  const mockStartupWarnings = ['warning1'];
+  const mockStartupWarnings: StartupWarning[] = [
+    { id: 'w1', message: 'warning1', priority: WarningPriority.High },
+  ];
   const mockWorkspaceRoot = '/root';
   const mockInitializationResult = {
     authError: null,
+    accountSuspensionInfo: null,
     themeError: null,
     shouldOpenAuthDialog: false,
     geminiMdFileCount: 0,
@@ -1439,23 +1641,31 @@ describe('startInteractiveUI', () => {
   vi.mock('./ui/utils/updateCheck.js', () => ({
     checkForUpdates: vi.fn(() => Promise.resolve(null)),
   }));
-
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
+    removeCleanup: vi.fn(),
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    removeSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
+    setupSignalHandlers: vi.fn(),
+    setupTtyCheck: vi.fn(() => vi.fn()),
   }));
 
+  beforeEach(() => {
+    vi.stubEnv('SHPOOL_SESSION_NAME', '');
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   async function startTestInteractiveUI(
     config: Config,
     settings: LoadedSettings,
-    startupWarnings: string[],
+    startupWarnings: StartupWarning[],
     workspaceRoot: string,
     resumedSessionData: ResumedSessionData | undefined,
     initializationResult: InitializationResult,
@@ -1547,7 +1757,9 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(3);
+    // 6 cleanups: mouseEvents, lineWrapping, non-resumable session cleanup,
+    // instance.unmount, TTY check, and consolePatcher
+    expect(registerCleanup).toHaveBeenCalledTimes(6);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
@@ -1607,6 +1819,7 @@ describe('startInteractiveUI', () => {
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
     const mockConfigWithScreenReader = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
       getScreenReader: () => screenReader,
     } as Config;

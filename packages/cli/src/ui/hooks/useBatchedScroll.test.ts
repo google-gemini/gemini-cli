@@ -9,14 +9,14 @@ import { renderHook } from '../../test-utils/render.js';
 import { useBatchedScroll } from './useBatchedScroll.js';
 
 describe('useBatchedScroll', () => {
-  it('returns initial scrollTop', () => {
-    const { result } = renderHook(() => useBatchedScroll(10));
+  it('returns initial scrollTop', async () => {
+    const { result } = await renderHook(() => useBatchedScroll(10));
     expect(result.current.getScrollTop()).toBe(10);
   });
 
-  it('returns updated scrollTop from props', () => {
+  it('returns updated scrollTop from props', async () => {
     let currentScrollTop = 10;
-    const { result, rerender } = renderHook(() =>
+    const { result, rerender } = await renderHook(() =>
       useBatchedScroll(currentScrollTop),
     );
 
@@ -28,24 +28,24 @@ describe('useBatchedScroll', () => {
     expect(result.current.getScrollTop()).toBe(100);
   });
 
-  it('returns pending scrollTop when set', () => {
-    const { result } = renderHook(() => useBatchedScroll(10));
+  it('returns pending scrollTop when set', async () => {
+    const { result } = await renderHook(() => useBatchedScroll(10));
 
     result.current.setPendingScrollTop(50);
     expect(result.current.getScrollTop()).toBe(50);
   });
 
-  it('overwrites pending scrollTop with subsequent sets before render', () => {
-    const { result } = renderHook(() => useBatchedScroll(10));
+  it('overwrites pending scrollTop with subsequent sets before render', async () => {
+    const { result } = await renderHook(() => useBatchedScroll(10));
 
     result.current.setPendingScrollTop(50);
     result.current.setPendingScrollTop(75);
     expect(result.current.getScrollTop()).toBe(75);
   });
 
-  it('resets pending scrollTop after rerender', () => {
+  it('resets pending scrollTop after rerender', async () => {
     let currentScrollTop = 10;
-    const { result, rerender } = renderHook(() =>
+    const { result, rerender } = await renderHook(() =>
       useBatchedScroll(currentScrollTop),
     );
 
@@ -60,8 +60,8 @@ describe('useBatchedScroll', () => {
     expect(result.current.getScrollTop()).toBe(100);
   });
 
-  it('resets pending scrollTop after rerender even if prop is same', () => {
-    const { result, rerender } = renderHook(() => useBatchedScroll(10));
+  it('resets pending scrollTop after rerender even if prop is same', async () => {
+    const { result, rerender } = await renderHook(() => useBatchedScroll(10));
 
     result.current.setPendingScrollTop(50);
     expect(result.current.getScrollTop()).toBe(50);
@@ -73,8 +73,8 @@ describe('useBatchedScroll', () => {
     expect(result.current.getScrollTop()).toBe(10);
   });
 
-  it('maintains stable function references', () => {
-    const { result, rerender } = renderHook(() => useBatchedScroll(10));
+  it('maintains stable function references', async () => {
+    const { result, rerender } = await renderHook(() => useBatchedScroll(10));
     const initialGetScrollTop = result.current.getScrollTop;
     const initialSetPendingScrollTop = result.current.setPendingScrollTop;
 

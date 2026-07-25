@@ -16,12 +16,14 @@ export interface ToolCallContext {
   schedulerId: string;
   /** The ID of the parent tool call, if this is a nested execution (e.g., in a subagent). */
   parentCallId?: string;
+  /** The name of the subagent executing the tool, if applicable. */
+  subagent?: string;
 }
 
 /**
  * AsyncLocalStorage instance for tool call context.
  */
-export const toolCallContext = new AsyncLocalStorage<ToolCallContext>();
+const toolCallContext = new AsyncLocalStorage<ToolCallContext>();
 
 /**
  * Runs a function within a tool call context.

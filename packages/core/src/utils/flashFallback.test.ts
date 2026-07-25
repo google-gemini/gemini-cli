@@ -19,6 +19,7 @@ import { AuthType } from '../core/contentGenerator.js';
 // Import the new types (Assuming this test file is in packages/core/src/utils/)
 import type { FallbackModelHandler } from '../fallback/types.js';
 import type { GoogleApiError } from './googleErrors.js';
+import { type HttpError } from './httpErrors.js';
 import { TerminalQuotaError } from './googleQuotaErrors.js';
 
 vi.mock('node:fs');
@@ -104,6 +105,34 @@ describe('Retry Utility Fallback Integration', () => {
     );
     expect(result).toBe('success after fallback');
     expect(mockApiCall).toHaveBeenCalledTimes(3);
+  });
+
+  it('should trigger onPersistent429 when HTTP 499 persists through all retry attempts', async () => {
+    let fallbackCalled = false;
+    const mockError: HttpError = new Error('Simulated 499 error');
+    mockError.status = 499;
+
+    const mockApiCall = vi.fn().mockRejectedValue(mockError); // Always fail with 499
+
+    const mockPersistent429Callback = vi.fn(async (_authType?: string) => {
+      fallbackCalled = true;
+      // In a real scenario, this would change the model being called by mockApiCall
+      // or similar, but for the test we just need to see if it's called.
+      // We return null to stop retrying after the fallback attempt in this test.
+      return null;
+    });
+
+    const promise = retryWithBackoff(mockApiCall, {
+      maxAttempts: 2,
+      initialDelayMs: 1,
+      maxDelayMs: 10,
+      onPersistent429: mockPersistent429Callback,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await expect(promise).rejects.toThrow('Simulated 499 error');
+    expect(fallbackCalled).toBe(true);
+    expect(mockPersistent429Callback).toHaveBeenCalledTimes(1);
   });
 
   it('should not trigger onPersistent429 for API key users', async () => {

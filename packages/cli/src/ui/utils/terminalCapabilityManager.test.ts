@@ -11,6 +11,7 @@ import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
 } from '@google/gemini-cli-core';
+import * as fs from 'node:fs';
 
 // Mock fs
 vi.mock('node:fs', () => ({
@@ -97,6 +98,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -113,6 +115,51 @@ describe('TerminalCapabilityManager', () => {
 
     await promise;
     expect(manager.getTerminalBackgroundColor()).toBe('#00ff00');
+  });
+
+  it('should ignore #ffffff in tmux as it is a common false positive', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.spyOn(manager, 'isTmux').mockReturnValue(true);
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for white
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:ffff/ffff/ffff\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBeUndefined();
+  });
+
+  it('should not ignore #ffffff when NOT in tmux', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.spyOn(manager, 'isTmux').mockReturnValue(false);
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for white
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:ffff/ffff/ffff\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#ffffff');
+  });
+
+  it('should NOT ignore other colors in tmux', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.stubEnv('TMUX', '1');
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for grey
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:8888/8888/8888\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#888888');
   });
 
   it('should detect Terminal Name', async () => {
@@ -140,6 +187,8 @@ describe('TerminalCapabilityManager', () => {
     // Should resolve without waiting for timeout
     await promise;
 
+    manager.enableSupportedModes();
+
     expect(manager.isKittyProtocolEnabled()).toBe(true);
     expect(manager.getTerminalBackgroundColor()).toBe('#000000');
   });
@@ -155,6 +204,7 @@ describe('TerminalCapabilityManager', () => {
     vi.advanceTimersByTime(1000);
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -166,6 +216,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(false);
   });
 
@@ -180,6 +231,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -195,6 +247,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -208,6 +262,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
@@ -223,6 +279,7 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+      manager.enableSupportedModes();
       expect(manager.isKittyProtocolEnabled()).toBe(true);
 
       expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
@@ -240,6 +297,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
@@ -256,6 +315,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -270,6 +331,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
       expect(manager.getTerminalName()).toBe('tmux');
@@ -286,8 +349,184 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
+    });
+
+    it('should wrap queries in hidden/clear sequence', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      void manager.detectCapabilities();
+
+      expect(fs.writeSync).toHaveBeenCalledWith(
+        expect.anything(),
+        // eslint-disable-next-line no-control-regex
+        expect.stringMatching(/^\x1b\[8m.*\x1b\[2K\r\x1b\[0m$/s),
+      );
+    });
+  });
+
+  describe('isGhosttyTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it.each([
+      {
+        name: 'Ghostty (terminal name)',
+        terminalName: 'Ghostty',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'ghostty (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'ghostty' },
+        expected: true,
+      },
+      {
+        name: 'xterm-ghostty (TERM)',
+        terminalName: undefined,
+        env: { TERM: 'xterm-ghostty' },
+        expected: true,
+      },
+      {
+        name: 'iTerm.app (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'iTerm.app' },
+        expected: false,
+      },
+      {
+        name: 'undefined env',
+        terminalName: undefined,
+        env: {},
+        expected: false,
+      },
+    ])(
+      'should return $expected for $name',
+      ({ terminalName, env, expected }) => {
+        vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
+        expect(manager.isGhosttyTerminal(env)).toBe(expected);
+      },
+    );
+  });
+
+  describe('isTmux', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when TMUX is set', () => {
+      expect(manager.isTmux({ TMUX: '1' })).toBe(true);
+      expect(manager.isTmux({ TMUX: 'tmux-1234' })).toBe(true);
+    });
+
+    it('returns false when TMUX is not set', () => {
+      expect(manager.isTmux({})).toBe(false);
+      expect(manager.isTmux({ STY: '1' })).toBe(false);
+    });
+  });
+
+  describe('isScreen', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when STY is set', () => {
+      expect(manager.isScreen({ STY: '1' })).toBe(true);
+      expect(manager.isScreen({ STY: 'screen.1234' })).toBe(true);
+    });
+
+    it('returns false when STY is not set', () => {
+      expect(manager.isScreen({})).toBe(false);
+      expect(manager.isScreen({ TMUX: '1' })).toBe(false);
+    });
+  });
+
+  describe('isITerm2', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when iTerm is in terminal name', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('iTerm.app');
+      expect(manager.isITerm2({})).toBe(true);
+    });
+
+    it('returns true when TERM_PROGRAM is iTerm.app', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isITerm2({ TERM_PROGRAM: 'iTerm.app' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('xterm');
+      expect(manager.isITerm2({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(false);
+    });
+  });
+
+  describe('isAlacritty', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when ALACRITTY_WINDOW_ID is set', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ ALACRITTY_WINDOW_ID: '123' })).toBe(true);
+    });
+
+    it('returns true when TERM is alacritty', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ TERM: 'alacritty' })).toBe(true);
+    });
+
+    it('returns true when terminal name contains alacritty', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('alacritty');
+      expect(manager.isAlacritty({})).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ TERM: 'xterm' })).toBe(false);
+    });
+  });
+
+  describe('isAppleTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when apple_terminal is in terminal name', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('apple_terminal');
+      expect(manager.isAppleTerminal({})).toBe(true);
+    });
+
+    it('returns true when TERM_PROGRAM is Apple_Terminal', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAppleTerminal({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(
+        true,
+      );
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('xterm');
+      expect(manager.isAppleTerminal({ TERM_PROGRAM: 'iTerm.app' })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isVSCodeTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when TERM_PROGRAM is vscode', () => {
+      expect(manager.isVSCodeTerminal({ TERM_PROGRAM: 'vscode' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      expect(manager.isVSCodeTerminal({ TERM_PROGRAM: 'iTerm.app' })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isWindowsTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when WT_SESSION is set', () => {
+      expect(manager.isWindowsTerminal({ WT_SESSION: 'some-guid' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      expect(manager.isWindowsTerminal({})).toBe(false);
     });
   });
 });

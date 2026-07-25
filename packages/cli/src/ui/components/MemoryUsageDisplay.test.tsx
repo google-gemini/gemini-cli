@@ -29,13 +29,16 @@ describe('MemoryUsageDisplay', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders memory usage', () => {
-    const { lastFrame } = render(<MemoryUsageDisplay />);
+  it('renders memory usage', async () => {
+    const { lastFrame, unmount } = await render(<MemoryUsageDisplay />);
     expect(lastFrame()).toContain('50.0 MB');
+    unmount();
   });
 
   it('updates memory usage over time', async () => {
-    const { lastFrame } = render(<MemoryUsageDisplay />);
+    const { lastFrame, waitUntilReady, unmount } = await render(
+      <MemoryUsageDisplay />,
+    );
     expect(lastFrame()).toContain('50.0 MB');
 
     vi.mocked(process.memoryUsage).mockReturnValue({
@@ -49,7 +52,9 @@ describe('MemoryUsageDisplay', () => {
     await act(async () => {
       vi.advanceTimersByTime(2000);
     });
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('100.0 MB');
+    unmount();
   });
 });

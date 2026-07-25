@@ -7,6 +7,8 @@
 import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
+import type { HistoryTurn } from '../core/agentChatHistory.js';
+import { deriveStableId } from './cryptoUtils.js';
 
 export const INITIAL_HISTORY_LENGTH = 1;
 
@@ -30,17 +32,10 @@ export async function getDirectoryContextString(
   );
 
   const folderStructure = folderStructures.join('\n');
+  const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
 
-  let workingDirPreamble: string;
-  if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
-  } else {
-    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
-  }
-
-  return `${workingDirPreamble}
-Here is the folder structure of the current working directories:
+  return `- **Workspace Directories:**\n${dirList}
+- **Directory Structure:**
 
 ${folderStructure}`;
 }
@@ -60,11 +55,18 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = await getDirectoryContextString(config);
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
   const tempDir = config.storage.getProjectTempDir();
-  const environmentMemory = config.getEnvironmentMemory();
+  // Tiered context model (see issue #11488):
+  // - Tier 1 (global): system instruction only
+  // - Tier 2 (extension + project): first user message (here)
+  // - Tier 3 (subdirectory): tool output (JIT)
+  const environmentMemory = config.getSessionMemory();
 
   const context = `
+<session_context>
 This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
@@ -72,7 +74,7 @@ The project's temporary directory is: ${tempDir}
 ${directoryContext}
 
 ${environmentMemory}
-        `.trim();
+</session_context>`.trim();
 
   const initialParts: Part[] = [{ text: context }];
 
@@ -81,23 +83,28 @@ ${environmentMemory}
 
 export async function getInitialChatHistory(
   config: Config,
-  extraHistory?: Content[],
-): Promise<Content[]> {
+  extraHistory?: ReadonlyArray<Content | HistoryTurn>,
+): Promise<Array<Content | HistoryTurn>> {
+  const envId = deriveStableId(['environment-context']);
+
+  if (extraHistory && extraHistory.length > 0) {
+    const first = extraHistory[0];
+    const firstId = 'id' in first ? first.id : undefined;
+    if (firstId === envId) {
+      return [...extraHistory];
+    }
+  }
+
   const envParts = await getEnvironmentContext(config);
   const envContextString = envParts.map((part) => part.text || '').join('\n\n');
 
-  const allSetupText = `
-${envContextString}
-
-Reminder: Do not return an empty response when a tool call is required.
-
-My setup is complete. I will provide my first command in the next turn.
-    `.trim();
-
   return [
     {
-      role: 'user',
-      parts: [{ text: allSetupText }],
+      id: deriveStableId(['environment-context']),
+      content: {
+        role: 'user',
+        parts: [{ text: envContextString }],
+      },
     },
     ...(extraHistory ?? []),
   ];

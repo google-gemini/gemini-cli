@@ -5,11 +5,10 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import semver from 'semver';
-import { getErrorMessage } from '../../utils/errors.js';
 import type { ExtensionConfig } from '../../config/extension.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
@@ -100,6 +99,7 @@ export const validateCommand: CommandModule = {
     }),
   handler: async (args) => {
     await handleValidate({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       path: args['path'] as string,
     });
     await exitCli();

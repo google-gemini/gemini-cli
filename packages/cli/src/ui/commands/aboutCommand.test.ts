@@ -36,10 +36,12 @@ describe('aboutCommand', () => {
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: vi.fn(),
-          getIdeMode: vi.fn().mockReturnValue(true),
-          getUserTierName: vi.fn().mockReturnValue(undefined),
+        agentContext: {
+          config: {
+            getModel: vi.fn(),
+            getIdeMode: vi.fn().mockReturnValue(true),
+            getUserTierName: vi.fn().mockReturnValue(undefined),
+          },
         },
         settings: {
           merged: {
@@ -57,9 +59,10 @@ describe('aboutCommand', () => {
     } as unknown as CommandContext);
 
     vi.mocked(getVersion).mockResolvedValue('test-version');
-    vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
-      'test-model',
-    );
+    vi.spyOn(
+      mockContext.services.agentContext!.config,
+      'getModel',
+    ).mockReturnValue('test-model');
     process.env['GOOGLE_CLOUD_PROJECT'] = 'test-gcp-project';
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
@@ -160,9 +163,9 @@ describe('aboutCommand', () => {
   });
 
   it('should display the tier when getUserTierName returns a value', async () => {
-    vi.mocked(mockContext.services.config!.getUserTierName).mockReturnValue(
-      'Enterprise Tier',
-    );
+    vi.mocked(
+      mockContext.services.agentContext!.config.getUserTierName,
+    ).mockReturnValue('Enterprise Tier');
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }

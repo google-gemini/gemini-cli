@@ -9,7 +9,8 @@ import {
   TestRig,
   poll,
   printDebugInfo,
-  validateModelOutput,
+  assertModelHasOutput,
+  checkModelOutputContent,
 } from './test-helper.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -68,7 +69,10 @@ describe('list_directory', () => {
       throw e;
     }
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, ['file1.txt', 'subdir'], 'List directory test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
+      expectedContent: ['file1.txt', 'subdir'],
+      testName: 'List directory test',
+    });
   });
 });

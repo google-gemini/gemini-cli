@@ -11,8 +11,11 @@ import type {
   InProcessCheckerConfig,
   ExternalCheckerConfig,
 } from '../policy/types.js';
-import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import {
+  SafetyCheckDecision,
+  type SafetyCheckInput,
+  type SafetyCheckResult,
+} from './protocol.js';
 import type { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
 import { z } from 'zod';
@@ -165,6 +168,8 @@ export class CheckerRunner {
     return new Promise((resolve) => {
       const child = spawn(checkerPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: this.contextBuilder.config.getWorkingDir(),
+        env: { ...process.env, ...this.contextBuilder.config.env },
       });
 
       let stdout = '';
@@ -229,6 +234,7 @@ export class CheckerRunner {
 
         // Try to parse the output
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const rawResult = JSON.parse(stdout);
           const result = SafetyCheckResultSchema.parse(rawResult);
 

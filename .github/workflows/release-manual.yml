@@ -46,7 +46,15 @@ on:
         default: 'prod'
 
 jobs:
+  build-mac:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    uses: './.github/workflows/build-unsigned-mac-binaries.yml'
+    with:
+      ref: '${{ github.event.inputs.ref }}'
+
   release:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    needs: ['build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -57,11 +65,13 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: 'Checkout Release Code'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
           path: 'release'
           fetch-depth: 0
@@ -81,6 +91,11 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
 
       - name: 'Prepare Release Info'
         id: 'release_info'
@@ -110,6 +125,7 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-release-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'

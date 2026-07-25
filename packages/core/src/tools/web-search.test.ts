@@ -4,10 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { WebSearchToolParams } from './web-search.js';
-import { WebSearchTool } from './web-search.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import { WebSearchTool, type WebSearchToolParams } from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
@@ -25,6 +31,9 @@ describe('WebSearchTool', () => {
   beforeEach(() => {
     const mockConfigInstance = {
       getGeminiClient: () => mockGeminiClient,
+      get geminiClient() {
+        return mockGeminiClient;
+      },
       getProxy: () => undefined,
       generationConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
@@ -33,6 +42,12 @@ describe('WebSearchTool', () => {
         })),
       },
     } as unknown as Config;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).config = mockConfigInstance;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).promptId = 'test-prompt-id';
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     tool = new WebSearchTool(mockConfigInstance, createMockMessageBus());
   });
@@ -89,7 +104,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toBe(
         'Web search results for "successful query":\n\nHere are your results.',
@@ -114,7 +129,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toBe(
         'No search results or information found for query: "no results query"',
@@ -128,7 +143,7 @@ describe('WebSearchTool', () => {
       (mockGeminiClient.generateContent as Mock).mockRejectedValue(testError);
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
       expect(result.llmContent).toContain('Error:');
@@ -166,7 +181,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       const expectedLlmContent = `Web search results for "grounding query":
 
@@ -237,7 +252,7 @@ Sources:
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       const expectedLlmContent = `Web search results for "multibyte query":
 

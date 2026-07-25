@@ -18,6 +18,7 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  ApprovalMode,
 } from '@google/gemini-cli-core';
 import * as os from 'node:os';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -36,8 +37,8 @@ describe('handleAtCommand with Agents', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
 
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'agent-test-'),
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(path.join(os.tmpdir(), 'agent-test-')),
     );
 
     abortController = new AbortController();
@@ -77,15 +78,46 @@ describe('handleAtCommand with Agents', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getWorkspaceContext: () => ({
-        isPathWithinWorkspace: () => true,
+        isPathWithinWorkspace: (p: string) =>
+          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
         getDirectories: () => [testRootDir],
       }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
       getMcpServers: () => ({}),
       getMcpServerCommand: () => undefined,
       getPromptRegistry: () => ({
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],
@@ -102,8 +134,10 @@ describe('handleAtCommand with Agents', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
-      getAgentRegistry: () => mockAgentRegistry,
       getMessageBus: () => mockMessageBus,
+      interactive: true,
+      getAgentRegistry: () => mockAgentRegistry,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig, mockMessageBus);

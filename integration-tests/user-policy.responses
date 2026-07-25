@@ -1,0 +1,2 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"run_shell_command","args":{"command":"ls -F"}}}]},"finishReason":"STOP","index":0}]},{"candidates":[{"content":{"parts":[{"text":"I ran ls -F"}]},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"I ran ls -F"}]},"finishReason":"STOP","index":0}]}]}

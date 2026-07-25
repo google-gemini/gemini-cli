@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthType, loadApiKey } from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
-export function validateAuthMethod(authMethod: string): string | null {
-  loadEnvironment(loadSettings().merged);
+export async function validateAuthMethod(
+  authMethod: string,
+): Promise<string | null> {
+  loadEnvironment(loadSettings().merged, process.cwd());
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
@@ -17,7 +19,8 @@ export function validateAuthMethod(authMethod: string): string | null {
   }
 
   if (authMethod === AuthType.USE_GEMINI) {
-    if (!process.env['GEMINI_API_KEY']) {
+    const key = process.env['GEMINI_API_KEY'] || (await loadApiKey());
+    if (!key) {
       return (
         'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
         'Update your environment and try again (no reload needed if using .env)!'

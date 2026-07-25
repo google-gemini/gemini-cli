@@ -5,7 +5,6 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
 import { loadSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
@@ -18,6 +17,7 @@ export async function handleList(args: { all?: boolean }) {
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     {
       debug: false,
     } as Partial<CliArgs> as CliArgs,
@@ -41,12 +41,11 @@ export async function handleList(args: { all?: boolean }) {
   });
 
   if (skills.length === 0) {
-    debugLogger.log('No skills discovered.');
+    process.stdout.write('No skills discovered.\n');
     return;
   }
 
-  debugLogger.log(chalk.bold('Discovered Agent Skills:'));
-  debugLogger.log('');
+  process.stdout.write(chalk.bold('Discovered Agent Skills:') + '\n\n');
 
   for (const skill of skills) {
     const status = skill.disabled
@@ -55,10 +54,11 @@ export async function handleList(args: { all?: boolean }) {
 
     const builtinSuffix = skill.isBuiltin ? chalk.gray(' [Built-in]') : '';
 
-    debugLogger.log(`${chalk.bold(skill.name)} ${status}${builtinSuffix}`);
-    debugLogger.log(`  Description: ${skill.description}`);
-    debugLogger.log(`  Location:    ${skill.location}`);
-    debugLogger.log('');
+    process.stdout.write(
+      `${chalk.bold(skill.name)} ${status}${builtinSuffix}\n`,
+    );
+    process.stdout.write(`  Description: ${skill.description}\n`);
+    process.stdout.write(`  Location:    ${skill.location}\n\n`);
   }
 }
 
@@ -72,6 +72,7 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     await handleList({ all: argv['all'] as boolean });
     await exitCli();
   },

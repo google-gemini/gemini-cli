@@ -6,7 +6,7 @@
 
 export const bytesToMB = (bytes: number): number => bytes / (1024 * 1024);
 
-export const formatMemoryUsage = (bytes: number): string => {
+export const formatBytes = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;

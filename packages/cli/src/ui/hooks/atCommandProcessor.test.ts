@@ -4,10 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleAtCommand } from './atCommandProcessor.js';
-import type { Config, DiscoveredMCPResource } from '@google/gemini-cli-core';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  checkPermissions,
+  handleAtCommand,
+  escapeAtSymbols,
+  unescapeLiteralAt,
+} from './atCommandProcessor.js';
 import {
   FileDiscoveryService,
   GlobTool,
@@ -15,12 +26,17 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  GEMINI_IGNORE_FILE_NAME,
+  ApprovalMode,
   // DEFAULT_FILE_EXCLUDES,
+  CoreToolCallStatus,
+  type Config,
+  type DiscoveredMCPResource,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
-import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -44,10 +60,13 @@ describe('handleAtCommand', () => {
   }
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     vi.resetAllMocks();
 
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'folder-structure-test-'),
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'folder-structure-test-'),
+      ),
     );
 
     abortController = new AbortController();
@@ -59,6 +78,12 @@ describe('handleAtCommand', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as core.MessageBus;
+
+    const mockWorkspaceContext = {
+      isPathWithinWorkspace: (p: string) =>
+        p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
+      getDirectories: () => [testRootDir],
+    };
 
     mockConfig = {
       getToolRegistry,
@@ -74,16 +99,45 @@ describe('handleAtCommand', () => {
       }),
       getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
-      getWorkspaceContext: () => ({
-        isPathWithinWorkspace: () => true,
-        getDirectories: () => [testRootDir],
-      }),
+      getWorkspaceContext: () => mockWorkspaceContext,
+      getMemoryContextManager: () => undefined,
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+
+        const workspaceContext = this.getWorkspaceContext();
+        const directories = workspaceContext.getDirectories();
+        if (directories.some((dir) => absolutePath.startsWith(dir))) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
       getMcpServers: () => ({}),
       getMcpServerCommand: () => undefined,
       getPromptRegistry: () => ({
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],
@@ -101,6 +155,7 @@ describe('handleAtCommand', () => {
         getClient: () => undefined,
       }),
       getMessageBus: () => mockMessageBus,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig, mockMessageBus);
@@ -112,6 +167,7 @@ describe('handleAtCommand', () => {
   afterEach(async () => {
     abortController.abort();
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
   });
 
   it('should pass through query if no @ command is present', async () => {
@@ -146,9 +202,6 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should process a valid text file path', async () => {
@@ -181,7 +234,9 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
@@ -259,8 +314,8 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
       fileContent,
     );
-    const escapedpath = path.join(testRootDir, 'path', 'to', 'my\\ file.txt');
-    const query = `@${escapedpath}`;
+
+    const query = `@${core.escapePath(filePath)}`;
 
     const result = await handleAtCommand({
       query,
@@ -283,11 +338,82 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
   }, 10000);
+
+  it('should correctly handle double-quoted paths with spaces', async () => {
+    // Mock platform to win32 so unescapePath strips quotes
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => 'win32',
+        },
+      }),
+    );
+
+    const fileContent = 'Content of file with spaces';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'my folder', 'my file.txt'),
+      fileContent,
+    );
+    // On Windows, the user might provide: @"path/to/my file.txt"
+    const query = `@"${filePath}"`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 126,
+      signal: abortController.signal,
+    });
+
+    const relativePath = getRelativePath(filePath);
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `@${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should correctly handle file paths with narrow non-breaking space (NNBSP)', async () => {
+    const nnbsp = '\u202F';
+    const fileContent = 'NNBSP file content.';
+    const filePath = await createTestFile(
+      path.join(testRootDir, `my${nnbsp}file.txt`),
+      fileContent,
+    );
+    const relativePath = getRelativePath(filePath);
+    const query = `@${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 129,
+      signal: abortController.signal,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.processedQuery).toEqual([
+      { text: `@${relativePath}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${relativePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
+    ]);
+  });
 
   it('should handle multiple @file references', async () => {
     const content1 = 'Content file1';
@@ -407,9 +533,6 @@ describe('handleAtCommand', () => {
     );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
-    );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
     );
   });
 
@@ -597,7 +720,7 @@ describe('handleAtCommand', () => {
   describe('gemini-ignore filtering', () => {
     it('should skip gemini-ignored files in @ commands', async () => {
       await createTestFile(
-        path.join(testRootDir, '.geminiignore'),
+        path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'build/output.js',
       );
       const geminiIgnoredFile = await createTestFile(
@@ -628,7 +751,7 @@ describe('handleAtCommand', () => {
   });
   it('should process non-ignored files when .geminiignore is present', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'build/output.js',
     );
     const validFile = await createTestFile(
@@ -659,7 +782,7 @@ describe('handleAtCommand', () => {
 
   it('should handle mixed gemini-ignored and valid files', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'dist/bundle.js',
     );
     const validFile = await createTestFile(
@@ -863,8 +986,8 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'spaced file.txt'),
         fileContent,
       );
-      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
-      const query = `Check @${escapedPath}, it has spaces.`;
+
+      const query = `Check @${core.escapePath(filePath)}, it has spaces.`;
 
       const result = await handleAtCommand({
         query,
@@ -1161,40 +1284,6 @@ describe('handleAtCommand', () => {
         expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
       );
     });
-
-    it('should skip absolute paths outside workspace', async () => {
-      const outsidePath = '/tmp/outside-workspace.txt';
-      const query = `Check @${outsidePath} please.`;
-
-      const mockWorkspaceContext = {
-        isPathWithinWorkspace: vi.fn((path: string) =>
-          path.startsWith(testRootDir),
-        ),
-        getDirectories: () => [testRootDir],
-        addDirectory: vi.fn(),
-        getInitialDirectories: () => [testRootDir],
-        setDirectories: vi.fn(),
-        onDirectoriesChanged: vi.fn(() => () => {}),
-      } as unknown as ReturnType<typeof mockConfig.getWorkspaceContext>;
-      mockConfig.getWorkspaceContext = () => mockWorkspaceContext;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
-        messageId: 502,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [{ text: `Check @${outsidePath} please.` }],
-      });
-
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Path ${outsidePath} is not in the workspace and will be skipped.`,
-      );
-    });
   });
 
   it("should not add the user's turn to history, as that is the caller's responsibility", async () => {
@@ -1219,7 +1308,9 @@ describe('handleAtCommand', () => {
     // Assert
     // It SHOULD be called for the tool_group
     expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'tool_group' }),
+      expect.objectContaining({
+        type: 'tool_group',
+      }),
       999,
     );
 
@@ -1264,7 +1355,9 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      expect(readResource).toHaveBeenCalledWith(resourceUri, {
+        signal: abortController.signal,
+      });
       const processedParts = Array.isArray(result.processedQuery)
         ? result.processedQuery
         : [];
@@ -1274,7 +1367,9 @@ describe('handleAtCommand', () => {
       });
       expect(containsResourceText).toBe(true);
       expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'tool_group' }),
+        expect.objectContaining({
+          type: 'tool_group',
+        }),
         expect.any(Number),
       );
     });
@@ -1334,7 +1429,8 @@ describe('handleAtCommand', () => {
     const query = `@${filePath}`;
 
     // Simulate user cancellation
-    const mockToolInstance = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockToolInstance: any = {
       buildAndExecute: vi
         .fn()
         .mockRejectedValue(new Error('User cancelled operation')),
@@ -1366,9 +1462,241 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+        tools: [expect.objectContaining({ status: CoreToolCallStatus.Error })],
       }),
       134,
     );
+  });
+
+  it('should resolve files in multiple workspace directories', async () => {
+    const secondRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(path.join(os.tmpdir(), 'second-root-')),
+    );
+    try {
+      const fileContent = 'Second root content';
+      const filePath = path.join(secondRootDir, 'second-file.txt');
+      await fsPromises.writeFile(filePath, fileContent);
+
+      vi.spyOn(
+        mockConfig.getWorkspaceContext(),
+        'getDirectories',
+      ).mockReturnValue([testRootDir, secondRootDir]);
+
+      const query = '@second-file.txt';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 700,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toContainEqual(
+        expect.objectContaining({ text: fileContent }),
+      );
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        expect.stringContaining(`resolved to file: ${filePath}`),
+      );
+    } finally {
+      await fsPromises.rm(secondRootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should attempt glob fallback if direct resolution is unauthorized', async () => {
+    const fileContent = 'Globbed content';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'secret', 'file.txt'),
+      fileContent,
+    );
+
+    // Mock validatePathAccess to deny direct access but allow it via glob (just for test purposes)
+    vi.spyOn(mockConfig, 'validatePathAccess').mockImplementation((p) => {
+      if (p.includes('secret') && !p.includes('file.txt'))
+        return 'Unauthorized';
+      // Let's say the direct path 'secret/file.txt' is unauthorized
+      if (p === filePath) return 'Access Denied';
+      return null;
+    });
+
+    const query = '@secret/file.txt';
+
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 701,
+      signal: abortController.signal,
+    });
+
+    // In this case, resolveAtCommandPath returns status: 'unauthorized'.
+    // resolveFilePaths should then try glob fallback.
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining('not found directly, attempting glob search.'),
+    );
+  });
+
+  it('should skip malformed paths (the original crash scenario)', async () => {
+    // We use a quoted path so the parser treats the whole thing as one @path token
+    const malformedPath =
+      '"FAIL tests/int/my.test.ts ... AssertionError: expected true to be false"';
+    const query = `@${malformedPath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 702,
+      signal: abortController.signal,
+    });
+
+    // Malformed path should be skipped and original query part preserved as text
+    expect(result.processedQuery).toEqual([{ text: query }]);
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
+    );
+  });
+
+  it('should recover a buried path from a malformed fragment during handleAtCommand', async () => {
+    const buriedFile = 'src/recovered.ts';
+    await createTestFile(
+      path.join(testRootDir, buriedFile),
+      'Recovered content',
+    );
+    const malformedFragment = `"FAIL ${buriedFile}:10:5 (AssertionError)"`;
+    const query = `@${malformedFragment}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 703,
+      signal: abortController.signal,
+    });
+
+    // It should extract src/recovered.ts and attach its content
+    expect(result.processedQuery).toContainEqual(
+      expect.objectContaining({ text: 'Recovered content' }),
+    );
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Identified invalid path fragment, attempting to extract path',
+      ),
+    );
+  });
+});
+
+describe('escapeAtSymbols', () => {
+  it('escapes a bare @ symbol', () => {
+    expect(escapeAtSymbols('test@domain.com')).toBe('test\\@domain.com');
+  });
+
+  it('escapes a leading @ symbol', () => {
+    expect(escapeAtSymbols('@scope/pkg')).toBe('\\@scope/pkg');
+  });
+
+  it('escapes multiple @ symbols', () => {
+    expect(escapeAtSymbols('a@b and c@d')).toBe('a\\@b and c\\@d');
+  });
+
+  it('does not double-escape an already escaped @', () => {
+    expect(escapeAtSymbols('test\\@domain.com')).toBe('test\\@domain.com');
+  });
+
+  it('returns text with no @ unchanged', () => {
+    expect(escapeAtSymbols('hello world')).toBe('hello world');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(escapeAtSymbols('')).toBe('');
+  });
+});
+
+describe('unescapeLiteralAt', () => {
+  it('unescapes \\@ to @', () => {
+    expect(unescapeLiteralAt('test\\@domain.com')).toBe('test@domain.com');
+  });
+
+  it('unescapes a leading \\@', () => {
+    expect(unescapeLiteralAt('\\@scope/pkg')).toBe('@scope/pkg');
+  });
+
+  it('unescapes multiple \\@ sequences', () => {
+    expect(unescapeLiteralAt('a\\@b and c\\@d')).toBe('a@b and c@d');
+  });
+
+  it('returns text with no \\@ unchanged', () => {
+    expect(unescapeLiteralAt('hello world')).toBe('hello world');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(unescapeLiteralAt('')).toBe('');
+  });
+
+  it('roundtrips correctly with escapeAtSymbols', () => {
+    const input = 'user@example.com and @scope/pkg';
+    expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
+  });
+});
+
+describe('checkPermissions', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    testRootDir = await fsPromises.realpath(
+      await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'check-permissions-test-'),
+      ),
+    );
+
+    mockConfig = {
+      getTargetDir: () => testRootDir,
+      getAgentRegistry: () => ({
+        getDefinition: () => undefined,
+      }),
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      validatePathAccess: () => null,
+    } as unknown as Config;
+  });
+
+  afterEach(async () => {
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+  });
+
+  // Regression for #22029 (and related #25910 / #25923): when a user pastes
+  // a JSON-like blob after an @, the @-command regex greedily captures it.
+  // The resolved string is longer than NAME_MAX, so fs.realpathSync throws
+  // ENAMETOOLONG. Previously this bubbled up as an unhandled rejection and
+  // crashed the CLI.
+  it('skips @-mentions whose path is too long to be a real filesystem entry', async () => {
+    const longSegment = 'a'.repeat(8192);
+    const query = `@${longSegment}`;
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([]);
+  });
+
+  it('still surfaces real @-mentioned files when a sibling @-mention is unresolvable', async () => {
+    // A real file alongside a giant pasted-blob mention: the bogus mention
+    // should be skipped, the real one should still appear in the result.
+    const realFile = path.join(testRootDir, 'real.txt');
+    await fsPromises.writeFile(realFile, 'hello');
+    const resolvedRealFile = fs.realpathSync(realFile);
+    mockConfig.validatePathAccess = () =>
+      'permission required' as unknown as null;
+    const longSegment = 'b'.repeat(8192);
+    const query = `@real.txt and @${longSegment}`;
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([
+      resolvedRealFile,
+    ]);
   });
 });

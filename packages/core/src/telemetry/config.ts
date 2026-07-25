@@ -60,6 +60,10 @@ export async function resolveTelemetrySettings(options: {
     parseBooleanEnvFlag(env['GEMINI_TELEMETRY_ENABLED']) ??
     settings.enabled;
 
+  const traces =
+    parseBooleanEnvFlag(env['GEMINI_TELEMETRY_TRACES_ENABLED']) ??
+    settings.traces;
+
   const rawTarget =
     argv.telemetryTarget ??
     env['GEMINI_TELEMETRY_TARGET'] ??
@@ -110,6 +114,7 @@ export async function resolveTelemetrySettings(options: {
 
   return {
     enabled,
+    traces,
     target,
     otlpEndpoint,
     otlpProtocol,

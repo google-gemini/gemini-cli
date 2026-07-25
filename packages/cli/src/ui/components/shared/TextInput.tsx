@@ -5,14 +5,16 @@
  */
 
 import type React from 'react';
-import { useCallback } from 'react';
-import type { Key } from '../../hooks/useKeypress.js';
-import { Text, Box } from 'ink';
-import { useKeypress } from '../../hooks/useKeypress.js';
+import { useCallback, useRef } from 'react';
+import { Text, Box, type DOMElement } from 'ink';
+import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
-import type { TextBuffer } from './text-buffer.js';
-import { cpSlice } from '../../utils/textUtils.js';
+import { expandPastePlaceholders, type TextBuffer } from './text-buffer.js';
+import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -29,6 +31,9 @@ export function TextInput({
   onCancel,
   focus = true,
 }: TextInputProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
+  const containerRef = useRef<DOMElement>(null);
+
   const {
     text,
     handleInput,
@@ -38,32 +43,44 @@ export function TextInput({
   } = buffer;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] = visualCursor;
 
-  const handleKeyPress = useCallback(
-    (key: Key) => {
-      if (key.name === 'escape') {
-        onCancel?.();
-        return;
+  useMouseClick(
+    containerRef,
+    (_event, relativeX, relativeY) => {
+      if (focus) {
+        const visRowAbsolute = visualScrollRow + relativeY;
+        buffer.moveToVisualPosition(visRowAbsolute, relativeX);
       }
-
-      if (key.name === 'return') {
-        onSubmit?.(text);
-        return;
-      }
-
-      handleInput(key);
     },
-    [handleInput, onCancel, onSubmit, text],
+    { isActive: focus, name: 'left-press' },
   );
 
-  useKeypress(handleKeyPress, { isActive: focus });
+  const handleKeyPress = useCallback(
+    (key: Key) => {
+      if (key.name === 'escape' && onCancel) {
+        onCancel();
+        return true;
+      }
+
+      if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
+        onSubmit(expandPastePlaceholders(text, buffer.pastedContent));
+        return true;
+      }
+
+      const handled = handleInput(key);
+      return handled;
+    },
+    [handleInput, onCancel, onSubmit, text, buffer.pastedContent, keyMatchers],
+  );
+
+  useKeypress(handleKeyPress, { isActive: focus, priority: true });
 
   const showPlaceholder = text.length === 0 && placeholder;
 
   if (showPlaceholder) {
     return (
-      <Box>
+      <Box ref={containerRef}>
         {focus ? (
-          <Text>
+          <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
             {chalk.inverse(placeholder[0] || ' ')}
             <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
           </Text>
@@ -75,7 +92,7 @@ export function TextInput({
   }
 
   return (
-    <Box flexDirection="column">
+    <Box ref={containerRef} flexDirection="column">
       {viewportVisualLines.map((lineText, idx) => {
         const currentVisualRow = visualScrollRow + idx;
         const isCursorLine =
@@ -95,7 +112,15 @@ export function TextInput({
 
         return (
           <Box key={idx} height={1}>
-            <Text>{lineDisplay}</Text>
+            <Text
+              terminalCursorFocus={isCursorLine}
+              terminalCursorPosition={cpIndexToOffset(
+                lineText,
+                cursorVisualColAbsolute,
+              )}
+            >
+              {lineDisplay}
+            </Text>
           </Box>
         );
       })}

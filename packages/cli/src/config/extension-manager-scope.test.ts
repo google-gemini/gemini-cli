@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings } from './settings.js';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
@@ -87,8 +88,9 @@ describe('ExtensionManager Settings Scope', () => {
     );
   });
 
-  afterEach(() => {
-    // Clean up files if needed, or rely on temp dir cleanup
+  afterEach(async () => {
+    await cleanupTmpDir(currentTempHome);
+    await cleanupTmpDir(tempWorkspace);
     vi.clearAllMocks();
   });
 
@@ -108,6 +110,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
@@ -146,6 +149,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
@@ -182,6 +186,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
@@ -195,7 +200,7 @@ describe('ExtensionManager Settings Scope', () => {
       (s) => s.envVar === 'TEST_SETTING',
     );
     expect(setting).toBeDefined();
-    expect(setting?.value).toBe('[not set]');
+    expect(setting?.value).toBeUndefined();
     expect(setting?.scope).toBeUndefined();
 
     // Verify output string does not contain scope

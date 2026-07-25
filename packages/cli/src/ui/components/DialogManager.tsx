@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,18 +13,22 @@ import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
 import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { OverageMenuDialog } from './OverageMenuDialog.js';
+import { EmptyWalletDialog } from './EmptyWalletDialog.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
+import { VoiceModelDialog } from './VoiceModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useQuotaState } from '../contexts/QuotaContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -34,6 +38,8 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
+import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
+import { LoginRestartDialog } from '../auth/LoginRestartDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -49,6 +55,7 @@ export const DialogManager = ({
   const settings = useSettings();
 
   const uiState = useUIState();
+  const quotaState = useQuotaState();
   const uiActions = useUIActions();
   const {
     constrainHeight,
@@ -71,25 +78,51 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.proQuotaRequest) {
+  if (quotaState.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        failedModel={uiState.proQuotaRequest.failedModel}
-        fallbackModel={uiState.proQuotaRequest.fallbackModel}
-        message={uiState.proQuotaRequest.message}
-        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
-        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
+        failedModel={quotaState.proQuotaRequest.failedModel}
+        fallbackModel={quotaState.proQuotaRequest.fallbackModel}
+        message={quotaState.proQuotaRequest.message}
+        isTerminalQuotaError={quotaState.proQuotaRequest.isTerminalQuotaError}
+        isModelNotFoundError={!!quotaState.proQuotaRequest.isModelNotFoundError}
+        authType={quotaState.proQuotaRequest.authType}
+        tierName={config?.getUserTierName()}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
   }
-  if (uiState.validationRequest) {
+  if (quotaState.validationRequest) {
     return (
       <ValidationDialog
-        validationLink={uiState.validationRequest.validationLink}
-        validationDescription={uiState.validationRequest.validationDescription}
-        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        validationLink={quotaState.validationRequest.validationLink}
+        validationDescription={
+          quotaState.validationRequest.validationDescription
+        }
+        learnMoreUrl={quotaState.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
+      />
+    );
+  }
+  if (quotaState.overageMenuRequest) {
+    return (
+      <OverageMenuDialog
+        failedModel={quotaState.overageMenuRequest.failedModel}
+        fallbackModel={quotaState.overageMenuRequest.fallbackModel}
+        resetTime={quotaState.overageMenuRequest.resetTime}
+        creditBalance={quotaState.overageMenuRequest.creditBalance}
+        onChoice={uiActions.handleOverageMenuChoice}
+      />
+    );
+  }
+  if (quotaState.emptyWalletRequest) {
+    return (
+      <EmptyWalletDialog
+        failedModel={quotaState.emptyWalletRequest.failedModel}
+        fallbackModel={quotaState.emptyWalletRequest.fallbackModel}
+        resetTime={quotaState.emptyWalletRequest.resetTime}
+        onGetCredits={quotaState.emptyWalletRequest.onGetCredits}
+        onChoice={uiActions.handleEmptyWalletChoice}
       />
     );
   }
@@ -106,6 +139,16 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+        discoveryResults={uiState.folderDiscoveryResults}
+      />
+    );
+  }
+  if (uiState.isPolicyUpdateDialogOpen) {
+    return (
+      <PolicyUpdateDialog
+        config={config}
+        request={uiState.policyUpdateConfirmationRequest!}
+        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
     );
   }
@@ -116,11 +159,38 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmationRequest) {
+
+  if (uiState.permissionConfirmationRequest) {
+    const files = uiState.permissionConfirmationRequest.files;
+    const filesList = files.map((f) => `- ${f}`).join('\n');
     return (
       <ConsentPrompt
-        prompt={uiState.confirmationRequest.prompt}
-        onConfirm={uiState.confirmationRequest.onConfirm}
+        prompt={`The following files are outside your workspace:\n\n${filesList}\n\nDo you want to allow this read?`}
+        onConfirm={(allowed) => {
+          uiState.permissionConfirmationRequest?.onComplete({ allowed });
+        }}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+
+  // commandConfirmationRequest and authConsentRequest are kept separate
+  // to avoid focus deadlocks and state race conditions between the
+  // synchronous command loop and the asynchronous auth flow.
+  if (uiState.commandConfirmationRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.commandConfirmationRequest.prompt}
+        onConfirm={uiState.commandConfirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.authConsentRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.authConsentRequest.prompt}
+        onConfirm={uiState.authConsentRequest.onConfirm}
         terminalWidth={terminalWidth}
       />
     );
@@ -160,20 +230,18 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <SettingsDialog
-          settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
-          }}
+          onRestartRequest={relaunchApp}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
-          config={config}
         />
       </Box>
     );
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (uiState.isVoiceModelDialogOpen) {
+    return <VoiceModelDialog onClose={uiActions.closeVoiceModelDialog} />;
   }
   if (
     uiState.isAgentConfigDialogOpen &&
@@ -188,6 +256,7 @@ export const DialogManager = ({
           displayName={uiState.selectedAgentDisplayName}
           definition={uiState.selectedAgentDefinition}
           settings={settings}
+          availableTerminalHeight={terminalHeight - staticExtraHeight}
           onClose={uiActions.closeAgentConfigDialog}
           onSave={async () => {
             // Reload agent registry to pick up changes
@@ -195,6 +264,21 @@ export const DialogManager = ({
             if (agentRegistry) {
               await agentRegistry.reload();
             }
+          }}
+        />
+      </Box>
+    );
+  }
+  if (uiState.accountSuspensionInfo) {
+    return (
+      <Box flexDirection="column">
+        <BannedAccountDialog
+          accountSuspensionInfo={uiState.accountSuspensionInfo}
+          onExit={() => {
+            process.exit(1);
+          }}
+          onChangeAuth={() => {
+            uiActions.clearAccountSuspension();
           }}
         />
       </Box>
@@ -218,6 +302,18 @@ export const DialogManager = ({
           onCancel={uiActions.handleApiKeyCancel}
           error={uiState.authError}
           defaultValue={uiState.apiKeyDefaultValue}
+        />
+      </Box>
+    );
+  }
+
+  if (uiState.isAwaitingLoginRestart) {
+    return (
+      <Box flexDirection="column">
+        <LoginRestartDialog
+          onDismiss={uiActions.dismissLoginRestart}
+          config={config}
+          message={uiState.loginRestartMessage}
         />
       </Box>
     );

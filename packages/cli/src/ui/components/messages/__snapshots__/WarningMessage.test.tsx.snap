@@ -3,10 +3,12 @@
 exports[`WarningMessage > renders multiline warning messages 1`] = `
 "
 ⚠  Warning line 1
-   Warning line 2"
+   Warning line 2
+"
 `;
 
 exports[`WarningMessage > renders with the correct prefix and text 1`] = `
 "
-⚠  Watch out!"
+⚠  Watch out!
+"
 `;

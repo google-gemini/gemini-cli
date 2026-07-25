@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import { StreamingState } from '../types.js';
-import { hasRedirection } from '@google/gemini-cli-core';
-import { type TrackedToolCall } from './useReactToolScheduler.js';
+import { hasRedirection, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { type TrackedToolCall } from './useToolScheduler.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -33,13 +33,16 @@ describe('useTurnActivityMonitor', () => {
     vi.useRealTimers();
   });
 
-  it('should set operationStartTime when entering Responding state', () => {
-    const { result, rerender } = renderHook(
+  it('should set operationStartTime when entering Responding state', async () => {
+    const { result, rerender } = await renderHook(
       ({ state }) => useTurnActivityMonitor(state, null, []),
       {
         initialProps: { state: StreamingState.Idle },
       },
     );
+
+    // Reset time to 1000 to counter the 50ms advanced by renderHook's wait
+    vi.setSystemTime(1000);
 
     expect(result.current.operationStartTime).toBe(0);
 
@@ -47,8 +50,8 @@ describe('useTurnActivityMonitor', () => {
     expect(result.current.operationStartTime).toBe(1000);
   });
 
-  it('should reset operationStartTime when PTY ID changes while responding', () => {
-    const { result, rerender } = renderHook(
+  it('should reset operationStartTime when PTY ID changes while responding', async () => {
+    const { result, rerender } = await renderHook(
       ({ state, ptyId }) => useTurnActivityMonitor(state, ptyId, []),
       {
         initialProps: {
@@ -65,13 +68,13 @@ describe('useTurnActivityMonitor', () => {
     expect(result.current.operationStartTime).toBe(2000);
   });
 
-  it('should detect redirection from tool calls', () => {
+  it('should detect redirection from tool calls', async () => {
     // Force mock implementation to ensure it's active
     vi.mocked(hasRedirection).mockImplementation((q: string) =>
       q.includes('>'),
     );
 
-    const { result, rerender } = renderHook(
+    const { result, rerender } = await renderHook(
       ({ state, pendingToolCalls }) =>
         useTurnActivityMonitor(state, null, pendingToolCalls),
       {
@@ -93,7 +96,7 @@ describe('useTurnActivityMonitor', () => {
             name: 'run_shell_command',
             args: { command: 'ls -la' },
           },
-          status: 'executing',
+          status: CoreToolCallStatus.Executing,
         } as unknown as TrackedToolCall,
       ],
     });
@@ -108,15 +111,15 @@ describe('useTurnActivityMonitor', () => {
             name: 'run_shell_command',
             args: { command: 'ls > tool_out.txt' },
           },
-          status: 'executing',
+          status: CoreToolCallStatus.Executing,
         } as unknown as TrackedToolCall,
       ],
     });
     expect(result.current.isRedirectionActive).toBe(true);
   });
 
-  it('should reset everything when idle', () => {
-    const { result, rerender } = renderHook(
+  it('should reset everything when idle', async () => {
+    const { result, rerender } = await renderHook(
       ({ state }) => useTurnActivityMonitor(state, 'pty-1', []),
       {
         initialProps: { state: StreamingState.Responding },

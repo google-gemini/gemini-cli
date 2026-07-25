@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  ModelConfigAlias,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfigAlias,
+  type ModelConfigServiceConfig,
 } from './modelConfigService.js';
-import { ModelConfigService } from './modelConfigService.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -668,6 +668,31 @@ describe('ModelConfigService', () => {
       // Specificity should win over order
       expect(resolved.generateContentConfig.temperature).toBe(0.1);
     });
+
+    it('should clear runtime overrides', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { generateContentConfig: { temperature: 0.99 } },
+      });
+
+      expect(
+        service.getResolvedConfig({ model: 'gemini-pro' }).generateContentConfig
+          .temperature,
+      ).toBe(0.99);
+
+      service.clearRuntimeOverrides();
+
+      expect(
+        service.getResolvedConfig({ model: 'gemini-pro' }).generateContentConfig
+          .temperature,
+      ).toBeUndefined();
+    });
   });
 
   describe('custom aliases', () => {
@@ -726,6 +751,71 @@ describe('ModelConfigService', () => {
       expect(resolved.generateContentConfig).toEqual({
         temperature: 0.1,
       });
+    });
+  });
+
+  describe('fallback behavior', () => {
+    it('should fallback to chat-base if the requested model is completely unknown', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      // It preserves the requested model name, but inherits the config from chat-base
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.99,
+      });
+    });
+
+    it('should return empty config if requested model is unknown and chat-base is not defined', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
+    });
+
+    it('should NOT fallback to chat-base if the requested model is completely unknown but isChatModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: false,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
     });
   });
 
@@ -951,6 +1041,116 @@ describe('ModelConfigService', () => {
         isRetry: true,
       });
       expect(retry.generateContentConfig.temperature).toBe(1.0);
+    });
+  });
+
+  // Resolves a model ID to a concrete model ID based on the provided context.
+  describe('resolveModelId', () => {
+    it('should resolve based on useGemini3_5Flash condition', () => {
+      const config: ModelConfigServiceConfig = {
+        modelIdResolutions: {
+          flash: {
+            default: 'gemini-2.0-flash',
+            contexts: [
+              {
+                condition: { useGemini3_5Flash: true },
+                target: 'gemini-3.5-flash',
+              },
+            ],
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      expect(service.resolveModelId('flash', { useGemini3_5Flash: true })).toBe(
+        'gemini-3.5-flash',
+      );
+      expect(
+        service.resolveModelId('flash', { useGemini3_5Flash: false }),
+      ).toBe('gemini-2.0-flash');
+      expect(service.resolveModelId('flash', {})).toBe('gemini-2.0-flash');
+    });
+
+    it('should resolve based on complex conditions including useGemini3_5Flash', () => {
+      const config: ModelConfigServiceConfig = {
+        modelIdResolutions: {
+          'gemini-flash': {
+            default: 'gemini-3-flash-preview',
+            contexts: [
+              {
+                condition: {
+                  useGemini3_5Flash: false,
+                  hasAccessToPreview: false,
+                },
+                target: 'gemini-2.5-flash',
+              },
+              {
+                condition: { useGemini3_5Flash: true },
+                target: 'gemini-3.5-flash',
+              },
+            ],
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      // Case 1: GA Access granted
+      expect(
+        service.resolveModelId('gemini-flash', { useGemini3_5Flash: true }),
+      ).toBe('gemini-3.5-flash');
+
+      // Case 2: GA Access denied, but has preview access
+      expect(
+        service.resolveModelId('gemini-flash', {
+          useGemini3_5Flash: false,
+          hasAccessToPreview: true,
+        }),
+      ).toBe('gemini-3-flash-preview');
+
+      // Case 3: GA Access denied AND no preview access
+      expect(
+        service.resolveModelId('gemini-flash', {
+          useGemini3_5Flash: false,
+          hasAccessToPreview: false,
+        }),
+      ).toBe('gemini-2.5-flash');
+    });
+  });
+
+  describe('getAvailableModelOptions', () => {
+    it('should filter out Pro models when hasAccessToProModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+          'gemini-3-flash': { isVisible: true, tier: 'flash' },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const options = service.getAvailableModelOptions({
+        hasAccessToProModel: false,
+      });
+
+      expect(options.map((o) => o.modelId)).not.toContain('gemini-3-pro');
+      expect(options.map((o) => o.modelId)).toContain('gemini-3-flash');
+    });
+
+    it('should include Pro models when hasAccessToProModel is true or undefined', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      const optionsWithTrue = service.getAvailableModelOptions({
+        hasAccessToProModel: true,
+      });
+      expect(optionsWithTrue.map((o) => o.modelId)).toContain('gemini-3-pro');
+
+      const optionsWithUndefined = service.getAvailableModelOptions({});
+      expect(optionsWithUndefined.map((o) => o.modelId)).toContain(
+        'gemini-3-pro',
+      );
     });
   });
 });

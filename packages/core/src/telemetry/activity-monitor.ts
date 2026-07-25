@@ -50,6 +50,7 @@ export const DEFAULT_ACTIVITY_CONFIG: ActivityMonitorConfig = {
     ActivityType.USER_INPUT_START,
     ActivityType.MESSAGE_ADDED,
     ActivityType.TOOL_CALL_SCHEDULED,
+    ActivityType.TOOL_CALL_COMPLETED,
     ActivityType.STREAM_START,
   ],
 };
@@ -174,6 +175,7 @@ export class ActivityMonitor {
     eventTypes: Record<ActivityType, number>;
     timeRange: { start: number; end: number } | null;
   } {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const eventTypes = {} as Record<ActivityType, number>;
     let start = Number.MAX_SAFE_INTEGER;
     let end = 0;

@@ -24,6 +24,7 @@ async function getHistoryFilePath(
   configStorage?: Storage,
 ): Promise<string> {
   const storage = configStorage ?? new Storage(projectRoot);
+  await storage.initialize();
   return storage.getHistoryFilePath();
 }
 

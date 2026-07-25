@@ -21,7 +21,7 @@ describe('GetInternalDocsTool (Integration)', () => {
 
   it('should find the documentation root and list files', async () => {
     const invocation = tool.build({});
-    const result = await invocation.execute(abortSignal);
+    const result = await invocation.execute({ abortSignal });
 
     expect(result.error).toBeUndefined();
     // Verify we found some files
@@ -45,7 +45,7 @@ describe('GetInternalDocsTool (Integration)', () => {
     const expectedContent = await fs.readFile(expectedDocsPath, 'utf8');
 
     const invocation = tool.build({ path: 'index.md' });
-    const result = await invocation.execute(abortSignal);
+    const result = await invocation.execute({ abortSignal });
 
     expect(result.error).toBeUndefined();
     expect(result.llmContent).toBe(expectedContent);
@@ -55,7 +55,7 @@ describe('GetInternalDocsTool (Integration)', () => {
   it('should prevent access to files outside the docs directory (Path Traversal)', async () => {
     // Attempt to read package.json from the root
     const invocation = tool.build({ path: '../package.json' });
-    const result = await invocation.execute(abortSignal);
+    const result = await invocation.execute({ abortSignal });
 
     expect(result.error).toBeDefined();
     expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
@@ -64,7 +64,7 @@ describe('GetInternalDocsTool (Integration)', () => {
 
   it('should handle non-existent files', async () => {
     const invocation = tool.build({ path: 'this-file-does-not-exist.md' });
-    const result = await invocation.execute(abortSignal);
+    const result = await invocation.execute({ abortSignal });
 
     expect(result.error).toBeDefined();
     expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);

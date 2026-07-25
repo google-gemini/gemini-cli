@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,7 @@ import {
   REFERENCE_CONTENT_END,
 } from '@google/gemini-cli-core';
 
-export const formatMemoryUsage = (bytes: number): string => {
+export const formatBytes = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -97,3 +97,59 @@ export function stripReferenceContent(text: string): string {
 
   return text.replace(pattern, '').trim();
 }
+
+export const formatResetTime = (
+  resetTime: string | undefined,
+  format: 'terse' | 'column' | 'full' = 'full',
+): string => {
+  if (!resetTime) return '';
+  const resetDate = new Date(resetTime);
+  if (isNaN(resetDate.getTime())) return '';
+
+  const diff = resetDate.getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const isTerse = format === 'terse';
+  const isColumn = format === 'column';
+
+  if (isTerse || isColumn) {
+    const hoursStr = hours > 0 ? `${hours}h` : '';
+    const minutesStr = minutes > 0 ? `${minutes}m` : '';
+    const duration =
+      hoursStr && minutesStr
+        ? `${hoursStr} ${minutesStr}`
+        : hoursStr || minutesStr;
+
+    if (isColumn) {
+      const timeStr = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: 'numeric',
+      }).format(resetDate);
+      return duration ? `${timeStr} (${duration})` : timeStr;
+    }
+
+    return duration;
+  }
+
+  let duration = '';
+  if (hours > 0) {
+    duration = `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (minutes > 0) {
+      duration += ` ${minutes} minute${minutes > 1 ? 's' : ''}`;
+    }
+  } else {
+    duration = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  }
+
+  const timeStr = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: 'numeric',
+    timeZoneName: 'short',
+  }).format(resetDate);
+
+  return `${duration} at ${timeStr}`;
+};

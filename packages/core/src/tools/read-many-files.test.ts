@@ -4,12 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs'; // Actual fs for setup
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -22,6 +30,8 @@ import {
 } from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import type { ReadManyFilesResult } from './tools.js';
 
 vi.mock('glob', { spy: true });
 
@@ -56,6 +66,16 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+  JIT_CONTEXT_PREFIX: '\n\n--- Newly Discovered Project Context ---\n',
+  JIT_CONTEXT_SUFFIX: '\n--- End Project Context ---',
+}));
+
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
   let tempRootDir: string;
@@ -69,7 +89,7 @@ describe('ReadManyFilesTool', () => {
     tempDirOutsideRoot = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'read-many-files-external-')),
     );
-    fs.writeFileSync(path.join(tempRootDir, '.geminiignore'), 'foo.*');
+    fs.writeFileSync(path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME), 'foo.*');
     const fileService = new FileDiscoveryService(tempRootDir);
     const mockConfig = {
       getFileService: () => fileService,
@@ -78,6 +98,7 @@ describe('ReadManyFilesTool', () => {
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
         respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
       }),
       getTargetDir: () => tempRootDir,
       getWorkspaceDirs: () => [tempRootDir],
@@ -90,7 +111,28 @@ describe('ReadManyFilesTool', () => {
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
       isInteractive: () => false,
-    } as Partial<Config> as Config;
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
     tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
     mockReadFileFn = mockControl.mockReadFile;
@@ -230,13 +272,15 @@ describe('ReadManyFilesTool', () => {
       createFile('file1.txt', 'Content of file1');
       const params = { include: ['file1.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -246,7 +290,9 @@ describe('ReadManyFilesTool', () => {
       createFile('subdir/file2.js', 'Content2');
       const params = { include: ['file1.txt', 'subdir/file2.js'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath1 = path.join(tempRootDir, 'file1.txt');
       const expectedPath2 = path.join(tempRootDir, 'subdir/file2.js');
@@ -260,7 +306,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -271,7 +317,9 @@ describe('ReadManyFilesTool', () => {
       createFile('sub/data.json', '{}');
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath1 = path.join(tempRootDir, 'file.txt');
       const expectedPath2 = path.join(tempRootDir, 'another.txt');
@@ -286,7 +334,7 @@ describe('ReadManyFilesTool', () => {
         ),
       ).toBe(true);
       expect(content.find((c) => c.includes('sub/data.json'))).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -296,7 +344,9 @@ describe('ReadManyFilesTool', () => {
       createFile('src/main.test.ts', 'Test content');
       const params = { include: ['src/**/*.ts'], exclude: ['**/*.test.ts'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/main.ts');
       expect(content).toEqual([
@@ -306,7 +356,7 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -314,11 +364,13 @@ describe('ReadManyFilesTool', () => {
     it('should handle nonexistent specific files gracefully', async () => {
       const params = { include: ['nonexistent-file.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         'No files matching the criteria were found or all were skipped.',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'No files were read and concatenated based on the criteria.',
       );
     });
@@ -328,7 +380,9 @@ describe('ReadManyFilesTool', () => {
       createFile('src/app.js', 'app code');
       const params = { include: ['**/*.js'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/app.js');
       expect(content).toEqual([
@@ -338,22 +392,21 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
 
     it('should NOT use default excludes if useDefaultExcludes is false', async () => {
-      createFile('node_modules/some-lib/index.js', 'lib code');
+      createFile('dist/some-lib/index.js', 'lib code');
       createFile('src/app.js', 'app code');
       const params = { include: ['**/*.js'], useDefaultExcludes: false };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
-      const expectedPath1 = path.join(
-        tempRootDir,
-        'node_modules/some-lib/index.js',
-      );
+      const expectedPath1 = path.join(tempRootDir, 'dist/some-lib/index.js');
       const expectedPath2 = path.join(tempRootDir, 'src/app.js');
       expect(
         content.some((c) =>
@@ -365,7 +418,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\napp code\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -377,7 +430,9 @@ describe('ReadManyFilesTool', () => {
       );
       const params = { include: ['*.png'] }; // Explicitly requesting .png
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -389,7 +444,7 @@ describe('ReadManyFilesTool', () => {
         },
         '\n--- End of content ---',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -401,7 +456,9 @@ describe('ReadManyFilesTool', () => {
       );
       const params = { include: ['myExactImage.png'] }; // Explicitly requesting by full name
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -420,7 +477,9 @@ describe('ReadManyFilesTool', () => {
       createFile('notes.txt', 'text notes');
       const params = { include: ['*'] }; // Generic glob, not specific to .pdf
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'notes.txt');
       expect(
@@ -430,8 +489,10 @@ describe('ReadManyFilesTool', () => {
             c.includes(`--- ${expectedPath} ---\n\ntext notes\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '**Skipped 1 item(s):**',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
       );
     });
@@ -440,7 +501,9 @@ describe('ReadManyFilesTool', () => {
       createBinaryFile('important.pdf', Buffer.from('%PDF-1.4...'));
       const params = { include: ['*.pdf'] }; // Explicitly requesting .pdf files
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -456,7 +519,9 @@ describe('ReadManyFilesTool', () => {
       createBinaryFile('report-final.pdf', Buffer.from('%PDF-1.4...'));
       const params = { include: ['report-final.pdf'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -474,10 +539,18 @@ describe('ReadManyFilesTool', () => {
       createFile('foo.quux', '');
       const params = { include: ['foo.bar', 'bar.ts', 'foo.quux'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.returnDisplay).not.toContain('foo.bar');
-      expect(result.returnDisplay).not.toContain('foo.quux');
-      expect(result.returnDisplay).toContain('bar.ts');
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect((result.returnDisplay as ReadManyFilesResult).files).not.toContain(
+        'foo.bar',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).files).not.toContain(
+        'foo.quux',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).files).toContain(
+        'bar.ts',
+      );
     });
 
     it('should read files from multiple workspace directories', async () => {
@@ -494,6 +567,7 @@ describe('ReadManyFilesTool', () => {
         getFileFilteringOptions: () => ({
           respectGitIgnore: true,
           respectGeminiIgnore: true,
+          customIgnoreFilePaths: [],
         }),
         getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
         getTargetDir: () => tempDir1,
@@ -505,7 +579,28 @@ describe('ReadManyFilesTool', () => {
           getReadManyFilesExcludes: () => [],
         }),
         isInteractive: () => false,
-      } as Partial<Config> as Config;
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
+      } as unknown as Config;
       tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
       fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');
@@ -513,7 +608,9 @@ describe('ReadManyFilesTool', () => {
 
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       if (!Array.isArray(content)) {
         throw new Error(`llmContent is not an array: ${content}`);
@@ -531,7 +628,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
 
@@ -549,7 +646,9 @@ describe('ReadManyFilesTool', () => {
 
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
 
       const normalFileContent = content.find((c) => c.includes('file1.txt'));
@@ -573,7 +672,9 @@ describe('ReadManyFilesTool', () => {
       createFile(filePath, 'Content of receive-detail');
       const params = { include: [filePath] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, filePath);
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---
@@ -583,7 +684,7 @@ Content of receive-detail
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -592,7 +693,9 @@ Content of receive-detail
       createFile('file[1].txt', 'Content of file[1]');
       const params = { include: ['file[1].txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, 'file[1].txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---
@@ -602,7 +705,7 @@ Content of file[1]
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -620,7 +723,9 @@ Content of file[1]
       vi.mocked(glob.glob).mockRejectedValue(new Error('Glob failed'));
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.error?.type).toBe(
         ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
       );
@@ -666,7 +771,9 @@ Content of file[1]
 
       const params = { include: files };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Verify all files were processed. The content should have fileCount
       // entries + 1 for the output terminator.
@@ -696,12 +803,16 @@ Content of file[1]
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
 
       // Should successfully process valid files despite one failure
       expect(content.length).toBeGreaterThanOrEqual(3);
-      expect(result.returnDisplay).toContain('Successfully read');
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        'Successfully read',
+      );
 
       // Verify valid files were processed
       const expectedPath1 = path.join(tempRootDir, 'valid1.txt');
@@ -723,7 +834,7 @@ Content of file[1]
 
       // Mock to track concurrent vs sequential execution
       detectFileTypeSpy.mockImplementation(async (filePath: string) => {
-        const fileName = filePath.split('/').pop() || '';
+        const fileName = path.basename(filePath);
         executionOrder.push(`start:${fileName}`);
 
         // Add delay to make timing differences visible
@@ -734,7 +845,7 @@ Content of file[1]
       });
 
       const invocation = tool.build({ include: files });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Verify concurrent execution pattern
       // In parallel execution: all "start:" events should come before all "end:" events
@@ -754,6 +865,111 @@ Content of file[1]
       expect(startsBeforeFirstEnd).toBe(startEvents); // Should PASS with parallel implementation
 
       detectFileTypeSpy.mockRestore();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-test.ts'),
+        'const x = 1;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-test.ts'] });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Newly Discovered Project Context');
+      expect(llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-disabled-test.ts'),
+        'const y = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-disabled-test.ts'] });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).not.toContain('Newly Discovered Project Context');
+    });
+
+    it('should discover JIT context sequentially to avoid duplicate shared parent context', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+
+      // Simulate two subdirectories sharing a parent GEMINI.md.
+      // Sequential execution means the second call sees the parent already
+      // loaded, so it only returns its own leaf context.
+      const callOrder: string[] = [];
+      let firstCallDone = false;
+      vi.mocked(discoverJitContext).mockImplementation(async (_config, dir) => {
+        callOrder.push(dir);
+        if (!firstCallDone) {
+          // First call (whichever dir) loads the shared parent + its own leaf
+          firstCallDone = true;
+          return 'Parent context\nFirst leaf context';
+        }
+        // Second call only returns its own leaf (parent already loaded)
+        return 'Second leaf context';
+      });
+
+      // Create files in two sibling subdirectories
+      fs.mkdirSync(path.join(tempRootDir, 'subA'), { recursive: true });
+      fs.mkdirSync(path.join(tempRootDir, 'subB'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subA', 'a.ts'),
+        'const a = 1;',
+        'utf8',
+      );
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subB', 'b.ts'),
+        'const b = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['subA/a.ts', 'subB/b.ts'] });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      // Verify both directories were discovered (order depends on Set iteration)
+      expect(callOrder).toHaveLength(2);
+      expect(callOrder).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('subA'),
+          expect.stringContaining('subB'),
+        ]),
+      );
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Parent context');
+      expect(llmContent).toContain('First leaf context');
+      expect(llmContent).toContain('Second leaf context');
+
+      // Parent context should appear only once (from the first call), not duplicated
+      const parentMatches = llmContent.match(/Parent context/g);
+      expect(parentMatches).toHaveLength(1);
     });
   });
 });

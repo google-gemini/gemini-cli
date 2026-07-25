@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
@@ -24,7 +24,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   };
 });
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
@@ -202,6 +201,53 @@ describe('ide-installer', () => {
       );
     });
   });
+
+  describe('PositronInstaller', () => {
+    function setup({
+      execSync = () => '',
+      platform = 'linux' as NodeJS.Platform,
+      existsResult = false,
+    }: {
+      execSync?: () => string;
+      platform?: NodeJS.Platform;
+      existsResult?: boolean;
+    } = {}) {
+      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
+      const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
+
+      return { installer };
+    }
+
+    it('installs the extension', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({});
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        'positron',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('returns a failure message if the cli is not found', async () => {
+      const { installer } = setup({
+        execSync: () => {
+          throw new Error('Command not found');
+        },
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Positron CLI not found');
+    });
+  });
 });
 
 describe('AntigravityInstaller', () => {
@@ -235,15 +281,105 @@ describe('AntigravityInstaller', () => {
     );
   });
 
-  it('returns a failure message if the alias is not set', async () => {
+  it('ignores an unsafe alias and falls back to safe commands', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy;malicious_command');
+    const { installer } = setup();
+    vi.mocked(child_process.execSync).mockImplementationOnce(() => 'agy');
+
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.execSync).toHaveBeenCalledTimes(1);
+    expect(child_process.execSync).toHaveBeenCalledWith('command -v agy', {
+      stdio: 'ignore',
+    });
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'agy',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: false },
+    );
+  });
+
+  it('falls back to antigravity when agy is unavailable on linux', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
+    const { installer } = setup();
+    vi.mocked(child_process.execSync)
+      .mockImplementationOnce(() => {
+        throw new Error('Command not found');
+      })
+      .mockImplementationOnce(() => 'antigravity');
+
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.execSync).toHaveBeenNthCalledWith(
+      1,
+      'command -v agy',
+      {
+        stdio: 'ignore',
+      },
+    );
+    expect(child_process.execSync).toHaveBeenNthCalledWith(
+      2,
+      'command -v antigravity',
+      { stdio: 'ignore' },
+    );
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'antigravity',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: false },
+    );
+  });
+
+  it('falls back to antigravity.cmd when agy.cmd is unavailable on windows', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy.cmd');
+    const { installer } = setup({
+      platform: 'win32',
+    });
+    vi.mocked(child_process.execSync)
+      .mockImplementationOnce(() => {
+        throw new Error('Command not found');
+      })
+      .mockImplementationOnce(
+        () => 'C:\\Program Files\\Antigravity\\bin\\antigravity.cmd',
+      );
+
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.execSync).toHaveBeenNthCalledWith(
+      1,
+      'where.exe agy.cmd',
+    );
+    expect(child_process.execSync).toHaveBeenNthCalledWith(
+      2,
+      'where.exe antigravity.cmd',
+    );
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'C:\\Program Files\\Antigravity\\bin\\antigravity.cmd',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: true },
+    );
+  });
+
+  it('falls back to default commands if the alias is not set', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const { installer } = setup({});
     const result = await installer.install();
 
-    expect(result.success).toBe(false);
-    expect(result.message).toContain(
-      'ANTIGRAVITY_CLI_ALIAS environment variable not set',
-    );
+    expect(result.success).toBe(true);
   });
 
   it('returns a failure message if the command is not found', async () => {
@@ -256,6 +392,7 @@ describe('AntigravityInstaller', () => {
     const result = await installer.install();
 
     expect(result.success).toBe(false);
-    expect(result.message).toContain('not-a-command not found');
+    expect(result.message).toContain('Antigravity CLI not found');
+    expect(result.message).toContain('agy, antigravity');
   });
 });

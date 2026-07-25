@@ -23,9 +23,9 @@ export const isGitHubRepository = (): boolean => {
     const pattern = /github\.com/;
 
     return pattern.test(remotes);
-  } catch (_error) {
+  } catch (error) {
     // If any filesystem error occurs, assume not a git repo
-    debugLogger.debug(`Failed to get git remote:`, _error);
+    debugLogger.debug(`Failed to get git remote:`, error);
     return false;
   }
 };
@@ -69,7 +69,13 @@ export const getLatestGitHubRelease = async (
         'X-GitHub-Api-Version': '2022-11-28',
       },
       dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
-      signal: AbortSignal.any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      signal: (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([AbortSignal.timeout(30_000), controller.signal]),
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
     } as RequestInit);
 
     if (!response.ok) {
@@ -78,15 +84,16 @@ export const getLatestGitHubRelease = async (
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const releaseTag = (await response.json()).tag_name;
     if (!releaseTag) {
       throw new Error(`Response did not include tag_name field`);
     }
-    return releaseTag;
-  } catch (_error) {
+    return typeof releaseTag === 'string' ? releaseTag : '';
+  } catch (error) {
     debugLogger.debug(
       `Failed to determine latest run-gemini-cli release:`,
-      _error,
+      error,
     );
     throw new Error(
       `Unable to determine the latest run-gemini-cli release on GitHub.`,
@@ -104,17 +111,38 @@ export function getGitHubRepoInfo(): { owner: string; repo: string } {
     encoding: 'utf-8',
   }).trim();
 
-  // Matches either https://github.com/owner/repo.git or git@github.com:owner/repo.git
-  const match = remoteUrl.match(
-    /(?:https?:\/\/|git@)github\.com(?::|\/)([^/]+)\/([^/]+?)(?:\.git)?$/,
-  );
-
-  // If the regex fails match, throw an error.
-  if (!match || !match[1] || !match[2]) {
+  // Handle SCP-style SSH URLs (git@github.com:owner/repo.git)
+  let urlToParse = remoteUrl;
+  if (remoteUrl.startsWith('git@github.com:')) {
+    urlToParse = remoteUrl.replace('git@github.com:', '');
+  } else if (remoteUrl.startsWith('git@')) {
+    // SSH URL for a different provider (GitLab, Bitbucket, etc.)
     throw new Error(
       `Owner & repo could not be extracted from remote URL: ${remoteUrl}`,
     );
   }
 
-  return { owner: match[1], repo: match[2] };
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(urlToParse, 'https://github.com');
+  } catch {
+    throw new Error(
+      `Owner & repo could not be extracted from remote URL: ${remoteUrl}`,
+    );
+  }
+
+  if (parsedUrl.host !== 'github.com') {
+    throw new Error(
+      `Owner & repo could not be extracted from remote URL: ${remoteUrl}`,
+    );
+  }
+
+  const parts = parsedUrl.pathname.split('/').filter((part) => part !== '');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error(
+      `Owner & repo could not be extracted from remote URL: ${remoteUrl}`,
+    );
+  }
+
+  return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') };
 }

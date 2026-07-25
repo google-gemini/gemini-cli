@@ -155,9 +155,9 @@ function generateMarkdown(currentStatsByModel, history) {
 
   const models = Object.keys(currentStatsByModel).sort();
 
-  for (const model of models) {
-    const currentStats = currentStatsByModel[model];
-    const totalStats = Object.values(currentStats).reduce(
+  const getPassRate = (statsForModel) => {
+    if (!statsForModel) return '-';
+    const totalStats = Object.values(statsForModel).reduce(
       (acc, stats) => {
         acc.passed += stats.passed;
         acc.total += stats.total;
@@ -165,11 +165,14 @@ function generateMarkdown(currentStatsByModel, history) {
       },
       { passed: 0, total: 0 },
     );
+    return totalStats.total > 0
+      ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
+      : '-';
+  };
 
-    const totalPassRate =
-      totalStats.total > 0
-        ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
-        : 'N/A';
+  for (const model of models) {
+    const currentStats = currentStatsByModel[model];
+    const totalPassRate = getPassRate(currentStats);
 
     console.log(`#### Model: ${model}`);
     console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
@@ -177,18 +180,22 @@ function generateMarkdown(currentStatsByModel, history) {
     // Header
     let header = '| Test Name |';
     let separator = '| :--- |';
+    let passRateRow = '| **Overall Pass Rate** |';
 
     for (const item of reversedHistory) {
       header += ` [${item.run.databaseId}](${item.run.url}) |`;
       separator += ' :---: |';
+      passRateRow += ` **${getPassRate(item.stats[model])}** |`;
     }
 
     // Add Current column last
     header += ' Current |';
     separator += ' :---: |';
+    passRateRow += ` **${totalPassRate}** |`;
 
     console.log(header);
     console.log(separator);
+    console.log(passRateRow);
 
     // Collect all test names for this model
     const allTestNames = new Set(Object.keys(currentStats));

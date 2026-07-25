@@ -1,22 +1,24 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect } from 'react';
+import type React from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import type { PromptCompletion } from './usePromptCompletion.js';
+import { useShellCompletion } from './useShellCompletion.js';
 import {
   usePromptCompletion,
   PROMPT_COMPLETION_MIN_LENGTH,
+  type PromptCompletion,
 } from './usePromptCompletion.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
@@ -26,6 +28,7 @@ export enum CompletionMode {
   AT = 'AT',
   SLASH = 'SLASH',
   PROMPT = 'PROMPT',
+  SHELL = 'SHELL',
 }
 
 export interface UseCommandCompletionReturn {
@@ -35,8 +38,10 @@ export interface UseCommandCompletionReturn {
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
+  forceShowShellSuggestions: boolean;
+  setForceShowShellSuggestions: (value: boolean) => void;
+  isShellSuggestionsVisible: boolean;
   setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
-  setShowSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
@@ -58,123 +63,155 @@ export interface UseCommandCompletionReturn {
   completionMode: CompletionMode;
 }
 
-export function useCommandCompletion(
-  buffer: TextBuffer,
-  cwd: string,
-  slashCommands: readonly SlashCommand[],
-  commandContext: CommandContext,
-  reverseSearchActive: boolean = false,
-  shellModeActive: boolean,
-  config?: Config,
-): UseCommandCompletionReturn {
+export interface UseCommandCompletionOptions {
+  buffer: TextBuffer;
+  cwd: string;
+  slashCommands: readonly SlashCommand[];
+  commandContext: CommandContext;
+  reverseSearchActive?: boolean;
+  shellModeActive: boolean;
+  config?: Config;
+  active: boolean;
+}
+
+export function useCommandCompletion({
+  buffer,
+  cwd,
+  slashCommands,
+  commandContext,
+  reverseSearchActive = false,
+  shellModeActive,
+  config,
+  active,
+}: UseCommandCompletionOptions): UseCommandCompletionReturn {
+  const [forceShowShellSuggestions, setForceShowShellSuggestions] =
+    useState(false);
+
   const {
     suggestions,
     activeSuggestionIndex,
     visibleStartIndex,
-    showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
 
     setSuggestions,
-    setShowSuggestions,
     setActiveSuggestionIndex,
     setIsLoadingSuggestions,
     setIsPerfectMatch,
     setVisibleStartIndex,
 
-    resetCompletionState,
+    resetCompletionState: baseResetCompletionState,
     navigateUp,
     navigateDown,
   } = useCompletion();
 
+  const resetCompletionState = useCallback(() => {
+    baseResetCompletionState();
+    setForceShowShellSuggestions(false);
+  }, [baseResetCompletionState]);
+
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
 
-  const { completionMode, query, completionStart, completionEnd } =
-    useMemo(() => {
-      const currentLine = buffer.lines[cursorRow] || '';
-      const codePoints = toCodePoints(currentLine);
+  const {
+    completionMode,
+    query: memoQuery,
+    completionStart,
+    completionEnd,
+  } = useMemo(() => {
+    const currentLine = buffer.lines[cursorRow] || '';
+    const codePoints = toCodePoints(currentLine);
 
-      // FIRST: Check for @ completion (scan backwards from cursor)
-      // This must happen before slash command check so that `/cmd @file`
-      // triggers file completion, not just slash command completion.
-      for (let i = cursorCol - 1; i >= 0; i--) {
-        const char = codePoints[i];
-
-        if (char === ' ') {
-          let backslashCount = 0;
-          for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-            backslashCount++;
-          }
-          if (backslashCount % 2 === 0) {
-            break;
-          }
-        } else if (char === '@') {
-          let end = codePoints.length;
-          for (let i = cursorCol; i < codePoints.length; i++) {
-            if (codePoints[i] === ' ') {
-              let backslashCount = 0;
-              for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-                backslashCount++;
-              }
-
-              if (backslashCount % 2 === 0) {
-                end = i;
-                break;
-              }
-            }
-          }
-          const pathStart = i + 1;
-          const partialPath = currentLine.substring(pathStart, end);
-          return {
-            completionMode: CompletionMode.AT,
-            query: partialPath,
-            completionStart: pathStart,
-            completionEnd: end,
-          };
-        }
-      }
-
-      // THEN: Check for slash command (only if no @ completion is active)
-      if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
-        return {
-          completionMode: CompletionMode.SLASH,
-          query: currentLine,
-          completionStart: 0,
-          completionEnd: currentLine.length,
-        };
-      }
-
-      // Check for prompt completion - only if enabled
-      const trimmedText = buffer.text.trim();
-      const isPromptCompletionEnabled =
-        config?.getEnablePromptCompletion() ?? false;
-
-      if (
-        isPromptCompletionEnabled &&
-        trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-        !isSlashCommand(trimmedText) &&
-        !trimmedText.includes('@')
-      ) {
-        return {
-          completionMode: CompletionMode.PROMPT,
-          query: trimmedText,
-          completionStart: 0,
-          completionEnd: trimmedText.length,
-        };
-      }
-
+    if (shellModeActive) {
       return {
-        completionMode: CompletionMode.IDLE,
-        query: null,
+        completionMode:
+          currentLine.trim().length === 0
+            ? CompletionMode.IDLE
+            : CompletionMode.SHELL,
+        query: '',
         completionStart: -1,
         completionEnd: -1,
       };
-    }, [cursorRow, cursorCol, buffer.lines, buffer.text, config]);
+    }
+
+    // FIRST: Check for @ completion (scan backwards from cursor)
+    // This must happen before slash command check so that `/cmd @file`
+    // triggers file completion, not just slash command completion.
+    for (let i = cursorCol - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        if (backslashCount % 2 === 0) {
+          break;
+        }
+      } else if (char === '@') {
+        let end = codePoints.length;
+        for (let i = cursorCol; i < codePoints.length; i++) {
+          if (codePoints[i] === ' ') {
+            let backslashCount = 0;
+            for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+              backslashCount++;
+            }
+
+            if (backslashCount % 2 === 0) {
+              end = i;
+              break;
+            }
+          }
+        }
+        const pathStart = i + 1;
+        const partialPath = currentLine.substring(pathStart, end);
+        return {
+          completionMode: CompletionMode.AT,
+          query: partialPath,
+          completionStart: pathStart,
+          completionEnd: end,
+        };
+      }
+    }
+
+    // THEN: Check for slash command (only if no @ completion is active)
+    if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
+      return {
+        completionMode: CompletionMode.SLASH,
+        query: currentLine,
+        completionStart: 0,
+        completionEnd: currentLine.length,
+      };
+    }
+
+    // Check for prompt completion - only if enabled
+    const trimmedText = buffer.text.trim();
+    const isPromptCompletionEnabled = false;
+    if (
+      isPromptCompletionEnabled &&
+      trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
+      !isSlashCommand(trimmedText) &&
+      !trimmedText.includes('@')
+    ) {
+      return {
+        completionMode: CompletionMode.PROMPT,
+        query: trimmedText,
+        completionStart: 0,
+        completionEnd: trimmedText.length,
+      };
+    }
+
+    return {
+      completionMode: CompletionMode.IDLE,
+      query: null,
+      completionStart: -1,
+      completionEnd: -1,
+    };
+  }, [cursorRow, cursorCol, buffer.lines, buffer.text, shellModeActive]);
 
   useAtCompletion({
-    enabled: completionMode === CompletionMode.AT,
-    pattern: query || '',
+    enabled: active && completionMode === CompletionMode.AT,
+    pattern: memoQuery || '',
     config,
     cwd,
     setSuggestions,
@@ -182,8 +219,9 @@ export function useCommandCompletion(
   });
 
   const slashCompletionRange = useSlashCompletion({
-    enabled: completionMode === CompletionMode.SLASH && !shellModeActive,
-    query,
+    enabled:
+      active && completionMode === CompletionMode.SLASH && !shellModeActive,
+    query: memoQuery,
     slashCommands,
     commandContext,
     setSuggestions,
@@ -191,32 +229,125 @@ export function useCommandCompletion(
     setIsPerfectMatch,
   });
 
-  const promptCompletion = usePromptCompletion({
-    buffer,
-    config,
-    enabled: completionMode === CompletionMode.PROMPT,
+  const shellCompletionRange = useShellCompletion({
+    enabled: active && completionMode === CompletionMode.SHELL,
+    line: buffer.lines[cursorRow] || '',
+    cursorCol,
+    cwd,
+    setSuggestions,
+    setIsLoadingSuggestions,
   });
+
+  const query =
+    completionMode === CompletionMode.SHELL
+      ? shellCompletionRange.query
+      : memoQuery;
+
+  const basePromptCompletion = usePromptCompletion({
+    buffer,
+  });
+
+  const isShellSuggestionsVisible =
+    completionMode !== CompletionMode.SHELL || forceShowShellSuggestions;
+
+  const promptCompletion = useMemo(() => {
+    if (
+      completionMode === CompletionMode.SHELL &&
+      suggestions.length === 1 &&
+      query != null &&
+      shellCompletionRange.completionStart === shellCompletionRange.activeStart
+    ) {
+      const suggestion = suggestions[0];
+      const textToInsertBase = suggestion.value;
+
+      if (
+        textToInsertBase.startsWith(query) &&
+        textToInsertBase.length > query.length
+      ) {
+        const currentLine = buffer.lines[cursorRow] || '';
+        const start = shellCompletionRange.completionStart;
+        const end = shellCompletionRange.completionEnd;
+
+        let textToInsert = textToInsertBase;
+        const charAfterCompletion = currentLine[end];
+        if (
+          charAfterCompletion !== ' ' &&
+          !textToInsert.endsWith('/') &&
+          !textToInsert.endsWith('\\')
+        ) {
+          textToInsert += ' ';
+        }
+
+        const newText =
+          currentLine.substring(0, start) +
+          textToInsert +
+          currentLine.substring(end);
+
+        return {
+          text: newText,
+          isActive: true,
+          isLoading: false,
+          accept: () => {
+            buffer.replaceRangeByOffset(
+              logicalPosToOffset(buffer.lines, cursorRow, start),
+              logicalPosToOffset(buffer.lines, cursorRow, end),
+              textToInsert,
+            );
+          },
+          clear: () => {},
+          markSelected: () => {},
+        };
+      }
+    }
+    return basePromptCompletion;
+  }, [
+    completionMode,
+    suggestions,
+    query,
+    basePromptCompletion,
+    buffer,
+    cursorRow,
+    shellCompletionRange,
+  ]);
 
   useEffect(() => {
     setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
     setVisibleStartIndex(0);
-  }, [suggestions, setActiveSuggestionIndex, setVisibleStartIndex]);
+
+    // Generic perfect match detection for non-slash modes or as a fallback
+    if (completionMode !== CompletionMode.SLASH) {
+      if (suggestions.length > 0) {
+        const firstSuggestion = suggestions[0];
+        setIsPerfectMatch(firstSuggestion.value === query);
+      } else {
+        setIsPerfectMatch(false);
+      }
+    }
+  }, [
+    suggestions,
+    setActiveSuggestionIndex,
+    setVisibleStartIndex,
+    completionMode,
+    query,
+    setIsPerfectMatch,
+  ]);
 
   useEffect(() => {
-    if (completionMode === CompletionMode.IDLE || reverseSearchActive) {
+    if (
+      !active ||
+      completionMode === CompletionMode.IDLE ||
+      reverseSearchActive
+    ) {
       resetCompletionState();
-      return;
     }
-    // Show suggestions if we are loading OR if there are results to display.
-    setShowSuggestions(isLoadingSuggestions || suggestions.length > 0);
-  }, [
-    completionMode,
-    suggestions.length,
-    isLoadingSuggestions,
-    reverseSearchActive,
-    resetCompletionState,
-    setShowSuggestions,
-  ]);
+  }, [active, completionMode, reverseSearchActive, resetCompletionState]);
+
+  const showSuggestions =
+    active &&
+    completionMode !== CompletionMode.IDLE &&
+    !reverseSearchActive &&
+    isShellSuggestionsVisible &&
+    (isLoadingSuggestions || suggestions.length > 0);
 
   /**
    * Gets the completed text by replacing the completion range with the suggestion value.
@@ -234,6 +365,9 @@ export function useCommandCompletion(
       if (completionMode === CompletionMode.SLASH) {
         start = slashCompletionRange.completionStart;
         end = slashCompletionRange.completionEnd;
+      } else if (completionMode === CompletionMode.SHELL) {
+        start = shellCompletionRange.completionStart;
+        end = shellCompletionRange.completionEnd;
       }
 
       if (start === -1 || end === -1) {
@@ -241,7 +375,7 @@ export function useCommandCompletion(
       }
 
       // Apply space padding for slash commands (needed for subcommands like "/chat list")
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         // Add leading space if completing a subcommand (cursor is after parent command with no space)
         if (start === end && start > 1 && currentLine[start - 1] !== ' ') {
@@ -263,6 +397,7 @@ export function useCommandCompletion(
       completionStart,
       completionEnd,
       slashCompletionRange,
+      shellCompletionRange,
     ],
   );
 
@@ -283,10 +418,13 @@ export function useCommandCompletion(
       if (completionMode === CompletionMode.SLASH) {
         start = slashCompletionRange.completionStart;
         end = slashCompletionRange.completionEnd;
+      } else if (completionMode === CompletionMode.SHELL) {
+        start = shellCompletionRange.completionStart;
+        end = shellCompletionRange.completionEnd;
       }
 
       // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         if (
           start === end &&
@@ -299,10 +437,23 @@ export function useCommandCompletion(
 
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
+
+      let shouldAddSpace = true;
+      if (completionMode === CompletionMode.SLASH) {
+        const command =
+          slashCompletionRange.getCommandFromSuggestion(suggestion);
+        // Don't add a space if the command has an action (can be executed)
+        // and doesn't have a completion function (doesn't REQUIRE more arguments)
+        const isExecutableCommand = !!(command && command.action);
+        const requiresArguments = !!(command && command.completion);
+        shouldAddSpace = !isExecutableCommand || requiresArguments;
+      }
+
       if (
         charAfterCompletion !== ' ' &&
         !suggestionText.endsWith('/') &&
-        !suggestionText.endsWith('\\')
+        !suggestionText.endsWith('\\') &&
+        shouldAddSpace
       ) {
         suggestionText += ' ';
       }
@@ -321,6 +472,7 @@ export function useCommandCompletion(
       completionStart,
       completionEnd,
       slashCompletionRange,
+      shellCompletionRange,
       getCompletedText,
     ],
   );
@@ -332,8 +484,10 @@ export function useCommandCompletion(
     showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
+    forceShowShellSuggestions,
+    setForceShowShellSuggestions,
+    isShellSuggestionsVisible,
     setActiveSuggestionIndex,
-    setShowSuggestions,
     resetCompletionState,
     navigateUp,
     navigateDown,

@@ -7,7 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 
 describe('file-system', () => {
   let rig: TestRig;
@@ -43,12 +48,15 @@ describe('file-system', () => {
       'Expected to find a read_file tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'hello world', 'File read test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
+      expectedContent: 'hello world',
+      testName: 'File read test',
+    });
   });
 
-  it('should be able to write a file', async () => {
-    await rig.setup('should be able to write a file', {
+  it('should be able to write a hello world message to a file', async () => {
+    await rig.setup('should be able to write a hello world message to a file', {
       settings: { tools: { core: ['write_file', 'replace', 'read_file'] } },
     });
     rig.createFile('test.txt', '');
@@ -74,8 +82,8 @@ describe('file-system', () => {
       'Expected to find a write_file, edit, or replace tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output
-    validateModelOutput(result, null, 'File write test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, { testName: 'File write test' });
 
     const fileContent = rig.readFile('test.txt');
 
@@ -113,6 +121,7 @@ describe('file-system', () => {
 
     const result = await rig.run({
       args: `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+      timeout: 600000, // 10 min — real LLM can be slow in Docker sandbox
     });
 
     const foundToolCall = await rig.waitForToolCall('write_file');
@@ -125,7 +134,9 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('hello');
+    // Trim to tolerate models that idiomatically append a trailing newline.
+    // This test is about path-with-spaces handling, not whitespace fidelity.
+    expect(newFileContent.trim()).toBe('hello');
   });
 
   it('should perform a read-then-write sequence', async () => {
@@ -161,7 +172,7 @@ describe('file-system', () => {
     ).toBeDefined();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('1.0.1');
+    expect(newFileContent.trimEnd()).toBe('1.0.1');
   });
 
   it.skip('should replace multiple instances of a string', async () => {

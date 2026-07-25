@@ -6,35 +6,38 @@
 
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Text, Box } from 'ink';
 import { theme } from '../semantic-colors.js';
 import process from 'node:process';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 
-export const MemoryUsageDisplay: React.FC = () => {
+export const MemoryUsageDisplay: React.FC<{
+  color?: string;
+  isActive?: boolean;
+}> = ({ color = theme.text.primary, isActive = true }) => {
   const [memoryUsage, setMemoryUsage] = useState<string>('');
-  const [memoryUsageColor, setMemoryUsageColor] = useState<string>(
-    theme.text.secondary,
-  );
+  const [memoryUsageColor, setMemoryUsageColor] = useState<string>(color);
 
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
     const updateMemory = () => {
       const usage = process.memoryUsage().rss;
-      setMemoryUsage(formatMemoryUsage(usage));
+      setMemoryUsage(formatBytes(usage));
       setMemoryUsageColor(
-        usage >= 2 * 1024 * 1024 * 1024
-          ? theme.status.error
-          : theme.text.secondary,
+        usage >= 2 * 1024 * 1024 * 1024 ? theme.status.error : color,
       );
     };
+
     const intervalId = setInterval(updateMemory, 2000);
     updateMemory(); // Initial update
     return () => clearInterval(intervalId);
-  }, []);
+  }, [color, isActive]);
 
   return (
     <Box>
-      <Text color={theme.text.secondary}> | </Text>
       <Text color={memoryUsageColor}>{memoryUsage}</Text>
     </Box>
   );

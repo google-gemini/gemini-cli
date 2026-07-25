@@ -5,5 +5,9 @@
     "allowJs": true
   },
   "include": ["**/*.ts"],
-  "references": [{ "path": "../packages/core" }]
+  "references": [
+    { "path": "../packages/core" },
+    { "path": "../packages/test-utils" },
+    { "path": "../packages/cli" }
+  ]
 }

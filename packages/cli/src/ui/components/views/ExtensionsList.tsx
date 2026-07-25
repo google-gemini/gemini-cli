@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { getFormattedSettingValue } from '../../../commands/extensions/utils.js';
 
 interface ExtensionsList {
   extensions: readonly GeminiCLIExtension[];
@@ -22,7 +23,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
   }
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Text>Installed extensions: </Text>
       <Box flexDirection="column" paddingLeft={2}>
         {extensions.map((ext) => {
@@ -70,7 +71,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
                   <Text>settings:</Text>
                   {ext.resolvedSettings.map((setting) => (
                     <Text key={setting.name}>
-                      - {setting.name}: {setting.value}
+                      - {setting.name}: {getFormattedSettingValue(setting)}
                       {setting.scope && (
                         <Text color="gray">
                           {' '}

@@ -9,8 +9,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     reporters: ['default', 'junit'],
-    timeout: 30000,
-    hookTimeout: 30000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
+    pool: 'forks',
     silent: true,
     setupFiles: ['./test-setup.ts'],
     outputFile: {
@@ -32,8 +33,8 @@ export default defineConfig({
     },
     poolOptions: {
       threads: {
-        minThreads: 8,
-        maxThreads: 16,
+        minThreads: 1,
+        maxThreads: 4,
       },
     },
   },

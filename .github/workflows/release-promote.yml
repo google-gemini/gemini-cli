@@ -55,6 +55,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
 
@@ -105,7 +106,9 @@ jobs:
           echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
           echo "STABLE_VERSION=${STABLE_VERSION}" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "STABLE_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)
+          STABLE_SHA=$(git rev-parse "${PREVIOUS_PREVIEW_TAG}^{commit}")
+          echo "STABLE_SHA=${STABLE_SHA}" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
@@ -171,11 +174,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ matrix.sha }}'
           path: 'release'
           fetch-depth: 0
@@ -197,9 +202,15 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+  build-mac:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    uses: './.github/workflows/build-unsigned-mac-binaries.yml'
+    with:
+      ref: '${{ github.event.inputs.ref }}'
+
   publish-preview:
     name: 'Publish preview'
-    needs: ['calculate-versions', 'test']
+    needs: ['calculate-versions', 'test', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -210,11 +221,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -229,6 +242,11 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -239,6 +257,7 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-release-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
@@ -265,7 +284,7 @@ jobs:
 
   publish-stable:
     name: 'Publish stable'
-    needs: ['calculate-versions', 'test', 'publish-preview']
+    needs: ['calculate-versions', 'test', 'publish-preview', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -276,11 +295,13 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
           path: 'release'
           fetch-depth: 0
@@ -295,6 +316,11 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
+      - name: 'Download macOS Binaries'
+        uses: './.github/actions/download-mac-binaries'
+        with:
+          path: 'release/dist'
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -305,6 +331,7 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-release-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
@@ -333,6 +360,7 @@ jobs:
     name: 'Create Nightly PR'
     needs: ['publish-stable', 'calculate-versions']
     runs-on: 'ubuntu-latest'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       pull-requests: 'write'
@@ -341,6 +369,7 @@ jobs:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          persist-credentials: false
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Setup Node.js'
@@ -360,26 +389,32 @@ jobs:
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          BRANCH_NAME="chore/nightly-version-bump-${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
 
       - name: 'Update package versions'
-        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+        run: 'npm run release:version "${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"'
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
 
       - name: 'Commit and Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          GIT_PUSH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |-
           git add package.json packages/*/package.json
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
-          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
-            git push --set-upstream origin "${BRANCH_NAME}"
+            git push "https://x-access-token:${GIT_PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH_NAME}" --follow-tags
           else
             echo "Dry run enabled. Skipping push."
           fi

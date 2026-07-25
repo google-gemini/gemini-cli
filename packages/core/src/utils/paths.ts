@@ -6,20 +6,13 @@
 
 import path from 'node:path';
 import os from 'node:os';
-import process from 'node:process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
-
-/**
- * Special characters that need to be escaped in file paths for shell compatibility.
- * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
- */
-export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
+export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
 /**
  * Returns the home directory.
@@ -278,43 +271,43 @@ export function makeRelative(
 }
 
 /**
- * Escapes special characters in a file path like macOS terminal does.
- * Escapes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ * Escape paths for at-commands.
+ *
+ *  - Windows: double quoted if they contain special chars, otherwise bare
+ *  - POSIX: backslash-escaped
  */
 export function escapePath(filePath: string): string {
-  let result = '';
-  for (let i = 0; i < filePath.length; i++) {
-    const char = filePath[i];
-
-    // Count consecutive backslashes before this character
-    let backslashCount = 0;
-    for (let j = i - 1; j >= 0 && filePath[j] === '\\'; j--) {
-      backslashCount++;
+  if (process.platform === 'win32') {
+    // Windows: Double quote if it contains special chars
+    if (/[\s&()[\]{}^=;!'+,`~%$@#]/.test(filePath)) {
+      return `"${filePath}"`;
     }
-
-    // Character is already escaped if there's an odd number of backslashes before it
-    const isAlreadyEscaped = backslashCount % 2 === 1;
-
-    // Only escape if not already escaped
-    if (!isAlreadyEscaped && SHELL_SPECIAL_CHARS.test(char)) {
-      result += '\\' + char;
-    } else {
-      result += char;
-    }
+    return filePath;
+  } else {
+    // POSIX: Backslash escape
+    return filePath.replace(/([ \t()[\]{};|*?$`'"#&<>!~\\])/g, '\\$1');
   }
-  return result;
 }
 
 /**
- * Unescapes special characters in a file path.
- * Removes backslash escaping from shell metacharacters.
+ * Unescapes paths for at-commands.
+ *
+ *  - Windows: double quoted if they contain special chars, otherwise bare
+ *  - POSIX: backslash-escaped
  */
 export function unescapePath(filePath: string): string {
-  return filePath.replace(
-    new RegExp(`\\\\([${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`, 'g'),
-    '$1',
-  );
+  if (process.platform === 'win32') {
+    if (
+      filePath.length >= 2 &&
+      filePath.startsWith('"') &&
+      filePath.endsWith('"')
+    ) {
+      return filePath.slice(1, -1);
+    }
+    return filePath;
+  } else {
+    return filePath.replace(/\\(.)/g, '$1');
+  }
 }
 
 /**
@@ -327,23 +320,85 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Resolves a path to an absolute path with forward slashes, preserving the
+ * original case of every segment.
+ *
+ * Use this for paths that will be surfaced to the user (e.g. `/memory list`,
+ * `--- Context from: ... ---` headers) or used as the storage form passed
+ * through to file I/O. For comparison/dedup keys on case-insensitive
+ * filesystems use `normalizePath` instead.
+ */
+export function toAbsolutePath(p: string): string {
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+  return pathModule.resolve(p).replace(/\\/g, '/');
+}
+
+/**
+ * Normalizes a path for reliable comparison across platforms.
+ * - Resolves to an absolute path.
+ * - Converts all path separators to forward slashes.
+ * - On case-insensitive platforms (Windows, macOS), converts to lowercase.
+ *
+ * Use this for comparison keys (Set/Map lookups, equality checks). For paths
+ * that will be displayed to the user or persisted as identifiers, use
+ * `toAbsolutePath` instead so the original casing is preserved.
+ */
+export function normalizePath(p: string): string {
+  const absolute = toAbsolutePath(p);
+  const platform = process.platform;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? absolute.toLowerCase() : absolute;
+}
+
+/**
  * Checks if a path is a subpath of another path.
  * @param parentPath The parent path.
  * @param childPath The child path.
  * @returns True if childPath is a subpath of parentPath, false otherwise.
  */
 export function isSubpath(parentPath: string, childPath: string): boolean {
-  const isWindows = os.platform() === 'win32';
+  const platform = process.platform;
+  const isWindows = platform === 'win32';
+  const isDarwin = platform === 'darwin';
   const pathModule = isWindows ? path.win32 : path;
 
-  // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
-  const relative = pathModule.relative(parentPath, childPath);
+  // Resolve both paths to absolute to ensure consistent comparison,
+  // especially when mixing relative and absolute paths or when casing differs.
+  let p = pathModule.resolve(parentPath);
+  let c = pathModule.resolve(childPath);
+
+  // On Windows, path.relative is case-insensitive.
+  // On POSIX (including Darwin), path.relative is case-sensitive.
+  // We want it to be case-insensitive on Darwin to match user expectation and sandbox policy.
+  if (isDarwin) {
+    p = p.toLowerCase();
+    c = c.toLowerCase();
+  }
+
+  const relative = pathModule.relative(p, c);
 
   return (
     !relative.startsWith(`..${pathModule.sep}`) &&
     relative !== '..' &&
     !pathModule.isAbsolute(relative)
   );
+}
+
+/**
+ * Type guard to verify a value is a string and does not contain null bytes.
+ */
+export function isValidPathString(p: unknown): p is string {
+  return typeof p === 'string' && !p.includes('\0');
+}
+
+/**
+ * Asserts that a value is a valid path string, throwing an Error otherwise.
+ */
+export function assertValidPathString(p: unknown): asserts p is string {
+  if (!isValidPathString(p)) {
+    throw new Error(`Invalid path: ${String(p)}`);
+  }
 }
 
 /**
@@ -355,8 +410,9 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
  */
-export function resolveToRealPath(path: string): string {
-  let resolvedPath = path;
+export function resolveToRealPath(pathStr: string): string {
+  assertValidPathString(pathStr);
+  let resolvedPath = pathStr;
 
   try {
     if (resolvedPath.startsWith('file://')) {
@@ -364,15 +420,206 @@ export function resolveToRealPath(path: string): string {
     }
 
     resolvedPath = decodeURIComponent(resolvedPath);
-  } catch (_e) {
+  } catch {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 
-  try {
-    return fs.realpathSync(resolvedPath);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the path processed.
-    return resolvedPath;
+  return robustRealpath(path.resolve(resolvedPath));
+}
+
+function robustRealpath(p: string, visited = new Set<string>()): string {
+  const key = process.platform === 'win32' ? p.toLowerCase() : p;
+  if (visited.has(key)) {
+    throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
   }
+  visited.add(key);
+  try {
+    return fs.realpathSync(p);
+  } catch (e: unknown) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e.code === 'ENOENT' ||
+        e.code === 'EISDIR' ||
+        e.code === 'ENAMETOOLONG' ||
+        e.code === 'ENOTDIR')
+    ) {
+      try {
+        const stat = fs.lstatSync(p);
+        if (stat.isSymbolicLink()) {
+          const target = fs.readlinkSync(p);
+          const resolvedTarget = path.resolve(path.dirname(p), target);
+          return robustRealpath(resolvedTarget, visited);
+        }
+      } catch (lstatError: unknown) {
+        // Not a symlink, or lstat failed. Re-throw if it's not an expected
+        // ENOENT (e.g., a permissions error), otherwise resolve parent.
+        if (
+          !(
+            lstatError &&
+            typeof lstatError === 'object' &&
+            'code' in lstatError &&
+            (lstatError.code === 'ENOENT' ||
+              lstatError.code === 'EISDIR' ||
+              lstatError.code === 'ENAMETOOLONG' ||
+              lstatError.code === 'ENOTDIR')
+          )
+        ) {
+          throw lstatError;
+        }
+      }
+      const parent = path.dirname(p);
+      if (parent === p) return p;
+      return path.join(robustRealpath(parent, visited), path.basename(p));
+    }
+    throw e;
+  }
+}
+
+/**
+ * Deduplicates an array of paths and ensures all paths are absolute.
+ */
+export function deduplicateAbsolutePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
+
+  const uniquePathsMap = new Map<string, string>();
+  for (const p of paths) {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`Path must be absolute: ${p}`);
+    }
+
+    const key = toPathKey(p);
+    if (!uniquePathsMap.has(key)) {
+      uniquePathsMap.set(key, p);
+    }
+  }
+
+  return Array.from(uniquePathsMap.values());
+}
+
+/**
+ * Returns a stable string key for a path to be used in comparisons or Map lookups.
+ */
+export function toPathKey(p: string): string {
+  // Normalize path segments
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    // On Windows, don't strip the slash from a drive root (e.g., "C:\\")
+    if (!/^[a-zA-Z]:[\\/]$/.test(norm)) {
+      norm = norm.slice(0, -1);
+    }
+  }
+
+  // Convert to lowercase on case-insensitive platforms
+  const platform = process.platform;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
+}
+
+/**
+ * Verifies if a path is a trusted system directory.
+ */
+export function isTrustedSystemPath(filePath: string): boolean {
+  const normPath = normalizePath(filePath);
+
+  // 1. Explicitly reject paths in current working directory to prevent RCE
+  // Exclude root directories to avoid inadvertently rejecting all system paths.
+  // Bypass this restriction in secure, hermetic environments (e.g., Bazel/Blaze).
+  const isHermeticEnv =
+    !!process.env['TEST_SRCDIR'] ||
+    !!process.env['TEST_WORKSPACE'] ||
+    !!process.env['BAZEL_TEST'] ||
+    !!process.env['RUNFILES_DIR'];
+
+  const normCwd = normalizePath(process.cwd());
+  const isRoot = normCwd === '/' || /^[a-zA-Z]:[\\/]?$/.test(normCwd);
+  if (!isRoot && isSubpath(normCwd, normPath)) {
+    return isHermeticEnv;
+  }
+
+  // 2. Allow standard system directories
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const trustedPrefixes = [
+      process.env['SystemRoot'] || 'C:\\Windows',
+      process.env['ProgramFiles'] || 'C:\\Program Files',
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  } else {
+    const trustedPrefixes = [
+      '/usr/bin',
+      '/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/Cellar',
+      '/usr/local/Cellar',
+      '/usr/sbin',
+      '/sbin',
+      // 1P internal hermetic execution paths
+      '/google/bin',
+      '/google/src/cloud',
+    ].map((p) => normalizePath(p));
+
+    return trustedPrefixes.some(
+      (prefix) => normPath === prefix || normPath.startsWith(prefix + '/'),
+    );
+  }
+}
+
+/**
+ * Defensively resolves and sanitizes a file path generated by the LLM,
+ * stripping user-facing reference prefixes if necessary.
+ */
+export function resolveDefensiveToolPath(
+  filePath: string,
+  targetDir: string,
+): string {
+  const cleanPath = filePath.replace(/\0/g, '');
+
+  try {
+    const literalPath = path.resolve(targetDir, cleanPath);
+
+    // If the file literally exists on disk as-is, return the resolved literal path immediately
+    if (fs.existsSync(literalPath)) {
+      return cleanPath;
+    }
+
+    // If the model supplied a leading @ prefix and the literal path doesn't exist:
+    if (cleanPath.startsWith('@') && cleanPath.length > 1) {
+      if (cleanPath.startsWith('@/') || cleanPath.startsWith('@\\')) {
+        const stripped = cleanPath.substring(1).replace(/^[\\/]+/, '');
+        return stripped.length > 0 ? stripped : cleanPath;
+      }
+
+      const strippedPath = cleanPath.substring(1).replace(/^[\\/]+/, '');
+
+      // Check if a literal directory/file starting with '@' exists for the first segment.
+      // If it does, we should preserve the '@' prefix.
+      const parts = strippedPath.split(/[\\/]/);
+      const firstSegment = parts[0];
+      if (firstSegment) {
+        const literalFirstSegment = path.resolve(targetDir, '@' + firstSegment);
+        if (fs.existsSync(literalFirstSegment)) {
+          return cleanPath;
+        }
+
+        // Otherwise, strip the '@' prefix to resolve to the standard directory name,
+        // preventing the accidental creation of literal '@'-prefixed directories (e.g. '@src', '@policies')
+        // when creating new files or directories.
+        return strippedPath;
+      }
+    }
+  } catch {
+    // Fallback to original path if any filesystem or resolution error occurs
+  }
+
+  // Fallback: return the original path
+  return cleanPath;
 }

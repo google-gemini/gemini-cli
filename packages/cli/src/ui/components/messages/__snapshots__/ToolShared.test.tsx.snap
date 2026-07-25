@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`McpProgressIndicator > renders complete progress at 100% 1`] = `
+"████████████████████ 100%
+"
+`;
+
+exports[`McpProgressIndicator > renders determinate progress at 50% 1`] = `
+"██████████░░░░░░░░░░ 50%
+"
+`;
+
+exports[`McpProgressIndicator > renders indeterminate progress with raw count 1`] = `
+"███████░░░░░░░░░░░░░ 7
+"
+`;
+
+exports[`McpProgressIndicator > renders progress with a message 1`] = `
+"██████░░░░░░░░░░░░░░ 30%
+Downloading...
+"
+`;

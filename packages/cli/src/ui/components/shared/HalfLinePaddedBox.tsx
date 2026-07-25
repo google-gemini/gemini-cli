@@ -6,14 +6,11 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import {
-  interpolateColor,
-  resolveColor,
-  getSafeLowColorBackground,
-} from '../../themes/color-utils.js';
-import { isLowColorDepth, isITerm2 } from '../../utils/terminalUtils.js';
+import { theme } from '../../semantic-colors.js';
+import { interpolateColor, resolveColor } from '../../themes/color-utils.js';
+import { supportsTrueColor } from '@google/gemini-cli-core';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -39,7 +36,8 @@ export interface HalfLinePaddedBoxProps {
  * at the top and bottom using block characters (▀/▄).
  */
 export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = (props) => {
-  if (props.useBackgroundColor === false) {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  if (props.useBackgroundColor === false || isScreenReaderEnabled) {
     return <>{props.children}</>;
   }
 
@@ -51,17 +49,10 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   backgroundOpacity,
   children,
 }) => {
-  const { terminalWidth, terminalBackgroundColor } = useUIState();
-  const terminalBg = terminalBackgroundColor || 'black';
-
-  const isLowColor = isLowColorDepth();
+  const { terminalWidth } = useUIState();
+  const terminalBg = theme.background.primary || 'black';
 
   const backgroundColor = useMemo(() => {
-    // Interpolated background colors often look bad in 256-color terminals
-    if (isLowColor) {
-      return getSafeLowColorBackground(terminalBg);
-    }
-
     const resolvedBase =
       resolveColor(backgroundBaseColor) || backgroundBaseColor;
     const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
@@ -71,37 +62,18 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
       resolvedBase,
       backgroundOpacity,
     );
-  }, [backgroundBaseColor, backgroundOpacity, terminalBg, isLowColor]);
+  }, [backgroundBaseColor, backgroundOpacity, terminalBg]);
 
   if (!backgroundColor) {
     return <>{children}</>;
   }
 
-  const isITerm = isITerm2();
+  const noTrueColor = !supportsTrueColor();
 
-  if (isITerm) {
+  if (noTrueColor) {
     return (
-      <Box
-        width={terminalWidth}
-        flexDirection="column"
-        alignItems="stretch"
-        minHeight={1}
-        flexShrink={0}
-      >
-        <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
-        </Box>
-        <Box
-          width={terminalWidth}
-          flexDirection="column"
-          alignItems="stretch"
-          backgroundColor={backgroundColor}
-        >
-          {children}
-        </Box>
-        <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
-        </Box>
+      <Box width={terminalWidth} backgroundColor={backgroundColor} paddingY={1}>
+        {children}
       </Box>
     );
   }
@@ -113,18 +85,20 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
       alignItems="stretch"
       minHeight={1}
       flexShrink={0}
-      backgroundColor={backgroundColor}
     >
       <Box width={terminalWidth} flexDirection="row">
-        <Text backgroundColor={backgroundColor} color={terminalBg}>
-          {'▀'.repeat(terminalWidth)}
-        </Text>
+        <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
       </Box>
-      {children}
+      <Box
+        width={terminalWidth}
+        flexDirection="column"
+        alignItems="stretch"
+        backgroundColor={backgroundColor}
+      >
+        {children}
+      </Box>
       <Box width={terminalWidth} flexDirection="row">
-        <Text color={terminalBg} backgroundColor={backgroundColor}>
-          {'▄'.repeat(terminalWidth)}
-        </Text>
+        <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
       </Box>
     </Box>
   );

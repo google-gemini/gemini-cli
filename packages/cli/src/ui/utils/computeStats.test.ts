@@ -29,6 +29,7 @@ describe('calculateErrorRate', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateErrorRate(metrics)).toBe(0);
   });
@@ -45,6 +46,7 @@ describe('calculateErrorRate', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateErrorRate(metrics)).toBe(20);
   });
@@ -63,6 +65,7 @@ describe('calculateAverageLatency', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateAverageLatency(metrics)).toBe(0);
   });
@@ -79,6 +82,7 @@ describe('calculateAverageLatency', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateAverageLatency(metrics)).toBe(150);
   });
@@ -97,6 +101,7 @@ describe('calculateCacheHitRate', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateCacheHitRate(metrics)).toBe(0);
   });
@@ -113,6 +118,7 @@ describe('calculateCacheHitRate', () => {
         thoughts: 0,
         tool: 0,
       },
+      roles: {},
     };
     expect(calculateCacheHitRate(metrics)).toBe(25);
   });
@@ -170,6 +176,7 @@ describe('computeSessionStats', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -209,6 +216,7 @@ describe('computeSessionStats', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {

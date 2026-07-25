@@ -30,17 +30,22 @@ const HistoryItemSchema = z
   })
   .passthrough();
 
-const ToolCallDataSchema = getToolCallDataSchema(HistoryItemSchema);
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+const ToolCallDataSchema = getToolCallDataSchema(
+  HistoryItemSchema as unknown as Parameters<typeof getToolCallDataSchema>[0],
+);
+/* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
 async function restoreAction(
   context: CommandContext,
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
   const { services, ui } = context;
-  const { config, git: gitService } = services;
+  const { agentContext, git: gitService } = services;
   const { addItem, loadHistory } = ui;
 
-  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
+  const checkpointDir =
+    agentContext?.config.storage.getProjectTempCheckpointsDir();
 
   if (!checkpointDir) {
     return {
@@ -116,7 +121,7 @@ async function restoreAction(
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
-          config?.getGeminiClient()?.setHistory(action.clientHistory);
+          agentContext!.geminiClient?.setHistory(action.clientHistory);
         }
       }
     }
@@ -140,8 +145,9 @@ async function completion(
   _partialArg: string,
 ): Promise<string[]> {
   const { services } = context;
-  const { config } = services;
-  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
+  const { agentContext } = services;
+  const checkpointDir =
+    agentContext?.config.storage.getProjectTempCheckpointsDir();
   if (!checkpointDir) {
     return [];
   }
@@ -149,7 +155,7 @@ async function completion(
     const files = await fs.readdir(checkpointDir);
     const jsonFiles = files.filter((file) => file.endsWith('.json'));
     return getTruncatedCheckpointNames(jsonFiles);
-  } catch (_err) {
+  } catch {
     return [];
   }
 }

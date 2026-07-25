@@ -21,6 +21,17 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { GEMINI_DIR, debugLogger } from '@google/gemini-cli-core';
 
+vi.mock('fs', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof fs>();
+  return {
+    ...actualFs,
+    existsSync: vi.fn(actualFs.existsSync),
+    readFileSync: vi.fn(actualFs.readFileSync),
+    writeFileSync: vi.fn(actualFs.writeFileSync),
+    mkdirSync: vi.fn(actualFs.mkdirSync),
+  };
+});
+
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
   writeFile: vi.fn(),
@@ -28,6 +39,14 @@ vi.mock('fs/promises', () => ({
 
 vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
+}));
+
+vi.mock('../../config/trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(() => ({
+    isTrusted: true,
+    source: undefined,
+  })),
+  isFolderTrustEnabled: vi.fn(() => false),
 }));
 
 describe('mcp remove command', () => {

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,13 @@ import { EventEmitter } from 'node:events';
 import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
+import type { EditorType } from './editor.js';
+import type {
+  TokenStorageInitializationEvent,
+  KeychainAvailabilityEvent,
+} from '../telemetry/types.js';
+import { debugLogger } from './debugLogger.js';
+import type { ApprovalMode } from '../policy/types.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -47,6 +54,20 @@ export interface ModelChangedPayload {
 }
 
 /**
+ * Payload for the 'approval-mode-changed' event.
+ */
+export interface ApprovalModeChangedPayload {
+  /**
+   * The session ID associated with the mode change.
+   */
+  sessionId: string;
+  /**
+   * The new approval mode.
+   */
+  mode: ApprovalMode;
+}
+
+/**
  * Payload for the 'console-log' event.
  */
 export interface ConsoleLogPayload {
@@ -83,8 +104,11 @@ export interface HookPayload {
  */
 export interface HookStartPayload extends HookPayload {
   /**
+   * The source of the hook configuration.
+   */
+  source?: string;
+  /**
    * The 1-based index of the current hook in the execution sequence.
-   * Used for progress indication (e.g. "Hook 1/3").
    */
   hookIndex?: number;
   /**
@@ -101,6 +125,13 @@ export interface HookEndPayload extends HookPayload {
 }
 
 /**
+ * Payload for the 'hook-system-message' event.
+ */
+export interface HookSystemMessagePayload extends HookPayload {
+  message: string;
+}
+
+/**
  * Payload for the 'retry-attempt' event.
  */
 export interface RetryAttemptPayload {
@@ -112,15 +143,60 @@ export interface RetryAttemptPayload {
 }
 
 /**
+ * Payload for the 'consent-request' event.
+ */
+export interface ConsentRequestPayload {
+  prompt: string;
+  onConfirm: (confirmed: boolean) => void;
+}
+
+/**
+ * Payload for the 'mcp-progress' event.
+ */
+export interface McpProgressPayload {
+  serverName: string;
+  callId: string;
+  progressToken: string | number;
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
+/**
  * Payload for the 'agents-discovered' event.
  */
 export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+  loserMcpServerName?: string;
+  winnerMcpServerName?: string;
+  loserKind?: string;
+  winnerKind?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
+/**
+ * Payload for the 'quota-changed' event.
+ */
+export interface QuotaChangedPayload {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
+  ApprovalModeChanged = 'approval-mode-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
@@ -130,28 +206,54 @@ export enum CoreEvent {
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
+  HookSystemMessage = 'hook-system-message',
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
+  ConsentRequest = 'consent-request',
+  McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
+  QuotaChanged = 'quota-changed',
+  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+  TelemetryTokenStorageType = 'telemetry-token-storage-type',
+}
+
+/**
+ * Payload for the 'editor-selected' event.
+ */
+export interface EditorSelectedPayload {
+  editor?: EditorType;
 }
 
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ApprovalModeChanged]: [ApprovalModeChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.OauthDisplayMessage]: string[];
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.HookSystemMessage]: [HookSystemMessagePayload];
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
+  [CoreEvent.McpProgress]: [McpProgressPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.RequestEditorSelection]: never[];
+  [CoreEvent.EditorSelected]: [EditorSelectedPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
+  [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
 
 type EventBacklogItem = {
@@ -163,6 +265,7 @@ type EventBacklogItem = {
 
 export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   private _eventBacklog: EventBacklogItem[] = [];
+  private _backlogHead = 0;
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
@@ -174,17 +277,26 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     ...args: CoreEvents[K]
   ): void {
     if (this.listenerCount(event) === 0) {
-      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._eventBacklog.shift();
+      const backlogSize = this._eventBacklog.length - this._backlogHead;
+      if (backlogSize >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        // Evict oldest entry. Use a head pointer instead of shift() to avoid
+        // O(n) array reindexing on every eviction at capacity.
+        (this._eventBacklog as unknown[])[this._backlogHead] = undefined;
+        this._backlogHead++;
+        // Compact once dead entries exceed half capacity to bound memory
+        if (this._backlogHead >= CoreEventEmitter.MAX_BACKLOG_SIZE / 2) {
+          this._eventBacklog = this._eventBacklog.slice(this._backlogHead);
+          this._backlogHead = 0;
+        }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this._eventBacklog.push({ event, args } as EventBacklogItem);
     } else {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(event, ...args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: K, ...args: CoreEvents[K]) => boolean)(
+        event,
+        ...args,
+      );
     }
   }
 
@@ -233,6 +345,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Notifies subscribers that the approval mode has changed.
+   */
+  emitApprovalModeChanged(sessionId: string, mode: ApprovalMode): void {
+    const payload: ApprovalModeChangedPayload = { sessionId, mode };
+    this.emit(CoreEvent.ApprovalModeChanged, payload);
+  }
+
+  /**
    * Notifies subscribers that settings have been modified.
    */
   emitSettingsChanged(): void {
@@ -251,6 +371,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitHookEnd(payload: HookEndPayload): void {
     this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook has provided a system message.
+   */
+  emitHookSystemMessage(payload: HookSystemMessagePayload): void {
+    this.emit(CoreEvent.HookSystemMessage, payload);
   }
 
   /**
@@ -275,6 +402,24 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Requests consent from the user via the UI.
+   */
+  emitConsentRequest(payload: ConsentRequestPayload): void {
+    this._emitOrQueue(CoreEvent.ConsentRequest, payload);
+  }
+
+  /**
+   * Notifies subscribers that progress has been made on an MCP tool call.
+   */
+  emitMcpProgress(payload: McpProgressPayload): void {
+    if (!Number.isFinite(payload.progress) || payload.progress < 0) {
+      debugLogger.log(`Invalid progress value: ${payload.progress}`);
+      return;
+    }
+    this.emit(CoreEvent.McpProgress, payload);
+  }
+
+  /**
    * Notifies subscribers that new unacknowledged agents have been discovered.
    */
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
@@ -282,21 +427,67 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
   }
 
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  /**
+   * Notifies subscribers that the quota has changed.
+   */
+  emitQuotaChanged(
+    remaining: number | undefined,
+    limit: number | undefined,
+    resetTime?: string,
+  ): void {
+    const payload: QuotaChangedPayload = { remaining, limit, resetTime };
+    this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
   /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
+   *
+   * @param transform - Optional function to transform events before they are emitted.
    */
-  drainBacklogs(): void {
-    const backlog = [...this._eventBacklog];
-    this._eventBacklog.length = 0; // Clear in-place
-    for (const item of backlog) {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(item.event, ...item.args);
+  drainBacklogs(
+    transform?: <K extends keyof CoreEvents>(
+      event: K,
+      args: CoreEvents[K],
+    ) => { event: K; args: CoreEvents[K] } | undefined,
+  ): void {
+    const backlog = this._eventBacklog;
+    const head = this._backlogHead;
+    this._eventBacklog = [];
+    this._backlogHead = 0;
+    for (let i = head; i < backlog.length; i++) {
+      const item = backlog[i];
+      if (item === undefined) continue;
+
+      let eventToEmit = item.event;
+      let argsToEmit = item.args;
+
+      if (transform) {
+        const transformed = transform(item.event, item.args);
+        if (!transformed) continue;
+        eventToEmit = transformed.event;
+        argsToEmit = transformed.args;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
+        eventToEmit,
+        ...argsToEmit,
+      );
     }
+  }
+
+  emitTelemetryKeychainAvailability(event: KeychainAvailabilityEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryKeychainAvailability, event);
+  }
+
+  emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
+    this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
   }
 }
 

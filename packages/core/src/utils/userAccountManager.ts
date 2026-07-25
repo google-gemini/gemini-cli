@@ -30,6 +30,7 @@ export class UserAccountManager {
       return defaultState;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const parsed = JSON.parse(content);
 
     // Inlined validation logic
@@ -37,6 +38,7 @@ export class UserAccountManager {
       debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const { active, old } = parsed as Partial<UserAccounts>;
     const isValid =
       (active === undefined || active === null || typeof active === 'string') &&
@@ -49,7 +51,9 @@ export class UserAccountManager {
     }
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       active: parsed.active ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       old: parsed.old ?? [],
     };
   }

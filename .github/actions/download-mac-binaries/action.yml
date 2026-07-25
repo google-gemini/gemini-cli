@@ -1,0 +1,23 @@
+name: 'Download Mac Binaries'
+description: 'Downloads the unsigned macOS binaries (x64 and arm64)'
+inputs:
+  path:
+    description: 'The base path to download the binaries to'
+    required: true
+    default: 'dist'
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Download macOS arm64 binary'
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: 'gemini-darwin-arm64-unsigned'
+        path: '${{ inputs.path }}/darwin-arm64'
+
+    - name: 'Download macOS x64 binary'
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: 'gemini-darwin-x64-unsigned'
+        path: '${{ inputs.path }}/darwin-x64'

@@ -4,10 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
-import { isTool } from '../index.js';
+import {
+  isTool,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+} from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
+import type { ToolCallResponseInfo } from '../scheduler/types.js';
+
+/**
+ * Validates if an object is a ToolCallResponseInfo.
+ */
+export function isToolCallResponseInfo(
+  data: unknown,
+): data is ToolCallResponseInfo {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'callId' in data &&
+    'responseParts' in data
+  );
+}
 
 /**
  * Generates a suggestion string for a tool name that was not found in the registry.
@@ -104,6 +122,7 @@ export function doesToolInvocationMatch(
         // This invocation has no command - nothing to check.
         continue;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       command = String((invocation.params as { command: string }).command);
     }
 

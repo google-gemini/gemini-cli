@@ -12,13 +12,20 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { normalizeModelId } from '../../utils/modelUtils.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
+import { LlmRole } from '../../telemetry/types.js';
 
 // The number of recent history turns to provide to the router for context.
-const HISTORY_TURNS_FOR_CONTEXT = 8;
+export const HISTORY_TURNS_FOR_CONTEXT = 8;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
@@ -91,39 +98,6 @@ const ClassifierResponseSchema = z.object({
   complexity_score: z.number().min(1).max(100),
 });
 
-/**
- * Deterministically calculates the routing threshold based on the session ID.
- * This ensures a consistent experience for the user within a session.
- *
- * This implementation uses the FNV-1a hash algorithm (32-bit).
- * @see https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
- *
- * @param sessionId The unique session identifier.
- * @returns The threshold (50 or 80).
- */
-function getComplexityThreshold(sessionId: string): number {
-  const FNV_OFFSET_BASIS_32 = 0x811c9dc5;
-  const FNV_PRIME_32 = 0x01000193;
-
-  let hash = FNV_OFFSET_BASIS_32;
-
-  for (let i = 0; i < sessionId.length; i++) {
-    hash ^= sessionId.charCodeAt(i);
-    // Multiply by prime (simulate 32-bit overflow with bitwise shift)
-    hash = Math.imul(hash, FNV_PRIME_32);
-  }
-
-  // Ensure positive integer
-  hash = hash >>> 0;
-
-  // Normalize to 0-99
-  const normalized = hash % 100;
-  // 50% split:
-  // 0-49: Strict (80)
-  // 50-99: Control (50)
-  return normalized < 50 ? 80 : 50;
-}
-
 export class NumericalClassifierStrategy implements RoutingStrategy {
   readonly name = 'numerical_classifier';
 
@@ -131,21 +105,55 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     context: RoutingContext,
     config: Config,
     baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      const model = context.requestedModel ?? config.getModel();
       if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
+      if (!isGemini3Model(model, config)) {
         return null;
       }
 
       const promptId = getPromptIdWithFallback('classifier-router');
 
-      const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+      const candidateSlice = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
+      // Find the first non-tool turn. The server cannot always handle tool-related
+      // turns in the first slots of the contents array, so we strip them if they appear at the start.
+      let firstTextIndex = -1;
+      for (let i = 0; i < candidateSlice.length; i++) {
+        if (
+          !isFunctionCall(candidateSlice[i]) &&
+          !isFunctionResponse(candidateSlice[i])
+        ) {
+          firstTextIndex = i;
+          break;
+        }
+      }
+      const finalHistory =
+        firstTextIndex === -1 ? [] : candidateSlice.slice(firstTextIndex);
 
       // Wrap the user's request in tags to prevent prompt injection
       const requestParts = Array.isArray(context.request)
         ? context.request
         : [context.request];
+
+      // Bypass the classifier if the request is a function response and history is empty.
+      // Since we prune leading tool turns, if the history becomes empty, sending a
+      // function response request would result in an invalid payload (starts with function response).
+      if (
+        finalHistory.length === 0 &&
+        isFunctionResponse(createUserContent(context.request))
+      ) {
+        debugLogger.log(
+          '[Routing] Bypassing NumericalClassifier: request is FunctionResponse but history is empty after slicing.',
+        );
+        return null;
+      }
 
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
@@ -164,30 +172,47 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
         abortSignal: context.signal,
         promptId,
+        role: LlmRole.UTILITY_ROUTER,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
       const { threshold, groupLabel, modelAlias } =
-        await this.getRoutingDecision(
-          score,
+        await this.getRoutingDecision(score, config);
+      const [useGemini3_1, useCustomToolModel] = await Promise.all([
+        config.getGemini31Launched(),
+        config.getUseCustomToolModel(),
+      ]);
+      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+      const selectedModel = normalizeModelId(
+        resolveClassifierModel(
+          normalizeModelId(model),
+          modelAlias,
+          useGemini3_1,
+          useCustomToolModel,
+          config.getHasAccessToPreviewModel?.() ?? true,
           config,
-          config.getSessionId() || 'unknown-session',
-        );
-
-      const selectedModel = resolveClassifierModel(
-        config.getModel(),
-        modelAlias,
-        config.getPreviewFeatures(),
+          useGemini3_5Flash,
+        ),
       );
+
+      const service = config.getModelAvailabilityService();
+      const snapshot = service.snapshot(selectedModel);
+
+      if (!snapshot.available) {
+        debugLogger.warn(
+          `[Routing] Numerical classifier selected unavailable model ${selectedModel} (${snapshot.reason}). Bypassing.`,
+        );
+        return null;
+      }
 
       const latencyMs = Date.now() - startTime;
 
       return {
         model: selectedModel,
         metadata: {
-          source: `Classifier (${groupLabel})`,
+          source: `NumericalClassifier (${groupLabel})`,
           latencyMs,
           reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
         },
@@ -201,29 +226,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   private async getRoutingDecision(
     score: number,
     config: Config,
-    sessionId: string,
   ): Promise<{
     threshold: number;
     groupLabel: string;
     modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
   }> {
-    let threshold: number;
-    let groupLabel: string;
-
+    const threshold = await config.getResolvedClassifierThreshold();
     const remoteThresholdValue = await config.getClassifierThreshold();
 
-    if (
-      remoteThresholdValue !== undefined &&
-      !isNaN(remoteThresholdValue) &&
-      remoteThresholdValue >= 0 &&
-      remoteThresholdValue <= 100
-    ) {
-      threshold = remoteThresholdValue;
+    let groupLabel: string;
+    if (threshold === remoteThresholdValue) {
       groupLabel = 'Remote';
     } else {
-      // Fallback to deterministic A/B test
-      threshold = getComplexityThreshold(sessionId);
-      groupLabel = threshold === 80 ? 'Strict' : 'Control';
+      groupLabel = 'Default';
     }
 
     const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;

@@ -5,13 +5,10 @@
  */
 
 import { useState, useEffect, useRef, act } from 'react';
-import { render } from 'ink-testing-library';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
-import { ScrollProvider } from '../../contexts/ScrollProvider.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { MouseProvider } from '../../contexts/MouseContext.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
 
 // Mock useStdout to provide a fixed size for testing
@@ -79,72 +76,80 @@ const TestComponent = ({
   }, [onRef]);
 
   return (
-    <MouseProvider mouseEventsEnabled={false}>
-      <KeypressProvider>
-        <ScrollProvider>
-          <Box flexDirection="column" width={80} height={24} padding={1}>
-            <Box flexGrow={1} borderStyle="round" borderColor="cyan">
-              <ScrollableList
-                ref={listRef}
-                data={items}
-                renderItem={({ item, index }) => (
-                  <Box flexDirection="column" paddingBottom={2}>
+    <Box flexDirection="column" width={80} height={24} padding={1}>
+      <Box flexGrow={1} borderStyle="round" borderColor="cyan">
+        <ScrollableList
+          ref={listRef}
+          data={items}
+          renderItem={({ item, index }) => (
+            <Box flexDirection="column" paddingBottom={2}>
+              <Box
+                sticky
+                flexDirection="column"
+                width={78}
+                opaque
+                stickyChildren={
+                  <Box flexDirection="column" width={78} opaque>
+                    <Text>{item.title}</Text>
                     <Box
-                      sticky
-                      flexDirection="column"
-                      width={78}
-                      opaque
-                      stickyChildren={
-                        <Box flexDirection="column" width={78} opaque>
-                          <Text>{item.title}</Text>
-                          <Box
-                            borderStyle="single"
-                            borderTop={true}
-                            borderBottom={false}
-                            borderLeft={false}
-                            borderRight={false}
-                            borderColor="gray"
-                          />
-                        </Box>
-                      }
-                    >
-                      <Text>{item.title}</Text>
-                    </Box>
-                    <Text color="gray">{getLorem(index)}</Text>
+                      borderStyle="single"
+                      borderTop={true}
+                      borderBottom={false}
+                      borderLeft={false}
+                      borderRight={false}
+                      borderColor="gray"
+                    />
                   </Box>
-                )}
-                estimatedItemHeight={() => 14}
-                keyExtractor={(item) => item.id}
-                hasFocus={true}
-                initialScrollIndex={Number.MAX_SAFE_INTEGER}
-              />
+                }
+              >
+                <Text>{item.title}</Text>
+              </Box>
+              <Text color="gray">{getLorem(index)}</Text>
             </Box>
-            <Text>Count: {items.length}</Text>
-          </Box>
-        </ScrollProvider>
-      </KeypressProvider>
-    </MouseProvider>
+          )}
+          estimatedItemHeight={() => 14}
+          keyExtractor={(item) => item.id}
+          hasFocus={true}
+          initialScrollIndex={Number.MAX_SAFE_INTEGER}
+        />
+      </Box>
+      <Text>Count: {items.length}</Text>
+    </Box>
   );
 };
 describe('ScrollableList Demo Behavior', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should scroll to bottom when new items are added and stop when scrolled up', async () => {
     let addItem: (() => void) | undefined;
     let listRef: ScrollableListRef<Item> | null = null;
-    let lastFrame: () => string | undefined;
+    let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
+    let waitUntilReady: () => Promise<void>;
+
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
 
     await act(async () => {
-      const result = render(
+      result = await renderWithProviders(
         <TestComponent
           onAddItem={(add) => {
             addItem = add;
           }}
-          onRef={(ref) => {
+          onRef={async (ref) => {
             listRef = ref;
           }}
         />,
       );
       lastFrame = result.lastFrame;
+      waitUntilReady = result.waitUntilReady;
     });
+
+    await waitUntilReady!();
 
     // Initial render should show Item 1000
     expect(lastFrame!()).toContain('Item 1000');
@@ -154,6 +159,8 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1001');
     });
@@ -164,6 +171,8 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1002');
     });
@@ -174,18 +183,22 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollBy(-5);
     });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
+    await waitUntilReady!();
 
     // Add item 1003 - should NOT be visible because we scrolled up
     await act(async () => {
       addItem?.();
     });
+    await waitUntilReady!();
+
     await waitFor(() => {
       expect(lastFrame!()).toContain('Count: 1003');
     });
     expect(lastFrame!()).not.toContain('Item 1003');
+
+    await act(async () => {
+      result.unmount();
+    });
   });
 
   it('should display sticky header when scrolled past the item', async () => {
@@ -202,45 +215,44 @@ describe('ScrollableList Demo Behavior', () => {
       }, []);
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={10}>
-                <ScrollableList
-                  ref={ref}
-                  data={items}
-                  renderItem={({ item, index }) => (
-                    <Box flexDirection="column" height={3}>
-                      {index === 0 ? (
-                        <Box
-                          sticky
-                          stickyChildren={<Text>[STICKY] {item.title}</Text>}
-                        >
-                          <Text>[Normal] {item.title}</Text>
-                        </Box>
-                      ) : (
-                        <Text>[Normal] {item.title}</Text>
-                      )}
-                      <Text>Content for {item.title}</Text>
-                      <Text>More content for {item.title}</Text>
-                    </Box>
-                  )}
-                  estimatedItemHeight={() => 3}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                />
+        <Box flexDirection="column" width={80} height={10}>
+          <ScrollableList
+            ref={ref}
+            data={items}
+            renderItem={({ item, index }) => (
+              <Box flexDirection="column" height={3}>
+                {index === 0 ? (
+                  <Box
+                    sticky
+                    stickyChildren={<Text>[STICKY] {item.title}</Text>}
+                  >
+                    <Text>[Normal] {item.title}</Text>
+                  </Box>
+                ) : (
+                  <Text>[Normal] {item.title}</Text>
+                )}
+                <Text>Content for {item.title}</Text>
+                <Text>More content for {item.title}</Text>
               </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+            )}
+            estimatedItemHeight={() => 3}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+          />
+        </Box>
       );
     };
 
     let lastFrame: () => string | undefined;
+    let waitUntilReady: () => Promise<void>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      const result = render(<StickyTestComponent />);
+      result = await renderWithProviders(<StickyTestComponent />);
       lastFrame = result.lastFrame;
+      waitUntilReady = result.waitUntilReady;
     });
+
+    await waitUntilReady!();
 
     // Initially at top, should see Normal Item 1
     await waitFor(() => {
@@ -252,6 +264,7 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollBy(2);
     });
+    await waitUntilReady!();
 
     // Now Item 1 should be stuck
     await waitFor(() => {
@@ -265,6 +278,7 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollTo(10);
     });
+    await waitUntilReady!();
 
     await waitFor(() => {
       expect(lastFrame!()).not.toContain('[STICKY] Item 1');
@@ -274,49 +288,53 @@ describe('ScrollableList Demo Behavior', () => {
     await act(async () => {
       listRef?.scrollTo(0);
     });
+    await waitUntilReady!();
 
     // Should be normal again
     await waitFor(() => {
       expect(lastFrame!()).toContain('[Normal] Item 1');
     });
     expect(lastFrame!()).not.toContain('[STICKY] Item 1');
+
+    await act(async () => {
+      result.unmount();
+    });
   });
 
   describe('Keyboard Navigation', () => {
     it('should handle scroll keys correctly', async () => {
       let listRef: ScrollableListRef<Item> | null = null;
-      let lastFrame: () => string | undefined;
+      let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let stdin: { write: (data: string) => void };
+      let waitUntilReady: () => Promise<void>;
 
       const items = Array.from({ length: 50 }, (_, i) => ({
         id: String(i),
         title: `Item ${i}`,
       }));
 
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        const result = render(
-          <MouseProvider mouseEventsEnabled={false}>
-            <KeypressProvider>
-              <ScrollProvider>
-                <Box flexDirection="column" width={80} height={10}>
-                  <ScrollableList
-                    ref={(ref) => {
-                      listRef = ref;
-                    }}
-                    data={items}
-                    renderItem={({ item }) => <Text>{item.title}</Text>}
-                    estimatedItemHeight={() => 1}
-                    keyExtractor={(item) => item.id}
-                    hasFocus={true}
-                  />
-                </Box>
-              </ScrollProvider>
-            </KeypressProvider>
-          </MouseProvider>,
+        result = await renderWithProviders(
+          <Box flexDirection="column" width={80} height={10}>
+            <ScrollableList
+              ref={(ref) => {
+                listRef = ref;
+              }}
+              data={items}
+              renderItem={({ item }) => <Text>{item.title}</Text>}
+              estimatedItemHeight={() => 1}
+              keyExtractor={(item) => item.id}
+              hasFocus={true}
+            />
+          </Box>,
         );
         lastFrame = result.lastFrame;
         stdin = result.stdin;
+        waitUntilReady = result.waitUntilReady;
       });
+
+      await waitUntilReady!();
 
       // Initial state
       expect(lastFrame!()).toContain('Item 0');
@@ -327,6 +345,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[b');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(0);
       });
@@ -335,6 +355,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[a');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
       });
@@ -343,6 +365,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[6~');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         // Height is 10, so should scroll ~10 units
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThanOrEqual(9);
@@ -352,6 +376,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[5~');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBeLessThan(2);
       });
@@ -360,6 +386,8 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[1;5F');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         // Total 50 items, height 10. Max scroll ~40.
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(30);
@@ -369,8 +397,16 @@ describe('ScrollableList Demo Behavior', () => {
       await act(async () => {
         stdin.write('\x1b[1;5H');
       });
+      await waitUntilReady!();
+
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
+      });
+
+      await act(async () => {
+        // Let the scrollbar fade out animation finish
+        await new Promise((resolve) => setTimeout(resolve, 1600));
+        result.unmount();
       });
     });
   });
@@ -378,33 +414,291 @@ describe('ScrollableList Demo Behavior', () => {
   describe('Width Prop', () => {
     it('should apply the width prop to the container', async () => {
       const items = [{ id: '1', title: 'Item 1' }];
-      let lastFrame: () => string | undefined;
+      let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
+      let waitUntilReady: () => Promise<void>;
 
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        const result = render(
-          <MouseProvider mouseEventsEnabled={false}>
-            <KeypressProvider>
-              <ScrollProvider>
-                <Box width={100} height={20}>
-                  <ScrollableList
-                    data={items}
-                    renderItem={({ item }) => <Text>{item.title}</Text>}
-                    estimatedItemHeight={() => 1}
-                    keyExtractor={(item) => item.id}
-                    hasFocus={true}
-                    width={50}
-                  />
-                </Box>
-              </ScrollProvider>
-            </KeypressProvider>
-          </MouseProvider>,
+        result = await renderWithProviders(
+          <Box width={100} height={20}>
+            <ScrollableList
+              data={items}
+              renderItem={({ item }) => <Text>{item.title}</Text>}
+              estimatedItemHeight={() => 1}
+              keyExtractor={(item) => item.id}
+              hasFocus={true}
+              width={50}
+            />
+          </Box>,
         );
         lastFrame = result.lastFrame;
+        waitUntilReady = result.waitUntilReady;
       });
+
+      await waitUntilReady!();
 
       await waitFor(() => {
         expect(lastFrame()).toContain('Item 1');
       });
+
+      await act(async () => {
+        result.unmount();
+      });
     });
+  });
+
+  it('regression: remove last item and add 2 items when scrolled to bottom', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let setItemsFunc: React.Dispatch<React.SetStateAction<Item[]>> | null =
+      null;
+
+    const TestComp = () => {
+      const [items, setItems] = useState<Item[]>(
+        Array.from({ length: 10 }, (_, i) => ({
+          id: String(i),
+          title: `Item ${i}`,
+        })),
+      );
+      useEffect(() => {
+        setItemsFunc = setItems;
+      }, []);
+
+      return (
+        <Box flexDirection="column" width={80} height={5}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item }) => <Text>{item.title}</Text>}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
+      );
+    };
+
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
+    await act(async () => {
+      result = await renderWithProviders(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Scrolled to bottom, max scroll = 10 - 5 = 5
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(5);
+    });
+
+    // Remove last element and add 2 elements
+    await act(async () => {
+      setItemsFunc!((prev) => {
+        const next = prev.slice(0, prev.length - 1);
+        next.push({ id: '10', title: 'Item 10' });
+        next.push({ id: '11', title: 'Item 11' });
+        return next;
+      });
+    });
+
+    await result!.waitUntilReady();
+
+    // Auto scrolls to new bottom: max scroll = 11 - 5 = 6
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(6);
+    });
+
+    // Scroll up slightly
+    await act(async () => {
+      listRef?.scrollBy(-2);
+    });
+    await result!.waitUntilReady();
+
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(4);
+    });
+
+    // Scroll back to bottom
+    await act(async () => {
+      listRef?.scrollToEnd();
+    });
+    await result!.waitUntilReady();
+
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(6);
+    });
+
+    // Add two more elements
+    await act(async () => {
+      setItemsFunc!((prev) => [
+        ...prev,
+        { id: '12', title: 'Item 12' },
+        { id: '13', title: 'Item 13' },
+      ]);
+    });
+
+    await result!.waitUntilReady();
+
+    // Auto scrolls to bottom: max scroll = 13 - 5 = 8
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(8);
+    });
+
+    result!.unmount();
+  });
+
+  it('regression: bottom-most element changes size but list does not update', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let expandLastFunc: (() => void) | null = null;
+
+    const ItemWithState = ({
+      item,
+      isLast,
+    }: {
+      item: Item;
+      isLast: boolean;
+    }) => {
+      const [expanded, setExpanded] = useState(false);
+      useEffect(() => {
+        if (isLast) {
+          expandLastFunc = () => setExpanded(true);
+        }
+      }, [isLast]);
+      return (
+        <Box flexDirection="column">
+          <Text>{item.title}</Text>
+          {expanded && <Text>Expanded content</Text>}
+        </Box>
+      );
+    };
+
+    const TestComp = () => {
+      // items array is stable
+      const [items] = useState(() =>
+        Array.from({ length: 5 }, (_, i) => ({
+          id: String(i),
+          title: `Item ${i}`,
+        })),
+      );
+
+      return (
+        <Box flexDirection="column" width={80} height={4}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item, index }) => (
+              <ItemWithState item={item} isLast={index === 4} />
+            )}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
+      );
+    };
+
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
+    await act(async () => {
+      result = await renderWithProviders(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Initially, total height is 5. viewport is 4. scroll is 1.
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(1);
+    });
+
+    // Expand the last item locally, without re-rendering the list!
+    await act(async () => {
+      expandLastFunc!();
+    });
+
+    await result!.waitUntilReady();
+
+    // The total height becomes 6. It should remain scrolled to bottom, so scroll becomes 2.
+    // This is expected to FAIL currently because VirtualizedList won't remeasure
+    // unless data changes or container height changes.
+    await waitFor(
+      () => {
+        expect(listRef?.getScrollState()?.scrollTop).toBe(2);
+      },
+      { timeout: 1000 },
+    );
+
+    result!.unmount();
+  });
+
+  it('regression: prepending items does not corrupt heights (total height correct)', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let setItemsFunc: React.Dispatch<React.SetStateAction<Item[]>> | null =
+      null;
+
+    const TestComp = () => {
+      // Items 1 to 5. Item 1 is very tall.
+      const [items, setItems] = useState<Item[]>(
+        Array.from({ length: 5 }, (_, i) => ({
+          id: String(i + 1),
+          title: `Item ${i + 1}`,
+        })),
+      );
+      useEffect(() => {
+        setItemsFunc = setItems;
+      }, []);
+
+      return (
+        <Box flexDirection="column" width={80} height={10}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item }) => (
+              <Box height={item.id === '1' ? 10 : 2}>
+                <Text>{item.title}</Text>
+              </Box>
+            )}
+            estimatedItemHeight={() => 2}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
+      );
+    };
+
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
+    await act(async () => {
+      result = await renderWithProviders(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Scroll is at bottom.
+    // Heights: Item 1: 10, Item 2: 2, Item 3: 2, Item 4: 2, Item 5: 2.
+    // Total height = 18. Container = 10. Max scroll = 8.
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(8);
+    });
+
+    // Prepend an item!
+    await act(async () => {
+      setItemsFunc!((prev) => [{ id: '0', title: 'Item 0' }, ...prev]);
+    });
+
+    await result!.waitUntilReady();
+
+    // Now items: 0(2), 1(10), 2(2), 3(2), 4(2), 5(2).
+    // Total height = 20. Container = 10. Max scroll = 10.
+    // Auto-scrolls to bottom because it was sticking!
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(10);
+    });
+
+    result!.unmount();
   });
 });

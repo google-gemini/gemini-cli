@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isSubpath } from './paths.js';
+import { isSubpath, resolveToRealPath } from './paths.js';
 import { debugLogger } from './debugLogger.js';
 
 // Simple console logger for import processing
@@ -48,18 +48,31 @@ export interface ProcessImportsResult {
   importTree: MemoryFile;
 }
 
-// Helper to find the project root (looks for .git directory)
-async function findProjectRoot(startDir: string): Promise<string> {
+// Helper to find the project root (looks for boundary marker directories/files)
+async function findProjectRoot(
+  startDir: string,
+  boundaryMarkers: readonly string[] = ['.git'],
+): Promise<string> {
+  if (boundaryMarkers.length === 0) {
+    return path.resolve(startDir);
+  }
+
   let currentDir = path.resolve(startDir);
   while (true) {
-    const gitPath = path.join(currentDir, '.git');
-    try {
-      const stats = await fs.lstat(gitPath);
-      if (stats.isDirectory()) {
-        return currentDir;
+    for (const marker of boundaryMarkers) {
+      // Sanitize: skip markers with path traversal or absolute paths
+      if (path.isAbsolute(marker) || marker.includes('..')) {
+        continue;
       }
-    } catch {
-      // .git not found, continue to parent
+      const markerPath = path.join(currentDir, marker);
+      try {
+        // Check for existence only — marker can be a directory (normal repos)
+        // or a file (submodules / worktrees).
+        await fs.access(markerPath);
+        return currentDir;
+      } catch {
+        // marker not found, continue
+      }
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
@@ -68,7 +81,7 @@ async function findProjectRoot(startDir: string): Promise<string> {
     }
     currentDir = parentDir;
   }
-  // Fallback to startDir if .git not found
+  // Fallback to startDir if no marker found
   return path.resolve(startDir);
 }
 
@@ -185,9 +198,10 @@ export async function processImports(
   },
   projectRoot?: string,
   importFormat: 'flat' | 'tree' = 'tree',
+  boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<ProcessImportsResult> {
   if (!projectRoot) {
-    projectRoot = await findProjectRoot(basePath);
+    projectRoot = await findProjectRoot(basePath, boundaryMarkers);
   }
 
   if (importState.currentDepth >= importState.maxDepth) {
@@ -346,6 +360,7 @@ export async function processImports(
         newImportState,
         projectRoot,
         importFormat,
+        boundaryMarkers,
       );
       result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
       imports.push(imported.importTree);
@@ -382,9 +397,28 @@ export function validateImportPath(
     return false;
   }
 
-  const resolvedPath = path.resolve(basePath, importPath);
+  let resolvedPath: string;
+  try {
+    // Canonicalize the path on the actual physical disk to resolve symlinks
+    resolvedPath = resolveToRealPath(path.resolve(basePath, importPath));
+  } catch {
+    // If path resolution fails (e.g., infinite recursion or invalid path), fail-closed and reject it
+    return false;
+  }
 
-  return allowedDirectories.some((allowedDir) =>
-    isSubpath(allowedDir, resolvedPath),
+  const realAllowedDirs = allowedDirectories
+    .map((dir) => {
+      const trimmed = dir.trim();
+      if (!trimmed) return null;
+      try {
+        return resolveToRealPath(trimmed);
+      } catch {
+        return null;
+      }
+    })
+    .filter((dir): dir is string => dir !== null);
+
+  return realAllowedDirs.some((realAllowedDir) =>
+    isSubpath(realAllowedDir, resolvedPath),
   );
 }

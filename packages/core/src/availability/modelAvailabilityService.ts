@@ -22,6 +22,7 @@ type HealthState =
       status: 'sticky_retry';
       reason: TurnUnavailabilityReason;
       consumed: boolean;
+      attempts: number;
     };
 
 export interface ModelAvailabilitySnapshot {
@@ -38,21 +39,26 @@ export interface ModelSelectionResult {
   }>;
 }
 
+import { normalizeModelId } from '../utils/modelUtils.js';
+
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
 
-  markTerminal(model: ModelId, reason: TerminalUnavailabilityReason) {
+  markTerminal(modelId: ModelId, reason: TerminalUnavailabilityReason) {
+    const model = normalizeModelId(modelId);
     this.setState(model, {
       status: 'terminal',
       reason,
     });
   }
 
-  markHealthy(model: ModelId) {
+  markHealthy(modelId: ModelId) {
+    const model = normalizeModelId(modelId);
     this.clearState(model);
   }
 
-  markRetryOncePerTurn(model: ModelId) {
+  markRetryOncePerTurn(modelId: ModelId, attempts: number = 1) {
+    const model = normalizeModelId(modelId);
     const currentState = this.health.get(model);
     // Do not override a terminal failure with a transient one.
     if (currentState?.status === 'terminal') {
@@ -70,17 +76,20 @@ export class ModelAvailabilityService {
       status: 'sticky_retry',
       reason: 'retry_once_per_turn',
       consumed,
+      attempts,
     });
   }
 
-  consumeStickyAttempt(model: ModelId) {
+  consumeStickyAttempt(modelId: ModelId) {
+    const model = normalizeModelId(modelId);
     const state = this.health.get(model);
     if (state?.status === 'sticky_retry') {
       this.setState(model, { ...state, consumed: true });
     }
   }
 
-  snapshot(model: ModelId): ModelAvailabilitySnapshot {
+  snapshot(modelId: ModelId): ModelAvailabilitySnapshot {
+    const model = normalizeModelId(modelId);
     const state = this.health.get(model);
 
     if (!state) {
@@ -98,15 +107,17 @@ export class ModelAvailabilityService {
     return { available: true };
   }
 
-  selectFirstAvailable(models: ModelId[]): ModelSelectionResult {
+  selectFirstAvailable(modelIds: ModelId[]): ModelSelectionResult {
     const skipped: ModelSelectionResult['skipped'] = [];
 
-    for (const model of models) {
+    for (const modelId of modelIds) {
+      const model = normalizeModelId(modelId);
       const snapshot = this.snapshot(model);
       if (snapshot.available) {
         const state = this.health.get(model);
         // A sticky model is being attempted, so note that.
-        const attempts = state?.status === 'sticky_retry' ? 1 : undefined;
+        const attempts =
+          state?.status === 'sticky_retry' ? state.attempts : undefined;
         return { selectedModel: model, skipped, attempts };
       } else {
         skipped.push({ model, reason: snapshot.reason ?? 'unknown' });

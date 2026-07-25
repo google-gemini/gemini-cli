@@ -13,8 +13,7 @@ import {
   type InProcessCheckerConfig,
   InProcessCheckerType,
 } from '../policy/types.js';
-import type { SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import { SafetyCheckDecision, type SafetyCheckResult } from './protocol.js';
 import type { Config } from '../config/config.js';
 
 // Mock dependencies
@@ -35,6 +34,10 @@ describe('CheckerRunner', () => {
 
   beforeEach(() => {
     mockContextBuilder = new ContextBuilder({} as Config);
+    vi.spyOn(mockContextBuilder, 'config', 'get').mockReturnValue({
+      env: {},
+      getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),
+    } as unknown as Config);
     mockRegistry = new CheckerRegistry('/mock/dist');
     CheckerRegistry.prototype.resolveInProcess = vi.fn();
 

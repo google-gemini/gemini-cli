@@ -413,6 +413,113 @@ describe('readPathFromWorkspace', () => {
     ).rejects.toThrow('Path not found in workspace: not-found.txt');
   });
 
+  it('should prevent path traversal outside the workspace via relative paths', async () => {
+    mock({
+      [CWD]: {},
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const config = createMockConfig(CWD);
+    // Attempt to traverse out of CWD to OUTSIDE_DIR
+    const relativeTraversal = path.join('..', 'outside', 'secret.txt');
+    await expect(
+      readPathFromWorkspace(relativeTraversal, config),
+    ).rejects.toThrow(`Path not found in workspace: ${relativeTraversal}`);
+  });
+
+  it('should prevent symlink escape outside the workspace', async () => {
+    mock({
+      [CWD]: {
+        'malicious-link': mock.symlink({
+          path: path.join(OUTSIDE_DIR, 'secret.txt'),
+        }),
+      },
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const config = createMockConfig(CWD);
+    // Even if the link is in the workspace, its target is not.
+    await expect(
+      readPathFromWorkspace('malicious-link', config),
+    ).rejects.toThrow('Path not found in workspace: malicious-link');
+  });
+
+  it('should block symlink escape inside a directory expansion (defense-in-depth)', async () => {
+    mock({
+      [CWD]: {
+        'allowed-dir': {
+          'legit.txt': 'legit content',
+          'malicious-link.txt': mock.symlink({
+            path: path.join(OUTSIDE_DIR, 'secret.txt'),
+          }),
+        },
+      },
+      [OUTSIDE_DIR]: {
+        'secret.txt': 'secrets',
+      },
+    });
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
+    const result = await readPathFromWorkspace('allowed-dir', config);
+    const resultText = result
+      .map((p) => {
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object' && p && 'text' in p) return p.text;
+        return '';
+      })
+      .join('');
+
+    // Legit content should be there
+    expect(resultText).toContain('legit content');
+    // Secret content should NOT be there, but a skip message SHOULD be
+    expect(resultText).not.toContain('secrets');
+    expect(resultText).toContain(
+      '--- Skipped malicious-link.txt: traverses outside workspace ---',
+    );
+  });
+
+  it('should push multiple skip messages if multiple traversals are found in a directory', async () => {
+    mock({
+      [CWD]: {
+        'bad-dir': {
+          'link1.txt': mock.symlink({ path: path.join(OUTSIDE_DIR, 's1.txt') }),
+          'link2.txt': mock.symlink({ path: path.join(OUTSIDE_DIR, 's2.txt') }),
+          'good.txt': 'good content',
+        },
+      },
+      [OUTSIDE_DIR]: {
+        's1.txt': 'secret1',
+        's2.txt': 'secret2',
+      },
+    });
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
+    const result = await readPathFromWorkspace('bad-dir', config);
+    const resultText = result
+      .map((p) => {
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object' && p && 'text' in p) return p.text;
+        return '';
+      })
+      .join('');
+
+    expect(resultText).toContain('good content');
+    expect(resultText).toContain(
+      '--- Skipped link1.txt: traverses outside workspace ---',
+    );
+    expect(resultText).toContain(
+      '--- Skipped link2.txt: traverses outside workspace ---',
+    );
+    expect(resultText).not.toContain('secret1');
+    expect(resultText).not.toContain('secret2');
+  });
+
   // mock-fs permission simulation is unreliable on Windows.
   it.skipIf(process.platform === 'win32')(
     'should return an error string if reading a file with no permissions',

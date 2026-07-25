@@ -5,8 +5,11 @@
  */
 
 import type { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
-import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import { createSessionId } from '../utils/session.js';
+import {
+  openBrowserSecurely,
+  shouldLaunchBrowser,
+} from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
@@ -18,7 +21,7 @@ import {
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
 
-const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
+export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
   config: Config,
@@ -26,9 +29,7 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
-  if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
-    return null;
-  }
+  const failureKind = classifyFailureKind(error);
 
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
@@ -36,15 +37,23 @@ export async function handleFallback(
     failedModel,
   );
 
-  const failureKind = classifyFailureKind(error);
   const availability = config.getModelAvailabilityService();
   const getAvailabilityContext = () => {
     if (!failedPolicy) return undefined;
     return { service: availability, policy: failedPolicy };
   };
 
+  const activeModel = config.getActiveModel();
   let fallbackModel: string;
+
   if (!candidates.length) {
+    if (
+      failedModel !== activeModel &&
+      availability.snapshot(activeModel).available
+    ) {
+      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      return processIntent(config, 'retry_always', activeModel, failedModel);
+    }
     fallbackModel = failedModel;
   } else {
     const selection = availability.selectFirstAvailable(
@@ -71,9 +80,21 @@ export async function handleFallback(
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
 
-    if (action === 'silent') {
+    if (
+      action === 'silent' ||
+      (fallbackModel === activeModel && failedModel !== activeModel)
+    ) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', fallbackModel);
+      // For standard auto-routing (silent), we only update the active model, so don't pass failedModel.
+      // For utility bypass, we want a hard runtime override, so pass failedModel.
+      const overrideFailedModel =
+        failedModel !== activeModel ? failedModel : undefined;
+      return processIntent(
+        config,
+        'retry_always',
+        fallbackModel,
+        overrideFailedModel,
+      );
     }
 
     // This will be used in the future when FallbackRecommendation is passed through UI
@@ -104,7 +125,12 @@ export async function handleFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
     }
 
-    return await processIntent(config, intent, fallbackModel);
+    return await processIntent(
+      config,
+      intent,
+      fallbackModel,
+      failedModel !== activeModel ? failedModel : undefined,
+    );
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
@@ -112,6 +138,12 @@ export async function handleFallback(
 }
 
 async function handleUpgrade() {
+  if (!shouldLaunchBrowser()) {
+    debugLogger.log(
+      `Cannot open browser in this environment. Please visit: ${UPGRADE_URL_PAGE}`,
+    );
+    return;
+  }
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
@@ -126,18 +158,23 @@ async function processIntent(
   config: Config,
   intent: FallbackIntent | null,
   fallbackModel: string,
+  failedModel?: string,
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
-      // TODO(telemetry): Implement generic fallback event logging. Existing
-      // logFlashFallback is specific to a single Model.
-      config.activateFallbackMode(fallbackModel);
+      // Rotate the session ID to ensure the backend treats the retried request
+      // as a brand-new session, preventing stateful model-switching errors.
+      config.rotateSessionId(createSessionId());
+      config.activateFallbackMode(fallbackModel, failedModel);
       return true;
 
     case 'retry_once':
       // For distinct retry (retry_once), we do NOT set the active model permanently.
       // The FallbackStrategy will handle routing to the available model for this turn
       // based on the availability service state (which is updated before this).
+      return true;
+
+    case 'retry_with_credits':
       return true;
 
     case 'stop':

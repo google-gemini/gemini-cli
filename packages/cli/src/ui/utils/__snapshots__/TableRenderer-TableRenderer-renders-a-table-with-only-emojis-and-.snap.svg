@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="122" viewBox="0 0 560 122">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="560" height="122" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#333333" textLength="315" lengthAdjust="spacingAndGlyphs">┌──────────┬───────────┬──────────┐</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="19" fill="#87afff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">Happy 😀</text>
+    <text x="90" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="108" y="19" fill="#87afff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Rocket 🚀</text>
+    <text x="189" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="207" y="19" fill="#87afff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">Heart ❤️</text>
+    <text x="279" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="315" lengthAdjust="spacingAndGlyphs">├──────────┼───────────┼──────────┤</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="53" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs">Smile 😃</text>
+    <text x="90" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="108" y="53" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Fire 🔥</text>
+    <text x="189" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="207" y="53" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Love 💖</text>
+    <text x="279" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Cool 😎</text>
+    <text x="90" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="108" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Star ⭐</text>
+    <text x="189" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="207" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Blue 💙</text>
+    <text x="279" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="315" lengthAdjust="spacingAndGlyphs">└──────────┴───────────┴──────────┘</text>
+  </g>
+</svg>

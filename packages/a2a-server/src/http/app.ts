@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express from 'express';
+import express, { type Request } from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type { TaskStore } from '@a2a-js/sdk/server';
 import {
+  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
+  UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
-import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
+import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import type { AgentSettings } from '../types.js';
@@ -25,9 +26,14 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  SimpleExtensionLoader,
+  GitService,
+  checkPathTrust,
+  isHeadlessMode,
+} from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
-import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;
@@ -52,8 +58,17 @@ const coderAgentCard: AgentCard = {
     pushNotifications: false,
     stateTransitionHistory: true,
   },
-  securitySchemes: undefined,
-  security: undefined,
+  securitySchemes: {
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+    },
+    basicAuth: {
+      type: 'http',
+      scheme: 'basic',
+    },
+  },
+  security: [{ bearerAuth: [] }, { basicAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -78,6 +93,35 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
+const customUserBuilder: UserBuilder = async (req: Request) => {
+  const auth = req.headers['authorization'];
+  if (auth) {
+    const scheme = auth.split(' ')[0];
+    logger.info(
+      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
+    );
+  }
+  if (!auth) return new UnauthenticatedUser();
+
+  // 1. Bearer Auth
+  if (auth.startsWith('Bearer ')) {
+    const token = auth.substring(7);
+    if (token === 'valid-token') {
+      return { userName: 'bearer-user', isAuthenticated: true };
+    }
+  }
+
+  // 2. Basic Auth
+  if (auth.startsWith('Basic ')) {
+    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
+    if (credentials === 'admin:password') {
+      return { userName: 'basic-user', isAuthenticated: true };
+    }
+  }
+
+  return new UnauthenticatedUser();
+};
+
 async function handleExecuteCommand(
   req: express.Request,
   res: express.Response,
@@ -88,6 +132,7 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { command, args } = req.body;
   try {
     if (typeof command !== 'string') {
@@ -118,6 +163,7 @@ async function handleExecuteCommand(
       const eventHandler = (event: AgentExecutionEvent) => {
         const jsonRpcResponse = {
           jsonrpc: '2.0',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           id: 'taskId' in event ? event.taskId : (event as Message).messageId,
           result: event,
         };
@@ -151,14 +197,46 @@ async function handleExecuteCommand(
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
-    const workspaceRoot = setTargetDir(undefined);
-    loadEnvironment();
-    const settings = loadSettings(workspaceRoot);
-    const extensions = loadExtensions(workspaceRoot);
+    const workspaceRoot = await setTargetDir(undefined);
+
+    // Use a temporary settings load to check if folder trust is enabled.
+    // This is similar to how the CLI handles the initial trust check.
+    const initialSettings = loadSettings(workspaceRoot, false);
+    const { isTrusted } = checkPathTrust({
+      path: workspaceRoot,
+      isFolderTrustEnabled: initialSettings.folderTrust ?? true,
+      isHeadless: isHeadlessMode(),
+    });
+
+    // Change the global working directory to the workspace root during startup
+    process.chdir(workspaceRoot);
+
+    // Load environment globally for the server startup
+    const globalEnv = await loadEnvironment(isTrusted ?? false, workspaceRoot);
+    // Only assign safe server-config variables to process.env to prevent credential leakage
+    const allowedServerKeys = [
+      'CODER_AGENT_PORT',
+      'CODER_AGENT_WORKSPACE_PATH',
+      'GCS_BUCKET_NAME',
+      'LOG_LEVEL',
+      'GOOGLE_APPLICATION_CREDENTIALS',
+      'GOOGLE_CLOUD_PROJECT',
+      'GEMINI_CLI_USE_COMPUTE_ADC',
+    ];
+    for (const key of allowedServerKeys) {
+      if (globalEnv[key] !== undefined) {
+        process.env[key] = globalEnv[key];
+      }
+    }
+
+    const settings = loadSettings(workspaceRoot, isTrusted ?? false);
+    const extensions = loadExtensions(workspaceRoot, isTrusted ?? false);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
+      isTrusted ?? false,
+      workspaceRoot,
     );
 
     let git: GitService | undefined;
@@ -199,16 +277,18 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
-    const appBuilder = new A2AExpressApp(requestHandler);
+    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
 
     expressApp.post('/tasks', async (req, res) => {
       try {
         const taskId = uuidv4();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,

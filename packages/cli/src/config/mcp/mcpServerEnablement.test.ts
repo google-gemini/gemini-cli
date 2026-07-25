@@ -13,6 +13,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     Storage: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.Storage,
       getGlobalGeminiDir: () => '/virtual-home/.gemini',
     },

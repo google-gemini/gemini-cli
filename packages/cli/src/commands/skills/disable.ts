@@ -53,6 +53,7 @@ export const disableCommand: CommandModule = {
         ? SettingScope.Workspace
         : SettingScope.User;
     await handleDisable({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       name: argv['name'] as string,
       scope,
     });

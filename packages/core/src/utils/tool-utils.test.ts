@@ -6,8 +6,7 @@
 
 import { expect, describe, it } from 'vitest';
 import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import { ReadFileTool, type AnyToolInvocation, type Config } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('getToolSuggestion', () => {
@@ -84,7 +83,11 @@ describe('doesToolInvocationMatch', () => {
   });
 
   describe('for non-shell tools', () => {
-    const readFileTool = new ReadFileTool({} as Config, createMockMessageBus());
+    const mockConfig = {
+      getTargetDir: () => '/tmp',
+      getFileFilteringOptions: () => ({}),
+    } as unknown as Config;
+    const readFileTool = new ReadFileTool(mockConfig, createMockMessageBus());
     const invocation = {
       params: { file: 'test.txt' },
     } as AnyToolInvocation;

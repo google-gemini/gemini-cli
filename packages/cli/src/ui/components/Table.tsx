@@ -75,6 +75,7 @@ export function Table<T>({ data, columns }: TableProps<T>) {
                 col.renderCell(item)
               ) : (
                 <Text color={theme.text.primary}>
+                  {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
                   {String((item as Record<string, unknown>)[col.key])}
                 </Text>
               )}

@@ -8,10 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Config } from '@google/gemini-cli-core';
-import { SessionBrowser } from './SessionBrowser.js';
-import type { SessionBrowserProps } from './SessionBrowser.js';
-import type { SessionInfo } from '../../utils/sessionUtils.js';
+import { type Config } from '@google/gemini-cli-core';
+import { SessionBrowser, type SessionBrowserProps } from './SessionBrowser.js';
+import { type SessionInfo } from '../../utils/sessionUtils.js';
 
 // Collect key handlers registered via useKeypress so tests can
 // simulate input without going through the full stdin pipeline.
@@ -87,6 +86,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       getProjectTempDir: () => '/tmp/test',
     },
     getSessionId: () => 'default-session-id',
+    getExperimentalGemma: () => false,
     ...overrides,
   }) as Config;
 
@@ -149,13 +149,13 @@ describe('SessionBrowser component', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows empty state when no sessions exist', () => {
+  it('shows empty state when no sessions exist', async () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -168,7 +168,7 @@ describe('SessionBrowser component', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders a list of sessions and marks current session as disabled', () => {
+  it('renders a list of sessions and marks current session as disabled', async () => {
     const session1 = createSession({
       id: 'abc123',
       file: 'abc123',
@@ -192,7 +192,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -206,6 +206,7 @@ describe('SessionBrowser component', () => {
   });
 
   it('enters search mode, filters sessions, and renders match snippets', async () => {
+    // ... same searchSession setup ...
     const searchSession = createSession({
       id: 'search1',
       file: 'search1',
@@ -243,7 +244,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -257,6 +258,7 @@ describe('SessionBrowser component', () => {
 
     // Enter search mode.
     triggerKey({ sequence: '/', name: '/' });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Search:');
@@ -272,6 +274,7 @@ describe('SessionBrowser component', () => {
         cmd: false,
       });
     }
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Chat Sessions (1 total, filtered');
@@ -279,7 +282,7 @@ describe('SessionBrowser component', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('handles keyboard navigation and resumes the selected session', () => {
+  it('handles keyboard navigation and resumes the selected session', async () => {
     const session1 = createSession({
       id: 'one',
       file: 'one',
@@ -300,7 +303,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -314,16 +317,18 @@ describe('SessionBrowser component', () => {
 
     // Move selection down.
     triggerKey({ name: 'down', sequence: '[B' });
+    await waitUntilReady();
 
     // Press Enter.
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
+    await waitUntilReady();
 
     expect(onResumeSession).toHaveBeenCalledTimes(1);
     const [resumedSession] = onResumeSession.mock.calls[0];
     expect(resumedSession).toEqual(session2);
   });
 
-  it('does not allow resuming or deleting the current session', () => {
+  it('does not allow resuming or deleting the current session', async () => {
     const currentSession = createSession({
       id: 'current',
       file: 'current',
@@ -346,7 +351,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    render(
+    const { waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -357,21 +362,23 @@ describe('SessionBrowser component', () => {
     );
 
     // Active selection is at 0 (current session).
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
+    await waitUntilReady();
     expect(onResumeSession).not.toHaveBeenCalled();
 
     // Attempt delete.
     triggerKey({ sequence: 'x', name: 'x' });
+    await waitUntilReady();
     expect(onDeleteSession).not.toHaveBeenCalled();
   });
 
-  it('shows an error state when loading sessions fails', () => {
+  it('shows an error state when loading sessions fails', async () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}

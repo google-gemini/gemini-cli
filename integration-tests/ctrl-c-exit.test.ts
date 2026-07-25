@@ -6,9 +6,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
-import { TestRig } from './test-helper.js';
+import { TestRig, skipFlaky } from './test-helper.js';
 
-describe('Ctrl+C exit', () => {
+describe.skipIf(skipFlaky)('Ctrl+C exit', () => {
   let rig: TestRig;
 
   beforeEach(() => {

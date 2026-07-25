@@ -11,6 +11,7 @@ import {
   type ToolInvocation,
   type ToolResult,
   type ToolCallConfirmationDetails,
+  type ExecuteOptions,
 } from './tools.js';
 import { GET_INTERNAL_DOCS_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -19,6 +20,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 import { ToolErrorType } from './tool-error.js';
+import { GET_INTERNAL_DOCS_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the GetInternalDocs tool.
@@ -94,13 +97,17 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
     return 'Listing all available internal documentation.';
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const docsRoot = await getDocsRoot();
 
       if (!this.params.path) {
-        // List all .md files recursively
-        const files = await glob('**/*.md', { cwd: docsRoot, posix: true });
+        // List all .md and .mdx files recursively
+        const files = await glob('**/*.{md,mdx}', {
+          cwd: docsRoot,
+          posix: true,
+        });
+
         files.sort();
 
         const fileList = files.map((f) => `- ${f}`).join('\n');
@@ -157,18 +164,9 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
     super(
       GetInternalDocsTool.Name,
       'GetInternalDocs',
-      'Returns the content of Gemini CLI internal documentation files. If no path is provided, returns a list of all available documentation paths.',
+      GET_INTERNAL_DOCS_DEFINITION.base.description!,
       Kind.Think,
-      {
-        type: 'object',
-        properties: {
-          path: {
-            description:
-              "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
-            type: 'string',
-          },
-        },
-      },
+      GET_INTERNAL_DOCS_DEFINITION.base.parametersJsonSchema,
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
@@ -187,5 +185,9 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
       _toolName ?? GetInternalDocsTool.Name,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(GET_INTERNAL_DOCS_DEFINITION, modelId);
   }
 }

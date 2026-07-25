@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies AT THE TOP
 const mockOpenBrowserSecurely = vi.hoisted(() => vi.fn());
@@ -33,16 +33,36 @@ vi.mock('../utils/events.js', () => ({
     emitConsoleLog: vi.fn(),
   },
 }));
+vi.mock('../utils/authConsent.js', () => ({
+  getConsentForOauth: vi.fn(() => Promise.resolve(true)),
+}));
+vi.mock('../utils/headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+vi.mock('node:readline', () => ({
+  default: {
+    createInterface: vi.fn(() => ({
+      question: vi.fn((_query, callback) => callback('')),
+      close: vi.fn(),
+      on: vi.fn(),
+    })),
+  },
+  createInterface: vi.fn(() => ({
+    question: vi.fn((_query, callback) => callback('')),
+    close: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import type {
-  MCPOAuthConfig,
-  OAuthTokenResponse,
-  OAuthClientRegistrationResponse,
+import {
+  MCPOAuthProvider,
+  type MCPOAuthConfig,
+  type OAuthTokenResponse,
+  type OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
-import { MCPOAuthProvider } from './oauth-provider.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import {
@@ -51,6 +71,7 @@ import {
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
+import { FatalCancellationError } from '../utils/errors.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -122,6 +143,7 @@ describe('MCPOAuthProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     authorizationUrl: 'https://auth.example.com/authorize',
+    issuer: 'https://auth.example.com',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',
@@ -617,6 +639,27 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should throw error when issuer is missing and dynamic registration is needed', async () => {
+      const configWithoutIssuer: MCPOAuthConfig = {
+        enabled: mockConfig.enabled,
+        authorizationUrl: mockConfig.authorizationUrl,
+        tokenUrl: mockConfig.tokenUrl,
+        scopes: mockConfig.scopes,
+        redirectUri: mockConfig.redirectUri,
+        audiences: mockConfig.audiences,
+      };
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+      });
+
+      const authProvider = new MCPOAuthProvider();
+
+      await expect(
+        authProvider.authenticate('test-server', configWithoutIssuer),
+      ).rejects.toThrow('Cannot perform dynamic registration without issuer');
+    });
+
     it('should handle OAuth callback errors', async () => {
       let callbackHandler: unknown;
       vi.mocked(http.createServer).mockImplementation((handler) => {
@@ -980,31 +1023,35 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should handle callback timeout', async () => {
-      vi.mocked(http.createServer).mockImplementation(
-        () => mockHttpServer as unknown as http.Server,
-      );
+      vi.useFakeTimers();
+      try {
+        vi.mocked(http.createServer).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        // Don't trigger callback - simulate timeout
-      });
+        mockHttpServer.listen.mockImplementation((port, callback) => {
+          callback?.();
+          // Don't trigger callback - simulate timeout
+        });
 
-      // Mock setTimeout to trigger timeout immediately
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = vi.fn((callback, delay) => {
-        if (delay === 5 * 60 * 1000) {
-          // 5 minute timeout
-          callback();
-        }
-        return originalSetTimeout(callback, 0);
-      }) as unknown as typeof setTimeout;
+        const authProvider = new MCPOAuthProvider();
 
-      const authProvider = new MCPOAuthProvider();
-      await expect(
-        authProvider.authenticate('test-server', mockConfig),
-      ).rejects.toThrow('OAuth callback timeout');
+        const authPromise = authProvider
+          .authenticate('test-server', mockConfig)
+          .catch((e: Error) => {
+            if (e.message !== 'OAuth callback timeout') throw e;
+            return e;
+          });
 
-      global.setTimeout = originalSetTimeout;
+        // Advance timers by 5 minutes
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+        const error = await authPromise;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('OAuth callback timeout');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should use port from redirectUri if provided', async () => {
@@ -1198,10 +1245,61 @@ describe('MCPOAuthProvider', () => {
         undefined,
       );
 
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'info',
+      expect(getConsentForOauth).toHaveBeenCalledWith(
         expect.stringContaining('production-server'),
       );
+    });
+
+    it('should call openBrowserSecurely when consent is granted', async () => {
+      vi.mocked(getConsentForOauth).mockResolvedValue(true);
+
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        setTimeout(() => {
+          const req = {
+            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          } as http.IncomingMessage;
+          const res = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          } as unknown as http.ServerResponse;
+          (handler as http.RequestListener)(req, res);
+        }, 0);
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((_port, callback) =>
+        callback?.(),
+      );
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', mockConfig);
+
+      expect(mockOpenBrowserSecurely).toHaveBeenCalled();
+    });
+
+    it('should throw FatalCancellationError when consent is denied', async () => {
+      vi.mocked(getConsentForOauth).mockResolvedValue(false);
+      mockHttpServer.listen.mockImplementation((_port, callback) =>
+        callback?.(),
+      );
+
+      // Use fake timers to avoid hanging from the 5-minute timeout in startCallbackServer
+      vi.useFakeTimers();
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate('test-server', mockConfig),
+      ).rejects.toThrow(FatalCancellationError);
+
+      expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
+      vi.useRealTimers();
     });
   });
 

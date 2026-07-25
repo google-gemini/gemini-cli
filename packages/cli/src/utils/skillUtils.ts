@@ -75,6 +75,18 @@ export function renderSkillActionFeedback(
   return `Skill "${skillName}" ${actionVerb} ${preposition} ${s} settings.`;
 }
 
+function isPathTraversal(relative: string): boolean {
+  return (
+    relative === '..' ||
+    relative.startsWith('..' + path.sep) ||
+    path.isAbsolute(relative)
+  );
+}
+
+function isInvalidSubpath(relative: string): boolean {
+  return relative === '' || isPathTraversal(relative);
+}
+
 /**
  * Central logic for installing a skill from a remote URL or local path.
  */
@@ -132,11 +144,12 @@ export async function installSkill(
     sourcePath = path.resolve(sourcePath);
 
     // Quick security check to prevent directory traversal out of temp dir when cloning
-    if (
-      tempDirToClean &&
-      !sourcePath.startsWith(path.resolve(tempDirToClean))
-    ) {
-      throw new Error('Invalid path: Directory traversal not allowed.');
+    if (tempDirToClean) {
+      const resolvedTemp = path.resolve(tempDirToClean);
+      const relative = path.relative(resolvedTemp, sourcePath);
+      if (isPathTraversal(relative)) {
+        throw new Error('Invalid path: Directory traversal not allowed.');
+      }
     }
 
     onLog(`Searching for skills in ${sourcePath}...`);
@@ -159,16 +172,22 @@ export async function installSkill(
       throw new Error('Skill installation cancelled by user.');
     }
 
-    await fs.mkdir(targetDir, { recursive: true });
+    const resolvedTarget = path.resolve(targetDir);
+    await fs.mkdir(resolvedTarget, { recursive: true });
 
     const installedSkills: Array<{ name: string; location: string }> = [];
 
     for (const skill of skills) {
       const skillName = skill.name;
       const skillDir = path.dirname(skill.location);
-      const destPath = path.join(targetDir, skillName);
+      const destPath = path.resolve(resolvedTarget, skillName);
 
-      const exists = await fs.stat(destPath).catch(() => null);
+      const relative = path.relative(resolvedTarget, destPath);
+      if (isInvalidSubpath(relative)) {
+        throw new Error('Invalid skill name: Path traversal detected.');
+      }
+
+      const exists = await fs.lstat(destPath).catch(() => null);
       if (exists) {
         onLog(`Skill "${skillName}" already exists. Overwriting...`);
         await fs.rm(destPath, { recursive: true, force: true });
@@ -187,6 +206,87 @@ export async function installSkill(
 }
 
 /**
+ * Central logic for linking a skill from a local path via symlink.
+ */
+export async function linkSkill(
+  source: string,
+  scope: 'user' | 'workspace',
+  onLog: (msg: string) => void,
+  requestConsent: (
+    skills: SkillDefinition[],
+    targetDir: string,
+  ) => Promise<boolean> = () => Promise.resolve(true),
+): Promise<Array<{ name: string; location: string }>> {
+  const sourcePath = path.resolve(source);
+
+  onLog(`Searching for skills in ${sourcePath}...`);
+  const skills = await loadSkillsFromDir(sourcePath);
+
+  if (skills.length === 0) {
+    throw new Error(
+      `No valid skills found in "${sourcePath}". Ensure a SKILL.md file exists with valid frontmatter.`,
+    );
+  }
+
+  // Check for internal name collisions
+  const seenNames = new Map<string, string>();
+  for (const skill of skills) {
+    if (seenNames.has(skill.name)) {
+      throw new Error(
+        `Duplicate skill name "${skill.name}" found at multiple locations:\n  - ${seenNames.get(skill.name)}\n  - ${skill.location}`,
+      );
+    }
+    seenNames.set(skill.name, skill.location);
+  }
+
+  const workspaceDir = process.cwd();
+  const storage = new Storage(workspaceDir);
+  const targetDir =
+    scope === 'workspace'
+      ? storage.getProjectSkillsDir()
+      : Storage.getUserSkillsDir();
+
+  if (!(await requestConsent(skills, targetDir))) {
+    throw new Error('Skill linking cancelled by user.');
+  }
+
+  const resolvedTarget = path.resolve(targetDir);
+  await fs.mkdir(resolvedTarget, { recursive: true });
+
+  const linkedSkills: Array<{ name: string; location: string }> = [];
+
+  for (const skill of skills) {
+    const skillName = skill.name;
+    const skillSourceDir = path.dirname(skill.location);
+    const destPath = path.resolve(resolvedTarget, skillName);
+
+    const relative = path.relative(resolvedTarget, destPath);
+    if (isInvalidSubpath(relative)) {
+      throw new Error('Invalid skill name: Path traversal detected.');
+    }
+
+    const exists = await fs.lstat(destPath).catch(() => null);
+    if (exists) {
+      onLog(
+        `Skill "${skillName}" already exists at destination. Overwriting...`,
+      );
+      await fs.rm(destPath, { recursive: true, force: true });
+    }
+
+    // Use 'junction' on Windows to avoid EPERM errors — junctions don't
+    // require elevated privileges or Developer Mode (fixes #24816)
+    await fs.symlink(
+      skillSourceDir,
+      destPath,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    linkedSkills.push({ name: skillName, location: destPath });
+  }
+
+  return linkedSkills;
+}
+
+/**
  * Central logic for uninstalling a skill by name.
  */
 export async function uninstallSkill(
@@ -200,14 +300,40 @@ export async function uninstallSkill(
       ? storage.getProjectSkillsDir()
       : Storage.getUserSkillsDir();
 
-  const skillPath = path.join(targetDir, name);
+  const resolvedTarget = path.resolve(targetDir);
 
-  const exists = await fs.stat(skillPath).catch(() => null);
+  // Load all skills in the target directory to find the one with the matching name
+  const discoveredSkills = await loadSkillsFromDir(resolvedTarget);
+  const skillToUninstall = discoveredSkills.find((s) => s.name === name);
 
-  if (!exists) {
+  if (!skillToUninstall) {
+    // Fallback: Check if a directory with the given name exists.
+    // This maintains backward compatibility for cases where the metadata might be missing or corrupted
+    // but the directory name matches the user's request.
+    const skillPath = path.resolve(resolvedTarget, name);
+
+    // Security check: ensure the resolved path is within the target directory to prevent path traversal
+    const relative = path.relative(resolvedTarget, skillPath);
+    if (isInvalidSubpath(relative)) {
+      return null;
+    }
+
+    const exists = await fs.lstat(skillPath).catch(() => null);
+
+    if (!exists) {
+      return null;
+    }
+
+    await fs.rm(skillPath, { recursive: true, force: true });
+    return { location: skillPath };
+  }
+
+  const skillDir = path.resolve(path.dirname(skillToUninstall.location));
+  const relative = path.relative(resolvedTarget, skillDir);
+  if (isInvalidSubpath(relative)) {
     return null;
   }
 
-  await fs.rm(skillPath, { recursive: true, force: true });
-  return { location: skillPath };
+  await fs.rm(skillDir, { recursive: true, force: true });
+  return { location: skillDir };
 }

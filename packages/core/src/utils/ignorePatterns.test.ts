@@ -203,6 +203,7 @@ describe('FileExclusions', () => {
 describe('BINARY_EXTENSIONS', () => {
   it.each([
     ['common binary file extensions', ['.exe', '.dll', '.jar', '.zip']],
+    ['game archive file extensions', ['.pak', '.rpa']],
     ['additional binary extensions', ['.dat', '.obj', '.wasm']],
     ['media file extensions', ['.pdf', '.png', '.jpg']],
   ])('should include %s', (_, extensions) => {
