@@ -1,0 +1,11 @@
+---
+FOLIO MAESTRO: SC360-2026-07-03-085034-AMP
+LICENCIA: ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-0005
+TITULAR: MAPA830324UM9 - CP 03020 Narvarte - idCIF 22030054697
+FILOSOFIA: No Se Borra, Se Corrige, Se Cambia, Se Actualiza y Documentar
+#MenteYDatos #VoluntadDeFamiliaDigital2026
+---
+## Cambios
+## Evidencia
+## Sello
+0xAMP-2026-MAPA830324UM9-EE-001
