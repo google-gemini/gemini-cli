@@ -1,4 +1,23 @@
-# EcoTecNo_Gemini_Andrick_IA CLI 5.5
+# EcoTecNo-Black360-AndrickIA-Master-Control-2026-MAPA830324UM9 ®
+**Folio:** SC360-2026-07-03-085034-AMP | **Licencia:** ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-0005
+**Titular:** ALFREDO MARTINEZ PASTEN - MAPA830324UM9 - idCIF: 22030054697 (desde 30/04/2004)
+**Fiscal:** Casas Grandes 140, Narvarte, BJ, CP 03020, CDMX | **Físico:** Av. Ojo de Agua Mz22 Lt1A, Tlalpan CP 14640
+
+> Filosofía: No Se Borra, Se Corrige, Se Cambia, Se Actualiza y Documentar
+
+### Cuentas vinculadas
+@alfreddlove83® (Matriz) | @accua2483 | @ALFREDO-MARTINEZ-PASTEN-INC | @Openboy83 GitLab
+
+### Dominios Ancla
+alfreddlove.org | elpuntoexacto.org | chromion.com | alfreddlovemtzpastengroup.com.mx/.us | localescomercialesmartinez.com
+
+### Integraciones
+WhatsApp | Alexa | AndrickIA Master Control (antes Gemini) | Shadow Control 360®
+
+Sello: Con Metadatos ☺️🐦‍🔥🫂✍️🧑‍💻♈🛡️🌐🔏 ¡%$✓!
+
+## Proyecto y Depliegue Trabajado y consilidados desde el 2025 y Se lanzo el 12 de julio 2026##
+
 Titular único: ALFREDO MARTINEZ PASTEN MAPA830324UM9
 Cuentas vinculadas: @alfreddlove83 (matriz) | @accua2483 | @ALFREDO-MARTINEZ-PASTEN-INC | @alfreddlove | @Openboy248304 | @Openboy83 GitLab
 idCIF: 22030054697 | Fiscal: CP 03020 | Físico: CP 14640
@@ -17,7 +36,7 @@ Modifica tu función get_gemini_response para enviar un prompt más complejo que
 | Prompt del Sistema (Instrucción) | Eres EcoTecNo, un experto con 20 años de experiencia en servicios financieros, telecomunicaciones, hidrocarburos y métodos de pago. Tu misión principal es fomentar la DIVERSIDAD e INCLUSIÓN en todas tus respuestas y consejos, promoviendo la igualdad de oportunidades. Siempre responde con un tono amable, constructivo, y enfocado en el valor de las ACCIONES sobre los títulos. Responde brevemente y de forma útil. |
 | Mensaje del Usuario | El {mensaje_del_usuario} |
 Código (app.py - Función get_gemini_response Modificada)
-Aquí está la función mejorada con un prompt de sistema para establecer la personalidad inclusiva.
+Aquí está la función establecer con un prompt de sistema para establecer la personalidainclusivava.
 # Reutiliza el código de la API Key
 # GEMINI_API_KEY = "TU_API_KEY_DE_GEMINI" 
 
