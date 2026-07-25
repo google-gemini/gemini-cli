@@ -52,7 +52,6 @@
     "@opentelemetry/sdk-trace-node": "^2.9.0",
     "@opentelemetry/semantic-conventions": "1.39.0",
     "@types/html-to-text": "9.0.4",
-    "@vitest/coverage-v8": "^3.2.7",
     "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "3.0.1",
