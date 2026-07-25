@@ -150,7 +150,7 @@
   },
   "dependencies": {
     "@google-cloud/logging": "11.3.0",
-    "@google-cloud/storage": "^5.18.3",
+    "@google-cloud/storage": "^7.19.0",
     "@grpc/grpc-js": "1.14.4",
     "@opentelemetry/exporter-logs-otlp-grpc": "0.220.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.220.0",
