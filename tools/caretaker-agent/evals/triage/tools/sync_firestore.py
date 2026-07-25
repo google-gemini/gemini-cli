@@ -1,4 +1,10 @@
-"""Bidirectional Firestore Synchronization CLI Tool."""
+"""
+Bidirectional Firestore Synchronization CLI Tool.
+
+CLI Usage:
+  python3 -m evals.triage.tools.sync_firestore --to-firestore
+  python3 -m evals.triage.tools.sync_firestore --from-firestore
+"""
 
 import json
 import argparse
@@ -53,7 +59,7 @@ def sync_from_firestore():
         issue_num = data.get("issue_number")
         if not issue_num:
             continue
-        file_path = GOLDEN_ISSUES_DIR / f"gemini_cli_{issue_num}.json"
+        file_path = GOLDEN_ISSUES_DIR / f"gemini_cli_{int(issue_num)}.json"
         file_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         print(f"  -> Downloaded Issue #{issue_num} to '{file_path.name}'")
         count += 1

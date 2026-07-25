@@ -29,6 +29,23 @@ from google.antigravity.hooks.policy import deny
 PROMPT_FILE = Path(__file__).parent / "generate_golden_spec.md"
 
 
+def _parse_llm_json(raw_text: str) -> dict:
+    """Strips markdown fences and parses LLM JSON with fallback unescaping."""
+    clean = raw_text.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[-1].rsplit("\n", 1)[0].strip()
+    try:
+        data = json.loads(clean, strict=False)
+    except Exception:
+        cleaned = re.sub(r'\\(?![/"bfnrtu]|u[0-9a-fA-F]{4})', r'\\\\', re.sub(r"(?<!\\)\\'", "'", clean))
+        data = json.loads(cleaned, strict=False)
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected JSON object from LLM, but got {type(data).__name__}. Raw output:\n{raw_text}")
+
+    return data
+
+
 def _load_system_instruction() -> str:
     """Loads prompt instructions from generate_golden_spec.md."""
     if not PROMPT_FILE.exists():
@@ -88,25 +105,7 @@ PR Filtered Code Diff:
             resolved_chunks = await response.resolve()
             raw_text = extract_final_output(resolved_chunks).strip()
 
-            # Clean json code block fences if present
-            clean_text = raw_text
-            if clean_text.startswith("```"):
-                lines = clean_text.splitlines()
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
-                clean_text = "\n".join(lines).strip()
-
-            try:
-                data = json.loads(clean_text, strict=False)
-            except Exception:
-                cleaned = re.sub(r'\\(?![/"bfnrtu]|u[0-9a-fA-F]{4})', r'\\\\', clean_text)
-                try:
-                    data = json.loads(cleaned, strict=False)
-                except Exception:
-                    cleaned_quotes = re.sub(r"(?<!\\)\\'", "'", cleaned)
-                    data = json.loads(cleaned_quotes, strict=False)
+            data = _parse_llm_json(raw_text)
 
             golden_spec_rationale = data.get("golden_spec_rationale", "")
             workable_spec = data.get("workable_spec", data)

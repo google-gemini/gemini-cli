@@ -1,3 +1,10 @@
+"""
+Golden Dataset Quality & Effort Metrics Diagnostic CLI Tool.
+
+CLI Usage:
+  python3 -m evals.triage.tools.dataset_metrics
+"""
+
 from collections import Counter
 from evals.triage.helpers.dataset import load_issues
 
@@ -5,7 +12,7 @@ VALID_QUALITIES = ["OK", "SPAM", "EMPTY", "NEEDS_INFO", "FEATURE"]
 VALID_EFFORTS = ["SMALL", "MEDIUM", "LARGE"]
 
 
-def _validate_spec_integrity(issues):
+def _validate_spec_integrity(issues) -> bool:
     """
     Validation helper that enforces spec & metadata integrity across the dataset:
     - Quality MUST be one of: OK, SPAM, EMPTY, NEEDS_INFO, FEATURE.
@@ -44,17 +51,19 @@ def _validate_spec_integrity(issues):
         print("\n--- ⚠️ Spec & Metadata Validation Errors ---")
         for err in errors:
             print(err)
+        return False
     else:
         print("\n  ✅ Spec & Metadata Integrity Check: All issues correctly configured.")
+        return True
 
 
-def compute_metrics():
+def compute_metrics() -> bool:
     issues = load_issues()
     total_issues = len(issues)
 
     if total_issues == 0:
         print("[METRICS] No golden issues found in Firestore.")
-        return
+        return True
 
     qualities = Counter()
     ok_efforts = Counter()
@@ -88,13 +97,16 @@ def compute_metrics():
         print(f"  {e:<12}: {count:>2} ({pct:>5.1f}%)  {bar}")
 
     # Run clean Spec & Metadata Integrity Check
-    _validate_spec_integrity(issues)
+    success = _validate_spec_integrity(issues)
 
     print("=" * 70 + "\n")
+    return success
 
 
 def main():
-    compute_metrics()
+    import sys
+    if not compute_metrics():
+        sys.exit(1)
 
 
 if __name__ == "__main__":
