@@ -1,1 +1,0 @@
-{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Part 1. "}],"role":"model"},"index":0}]},{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":10,"totalTokenCount":110}},{"candidates":[{"content":{"parts":[{"text":"Part 2."}],"role":"model"},"index":0,"finishReason":"STOP"}]}]}
