@@ -214,13 +214,15 @@ class TestIntegrationMain(unittest.TestCase):
         self.assertIsNone(self.stored_data["lock"]["holder"])
 
     @patch("main.process_issue_triage")
+    @patch("main.send_comment_action")
     @patch("main.send_label_action")
-    def test_auto_close_flows(self, mock_send_label, mock_triage):
+    def test_auto_close_flows(self, mock_send_label, mock_send_comment, mock_triage):
         """Verifies end-to-end flow for auto-closed issues."""
         for quality in ["SPAM", "EMPTY", "FEATURE"]:
             self.mock_store.acquire_lock.reset_mock()
             self.mock_store.release_lock.reset_mock()
             mock_send_label.reset_mock()
+            mock_send_comment.reset_mock()
             mock_triage.reset_mock()
 
             self.stored_data = {
@@ -249,6 +251,7 @@ class TestIntegrationMain(unittest.TestCase):
             mock_send_label.assert_called_once_with(
                 "owner", "repo", 42, ["auto-close"]
             )
+            mock_send_comment.assert_called_once()
 
             self.assertEqual(self.stored_data["status"], "AUTO_CLOSE")
             self.assertIsNone(self.stored_data["lock"]["holder"])
