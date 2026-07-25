@@ -58,7 +58,7 @@
     "dotenv": "16.4.5",
     "supertest": "7.1.4",
     "typescript": "5.8.3",
-    "vitest": "^3.1.1"
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": ">=20"
