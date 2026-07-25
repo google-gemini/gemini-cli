@@ -90,30 +90,57 @@ function trimLiveOutputBuffer(output: string): string {
   return output.slice(startIndex);
 }
 
-// Takes at most `maxBytes` of UTF-8 output from the start (or end) of a string
-// without splitting a multi-byte character.
+// Grapheme-cluster segmenter, reused across calls. Falls back to plain
+// (still surrogate-pair-safe) string iteration where Intl.Segmenter is
+// unavailable.
+const graphemeSegmenter: Intl.Segmenter | undefined =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : undefined;
+
+function* iterateGraphemes(output: string): Generator<string> {
+  if (graphemeSegmenter) {
+    for (const { segment } of graphemeSegmenter.segment(output)) {
+      yield segment;
+    }
+  } else {
+    yield* output;
+  }
+}
+
+// Takes at most `maxBytes` of UTF-8 output from the start (or end) of a
+// string without splitting a multi-byte character or grapheme cluster.
+// Iterates lazily instead of materializing the whole output as an array, so
+// a single huge command output doesn't balloon memory: the head case breaks
+// out as soon as the budget is hit, and the tail case keeps only a
+// maxBytes-sized sliding window rather than reversing the full output.
 function takeBytes(output: string, maxBytes: number, fromEnd: boolean): string {
   if (maxBytes <= 0) {
     return '';
   }
-  const chars = Array.from(output);
-  if (fromEnd) {
-    chars.reverse();
-  }
-  let bytes = 0;
-  const kept: string[] = [];
-  for (const ch of chars) {
-    const size = Buffer.byteLength(ch, 'utf8');
-    if (bytes + size > maxBytes) {
-      break;
+  if (!fromEnd) {
+    let bytes = 0;
+    let end = 0;
+    for (const cluster of iterateGraphemes(output)) {
+      const size = Buffer.byteLength(cluster, 'utf8');
+      if (bytes + size > maxBytes) {
+        break;
+      }
+      bytes += size;
+      end += cluster.length;
     }
-    bytes += size;
-    kept.push(ch);
+    return output.slice(0, end);
   }
-  if (fromEnd) {
-    kept.reverse();
+  const window: string[] = [];
+  let bytes = 0;
+  for (const cluster of iterateGraphemes(output)) {
+    window.push(cluster);
+    bytes += Buffer.byteLength(cluster, 'utf8');
+    while (bytes > maxBytes) {
+      bytes -= Buffer.byteLength(window.shift()!, 'utf8');
+    }
   }
-  return kept.join('');
+  return window.join('');
 }
 
 /**
