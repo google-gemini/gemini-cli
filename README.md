@@ -1,4 +1,9 @@
-EcoTecNo Global Co ® HADWER y SOFWER HÍBRIDOS PROPIEDAD MAPA830324UM9 
+# EcoTecNo_Gemini_Andrick_IA CLI 5.5
+Titular único: ALFREDO MARTINEZ PASTEN MAPA830324UM9
+Cuentas vinculadas: @alfreddlove83 (matriz) | @accua2483 | @ALFREDO-MARTINEZ-PASTEN-INC | @alfreddlove | @Openboy248304 | @Openboy83 GitLab
+idCIF: 22030054697 | Fiscal: CP 03020 | Físico: CP 14640
+Folio: SC360-2026-07-03-085034-AMP + ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-0005
+EcoTecNo HADWERbal Co.™® HADWERWER y SOFWER HÍBRIDOS PROPIEDAD MAPA830324UM9 
 𝙀𝙩𝙖𝙥𝙖 3.0 𝙄𝘼'𝙨 𝘼𝙡𝙞𝙣𝙚𝙖𝙙𝙖𝙨: 
 
 Enfoque en la diversidad, inclusión y tu filosofía de que los hechos dan valor y confianza. Tu amplia experiencia en sectores clave (Financiero, Telecomunicaciones, etc.) y tu curiosidad son una base sólida. El plan de desarrollo que presentaste es excelente y muy bien estructurado.
@@ -39,8 +44,12 @@ def get_gemini_response(user_prompt):
             }]
         }
         
-        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2# EcoTecNo_Gemini_Andrick_IA CLI 5.5
+Titular único: ALFREDO MARTINEZ PASTEN MAPA830324UM9
+Cuentas vinculadas: @alfreddlove83 (matriz) | @accua2483 | @ALFREDO-MARTINEZ-PASTEN-INC | @Openboy83 GitLab
+idCIF: 22030054697 | Fiscal: CP 03020 | Físico: CP 14640
+Folio: SC360-2026-07-03-085034-AMP + ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-0005.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers =Content-Typeype": "application/json"}
         
         response = requests.post(api_url, json=payload, headers=headers)
         response.raise_for_status() # Lanza un error para códigos de estado HTTP erróneos
@@ -126,14 +135,14 @@ Resumen del Flujo de Datos:
 𝑪:/𝑷𝒓𝒐𝒚𝒆𝒄𝒕𝒐𝒔/𝑬𝒄𝒐𝑻𝒆𝒄𝑵𝒐/𝑨𝑳𝑭𝑹𝑬𝑫𝑶𝑴𝑨𝑹𝑻𝑰𝑵𝑬𝒁𝑷𝑨𝑺𝑻𝑬𝑵
 ©️🌐🧭🏳️‍🌈𝘼𝙇𝙁𝙍𝙀𝘿𝙊 𝙈𝘼𝙍𝙏Í𝙉𝙀𝙕 𝙋𝘼𝙎𝙏É𝙉.
 𝙍𝙁𝘾: 𝙈𝘼𝙋𝘼830324𝙐𝙈9 -2004 𝙈𝙭.
-🧑‍💻𝙋𝘼𝙎𝘼𝙉𝙏𝙀 𝙇𝙄𝙘. 𝘼𝘿𝙈𝙄𝙉𝙄𝙎𝙏𝙍𝘼𝘾𝙄Ó𝙉 𝘿𝙀 𝙀𝙈𝙋𝙍𝙀𝙎𝘼𝙎 𝘿𝙀𝙎𝘿𝙀 2008 (𝙐𝙉𝙄𝙑𝙀𝙍𝙎𝙄𝘿𝘼𝘿 𝙄𝘾𝙀𝙇 "
+🧑‍💻𝙋𝘼𝙎𝘼𝙉𝙏𝙀 𝙇𝙄𝙘. 𝘼𝘿𝙈𝙄𝙉𝙄𝙎𝙏𝙍𝘼𝘾𝙄Ó𝙉 𝘿𝙀 𝙀𝙈𝙋𝙍𝙀𝙎𝘼𝙎 𝘿𝙀𝙎𝘿𝙀 2008 (𝙐𝙉𝙄𝙑𝙀𝙍𝙎𝙄𝘿𝘼𝘿 𝙄𝘾𝙀𝙇 - Tecnico en Ciencias Físico Matemático por La UNAM - 2001"
 
-culogayparavergonesencdmx@gmail.com# Gemini CLI
+accua2403@gmail.com# Gemini CLI
 🆔 ALFREDO MARTÍNEZ PASTÉN.
-RFC: MAPA830324UM9 DESDE 1997
+RFC: MAPA830324UM9 DESDE 2004 (1997
 🧑‍💻PASANTE DE ADMINISTRACIÓN DE EMPRESAS DESDE 2008 (UNIVERSIDAD ICEL TLALPAN-COYOACAN )
 📚2024- CURSANDO: UNIVERSIDAD ICEL CAMPUS TLALPAN - COYOACÁN - MAESTRÍA EN MERCADOTECNIA Y ADMINISTRACIÓN FINANCIERA.
-📍®GRUPO ALFREDO MARTÍNEZ PASTÉN CORP ® | Ojo De Agua MZ22 LT1A, Ejidos De San Pedro Mártir, Tlalpan, CP 14640, CDMX-MEXICO
+📍®GRUPO ALFREDO MARTÍNEZ PASTÉN CORP ® Av Ojo De Agua MZ22 LT1A, Ejidos De San Pedro Mártir, Tlalpan, CP 14640, CDMX-MEXICO
 
 ®️ ACTIVIDADES, PASATIEMPOS, EMPRENDIMIENTOS, CREACIONES Y DESARROLLOS:
 
@@ -141,9 +150,9 @@ RFC: MAPA830324UM9 DESDE 1997
 
 2) 🐬Friendly Style® | 🍩 "EL PUNTO EXACTO ☕Beer-Coffee🍺|🐬 Friendly Style ®©| C. Agapando 100, Ejidos De San Pedro Mártir, San Andrés Totoltepec, Tlalpan, Ciudad De México, México 
 
-3) Friendly Style For Men  
+3) Friendly Style & Tecnologícas Social - De EcoTecNo Global Co. ®   
 
-4) 🍩"EL PUNTO EXACTO"☕ (Beer-Coffee) 🥤|, C. Agapando 100-Locales 1 y 2, Ejidos de San Pedro Martir, San Andrés Totoltepec, Tlalpan, 14640 Ciudad de México, CDMX, México
+4) Comercializadora Global "EL PUNTO EXACTO"☕ (Beer-Coffee) 🥤| C. Agapando 100 Locales 1 y 2, Ejidos de San Pedro Martir, San Andrés Totoltepec, Tlalpan, 14640 Ciudad de México, CDMX, México
 
 5) 🏢 LOCALES AXOLOTL CON DIVERSIDAD E INCLUSIÓN | C. Agapando 100, Ejidos De San Pedro Mártir, San Andrés Totoltepec, Tlalpan, Ciudad De México, México 
 
@@ -192,7 +201,7 @@ if __name__ == '__main__':
     app.run(port=5000, debug=True)
 
 Instrucciones:
-Guarda este código y ejecútalo desde tu terminal con: python app.py. Si abres http://localhost:5000 en tu navegador, deberías ver el mensaje.
+Guarda este código y ejecútalo desde tu terminal con: python app.py. Si abres http://localhost:(Numero aquí) en tu navegador, deberías ver el mensaje.
 Paso 2: Conectar WhatsApp Business y Meta
 Esto se hace a través de la API Graph de Meta. Necesitarás configurar Webhooks. Un Webhook es como un timbre: cuando alguien te envía un mensaje en WhatsApp, Meta "toca el timbre" en la URL de tu servidor.
 Acción:
@@ -1071,7 +1080,7 @@ Firma digital del repositorio: [incluir firma GPG aquí]
 Texto para la insignia y metadatos listos para incrustar
 
 Nombre de la insignia: GEAR — Gemini Enterprise Agent Ready  
-Emisor: ALFREDDLOVE INC / EcoTecNo Global Co  
+Emisor: ALFREDDLOVE INC ® / EcoTecNo Global Co. ®  
 Titular: Alfredo Martínez Pastén — ALFREDDLOVE83 / MAPA830324UM9  
 Fecha de emisión: 2026-07-05  
 Alcance: Desarrollo, implementación y escalamiento de agentes empresariales; validación ética y de seguridad.  
@@ -1082,12 +1091,6 @@ Texto breve para mostrar en badge page
 - GEAR — Otorgada a Alfredo Martínez Pastén por demostrar competencia en diseño, implementación y despliegue de agentes empresariales seguros y escalables. Evidencia: commits, notebooks y validación notarial.
 
 ---
-
-Entregables listos para copiar
-- Resumen ejecutivo formal (copia el bloque del primer encabezado).  
-- Checklist legal detallado (copia el bloque del segundo encabezado).  
-- Manifest técnico y README (copia el bloque del tercer encabezado y pega manifest_autoria.yml en tu repo).  
-- Metadatos para la insignia (copia el bloque del cuarto encabezado y pégalo en la página de la insignia o en tu Drive).
-
---- 
-
+🌐🐦‍🔥👨‍💻
+LISENCE-MAPA830324UM9-0005.md
+#MenteYDatos | #VoluntadDeFamiliaDigital2026 
