@@ -53,7 +53,7 @@
     "@opentelemetry/semantic-conventions": "1.39.0",
     "@types/html-to-text": "9.0.4",
     "@xterm/headless": "5.5.0",
-    "ajv": "^8.17.1",
+    "ajv": "^8.20.0",
     "ajv-formats": "3.0.1",
     "chokidar": "5.0.0",
     "command-exists": "1.2.9",
