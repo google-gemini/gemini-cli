@@ -1,0 +1,14 @@
+# Verifica si la rama existe localmente
+git branch
+
+# Si ves gh-pages en la lista, súbela al remoto:
+git push origin gh-pages
+
+# Si no existe, créala y súbela:
+git checkout --orphan gh-pages
+git rm -rf .
+cp -r public/* .   # o mueve index.html, amp.html, AMP-CODE-LINK.js, manifest.json, assets/
+git add .
+git commit -m "Deploy site"
+git push origin gh-pages
+
