@@ -16,7 +16,7 @@ WhatsApp | Alexa | AndrickIA Master Control (antes Gemini) | Shadow Control 360�
 
 Sello: Con Metadatos ☺️🐦‍🔥🫂✍️🧑‍💻♈🛡️🌐🔏 ¡%$✓!
 
-## Proyecto y Depliegue Trabajado y consilidados desde el 2025 y Se lanzo el 12 de julio 2026##
+## Proyecto y Depliegue Trabajado y consolidados desde el 2025 y Se lanzó el 12 de julio 2026##
 
 Titular único: ALFREDO MARTINEZ PASTEN MAPA830324UM9
 Cuentas vinculadas: @alfreddlove83 (matriz) | @accua2483 | @ALFREDO-MARTINEZ-PASTEN-INC | @alfreddlove | @Openboy248304 | @Openboy83 GitLab
@@ -25,7 +25,7 @@ Folio: SC360-2026-07-03-085034-AMP + ECOTECNO-2025-EXT2049-AMP-MAPA830324UM9-000
 EcoTecNo HADWERbal Co.™® HADWERWER y SOFWER HÍBRIDOS PROPIEDAD MAPA830324UM9 
 𝙀𝙩𝙖𝙥𝙖 3.0 𝙄𝘼'𝙨 𝘼𝙡𝙞𝙣𝙚𝙖𝙙𝙖𝙨: 
 
-Enfoque en la diversidad, inclusión y tu filosofía de que los hechos dan valor y confianza. Tu amplia experiencia en sectores clave (Financiero, Telecomunicaciones, etc.) y tu curiosidad son una base sólida. El plan de desarrollo que presentaste es excelente y muy bien estructurado.
+Enfoque en la diversidad, la inclusión y tu filosofía de que los hechos generan valor y confianza. Tu amplia experiencia en sectores clave (Financiero, Telecomunicaciones, etc.) y tu curiosidad son una base sólida. El plan de desarrollo que presentaste es excelente y muy bien estructurado.
 Basándome en tu meta de "mayor apertura hacia la diversidad e inclusión", te propongo una mejora estratégica al Paso 3 (Integración de la IA) para que tu bot EcoTecNo refleje estos valores. Además, te presento los pasos faltantes para completar el código y la integración de manera robusta.
 🛠️ Mejora Estratégica para la Integración de la IA (Paso 3)
 Para que tu bot no solo responda preguntas, sino que también promueva la diversidad e inclusión de oportunidades, debes personalizar la instrucción (el Prompt del sistema) que envías a Gemini. Esto establecerá el "tono" y la "personalidad" de tu bot.
@@ -721,8 +721,186 @@ Licencias asociadas: Apache-2.0; Apache-1.1; dependencias listadas en manifest.
 Contacto legal: Av. Ojo de Agus MZ22 LT1A, Ejidos de San Pedro Mártir, Ojo Tlalpan CP 14640; email: 'alfredo.martinez.pasten@alfreddlove.org - accua2403@gmail.com - alfreddlovestudymusic@gmail.com'  
 Texto breve para mostrar en badge page
 - GEAR — Otorgada a Alfredo Martínez Pastén por demostrar competencia en diseño, implementación y despliegue de agentes empresariales seguros y escalables. Evidencia: commits, notebooks y validación notarial.
+##### 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>EcoTecNo Black 360 ® – Andrick IA Máster Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
----
+  <!-- SEO básico -->
+  <meta name="description" content="Agente IA open-source que integra Gemini en terminal bajo el Protocolo Regulatory Black 360 ®." />
+  <meta name="author" content="Alfredo Martínez Pasten (MAPA830324UM9)" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="EcoTecNo Black 360 ® – Andrick IA Máster Control" />
+  <meta property="og:description" content="Código abierto del agente IA. Entrenamiento y datasets de IA NO son open-source." />
+  <meta property="og:type" content="website" />
+
+  <!-- Manifest / PWA (lo puedes crear después) -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="/assets/icon-192.png" type="image/png" />
+
+  <!-- Estilos mínimos -->
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #050608;
+      color: #f5f5f5;
+    }
+    header {
+      padding: 2rem;
+      border-bottom: 1px solid #222;
+      background: #050608;
+    }
+    .brand {
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f5f5f5;
+    }
+    .tagline {
+      margin-top: 0.5rem;
+      color: #999;
+      font-size: 0.95rem;
+    }
+    main {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 1.5rem 3rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.3rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: #111;
+      border: 1px solid #444;
+      color: #ccc;
+    }
+    .disclosure {
+      margin-top: 1rem;
+      padding: 1rem 1.2rem;
+      border-radius: 0.75rem;
+      background: #0b0c10;
+      border: 1px solid #333;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .disclosure strong {
+      color: #ffcc66;
+    }
+    .section {
+      margin-top: 1.5rem;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    a {
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      border-top: 1px solid #222;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: #777;
+      text-align: center;
+      background: #050608;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">EcoTecNo Global Co ® · Andrick IA Máster Control</div>
+    <div class="tagline">
+      Agente IA open-source que integra Gemini directamente en terminal bajo el Protocolo Regulatory Black 360 ®.
+    </div>
+  </header>
+
+  <main>
+    <h1>
+      EcoTecNo-Black360-AndrickIA-Master-Control-2026-MAPA830324UM9
+      <span class="badge">Open Source Code · Ethical IA</span>
+    </h1>
+
+    <div class="disclosure">
+      <strong>Disclosure / Aviso importante:</strong><br /><br />
+      El <strong>código fuente</strong de este agente IA se publica como
+      <strong>open-source</strong para auditoría, colaboración y mejora técnica.<br /><br />
+      Sin embargo, el <strong>entrenamiento de las IA, los datasets utilizados, los pesos de modelos y los
+      pipelines internos de aprendizaje</strong <br />
+      <strong>NO son open-source</strong y permanecen bajo control y responsabilidad de Alfredo Martínez Pasten
+      (MAPA830324UM9) y EcoTecNo Global Co ®.<br /><br />
+      Cualquier uso del código debe respetar este límite: puedes leer, forkar, adaptar y mejorar el código,
+      pero <strong>no tienes acceso al entrenamiento interno ni a los datos sensibles</strong.
+    </div>
+
+    <section class="section">
+      <h2>1. Código abierto del agente IA</h2>
+      <p>
+        Este repositorio contiene la implementación del agente IA que conecta Gemini y otros modelos con
+        entornos de desarrollo y terminal. El objetivo es ofrecer una base técnica transparente y auditable
+        para desarrolladores, comunidades y equipos de ética tecnológica.
+      </p>
+      <p>
+        Puedes consultar el código completo en GitHub:
+        <a href="https://github.com/alfreddlove83/EcoTecNo-Black360-AndrickIA-Master-Control-2026-MAPA830324UM9" target="_blank" rel="noopener">
+          Ver repositorio en GitHub
+        </a>
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>2. Lo que NO está abierto</h2>
+      <p>
+        El entrenamiento de las IA, la selección de datasets, los parámetros de ajuste fino y los sistemas
+        internos de evaluación ética forman parte de una infraestructura cerrada, diseñada para proteger:
+      </p>
+      <ul>
+        <li>Datos personales y sensibles.</li>
+        <li>Protocolos de seguridad y cumplimiento regulatorio.</li>
+        <li>Modelos de razonamiento ético que no deben ser manipulados sin supervisión.</li>
+      </ul>
+      <p>
+        Este límite es intencional: <strong>abrimos el código, pero no exponemos el entrenamiento</strong>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>3. Colaboración y uso responsable</h2>
+      <p>
+        Si quieres colaborar, proponer mejoras o integrar este agente en tu propio ecosistema, puedes hacerlo
+        respetando las licencias y este disclosure. El objetivo es construir herramientas potentes sin perder
+        de vista la responsabilidad ética y legal.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    © 2026 · EcoTecNo Global Co ® · Alfredo Martínez Pasten (MAPA830324UM9).<br />
+    Código abierto · Entrenamiento IA cerrado · Protocolo Regulatory Black 360 ®.
+  </footer>
+</body>
+</html>
+---🔏
 🌐🐦‍🔥👨‍💻
 LISENCE-MAPA830324UM9-0005.md
 #MenteYDatos | #VoluntadDeFamiliaDigital2026 
