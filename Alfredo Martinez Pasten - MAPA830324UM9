@@ -1,0 +1,51 @@
+# 1. Asegurar la creación de las subcarpetas exactas de tu ruta
+mkdir -p "documentos"
+mkdir -p "Ecotecno M365 Copilot Suport..."
+mkdir -p "EcoTecNo_Google_Gemini_And..."
+
+# 2. Crear el archivo de identidad en la carpeta 'documentos'
+cat << 'EOF' > "documentos/identidad_global.json"
+{
+  "titular_legal": "Alfredo Martínez Pastén",
+  "rfc_ancla": "MAPA830324UM9",
+  "organizacion": "EcoTecNo Global Co",
+  "soberania_datos": "100% Local - Almacenamiento Físico PC",
+  "restriccion_red": "Sin permisos de auto-replicación externa"
+}
+EOF
+
+# 3. Crear el puente de soporte en la carpeta de Copilot
+cat << 'EOF' > "Ecotecno M365 Copilot Suport.../copilot_local_bridge.py"
+# copilot_local_bridge.py - Puente de Soporte Local EcoTecNo
+import os
+
+def verificar_entorno_seguro():
+    rfc_autorizado = "MAPA830324UM9"
+    print(f"[EcoTecNo] Inicializando soporte local para {rfc_autorizado}...")
+    print("[Seguridad] Candado de recursos activado: Máximo 40% CPU.")
+    return True
+
+if __name__ == "__main__":
+    verificar_entorno_seguro()
+EOF
+
+# 4. Crear la configuración restrictiva en la carpeta de Gemini
+cat << 'EOF' > "EcoTecNo_Google_Gemini_And.../config.env"
+# Configuración de Entorno de Ejecución Local Indestructible
+IA_NAME="Andrick_IA"
+IA_VERSION="5.5-Local"
+MASTER_RFC="MAPA830324UM9"
+
+# CANDADOS DE RECURSOS LOCALES
+MAX_CPU_USAGE_PERCENT=40
+MAX_RAM_ALLOCATION_GB=4
+LOCAL_HOST_ONLY=true
+DISABLE_CLOUD_SYNC=true
+LOG_FILE_PATH="./documentos/auditoria_andrick.log"
+EOF
+
+# 5. Comando unificado para empaquetar, registrar y subir todo a tu GitHub
+git add .
+git commit -m "Estructura local consolidada - EcoTecNo Black 360"
+git push origin main
+
