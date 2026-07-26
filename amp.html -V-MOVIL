@@ -1,0 +1,77 @@
+<!doctype html>
+<html ⚡ lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>EcoTecNo Black 360 ® – Andrick IA Máster Control</title>
+  <link rel="canonical" href="https://alfreddlove.org/">
+  <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1">
+
+  <!-- AMP runtime -->
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+
+  <!-- AMP boilerplate -->
+  <style amp-boilerplate>
+    body { -webkit-animation: -amp-start 8s steps(1,end) 0s 1 normal both;
+           -moz-animation: -amp-start 8s steps(1,end) 0s 1 normal both;
+           -ms-animation: -amp-start 8s steps(1,end) 0s 1 normal both;
+           animation: -amp-start 8s steps(1,end) 0s 1 normal both; }
+    @-webkit-keyframes -amp-start { from { visibility:hidden } to { visibility:visible } }
+    @-moz-keyframes -amp-start { from { visibility:hidden } to { visibility:visible } }
+    @-ms-keyframes -amp-start { from { visibility:hidden } to { visibility:visible } }
+    @-o-keyframes -amp-start { from { visibility:hidden } to { visibility:visible } }
+    @keyframes -amp-start { from { visibility:hidden } to { visibility:visible } }
+  </style>
+  <noscript><style amp-boilerplate>body{animation:none}</style></noscript>
+
+  <!-- Identidad -->
+  <meta name="author" content="Alfredo Martínez Pasten (MAPA830324UM9)">
+  <meta name="description" content="Código abierto del agente IA Andrick Máster Control. Entrenamiento IA cerrado bajo Protocolo Regulatory Black 360 ®.">
+
+  <!-- Social -->
+  <meta property="og:title" content="EcoTecNo Black 360 ® – Andrick IA Máster Control">
+  <meta property="og:description" content="Código abierto. Entrenamiento IA cerrado. Interacción ética y responsable con IA.">
+  <meta property="og:type" content="website">
+
+  <!-- AMP styles -->
+  <style amp-custom>
+    body { background:#050608; color:#f5f5f5; font-family:system-ui; margin:0; }
+    header { padding:2rem; text-align:center; border-bottom:1px solid #222; }
+    .brand { font-size:1.4rem; font-weight:700; text-transform:uppercase; }
+    .tagline { margin-top:0.5rem; color:#999; }
+    main { max-width:960px; margin:2rem auto; padding:0 1.5rem; }
+    h1 { font-size:1.6rem; margin-bottom:0.5rem; }
+    .badge { display:inline-block; padding:0.25rem 0.6rem; border-radius:999px; background:#111; border:1px solid #444; font-size:0.75rem; color:#ccc; }
+    .disclosure { margin-top:1rem; padding:1rem; border-radius:0.75rem; background:#0b0c10; border:1px solid #333; font-size:0.9rem; line-height:1.5; }
+    .disclosure strong { color:#ffcc66; }
+    footer { border-top:1px solid #222; padding:1.5rem; font-size:0.8rem; color:#777; text-align:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">EcoTecNo Global Co ® · Andrick IA Máster Control</div>
+    <div class="tagline">Código abierto · Entrenamiento IA cerrado · Interacción ética y responsable</div>
+  </header>
+
+  <main>
+    <h1>
+      EcoTecNo-Black360-AndrickIA-Master-Control-2026-MAPA830324UM9
+      <span class="badge">Open Source Code · Ethical IA</span>
+    </h1>
+
+    <!-- Imagen AMP -->
+    <amp-img src="/assets/andrick-ia-github-enterprises.jpg" width="800" height="450" layout="responsive" alt="@ANDRICK-IA-GITHUB-ENTERPRISES"></amp-img>
+
+    <div class="disclosure">
+      <strong>Disclosure / Aviso importante:</strong><br><br>
+      El <strong>código fuente</strong de este agente IA se publica como <strong>open-source</strong.<br><br>
+      El <strong>entrenamiento de las IA, los datasets, los pesos de modelos y los pipelines internos</strong<br>
+      <strong>NO son open-source</strong y permanecen bajo control de Alfredo Martínez Pasten (MAPA830324UM9) y EcoTecNo Global Co ®.
+    </div>
+  </main>
+
+  <footer>
+    © 2026 · EcoTecNo Global Co ® · Alfredo Martínez Pasten (MAPA830324UM9).<br>
+    Código abierto · Entrenamiento IA cerrado · Protocolo Regulatory Black 360 ®.
+  </footer>
+</body>
+</html>
