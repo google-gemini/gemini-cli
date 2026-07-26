@@ -30,7 +30,11 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import {
+  resolveModel,
+  supportsModernFeatures,
+  isGemini2Model,
+} from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
@@ -766,9 +770,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
-        ? [...contentsForPreviewModel]
-        : [...requestContents];
+      let contentsToUse: Content[] =
+        supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+          ? [...contentsForPreviewModel]
+          : [...requestContents];
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -810,9 +815,10 @@ export class GeminiChat {
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
-          contentsToUse = supportsModernFeatures(modelToUse)
-            ? [...contentsForPreviewModel]
-            : [...requestContents];
+          contentsToUse =
+            supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+              ? [...contentsForPreviewModel]
+              : [...requestContents];
         }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
@@ -956,9 +962,16 @@ export class GeminiChat {
       ? extractCuratedHistory(this.agentHistory.get())
       : [...this.agentHistory.get()];
 
-    return this.context.config.isContextManagementEnabled()
-      ? scrubHistory(history)
-      : history;
+    if (this.context.config.isContextManagementEnabled()) {
+      return scrubHistory(history);
+    }
+
+    const model = this.context.config.getModel();
+    if (isGemini2Model(model) || supportsModernFeatures(model)) {
+      return coalesceConsecutiveRoles(stripThoughts(history));
+    }
+
+    return history;
   }
 
   /**
@@ -1502,4 +1515,23 @@ export function coalesceConsecutiveRoles(
     }
   }
   return result;
+}
+
+export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
+  return history
+    .map((turn) => {
+      if (!turn.content.parts) return turn;
+      const hasThought = turn.content.parts.some((p) => p && p.thought);
+      if (!hasThought) return turn;
+
+      const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+      return {
+        ...turn,
+        content: {
+          ...turn.content,
+          parts: nonThoughtParts,
+        },
+      };
+    })
+    .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
 }

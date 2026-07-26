@@ -1861,6 +1861,10 @@ export class Config implements McpContext, AgentLoopContext {
     }
   }
 
+  rotateSessionId(sessionId: string): void {
+    this._sessionId = sessionId;
+  }
+
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
   }
