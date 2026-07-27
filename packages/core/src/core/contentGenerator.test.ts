@@ -805,6 +805,39 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should strip Authorization header from customHeaders when in USE_GEMINI mode', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+      customHeaders: { Authorization: 'Bearer stale-oauth-token' },
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: expect.any(String),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),

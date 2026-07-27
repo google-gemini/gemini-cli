@@ -319,6 +319,13 @@ export async function createContentGenerator(
         headers = { ...headers, ...config.customHeaders };
       }
       if (
+        config.authType === AuthType.USE_GEMINI &&
+        apiKeyAuthMechanism !== 'bearer'
+      ) {
+        delete headers['Authorization'];
+        delete headers['authorization'];
+      }
+      if (
         config.authType === AuthType.USE_VERTEX_AI &&
         config.vertexAiRouting
       ) {
