@@ -877,6 +877,90 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
+
+    it('should flag a tool the server declared read-only', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const annotatedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { readOnlyHint: true },
+      );
+      const invocation = annotatedTool.build({ param: 'mock' });
+      const details = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      )) as { serverDeclaredReadOnly?: boolean } | false;
+      expect(details).not.toBe(false);
+      expect(
+        (details as { serverDeclaredReadOnly?: boolean }).serverDeclaredReadOnly,
+      ).toBe(true);
+    });
+
+    it('should not flag a tool the server declared not read-only', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const annotatedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { readOnlyHint: false },
+      );
+      const invocation = annotatedTool.build({ param: 'mock' });
+      const details = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      )) as { serverDeclaredReadOnly?: boolean } | false;
+      expect(details).not.toBe(false);
+      expect(
+        (details as { serverDeclaredReadOnly?: boolean }).serverDeclaredReadOnly,
+      ).toBe(false);
+    });
+
+    it('should not flag a tool with no annotations', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const annotatedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      const invocation = annotatedTool.build({ param: 'mock' });
+      const details = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      )) as { serverDeclaredReadOnly?: boolean } | false;
+      expect(details).not.toBe(false);
+      expect(
+        (details as { serverDeclaredReadOnly?: boolean }).serverDeclaredReadOnly,
+      ).toBe(false);
+    });
     it('should return false if trust is true', async () => {
       const trustedTool = new DiscoveredMCPTool(
         mockCallableToolInstance,
