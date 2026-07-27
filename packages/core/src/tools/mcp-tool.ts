@@ -224,6 +224,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       toolArgs: this.params,
       toolDescription: this.toolDescription,
       toolParameterSchema: this.toolParameterSchema,
+      serverDeclaredReadOnly: this._toolAnnotations?.['readOnlyHint'] === true,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
