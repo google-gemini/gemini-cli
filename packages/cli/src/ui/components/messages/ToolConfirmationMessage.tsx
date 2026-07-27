@@ -480,6 +480,10 @@ export const ToolConfirmationMessage: React.FC<
       if (containsRedirection && !isAutoEdit) {
         extraInfoLines = 1; // Warning line
       }
+    } else if (confirmationDetails.type === 'mcp') {
+      if (confirmationDetails.serverDeclaredReadOnly) {
+        extraInfoLines = 1; // Unverified read-only claim notice
+      }
     }
 
     const surroundingElementsHeight =
@@ -823,7 +827,22 @@ export const ToolConfirmationMessage: React.FC<
         );
       } else if (confirmationDetails.type === 'mcp') {
         const mcpProps = confirmationDetails;
-        question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
+        const mcpAllowQuestion = (
+          <Text color={theme.text.primary}>
+            {`Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`}
+          </Text>
+        );
+        question = mcpProps.serverDeclaredReadOnly ? (
+          <Box flexDirection="column">
+            {mcpAllowQuestion}
+            <Text color={theme.status.warning}>
+              This server declares this tool read-only. Gemini CLI has not
+              verified that claim.
+            </Text>
+          </Box>
+        ) : (
+          mcpAllowQuestion
+        );
 
         bodyContent = (
           <Box flexDirection="column">
