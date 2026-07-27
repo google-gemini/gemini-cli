@@ -1045,6 +1045,13 @@ export interface ToolMcpConfirmationDetails {
   toolArgs?: Record<string, unknown>;
   toolDescription?: string;
   toolParameterSchema?: unknown;
+  /**
+   * True when the MCP server declared this tool read-only via the
+   * `readOnlyHint` annotation. The value comes from the server and is not
+   * verified by Gemini CLI, so it is surfaced to the user at the point of
+   * approval rather than treated as a guarantee.
+   */
+  serverDeclaredReadOnly?: boolean;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
