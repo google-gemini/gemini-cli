@@ -39,6 +39,7 @@ import {
   SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
 } from './sandboxUtils.js';
+import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -56,6 +57,23 @@ export async function start_sandbox(
   patcher.patch();
 
   let stopProxy: (() => void) | undefined = undefined;
+  let tempProfileFile: string | null = null;
+
+  const cleanupTempProfile = () => {
+    if (tempProfileFile && fs.existsSync(tempProfileFile)) {
+      try {
+        fs.unlinkSync(tempProfileFile);
+      } catch {
+        // ignore
+      }
+      tempProfileFile = null;
+    }
+  };
+
+  const cleanup = () => {
+    cleanupTempProfile();
+    process.off('exit', cleanupTempProfile);
+  };
 
   try {
     if (config.command === 'sandbox-exec') {
@@ -81,161 +99,196 @@ export async function start_sandbox(
         profileFile = fs.existsSync(userProfileFile)
           ? userProfileFile
           : projectProfileFile;
-      }
-      if (!fs.existsSync(profileFile)) {
-        throw new FatalSandboxError(
-          `Missing macos seatbelt profile file '${profileFile}'`,
-        );
-      }
-      debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
-      // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
-      const nodeOptions = [
-        ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
-        ...nodeArgs,
-      ].join(' ');
+      } else {
+        // For builtin profiles, if the file doesn't exist on disk (e.g. bundled or bazel environments),
+        // write the embedded profile content to a temporary file.
+        if (!fs.existsSync(profileFile)) {
+          const content = BUILTIN_SEATBELT_PROFILE_CONTENTS[profile];
+          if (content) {
+            try {
+              const tempDir = fs.realpathSync(os.tmpdir());
+              const rand = randomBytes(8).toString('hex');
+              tempProfileFile = path.join(
+                tempDir,
+                `gemini-sandbox-macos-${profile}-${rand}.sb`,
+              );
+              fs.writeFileSync(tempProfileFile, content, 'utf8');
+              profileFile = tempProfileFile;
 
-      const args = [
-        '-D',
-        `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
-        '-D',
-        `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
-        '-D',
-        `HOME_DIR=${fs.realpathSync(homedir())}`,
-        '-D',
-        `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
-      ];
-
-      // Add included directories from the workspace context
-      // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
-      const MAX_INCLUDE_DIRS = 5;
-      const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
-      const includedDirs: string[] = [];
-
-      if (cliConfig) {
-        const workspaceContext = cliConfig.getWorkspaceContext();
-        const directories = workspaceContext.getDirectories();
-
-        // Filter out TARGET_DIR
-        for (const dir of directories) {
-          const realDir = fs.realpathSync(dir);
-          if (realDir !== targetDir) {
-            includedDirs.push(realDir);
+              // Register cleanups
+              process.on('exit', cleanupTempProfile);
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to write temporary seatbelt profile: ${err}`,
+              );
+            }
           }
         }
       }
 
-      // Add custom allowed paths from config
-      if (config.allowedPaths) {
-        for (const hostPath of config.allowedPaths) {
-          if (
-            hostPath &&
-            path.isAbsolute(hostPath) &&
-            fs.existsSync(hostPath)
-          ) {
-            const realDir = fs.realpathSync(hostPath);
-            if (!includedDirs.includes(realDir) && realDir !== targetDir) {
+      try {
+        if (!fs.existsSync(profileFile)) {
+          throw new FatalSandboxError(
+            `Missing macos seatbelt profile file '${profileFile}'`,
+          );
+        }
+        debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
+        // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+        const nodeOptions = [
+          ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+          ...nodeArgs,
+        ].join(' ');
+
+        const args = [
+          '-D',
+          `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
+          '-D',
+          `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
+          '-D',
+          `HOME_DIR=${fs.realpathSync(homedir())}`,
+          '-D',
+          `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
+        ];
+
+        // Add included directories from the workspace context
+        // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
+        const MAX_INCLUDE_DIRS = 5;
+        const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
+        const includedDirs: string[] = [];
+
+        if (cliConfig) {
+          const workspaceContext = cliConfig.getWorkspaceContext();
+          const directories = workspaceContext.getDirectories();
+
+          // Filter out TARGET_DIR
+          for (const dir of directories) {
+            const realDir = fs.realpathSync(dir);
+            if (realDir !== targetDir) {
               includedDirs.push(realDir);
             }
           }
         }
-      }
 
-      for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
-        let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
-
-        if (i < includedDirs.length) {
-          dirPath = includedDirs[i];
-        }
-
-        args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
-      }
-
-      const finalArgv = cliArgs;
-
-      args.push(
-        '-f',
-        profileFile,
-        'sh',
-        '-c',
-        [
-          `SANDBOX=sandbox-exec`,
-          `NODE_OPTIONS="${nodeOptions}"`,
-          ...finalArgv.map((arg) => quote([arg])),
-        ].join(' '),
-      );
-      // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
-      const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
-      let proxyProcess: ChildProcess | undefined = undefined;
-      let sandboxProcess: ChildProcess | undefined = undefined;
-      const sandboxEnv = { ...process.env };
-      if (proxyCommand) {
-        const proxy =
-          process.env['HTTPS_PROXY'] ||
-          process.env['https_proxy'] ||
-          process.env['HTTP_PROXY'] ||
-          process.env['http_proxy'] ||
-          'http://localhost:8877';
-        sandboxEnv['HTTPS_PROXY'] = proxy;
-        sandboxEnv['https_proxy'] = proxy; // lower-case can be required, e.g. for curl
-        sandboxEnv['HTTP_PROXY'] = proxy;
-        sandboxEnv['http_proxy'] = proxy;
-        const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
-        if (noProxy) {
-          sandboxEnv['NO_PROXY'] = noProxy;
-          sandboxEnv['no_proxy'] = noProxy;
-        }
-        proxyProcess = spawn(proxyCommand, {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          shell: true,
-          detached: true,
-        });
-        // install handlers to stop proxy on exit/signal
-        stopProxy = () => {
-          debugLogger.log('stopping proxy ...');
-          if (proxyProcess?.pid) {
-            try {
-              process.kill(-proxyProcess.pid, 'SIGTERM');
-            } catch {
-              // ignore
+        // Add custom allowed paths from config
+        if (config.allowedPaths) {
+          for (const hostPath of config.allowedPaths) {
+            if (
+              hostPath &&
+              path.isAbsolute(hostPath) &&
+              fs.existsSync(hostPath)
+            ) {
+              const realDir = fs.realpathSync(hostPath);
+              if (!includedDirs.includes(realDir) && realDir !== targetDir) {
+                includedDirs.push(realDir);
+              }
             }
           }
-        };
-        process.on('exit', stopProxy);
-        process.on('SIGINT', stopProxy);
-        process.on('SIGTERM', stopProxy);
+        }
 
-        // commented out as it disrupts ink rendering
-        // proxyProcess.stdout?.on('data', (data) => {
-        //   console.info(data.toString());
-        // });
-        proxyProcess.stderr?.on('data', (data) => {
-          debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
-        });
-        proxyProcess.on('close', (code, signal) => {
-          if (sandboxProcess?.pid) {
-            process.kill(-sandboxProcess.pid, 'SIGTERM');
+        for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
+          let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
+
+          if (i < includedDirs.length) {
+            dirPath = includedDirs[i];
           }
-          throw new FatalSandboxError(
-            `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
-          );
-        });
-        debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+
+          args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
+        }
+
+        const finalArgv = cliArgs;
+
+        args.push(
+          '-f',
+          profileFile,
+          'sh',
+          '-c',
+          [
+            `SANDBOX=sandbox-exec`,
+            quote([`NODE_OPTIONS=${nodeOptions}`]),
+            ...finalArgv.map((arg) => quote([arg])),
+          ].join(' '),
         );
-      }
-      // spawn child and let it inherit stdio
-      process.stdin.pause();
-      sandboxProcess = spawn(config.command, args, {
-        stdio: 'inherit',
-      });
-      return await new Promise((resolve, reject) => {
-        sandboxProcess?.on('error', reject);
-        sandboxProcess?.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
+        const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
+        let proxyProcess: ChildProcess | undefined = undefined;
+        let sandboxProcess: ChildProcess | undefined = undefined;
+        const sandboxEnv = { ...process.env };
+        if (proxyCommand) {
+          const proxy =
+            process.env['HTTPS_PROXY'] ||
+            process.env['https_proxy'] ||
+            process.env['HTTP_PROXY'] ||
+            process.env['http_proxy'] ||
+            'http://localhost:8877';
+          sandboxEnv['HTTPS_PROXY'] = proxy;
+          sandboxEnv['https_proxy'] = proxy; // lower-case can be required, e.g. for curl
+          sandboxEnv['HTTP_PROXY'] = proxy;
+          sandboxEnv['http_proxy'] = proxy;
+          const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
+          if (noProxy) {
+            sandboxEnv['NO_PROXY'] = noProxy;
+            sandboxEnv['no_proxy'] = noProxy;
+          }
+          proxyProcess = spawn(proxyCommand, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            shell: true,
+            detached: true,
+          });
+          // install handlers to stop proxy on exit/signal
+          stopProxy = () => {
+            debugLogger.log('stopping proxy ...');
+            if (proxyProcess?.pid) {
+              try {
+                process.kill(-proxyProcess.pid, 'SIGTERM');
+              } catch {
+                // ignore
+              }
+            }
+          };
+          process.on('exit', stopProxy);
+          process.on('SIGINT', stopProxy);
+          process.on('SIGTERM', stopProxy);
+
+          // commented out as it disrupts ink rendering
+          // proxyProcess.stdout?.on('data', (data) => {
+          //   console.info(data.toString());
+          // });
+          proxyProcess.stderr?.on('data', (data) => {
+            debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
+          });
+          proxyProcess.on('close', (code, signal) => {
+            if (sandboxProcess?.pid) {
+              process.kill(-sandboxProcess.pid, 'SIGTERM');
+            }
+            throw new FatalSandboxError(
+              `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+            );
+          });
+          debugLogger.log('waiting for proxy to start ...');
+          await execAsync(
+            `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+          );
+        }
+        // spawn child and let it inherit stdio
+        process.stdin.pause();
+        sandboxProcess = spawn(config.command, args, {
+          stdio: 'inherit',
         });
-      });
+        return await new Promise((resolve, reject) => {
+          sandboxProcess?.on('error', (err) => {
+            cleanup();
+            reject(err);
+          });
+          sandboxProcess?.on('close', (code) => {
+            process.stdin.resume();
+            cleanup();
+            resolve(code ?? 1);
+          });
+        });
+      } catch (err) {
+        cleanup();
+        throw err;
+      }
     }
 
     if (config.command === 'lxc') {

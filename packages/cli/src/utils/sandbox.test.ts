@@ -292,6 +292,67 @@ describe('sandbox', () => {
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
 
+    it('should fall back to embedded profile if the .sb file is missing on disk', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).includes(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+
+      // Verify fs.writeFileSync was called with the temp profile file and content
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+        expect.stringContaining('deny default'),
+        'utf8',
+      );
+
+      // Verify spawn was called with the temp profile file
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining([
+          '-f',
+          expect.stringContaining(
+            'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+          ),
+        ]),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+
+      // Verify fs.unlinkSync was called to clean up the temp file
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+    });
+
     it('should handle Docker execution', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
