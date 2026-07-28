@@ -270,8 +270,13 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   private async isBlockedHost(urlStr: string): Promise<boolean> {
     try {
       const url = new URL(urlStr);
-      const hostname = url.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '::ffff:127.0.0.1'
+      ) {
         return true;
       }
       return await isPrivateIpAsync(urlStr);
@@ -359,8 +364,18 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
-    for (const url of uniqueUrls) {
-      if (await this.isBlockedHost(url)) {
+    // Resolve blocked-host checks in parallel rather than sequentially,
+    // since each check can involve a DNS lookup and up to 20 URLs may
+    // be present in a single prompt.
+    const blockedChecks = await Promise.all(
+      uniqueUrls.map(async (url) => ({
+        url,
+        blocked: await this.isBlockedHost(url),
+      })),
+    );
+
+    for (const { url, blocked } of blockedChecks) {
+      if (blocked) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
