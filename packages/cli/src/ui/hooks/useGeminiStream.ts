@@ -1241,8 +1241,8 @@ export const useGeminiStream = (
       }
       maybeAddSuppressedToolErrorNote(userMessageTimestamp);
 
-      let text = eventValue.message;
-      if (eventValue.type === 'NO_RESPONSE_TEXT') {
+      let text = eventValue?.message?.trim() || 'Invalid stream received from model';
+      if (eventValue?.type === 'NO_RESPONSE_TEXT') {
         text =
           'The model returned an empty text response. If this error persists as your conversation grows, try using `/compress` to reduce context size.';
       }
