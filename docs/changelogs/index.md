@@ -18,6 +18,23 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.53.0 - 2026-07-28
+
+- **Caretaker Triage Orchestration:** Implemented an LLM triage orchestrator and
+  container build setup
+  ([#28345](https://github.com/google-gemini/gemini-cli/pull/28345) by
+  @chadd28).
+- **Eval Coverage Reporting:** Introduced a new command for generating
+  evaluation coverage reports
+  ([#28169](https://github.com/google-gemini/gemini-cli/pull/28169) by @ved015).
+- **Security & Loop Mitigations:** Enforced workspace trust and task isolation
+  in the A2A server, aligned macOS Seatbelt profiles with the deny-default
+  model, and mitigated infinite ReAct/prompt injection loops
+  ([#28470](https://github.com/google-gemini/gemini-cli/pull/28470) by
+  @luisfelipe-alt,
+  [#28424](https://github.com/google-gemini/gemini-cli/pull/28424) by
+  @ompatel-aiml).
+
 ## Announcements: v0.52.0 - 2026-07-22
 
 - **Caretaker Triage & Egress Services:** Implemented the core triage worker
