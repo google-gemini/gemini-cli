@@ -921,7 +921,7 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError without retrying when no tool call and empty response text', async () => {
+    it('should retry when no tool call and empty response text, and succeed if a retry succeeds', async () => {
       vi.mocked(mockContentGenerator.generateContentStream)
         .mockImplementationOnce(async () =>
           // First attempt: finish reason is present, but the stream has no
@@ -941,7 +941,7 @@ describe('GeminiChat', () => {
           })(),
         )
         .mockImplementationOnce(async () =>
-          // This would succeed if NO_RESPONSE_TEXT were retried.
+          // Second attempt: succeeds
           (async function* () {
             yield {
               candidates: [
@@ -965,6 +965,54 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
+      const chunks: GenerateContentResponse[] = [];
+      for await (const chunk of stream) {
+        if (chunk.type === StreamEventType.CHUNK) {
+          chunks.push(chunk.value);
+        }
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
+      expect(chunks.length).toBe(2);
+      expect(chunks[0].candidates?.[0]?.content?.parts?.[0]?.thought).toBe(
+        true,
+      );
+      expect(chunks[1].candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+        'valid response after retry',
+      );
+    });
+
+    it('should retry when no tool call and empty response text, and throw InvalidStreamError after exhausting retries', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          // All attempts return empty response text
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test message',
+        'prompt-id-1',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
       await expect(
         (async () => {
           for await (const _ of stream) {
@@ -972,10 +1020,11 @@ describe('GeminiChat', () => {
           }
         })(),
       ).rejects.toThrow(InvalidStreamError);
+
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
+        4,
       );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 

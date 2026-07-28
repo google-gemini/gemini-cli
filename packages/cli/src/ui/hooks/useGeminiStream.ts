@@ -54,6 +54,7 @@ import type {
   ServerGeminiContentEvent as ContentEvent,
   ServerGeminiFinishedEvent,
   ServerGeminiStreamEvent as GeminiEvent,
+  ServerGeminiInvalidStreamEvent,
   ThoughtSummary,
   ToolCallRequestInfo,
   ToolCallResponseInfo,
@@ -1229,6 +1230,43 @@ export const useGeminiStream = (
     ],
   );
 
+  const handleInvalidStreamEvent = useCallback(
+    (
+      eventValue: ServerGeminiInvalidStreamEvent['value'],
+      userMessageTimestamp: number,
+    ) => {
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      maybeAddSuppressedToolErrorNote(userMessageTimestamp);
+
+      let text = eventValue.message;
+      if (eventValue.type === 'NO_RESPONSE_TEXT') {
+        text =
+          'The model returned an empty text response. If this error persists as your conversation grows, try using `/compress` to reduce context size.';
+      }
+
+      addItem(
+        {
+          type: MessageType.ERROR,
+          text,
+        },
+        userMessageTimestamp,
+      );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
+      setThought(null); // Reset thought when there's an error
+    },
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      setThought,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
+    ],
+  );
+
   const handleCitationEvent = useCallback(
     (text: string, userMessageTimestamp: number) => {
       if (!showCitations(settings)) {
@@ -1541,8 +1579,10 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
+            // Handled transparently by the backend stream retries.
+            break;
           case ServerGeminiEventType.InvalidStream:
-            // Will add the missing logic later
+            handleInvalidStreamEvent(event.value, userMessageTimestamp);
             break;
           default: {
             // enforces exhaustive switch-case
@@ -1575,6 +1615,7 @@ export const useGeminiStream = (
       handleChatModelEvent,
       handleAgentExecutionStoppedEvent,
       handleAgentExecutionBlockedEvent,
+      handleInvalidStreamEvent,
       addItem,
       pendingHistoryItemRef,
       setPendingHistoryItem,

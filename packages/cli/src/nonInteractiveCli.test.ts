@@ -2298,7 +2298,13 @@ describe('runNonInteractive', () => {
 
     it('should handle InvalidStream event gracefully in TEXT mode', async () => {
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),
@@ -2325,7 +2331,13 @@ describe('runNonInteractive', () => {
         OutputFormat.STREAM_JSON,
       );
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),
@@ -2355,7 +2367,13 @@ describe('runNonInteractive', () => {
         OutputFormat.JSON,
       );
       const events: ServerGeminiStreamEvent[] = [
-        { type: GeminiEventType.InvalidStream },
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
       ];
       mockGeminiClient.sendMessageStream.mockReturnValue(
         createStreamFromEvents(events),

@@ -585,8 +585,7 @@ export class GeminiChat {
             );
 
             const isContentError = error instanceof InvalidStreamError;
-            const isRetryableContentError =
-              isContentError && error.type !== 'NO_RESPONSE_TEXT';
+            const isRetryableContentError = isContentError;
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);

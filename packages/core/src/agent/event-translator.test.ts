@@ -520,6 +520,10 @@ describe('translateEvent', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.InvalidStream,
+        value: {
+          type: 'NO_RESPONSE_TEXT',
+          message: 'Empty response',
+        },
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
