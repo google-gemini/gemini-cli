@@ -34,7 +34,6 @@ class IssueStatus(str, Enum):
     NEEDS_INFO = "NEEDS_INFO"
     TRIAGED = "TRIAGED"
     COMMIT_GENERATION = "COMMIT_GENERATION"
-    PR_VALIDATION_PENDING = "PR_VALIDATION_PENDING"
     PR_EVALUATION_PENDING = "PR_EVALUATION_PENDING"
     PR_REVISION = "PR_REVISION"
     NEEDS_HUMAN = "NEEDS_HUMAN"
@@ -197,10 +196,11 @@ def _acquire_lock_tx(
     current_status = data.get("status")
     attempts = data.get("generation_attempts", 0)
 
-    # Only allow PR generation to start for TRIAGED issues or recovering COMMIT_GENERATION jobs
+    # Only allow PR generation to start for TRIAGED issues, recovering COMMIT_GENERATION jobs, or PR_REVISION
     allowed_start_states = {
         IssueStatus.TRIAGED.value,
         IssueStatus.COMMIT_GENERATION.value,
+        IssueStatus.PR_REVISION.value,  # TODO: defensive programming for when PR revision is implemented
     }
     if current_status not in allowed_start_states:
         return ClaimAction.SKIP
@@ -302,6 +302,7 @@ def _release_lock_tx(
         updates["error"] = error
 
     if success:
+        updates["generation_attempts"] = 0  # Defensive reset for multi-stage runs
         if status:
             updates["status"] = status
         if workable_spec is not None:
