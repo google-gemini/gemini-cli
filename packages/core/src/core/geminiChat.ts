@@ -1044,11 +1044,19 @@ export class GeminiChat {
     requestContents: readonly Content[],
   ): readonly Content[] {
     // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
+    // with a text message, i.e. that is not a function response. Testing for
+    // text alone is not enough: `coalesceConsecutiveRoles` can merge a function
+    // response turn with the prompt that follows it, and starting the loop at
+    // such a turn starts it later than the API starts the turn, leaving earlier
+    // function calls unsigned but still validated.
     let activeLoopStartIndex = -1;
     for (let i = requestContents.length - 1; i >= 0; i--) {
       const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+      if (
+        content.role === 'user' &&
+        content.parts?.some((part) => part.text) &&
+        !content.parts?.some((part) => part.functionResponse)
+      ) {
         activeLoopStartIndex = i;
         break;
       }
