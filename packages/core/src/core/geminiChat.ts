@@ -30,7 +30,11 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { resolveModel, supportsModernFeatures } from '../config/models.js';
+import {
+  resolveModel,
+  supportsModernFeatures,
+  isGemini2Model,
+} from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
@@ -683,9 +687,12 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
     // before sending to the Gemini API. This whitelists only standard Gemini fields.
-    const scrubbedHistory = this.context.config.isContextManagementEnabled()
+    let scrubbedHistory = this.context.config.isContextManagementEnabled()
       ? scrubHistory([...requestHistory])
       : [...requestHistory];
+
+    // Always coalesce consecutive roles to prevent 400 Bad Request errors
+    scrubbedHistory = coalesceConsecutiveRoles(scrubbedHistory);
 
     const scrubbedContents = scrubbedHistory.map((h) => h.content);
 
@@ -763,9 +770,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
-        ? [...contentsForPreviewModel]
-        : [...requestContents];
+      let contentsToUse: Content[] =
+        supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+          ? [...contentsForPreviewModel]
+          : [...requestContents];
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -807,9 +815,10 @@ export class GeminiChat {
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
-          contentsToUse = supportsModernFeatures(modelToUse)
-            ? [...contentsForPreviewModel]
-            : [...requestContents];
+          contentsToUse =
+            supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
+              ? [...contentsForPreviewModel]
+              : [...requestContents];
         }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
@@ -953,9 +962,16 @@ export class GeminiChat {
       ? extractCuratedHistory(this.agentHistory.get())
       : [...this.agentHistory.get()];
 
-    return this.context.config.isContextManagementEnabled()
-      ? scrubHistory(history)
-      : history;
+    if (this.context.config.isContextManagementEnabled()) {
+      return scrubHistory(history);
+    }
+
+    const model = this.context.config.getModel();
+    if (isGemini2Model(model) || supportsModernFeatures(model)) {
+      return coalesceConsecutiveRoles(stripThoughts(history));
+    }
+
+    return history;
   }
 
   /**
@@ -1471,4 +1487,51 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       return newPart;
     }),
   }));
+}
+
+export function coalesceConsecutiveRoles(
+  history: HistoryTurn[],
+): HistoryTurn[] {
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.content.role && last.content.role === turn.content.role) {
+      const hasParts = last.content.parts || turn.content.parts;
+      result[lastIdx] = {
+        id: last.id,
+        content: {
+          ...last.content,
+          parts: hasParts
+            ? [...(last.content.parts || []), ...(turn.content.parts || [])]
+            : undefined,
+        },
+      };
+    } else {
+      result.push({
+        id: turn.id,
+        content: { ...turn.content },
+      });
+    }
+  }
+  return result;
+}
+
+export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
+  return history
+    .map((turn) => {
+      if (!turn.content.parts) return turn;
+      const hasThought = turn.content.parts.some((p) => p && p.thought);
+      if (!hasThought) return turn;
+
+      const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+      return {
+        ...turn,
+        content: {
+          ...turn.content,
+          parts: nonThoughtParts,
+        },
+      };
+    })
+    .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
 }

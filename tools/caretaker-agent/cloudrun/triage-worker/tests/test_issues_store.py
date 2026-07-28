@@ -29,7 +29,7 @@ class TestIssuesStore(unittest.TestCase):
 
     def test_acquire_lock_terminal_states(self):
         """acquire lock on terminal status docs should skip triage"""
-        terminal_statuses = ["TRIAGED", "LOW_QUALITY", "NEEDS_INFO", "NEEDS_HUMAN"]
+        terminal_statuses = ["TRIAGED", "AUTO_CLOSE", "NEEDS_INFO", "NEEDS_HUMAN"]
         self.snapshot.exists = True
         for status in terminal_statuses:
             with self.subTest(status=status):

@@ -72,6 +72,11 @@ describe('CloudFreePrivacyNotice', () => {
       expectedText: 'Gemini Code Assist Privacy Notice',
     },
     {
+      stateName: 'tier unavailable state',
+      mockState: { isFreeTier: undefined, isTierUnavailable: true },
+      expectedText: 'GOOGLE_CLOUD_PROJECT',
+    },
+    {
       stateName: 'free tier state',
       mockState: { isFreeTier: true },
       expectedText: 'Gemini Code Assist for Individuals Privacy Notice',
@@ -99,6 +104,11 @@ describe('CloudFreePrivacyNotice', () => {
     {
       stateName: 'non-free tier state',
       mockState: { isFreeTier: false },
+      shouldExit: true,
+    },
+    {
+      stateName: 'tier unavailable state',
+      mockState: { isFreeTier: undefined, isTierUnavailable: true },
       shouldExit: true,
     },
     {
