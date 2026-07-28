@@ -322,8 +322,11 @@ export async function createContentGenerator(
         config.authType === AuthType.USE_GEMINI &&
         apiKeyAuthMechanism !== 'bearer'
       ) {
-        delete headers['Authorization'];
-        delete headers['authorization'];
+        for (const header of Object.keys(headers)) {
+          if (header.toLowerCase() === 'authorization') {
+            delete headers[header];
+          }
+        }
       }
       if (
         config.authType === AuthType.USE_VERTEX_AI &&

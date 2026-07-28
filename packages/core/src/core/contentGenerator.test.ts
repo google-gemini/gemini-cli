@@ -805,13 +805,12 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should strip Authorization header from customHeaders when in USE_GEMINI mode', async () => {
+  it('should strip Authorization headers case-insensitively from customHeaders in USE_GEMINI mode', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
       getClientName: vi.fn().mockReturnValue(undefined),
-      customHeaders: { Authorization: 'Bearer stale-oauth-token' },
     } as unknown as Config;
 
     const mockGenerator = {
@@ -823,19 +822,23 @@ describe('createContentGenerator', () => {
       {
         apiKey: 'test-api-key',
         authType: AuthType.USE_GEMINI,
+        customHeaders: {
+          AuThOrIzAtIoN: 'Bearer stale-oauth-token',
+          'X-Custom-Header': 'preserved',
+        },
       },
       mockConfig,
     );
 
-    expect(GoogleGenAI).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        httpOptions: expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: expect.any(String),
-          }),
-        }),
-      }),
-    );
+    const callArg = vi.mocked(GoogleGenAI).mock.calls[0][0];
+    const headers = callArg.httpOptions?.headers as Record<string, string>;
+
+    expect(
+      Object.keys(headers).some(
+        (header) => header.toLowerCase() === 'authorization',
+      ),
+    ).toBe(false);
+    expect(headers['X-Custom-Header']).toBe('preserved');
   });
 
   it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
