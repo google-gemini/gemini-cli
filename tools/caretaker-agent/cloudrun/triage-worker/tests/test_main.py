@@ -137,8 +137,14 @@ class TestMainExecutionLoop(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    def test_main_ok_quality_flow(self, mock_send_label, mock_triage):
-        """OK quality issues dispatch effort label and release TRIAGED spec."""
+    @patch("main.publish_issue_ready_for_code")
+    def test_main_ok_quality_flow(
+        self, mock_publish_event, mock_send_label, mock_triage
+    ):
+        """
+        OK quality issues dispatch effort label, release TRIAGED spec,
+        and publish ready-for-code event.
+        """
         self.mock_store.acquire_lock.return_value = ClaimAction.PROCEED
         output = json.dumps({
             "triage_metadata": {"quality": "OK", "effort_estimate": "SMALL"},
@@ -161,6 +167,9 @@ class TestMainExecutionLoop(unittest.TestCase):
             success=True,
             status="TRIAGED",
             workable_spec=VALID_SPEC,
+        )
+        mock_publish_event.assert_called_once_with(
+            "owner", "repo", 42, VALID_SPEC
         )
 
     @patch("main.process_issue_triage")

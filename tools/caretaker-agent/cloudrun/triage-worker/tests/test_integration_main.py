@@ -140,7 +140,10 @@ class TestIntegrationMain(unittest.TestCase):
 
     @patch("main.process_issue_triage")
     @patch("main.send_label_action")
-    def test_ok_quality_flow(self, mock_send_label, mock_triage):
+    @patch("main.publish_issue_ready_for_code")
+    def test_ok_quality_flow(
+        self, mock_publish_event, mock_send_label, mock_triage
+    ):
         """Verifies end-to-end flow for OK quality issues."""
         self.stored_data = {
             "status": "UNTRIAGED",
@@ -167,6 +170,9 @@ class TestIntegrationMain(unittest.TestCase):
         )
         mock_send_label.assert_called_once_with(
             "owner", "repo", 42, ["effort/small"]
+        )
+        mock_publish_event.assert_called_once_with(
+            "owner", "repo", 42, INTEGRATION_OK_PAYLOAD["workable_spec"]
         )
 
         # Verify state transition in store data
