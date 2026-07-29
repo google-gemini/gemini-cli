@@ -131,6 +131,86 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  describe('disposable tracking', () => {
+    // Each registration returns a Disposable tagged with what produced it, so
+    // the assertions below can tell *which* Disposables reached
+    // context.subscriptions rather than merely that the registration ran.
+    //
+    // Asserting the call happened is not enough: a comma expression
+    // `(regA(), regB())` still evaluates both operands, so both mocks are
+    // called while only regB's Disposable becomes the argument to push().
+    // These tests read context.subscriptions for that reason.
+    const tagged = (tag: string) => ({ tag, dispose: vi.fn() });
+
+    beforeEach(() => {
+      vi.mocked(context.globalState.get).mockReturnValue(true);
+      vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(
+        () => tagged('onDidCloseTextDocument') as never,
+      );
+      vi.mocked(
+        vscode.workspace.registerTextDocumentContentProvider,
+      ).mockImplementation(
+        () => tagged('registerTextDocumentContentProvider') as never,
+      );
+      vi.mocked(
+        vscode.workspace.onDidChangeWorkspaceFolders,
+      ).mockImplementation(
+        () => tagged('onDidChangeWorkspaceFolders') as never,
+      );
+      vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust).mockImplementation(
+        () => tagged('onDidGrantWorkspaceTrust') as never,
+      );
+      vi.mocked(vscode.commands.registerCommand).mockImplementation(
+        (command: string) => tagged(`command:${command}`) as never,
+      );
+    });
+
+    const subscribedTags = () =>
+      context.subscriptions.map((d) => (d as unknown as { tag: string }).tag);
+
+    it('tracks every registration made during activation', async () => {
+      await activate(context);
+
+      expect(subscribedTags()).toEqual(
+        expect.arrayContaining([
+          'onDidCloseTextDocument',
+          'registerTextDocumentContentProvider',
+          'command:gemini.diff.accept',
+          'command:gemini.diff.cancel',
+          'onDidChangeWorkspaceFolders',
+          'onDidGrantWorkspaceTrust',
+          'command:gemini-cli.runGeminiCLI',
+          'command:gemini-cli.showNotices',
+        ]),
+      );
+    });
+
+    it('tracks the gemini.diff.accept command so re-activation does not collide', async () => {
+      // Left untracked, the command stays registered after deactivation and a
+      // re-activate in the same extension host throws
+      // "command 'gemini.diff.accept' already exists".
+      await activate(context);
+
+      expect(subscribedTags()).toContain('command:gemini.diff.accept');
+    });
+
+    it('tracks the onDidChangeWorkspaceFolders listener so it stops on deactivation', async () => {
+      // Left untracked, the listener outlives the IDEServer it calls and keeps
+      // firing syncEnvVars() against a stopped server.
+      await activate(context);
+
+      expect(subscribedTags()).toContain('onDidChangeWorkspaceFolders');
+    });
+
+    it('pushes one Disposable per registration', async () => {
+      await activate(context);
+
+      const tags = subscribedTags();
+      expect(tags).toHaveLength(new Set(tags).size);
+      expect(tags).toHaveLength(8);
+    });
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
