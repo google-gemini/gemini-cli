@@ -1913,7 +1913,7 @@ export const useGeminiStream = (
                     thoughtSignature: tool.request.thoughtSignature,
                   }),
                   functionCall: {
-                    ...(tool.request.id && { id: tool.request.id }), // Good practice to include ID if present
+                    id: tool.request.id ?? tool.request.callId,
                     name: tool.request.name,
                     args: tool.request.args,
                   },
