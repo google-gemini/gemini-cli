@@ -194,6 +194,15 @@ describe('commandUtils', () => {
       expect(isAtCommand('\\@file')).toBe(false);
     });
 
+    it('should not treat unified diff hunk markers as @ commands', () => {
+      expect(isAtCommand('@@ -1,2 +1,2 @@')).toBe(false);
+      expect(isAtCommand('@@@ -10,2 -10,2 +10,2 @@@')).toBe(false);
+    });
+
+    it('should still detect paths that start with @', () => {
+      expect(isAtCommand('@@scope.ts')).toBe(true);
+    });
+
     it('should return true for multi-line external editor prompts with @-references', () => {
       expect(isAtCommand('Please review:\n@src/main.py\nand fix bugs.')).toBe(
         true,

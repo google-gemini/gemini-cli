@@ -204,6 +204,59 @@ describe('handleAtCommand', () => {
     });
   });
 
+  it('should preserve diff hunk markers without searching for files', async () => {
+    const query = [
+      'Review this diff:',
+      '--- a/example.ts',
+      '+++ b/example.ts',
+      '@@ -1,2 +1,2 @@',
+      '-const oldValue = 1;',
+      '+const newValue = 2;',
+      '@@@ -10,2 -10,2 +10,2 @@@',
+    ].join('\n');
+    const globTool = mockConfig.getToolRegistry().getTool('glob');
+    const globSpy = vi.spyOn(globTool!, 'buildAndExecute');
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 125,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+    expect(globSpy).not.toHaveBeenCalled();
+  });
+
+  it('should still process file paths that start with @', async () => {
+    const fileContent = 'scoped file content';
+    await createTestFile(path.join(testRootDir, '@scope.ts'), fileContent);
+    const query = '@@scope.ts';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 126,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: query },
+        { text: '\n--- Content from referenced files ---' },
+        { text: '\nContent from @@scope.ts:\n' },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
   it('should process a valid text file path', async () => {
     const fileContent = 'This is the file content.';
     const filePath = await createTestFile(

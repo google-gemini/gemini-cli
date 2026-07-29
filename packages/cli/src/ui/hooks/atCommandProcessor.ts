@@ -54,12 +54,13 @@ export function unescapeLiteralAt(text: string): string {
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
  * 1. "(?:[^"]*)" matches a double-quoted string (for Windows paths with spaces).
- * 2. \\. matches any escaped character (e.g., \ ).
- * 3. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
- * 4. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ * 2. (?!@+(?=$|[ \t\n\r])) excludes bare @ runs, such as unified diff hunk markers.
+ * 3. \\. matches any escaped character (e.g., \ ).
+ * 4. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
+ * 5. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
  */
 export const AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+  '(?!@+(?=$|[ \\t\\n\\r]))(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
 
 interface HandleAtCommandParams {
   query: string;
