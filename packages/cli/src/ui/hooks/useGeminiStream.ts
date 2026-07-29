@@ -14,6 +14,8 @@ import {
   GitService,
   UnauthorizedError,
   UserPromptEvent,
+  logApiError,
+  ApiErrorEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
   logConversationFinishedEvent,
   ConversationFinishedEvent,
@@ -1248,6 +1250,22 @@ export const useGeminiStream = (
           'The model returned an empty text response. If this error persists as your conversation grows, try using `/compress` to reduce context size.';
       }
 
+      // Log the API error telemetry
+      logApiError(
+        config,
+        new ApiErrorEvent(
+          geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+          eventValue?.message || 'Invalid stream received from model',
+          0, // duration
+          {
+            prompt_id: lastPromptIdRef.current || 'unknown',
+            contents: [],
+          },
+          config.getContentGeneratorConfig()?.authType,
+          eventValue?.type || 'INVALID_STREAM',
+        ),
+      );
+
       addItem(
         {
           type: MessageType.ERROR,
@@ -1265,6 +1283,9 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      config,
+      geminiClient,
+      lastPromptIdRef,
     ],
   );
 

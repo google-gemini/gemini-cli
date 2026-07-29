@@ -30,6 +30,8 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  logApiError,
+  ApiErrorEvent,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -433,8 +435,32 @@ export async function runNonInteractive(
             }
             warnings.push(blockMessage);
           } else if (event.type === GeminiEventType.InvalidStream) {
-            invalidStreamError =
-              'Invalid stream: The model returned an empty response or malformed tool call.';
+            const eventValue = event.value;
+            if (eventValue?.type === 'NO_RESPONSE_TEXT') {
+              invalidStreamError =
+                'The model returned an empty text response. If your context window is near capacity, try using /compress.';
+            } else {
+              invalidStreamError =
+                eventValue?.message?.trim() ||
+                'Invalid stream: The model returned an empty response or malformed tool call.';
+            }
+
+            // Log the API error telemetry
+            logApiError(
+              config,
+              new ApiErrorEvent(
+                geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+                eventValue?.message || 'Invalid stream received from model',
+                0, // duration
+                {
+                  prompt_id,
+                  contents: [],
+                },
+                config.getContentGeneratorConfig()?.authType,
+                eventValue?.type || 'INVALID_STREAM',
+              ),
+            );
+
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
