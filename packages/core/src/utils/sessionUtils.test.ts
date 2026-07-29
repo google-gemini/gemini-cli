@@ -211,4 +211,63 @@ describe('convertSessionToClientHistory', () => {
       },
     ]);
   });
+
+  it('should preserve thoughtSignature when mapping tool calls', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Run parallel tools',
+      },
+      {
+        id: 'msg2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call456',
+            name: 'weather_tool',
+            args: { location: 'New York' },
+            thoughtSignature: 'test-hash-signature-456', // Simulated thought signature
+            status: CoreToolCallStatus.Success,
+            timestamp: '2024-01-01T10:01:05Z',
+            result: 'Sunny',
+          },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history.map((h) => h.content)).toEqual([
+      { role: 'user', parts: [{ text: 'Run parallel tools' }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            thoughtSignature: 'test-hash-signature-456', // Asserting it is preserved
+            functionCall: {
+              name: 'weather_tool',
+              args: { location: 'New York' },
+              id: 'call456',
+            },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'call456',
+              name: 'weather_tool',
+              response: { output: 'Sunny' },
+            },
+          },
+        ],
+      },
+    ]);
+  });
 });

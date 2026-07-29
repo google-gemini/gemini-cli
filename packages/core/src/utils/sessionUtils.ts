@@ -163,6 +163,9 @@ export function convertSessionToClientHistory(
         if (msg.toolCalls && msg.toolCalls.length > 0) {
           for (const toolCall of msg.toolCalls) {
             modelParts.push({
+              ...(toolCall.thoughtSignature && {
+                thoughtSignature: toolCall.thoughtSignature,
+              }), // ADD THIS LINE
               functionCall: {
                 id: toolCall.id,
                 name: toolCall.name,
