@@ -2458,6 +2458,130 @@ describe('runNonInteractive', () => {
       const output = JSON.parse(getWrittenOutput());
       expect(output.warnings).toBeUndefined();
     });
+
+    it('should handle InvalidStream event gracefully in TEXT mode', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[ERROR] The model returned an empty text response. If your context window is near capacity, try using /compress.\n',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in STREAM_JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain('"severity":"error"');
+      expect(output).toContain(
+        'The model returned an empty text response. If your context window is near capacity, try using /compress.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_RESPONSE_TEXT',
+            message: 'Empty response',
+          },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"error": {');
+      expect(output).toContain('"type": "INVALID_STREAM"');
+      expect(output).toContain(
+        'The model returned an empty text response. If your context window is near capacity, try using /compress.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle non-NO_RESPONSE_TEXT InvalidStream event gracefully and use message from eventValue', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'MALFORMED_FUNCTION_CALL',
+            message: 'Malformed call',
+          },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith('[ERROR] Malformed call\n');
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Output Sanitization', () => {

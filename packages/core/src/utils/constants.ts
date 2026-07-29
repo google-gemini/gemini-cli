@@ -10,3 +10,6 @@ export const REFERENCE_CONTENT_END = '--- End of content ---';
 export const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
 export const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 export const MAX_FILE_SIZE_MB = 20;
+
+export const EMPTY_RESPONSE_COMPRESS_SUGGESTION =
+  'The model returned an empty text response. If your context window is near capacity, try using /compress.';

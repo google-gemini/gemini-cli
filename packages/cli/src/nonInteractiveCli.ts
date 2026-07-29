@@ -32,6 +32,7 @@ import {
   ROOT_SCHEDULER_ID,
   logApiError,
   ApiErrorEvent,
+  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -437,8 +438,7 @@ export async function runNonInteractive(
           } else if (event.type === GeminiEventType.InvalidStream) {
             const eventValue = event.value;
             if (eventValue?.type === 'NO_RESPONSE_TEXT') {
-              invalidStreamError =
-                'The model returned an empty text response. If your context window is near capacity, try using /compress.';
+              invalidStreamError = EMPTY_RESPONSE_COMPRESS_SUGGESTION;
             } else {
               invalidStreamError =
                 eventValue?.message?.trim() ||

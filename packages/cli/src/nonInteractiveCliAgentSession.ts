@@ -41,6 +41,7 @@ import {
   debugLogger,
   logApiError,
   ApiErrorEvent,
+  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -334,14 +335,17 @@ export async function runNonInteractive({
         return text ? text : undefined;
       };
 
-      const emitFinalSuccessResult = (): void => {
+      const emitFinalResult = (errorPayload?: {
+        type: string;
+        message: string;
+      }): void => {
         if (streamFormatter) {
           const metrics = uiTelemetryService.getMetrics();
           const durationMs = Date.now() - startTime;
           streamFormatter.emitEvent({
             type: JsonStreamEventType.RESULT,
             timestamp: new Date().toISOString(),
-            status: 'success',
+            status: errorPayload ? 'error' : 'success',
             stats: streamFormatter.convertToStreamStats(metrics, durationMs),
           });
         } else if (config.getOutputFormat() === OutputFormat.JSON) {
@@ -352,7 +356,7 @@ export async function runNonInteractive({
               config.getSessionId(),
               responseText,
               stats,
-              undefined,
+              errorPayload,
               warnings,
             ),
           );
@@ -555,32 +559,20 @@ export async function runNonInteractive({
               const rawMessage =
                 typeof rawMessageVal === 'string' ? rawMessageVal : undefined;
 
-              if (errorType === 'NO_RESPONSE_TEXT') {
-                const warningMessage =
-                  'The model returned an empty text response. If your context window is near capacity, try using /compress.';
+              const warningMessage =
+                errorType === 'NO_RESPONSE_TEXT'
+                  ? EMPTY_RESPONSE_COMPRESS_SUGGESTION
+                  : event.message;
 
-                if (streamFormatter) {
-                  streamFormatter.emitEvent({
-                    type: JsonStreamEventType.ERROR,
-                    timestamp: new Date().toISOString(),
-                    severity: 'error',
-                    message: warningMessage,
-                  });
-                } else if (config.getOutputFormat() === OutputFormat.TEXT) {
-                  process.stderr.write(`[ERROR] ${warningMessage}\n`);
-                }
-              } else {
-                const warningMessage = event.message;
-                if (streamFormatter) {
-                  streamFormatter.emitEvent({
-                    type: JsonStreamEventType.ERROR,
-                    timestamp: new Date().toISOString(),
-                    severity: 'error',
-                    message: warningMessage,
-                  });
-                } else if (config.getOutputFormat() === OutputFormat.TEXT) {
-                  process.stderr.write(`[ERROR] ${warningMessage}\n`);
-                }
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: warningMessage,
+                });
+              } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(`[ERROR] ${warningMessage}\n`);
               }
 
               // Log the API error telemetry
@@ -600,7 +592,10 @@ export async function runNonInteractive({
               );
 
               // If it's a fatal stream error, we should terminate and output final results
-              emitFinalSuccessResult();
+              emitFinalResult({
+                type: 'INVALID_STREAM',
+                message: warningMessage,
+              });
               streamEnded = true;
               break;
             }
@@ -673,7 +668,7 @@ export async function runNonInteractive({
               process.stderr.write(`Agent execution stopped: ${stopMessage}\n`);
             }
 
-            emitFinalSuccessResult();
+            emitFinalResult();
             streamEnded = true;
             break;
           }
