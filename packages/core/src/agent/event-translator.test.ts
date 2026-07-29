@@ -531,6 +531,9 @@ describe('translateEvent', () => {
       expect(err.status).toBe('INTERNAL');
       expect(err.message).toBe('Empty response');
       expect(err.fatal).toBe(true);
+      expect(err._meta?.['code']).toBe('INVALID_STREAM');
+      expect(err._meta?.['errorType']).toBe('NO_RESPONSE_TEXT');
+      expect(err._meta?.['rawMessage']).toBe('Empty response');
     });
 
     it('falls back to default message when message is missing', () => {

@@ -39,6 +39,8 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
+  logApiError,
+  ApiErrorEvent,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -545,6 +547,64 @@ export async function runNonInteractive({
             break;
           }
           case 'error': {
+            if (event._meta?.['code'] === 'INVALID_STREAM') {
+              const errorTypeVal = event._meta?.['errorType'];
+              const errorType =
+                typeof errorTypeVal === 'string' ? errorTypeVal : undefined;
+              const rawMessageVal = event._meta?.['rawMessage'];
+              const rawMessage =
+                typeof rawMessageVal === 'string' ? rawMessageVal : undefined;
+
+              if (errorType === 'NO_RESPONSE_TEXT') {
+                const warningMessage =
+                  'The model returned an empty text response. If your context window is near capacity, try using /compress.';
+
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.ERROR,
+                    timestamp: new Date().toISOString(),
+                    severity: 'error',
+                    message: warningMessage,
+                  });
+                } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`[ERROR] ${warningMessage}\n`);
+                }
+              } else {
+                const warningMessage = event.message;
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.ERROR,
+                    timestamp: new Date().toISOString(),
+                    severity: 'error',
+                    message: warningMessage,
+                  });
+                } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`[ERROR] ${warningMessage}\n`);
+                }
+              }
+
+              // Log the API error telemetry
+              logApiError(
+                config,
+                new ApiErrorEvent(
+                  geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+                  rawMessage || 'Invalid stream received from model',
+                  0, // duration
+                  {
+                    prompt_id,
+                    contents: [],
+                  },
+                  config.getContentGeneratorConfig()?.authType,
+                  errorType || 'INVALID_STREAM',
+                ),
+              );
+
+              // If it's a fatal stream error, we should terminate and output final results
+              emitFinalSuccessResult();
+              streamEnded = true;
+              break;
+            }
+
             if (event.fatal) {
               throw reconstructFatalError(event);
             }

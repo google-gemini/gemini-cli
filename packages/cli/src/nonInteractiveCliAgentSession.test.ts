@@ -199,6 +199,7 @@ describe('runNonInteractive', () => {
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
       getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {

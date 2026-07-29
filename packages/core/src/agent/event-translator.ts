@@ -226,6 +226,11 @@ export function translateEvent(
             event.value?.message?.trim() ||
             'Invalid stream received from model',
           fatal: true,
+          _meta: {
+            code: 'INVALID_STREAM',
+            errorType: event.value?.type,
+            rawMessage: event.value?.message,
+          },
         }),
       );
       break;
