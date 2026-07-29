@@ -55,6 +55,7 @@ export interface ToolCallRecord {
   id: string;
   name: string;
   args: Record<string, unknown>;
+  thoughtSignature?: string;
   result?: PartListUnion | null;
   status: Status;
   timestamp: string;

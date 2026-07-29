@@ -1909,7 +1909,11 @@ export const useGeminiStream = (
               role: 'model',
               parts: [
                 {
+                  ...(tool.request.thoughtSignature && {
+                    thoughtSignature: tool.request.thoughtSignature,
+                  }),
                   functionCall: {
+                    ...(tool.request.id && { id: tool.request.id }), // Good practice to include ID if present
                     name: tool.request.name,
                     args: tool.request.args,
                   },

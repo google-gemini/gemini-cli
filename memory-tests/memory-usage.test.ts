@@ -433,6 +433,9 @@ async function generateSharedLargeChatData(tempDir: string) {
         if (geminiMsg.toolCalls) {
           for (const tc of geminiMsg.toolCalls) {
             parts.push({
+              ...(tc.thoughtSignature && {
+                thoughtSignature: tc.thoughtSignature,
+              }),
               functionCall: {
                 name: tc.name,
                 args: tc.args,

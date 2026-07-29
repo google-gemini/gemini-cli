@@ -35,6 +35,8 @@ export enum CoreToolCallStatus {
 
 export interface ToolCallRequestInfo {
   callId: string;
+  id?: string;
+  thoughtSignature?: string;
   name: string;
   args: Record<string, unknown>;
   /** Tool-controlled display information. */
