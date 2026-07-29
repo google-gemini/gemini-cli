@@ -2496,6 +2496,37 @@ describe('GeminiChat', () => {
       expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
     });
 
+    it('should skip a user turn that has text alongside a functionResponse when locating the active loop', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      // `coalesceConsecutiveRoles` can merge a function response turn with the
+      // prompt that follows it, producing a user turn holding both.
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'First prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'Working on it' },
+            { functionCall: { name: 'some_tool', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { functionResponse: { name: 'some_tool', response: {} } },
+            { text: 'Second prompt' },
+          ],
+        },
+      ];
+
+      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+
+      // The merged turn must not be taken as the loop start, otherwise the
+      // model turn before it is left unsigned while the API still validates it.
+      expect(newContents[1]?.parts?.[1]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
+    });
+
     it('should not modify contents if there is no user text message', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
