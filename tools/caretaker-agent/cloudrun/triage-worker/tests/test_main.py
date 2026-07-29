@@ -44,7 +44,8 @@ class TestMainExecutionLoop(unittest.TestCase):
             "ISSUE_DETAILS": encoded,
             "WORKFLOW_EXECUTION_ID": "exec-123",
             "PROJECT_ID": "test-project",
-            "EGRESS_TOPIC_ID": "test-topic"
+            "EGRESS_TOPIC_ID": "test-topic",
+            "READY_FOR_CODE_TOPIC_ID": "test-ready-topic"
         })
         self.env_patcher.start()
 

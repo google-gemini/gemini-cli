@@ -82,7 +82,8 @@ class TestIntegrationMain(unittest.TestCase):
             }).encode("utf-8")).decode("utf-8"),
             "WORKFLOW_EXECUTION_ID": "test-workflow-exec-101",
             "PROJECT_ID": "test-gcp-project",
-            "EGRESS_TOPIC_ID": "test-egress-actions"
+            "EGRESS_TOPIC_ID": "test-egress-actions",
+            "READY_FOR_CODE_TOPIC_ID": "test-ready-topic"
         })
         self.env_patcher.start()
 
