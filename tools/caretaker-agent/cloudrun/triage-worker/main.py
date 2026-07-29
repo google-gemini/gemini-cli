@@ -145,6 +145,9 @@ def main() -> None:
                 send_label_action(
                     owner, repo, issue_number, [f"effort/{effort.lower()}"]
                 )
+                publish_issue_ready_for_code(
+                    owner, repo, issue_number, workable_spec
+                )
                 store.release_lock(
                     owner,
                     repo,
@@ -153,9 +156,6 @@ def main() -> None:
                     success=True,
                     status="TRIAGED",
                     workable_spec=workable_spec,
-                )
-                publish_issue_ready_for_code(
-                    owner, repo, issue_number, workable_spec
                 )
                 print(f"[WORKER] Triage success.")
                 sys.exit(0)
