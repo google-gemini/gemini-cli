@@ -165,8 +165,13 @@ describe('activate', () => {
       );
     });
 
+    // Only the stubs above carry a `tag`. IDEServer.start also pushes its own
+    // untagged Disposables onto context.subscriptions, so filter to the tagged
+    // ones rather than assuming every entry is one of ours.
     const subscribedTags = () =>
-      context.subscriptions.map((d) => (d as unknown as { tag: string }).tag);
+      context.subscriptions
+        .map((d) => (d as unknown as { tag?: unknown } | undefined)?.tag)
+        .filter((tag): tag is string => typeof tag === 'string');
 
     it('tracks every registration made during activation', async () => {
       await activate(context);
