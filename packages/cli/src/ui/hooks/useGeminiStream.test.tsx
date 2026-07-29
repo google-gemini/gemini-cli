@@ -54,6 +54,7 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   UPDATE_TOPIC_TOOL_NAME,
+  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -2303,6 +2304,37 @@ describe('useGeminiStream', () => {
           undefined,
           'gemini-2.5-pro',
           'gemini-2.5-flash',
+        );
+      });
+    });
+
+    it('should use EMPTY_RESPONSE_COMPRESS_SUGGESTION when receiving an invalid stream event of type NO_RESPONSE_TEXT', async () => {
+      mockSendMessageStream.mockClear();
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.InvalidStream,
+            value: {
+              type: 'NO_RESPONSE_TEXT',
+              message: 'empty response text',
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: EMPTY_RESPONSE_COMPRESS_SUGGESTION,
+          }),
+          expect.any(Number),
         );
       });
     });

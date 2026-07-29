@@ -47,6 +47,7 @@ import {
   buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
+  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1246,8 +1247,7 @@ export const useGeminiStream = (
       let text =
         eventValue?.message?.trim() || 'Invalid stream received from model';
       if (eventValue?.type === 'NO_RESPONSE_TEXT') {
-        text =
-          'The model returned an empty text response. If this error persists as your conversation grows, try using `/compress` to reduce context size.';
+        text = EMPTY_RESPONSE_COMPRESS_SUGGESTION;
       }
 
       // Log the API error telemetry
