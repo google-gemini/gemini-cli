@@ -999,6 +999,54 @@ describe('GeminiChat', () => {
       expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
     });
 
+    it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
+      // Establish an initial token count baseline
+      const initialBaseline = chat.getLastPromptTokenCount();
+
+      // Setup: Stream that yields usageMetadata updating token count and then throws an InvalidStreamError
+      const streamWithUsageAndFailure = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: '' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: initialBaseline + 500, // mock updated larger token count
+            candidatesTokenCount: 10,
+            totalTokenCount: initialBaseline + 510,
+          },
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithUsageAndFailure,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test prompt for token baseline rollback',
+        'prompt-id-baseline-rollback',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream to trigger validation error
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // Verify that the prompt token count has been successfully restored to its initial baseline
+      expect(chat.getLastPromptTokenCount()).toBe(initialBaseline);
+    });
+
     it('should sync the chat recording service on history rollback when InvalidStreamError is thrown', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const updateSpy = vi.spyOn(

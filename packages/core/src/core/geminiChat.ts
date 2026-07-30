@@ -398,6 +398,7 @@ export class GeminiChat {
     await this.sendPromise;
 
     const historyLengthBefore = this.agentHistory.length;
+    const baselinePromptTokenCount = this.lastPromptTokenCount;
 
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
@@ -670,6 +671,7 @@ export class GeminiChat {
           this.chatRecordingService.updateMessagesFromHistory(
             this.agentHistory.get(),
           );
+          this.lastPromptTokenCount = baselinePromptTokenCount;
         }
         throw error;
       } finally {
