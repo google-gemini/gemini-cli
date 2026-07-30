@@ -1,5 +1,5 @@
 # ---- Stage 1: Builder ----
-FROM docker.io/library/node:20-slim AS builder
+FROM docker.io/library/node:24-slim AS builder
 
 # Install git (needed by generate-git-commit-info.js script)
 RUN apt-get update && apt-get install -y --no-install-recommends git \
@@ -39,7 +39,7 @@ RUN HUSKY=0 npm run build && \
     npm pack -w packages/cli --pack-destination packages/cli/dist/
 
 # ---- Stage 2: Runtime ----
-FROM docker.io/library/node:20-slim
+FROM docker.io/library/node:24-slim
 
 ARG SANDBOX_NAME="gemini-cli-sandbox"
 ARG CLI_VERSION_ARG
@@ -81,8 +81,13 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 USER node
 
 # install gemini-cli and clean up
-COPY --chown=node:node packages/cli/dist/google-gemini-cli-*.tgz /tmp/gemini-cli.tgz
-COPY --chown=node:node packages/core/dist/google-gemini-cli-core-*.tgz /tmp/gemini-core.tgz
+COPY --from=builder --chown=node:node \
+    /build/packages/cli/dist/google-gemini-cli-*.tgz \
+    /tmp/gemini-cli.tgz
+
+COPY --from=builder --chown=node:node \
+    /build/packages/core/dist/google-gemini-cli-core-*.tgz \
+    /tmp/gemini-core.tgz
 RUN npm install -g /tmp/gemini-core.tgz \
   && npm install -g /tmp/gemini-cli.tgz \
   && node -e "const fs=require('node:fs'); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli/package.json','utf8')); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli-core/package.json','utf8'));" \
