@@ -47,7 +47,12 @@ import {
   buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
-  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
+  THINKING_ONLY_COMPRESS_SUGGESTION,
+  MAX_TOKENS_EXCEEDED_SUGGESTION,
+  SAFETY_BLOCKED_MESSAGE,
+  RECITATION_BLOCKED_MESSAGE,
+  OTHER_BLOCKED_MESSAGE,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1247,7 +1252,17 @@ export const useGeminiStream = (
       let text =
         eventValue?.message?.trim() || 'Invalid stream received from model';
       if (eventValue?.type === 'NO_RESPONSE_TEXT') {
-        text = EMPTY_RESPONSE_COMPRESS_SUGGESTION;
+        text = TRUE_EMPTY_RESPONSE_MESSAGE;
+      } else if (eventValue?.type === 'THINKING_ONLY_RESPONSE') {
+        text = THINKING_ONLY_COMPRESS_SUGGESTION;
+      } else if (eventValue?.type === 'MAX_TOKENS_EXCEEDED') {
+        text = MAX_TOKENS_EXCEEDED_SUGGESTION;
+      } else if (eventValue?.type === 'SAFETY_BLOCKED') {
+        text = SAFETY_BLOCKED_MESSAGE;
+      } else if (eventValue?.type === 'RECITATION_BLOCKED') {
+        text = RECITATION_BLOCKED_MESSAGE;
+      } else if (eventValue?.type === 'OTHER_BLOCKED') {
+        text = OTHER_BLOCKED_MESSAGE;
       }
 
       // Log the API error telemetry

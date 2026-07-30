@@ -225,7 +225,12 @@ export class InvalidStreamError extends Error {
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
     | 'MALFORMED_FUNCTION_CALL'
-    | 'UNEXPECTED_TOOL_CALL';
+    | 'UNEXPECTED_TOOL_CALL'
+    | 'MAX_TOKENS_EXCEEDED'
+    | 'SAFETY_BLOCKED'
+    | 'RECITATION_BLOCKED'
+    | 'OTHER_BLOCKED'
+    | 'THINKING_ONLY_RESPONSE';
 
   constructor(
     message: string,
@@ -233,7 +238,12 @@ export class InvalidStreamError extends Error {
       | 'NO_FINISH_REASON'
       | 'NO_RESPONSE_TEXT'
       | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL',
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -521,6 +531,7 @@ export class GeminiChat {
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
+        let lastStreamError: unknown = undefined;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -532,7 +543,7 @@ export class GeminiChat {
             // If this is a retry, update the key with the new context.
             const currentConfigKey =
               attempt > 0
-                ? { ...modelConfigKey, isRetry: true }
+                ? { ...modelConfigKey, isRetry: true, lastStreamError }
                 : modelConfigKey;
 
             isConnectionPhase = true;
@@ -551,6 +562,10 @@ export class GeminiChat {
 
             return;
           } catch (error) {
+            if (error instanceof InvalidStreamError) {
+              lastStreamError = error;
+            }
+
             if (error instanceof AgentExecutionStoppedError) {
               yield {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
@@ -776,6 +791,30 @@ export class GeminiChat {
         tools: this.tools,
         abortSignal,
       };
+
+      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
+      if (
+        modelConfigKey.isRetry &&
+        modelConfigKey.lastStreamError instanceof InvalidStreamError
+      ) {
+        const lastError = modelConfigKey.lastStreamError;
+        let nudgeMessage = '';
+        if (lastError.type === 'THINKING_ONLY_RESPONSE') {
+          nudgeMessage =
+            '\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+        } else if (lastError.type === 'NO_RESPONSE_TEXT') {
+          nudgeMessage =
+            '\n[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
+        }
+
+        if (nudgeMessage) {
+          if (typeof config.systemInstruction === 'string') {
+            config.systemInstruction += nudgeMessage;
+          } else if (config.systemInstruction === undefined) {
+            config.systemInstruction = nudgeMessage;
+          }
+        }
+      }
 
       let contentsToUse: Content[] =
         supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
@@ -1325,10 +1364,15 @@ export class GeminiChat {
       }
     }
 
-    const responseText = consolidatedParts
+    const rawResponseText = consolidatedParts
       .filter((part) => part.text)
       .map((part) => part.text)
-      .join('')
+      .join('');
+
+    // Clean zero-width/invisible characters and HTML comments to determine actual printable/visible content
+    const responseText = rawResponseText
+      .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
       .trim();
 
     let id: string;
@@ -1377,6 +1421,36 @@ export class GeminiChat {
         );
       }
       if (!responseText) {
+        if (finishReason === FinishReason.MAX_TOKENS) {
+          throw new InvalidStreamError(
+            'Model stream ended due to token limit exhaustion (MAX_TOKENS) with empty response text.',
+            'MAX_TOKENS_EXCEEDED',
+          );
+        }
+        if (finishReason === FinishReason.SAFETY) {
+          throw new InvalidStreamError(
+            'Model stream ended due to safety settings (SAFETY) with empty response text.',
+            'SAFETY_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.RECITATION) {
+          throw new InvalidStreamError(
+            'Model stream ended due to recitation settings (RECITATION) with empty response text.',
+            'RECITATION_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.OTHER) {
+          throw new InvalidStreamError(
+            'Model stream ended due to other settings (OTHER) with empty response text.',
+            'OTHER_BLOCKED',
+          );
+        }
+        if (hasThoughts) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text but contained reasoning thoughts.',
+            'THINKING_ONLY_RESPONSE',
+          );
+        }
         throw new InvalidStreamError(
           'Model stream ended with empty response text.',
           'NO_RESPONSE_TEXT',

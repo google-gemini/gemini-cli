@@ -41,7 +41,12 @@ import {
   debugLogger,
   logApiError,
   ApiErrorEvent,
-  EMPTY_RESPONSE_COMPRESS_SUGGESTION,
+  THINKING_ONLY_COMPRESS_SUGGESTION,
+  MAX_TOKENS_EXCEEDED_SUGGESTION,
+  SAFETY_BLOCKED_MESSAGE,
+  RECITATION_BLOCKED_MESSAGE,
+  OTHER_BLOCKED_MESSAGE,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -559,10 +564,20 @@ export async function runNonInteractive({
               const rawMessage =
                 typeof rawMessageVal === 'string' ? rawMessageVal : undefined;
 
-              const errorMessage =
-                errorType === 'NO_RESPONSE_TEXT'
-                  ? EMPTY_RESPONSE_COMPRESS_SUGGESTION
-                  : event.message;
+              let errorMessage = event.message;
+              if (errorType === 'NO_RESPONSE_TEXT') {
+                errorMessage = TRUE_EMPTY_RESPONSE_MESSAGE;
+              } else if (errorType === 'THINKING_ONLY_RESPONSE') {
+                errorMessage = THINKING_ONLY_COMPRESS_SUGGESTION;
+              } else if (errorType === 'MAX_TOKENS_EXCEEDED') {
+                errorMessage = MAX_TOKENS_EXCEEDED_SUGGESTION;
+              } else if (errorType === 'SAFETY_BLOCKED') {
+                errorMessage = SAFETY_BLOCKED_MESSAGE;
+              } else if (errorType === 'RECITATION_BLOCKED') {
+                errorMessage = RECITATION_BLOCKED_MESSAGE;
+              } else if (errorType === 'OTHER_BLOCKED') {
+                errorMessage = OTHER_BLOCKED_MESSAGE;
+              }
 
               if (streamFormatter) {
                 streamFormatter.emitEvent({

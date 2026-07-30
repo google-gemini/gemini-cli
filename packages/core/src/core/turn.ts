@@ -110,7 +110,12 @@ export type ServerGeminiInvalidStreamEvent = {
       | 'NO_FINISH_REASON'
       | 'NO_RESPONSE_TEXT'
       | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL';
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE';
     message: string;
   };
 };

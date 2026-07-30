@@ -22,6 +22,7 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   JsonStreamEventType,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -2320,7 +2321,7 @@ describe('runNonInteractive', () => {
       });
 
       expect(processStderrSpy).toHaveBeenCalledWith(
-        '[ERROR] The model returned an empty text response. If your context window is near capacity, try using /compress.\n',
+        `[ERROR] ${TRUE_EMPTY_RESPONSE_MESSAGE}\n`,
       );
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
@@ -2355,9 +2356,7 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"type":"error"');
       expect(output).toContain('"severity":"error"');
-      expect(output).toContain(
-        'The model returned an empty text response. If your context window is near capacity, try using /compress.',
-      );
+      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
 
@@ -2391,9 +2390,7 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"error": {');
       expect(output).toContain('"type": "INVALID_STREAM"');
-      expect(output).toContain(
-        'The model returned an empty text response. If your context window is near capacity, try using /compress.',
-      );
+      expect(output).toContain(TRUE_EMPTY_RESPONSE_MESSAGE);
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
 

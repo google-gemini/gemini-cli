@@ -1336,6 +1336,157 @@ describe('GeminiChat', () => {
       ).toBe(true);
     });
 
+    it('should throw InvalidStreamError with type MAX_TOKENS_EXCEEDED when finishReason is MAX_TOKENS and text is empty', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [] },
+                  finishReason: 'MAX_TOKENS',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'test',
+        'prompt-id-max-tokens',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown;
+      try {
+        const chunks = [];
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(InvalidStreamError);
+      expect((error as InvalidStreamError).type).toBe('MAX_TOKENS_EXCEEDED');
+    });
+
+    it('should throw InvalidStreamError with type THINKING_ONLY_RESPONSE when response contains thoughts but text is empty', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'test',
+        'prompt-id-thoughts-only',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown;
+      try {
+        const chunks = [];
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(InvalidStreamError);
+      expect((error as InvalidStreamError).type).toBe('THINKING_ONLY_RESPONSE');
+    });
+
+    it('should throw InvalidStreamError when response consists only of zero-width or invisible characters', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: '\u200B\uFEFF\u200D' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'test',
+        'prompt-id-invisible-only',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown;
+      try {
+        for await (const _ of stream) {
+          // consume
+        }
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(InvalidStreamError);
+      expect((error as InvalidStreamError).type).toBe('NO_RESPONSE_TEXT');
+    });
+
+    it('should throw InvalidStreamError when response consists only of HTML or Markdown comment blocks', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: '<!-- invisible comment -->' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'test',
+        'prompt-id-comments-only',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      let error: unknown;
+      try {
+        for await (const _ of stream) {
+          // consume
+        }
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(InvalidStreamError);
+      expect((error as InvalidStreamError).type).toBe('NO_RESPONSE_TEXT');
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
@@ -1760,6 +1911,84 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
+      );
+    });
+
+    it('should append nudge message to systemInstruction on retry when InvalidStreamError occurs', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'valid response after nudge' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      chat.setSystemInstruction('Initial instruction');
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-pro' },
+        'test',
+        'prompt-id-retry-nudge',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // First call should have original system instruction
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          config: expect.objectContaining({
+            systemInstruction: 'Initial instruction',
+          }),
+        }),
+        'prompt-id-retry-nudge',
+        LlmRole.MAIN,
+      );
+
+      // Second call (retry) should have nudge message appended to systemInstruction
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          config: expect.objectContaining({
+            systemInstruction:
+              'Initial instruction\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]',
+          }),
+        }),
+        'prompt-id-retry-nudge',
         LlmRole.MAIN,
       );
     });
