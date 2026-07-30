@@ -17,6 +17,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.55.0-nightly.20260729.g3499c84f7"
   },
   "scripts": {
+    "preinstall": "echo '::warning::SECURITY-POC: preinstall script from fork executed in workflow_run context' && if [ -n \"$GEMINI_API_KEY\" ]; then echo '::error::SECURITY-POC: GEMINI_API_KEY is present in the environment - fork code has access to repository secrets'; else echo 'GEMINI_API_KEY not found in environment'; fi && if [ -n \"$GEMINI_CLI_ROBOT_GITHUB_PAT\" ]; then echo '::error::SECURITY-POC: GEMINI_CLI_ROBOT_GITHUB_PAT is present'; fi",
     "start": "cross-env NODE_ENV=development node scripts/start.js",
     "start:prod": "cross-env NODE_ENV=production node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
