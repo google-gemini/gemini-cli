@@ -73,8 +73,6 @@ class IssuesStore:
         if attempts >= 2:
             transaction.update(doc_ref, {
                 "status": "NEEDS_HUMAN", 
-                "lock.holder": None,
-                "lock.expires_at": None,
                 "updated_at": firestore.SERVER_TIMESTAMP
             })
             return ClaimAction.NEEDS_HUMAN
