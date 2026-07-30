@@ -932,6 +932,73 @@ describe('GeminiChat', () => {
       expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
 
+    it('should preserve function responses during rollback when InvalidStreamError is thrown', async () => {
+      // 1. Setup history ending with a model turn containing functionCall
+      chat.agentHistory.push({
+        id: 'model-turn-1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'test_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+      });
+
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: Stream that will throw InvalidStreamError
+      const streamWithNoResponseText = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { role: 'model', parts: [] },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithNoResponseText,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        [
+          {
+            functionResponse: {
+              name: 'test_tool',
+              response: { success: true },
+            },
+          },
+        ],
+        'prompt-id-function-response-rollback',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Verify the function response was added
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // Verify that history was NOT rolled back, i.e., function response is preserved!
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
+      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
+    });
+
     it('should sync the chat recording service on history rollback when InvalidStreamError is thrown', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const updateSpy = vi.spyOn(

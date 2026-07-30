@@ -665,10 +665,12 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        this.agentHistory.rollback(historyLengthBefore);
-        this.chatRecordingService.updateMessagesFromHistory(
-          this.agentHistory.get(),
-        );
+        if (!isFunctionResponse(userContent)) {
+          this.agentHistory.rollback(historyLengthBefore);
+          this.chatRecordingService.updateMessagesFromHistory(
+            this.agentHistory.get(),
+          );
+        }
         throw error;
       } finally {
         streamDoneResolver!();
