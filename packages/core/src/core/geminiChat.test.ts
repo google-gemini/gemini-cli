@@ -1047,6 +1047,93 @@ describe('GeminiChat', () => {
       expect(chat.getLastPromptTokenCount()).toBe(initialBaseline);
     });
 
+    it('should not write failed retry attempts to the chat recording service', async () => {
+      const recordMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordMessage',
+      );
+      const recordSyntheticMessageSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordSyntheticMessage',
+      );
+
+      // Attempt 1: returns invalid stream (triggering InvalidStreamError)
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: '' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        // Attempt 2: returns a valid response
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'successful retry response' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test prompt for recording deferral',
+        'prompt-id-recording-deferral',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume stream completely
+      }
+
+      // 1. The execution was successful, and final history turn has the correct text
+      const lastHistoryTurn =
+        chat.agentHistory.get()[chat.agentHistory.length - 1];
+      expect(lastHistoryTurn.content.parts?.[0]?.text).toBe(
+        'successful retry response',
+      );
+
+      // 2. recordMessage was only called for the successful turn
+      // (The failed attempt was NEVER recorded!)
+      const successfulCalls = recordMessageSpy.mock.calls.filter((call) => {
+        const payload = call[0];
+        return (
+          typeof payload === 'object' &&
+          payload !== null &&
+          payload.content === 'successful retry response'
+        );
+      });
+      const failedCalls = recordMessageSpy.mock.calls.filter((call) => {
+        const payload = call[0];
+        return (
+          typeof payload === 'object' &&
+          payload !== null &&
+          payload.content === ''
+        );
+      });
+
+      expect(successfulCalls.length).toBe(1);
+      expect(failedCalls.length).toBe(0);
+      expect(recordSyntheticMessageSpy).not.toHaveBeenCalled();
+
+      recordMessageSpy.mockRestore();
+      recordSyntheticMessageSpy.mockRestore();
+    });
+
     it('should sync the chat recording service on history rollback when InvalidStreamError is thrown', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const updateSpy = vi.spyOn(

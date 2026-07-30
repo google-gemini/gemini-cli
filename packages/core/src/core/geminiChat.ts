@@ -1379,24 +1379,6 @@ export class GeminiChat {
       .replace(/<!--[\s\S]*?-->/g, '')
       .trim();
 
-    let id: string;
-    // Record model response text from the collected parts.
-    // Also flush when there are thoughts or a tool call (even with no text)
-    // so that BeforeTool hooks always see the latest transcript state.
-    if (responseText || hasThoughts || hasToolCall) {
-      id = this.chatRecordingService.recordMessage({
-        model,
-        type: 'gemini',
-        content: responseText,
-      });
-    } else {
-      // Still need a durable ID even if response is empty (e.g. only tool calls)
-      id = this.chatRecordingService.recordSyntheticMessage(
-        'gemini',
-        consolidatedParts,
-      );
-    }
-
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call OR
     // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
@@ -1460,6 +1442,24 @@ export class GeminiChat {
           'NO_RESPONSE_TEXT',
         );
       }
+    }
+
+    let id: string;
+    // Record model response text from the collected parts.
+    // Also flush when there are thoughts or a tool call (even with no text)
+    // so that BeforeTool hooks always see the latest transcript state.
+    if (responseText || hasThoughts || hasToolCall) {
+      id = this.chatRecordingService.recordMessage({
+        model,
+        type: 'gemini',
+        content: responseText,
+      });
+    } else {
+      // Still need a durable ID even if response is empty (e.g. only tool calls)
+      id = this.chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        consolidatedParts,
+      );
     }
 
     this.agentHistory.push({
