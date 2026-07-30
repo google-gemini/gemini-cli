@@ -14,8 +14,7 @@ import {
   GitService,
   UnauthorizedError,
   UserPromptEvent,
-  logApiError,
-  ApiErrorEvent,
+  uiTelemetryService,
   DEFAULT_GEMINI_FLASH_MODEL,
   logConversationFinishedEvent,
   ConversationFinishedEvent,
@@ -1265,20 +1264,10 @@ export const useGeminiStream = (
         text = OTHER_BLOCKED_MESSAGE;
       }
 
-      // Log the API error telemetry
-      logApiError(
-        config,
-        new ApiErrorEvent(
-          geminiClient.getCurrentSequenceModel() ?? config.getModel(),
-          eventValue?.message || 'Invalid stream received from model',
-          0, // duration
-          {
-            prompt_id: lastPromptIdRef.current || 'unknown',
-            contents: [],
-          },
-          config.getContentGeneratorConfig()?.authType,
-          eventValue?.type || 'INVALID_STREAM',
-        ),
+      // Log semantic error telemetry without double-counting requests
+      uiTelemetryService.recordSemanticValidationError(
+        geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+        eventValue?.type || 'INVALID_STREAM',
       );
 
       addItem(
@@ -1300,7 +1289,6 @@ export const useGeminiStream = (
       maybeAddLowVerbosityFailureNote,
       config,
       geminiClient,
-      lastPromptIdRef,
     ],
   );
 

@@ -172,6 +172,23 @@ export class UiTelemetryService extends EventEmitter {
     });
   }
 
+  recordSemanticValidationError(model: string, errorType: string): void {
+    const modelMetrics = this.getOrCreateModelMetrics(model);
+    modelMetrics.api.totalErrors++;
+
+    if (!modelMetrics.api.errorsByType) {
+      modelMetrics.api.errorsByType = {};
+    }
+    const type = errorType || 'INVALID_STREAM';
+    modelMetrics.api.errorsByType[type] =
+      (modelMetrics.api.errorsByType[type] || 0) + 1;
+
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
   getMetrics(): SessionMetrics {
     return this.#metrics;
   }

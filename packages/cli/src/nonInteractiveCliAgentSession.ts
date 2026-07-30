@@ -39,8 +39,6 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
-  logApiError,
-  ApiErrorEvent,
   THINKING_ONLY_COMPRESS_SUGGESTION,
   MAX_TOKENS_EXCEEDED_SUGGESTION,
   SAFETY_BLOCKED_MESSAGE,
@@ -560,9 +558,6 @@ export async function runNonInteractive({
               const errorTypeVal = event._meta?.['errorType'];
               const errorType =
                 typeof errorTypeVal === 'string' ? errorTypeVal : undefined;
-              const rawMessageVal = event._meta?.['rawMessage'];
-              const rawMessage =
-                typeof rawMessageVal === 'string' ? rawMessageVal : undefined;
 
               let errorMessage = event.message;
               if (errorType === 'NO_RESPONSE_TEXT') {
@@ -590,20 +585,10 @@ export async function runNonInteractive({
                 process.stderr.write(`[ERROR] ${errorMessage}\n`);
               }
 
-              // Log the API error telemetry
-              logApiError(
-                config,
-                new ApiErrorEvent(
-                  geminiClient.getCurrentSequenceModel() ?? config.getModel(),
-                  rawMessage || 'Invalid stream received from model',
-                  0, // duration
-                  {
-                    prompt_id,
-                    contents: [],
-                  },
-                  config.getContentGeneratorConfig()?.authType,
-                  errorType || 'INVALID_STREAM',
-                ),
+              // Log semantic error telemetry without double-counting requests
+              uiTelemetryService.recordSemanticValidationError(
+                geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+                errorType || 'INVALID_STREAM',
               );
 
               // If it's a fatal stream error, we should terminate and output final results

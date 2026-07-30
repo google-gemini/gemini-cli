@@ -30,8 +30,6 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
-  logApiError,
-  ApiErrorEvent,
   THINKING_ONLY_COMPRESS_SUGGESTION,
   MAX_TOKENS_EXCEEDED_SUGGESTION,
   SAFETY_BLOCKED_MESSAGE,
@@ -460,20 +458,10 @@ export async function runNonInteractive(
                 'Invalid stream: The model returned an empty response or malformed tool call.';
             }
 
-            // Log the API error telemetry
-            logApiError(
-              config,
-              new ApiErrorEvent(
-                geminiClient.getCurrentSequenceModel() ?? config.getModel(),
-                eventValue?.message || 'Invalid stream received from model',
-                0, // duration
-                {
-                  prompt_id,
-                  contents: [],
-                },
-                config.getContentGeneratorConfig()?.authType,
-                eventValue?.type || 'INVALID_STREAM',
-              ),
+            // Log semantic error telemetry without double-counting requests
+            uiTelemetryService.recordSemanticValidationError(
+              geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+              eventValue?.type || 'INVALID_STREAM',
             );
 
             if (streamFormatter) {
