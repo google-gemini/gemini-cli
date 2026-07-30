@@ -93,7 +93,11 @@ import {
 
 import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
-import { deleteSession, listSessions } from './utils/sessions.js';
+import {
+  deleteSession,
+  listSessions,
+  listAllSessions,
+} from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
@@ -697,6 +701,14 @@ export async function main() {
       }
 
       await listSessions(config);
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
+    // Handle --list-all-sessions flag
+    if (config.getListAllSessions()) {
+      // No summary generation is needed for other projects, just print sessions directly
+      await listAllSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     }

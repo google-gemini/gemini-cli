@@ -272,6 +272,7 @@ export { createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+export { ProjectRegistry } from './config/projectRegistry.js';
 
 // Export hooks system
 export * from './hooks/index.js';

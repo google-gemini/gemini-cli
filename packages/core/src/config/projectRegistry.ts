@@ -59,6 +59,16 @@ export class ProjectRegistry {
     return this.initPromise;
   }
 
+  /**
+   * Returns a copy of the registered projects mapping.
+   */
+  getProjects(): Record<string, string> {
+    if (!this.data) {
+      throw new Error('ProjectRegistry must be initialized before use');
+    }
+    return { ...this.data.projects };
+  }
+
   private async loadData(): Promise<RegistryData> {
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');

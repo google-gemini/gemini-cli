@@ -643,6 +643,8 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   acpMode?: boolean;
   listSessions?: boolean;
+  listAllSessions?: boolean;
+  groupByWorkspace?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
@@ -839,6 +841,8 @@ export class Config implements McpContext, AgentLoopContext {
   private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
+  private readonly listAllSessions: boolean;
+  private readonly groupByWorkspace: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
@@ -1241,6 +1245,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
+    this.listAllSessions = params.listAllSessions ?? false;
+    this.groupByWorkspace = params.groupByWorkspace ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
     this._extensionLoader =
@@ -3051,6 +3057,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getListSessions(): boolean {
     return this.listSessions;
+  }
+
+  getListAllSessions(): boolean {
+    return this.listAllSessions;
+  }
+
+  getGroupByWorkspace(): boolean {
+    return this.groupByWorkspace;
   }
 
   getDeleteSession(): string | undefined {

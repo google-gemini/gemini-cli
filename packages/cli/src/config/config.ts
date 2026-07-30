@@ -97,6 +97,8 @@ export interface CliArgs {
   sessionFile?: string | undefined;
   sessionId: string | undefined;
   listSessions: boolean | undefined;
+  listAllSessions: boolean | undefined;
+  groupByWorkspace: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
@@ -445,6 +447,16 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'List available sessions for the current project and exit.',
+        })
+        .option('list-all-sessions', {
+          type: 'boolean',
+          description:
+            'List available sessions for all projects/workspaces and exit.',
+        })
+        .option('group-by-workspace', {
+          type: 'boolean',
+          alias: 'group',
+          description: 'Group the listed sessions by workspace path.',
         })
         .option('delete-session', {
           type: 'string',
@@ -1037,6 +1049,8 @@ export async function loadCliConfig(
 
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
+    listAllSessions: argv.listAllSessions || false,
+    groupByWorkspace: argv.groupByWorkspace || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: finalExtensionLoader,

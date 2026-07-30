@@ -36,6 +36,8 @@ describe('loadCliConfig skipExtensions', () => {
     resume: undefined,
     sessionId: undefined,
     listSessions: undefined,
+    listAllSessions: undefined,
+    groupByWorkspace: undefined,
   } as unknown as CliArgs;
 
   beforeEach(() => {

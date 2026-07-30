@@ -42,6 +42,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getListExtensions: vi.fn(() => false),
     getExtensions: vi.fn(() => []),
     getListSessions: vi.fn(() => false),
+    getListAllSessions: vi.fn(() => false),
+    getGroupByWorkspace: vi.fn(() => false),
     getDeleteSession: vi.fn(() => undefined),
     setSessionId: vi.fn(),
     resetNewSessionState: vi.fn(),

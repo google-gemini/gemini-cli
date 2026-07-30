@@ -6,28 +6,42 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { deleteStoredSession, type Config } from '@google/gemini-cli-core';
-import { listSessions, deleteSession } from './sessions.js';
-import { SessionSelector, type SessionInfo } from './sessionUtils.js';
+import { listSessions, listAllSessions, deleteSession } from './sessions.js';
+import {
+  SessionSelector,
+  type SessionInfo,
+  getSessionFiles,
+} from './sessionUtils.js';
 
 const mocks = vi.hoisted(() => ({
   writeToStdout: vi.fn(),
   writeToStderr: vi.fn(),
+  mockGetProjects: vi.fn(),
+  mockInitialize: vi.fn(),
 }));
 
 // Mock the SessionSelector and deleteStoredSession.
 vi.mock('./sessionUtils.js', () => ({
   SessionSelector: vi.fn(),
   formatRelativeTime: vi.fn(() => 'some time ago'),
+  getSessionFiles: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
+
+  const MockProjectRegistry = vi.fn().mockImplementation(() => ({
+    initialize: mocks.mockInitialize,
+    getProjects: mocks.mockGetProjects,
+  }));
+
   return {
     ...actual,
     deleteStoredSession: vi.fn(),
     generateSummary: vi.fn().mockResolvedValue(undefined),
     writeToStdout: mocks.writeToStdout,
     writeToStderr: mocks.writeToStderr,
+    ProjectRegistry: MockProjectRegistry,
   };
 });
 
@@ -740,6 +754,203 @@ describe('deleteSession', () => {
     );
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       expect.stringContaining('Oldest session'),
+    );
+  });
+});
+
+describe('listAllSessions', () => {
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    mockConfig = {
+      storage: {
+        getProjectRoot: vi
+          .fn()
+          .mockReturnValue('/home/user/workspace/gemini-cli'),
+      },
+      getSessionId: vi.fn().mockReturnValue('current-session-id'),
+      getGroupByWorkspace: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    mocks.writeToStdout.mockClear();
+    mocks.writeToStderr.mockClear();
+    mocks.mockGetProjects.mockReset();
+    mocks.mockInitialize.mockReset();
+    vi.mocked(getSessionFiles).mockReset();
+  });
+
+  it('should print message when no workspaces are found', async () => {
+    mocks.mockInitialize.mockResolvedValue(undefined);
+    mocks.mockGetProjects.mockReturnValue({});
+
+    await listAllSessions(mockConfig);
+
+    expect(mocks.mockInitialize).toHaveBeenCalledOnce();
+    expect(mocks.mockGetProjects).toHaveBeenCalledOnce();
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining('No workspaces found in the project registry.'),
+    );
+  });
+
+  it('should print message when workspaces exist but none have sessions', async () => {
+    mocks.mockInitialize.mockResolvedValue(undefined);
+    mocks.mockGetProjects.mockReturnValue({
+      '/home/user/workspace/gemini-cli': 'gemini-cli',
+    });
+    vi.mocked(getSessionFiles).mockResolvedValue([]);
+
+    await listAllSessions(mockConfig);
+
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'No previous sessions found across any workspaces.',
+      ),
+    );
+  });
+
+  it('should list flat global chronological sessions across workspaces', async () => {
+    mocks.mockInitialize.mockResolvedValue(undefined);
+    mocks.mockGetProjects.mockReturnValue({
+      '/home/user/workspace/gemini-cli': 'gemini-cli',
+      '/home/user/workspace/another-project': 'another-project',
+    });
+
+    const mockCliSessions: SessionInfo[] = [
+      {
+        id: 'current-session-id',
+        file: 'session-file-2',
+        fileName: 'session-file-2.json',
+        startTime: '2025-01-20T11:00:00.000Z',
+        lastUpdated: '2025-01-20T11:00:00.000Z',
+        messageCount: 5,
+        displayName: 'Active session',
+        firstUserMessage: 'Active message',
+        isCurrentSession: true,
+        index: 2,
+      },
+    ];
+
+    const mockAnotherSessions: SessionInfo[] = [
+      {
+        id: 'session-1',
+        file: 'session-file-1',
+        fileName: 'session-file-1.json',
+        startTime: '2025-01-20T10:00:00.000Z',
+        lastUpdated: '2025-01-20T10:00:00.000Z',
+        messageCount: 3,
+        displayName: 'First session',
+        firstUserMessage: 'First message',
+        isCurrentSession: false,
+        index: 1,
+      },
+    ];
+
+    vi.mocked(getSessionFiles).mockImplementation(async (chatsDir) => {
+      if (chatsDir.includes('gemini-cli')) {
+        return mockCliSessions;
+      }
+      if (chatsDir.includes('another-project')) {
+        return mockAnotherSessions;
+      }
+      return [];
+    });
+
+    await listAllSessions(mockConfig);
+
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining('Latest Sessions Across All Workspaces:'),
+    );
+
+    // Verify they are sorted newest first
+    const sessionCalls = mocks.writeToStdout.mock.calls.filter(
+      (call): call is [string] => {
+        const firstArg = call[0];
+        return (
+          typeof firstArg === 'string' &&
+          (firstArg.includes('Active session') ||
+            firstArg.includes('First session'))
+        );
+      },
+    );
+    // 1. Active session (newest) - should have '*' since it is the active workspace
+    expect(sessionCalls[0][0]).toContain('* 1. Active session [gemini-cli]');
+    // 2. First session (older) - should have ' ' since it belongs to another-project
+    expect(sessionCalls[1][0]).toContain(
+      '  2. First session [another-project]',
+    );
+  });
+
+  it('should list grouped sessions of workspaces when getGroupByWorkspace() is true', async () => {
+    mockConfig = {
+      storage: {
+        getProjectRoot: vi
+          .fn()
+          .mockReturnValue('/home/user/workspace/gemini-cli'),
+      },
+      getSessionId: vi.fn().mockReturnValue('current-session-id'),
+      getGroupByWorkspace: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+
+    mocks.mockInitialize.mockResolvedValue(undefined);
+    mocks.mockGetProjects.mockReturnValue({
+      '/home/user/workspace/gemini-cli': 'gemini-cli',
+      '/home/user/workspace/another-project': 'another-project',
+    });
+
+    const mockCliSessions: SessionInfo[] = [
+      {
+        id: 'current-session-id',
+        file: 'session-file-2',
+        fileName: 'session-file-2.json',
+        startTime: '2025-01-20T11:00:00.000Z',
+        lastUpdated: '2025-01-20T11:00:00.000Z',
+        messageCount: 5,
+        displayName: 'Active session',
+        firstUserMessage: 'Active message',
+        isCurrentSession: true,
+        index: 2,
+      },
+    ];
+
+    const mockAnotherSessions: SessionInfo[] = [
+      {
+        id: 'session-1',
+        file: 'session-file-1',
+        fileName: 'session-file-1.json',
+        startTime: '2025-01-20T10:00:00.000Z',
+        lastUpdated: '2025-01-20T10:00:00.000Z',
+        messageCount: 3,
+        displayName: 'First session',
+        firstUserMessage: 'First message',
+        isCurrentSession: false,
+        index: 1,
+      },
+    ];
+
+    vi.mocked(getSessionFiles).mockImplementation(async (chatsDir) => {
+      if (chatsDir.includes('gemini-cli')) {
+        return mockCliSessions;
+      }
+      if (chatsDir.includes('another-project')) {
+        return mockAnotherSessions;
+      }
+      return [];
+    });
+
+    await listAllSessions(mockConfig);
+
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Workspace: /home/user/workspace/gemini-cli (active)',
+      ),
+    );
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Workspace: /home/user/workspace/another-project',
+      ),
     );
   });
 });

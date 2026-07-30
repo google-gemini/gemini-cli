@@ -559,6 +559,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       resume: undefined,
       sessionId: undefined,
       listSessions: undefined,
+      listAllSessions: undefined,
+      groupByWorkspace: undefined,
       deleteSession: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
@@ -619,6 +621,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       resume: undefined,
       sessionId: undefined,
       listSessions: undefined,
+      listAllSessions: undefined,
+      groupByWorkspace: undefined,
       deleteSession: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
@@ -640,9 +644,12 @@ describe('gemini.tsx main function kitty protocol', () => {
   it.each([
     { flag: 'listExtensions' },
     { flag: 'listSessions' },
+    { flag: 'listAllSessions' },
     { flag: 'deleteSession', value: 'session-id' },
   ])('should handle --$flag flag', async ({ flag, value }) => {
-    const { listSessions, deleteSession } = await import('./utils/sessions.js');
+    const { listSessions, listAllSessions, deleteSession } = await import(
+      './utils/sessions.js'
+    );
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
@@ -675,6 +682,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       getSandbox: () => undefined,
       getListExtensions: () => flag === 'listExtensions',
       getListSessions: () => flag === 'listSessions',
+      getListAllSessions: () => flag === 'listAllSessions',
+      getGroupByWorkspace: () => false,
       getDeleteSession: () => (flag === 'deleteSession' ? value : undefined),
       getExtensions: () => [
         {
@@ -691,6 +700,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
     vi.mock('./utils/sessions.js', () => ({
       listSessions: vi.fn(),
+      listAllSessions: vi.fn(),
       deleteSession: vi.fn(),
     }));
 
@@ -713,6 +723,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       );
     } else if (flag === 'listSessions') {
       expect(listSessions).toHaveBeenCalledWith(mockConfig);
+    } else if (flag === 'listAllSessions') {
+      expect(listAllSessions).toHaveBeenCalledWith(mockConfig);
     } else if (flag === 'deleteSession') {
       expect(deleteSession).toHaveBeenCalledWith(mockConfig, value);
     }
