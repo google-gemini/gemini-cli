@@ -884,6 +884,104 @@ describe('GeminiChat', () => {
       ).resolves.not.toThrow();
     });
 
+    it('should roll back the un-responded user turn from history when InvalidStreamError is thrown', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: Stream with text but no finish reason and no tool call (will trigger InvalidStreamError)
+      const streamWithoutFinishReason = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'some response' }],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithoutFinishReason,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test message to roll back',
+        'prompt-id-rollback',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Verify the user turn WAS added during sendMessageStream
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+      expect(chat.getHistory()[initialHistoryLength].parts?.[0]?.text).toBe(
+        'test message to roll back',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream to trigger validation error
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // Verify history has been rolled back to its initial state
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
+    it('should sync the chat recording service on history rollback when InvalidStreamError is thrown', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+      const updateSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'updateMessagesFromHistory',
+      );
+
+      // Setup: Stream with text but no finish reason and no tool call (will trigger InvalidStreamError)
+      const streamWithoutFinishReason = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'some response' }],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithoutFinishReason,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test disk sync rollback',
+        'prompt-id-rollback-sync',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream to trigger validation error
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // Verify history has been rolled back to its initial state
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+      // Verify chatRecordingService.updateMessagesFromHistory was called to sync the disk
+      expect(updateSpy).toHaveBeenCalled();
+
+      updateSpy.mockRestore();
+    });
+
     it('should throw InvalidStreamError when no tool call and no finish reason', async () => {
       // Setup: Stream with text but no finish reason and no tool call
       const streamWithoutFinishReason = (async function* () {
@@ -1631,13 +1729,9 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should still contain the user message.
+      // History should be rolled back to exclude the un-responded user message.
       const history = chat.getHistory();
-      expect(history.length).toBe(1);
-      expect(history[0]).toEqual({
-        role: 'user',
-        parts: [{ text: 'test' }],
-      });
+      expect(history.length).toBe(0);
     });
 
     describe('API error retry behavior', () => {

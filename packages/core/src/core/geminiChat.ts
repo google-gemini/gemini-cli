@@ -387,6 +387,8 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    const historyLengthBefore = this.agentHistory.length;
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -647,6 +649,14 @@ export class GeminiChat {
             throw error;
           }
         }
+      } catch (error) {
+        if (error instanceof InvalidStreamError) {
+          this.agentHistory.rollback(historyLengthBefore);
+          this.chatRecordingService.updateMessagesFromHistory(
+            this.agentHistory.get(),
+          );
+        }
+        throw error;
       } finally {
         streamDoneResolver!();
       }

@@ -2338,6 +2338,37 @@ describe('useGeminiStream', () => {
         );
       });
     });
+
+    it('should use the event message when receiving a non-NO_RESPONSE_TEXT invalid stream event', async () => {
+      mockSendMessageStream.mockClear();
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.InvalidStream,
+            value: {
+              type: 'MALFORMED_FUNCTION_CALL',
+              message: 'Custom malformed function call message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: 'Custom malformed function call message',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
   });
 
   describe('handleApprovalModeChange', () => {

@@ -559,7 +559,7 @@ export async function runNonInteractive({
               const rawMessage =
                 typeof rawMessageVal === 'string' ? rawMessageVal : undefined;
 
-              const warningMessage =
+              const errorMessage =
                 errorType === 'NO_RESPONSE_TEXT'
                   ? EMPTY_RESPONSE_COMPRESS_SUGGESTION
                   : event.message;
@@ -569,10 +569,10 @@ export async function runNonInteractive({
                   type: JsonStreamEventType.ERROR,
                   timestamp: new Date().toISOString(),
                   severity: 'error',
-                  message: warningMessage,
+                  message: errorMessage,
                 });
               } else if (config.getOutputFormat() === OutputFormat.TEXT) {
-                process.stderr.write(`[ERROR] ${warningMessage}\n`);
+                process.stderr.write(`[ERROR] ${errorMessage}\n`);
               }
 
               // Log the API error telemetry
@@ -594,7 +594,7 @@ export async function runNonInteractive({
               // If it's a fatal stream error, we should terminate and output final results
               emitFinalResult({
                 type: 'INVALID_STREAM',
-                message: warningMessage,
+                message: errorMessage,
               });
               streamEnded = true;
               break;
