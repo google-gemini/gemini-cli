@@ -982,6 +982,78 @@ describe('GeminiChat', () => {
       updateSpy.mockRestore();
     });
 
+    it('should roll back the un-responded user turn from history when the stream is aborted/cancelled', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+      const abortController = new AbortController();
+
+      // Setup: Stream that aborts/fails mid-generation
+      const streamWithAbort = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'some text' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        abortController.abort();
+        throw new Error('User aborted a request.');
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithAbort,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test abort message',
+        'prompt-id-abort',
+        abortController.signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream to trigger abort error
+          }
+        })(),
+      ).rejects.toThrow();
+
+      // Verify history has been rolled back to its initial state
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
+    it('should roll back the un-responded user turn from history when an ApiError is thrown', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: Stream that throws a standard API error
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        new Error('API rate limit reached'),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test api error message',
+        'prompt-id-api-error',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow('API rate limit reached');
+
+      // Verify history has been rolled back to its initial state
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+    });
+
     it('should throw InvalidStreamError when no tool call and no finish reason', async () => {
       // Setup: Stream with text but no finish reason and no tool call
       const streamWithoutFinishReason = (async function* () {
@@ -3218,6 +3290,49 @@ describe('GeminiChat', () => {
       expect(capturedContents[2].parts![1].inlineData!.mimeType).toBe(
         'video/mp4',
       );
+    });
+
+    it('should roll back all synthetic binary injection turns when the stream fails', async () => {
+      const initialHistoryLength = chat.agentHistory.length;
+      const audioParts = [
+        {
+          functionResponse: {
+            id: 'call-123',
+            name: 'read_file',
+            response: {
+              output: 'Success',
+              [BINARY_INJECTION_KEY]: [
+                { inlineData: { mimeType: 'audio/mpeg', data: 'base64' } },
+              ],
+            },
+          },
+        },
+      ];
+
+      // Setup: Stream that throws an error
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        new Error('API error during binary injection stream'),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        audioParts,
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow('API error during binary injection stream');
+
+      // Verify that history has been rolled back to its initial state,
+      // and all 3 synthetic binary injection turns have been cleaned up.
+      expect(chat.agentHistory.length).toBe(initialHistoryLength);
     });
   });
 

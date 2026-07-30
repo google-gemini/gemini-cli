@@ -650,12 +650,10 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        if (error instanceof InvalidStreamError) {
-          this.agentHistory.rollback(historyLengthBefore);
-          this.chatRecordingService.updateMessagesFromHistory(
-            this.agentHistory.get(),
-          );
-        }
+        this.agentHistory.rollback(historyLengthBefore);
+        this.chatRecordingService.updateMessagesFromHistory(
+          this.agentHistory.get(),
+        );
         throw error;
       } finally {
         streamDoneResolver!();
