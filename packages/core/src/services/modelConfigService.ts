@@ -160,9 +160,10 @@ export class ModelConfigService {
     const useGemini3_5Flash = context.useGemini3_5Flash ?? false;
 
     const mainOptions = Object.entries(definitions)
-      .filter(([_, m]) => {
+      .filter(([id, m]) => {
         if (m.isVisible !== true) return false;
-        if (m.isPreview && !shouldShowPreviewModels) return false;
+        if (m.isPreview && !shouldShowPreviewModels && id !== 'auto')
+          return false;
         if (m.tier !== 'auto') return false;
         return true;
       })
