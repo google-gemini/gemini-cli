@@ -126,6 +126,25 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
+  it('should return TerminalQuotaError for MODEL_CAPACITY_EXHAUSTED even when the domain is not a Cloud Code domain (domain-agnostic)', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+          domain: 'other.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-preview' },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
   it('should return TerminalQuotaError for MODEL_CAPACITY_EXCEEDED when no retry delay is specified', () => {
     const apiError: GoogleApiError = {
       code: 429,
