@@ -1374,10 +1374,16 @@ export class GeminiChat {
       .join('');
 
     // Clean zero-width/invisible characters and HTML comments to determine actual printable/visible content
-    const responseText = rawResponseText
-      .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .trim();
+    let responseText = rawResponseText.replace(
+      /[\u200B-\u200D\uFEFF\u200E\u200F]/g,
+      '',
+    );
+    let previous: string;
+    do {
+      previous = responseText;
+      responseText = responseText.replace(/<!--[\s\S]*?-->/g, '');
+    } while (responseText !== previous);
+    responseText = responseText.trim();
 
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call OR
