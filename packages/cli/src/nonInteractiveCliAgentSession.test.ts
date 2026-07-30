@@ -79,6 +79,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ChatRecordingService: MockChatRecordingService,
     uiTelemetryService: {
       getMetrics: vi.fn(),
+      recordSemanticValidationError: vi.fn(),
     },
     LegacyAgentSession: original.LegacyAgentSession,
     geminiPartsToContentParts: original.geminiPartsToContentParts,
