@@ -330,6 +330,23 @@ export function classifyGoogleError(error: unknown): unknown {
       );
     }
 
+    if (
+      errorInfo.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+      errorInfo.reason === 'MODEL_CAPACITY_EXCEEDED'
+    ) {
+      // If no server backoff delay is specified, treat capacity exhaustion as a terminal error
+      // to trigger immediate model fallback without retrying on the same exhausted model.
+      if (delaySeconds === undefined) {
+        return new TerminalQuotaError(
+          googleApiError.message,
+          googleApiError,
+          delaySeconds,
+          errorInfo.reason,
+        );
+      }
+      // Otherwise, fall through to RetryableQuotaError to honor the server's requested delay.
+    }
+
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
       if (isCloudCodeDomain(errorInfo.domain)) {
