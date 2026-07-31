@@ -56,7 +56,7 @@ export async function start_sandbox(
   });
   patcher.patch();
 
-  let stopProxy: (() => void) | undefined = undefined;
+  let stopProxy: ((signal?: string) => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
 
   const cleanupTempProfile = () => {
@@ -70,11 +70,23 @@ export async function start_sandbox(
     }
   };
 
+  const sigintHandler = () => {
+    cleanupTempProfile();
+    process.off('SIGINT', sigintHandler);
+    process.kill(process.pid, 'SIGINT');
+  };
+
+  const sigtermHandler = () => {
+    cleanupTempProfile();
+    process.off('SIGTERM', sigtermHandler);
+    process.kill(process.pid, 'SIGTERM');
+  };
+
   const cleanup = () => {
     cleanupTempProfile();
     process.off('exit', cleanupTempProfile);
-    process.off('SIGINT', cleanupTempProfile);
-    process.off('SIGTERM', cleanupTempProfile);
+    process.off('SIGINT', sigintHandler);
+    process.off('SIGTERM', sigtermHandler);
   };
 
   try {
@@ -122,8 +134,8 @@ export async function start_sandbox(
 
               // Register cleanups
               process.on('exit', cleanupTempProfile);
-              process.on('SIGINT', cleanupTempProfile);
-              process.on('SIGTERM', cleanupTempProfile);
+              process.on('SIGINT', sigintHandler);
+              process.on('SIGTERM', sigtermHandler);
             } catch (err) {
               debugLogger.warn(
                 `Failed to write temporary seatbelt profile: ${err}`,
@@ -242,7 +254,7 @@ export async function start_sandbox(
             detached: true,
           });
           // install handlers to stop proxy on exit/signal
-          stopProxy = () => {
+          stopProxy = (signal?: string) => {
             debugLogger.log('stopping proxy ...');
             if (proxyProcess?.pid) {
               try {
@@ -250,6 +262,10 @@ export async function start_sandbox(
               } catch {
                 // ignore
               }
+            }
+            if (signal === 'SIGINT' || signal === 'SIGTERM') {
+              process.off(signal, stopProxy!);
+              process.kill(process.pid, signal);
             }
           };
           process.on('exit', stopProxy);
@@ -818,7 +834,7 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      stopProxy = () => {
+      stopProxy = (signal?: string) => {
         debugLogger.log('stopping proxy container ...');
         try {
           spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
@@ -826,6 +842,10 @@ export async function start_sandbox(
           });
         } catch {
           // ignore
+        }
+        if (signal === 'SIGINT' || signal === 'SIGTERM') {
+          process.off(signal, stopProxy!);
+          process.kill(process.pid, signal);
         }
       };
       process.on('exit', stopProxy);
