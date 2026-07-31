@@ -43,36 +43,41 @@ vi.mock('../utils/errors.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../utils/retry.js', () => ({
-  retryWithBackoff: vi.fn(async (fn, options) => {
-    // Default implementation - just call the function
-    const result = await fn();
+vi.mock('../utils/retry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/retry.js')>();
+  return {
+    ...actual,
+    retryWithBackoff: vi.fn(async (fn, options) => {
+      // Default implementation - just call the function
+      const result = await fn();
 
-    // If shouldRetryOnContent is provided, test it but don't actually retry
-    // (unless we want to simulate retry exhaustion for testing)
-    if (options?.shouldRetryOnContent) {
-      const shouldRetry = options.shouldRetryOnContent(result);
-      if (shouldRetry) {
-        // Check if we need to simulate retry exhaustion (for error testing)
-        const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (
-          !responseText ||
-          responseText.trim() === '' ||
-          responseText.includes('{"color": "blue"')
-        ) {
-          throw new Error('Retry attempts exhausted for invalid content');
+      // If shouldRetryOnContent is provided, test it but don't actually retry
+      // (unless we want to simulate retry exhaustion for testing)
+      if (options?.shouldRetryOnContent) {
+        const shouldRetry = options.shouldRetryOnContent(result);
+        if (shouldRetry) {
+          // Check if we need to simulate retry exhaustion (for error testing)
+          const responseText =
+            result?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (
+            !responseText ||
+            responseText.trim() === '' ||
+            responseText.includes('{"color": "blue"')
+          ) {
+            throw new Error('Retry attempts exhausted for invalid content');
+          }
         }
       }
-    }
 
-    const context = options?.getAvailabilityContext?.();
-    if (context) {
-      context.service.markHealthy(context.policy.model);
-    }
+      const context = options?.getAvailabilityContext?.();
+      if (context) {
+        context.service.markHealthy(context.policy.model);
+      }
 
-    return result;
-  }),
-}));
+      return result;
+    }),
+  };
+});
 
 const mockGenerateContent = vi.fn();
 const mockEmbedContent = vi.fn();

@@ -629,18 +629,13 @@ export const ToolConfirmationMessage: React.FC<
           );
         }
       } else if (confirmationDetails.type === 'sandbox_expansion') {
-        const { additionalPermissions, command, rootCommand } =
-          confirmationDetails;
+        const { additionalPermissions, command } = confirmationDetails;
         const readPaths = additionalPermissions?.fileSystem?.read || [];
         const writePaths = additionalPermissions?.fileSystem?.write || [];
         const network = additionalPermissions?.network;
         const isShell = isShellTool(toolName);
 
-        const rootCmds = rootCommand
-          .split(',')
-          .map((c) => c.trim().split(/\s+/)[0])
-          .filter((c) => c && !c.startsWith('redirection'));
-        const commandNames = Array.from(new Set(rootCmds)).join(', ');
+        const commandNames = isShell ? 'Shell' : toolName;
         question = '';
 
         bodyContent = (
@@ -730,13 +725,7 @@ export const ToolConfirmationMessage: React.FC<
           );
         }
 
-        const commandNames = Array.from(
-          new Set(
-            commandsToDisplay
-              .map((cmd) => cmd.trim().split(/\s+/)[0])
-              .filter(Boolean),
-          ),
-        ).join(', ');
+        const commandNames = isShell ? 'Shell' : toolName;
 
         const allowQuestion = (
           <Text>

@@ -6,7 +6,12 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -74,10 +79,20 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+    const sanitizedPath = resolveDefensiveToolPath(
       this.params.file_path,
+      this.config.getTargetDir(),
     );
+    try {
+      this.resolvedPath = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
+    } catch {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        sanitizedPath,
+      );
+    }
   }
 
   getDescription(): string {
@@ -186,8 +201,20 @@ ${result.llmContent}`;
       }
     }
 
+    const displayResultSummary = result.isTruncated
+      ? `${result.linesShown![0]}-${result.linesShown![1]} of ${result.originalLineCount}`
+      : lines !== undefined
+        ? `${lines} lines`
+        : undefined;
+
     return {
       llmContent,
+      display: {
+        name: READ_FILE_DISPLAY_NAME,
+        description: this.getDescription(),
+        resultSummary: displayResultSummary,
+        result: { type: 'text', text: result.returnDisplay || '' },
+      },
       returnDisplay: result.returnDisplay || '',
     };
   }
@@ -230,10 +257,19 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+    const sanitizedPath = resolveDefensiveToolPath(
       params.file_path,
+      this.config.getTargetDir(),
     );
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), sanitizedPath),
+      );
+    } catch (err) {
+      return `Failed to resolve path: ${err instanceof Error ? err.message : String(err)}`;
+    }
 
     const validationError = this.config.validatePathAccess(
       resolvedPath,
@@ -243,12 +279,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
-    if (params.start_line !== undefined && params.start_line < 1) {
-      return 'start_line must be at least 1';
-    }
-    if (params.end_line !== undefined && params.end_line < 1) {
-      return 'end_line must be at least 1';
-    }
     if (
       params.start_line !== undefined &&
       params.end_line !== undefined &&

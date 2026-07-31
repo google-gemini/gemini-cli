@@ -29,6 +29,7 @@ describe('useMessageQueue', () => {
     streamingState: StreamingState;
     submitQuery: (query: string) => void;
     isMcpReady: boolean;
+    isCompressing?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useMessageQueue>;
     function TestComponent(props: typeof initialProps) {
@@ -400,6 +401,54 @@ describe('useMessageQueue', () => {
 
       expect(secondPop).toBe('Third\n\nFourth');
       expect(result.current.messageQueue).toEqual([]);
+    });
+  });
+
+  describe('isCompressing logic', () => {
+    it('should not auto-submit when isCompressing is true, even if streamingState is Idle', async () => {
+      const { result } = await renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Idle,
+        submitQuery: mockSubmitQuery,
+        isMcpReady: true,
+        isCompressing: true,
+      });
+
+      // Add messages
+      act(() => {
+        result.current.addMessage('Compression message');
+      });
+
+      expect(mockSubmitQuery).not.toHaveBeenCalled();
+      expect(result.current.messageQueue).toEqual(['Compression message']);
+    });
+
+    it('should auto-submit queued messages when isCompressing becomes false', async () => {
+      const { result, rerender } = await renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Idle,
+        submitQuery: mockSubmitQuery,
+        isMcpReady: true,
+        isCompressing: true,
+      });
+
+      // Add messages
+      act(() => {
+        result.current.addMessage('Pending compression message 1');
+        result.current.addMessage('Pending compression message 2');
+      });
+
+      expect(mockSubmitQuery).not.toHaveBeenCalled();
+
+      // Transition isCompressing to false
+      rerender({ isCompressing: false });
+
+      await waitFor(() => {
+        expect(mockSubmitQuery).toHaveBeenCalledWith(
+          'Pending compression message 1\n\nPending compression message 2',
+        );
+        expect(result.current.messageQueue).toEqual([]);
+      });
     });
   });
 });

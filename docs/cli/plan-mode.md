@@ -64,6 +64,7 @@ Gemini CLI takes action.
     reach an informal agreement on the approach before proceeding.
 3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
     a detailed implementation plan as a Markdown file in your plans directory.
+
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
@@ -138,7 +139,6 @@ These are the only allowed tools:
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
-- **Memory:** [`save_memory`](../tools/memory.md)
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
   instructions and resources in a read-only manner)
 
@@ -331,7 +331,6 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 #!/usr/bin/env bash
 # Extract the plan filename from the tool input JSON
 plan_filename=$(jq -r '.tool_input.plan_filename // empty')
-plan_filename=$(basename -- "$plan_filename")
 
 # Construct the absolute path using the GEMINI_PLANS_DIR environment variable
 plan_path="$GEMINI_PLANS_DIR/$plan_filename"
@@ -360,7 +359,7 @@ To register this `AfterTool` hook, add it to your `settings.json`:
           {
             "name": "archive-plan",
             "type": "command",
-            "command": "./.gemini/hooks/archive-plan.sh"
+            "command": "~/.gemini/hooks/archive-plan.sh"
           }
         ]
       }
@@ -471,7 +470,8 @@ associated plan files and task trackers.
 
 - **Default behavior:** Sessions (and their plans) are retained for **30 days**.
 - **Configuration:** You can customize this behavior via the `/settings` command
-  (search for **Session Retention**) or in your `settings.json` file. See
+  (search for **Enable Session Cleanup** or **Keep chat history**) or in your
+  `settings.json` file. See
   [session retention](../cli/session-management.md#session-retention) for more
   details.
 

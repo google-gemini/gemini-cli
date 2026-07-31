@@ -14,16 +14,17 @@ import {
   type Mock,
 } from 'vitest';
 import { listMcpServers } from './list.js';
+import { loadSettings } from '../../config/settings.js';
 import {
-  loadSettings,
-  mergeSettings,
-  type LoadedSettings,
-} from '../../config/settings.js';
-import { createTransport, debugLogger } from '@google/gemini-cli-core';
+  createTransport,
+  debugLogger,
+  type AdminControlsSettings,
+} from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { McpServerEnablementManager } from '../../config/mcp/index.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -133,10 +134,7 @@ describe('mcp list command', () => {
   });
 
   it('should display message when no servers configured', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: { ...defaultMergedSettings, mcpServers: {} },
-    });
+    mockedLoadSettings.mockReturnValue(createMockSettings({ mcpServers: {} }));
 
     await listMcpServers();
 
@@ -144,10 +142,8 @@ describe('mcp list command', () => {
   });
 
   it('should display different server types with connected status', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcpServers: {
           'stdio-server': { command: '/path/to/server', args: ['arg1'] },
           'sse-server': { url: 'https://example.com/sse', type: 'sse' },
@@ -158,9 +154,9 @@ describe('mcp list command', () => {
             type: 'http',
           },
         },
-      },
-      isTrusted: true,
-    });
+        isTrusted: true,
+      }),
+    );
 
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
@@ -196,15 +192,14 @@ describe('mcp list command', () => {
   });
 
   it('should display disconnected status when connection fails', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcpServers: {
           'test-server': { command: '/test/server' },
         },
-      },
-    });
+        isTrusted: true,
+      }),
+    );
 
     mockClient.connect.mockRejectedValue(new Error('Connection failed'));
 
@@ -217,17 +212,81 @@ describe('mcp list command', () => {
     );
   });
 
+  it('should display connected status even if ping fails', async () => {
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
+        mcpServers: {
+          'test-server': { command: '/test/server' },
+        },
+        isTrusted: true,
+      }),
+    );
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockRejectedValue(new Error('Ping failed'));
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Connected'),
+    );
+  });
+
+  it('should use configured timeout for connection', async () => {
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
+        mcpServers: {
+          'test-server': { command: '/test/server', timeout: 12345 },
+        },
+        isTrusted: true,
+      }),
+    );
+
+    mockClient.connect.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    expect(mockClient.connect).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ timeout: 12345 }),
+    );
+    expect(mockClient.ping).toHaveBeenCalledWith(
+      expect.objectContaining({ timeout: 12345 }),
+    );
+  });
+
+  it('should use default timeout for connection when not configured', async () => {
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
+        mcpServers: {
+          'test-server': { command: '/test/server' },
+        },
+        isTrusted: true,
+      }),
+    );
+
+    mockClient.connect.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    expect(mockClient.connect).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ timeout: 5000 }),
+    );
+    expect(mockClient.ping).toHaveBeenCalledWith(
+      expect.objectContaining({ timeout: 5000 }),
+    );
+  });
+
   it('should merge extension servers with config servers', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcpServers: {
           'config-server': { command: '/config/server' },
         },
-      },
-      isTrusted: true,
-    });
+        isTrusted: true,
+      }),
+    );
 
     mockExtensionManager.loadExtensions.mockReturnValue([
       {
@@ -254,36 +313,40 @@ describe('mcp list command', () => {
   });
 
   it('should filter servers based on admin allowlist passed in settings', async () => {
-    const settingsWithAllowlist = mergeSettings({}, {}, {}, {}, true);
-    settingsWithAllowlist.admin = {
-      secureModeEnabled: false,
-      extensions: { enabled: true },
-      skills: { enabled: true },
-      mcp: {
-        enabled: true,
-        config: {
-          'allowed-server': { url: 'http://allowed' },
+    const adminControls = {
+      strictModeDisabled: true,
+      mcpSetting: {
+        mcpEnabled: true,
+        mcpConfig: {
+          mcpServers: {
+            'allowed-server': { url: 'http://allowed' },
+          },
         },
-        requiredConfig: {},
       },
     };
 
-    settingsWithAllowlist.mcpServers = {
+    const mcpServers = {
       'allowed-server': { command: 'cmd1' },
       'forbidden-server': { command: 'cmd2' },
     };
 
-    mockedLoadSettings.mockReturnValue({
-      merged: settingsWithAllowlist,
+    const mockSettings = createMockSettings({
+      mcpServers,
+      isTrusted: true,
     });
+    // setRemoteAdminSettings is the correct way to set admin settings in tests
+    (
+      mockSettings as unknown as {
+        setRemoteAdminSettings: (controls: AdminControlsSettings) => void;
+      }
+    ).setRemoteAdminSettings(adminControls as unknown as AdminControlsSettings);
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
 
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers({
-      merged: settingsWithAllowlist,
-      isTrusted: true,
-    } as unknown as LoadedSettings);
+    await listMcpServers(mockSettings);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining('allowed-server'),
@@ -299,44 +362,40 @@ describe('mcp list command', () => {
     );
   });
 
-  it('should show stdio servers as disconnected in untrusted folders', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+  it('should show stdio servers as disabled in untrusted folders', async () => {
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcpServers: {
           'test-server': { command: '/test/server' },
         },
-      },
-      isTrusted: false,
-    });
-
-    // createTransport will throw in core if not trusted
-    mockedCreateTransport.mockRejectedValue(new Error('Folder not trusted'));
+        isTrusted: false,
+      }),
+    );
 
     await listMcpServers();
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
-        'test-server: /test/server  (stdio) - Disconnected',
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.',
       ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Disabled'),
     );
   });
 
   it('should display blocked status for servers in excluded list', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcp: {
           excluded: ['blocked-server'],
         },
         mcpServers: {
           'blocked-server': { command: '/test/server' },
         },
-      },
-      isTrusted: true,
-    });
+        isTrusted: true,
+      }),
+    );
 
     await listMcpServers();
 
@@ -349,16 +408,14 @@ describe('mcp list command', () => {
   });
 
   it('should display disabled status for servers disabled via enablement manager', async () => {
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockedLoadSettings.mockReturnValue({
-      merged: {
-        ...defaultMergedSettings,
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
         mcpServers: {
           'disabled-server': { command: '/test/server' },
         },
-      },
-      isTrusted: true,
-    });
+        isTrusted: true,
+      }),
+    );
 
     vi.spyOn(
       McpServerEnablementManager.prototype,
@@ -371,6 +428,304 @@ describe('mcp list command', () => {
       expect.stringContaining(
         'disabled-server: /test/server  (stdio) - Disabled',
       ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should display warning and disabled status in untrusted folders', async () => {
+    const userMcpServers = {
+      'user-server': { url: 'https://example.com/user' },
+    };
+    const workspaceMcpServers = {
+      'project-server': { command: '/path/to/project/server' },
+    };
+
+    mockedLoadSettings.mockReturnValue(
+      createMockSettings({
+        user: {
+          settings: { mcpServers: userMcpServers },
+          originalSettings: { mcpServers: userMcpServers },
+          path: '/mock/user/settings.json',
+        },
+        workspace: {
+          settings: { mcpServers: workspaceMcpServers },
+          originalSettings: { mcpServers: workspaceMcpServers },
+          path: '/mock/workspace/settings.json',
+        },
+        isTrusted: false,
+      }),
+    );
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'project-server: /path/to/project/server  (stdio) - Disabled',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'user-server: https://example.com/user (http) - Disabled',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should block servers excluded by user settings even if workspace settings override/clear the excluded list', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            excluded: ['blocked-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: ['blocked-server'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            excluded: [],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: [],
+          },
+        },
+      },
+      mcpServers: {
+        'blocked-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          excluded: [], // workspace has overridden user settings!
+        },
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should block servers case-insensitively when excluded', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            excluded: ['BLOCKED-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            excluded: ['BLOCKED-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'blocked-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+      merged: {
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should restrict allowed servers to the intersection of all defined allowlists', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'allowed-server-2'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'allowed-server-2'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'malicious-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['allowed-server-1', 'malicious-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'allowed-server-1': { command: '/allowed/1' },
+        'allowed-server-2': { command: '/allowed/2' },
+        'malicious-server': { command: '/malicious' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          allowed: ['allowed-server-1', 'malicious-server'], // workspace overrode user settings!
+        },
+        mcpServers: {
+          'allowed-server-1': { command: '/allowed/1' },
+          'allowed-server-2': { command: '/allowed/2' },
+          'malicious-server': { command: '/malicious' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    // allowed-server-1 is in the intersection, so it should connect
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'allowed-server-1: /allowed/1  (stdio) - Connected',
+      ),
+    );
+    // allowed-server-2 and malicious-server are not in the intersection, so they should be Blocked
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'allowed-server-2: /allowed/2  (stdio) - Blocked',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'malicious-server: /malicious  (stdio) - Blocked',
+      ),
+    );
+
+    expect(mockedCreateTransport).toHaveBeenCalledTimes(1);
+    expect(mockedCreateTransport).toHaveBeenCalledWith(
+      'allowed-server-1',
+      expect.any(Object),
+      false,
+      expect.any(Object),
+    );
+  });
+
+  it('should block all servers if the intersection of user and workspace allowlists is empty (disjoint allowlists)', async () => {
+    const mockSettings = createMockSettings({
+      user: {
+        path: '/user/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['user-allowed-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['user-allowed-server'],
+          },
+        },
+      },
+      workspace: {
+        path: '/workspace/settings.json',
+        settings: {
+          mcp: {
+            allowed: ['workspace-allowed-server'],
+          },
+        },
+        originalSettings: {
+          mcp: {
+            allowed: ['workspace-allowed-server'],
+          },
+        },
+      },
+      mcpServers: {
+        'user-allowed-server': { command: '/allowed/user' },
+        'workspace-allowed-server': { command: '/allowed/workspace' },
+      },
+      isTrusted: true,
+      merged: {
+        mcp: {
+          allowed: ['workspace-allowed-server'], // workspace override
+        },
+        mcpServers: {
+          'user-allowed-server': { command: '/allowed/user' },
+          'workspace-allowed-server': { command: '/allowed/workspace' },
+        },
+      },
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    // Since the intersection is empty ([]), both servers should be Blocked!
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'user-allowed-server: /allowed/user  (stdio) - Blocked',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'workspace-allowed-server: /allowed/workspace  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should block all servers if allowlist is configured as empty array []', async () => {
+    const mockSettings = createMockSettings({
+      mcp: {
+        allowed: [], // empty allowlist configured!
+      },
+      mcpServers: {
+        'test-server': { command: '/test/server' },
+      },
+      isTrusted: true,
+    });
+
+    mockedLoadSettings.mockReturnValue(mockSettings);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Blocked'),
     );
     expect(mockedCreateTransport).not.toHaveBeenCalled();
   });

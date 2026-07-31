@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
@@ -11,9 +11,14 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, RollingSummary } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type RollingSummary,
+  NodeType,
+} from '../graph/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
+import { formatNodesForLlm } from '../utils/formatNodesForLlm.js';
 
 export interface RollingSummaryProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
@@ -43,21 +48,7 @@ export function createRollingSummaryProcessor(
   const generateRollingSummary = async (
     nodes: ConcreteNode[],
   ): Promise<string> => {
-    let transcript = '';
-    for (const node of nodes) {
-      let nodeContent = '';
-      if ('text' in node && typeof node.text === 'string') {
-        nodeContent = node.text;
-      } else if ('semanticParts' in node) {
-        nodeContent = JSON.stringify(node.semanticParts);
-      } else if ('observation' in node) {
-        nodeContent =
-          typeof node.observation === 'string'
-            ? node.observation
-            : JSON.stringify(node.observation);
-      }
-      transcript += `[${node.type}]: ${nodeContent}\n`;
-    }
+    const transcript = formatNodesForLlm(nodes);
 
     const systemPrompt =
       options.systemInstruction ??
@@ -121,18 +112,19 @@ export function createRollingSummaryProcessor(
       try {
         // Synthesize the rolling summary synchronously
         const snapshotText = await generateRollingSummary(nodesToSummarize);
-        const newId = randomUUID();
+        const consumedIds = nodesToSummarize.map((n) => n.id);
+        const newId = deriveStableId(consumedIds);
 
         const summaryNode: RollingSummary = {
           id: newId,
-          logicalParentId: newId,
-          type: 'ROLLING_SUMMARY',
-          timestamp: Date.now(),
-          text: snapshotText,
-          abstractsIds: nodesToSummarize.map((n) => n.id),
+          turnId: newId,
+          type: NodeType.ROLLING_SUMMARY,
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
+          role: 'user',
+          payload: { text: snapshotText },
+          abstractsIds: consumedIds,
         };
 
-        const consumedIds = nodesToSummarize.map((n) => n.id);
         const returnedNodes = targets.filter(
           (t) => !consumedIds.includes(t.id),
         );

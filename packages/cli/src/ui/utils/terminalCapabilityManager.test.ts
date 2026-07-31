@@ -117,6 +117,51 @@ describe('TerminalCapabilityManager', () => {
     expect(manager.getTerminalBackgroundColor()).toBe('#00ff00');
   });
 
+  it('should ignore #ffffff in tmux as it is a common false positive', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.spyOn(manager, 'isTmux').mockReturnValue(true);
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for white
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:ffff/ffff/ffff\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBeUndefined();
+  });
+
+  it('should not ignore #ffffff when NOT in tmux', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.spyOn(manager, 'isTmux').mockReturnValue(false);
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for white
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:ffff/ffff/ffff\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#ffffff');
+  });
+
+  it('should NOT ignore other colors in tmux', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    vi.stubEnv('TMUX', '1');
+
+    const promise = manager.detectCapabilities();
+
+    // Simulate OSC 11 response for grey
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:8888/8888/8888\x1b\\'));
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#888888');
+  });
+
   it('should detect Terminal Name', async () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();

@@ -6,21 +6,30 @@
 
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   type Config,
   ApprovalMode,
+  type MemoryScratchpad,
   SESSION_FILE_PREFIX,
   getProjectHash,
   startMemoryService,
 } from '@google/gemini-cli-core';
-import { componentEvalTest } from './component-test-helper.js';
+import { ComponentRig, componentEvalTest } from './component-test-helper.js';
+import {
+  average,
+  averageNullable,
+  countMatchingIds,
+  roundStat,
+} from './statistics-helper.js';
+import { prepareWorkspace } from './test-helper.js';
 
 interface SeedSession {
   sessionId: string;
   summary: string;
   userTurns: string[];
   timestampOffsetMinutes: number;
+  memoryScratchpad?: MemoryScratchpad;
 }
 
 interface MessageRecord {
@@ -28,6 +37,81 @@ interface MessageRecord {
   timestamp: string;
   type: string;
   content: Array<{ text: string }>;
+}
+
+interface SessionVersion {
+  sessionId: string;
+  lastUpdated: string;
+}
+
+interface ExtractionRunSnapshot {
+  sessionIds: string[];
+  skillsCreated: string[];
+  candidateSessions: SessionVersion[];
+  processedSessions: SessionVersion[];
+  turnCount?: number;
+  durationMs?: number;
+  terminateReason?: string;
+}
+
+interface ExtractionOutcome {
+  state: { runs: ExtractionRunSnapshot[] };
+  skillsDir: string;
+  skillBodies: string[];
+}
+
+interface SkillQualitySignal {
+  label: string;
+  pattern: RegExp;
+}
+
+interface ScratchpadRunMetrics {
+  turnCount: number | null;
+  durationMs: number | null;
+  terminateReason: string | null;
+  skillsCreated: number;
+  candidateSessions: number;
+  processedSessions: number;
+  relevantReads: number;
+  distractorReads: number;
+  totalReads: number;
+  recall: number;
+  precision: number;
+  signalScore: number;
+  skillQualityScore: number;
+  skillQualityMax: number;
+  skillQualityRatio: number;
+  missingQualitySignals: string[];
+}
+
+interface ScratchpadStatsTrial {
+  trial: number;
+  baseline: ScratchpadRunMetrics;
+  enhanced: ScratchpadRunMetrics;
+}
+
+interface ScratchpadStatsAggregate {
+  turnCountAvg: number | null;
+  durationMsAvg: number | null;
+  recallAvg: number;
+  precisionAvg: number;
+  signalScoreAvg: number;
+  relevantReadsAvg: number;
+  distractorReadsAvg: number;
+  skillsCreatedAvg: number;
+  skillQualityScoreAvg: number;
+  skillQualityRatioAvg: number;
+}
+
+interface ScratchpadStatsReport {
+  generatedAt: string;
+  trials: number;
+  aggregate: {
+    baseline: ScratchpadStatsAggregate;
+    enhanced: ScratchpadStatsAggregate;
+  };
+  deltas: ScratchpadStatsAggregate;
+  results: ScratchpadStatsTrial[];
 }
 
 const WORKSPACE_FILES = {
@@ -68,6 +152,143 @@ function buildMessages(userTurns: string[]): MessageRecord[] {
   ]);
 }
 
+function padTurns(turns: string[]): string[] {
+  if (turns.length >= 10) {
+    return turns;
+  }
+
+  const padded = [...turns];
+  for (let i = turns.length; i < 10; i++) {
+    padded.push(`${turns[i % turns.length]} (repeat ${i + 1})`);
+  }
+  return padded;
+}
+
+function createScratchpad(
+  workflowSummary: string,
+  touchedPaths: string[],
+  validationStatus: MemoryScratchpad['validationStatus'] = 'passed',
+): MemoryScratchpad {
+  return {
+    version: 1,
+    workflowSummary,
+    toolSequence: ['run_shell_command'],
+    touchedPaths,
+    validationStatus,
+  };
+}
+
+function createWorkflowComparisonSessions(withScratchpad: boolean): {
+  sessions: SeedSession[];
+  relevantSessionIds: string[];
+  distractorSessionIds: string[];
+} {
+  const relevantWorkflowSummary =
+    'run_shell_command -> run_shell_command | paths packages/cli/src/config/settings.ts, docs/settings.md | validated';
+
+  const relevantScratchpad = withScratchpad
+    ? createScratchpad(relevantWorkflowSummary, [
+        'packages/cli/src/config/settings.ts',
+        'docs/settings.md',
+      ])
+    : undefined;
+
+  const sessions: SeedSession[] = [
+    {
+      sessionId: 'hidden-settings-workflow-a',
+      summary: 'Prepare release notes for settings launch',
+      timestampOffsetMinutes: 420,
+      memoryScratchpad: relevantScratchpad,
+      userTurns: padTurns([
+        'When we add a new setting, the durable workflow is to regenerate the settings docs instead of editing them by hand.',
+        'The sequence that worked was npm run predocs:settings, npm run schema:settings, then npm run docs:settings.',
+        'Skipping predocs leaves stale defaults in the generated docs.',
+        'We verify the workflow by checking that both the schema output and docs update together.',
+        'This exact command order is the recurring workflow we use for settings changes.',
+      ]),
+    },
+    {
+      sessionId: 'hidden-settings-workflow-b',
+      summary: 'Investigate CI drift in generated config reference',
+      timestampOffsetMinutes: 390,
+      memoryScratchpad: relevantScratchpad,
+      userTurns: padTurns([
+        'The config reference drift was fixed by rerunning the standard settings regeneration workflow.',
+        'We again used npm run predocs:settings before npm run schema:settings and npm run docs:settings.',
+        'The recurring rule is never to hand-edit generated settings docs.',
+        'The validation step is to confirm the schema artifact and docs changed together after regeneration.',
+        'This is the same recurring workflow we use every time a setting changes.',
+      ]),
+    },
+    {
+      sessionId: 'distractor-release-notes',
+      summary: 'Prepare release notes for auth launch',
+      timestampOffsetMinutes: 360,
+      memoryScratchpad: undefined,
+      userTurns: padTurns([
+        'This release-notes task was one-off and just needed manual wording updates.',
+        'I edited CHANGELOG.md and docs/release-notes.md directly.',
+        'There was no reusable command sequence here beyond proofreading the copy.',
+        'This task should not become a standing workflow.',
+        'Once the wording landed, we were done.',
+      ]),
+    },
+    {
+      sessionId: 'distractor-ci-snapshots',
+      summary: 'Investigate CI drift in auth snapshots',
+      timestampOffsetMinutes: 330,
+      memoryScratchpad: undefined,
+      userTurns: padTurns([
+        'This auth snapshot issue was specific to a flaky test in CI.',
+        'The only commands we ran were npm test -- auth and an isolated snapshot update.',
+        'It was not the recurring settings-doc workflow.',
+        'Once the flaky snapshot passed, there was no broader reusable procedure.',
+        'Treat this as a one-off CI cleanup.',
+      ]),
+    },
+    {
+      sessionId: 'distractor-onboarding-docs',
+      summary: 'Refresh onboarding documentation copy',
+      timestampOffsetMinutes: 300,
+      memoryScratchpad: undefined,
+      userTurns: padTurns([
+        'This was just a docs wording cleanup in docs/onboarding.md.',
+        'No command sequence was involved.',
+        'We manually edited the copy and reviewed it.',
+        'There is no recurring operational workflow to capture here.',
+        'This should stay a one-off docs edit.',
+      ]),
+    },
+    {
+      sessionId: 'distractor-deploy-copy',
+      summary: 'Adjust deployment checklist wording',
+      timestampOffsetMinutes: 270,
+      memoryScratchpad: undefined,
+      userTurns: padTurns([
+        'This was a wording-only change to docs/deploy.md.',
+        'We did not run a reusable command sequence.',
+        'It should not become a skill.',
+        'The edit was only for this deploy checklist cleanup.',
+        'After the copy change, the task was complete.',
+      ]),
+    },
+  ];
+
+  return {
+    sessions,
+    relevantSessionIds: [
+      'hidden-settings-workflow-a',
+      'hidden-settings-workflow-b',
+    ],
+    distractorSessionIds: [
+      'distractor-release-notes',
+      'distractor-ci-snapshots',
+      'distractor-onboarding-docs',
+      'distractor-deploy-copy',
+    ],
+  };
+}
+
 async function seedSessions(
   config: Config,
   sessions: SeedSession[],
@@ -78,9 +299,10 @@ async function seedSessions(
   const projectRoot = config.storage.getProjectRoot();
 
   for (const session of sessions) {
-    const timestamp = new Date(
+    const sessionTimestamp = new Date(
       Date.now() - session.timestampOffsetMinutes * 60 * 1000,
-    )
+    );
+    const timestamp = sessionTimestamp
       .toISOString()
       .slice(0, 16)
       .replace(/:/g, '-');
@@ -89,8 +311,9 @@ async function seedSessions(
       sessionId: session.sessionId,
       projectHash: getProjectHash(projectRoot),
       summary: session.summary,
+      memoryScratchpad: session.memoryScratchpad,
       startTime: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
-      lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      lastUpdated: sessionTimestamp.toISOString(),
       messages: buildMessages(session.userTurns),
     };
 
@@ -101,10 +324,9 @@ async function seedSessions(
   }
 }
 
-async function runExtractionAndReadState(config: Config): Promise<{
-  state: { runs: Array<{ sessionIds: string[]; skillsCreated: string[] }> };
-  skillsDir: string;
-}> {
+async function runExtractionAndReadState(
+  config: Config,
+): Promise<ExtractionOutcome> {
   await startMemoryService(config);
 
   const memoryDir = config.storage.getProjectMemoryTempDir();
@@ -113,7 +335,15 @@ async function runExtractionAndReadState(config: Config): Promise<{
 
   const raw = await fsp.readFile(statePath, 'utf-8');
   const state = JSON.parse(raw) as {
-    runs?: Array<{ sessionIds?: string[]; skillsCreated?: string[] }>;
+    runs?: Array<{
+      sessionIds?: string[];
+      skillsCreated?: string[];
+      candidateSessions?: SessionVersion[];
+      processedSessions?: SessionVersion[];
+      turnCount?: number;
+      durationMs?: number;
+      terminateReason?: string;
+    }>;
   };
   if (!Array.isArray(state.runs) || state.runs.length === 0) {
     throw new Error('Skill extraction finished without writing any run state');
@@ -126,26 +356,291 @@ async function runExtractionAndReadState(config: Config): Promise<{
         skillsCreated: Array.isArray(run.skillsCreated)
           ? run.skillsCreated
           : [],
+        candidateSessions: Array.isArray(run.candidateSessions)
+          ? run.candidateSessions
+          : [],
+        processedSessions: Array.isArray(run.processedSessions)
+          ? run.processedSessions
+          : [],
+        turnCount:
+          typeof run.turnCount === 'number' ? run.turnCount : undefined,
+        durationMs:
+          typeof run.durationMs === 'number' ? run.durationMs : undefined,
+        terminateReason:
+          typeof run.terminateReason === 'string'
+            ? run.terminateReason
+            : undefined,
       })),
     },
     skillsDir,
+    skillBodies: await readSkillBodies(skillsDir),
   };
 }
 
+async function summarizeScratchpadRun(
+  outcome: ExtractionOutcome,
+  run: ExtractionRunSnapshot,
+  scenario: ReturnType<typeof createWorkflowComparisonSessions>,
+): Promise<ScratchpadRunMetrics> {
+  const relevantReads = countMatchingIds(
+    run.processedSessions,
+    scenario.relevantSessionIds,
+  );
+  const distractorReads = countMatchingIds(
+    run.processedSessions,
+    scenario.distractorSessionIds,
+  );
+  const totalReads = run.processedSessions.length;
+  const quality = scoreSkillQuality(
+    outcome.skillBodies,
+    SETTINGS_SKILL_QUALITY_SIGNALS,
+  );
+
+  return {
+    turnCount: run.turnCount ?? null,
+    durationMs: run.durationMs ?? null,
+    terminateReason: run.terminateReason ?? null,
+    skillsCreated: run.skillsCreated.length,
+    candidateSessions: run.candidateSessions.length,
+    processedSessions: totalReads,
+    relevantReads,
+    distractorReads,
+    totalReads,
+    recall: relevantReads / scenario.relevantSessionIds.length,
+    precision: totalReads === 0 ? 0 : relevantReads / totalReads,
+    signalScore: relevantReads - distractorReads,
+    skillQualityScore: quality.score,
+    skillQualityMax: quality.maxScore,
+    skillQualityRatio:
+      quality.maxScore === 0 ? 0 : quality.score / quality.maxScore,
+    missingQualitySignals: quality.missing,
+  };
+}
+
+function averageScratchpadRuns(
+  runs: ScratchpadRunMetrics[],
+): ScratchpadStatsAggregate {
+  return {
+    turnCountAvg: roundStat(averageNullable(runs.map((run) => run.turnCount))),
+    durationMsAvg: roundStat(
+      averageNullable(runs.map((run) => run.durationMs)),
+    ),
+    recallAvg: roundStat(average(runs.map((run) => run.recall))) ?? 0,
+    precisionAvg: roundStat(average(runs.map((run) => run.precision))) ?? 0,
+    signalScoreAvg: roundStat(average(runs.map((run) => run.signalScore))) ?? 0,
+    relevantReadsAvg:
+      roundStat(average(runs.map((run) => run.relevantReads))) ?? 0,
+    distractorReadsAvg:
+      roundStat(average(runs.map((run) => run.distractorReads))) ?? 0,
+    skillsCreatedAvg:
+      roundStat(average(runs.map((run) => run.skillsCreated))) ?? 0,
+    skillQualityScoreAvg:
+      roundStat(average(runs.map((run) => run.skillQualityScore))) ?? 0,
+    skillQualityRatioAvg:
+      roundStat(average(runs.map((run) => run.skillQualityRatio))) ?? 0,
+  };
+}
+
+function diffScratchpadAggregates(
+  baseline: ScratchpadStatsAggregate,
+  enhanced: ScratchpadStatsAggregate,
+): ScratchpadStatsAggregate {
+  return {
+    turnCountAvg:
+      baseline.turnCountAvg === null || enhanced.turnCountAvg === null
+        ? null
+        : roundStat(enhanced.turnCountAvg - baseline.turnCountAvg),
+    durationMsAvg:
+      baseline.durationMsAvg === null || enhanced.durationMsAvg === null
+        ? null
+        : roundStat(enhanced.durationMsAvg - baseline.durationMsAvg),
+    recallAvg: roundStat(enhanced.recallAvg - baseline.recallAvg) ?? 0,
+    precisionAvg: roundStat(enhanced.precisionAvg - baseline.precisionAvg) ?? 0,
+    signalScoreAvg:
+      roundStat(enhanced.signalScoreAvg - baseline.signalScoreAvg) ?? 0,
+    relevantReadsAvg:
+      roundStat(enhanced.relevantReadsAvg - baseline.relevantReadsAvg) ?? 0,
+    distractorReadsAvg:
+      roundStat(enhanced.distractorReadsAvg - baseline.distractorReadsAvg) ?? 0,
+    skillsCreatedAvg:
+      roundStat(enhanced.skillsCreatedAvg - baseline.skillsCreatedAvg) ?? 0,
+    skillQualityScoreAvg:
+      roundStat(
+        enhanced.skillQualityScoreAvg - baseline.skillQualityScoreAvg,
+      ) ?? 0,
+    skillQualityRatioAvg:
+      roundStat(
+        enhanced.skillQualityRatioAvg - baseline.skillQualityRatioAvg,
+      ) ?? 0,
+  };
+}
+
+async function runScenarioWithFreshRig(
+  sessions: SeedSession[],
+): Promise<ExtractionOutcome> {
+  const rig = new ComponentRig({
+    configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+  });
+  try {
+    await rig.initialize();
+    await prepareWorkspace(rig.testDir, rig.testDir, WORKSPACE_FILES);
+    await seedSessions(rig.config!, sessions);
+    return await runExtractionAndReadState(rig.config!);
+  } finally {
+    await rig.cleanup();
+  }
+}
+
+async function runScratchpadStatsTrial(
+  trial: number,
+): Promise<ScratchpadStatsTrial> {
+  const baselineScenario = createWorkflowComparisonSessions(false);
+  const enhancedScenario = createWorkflowComparisonSessions(true);
+
+  const baselineOutcome = await runScenarioWithFreshRig(
+    baselineScenario.sessions,
+  );
+  const enhancedOutcome = await runScenarioWithFreshRig(
+    enhancedScenario.sessions,
+  );
+
+  const baselineRun = baselineOutcome.state.runs.at(-1);
+  const enhancedRun = enhancedOutcome.state.runs.at(-1);
+  if (!baselineRun || !enhancedRun) {
+    throw new Error('Expected both baseline and scratchpad runs to exist');
+  }
+
+  expectSuccessfulExtractionRun(baselineRun);
+  expectSuccessfulExtractionRun(enhancedRun);
+
+  return {
+    trial,
+    baseline: await summarizeScratchpadRun(
+      baselineOutcome,
+      baselineRun,
+      baselineScenario,
+    ),
+    enhanced: await summarizeScratchpadRun(
+      enhancedOutcome,
+      enhancedRun,
+      enhancedScenario,
+    ),
+  };
+}
+
+async function runScratchpadStatsReport(
+  trials: number,
+): Promise<ScratchpadStatsReport> {
+  const results: ScratchpadStatsTrial[] = [];
+
+  for (let trial = 1; trial <= trials; trial++) {
+    results.push(await runScratchpadStatsTrial(trial));
+  }
+
+  const baseline = averageScratchpadRuns(
+    results.map((result) => result.baseline),
+  );
+  const enhanced = averageScratchpadRuns(
+    results.map((result) => result.enhanced),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    trials,
+    aggregate: {
+      baseline,
+      enhanced,
+    },
+    deltas: diffScratchpadAggregates(baseline, enhanced),
+    results,
+  };
+}
+
+async function writeScratchpadStatsReport(
+  report: ScratchpadStatsReport,
+): Promise<string> {
+  const outputPath = path.resolve(
+    process.cwd(),
+    'evals/logs/skill_extraction_scratchpad_stats.json',
+  );
+  await fsp.mkdir(path.dirname(outputPath), { recursive: true });
+  await fsp.writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+  return outputPath;
+}
+
 async function readSkillBodies(skillsDir: string): Promise<string[]> {
+  const bodies: string[] = [];
+
   try {
     const entries = await fsp.readdir(skillsDir, { withFileTypes: true });
-    const skillDirs = entries.filter((entry) => entry.isDirectory());
-    const bodies = await Promise.all(
-      skillDirs.map((entry) =>
-        fsp.readFile(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf-8'),
-      ),
-    );
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      try {
+        bodies.push(
+          await fsp.readFile(
+            path.join(skillsDir, entry.name, 'SKILL.md'),
+            'utf-8',
+          ),
+        );
+      } catch {
+        // Ignore incomplete skill directories so one bad artifact does not hide
+        // valid skills created in the same eval run.
+      }
+    }
     return bodies;
   } catch {
     return [];
   }
 }
+
+function expectSuccessfulExtractionRun(run: ExtractionRunSnapshot): void {
+  expect(run.turnCount).toBeGreaterThan(0);
+  expect(run.turnCount).toBeLessThanOrEqual(30);
+  expect(run.durationMs).toBeGreaterThan(0);
+  expect(run.terminateReason).toBe('GOAL');
+}
+
+function scoreSkillQuality(
+  skillBodies: string[],
+  signals: SkillQualitySignal[],
+): { score: number; maxScore: number; missing: string[] } {
+  const combined = skillBodies.join('\n\n');
+  const matched = signals.filter((signal) => signal.pattern.test(combined));
+
+  return {
+    score: matched.length,
+    maxScore: signals.length,
+    missing: signals
+      .filter((signal) => !signal.pattern.test(combined))
+      .map((signal) => signal.label),
+  };
+}
+
+const SETTINGS_SKILL_QUALITY_SIGNALS: SkillQualitySignal[] = [
+  { label: 'predocs command', pattern: /npm run predocs:settings/i },
+  { label: 'schema command', pattern: /npm run schema:settings/i },
+  { label: 'docs command', pattern: /npm run docs:settings/i },
+  { label: 'verification guidance', pattern: /verif(?:y|ication)/i },
+  {
+    label: 'generated docs warning or ordering constraint',
+    pattern:
+      /do not hand-edit|manual edits|exact command order|preserve.*order/i,
+  },
+];
+
+const DB_MIGRATION_SKILL_QUALITY_SIGNALS: SkillQualitySignal[] = [
+  { label: 'db check command', pattern: /npm run db:check/i },
+  { label: 'db migrate command', pattern: /npm run db:migrate/i },
+  { label: 'db validate command', pattern: /npm run db:validate/i },
+  { label: 'rollback guidance', pattern: /npm run db:rollback|rollback/i },
+  {
+    label: 'ordering constraint',
+    pattern: /check.*migrate.*validate|ordering is critical|mandatory/i,
+  },
+];
 
 /**
  * Shared configOverrides for all skill extraction component evals.
@@ -157,6 +652,16 @@ const EXTRACTION_CONFIG_OVERRIDES = {
   experimentalAutoMemory: true,
   approvalMode: ApprovalMode.YOLO,
 };
+
+function parseScratchpadStatsTrials(): number {
+  const configured = Number.parseInt(
+    process.env['SCRATCHPAD_STATS_TRIALS'] ?? '8',
+    10,
+  );
+  return Number.isFinite(configured) && configured > 0 ? configured : 8;
+}
+
+const SCRATCHPAD_STATS_TRIALS = parseScratchpadStatsTrials();
 
 describe('Skill Extraction', () => {
   componentEvalTest('USUALLY_PASSES', {
@@ -264,15 +769,24 @@ describe('Skill Extraction', () => {
       const { state, skillsDir } = await runExtractionAndReadState(config);
       const skillBodies = await readSkillBodies(skillsDir);
       const combinedSkills = skillBodies.join('\n\n');
+      const quality = scoreSkillQuality(
+        skillBodies,
+        SETTINGS_SKILL_QUALITY_SIGNALS,
+      );
 
       expect(state.runs).toHaveLength(1);
       expect(state.runs[0].sessionIds).toHaveLength(2);
+      expectSuccessfulExtractionRun(state.runs[0]);
       expect(state.runs[0].skillsCreated.length).toBeGreaterThanOrEqual(1);
       expect(skillBodies.length).toBeGreaterThanOrEqual(1);
       expect(combinedSkills).toContain('npm run predocs:settings');
       expect(combinedSkills).toContain('npm run schema:settings');
       expect(combinedSkills).toContain('npm run docs:settings');
-      expect(combinedSkills).toMatch(/Verification/i);
+      expect(combinedSkills).toMatch(/verif(?:y|ication)/i);
+      expect(
+        quality.score,
+        `missing quality signals: ${quality.missing.join(', ')}`,
+      ).toBeGreaterThanOrEqual(4);
 
       // Verify the extraction agent activated skill-creator for design guidance.
       expect(config.getSkillManager().isSkillActive('skill-creator')).toBe(
@@ -280,6 +794,96 @@ describe('Skill Extraction', () => {
       );
     },
   });
+
+  componentEvalTest('USUALLY_PASSES', {
+    suiteName: 'skill-extraction',
+    suiteType: 'component-level',
+    name: 'memory scratchpad improves repeated-workflow recall versus summary-only index',
+    files: WORKSPACE_FILES,
+    timeout: 360000,
+    configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+    assert: async () => {
+      const baselineScenario = createWorkflowComparisonSessions(false);
+      const enhancedScenario = createWorkflowComparisonSessions(true);
+
+      const baselineOutcome = await runScenarioWithFreshRig(
+        baselineScenario.sessions,
+      );
+      const enhancedOutcome = await runScenarioWithFreshRig(
+        enhancedScenario.sessions,
+      );
+
+      const baselineRun = baselineOutcome.state.runs.at(-1);
+      const enhancedRun = enhancedOutcome.state.runs.at(-1);
+      if (!baselineRun || !enhancedRun) {
+        throw new Error('Expected both baseline and scratchpad runs to exist');
+      }
+
+      expectSuccessfulExtractionRun(baselineRun);
+      expectSuccessfulExtractionRun(enhancedRun);
+
+      const baselineRelevantReads = countMatchingIds(
+        baselineRun.processedSessions,
+        baselineScenario.relevantSessionIds,
+      );
+      const enhancedRelevantReads = countMatchingIds(
+        enhancedRun.processedSessions,
+        enhancedScenario.relevantSessionIds,
+      );
+      const baselineDistractorReads = countMatchingIds(
+        baselineRun.processedSessions,
+        baselineScenario.distractorSessionIds,
+      );
+      const enhancedDistractorReads = countMatchingIds(
+        enhancedRun.processedSessions,
+        enhancedScenario.distractorSessionIds,
+      );
+      const baselineSignalScore =
+        baselineRelevantReads - baselineDistractorReads;
+      const enhancedSignalScore =
+        enhancedRelevantReads - enhancedDistractorReads;
+
+      expect(enhancedRun.candidateSessions).toHaveLength(
+        enhancedScenario.sessions.length,
+      );
+      expect(enhancedRelevantReads).toBeGreaterThanOrEqual(2);
+      expect(enhancedRelevantReads).toBeGreaterThanOrEqual(
+        baselineRelevantReads,
+      );
+      expect(enhancedDistractorReads).toBeLessThanOrEqual(
+        baselineDistractorReads,
+      );
+      expect(enhancedSignalScore).toBeGreaterThan(baselineSignalScore);
+    },
+  });
+
+  if (process.env['RUN_SCRATCHPAD_STATS'] === '1') {
+    componentEvalTest('USUALLY_PASSES', {
+      suiteName: 'skill-extraction',
+      suiteType: 'component-level',
+      name: 'reports memory scratchpad retrieval statistics',
+      timeout: Math.max(360000, SCRATCHPAD_STATS_TRIALS * 150000),
+      configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+      assert: async () => {
+        const report = await runScratchpadStatsReport(SCRATCHPAD_STATS_TRIALS);
+        const outputPath = await writeScratchpadStatsReport(report);
+
+        console.info(
+          `Wrote scratchpad stats report to ${outputPath}\n${JSON.stringify(
+            report.aggregate,
+            null,
+            2,
+          )}`,
+        );
+
+        expect(report.results).toHaveLength(SCRATCHPAD_STATS_TRIALS);
+        expect(report.aggregate.baseline.recallAvg).toBeGreaterThan(0);
+        expect(report.aggregate.enhanced.recallAvg).toBeGreaterThan(0);
+      },
+    });
+  } else {
+    it.skip('reports memory scratchpad retrieval statistics', () => {});
+  }
 
   componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
@@ -330,15 +934,24 @@ describe('Skill Extraction', () => {
       const { state, skillsDir } = await runExtractionAndReadState(config);
       const skillBodies = await readSkillBodies(skillsDir);
       const combinedSkills = skillBodies.join('\n\n');
+      const quality = scoreSkillQuality(
+        skillBodies,
+        DB_MIGRATION_SKILL_QUALITY_SIGNALS,
+      );
 
       expect(state.runs).toHaveLength(1);
       expect(state.runs[0].sessionIds).toHaveLength(2);
+      expectSuccessfulExtractionRun(state.runs[0]);
       expect(state.runs[0].skillsCreated.length).toBeGreaterThanOrEqual(1);
       expect(skillBodies.length).toBeGreaterThanOrEqual(1);
       expect(combinedSkills).toContain('npm run db:check');
       expect(combinedSkills).toContain('npm run db:migrate');
       expect(combinedSkills).toContain('npm run db:validate');
       expect(combinedSkills).toMatch(/rollback/i);
+      expect(
+        quality.score,
+        `missing quality signals: ${quality.missing.join(', ')}`,
+      ).toBeGreaterThanOrEqual(4);
 
       // Verify the extraction agent activated skill-creator for design guidance.
       expect(config.getSkillManager().isSkillActive('skill-creator')).toBe(

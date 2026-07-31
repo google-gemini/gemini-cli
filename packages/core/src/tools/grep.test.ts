@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -156,7 +156,7 @@ describe('GrepTool', () => {
     });
 
     it('should return error if path is a file, not a directory', async () => {
-      const filePath = path.join(tempRootDir, 'fileA.txt');
+      const filePath = resolveToRealPath(path.join(tempRootDir, 'fileA.txt'));
       const params: GrepToolParams = { pattern: 'hello', dir_path: filePath };
       expect(grepTool.validateToolParams(params)).toContain(
         `Path is not a directory: ${filePath}`,
@@ -313,6 +313,34 @@ describe('GrepTool', () => {
         'L2: function baz() { return "hello"; }',
       );
     }, 30000);
+
+    it('should pass -i flag to system grep for case-insensitivity', async () => {
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['fileA.txt:1:hello world']),
+      );
+
+      const params: GrepToolParams = { pattern: 'HELLO' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (options: ExecuteOptions) => Promise<ToolResult>;
+      };
+      // Force system grep strategy by mocking isCommandAvailable and ensuring git grep is not used
+      invocation.isCommandAvailable = vi.fn(async (command: string) => {
+        if (command === 'git') return false;
+        if (command === 'grep') return true;
+        return false;
+      });
+
+      await invocation.execute({ abortSignal });
+
+      expect(execStreaming).toHaveBeenCalledWith(
+        'grep',
+        expect.arrayContaining(['-i']),
+        expect.objectContaining({
+          cwd: expect.any(String),
+        }),
+      );
+    });
 
     it('should throw an error if params are invalid', async () => {
       const params = { dir_path: '.' } as unknown as GrepToolParams; // Invalid: pattern missing

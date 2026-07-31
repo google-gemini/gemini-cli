@@ -9,6 +9,8 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
 
+import { ApprovalMode } from '../policy/types.js';
+
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
 });
@@ -23,8 +25,14 @@ export const GeneralistAgent = (
   kind: 'local',
   name: 'generalist',
   displayName: 'Generalist Agent',
-  description:
-    'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: batch refactoring/error fixing across multiple files, running commands with high-volume output, and speculative investigations.',
+  get description() {
+    const baseDescription =
+      'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: ';
+    if (context.config.getApprovalMode() === ApprovalMode.PLAN) {
+      return `${baseDescription}large-scale investigation and batch planning across multiple files.`;
+    }
+    return `${baseDescription}batch refactoring/error fixing across multiple files, running commands with high-volume output, and speculative investigations.`;
+  },
   inputConfig: {
     inputSchema: {
       type: 'object',

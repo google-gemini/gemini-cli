@@ -17,3 +17,10 @@ approvedTools = ['sed', 'grep', 'awk', 'perl', 'cat', 'echo', 'Add-Content', 'Se
 allowOverrides = true
 
 [commands]
+
+[[rules]]
+name = "Deny gha-creds"
+toolName = "*"
+argsPattern = ".*gha-creds-.*\\.json.*"
+decision = "deny"
+denyMessage = "Access to GitHub Actions credentials file is denied."

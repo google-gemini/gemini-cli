@@ -445,12 +445,10 @@ export class ExecutionLifecycleService {
       return;
     }
 
-    const {
-      error = null,
-      aborted = false,
-      exitCode = error ? 1 : 0,
-      signal = null,
-    } = options ?? {};
+    const error = options?.error ?? null;
+    const aborted = options?.aborted ?? false;
+    const exitCode = options?.exitCode ?? (error ? 1 : 0);
+    const signal = options?.signal ?? null;
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
     const snapshot = execution.getSubscriptionSnapshot?.();

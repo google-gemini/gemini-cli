@@ -44,8 +44,11 @@ export function resolveEnvVarsInString(
       if (customEnv && typeof customEnv[varName] === 'string') {
         return customEnv[varName];
       }
-      if (process && process.env && typeof process.env[varName] === 'string') {
-        return process.env[varName];
+      if (process && process.env) {
+        const val = process.env[varName];
+        if (typeof val === 'string') {
+          return val;
+        }
       }
       if (defaultValue !== undefined) {
         return defaultValue;
@@ -111,18 +114,20 @@ function resolveEnvVarsInObjectInternal<T>(
     // Check for circular reference
     if (visited.has(obj)) {
       // Return a shallow copy to break the cycle
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return [...obj] as unknown as T;
+      const copy: unknown = [...obj];
+      const isTArray = (val: unknown): val is T => Array.isArray(val);
+      if (isTArray(copy)) return copy;
+      throw new Error('Unreachable');
     }
 
     visited.add(obj);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const result = obj.map((item) =>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    const mapped: unknown = obj.map((item: unknown) =>
       resolveEnvVarsInObjectInternal(item, visited, customEnv),
-    ) as unknown as T;
+    );
     visited.delete(obj);
-    return result;
+    const isTArray = (val: unknown): val is T => Array.isArray(val);
+    if (isTArray(mapped)) return mapped;
+    throw new Error('Unreachable');
   }
 
   if (typeof obj === 'object') {

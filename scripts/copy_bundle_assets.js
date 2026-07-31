@@ -54,6 +54,18 @@ for (const file of policyFiles) {
 
 console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 
+// Also copy policies to a2a-server dist directory for bundled execution
+const a2aPolicyDir = join(root, 'packages/a2a-server/dist/policies');
+if (!existsSync(a2aPolicyDir)) {
+  mkdirSync(a2aPolicyDir, { recursive: true });
+}
+for (const file of policyFiles) {
+  copyFileSync(join(root, file), join(a2aPolicyDir, basename(file)));
+}
+console.log(
+  `Copied ${policyFiles.length} policy files to packages/a2a-server/dist/policies/`,
+);
+
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
@@ -73,29 +85,7 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
-// 5. Copy DevTools package so the external dynamic import resolves at runtime
-const devtoolsSrc = join(root, 'packages/devtools');
-const devtoolsDest = join(
-  bundleDir,
-  'node_modules',
-  '@google',
-  'gemini-cli-devtools',
-);
-const devtoolsDistSrc = join(devtoolsSrc, 'dist');
-if (existsSync(devtoolsDistSrc)) {
-  mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
-    recursive: true,
-    dereference: true,
-  });
-  copyFileSync(
-    join(devtoolsSrc, 'package.json'),
-    join(devtoolsDest, 'package.json'),
-  );
-  console.log('Copied devtools package to bundle/node_modules/');
-}
-
-// 6. Copy bundled chrome-devtools-mcp
+// 5. Copy bundled chrome-devtools-mcp
 const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
 const bundleMcpDest = join(bundleDir, 'bundled');
 if (!existsSync(bundleMcpSrc)) {
@@ -108,19 +98,7 @@ if (!existsSync(bundleMcpSrc)) {
 cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
 console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
 
-// 7. Copy pre-built ripgrep vendor binaries
-const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
-const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
-if (existsSync(ripgrepVendorSrc)) {
-  mkdirSync(ripgrepVendorDest, { recursive: true });
-  cpSync(ripgrepVendorSrc, ripgrepVendorDest, {
-    recursive: true,
-    dereference: true,
-  });
-  console.log('Copied ripgrep vendor binaries to bundle/vendor/ripgrep/');
-}
-
-// 8. Copy Extension Examples
+// 6. Copy Extension Examples
 const extensionExamplesSrc = join(
   root,
   'packages/cli/src/commands/extensions/examples',

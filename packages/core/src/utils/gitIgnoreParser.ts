@@ -6,7 +6,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import ignore, { type Ignore } from 'ignore';
+import ignorePkg, { type Ignore } from 'ignore';
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
+  ignorePkg) as () => Ignore;
 import { getNormalizedRelativePath } from './ignorePathUtils.js';
 
 export interface GitIgnoreFilter {
@@ -52,7 +55,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           .split(path.sep)
           .join(path.posix.sep);
 
-    const rawPatterns = content.split('\n');
+    const rawPatterns = content.split(/\r\n|\n|\r/);
     return ignore().add(this.processPatterns(rawPatterns, relativeBaseDir));
   }
 

@@ -47,6 +47,7 @@ function resolveProcessorOptions<T>(
 }
 
 export interface ContextProfile {
+  name: string;
   config: ContextManagementConfig;
   buildPipelines: (
     env: ContextEnvironment,
@@ -56,17 +57,28 @@ export interface ContextProfile {
     env: ContextEnvironment,
     config?: ContextManagementConfig,
   ) => AsyncPipelineDef[];
+  sentinels?: {
+    continuation?: string;
+    lostToolResponse?: string;
+  };
 }
 
 /**
  * The standard default context management profile.
  * Optimized for safety, precision, and reliable summarization.
  */
-export const defaultContextProfile: ContextProfile = {
+export const generalistProfile: ContextProfile = {
+  name: 'Generalist (Default)',
+  sentinels: {
+    continuation: '[Continuing from previous AI thoughts...]',
+    lostToolResponse:
+      'The tool execution result was lost due to context management truncation.',
+  },
   config: {
     budget: {
       retainedTokens: 65000,
       maxTokens: 150000,
+      coalescingThresholdTokens: 5000,
     },
   },
 
@@ -88,24 +100,32 @@ export const defaultContextProfile: ContextProfile = {
             }),
           ),
           createBlobDegradationProcessor('BlobDegradation', env), // No options
+          // Automatically distill extremely large blocks (e.g. huge source files pasted by the user)
+          createNodeDistillationProcessor(
+            'ImmediateNodeDistillation',
+            env,
+            resolveProcessorOptions(config, 'ImmediateNodeDistillation', {
+              nodeThresholdTokens: 15000,
+            }),
+          ),
         ],
       },
       {
         name: 'Normalization',
         triggers: ['retained_exceeded'],
         processors: [
-          createNodeTruncationProcessor(
-            'NodeTruncation',
-            env,
-            resolveProcessorOptions(config, 'NodeTruncation', {
-              maxTokensPerNode: 3000,
-            }),
-          ),
           createNodeDistillationProcessor(
             'NodeDistillation',
             env,
             resolveProcessorOptions(config, 'NodeDistillation', {
-              nodeThresholdTokens: 5000,
+              nodeThresholdTokens: 3000,
+            }),
+          ),
+          createNodeTruncationProcessor(
+            'NodeTruncation',
+            env,
+            resolveProcessorOptions(config, 'NodeTruncation', {
+              maxTokensPerNode: 4000,
             }),
           ),
         ],
@@ -119,6 +139,8 @@ export const defaultContextProfile: ContextProfile = {
             env,
             resolveProcessorOptions(config, 'StateSnapshotSync', {
               target: 'max',
+              maxStateTokens: 4000,
+              maxSummaryTurns: 5,
             }),
           ),
         ],
@@ -137,6 +159,174 @@ export const defaultContextProfile: ContextProfile = {
           env,
           resolveProcessorOptions(config, 'StateSnapshotAsync', {
             type: 'accumulate',
+            maxStateTokens: 4000,
+            maxSummaryTurns: 5,
+          }),
+        ),
+      ],
+    },
+  ],
+};
+
+/**
+ * A highly aggressive profile designed exclusively for testing Context Management.
+ * Lowers token limits dramatically to force garbage collection and distillation loops
+ * within a few conversational turns.
+ */
+export const stressTestProfile: ContextProfile = {
+  name: 'Stress Test',
+  config: {
+    budget: {
+      retainedTokens: 1500,
+      maxTokens: 5000,
+    },
+    processorOptions: {
+      ToolMasking: {
+        type: 'ToolMaskingProcessor',
+        options: {
+          stringLengthThresholdTokens: 500,
+        },
+      },
+      NodeTruncation: {
+        type: 'NodeTruncationProcessor',
+        options: {
+          maxTokensPerNode: 1000,
+        },
+      },
+      NodeDistillation: {
+        type: 'NodeDistillationProcessor',
+        options: {
+          nodeThresholdTokens: 1500,
+        },
+      },
+    },
+  },
+  // Re-use the generalist pipeline architecture exactly, but the `config` above
+  // will be passed into `resolveProcessorOptions` to aggressively override the thresholds.
+  buildPipelines: generalistProfile.buildPipelines,
+  buildAsyncPipelines: generalistProfile.buildAsyncPipelines,
+};
+
+/**
+ * An experimental profile for power users testing maximum context endurance.
+ * Uses a three-stage pipeline (retained -> normalized -> archived) and incremental GC.
+ */
+export const powerUserProfile: ContextProfile = {
+  name: 'Power User (Experimental)',
+  sentinels: generalistProfile.sentinels,
+  config: {
+    budget: {
+      retainedTokens: 65000,
+      normalizedTokens: 100000,
+      maxTokens: 150000,
+      coalescingThresholdTokens: 5000,
+    },
+    gcStrategy: 'incremental',
+  },
+  buildPipelines: (
+    env: ContextEnvironment,
+    config?: ContextManagementConfig,
+  ): PipelineDef[] => [
+    {
+      name: 'Immediate Sanitization',
+      triggers: ['new_message'],
+      processors: [
+        createToolMaskingProcessor(
+          'ToolMasking',
+          env,
+          resolveProcessorOptions(config, 'ToolMasking', {
+            stringLengthThresholdTokens: 8000,
+          }),
+        ),
+        createBlobDegradationProcessor('BlobDegradation', env),
+        createNodeDistillationProcessor(
+          'ImmediateNodeDistillation',
+          env,
+          resolveProcessorOptions(config, 'ImmediateNodeDistillation', {
+            nodeThresholdTokens: 15000,
+          }),
+        ),
+      ],
+    },
+    {
+      name: 'Normalization',
+      triggers: ['retained_exceeded'],
+      processors: [
+        createNodeDistillationProcessor(
+          'NodeDistillation',
+          env,
+          resolveProcessorOptions(config, 'NodeDistillation', {
+            nodeThresholdTokens: 3000,
+          }),
+        ),
+        createNodeTruncationProcessor(
+          'NodeTruncation',
+          env,
+          resolveProcessorOptions(config, 'NodeTruncation', {
+            maxTokensPerNode: 4000,
+          }),
+        ),
+      ],
+    },
+    {
+      name: 'Archiving',
+      triggers: ['normalized_exceeded'],
+      processors: [
+        createNodeDistillationProcessor(
+          'ArchiveNodeDistillation',
+          env,
+          resolveProcessorOptions(config, 'ArchiveNodeDistillation', {
+            nodeThresholdTokens: 1000,
+          }),
+        ),
+        createNodeTruncationProcessor(
+          'ArchiveNodeTruncation',
+          env,
+          resolveProcessorOptions(config, 'ArchiveNodeTruncation', {
+            maxTokensPerNode: 1500,
+          }),
+        ),
+      ],
+    },
+    {
+      name: 'Emergency Backstop',
+      triggers: ['gc_backstop'],
+      processors: [
+        createStateSnapshotProcessor(
+          'StateSnapshotSync',
+          env,
+          resolveProcessorOptions(config, 'StateSnapshotSync', {
+            target: 'max',
+            maxStateTokens: 2000,
+            maxSummaryTurns: 10,
+          }),
+        ),
+        // If we STILL exceed max tokens, aggressively truncate
+        createNodeTruncationProcessor(
+          'EmergencyNodeTruncation',
+          env,
+          resolveProcessorOptions(config, 'EmergencyNodeTruncation', {
+            maxTokensPerNode: 500,
+          }),
+        ),
+      ],
+    },
+  ],
+  buildAsyncPipelines: (
+    env: ContextEnvironment,
+    config?: ContextManagementConfig,
+  ): AsyncPipelineDef[] => [
+    {
+      name: 'Async Background GC',
+      triggers: ['nodes_aged_out'],
+      processors: [
+        createStateSnapshotAsyncProcessor(
+          'StateSnapshotAsync',
+          env,
+          resolveProcessorOptions(config, 'StateSnapshotAsync', {
+            type: 'accumulate',
+            maxStateTokens: 4000,
+            maxSummaryTurns: 5,
           }),
         ),
       ],

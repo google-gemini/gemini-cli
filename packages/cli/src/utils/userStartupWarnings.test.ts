@@ -19,11 +19,11 @@ import {
 } from '@google/gemini-cli-core';
 
 // Mock os.homedir to control the home directory in tests
-vi.mock('os', async (importOriginal) => {
+vi.mock('node:os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
-    homedir: vi.fn(),
+    homedir: vi.fn(() => actualOs.homedir()),
   };
 });
 
@@ -32,8 +32,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    homedir: () => os.homedir(),
     getCompatibilityWarnings: vi.fn().mockReturnValue([]),
+    isHeadlessMode: vi.fn().mockReturnValue(false),
     WarningPriority: {
       Low: 'low',
       High: 'high',
@@ -65,6 +65,7 @@ describe('getUserStartupWarnings', () => {
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -94,6 +95,54 @@ describe('getUserStartupWarnings', () => {
         { ui: { showHomeDirectoryWarning: false } },
         homeDir,
       );
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
+    });
+
+    it('should not return a warning when running in a subdirectory of home', async () => {
+      const subDir = path.join(homeDir, 'projects', 'my-app');
+      await fs.mkdir(subDir, { recursive: true });
+      const warnings = await getUserStartupWarnings({}, subDir);
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
+    });
+
+    it('should not return a warning when home directory is a symlink and running in a subdirectory', async () => {
+      const realHome = path.join(testRootDir, 'real-home');
+      await fs.mkdir(realHome, { recursive: true });
+      const symlinkedHome = path.join(testRootDir, 'symlinked-home');
+      await fs.symlink(realHome, symlinkedHome);
+      vi.mocked(os.homedir).mockReturnValue(symlinkedHome);
+
+      const subDir = path.join(symlinkedHome, 'projects');
+      await fs.mkdir(subDir, { recursive: true });
+      const warnings = await getUserStartupWarnings({}, subDir);
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
+    });
+
+    it('should return a warning when home directory is a symlink and running in it', async () => {
+      const realHome = path.join(testRootDir, 'real-home2');
+      await fs.mkdir(realHome, { recursive: true });
+      const symlinkedHome = path.join(testRootDir, 'symlinked-home2');
+      await fs.symlink(realHome, symlinkedHome);
+      vi.mocked(os.homedir).mockReturnValue(symlinkedHome);
+
+      const warnings = await getUserStartupWarnings({}, symlinkedHome);
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'home-directory',
+          message: expect.stringContaining(
+            'Warning you are running Gemini CLI in your home directory',
+          ),
+          priority: WarningPriority.Low,
+        }),
+      );
+    });
+
+    it('should not return a warning when GEMINI_CLI_HOME differs from os.homedir', async () => {
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir, { recursive: true });
+      vi.stubEnv('GEMINI_CLI_HOME', projectDir);
+
+      const warnings = await getUserStartupWarnings({}, projectDir);
       expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
     });
 
@@ -143,6 +192,51 @@ describe('getUserStartupWarnings', () => {
     });
   });
 
+  describe('folder trust check', () => {
+    it('should throw FatalUntrustedWorkspaceError when untrusted in headless mode', async () => {
+      const { isHeadlessMode, FatalUntrustedWorkspaceError } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockImplementation(() => {
+        throw new FatalUntrustedWorkspaceError(
+          'Gemini CLI is not running in a trusted directory',
+        );
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      await expect(
+        getUserStartupWarnings({}, testRootDir),
+      ).rejects.toThrowError(FatalUntrustedWorkspaceError);
+    });
+
+    it('should not return a warning when trusted in headless mode', async () => {
+      const { isHeadlessMode } = await import('@google/gemini-cli-core');
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      const warnings = await getUserStartupWarnings({}, testRootDir);
+      expect(warnings.find((w) => w.id === 'folder-trust')).toBeUndefined();
+    });
+
+    it('should not return a warning when untrusted in interactive mode', async () => {
+      const { isHeadlessMode } = await import('@google/gemini-cli-core');
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: undefined,
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(false);
+
+      const warnings = await getUserStartupWarnings({}, testRootDir);
+      expect(warnings.find((w) => w.id === 'folder-trust')).toBeUndefined();
+    });
+  });
+
   describe('compatibility warnings', () => {
     it('should include compatibility warnings by default', async () => {
       const compWarning = {
@@ -173,6 +267,23 @@ describe('getUserStartupWarnings', () => {
         projectDir,
       );
       expect(warnings).not.toContainEqual(compWarning);
+    });
+
+    it('should correctly pass isAlternateBuffer option to getCompatibilityWarnings', async () => {
+      const projectDir = path.join(testRootDir, 'project-alt');
+      await fs.mkdir(projectDir);
+
+      await getUserStartupWarnings({}, projectDir, { isAlternateBuffer: true });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: true,
+      });
+
+      await getUserStartupWarnings({}, projectDir, {
+        isAlternateBuffer: false,
+      });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: false,
+      });
     });
   });
 });

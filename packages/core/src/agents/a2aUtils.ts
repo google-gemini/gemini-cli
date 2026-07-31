@@ -16,7 +16,7 @@ import type {
   AgentInterface,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
-import type { SubagentActivityItem } from './types.js';
+import { type SubagentActivityItem, SubagentState } from './types.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
 
@@ -124,8 +124,9 @@ export class A2AResultReassembler {
 
   private pushMessage(message: Message | undefined) {
     if (!message) return;
+    if (message.role === 'user') return; // Skip user messages reflected by server
     const text = extractPartsText(message.parts, '');
-    if (text && this.messageLog[this.messageLog.length - 1] !== text) {
+    if (text && this.messageLog.at(-1) !== text) {
       this.messageLog.push(text);
     }
   }
@@ -135,21 +136,36 @@ export class A2AResultReassembler {
    */
   toActivityItems(): SubagentActivityItem[] {
     const isAuthRequired = this.messageLog.includes(AUTH_REQUIRED_MSG);
-    return [
-      isAuthRequired
-        ? {
-            id: 'auth-required',
-            type: 'thought',
-            content: AUTH_REQUIRED_MSG,
-            status: 'running',
-          }
-        : {
-            id: 'pending',
-            type: 'thought',
-            content: 'Working...',
-            status: 'running',
-          },
-    ];
+    const items: SubagentActivityItem[] = [];
+
+    if (isAuthRequired) {
+      items.push({
+        id: 'auth-required',
+        type: 'thought',
+        content: AUTH_REQUIRED_MSG,
+        status: SubagentState.RUNNING,
+      });
+    }
+
+    this.messageLog.forEach((msg, index) => {
+      items.push({
+        id: `msg-${index}`,
+        type: 'thought',
+        content: msg.trim(),
+        status: SubagentState.COMPLETED,
+      });
+    });
+
+    if (items.length === 0 && !isAuthRequired) {
+      items.push({
+        id: 'pending',
+        type: 'thought',
+        content: 'Working...',
+        status: SubagentState.RUNNING,
+      });
+    }
+
+    return items;
   }
 
   /**

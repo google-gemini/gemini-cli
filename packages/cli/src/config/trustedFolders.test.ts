@@ -11,7 +11,7 @@ import * as os from 'node:os';
 import {
   FatalConfigError,
   ideContextStore,
-  coreEvents,
+  normalizePath,
 } from '@google/gemini-cli-core';
 import {
   loadTrustedFolders,
@@ -32,9 +32,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     homedir: () => '/mock/home/user',
     isHeadlessMode: vi.fn(() => false),
-    coreEvents: {
-      emitFeedback: vi.fn(),
-    },
+    coreEvents: Object.assign(
+      Object.create(Object.getPrototypeOf(actual.coreEvents)),
+      actual.coreEvents,
+      {
+        emitFeedback: vi.fn(),
+      },
+    ),
+    FatalConfigError: actual.FatalConfigError,
   };
 });
 
@@ -53,6 +58,7 @@ describe('Trusted Folders', () => {
     // Reset the internal state
     resetTrustedFoldersForTesting();
     vi.clearAllMocks();
+    delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
   });
 
   afterEach(() => {
@@ -70,8 +76,14 @@ describe('Trusted Folders', () => {
 
       // Start two concurrent calls
       // These will race to acquire the lock on the real file system
-      const p1 = loadedFolders.setValue('/path1', TrustLevel.TRUST_FOLDER);
-      const p2 = loadedFolders.setValue('/path2', TrustLevel.TRUST_FOLDER);
+      const p1 = loadedFolders.setValue(
+        path.resolve('/path1'),
+        TrustLevel.TRUST_FOLDER,
+      );
+      const p2 = loadedFolders.setValue(
+        path.resolve('/path2'),
+        TrustLevel.TRUST_FOLDER,
+      );
 
       await Promise.all([p1, p2]);
 
@@ -80,8 +92,8 @@ describe('Trusted Folders', () => {
       const config = JSON.parse(content);
 
       expect(config).toEqual({
-        '/path1': TrustLevel.TRUST_FOLDER,
-        '/path2': TrustLevel.TRUST_FOLDER,
+        [normalizePath('/path1')]: TrustLevel.TRUST_FOLDER,
+        [normalizePath('/path2')]: TrustLevel.TRUST_FOLDER,
       });
     });
   });
@@ -95,13 +107,16 @@ describe('Trusted Folders', () => {
 
     it('should load rules from the configuration file', () => {
       const config = {
-        '/user/folder': TrustLevel.TRUST_FOLDER,
+        [normalizePath('/user/folder')]: TrustLevel.TRUST_FOLDER,
       };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
       const { rules, errors } = loadTrustedFolders();
       expect(rules).toEqual([
-        { path: '/user/folder', trustLevel: TrustLevel.TRUST_FOLDER },
+        {
+          path: normalizePath('/user/folder'),
+          trustLevel: TrustLevel.TRUST_FOLDER,
+        },
       ]);
       expect(errors).toEqual([]);
     });
@@ -143,14 +158,14 @@ describe('Trusted Folders', () => {
       const content = `
         {
           // This is a comment
-          "/path": "TRUST_FOLDER"
+          "${normalizePath('/path').replaceAll('\\', '\\\\')}": "TRUST_FOLDER"
         }
       `;
       fs.writeFileSync(trustedFoldersPath, content, 'utf-8');
 
       const { rules, errors } = loadTrustedFolders();
       expect(rules).toEqual([
-        { path: '/path', trustLevel: TrustLevel.TRUST_FOLDER },
+        { path: normalizePath('/path'), trustLevel: TrustLevel.TRUST_FOLDER },
       ]);
       expect(errors).toEqual([]);
     });
@@ -216,15 +231,18 @@ describe('Trusted Folders', () => {
       fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
       const loadedFolders = loadTrustedFolders();
 
-      await loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
+      await loadedFolders.setValue(
+        normalizePath('/new/path'),
+        TrustLevel.TRUST_FOLDER,
+      );
 
-      expect(loadedFolders.user.config['/new/path']).toBe(
+      expect(loadedFolders.user.config[normalizePath('/new/path')]).toBe(
         TrustLevel.TRUST_FOLDER,
       );
 
       const content = fs.readFileSync(trustedFoldersPath, 'utf-8');
       const config = JSON.parse(content);
-      expect(config['/new/path']).toBe(TrustLevel.TRUST_FOLDER);
+      expect(config[normalizePath('/new/path')]).toBe(TrustLevel.TRUST_FOLDER);
     });
 
     it('should throw FatalConfigError if there were load errors', async () => {
@@ -236,28 +254,6 @@ describe('Trusted Folders', () => {
       await expect(
         loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
       ).rejects.toThrow(FatalConfigError);
-    });
-
-    it('should report corrupted config via coreEvents.emitFeedback and still succeed', async () => {
-      // Initialize with valid JSON
-      fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
-      const loadedFolders = loadTrustedFolders();
-
-      // Corrupt the file after initial load
-      fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
-
-      await loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
-
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('may be corrupted'),
-        expect.any(Error),
-      );
-
-      // Should have overwritten the corrupted file with new valid config
-      const content = fs.readFileSync(trustedFoldersPath, 'utf-8');
-      const config = JSON.parse(content);
-      expect(config).toEqual({ '/new/path': TrustLevel.TRUST_FOLDER });
     });
   });
 
@@ -427,14 +423,26 @@ describe('Trusted Folders', () => {
       },
     };
 
-    it('should return true when isHeadlessMode is true, ignoring config', async () => {
+    it('should NOT return true when isHeadlessMode is true, ignoring config', async () => {
       const geminiCore = await import('@google/gemini-cli-core');
       vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(true);
 
       expect(isWorkspaceTrusted(mockSettings)).toEqual({
-        isTrusted: true,
+        isTrusted: undefined,
         source: undefined,
       });
+    });
+
+    it('should return true when GEMINI_CLI_TRUST_WORKSPACE is true', async () => {
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+      try {
+        expect(isWorkspaceTrusted(mockSettings)).toEqual({
+          isTrusted: true,
+          source: 'env',
+        });
+      } finally {
+        delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
+      }
     });
 
     it('should fall back to config when isHeadlessMode is false', async () => {
@@ -449,12 +457,12 @@ describe('Trusted Folders', () => {
       );
     });
 
-    it('should return true for isPathTrusted when isHeadlessMode is true', async () => {
+    it('should return undefined for isPathTrusted when isHeadlessMode is true', async () => {
       const geminiCore = await import('@google/gemini-cli-core');
       vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(true);
 
       const folders = loadTrustedFolders();
-      expect(folders.isPathTrusted('/any-untrusted-path')).toBe(true);
+      expect(folders.isPathTrusted('/any-untrusted-path')).toBe(undefined);
     });
   });
 

@@ -26,7 +26,10 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  UPDATE_TOPIC_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -36,6 +39,7 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
+import { populateToolDisplay } from '../agent/tool-display-utils.js';
 import type { EditorType } from '../utils/editor.js';
 import {
   MessageBusType,
@@ -196,6 +200,7 @@ export class Scheduler {
       {
         operation: GeminiCliOperation.ScheduleToolCalls,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.context.config.getTelemetryTracesEnabled(),
         sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
@@ -380,6 +385,16 @@ export class Scheduler {
       () => {
         try {
           const invocation = tool.build(request.args);
+          if (!request.display) {
+            request.display = populateToolDisplay({
+              name: tool.name,
+              invocation,
+              displayName: tool.displayName,
+            });
+            if (!request.display.description) {
+              request.display.description = tool.description;
+            }
+          }
           return {
             status: CoreToolCallStatus.Validating,
             request,
@@ -525,7 +540,7 @@ export class Scheduler {
 
     if (isWaitingForExternal && this.state.isActive) {
       // Yield to the event loop to allow external events (tool completion, user input) to progress.
-      await new Promise((resolve) => queueMicrotask(() => resolve(true)));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return true;
     }
 
@@ -535,6 +550,13 @@ export class Scheduler {
   }
 
   private _isParallelizable(request: ToolCallRequestInfo): boolean {
+    // update_topic tool is forced as sequential call
+    if (
+      request.name === UPDATE_TOPIC_TOOL_NAME ||
+      EDIT_TOOL_NAMES.has(request.name)
+    ) {
+      return false;
+    }
     if (request.args) {
       const wait = request.args['wait_for_previous'];
       if (typeof wait === 'boolean') {

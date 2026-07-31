@@ -58,7 +58,9 @@ exports[`Focus Hint > 'ToolMessage' > shows focus hint after delay with output >
 
 exports[`Focus Hint > handles long descriptions by shrinking them to show the focus hint > long-description 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA… (Tab to focus) │
+│ ⊶  Shell Command                                              (Tab to focus) │
+│    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA                │
+│    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA                                │
 │                                                                              │
 "
 `;

@@ -12,6 +12,7 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   ToolLiveOutput,
+  ToolDisplay,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
@@ -36,6 +37,8 @@ export interface ToolCallRequestInfo {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   /**
    * The original name and arguments of the tool requested by the model.
    * This is used for tail calls to ensure the final response and log retains
@@ -56,6 +59,8 @@ export interface ToolCallRequestInfo {
 export interface ToolCallResponseInfo {
   callId: string;
   responseParts: Part[];
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;

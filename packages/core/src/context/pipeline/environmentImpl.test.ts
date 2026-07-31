@@ -8,15 +8,19 @@ import { ContextEnvironmentImpl } from './environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
+import { StaticTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 
 describe('ContextEnvironmentImpl', () => {
   it('should initialize with defaults correctly', () => {
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock' });
     const eventBus = new ContextEventBus();
     const mockLlmClient = createMockLlmClient();
+    const behaviorRegistry = new NodeBehaviorRegistry();
+    const calculator = new StaticTokenCalculator(4, behaviorRegistry);
 
     const env = new ContextEnvironmentImpl(
-      mockLlmClient,
+      () => mockLlmClient,
       'mock-session',
       'mock-prompt',
       '/tmp/trace',
@@ -24,6 +28,8 @@ describe('ContextEnvironmentImpl', () => {
       tracer,
       4,
       eventBus,
+      calculator,
+      behaviorRegistry,
     );
 
     expect(env.llmClient).toBe(mockLlmClient);

@@ -108,6 +108,30 @@ describe('keyBindings config', () => {
     }
   });
 
+  it('should have platform-specific UNDO bindings', () => {
+    const undoBindings = defaultKeyBindingConfig.get(Command.UNDO);
+    if (process.platform === 'win32') {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].ctrl).toBe(true);
+    } else if (process.platform === 'darwin') {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].cmd).toBe(true);
+    } else {
+      expect(undoBindings?.[0].name).toBe('z');
+      expect(undoBindings?.[0].alt).toBe(true);
+      // Ensure ctrl+z is also present for smart bubbling
+      expect(undoBindings?.some((b) => b.name === 'z' && b.ctrl)).toBe(true);
+    }
+  });
+
+  it('should have platform-specific REDO bindings', () => {
+    const redoBindings = defaultKeyBindingConfig.get(Command.REDO);
+    // Ctrl+Shift+Z is now the universal primary to avoid conflict with YOLO (Ctrl+Y)
+    expect(redoBindings?.[0].name).toBe('z');
+    expect(redoBindings?.[0].shift).toBe(true);
+    expect(redoBindings?.[0].ctrl).toBe(true);
+  });
+
   describe('command metadata', () => {
     const commandValues = Object.values(Command);
 

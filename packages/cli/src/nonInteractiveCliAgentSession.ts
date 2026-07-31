@@ -59,6 +59,13 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
+/**
+ * Runs the non-interactive CLI using the LegacyAgentSession.
+ *
+ * Programmatic output formats (JSON, STREAM_JSON) use lenient sanitization
+ * by stripping ANSI escape sequences from messages to ensure clean,
+ * parseable output for downstream consumers.
+ */
 export async function runNonInteractive({
   config,
   settings,
@@ -80,7 +87,7 @@ export async function runNonInteractive({
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
@@ -339,7 +346,13 @@ export async function runNonInteractive({
           const formatter = new JsonFormatter();
           const stats = uiTelemetryService.getMetrics();
           textOutput.write(
-            formatter.format(config.getSessionId(), responseText, stats),
+            formatter.format(
+              config.getSessionId(),
+              responseText,
+              stats,
+              undefined,
+              warnings,
+            ),
           );
         } else {
           textOutput.ensureTrailingNewline();
@@ -420,6 +433,7 @@ export async function runNonInteractive({
       let responseText = '';
       let preToolResponseText: string | undefined;
       let streamEnded = false;
+      const warnings: string[] = [];
       for await (const event of session.stream({ streamId })) {
         if (streamEnded) break;
         switch (event.type) {
@@ -538,9 +552,18 @@ export async function runNonInteractive({
             const errorCode = event._meta?.['code'];
 
             if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
+              const blockMessage = `Agent execution blocked: ${event.message.trim()}`;
               if (config.getOutputFormat() === OutputFormat.TEXT) {
-                process.stderr.write(`[WARNING] ${event.message}\n`);
+                process.stderr.write(`[WARNING] ${blockMessage}\n`);
+              } else if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'warning',
+                  message: stripAnsi(blockMessage),
+                });
               }
+              warnings.push(blockMessage);
               break;
             }
 
@@ -554,9 +577,10 @@ export async function runNonInteractive({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity,
-                message: event.message,
+                message: stripAnsi(event.message),
               });
             }
+            warnings.push(event.message);
             break;
           }
           case 'agent_end': {

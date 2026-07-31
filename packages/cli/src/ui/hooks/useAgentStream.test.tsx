@@ -202,6 +202,6 @@ describe('useAgentStream', () => {
     });
 
     expect(mockLegacyAgentProtocol.abort).toHaveBeenCalled();
-    expect(mockOnCancelSubmit).toHaveBeenCalledWith(false);
+    expect(mockOnCancelSubmit).toHaveBeenCalledWith(false, true);
   });
 });

@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<HalfLinePaddedBox /> > renders iTerm2-specific blocks when iTerm2 is detected 1`] = `
-"▄▄▄▄▄▄▄▄▄▄
+exports[`<HalfLinePaddedBox /> > renders alternative blocks when true color is not supported 1`] = `
+"          
 Content   
-▀▀▀▀▀▀▀▀▀▀
+          
 "
 `;
 
@@ -17,9 +17,9 @@ exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is fals
 "
 `;
 
-exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not iTerm2 1`] = `
-"▀▀▀▀▀▀▀▀▀▀
+exports[`<HalfLinePaddedBox /> > renders standard background and blocks when true color is supported 1`] = `
+"▄▄▄▄▄▄▄▄▄▄
 Content   
-▄▄▄▄▄▄▄▄▄▄
+▀▀▀▀▀▀▀▀▀▀
 "
 `;

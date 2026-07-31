@@ -15,6 +15,8 @@ import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
 
+export const BINARY_INJECTION_KEY = '__binary_injection__';
+
 /**
  * Formats tool output for a Gemini FunctionResponse.
  */
@@ -89,6 +91,43 @@ export function convertToFunctionResponse(
     // Ignore other part types
   }
 
+  // build a list of unsupported MIME types for function responses
+  const filteredInlineDataParts: Part[] = [];
+  const unsupportedInlineDataParts: Part[] = [];
+
+  for (const part of inlineDataParts) {
+    const mimeType = part.inlineData?.mimeType;
+    if (
+      mimeType &&
+      (mimeType.startsWith('audio/') || mimeType.startsWith('video/'))
+    ) {
+      unsupportedInlineDataParts.push(part);
+    } else {
+      filteredInlineDataParts.push(part);
+    }
+  }
+
+  if (unsupportedInlineDataParts.length > 0) {
+    const uniqueMimes = Array.from(
+      new Set(
+        unsupportedInlineDataParts.map((p) => p.inlineData?.mimeType ?? ''),
+      ),
+    ).join(', ');
+
+    const isReadFileTool =
+      toolName === 'read_file' || toolName === 'read_many_files';
+
+    if (isReadFileTool) {
+      textParts.unshift(
+        `Binary content (${uniqueMimes}) read successfully. Content will be injected for analysis in the next sequence.`,
+      );
+    } else {
+      textParts.unshift(
+        `[SYSTEM: Binary content (${uniqueMimes}) stripped from response due to protocol limitations.]`,
+      );
+    }
+  }
+
   // Build the primary response part
   const part: Part = {
     functionResponse: {
@@ -98,30 +137,40 @@ export function convertToFunctionResponse(
     },
   };
 
+  const isReadFileTool =
+    toolName === 'read_file' || toolName === 'read_many_files';
+
+  if (unsupportedInlineDataParts.length > 0 && isReadFileTool) {
+    if (part.functionResponse) {
+      Object.assign(part.functionResponse.response!, {
+        [BINARY_INJECTION_KEY]: unsupportedInlineDataParts,
+      });
+    }
+  }
+
   const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
     model,
     config,
   );
   const siblingParts: Part[] = [...fileDataParts];
 
-  if (inlineDataParts.length > 0) {
+  if (filteredInlineDataParts.length > 0) {
     if (isMultimodalFRSupported) {
       // Nest inlineData if supported by the model
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (part.functionResponse as unknown as { parts: Part[] }).parts =
-        inlineDataParts;
+      Object.assign(part.functionResponse!, { parts: filteredInlineDataParts });
     } else {
       // Otherwise treat as siblings
-      siblingParts.push(...inlineDataParts);
+      siblingParts.push(...filteredInlineDataParts);
     }
   }
 
   // Add descriptive text if the response object is empty but we have binary content
   if (
     textParts.length === 0 &&
-    (inlineDataParts.length > 0 || fileDataParts.length > 0)
+    (filteredInlineDataParts.length > 0 || fileDataParts.length > 0)
   ) {
-    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
+    const totalBinaryItems =
+      filteredInlineDataParts.length + fileDataParts.length;
     part.functionResponse!.response = {
       output: `Binary content provided (${totalBinaryItems} item(s)).`,
     };

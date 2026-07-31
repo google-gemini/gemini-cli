@@ -78,10 +78,12 @@ export async function requestConsentNonInteractive(
 export async function requestConsentInteractive(
   consentDescription: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
+  clearConfirmationRequest?: () => void,
 ): Promise<boolean> {
   return promptForConsentInteractive(
     consentDescription + '\n\nDo you want to continue?',
     addExtensionUpdateConfirmationRequest,
+    clearConfirmationRequest,
   );
 }
 
@@ -129,12 +131,14 @@ export async function promptForConsentNonInteractive(
 async function promptForConsentInteractive(
   prompt: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
+  clearConfirmationRequest?: () => void,
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     addExtensionUpdateConfirmationRequest({
       prompt,
       onConfirm: (resolvedConfirmed) => {
-        resolve(resolvedConfirmed);
+        clearConfirmationRequest?.();
+        setImmediate(() => resolve(resolvedConfirmed));
       },
     });
   });

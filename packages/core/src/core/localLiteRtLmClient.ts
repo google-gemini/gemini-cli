@@ -25,6 +25,8 @@ export class LocalLiteRtLmClient {
     this.client = new GoogleGenAI({
       // The LiteRT-LM server does not require an API key, but the SDK requires one to be set even for local endpoints. This is a dummy value and is not used for authentication.
       apiKey: 'no-api-key-needed',
+      apiVersion: 'v1beta',
+      vertexai: false,
       httpOptions: {
         baseUrl: this.host,
         // If the LiteRT-LM server is started but the wrong port is set, there will be a lengthy TCP timeout (here fixed to be 10 seconds).
@@ -82,8 +84,13 @@ export class LocalLiteRtLmClient {
         );
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(result.text);
+      const parsed: unknown = JSON.parse(result.text);
+      const isRecord = (val: unknown): val is Record<string, unknown> =>
+        typeof val === 'object' && val !== null && !Array.isArray(val);
+      if (isRecord(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid JSON response format from Local LLM');
     } catch (error) {
       debugLogger.error(
         `[LocalLiteRtLmClient] Failed to generate content:`,

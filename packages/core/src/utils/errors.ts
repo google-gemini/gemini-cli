@@ -114,6 +114,12 @@ export class FatalToolExecutionError extends FatalError {
     this.name = 'FatalToolExecutionError';
   }
 }
+export class FatalUntrustedWorkspaceError extends FatalError {
+  constructor(message: string) {
+    super(message, 55);
+    this.name = 'FatalUntrustedWorkspaceError';
+  }
+}
 export class FatalCancellationError extends FatalError {
   constructor(message: string) {
     super(message, 130); // Standard exit code for SIGINT
@@ -274,16 +280,9 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 export function isAuthenticationError(error: unknown): boolean {
   // Check for MCP SDK errors with code property
   // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (
-    error &&
-    typeof error === 'object' &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'number'
-  ) {
-    // Safe access after check
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const errorCode = (error as { code: number }).code;
-    if (errorCode === 401) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const errorCode: unknown = (error as Record<string, unknown>)['code'];
+    if (typeof errorCode === 'number' && errorCode === 401) {
       return true;
     }
   }

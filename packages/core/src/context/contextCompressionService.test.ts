@@ -14,9 +14,13 @@ vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+  };
+});
 
 describe('ContextCompressionService', () => {
   let mockConfig: Partial<Config>;

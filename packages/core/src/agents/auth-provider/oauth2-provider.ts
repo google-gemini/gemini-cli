@@ -34,7 +34,7 @@ import { Storage } from '../../config/storage.js';
  * and persists tokens via `MCPOAuthTokenStorage`.
  */
 export class OAuth2AuthProvider extends BaseA2AAuthProvider {
-  readonly type = 'oauth2' as const;
+  readonly type = 'oauth2';
 
   private readonly tokenStorage: MCPOAuthTokenStorage;
   private cachedToken: OAuthToken | null = null;

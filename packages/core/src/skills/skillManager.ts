@@ -27,6 +27,13 @@ export class SkillManager {
   }
 
   /**
+   * Resets session-scoped state (active skill names).
+   */
+  reset(): void {
+    this.activeSkillNames.clear();
+  }
+
+  /**
    * Sets administrative settings for skills.
    */
   setAdminSettings(enabled: boolean): void {

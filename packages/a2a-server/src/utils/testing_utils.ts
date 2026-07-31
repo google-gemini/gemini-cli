@@ -98,6 +98,7 @@ export function createMockConfig(
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
     getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+    getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
@@ -111,6 +112,7 @@ export function createMockConfig(
     }),
     isContextManagementEnabled: vi.fn().mockReturnValue(false),
     getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
+    getExperimentalGemma: vi.fn().mockReturnValue(false),
     ...overrides,
   } as unknown as Config;
 

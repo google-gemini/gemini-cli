@@ -32,10 +32,12 @@ export const STATUS_INDICATOR_WIDTH = 3;
  * Returns true if the tool name corresponds to a shell tool.
  */
 export function isShellTool(name: string): boolean {
+  const normalized = name.toLowerCase();
   return (
     name === SHELL_COMMAND_NAME ||
     name === SHELL_NAME ||
-    name === SHELL_TOOL_NAME
+    name === SHELL_TOOL_NAME ||
+    normalized === 'shell'
   );
 }
 
@@ -194,6 +196,7 @@ type ToolInfoProps = {
   emphasis: TextEmphasis;
   progressMessage?: string;
   originalRequestName?: string;
+  isExpanded?: boolean;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -203,6 +206,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   emphasis,
   progressMessage: _progressMessage,
   originalRequestName,
+  isExpanded = false,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -224,8 +228,16 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
   return (
-    <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
-      <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
+    <Box
+      overflow="hidden"
+      height={isExpanded ? undefined : 1}
+      flexGrow={1}
+      flexShrink={1}
+    >
+      <Text
+        strikethrough={status === ToolCallStatus.Canceled}
+        wrap={isExpanded ? 'wrap' : 'truncate'}
+      >
         <Text color={nameColor} bold>
           {name}
         </Text>

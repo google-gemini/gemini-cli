@@ -3,21 +3,11 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Content, Part } from '@google/genai';
-import type { ConcreteNode } from './types.js';
-
-export interface NodeSerializationWriter {
-  appendContent(content: Content): void;
-  appendModelPart(part: Part): void;
-  appendUserPart(part: Part): void;
-  flushModelParts(): void;
-}
+import type { Part } from '@google/genai';
+import type { ConcreteNode, NodeType } from './types.js';
 
 export interface NodeBehavior<T extends ConcreteNode = ConcreteNode> {
-  readonly type: T['type'];
-
-  /** Serializes the node into the Gemini Content structure. */
-  serialize(node: T, writer: NodeSerializationWriter): void;
+  readonly type: NodeType;
 
   /**
    * Generates a structural representation of the node for the purpose
@@ -27,13 +17,13 @@ export interface NodeBehavior<T extends ConcreteNode = ConcreteNode> {
 }
 
 export class NodeBehaviorRegistry {
-  private readonly behaviors = new Map<string, NodeBehavior<ConcreteNode>>();
+  private readonly behaviors = new Map<NodeType, NodeBehavior<ConcreteNode>>();
 
   register<T extends ConcreteNode>(behavior: NodeBehavior<T>) {
     this.behaviors.set(behavior.type, behavior);
   }
 
-  get(type: string): NodeBehavior<ConcreteNode> {
+  get(type: NodeType): NodeBehavior<ConcreteNode> {
     const behavior = this.behaviors.get(type);
     if (!behavior) {
       throw new Error(`Unregistered Node type: ${type}`);

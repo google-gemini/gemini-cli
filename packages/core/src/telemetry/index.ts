@@ -92,6 +92,7 @@ export {
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
+export { captureHeapSnapshot } from './heap-snapshot.js';
 export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
 export {
   EventLoopMonitor,

@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -71,13 +71,19 @@ export function EditorSettingsDialog({
         (item: EditorDisplay) => item.type === currentPreference,
       )
     : 0;
-  if (editorIndex === -1) {
-    coreEvents.emitFeedback(
-      'error',
-      `Editor is not supported: ${currentPreference}`,
-    );
+  const isUnsupportedEditor = editorIndex === -1;
+  if (isUnsupportedEditor) {
     editorIndex = 0;
   }
+
+  useEffect(() => {
+    if (isUnsupportedEditor && currentPreference) {
+      coreEvents.emitFeedback(
+        'error',
+        `Editor is not supported: ${currentPreference}`,
+      );
+    }
+  }, [isUnsupportedEditor, currentPreference]);
 
   const scopeItems: Array<{
     label: string;
@@ -131,10 +137,7 @@ export function EditorSettingsDialog({
     isEditorAvailable(settings.merged.general.preferredEditor)
   ) {
     mergedEditorName =
-      EDITOR_DISPLAY_NAMES[
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        settings.merged.general.preferredEditor as EditorType
-      ];
+      EDITOR_DISPLAY_NAMES[settings.merged.general.preferredEditor];
   }
 
   return (
@@ -161,6 +164,7 @@ export function EditorSettingsDialog({
           onSelect={handleEditorSelect}
           isFocused={focusedSection === 'editor'}
           key={selectedScope}
+          maxItemsToShow={editorItems.length}
         />
 
         <Box marginTop={1} flexDirection="column">

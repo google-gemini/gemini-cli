@@ -22,6 +22,11 @@ import {
 } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
+import {
+  captureHeapSnapshot,
+  MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES,
+} from '../utils/memorySnapshot.js';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 
 export const bugCommand: SlashCommand = {
@@ -128,6 +133,54 @@ export const bugCommand: SlashCommand = {
         },
         Date.now(),
       );
+    }
+
+    const rss = process.memoryUsage().rss;
+    const tempDir = config?.storage?.getProjectTempDir();
+    if (rss >= MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES && tempDir) {
+      const snapshotPath = path.join(
+        tempDir,
+        `bug-memory-${Date.now()}.heapsnapshot`,
+      );
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: `High memory usage detected (${formatBytes(rss)}). Capturing V8 heap snapshot to ${snapshotPath}.\nThis can take 20+ seconds and the CLI may be temporarily unresponsive; please do not exit.`,
+        },
+        Date.now(),
+      );
+      try {
+        const startedAt = Date.now();
+        await captureHeapSnapshot(snapshotPath);
+        const durationMs = Date.now() - startedAt;
+        let sizeText = '';
+        try {
+          const { size } = await stat(snapshotPath);
+          sizeText = ` (${formatBytes(size)})`;
+        } catch {
+          // Size reporting is best-effort; the snapshot itself was captured successfully.
+        }
+        context.ui.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Heap snapshot saved${sizeText} in ${durationMs}ms:\n${snapshotPath}\n\nConsider attaching it to your bug report only if it does not contain sensitive information.`,
+          },
+          Date.now(),
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        debugLogger.error(
+          `Failed to capture heap snapshot for bug report: ${errorMessage}`,
+        );
+        context.ui.addItem(
+          {
+            type: MessageType.ERROR,
+            text: `Failed to capture heap snapshot: ${errorMessage}`,
+          },
+          Date.now(),
+        );
+      }
     }
   },
 };

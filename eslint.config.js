@@ -54,7 +54,9 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       'eslint.config.js',
+      '**/coverage/**',
       'packages/**/dist/**',
+      'tools/**/dist/**',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
@@ -79,8 +81,8 @@ export default tseslint.config(
     },
   },
   {
-    // Rules for packages/*/src (TS/TSX)
-    files: ['packages/*/src/**/*.{ts,tsx}'],
+    // Rules for packages/*/src and tools/caretaker-agent (TS/TSX)
+    files: ['packages/*/src/**/*.{ts,tsx}', 'tools/caretaker-agent/**/*.{ts,tsx}'],
     plugins: {
       import: importPlugin,
     },
@@ -283,7 +285,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/*/src/**/*.test.{ts,tsx}'],
+    files: ['packages/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     plugins: {
       vitest,
     },
@@ -407,6 +409,13 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // Allow console logging for backend services (Cloud Logging)
+  {
+    files: ['tools/**/*.ts', 'tools/**/*.test.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
   // Prettier config must be last

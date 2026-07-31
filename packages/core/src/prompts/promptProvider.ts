@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, makeRelative } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -30,7 +30,11 @@ import {
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getAllGeminiMdFilenames,
+  getGlobalMemoryFilePath,
+  getProjectMemoryIndexFilePath,
+} from '../tools/memoryTool.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
@@ -69,10 +73,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -138,6 +142,7 @@ export class PromptProvider {
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
+          approvalMode,
         })),
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,
@@ -199,8 +204,19 @@ export class PromptProvider {
           () => ({
             interactive: interactiveMode,
             planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
-            approvedPlanPath: context.config.getApprovedPlanPath(),
+            plansDir: makeRelative(
+              context.config.storage.getPlansDir(),
+              context.config.getProjectRoot(),
+            ).replaceAll('\\', '/'),
+            approvedPlanPath: (() => {
+              const approvedPath = context.config.getApprovedPlanPath();
+              return approvedPath
+                ? makeRelative(
+                    approvedPath,
+                    context.config.getProjectRoot(),
+                  ).replaceAll('\\', '/')
+                : undefined;
+            })(),
           }),
           isPlanMode,
         ),
@@ -212,7 +228,10 @@ export class PromptProvider {
               context.config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration: isTopicUpdateNarrationEnabled,
-            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
+            userProjectMemoryPath: normalizePromptPath(
+              getProjectMemoryIndexFilePath(context.config.storage),
+            ),
+            globalMemoryPath: normalizePromptPath(getGlobalMemoryFilePath()),
           }),
         ),
         sandbox: this.withSection('sandbox', () => ({
@@ -278,10 +297,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
-      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
+      context.config.hasGemini35FlashGAAccess?.() ?? false,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -314,6 +333,10 @@ export class PromptProvider {
       fs.writeFileSync(writePath, basePrompt);
     }
   }
+}
+
+function normalizePromptPath(filePath: string): string {
+  return filePath.replaceAll('\\', '/');
 }
 
 // --- Internal Context Helpers ---

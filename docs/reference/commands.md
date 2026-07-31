@@ -111,6 +111,11 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Manage custom slash commands loaded from `.toml` files.
 - **Sub-commands:**
+  - **`list`**:
+    - **Description:** List available custom command `.toml` files from all
+      sources (user-level `~/.gemini/commands/`, project-level
+      `<project>/.gemini/commands/`, and active extensions).
+    - **Usage:** `/commands list`
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
       (user-level `~/.gemini/commands/`, project-level
@@ -260,9 +265,6 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Manage the AI's instructional context (hierarchical memory
   loaded from `GEMINI.md` files).
 - **Sub-commands:**
-  - **`add`**:
-    - **Description:** Adds the following text to the AI's memory. Usage:
-      `/memory add <text to remember>`
   - **`list`**:
     - **Description:** Lists the paths of the GEMINI.md files in use for
       hierarchical memory.
@@ -323,6 +325,11 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/quit` (or `/exit`)
 
 - **Description:** Exit Gemini CLI.
+- **Flags:**
+  - **`--delete`** _(optional)_: Exit and permanently delete the current
+    session's history and temporary files (chat recording, tool outputs). Useful
+    for privacy or one-off tasks where you don't want to leave any traces.
+  - **Usage:** `/quit --delete` or `/exit --delete`
 
 ### `/restore`
 
@@ -499,12 +506,13 @@ the dedicated [Custom Commands documentation](../cli/custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Alt+z** or **Cmd+z** to undo the last action
-    in the input prompt.
+
+  - **Keyboard shortcut:** Press **Ctrl+z** (Windows), **Cmd+z** (macOS), or
+    **Alt+z** (Linux/WSL) to undo the last action in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Shift+Alt+Z** or **Shift+Cmd+Z** to redo the
-    last undone action in the input prompt.
+  - **Keyboard shortcut:** Press **Shift+Cmd+Z** (macOS), or **Shift+Alt+Z**
+    (Linux/WSL) to redo the last undone action in the input prompt.
 
 ## At commands (`@`)
 
@@ -512,6 +520,7 @@ At commands are used to include the content of files or directories as part of
 your prompt to Gemini. These commands include git-aware filtering.
 
 - **`@<path_to_file_or_directory>`**
+
   - **Description:** Inject the content of the specified file or files into your
     current prompt. This is useful for asking questions about specific code,
     text, or collections of files.
@@ -558,6 +567,7 @@ The `!` prefix lets you interact with your system's shell directly from within
 Gemini CLI.
 
 - **`!<shell_command>`**
+
   - **Description:** Execute the given `<shell_command>` using `bash` on
     Linux/macOS or `powershell.exe -NoProfile -Command` on Windows (unless you
     override `ComSpec`). Any output or errors from the command are displayed in
@@ -567,6 +577,7 @@ Gemini CLI.
     - `!git status` (executes `git status` and returns to Gemini CLI)
 
 - **`!` (Toggle shell mode)**
+
   - **Description:** Typing `!` on its own toggles shell mode.
     - **Entering shell mode:**
       - When active, shell mode uses a different coloring and a "Shell Mode

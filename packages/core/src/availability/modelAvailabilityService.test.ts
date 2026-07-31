@@ -34,6 +34,12 @@ describe('ModelAvailabilityService', () => {
     expect(service.snapshot(model)).toEqual({ available: true });
   });
 
+  it('tracks retry with custom attempts', () => {
+    service.markRetryOncePerTurn(model, 3);
+    const selection = service.selectFirstAvailable([model]);
+    expect(selection.attempts).toBe(3);
+  });
+
   it('tracks terminal failures', () => {
     service.markTerminal(model, 'quota');
     expect(service.snapshot(model)).toEqual({
@@ -160,6 +166,48 @@ describe('ModelAvailabilityService', () => {
     expect(service.snapshot(model)).toEqual({
       available: false,
       reason: 'quota',
+    });
+  });
+
+  describe('prefix normalization', () => {
+    it('treats prefixed and non-prefixed models as identical when marking terminal', () => {
+      service.markTerminal('models/gemini-3.1-pro-preview', 'quota');
+
+      // Checking the non-prefixed version should show it as unavailable
+      expect(service.snapshot('gemini-3.1-pro-preview')).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+
+      // Checking the prefixed version should also show it as unavailable
+      expect(service.snapshot('models/gemini-3.1-pro-preview')).toEqual({
+        available: false,
+        reason: 'quota',
+      });
+    });
+
+    it('treats prefixed and non-prefixed models as identical when selecting', () => {
+      service.markTerminal('gemini-3-flash-preview', 'quota');
+
+      // Attempting to select the prefixed version should skip it because the base is exhausted
+      const result = service.selectFirstAvailable([
+        'models/gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+      ]);
+
+      expect(result.selectedModel).toBe('gemini-3.1-pro-preview');
+      expect(result.skipped).toEqual([
+        { model: 'gemini-3-flash-preview', reason: 'quota' },
+      ]);
+    });
+
+    it('treats prefixed and non-prefixed models as identical when marking healthy', () => {
+      service.markTerminal('gemini-3-flash-preview', 'quota');
+      service.markHealthy('models/gemini-3-flash-preview');
+
+      expect(service.snapshot('gemini-3-flash-preview')).toEqual({
+        available: true,
+      });
     });
   });
 });

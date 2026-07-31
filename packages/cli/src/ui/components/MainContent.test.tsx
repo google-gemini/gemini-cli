@@ -15,6 +15,20 @@ import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    validatePlanPath: vi
+      .fn()
+      .mockResolvedValue('Storage must be initialized before use'),
+    validatePlanContent: vi
+      .fn()
+      .mockResolvedValue('Storage must be initialized before use'),
+  };
+});
 import {
   UIStateContext,
   useUIState,
@@ -672,9 +686,15 @@ describe('MainContent', () => {
       }),
     );
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-      config: makeFakeConfig({ useAlternateBuffer: false }),
+    let lastFrame!: () => string;
+    let unmount!: () => void;
+    await act(async () => {
+      const res = await renderWithProviders(<MainContent />, {
+        uiState: uiState as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+      });
+      lastFrame = res.lastFrame;
+      unmount = res.unmount;
     });
 
     await waitFor(() => {
@@ -683,6 +703,8 @@ describe('MainContent', () => {
       expect(output).not.toContain('Hidden content');
       // The output should contain the confirmation header
       expect(output).toContain('Ready to start implementation?');
+      // Wait for the async error message to appear
+      expect(output).toContain('File not found: /path/to/plan');
     });
 
     // Snapshot will reveal if there are extra blank lines

@@ -680,6 +680,64 @@ describe('oauth2', () => {
         expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
         expect(client).toBe(mockExternalAccountClient);
       });
+
+      it('should fall back to GOOGLE_APPLICATION_CREDENTIALS if default cached credentials are invalid or expired', async () => {
+        // Setup default cached credentials that are expired/invalid
+        const defaultCreds = { refresh_token: 'expired-token' };
+        const defaultCredsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(defaultCredsPath), {
+          recursive: true,
+        });
+        await fs.promises.writeFile(
+          defaultCredsPath,
+          JSON.stringify(defaultCreds),
+        );
+
+        // Setup valid fallback credentials via environment variable
+        const envCreds = { refresh_token: 'valid-env-token' };
+        const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+        await fs.promises.writeFile(envCredsPath, JSON.stringify(envCreds));
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        let currentCredentials: Credentials | null = null;
+        const mockClient = {
+          setCredentials: vi.fn((creds) => {
+            currentCredentials = creds as Credentials;
+          }),
+          getAccessToken: vi.fn(async () => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return { token: 'valid-token' };
+          }),
+          getTokenInfo: vi.fn(async (_token) => {
+            if (
+              currentCredentials &&
+              currentCredentials.refresh_token === 'expired-token'
+            ) {
+              throw new Error('Token is expired or revoked');
+            }
+            return {};
+          }),
+          on: vi.fn(),
+        };
+
+        vi.mocked(OAuth2Client).mockImplementation(
+          () => mockClient as unknown as OAuth2Client,
+        );
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        // Assert that fallback envCreds were eventually loaded and used
+        expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
+      });
     });
 
     describe('with GCP environment variables', () => {
@@ -1450,6 +1508,67 @@ describe('oauth2', () => {
 
         stdinOnSpy.mockRestore();
         stdinRemoveListenerSpy.mockRestore();
+      });
+
+      it('should NOT cancel when 0x03 is embedded in a multi-byte escape sequence (Ghostty/VS Code WSL false-positive)', async () => {
+        // Only a lone 0x03 byte is Ctrl+C; a multi-byte escape sequence that
+        // merely contains 0x03 (e.g. from Ghostty on init/resize) must not cancel.
+        const stdinOnSpy = vi
+          .spyOn(process.stdin, 'on')
+          .mockImplementation(() => process.stdin);
+        vi.spyOn(process.stdin, 'removeListener').mockImplementation(
+          () => process.stdin,
+        );
+
+        const mockHttpServer = {
+          listen: vi.fn(),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
+        vi.mocked(OAuth2Client).mockImplementation(
+          () =>
+            ({
+              generateAuthUrl: vi.fn().mockReturnValue('https://example.com'),
+              on: vi.fn(),
+            }) as unknown as OAuth2Client,
+        );
+        vi.mocked(open).mockImplementation(
+          async () => ({ on: vi.fn() }) as never,
+        );
+
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        // Grab the registered stdin data handler
+        let dataHandler: ((data: Buffer) => void) | undefined;
+        await vi.waitFor(() => {
+          dataHandler = stdinOnSpy.mock.calls.find(
+            (c: [string | symbol, ...unknown[]]) => c[0] === 'data',
+          )?.[1] as (data: Buffer) => void;
+          if (!dataHandler) throw new Error('handler not registered');
+        });
+
+        // Fire an escape sequence embedding 0x03 — must NOT cancel.
+        dataHandler!(Buffer.from([0x1b, 0x5b, 0x03, 0x4d])); // ESC [ 0x03 M
+
+        // Promise must still be pending (not rejected).
+        const result = await Promise.race([
+          clientPromise.then(
+            () => 'resolved',
+            () => 'rejected',
+          ),
+          new Promise<string>((r) => setTimeout(() => r('pending'), 50)),
+        ]);
+        expect(result).toBe('pending');
+
+        stdinOnSpy.mockRestore();
+        vi.spyOn(process.stdin, 'removeListener').mockRestore();
       });
 
       it('should throw FatalCancellationError when consent is denied', async () => {

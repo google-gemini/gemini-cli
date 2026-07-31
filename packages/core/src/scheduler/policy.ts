@@ -119,16 +119,16 @@ export async function updatePolicy(
   messageBus: MessageBus,
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
+  const currentMode = context.config.getApprovalMode();
+
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-    return;
   }
 
   // Determine persist scope if we are persisting.
   let persistScope: 'workspace' | 'user' | undefined;
   let modes: ApprovalMode[] | undefined;
-  const currentMode = context.config.getApprovalMode();
 
   // If this is an 'Always Allow' selection, we restrict it to the current mode
   // and more permissive modes.

@@ -17,6 +17,7 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  SubagentState,
   getAgentCardLoadOptions,
   getRemoteAgentTargetUrl,
 } from './types.js';
@@ -138,13 +139,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         updateOutput({
           isSubagentProgress: true,
           agentName,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: [
             {
               id: 'pending',
               type: 'thought',
               content: 'Working...',
-              status: 'running',
+              status: SubagentState.RUNNING,
             },
           ],
         });
@@ -193,7 +194,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           updateOutput({
             isSubagentProgress: true,
             agentName,
-            state: 'running',
+            state: SubagentState.RUNNING,
             recentActivity: reassembler.toActivityItems(),
             result: reassembler.toString(),
           });
@@ -225,7 +226,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const finalProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: finalOutput,
         recentActivity: reassembler.toActivityItems(),
       };
@@ -249,7 +250,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const errorProgress: SubagentProgress = {
         isSubagentProgress: true,
         agentName,
-        state: 'error',
+        state: SubagentState.ERROR,
         result: fullDisplay,
         recentActivity: reassembler.toActivityItems(),
       };

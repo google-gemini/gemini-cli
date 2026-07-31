@@ -35,7 +35,7 @@ describe('Interactive file system', () => {
     const run = await rig.runInteractive();
 
     // Step 1: Read the file
-    const readPrompt = `Read the version from ${fileName}`;
+    const readPrompt = `Read the version from ${fileName} using the read_file tool`;
     await run.type(readPrompt);
     await run.type('\r');
 

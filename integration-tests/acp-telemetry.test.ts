@@ -70,6 +70,7 @@ describe('ACP telemetry', () => {
           GEMINI_API_KEY: 'fake-key',
           GEMINI_CLI_HOME: rig.homeDir!,
           GEMINI_TELEMETRY_ENABLED: 'true',
+          GEMINI_TELEMETRY_TRACES_ENABLED: 'true',
           GEMINI_TELEMETRY_TARGET: 'local',
           GEMINI_TELEMETRY_OUTFILE: telemetryPath,
         },

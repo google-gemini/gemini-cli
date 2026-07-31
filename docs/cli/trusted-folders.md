@@ -100,6 +100,34 @@ protect you. In this mode, the following features are disabled:
 Granting trust to a folder unlocks the full functionality of Gemini CLI for that
 workspace.
 
+## Headless and automated environments
+
+When running Gemini CLI in a headless environment (for example, a CI/CD
+pipeline) where interactive prompts are not possible, the trust dialog cannot be
+displayed. If the folder is untrusted and the Folder Trust feature is enabled,
+the CLI will throw a `FatalUntrustedWorkspaceError` and exit.
+
+To proceed in these environments, you can bypass the trust check using one of
+the following methods:
+
+- **Command-line flag:** Run the CLI with the `--skip-trust` flag.
+- **Environment variable:** Set the `GEMINI_CLI_TRUST_WORKSPACE=true`
+  environment variable.
+
+These methods will trust the current workspace for the duration of the session
+without prompting.
+
+For detailed instructions on managing folder trust within CI/CD workflows,
+review the
+[Gemini CLI trust guidance for GitHub Actions](https://github.com/google-github-actions/run-gemini-cli/blob/main/docs/trust-guidance.md).
+
+## Overriding the trust file location
+
+By default, trust settings are saved to `~/.gemini/trustedFolders.json`. If you
+need to store this file in a different location, you can set the
+`GEMINI_CLI_TRUSTED_FOLDERS_PATH` environment variable to the desired absolute
+file path.
+
 ## Managing your trust settings
 
 If you need to change a decision or see all your settings, you have a couple of

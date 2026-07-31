@@ -45,7 +45,7 @@ describe('useAuth', () => {
   });
 
   describe('validateAuthMethodWithSettings', () => {
-    it('should return error if auth type is enforced and does not match', () => {
+    it('should return error if auth type is enforced and does not match', async () => {
       const settings = {
         merged: {
           security: {
@@ -56,14 +56,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.USE_GEMINI,
         settings,
       );
       expect(error).toContain('Authentication is enforced to be oauth');
     });
 
-    it('should return null if useExternal is true', () => {
+    it('should return null if useExternal is true', async () => {
       const settings = {
         merged: {
           security: {
@@ -74,14 +74,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.LOGIN_WITH_GOOGLE,
         settings,
       );
       expect(error).toBeNull();
     });
 
-    it('should return null if authType is USE_GEMINI', () => {
+    it('should return null if authType is USE_GEMINI', async () => {
       const settings = {
         merged: {
           security: {
@@ -90,14 +90,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.USE_GEMINI,
         settings,
       );
       expect(error).toBeNull();
     });
 
-    it('should call validateAuthMethod for other auth types', () => {
+    it('should call validateAuthMethod for other auth types', async () => {
       const settings = {
         merged: {
           security: {
@@ -106,8 +106,8 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      mockValidateAuthMethod.mockReturnValue('Validation Error');
-      const error = validateAuthMethodWithSettings(
+      mockValidateAuthMethod.mockResolvedValue('Validation Error');
+      const error = await validateAuthMethodWithSettings(
         AuthType.LOGIN_WITH_GOOGLE,
         settings,
       );
@@ -265,7 +265,7 @@ describe('useAuth', () => {
     });
 
     it('should set error if validation fails', async () => {
-      mockValidateAuthMethod.mockReturnValue('Validation Failed');
+      mockValidateAuthMethod.mockResolvedValue('Validation Failed');
       const { result } = await renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
       );

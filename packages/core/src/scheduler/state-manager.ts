@@ -23,6 +23,7 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   AnyToolInvocation,
+  ToolDisplay,
   ToolCallConfirmationDetails,
   AnyDeclarativeTool,
 } from '../tools/tools.js';
@@ -172,10 +173,15 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call || call.status === CoreToolCallStatus.Error) return;
 
+    const display: ToolDisplay = call.request.display
+      ? { ...call.request.display }
+      : { name: call.request.name };
+    display.description = newInvocation.getDescription();
+
     this.activeCalls.set(
       callId,
       this.patchCall(call, {
-        request: { ...call.request, args: newArgs },
+        request: { ...call.request, args: newArgs, display },
         invocation: newInvocation,
       }),
     );

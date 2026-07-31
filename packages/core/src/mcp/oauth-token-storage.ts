@@ -143,9 +143,18 @@ export class MCPOAuthTokenStorage implements TokenStorage {
   ): Promise<void> {
     await this.ensureConfigDir();
 
+    const existing = await this.getCredentials(serverName);
+    const mergedRefreshToken =
+      token.refreshToken || existing?.token.refreshToken;
+
+    const mergedToken = {
+      ...token,
+      refreshToken: mergedRefreshToken,
+    };
+
     const credential: OAuthCredentials = {
       serverName,
-      token,
+      token: mergedToken,
       clientId,
       tokenUrl,
       mcpServerUrl,

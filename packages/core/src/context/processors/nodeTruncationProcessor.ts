@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { randomUUID } from 'node:crypto';
+import { deriveStableId } from '../../utils/cryptoUtils.js';
 import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
@@ -73,69 +73,25 @@ export function createNodeTruncationProcessor(
       const returnedNodes: ConcreteNode[] = [];
 
       for (const node of targets) {
-        switch (node.type) {
-          case 'USER_PROMPT': {
-            let modified = false;
-            const newParts = [...node.semanticParts];
+        const payload = node.payload;
+        const text = payload.text;
 
-            for (let j = 0; j < node.semanticParts.length; j++) {
-              const part = node.semanticParts[j];
-              if (part.type === 'text') {
-                const squashResult = tryApplySquash(part.text, limitChars);
-                if (squashResult) {
-                  newParts[j] = { type: 'text', text: squashResult.text };
-                  modified = true;
-                }
-              }
-            }
-
-            if (modified) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                semanticParts: newParts,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
+        if (text) {
+          const squashResult = tryApplySquash(text, limitChars);
+          if (squashResult) {
+            const newId = deriveStableId([node.id, 'truncated']);
+            returnedNodes.push({
+              ...node,
+              id: newId,
+              payload: { ...payload, text: squashResult.text },
+              replacesId: node.id,
+              turnId: node.turnId,
+            });
+            continue;
           }
-
-          case 'AGENT_THOUGHT': {
-            const squashResult = tryApplySquash(node.text, limitChars);
-            if (squashResult) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                text: squashResult.text,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-
-          case 'AGENT_YIELD': {
-            const squashResult = tryApplySquash(node.text, limitChars);
-            if (squashResult) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                text: squashResult.text,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-
-          default:
-            returnedNodes.push(node);
-            break;
         }
+
+        returnedNodes.push(node);
       }
 
       return returnedNodes;

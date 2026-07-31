@@ -552,6 +552,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openVoiceModelDialog: vi.fn(),
+  closeVoiceModelDialog: vi.fn(),
   openAgentConfigDialog: vi.fn(),
   closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
@@ -590,6 +592,7 @@ const mockUIActions: UIActions = {
   setActiveBackgroundTaskPid: vi.fn(),
   setIsBackgroundTaskListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  dismissLoginRestart: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),
   onHintClear: vi.fn(),
@@ -598,6 +601,7 @@ const mockUIActions: UIActions = {
   handleNewAgentsSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
+  setVoiceModeEnabled: vi.fn(),
 };
 
 import { type TextBuffer } from '../ui/components/shared/text-buffer.js';
@@ -702,13 +706,13 @@ export const renderWithProviders = async (
 
   const terminalWidth = width ?? baseState.terminalWidth;
 
-  if (!config) {
-    config = makeFakeConfig({
+  const finalConfig =
+    config ||
+    makeFakeConfig({
       useAlternateBuffer: settings.merged.ui?.useAlternateBuffer,
       showMemoryUsage: settings.merged.ui?.showMemoryUsage,
       accessibility: settings.merged.ui?.accessibility,
     });
-  }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
@@ -738,21 +742,23 @@ export const renderWithProviders = async (
 
   const wrapWithProviders = (comp: React.ReactElement) => (
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={settings}>
           <QuotaContext.Provider value={quotaState}>
             <InputContext.Provider value={inputState}>
               <UIStateContext.Provider value={finalUiState}>
                 <VimModeProvider>
                   <ShellFocusContext.Provider value={shellFocus}>
-                    <SessionStatsProvider sessionId={config.getSessionId()}>
+                    <SessionStatsProvider
+                      sessionId={finalConfig.getSessionId()}
+                    >
                       <StreamingContext.Provider
                         value={finalUiState.streamingState}
                       >
                         <UIActionsContext.Provider value={finalUIActions}>
                           <OverflowProvider>
                             <ToolActionsProvider
-                              config={config}
+                              config={finalConfig}
                               toolCalls={allToolCalls}
                               isExpanded={
                                 toolActions?.isExpanded ??

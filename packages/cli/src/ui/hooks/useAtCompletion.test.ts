@@ -553,6 +553,38 @@ describe('useAtCompletion', () => {
       ]);
     });
 
+    it('should pass enableFileWatcher flag into FileSearchFactory options', async () => {
+      const structure: FileSystemStructure = {
+        src: {
+          'index.ts': '',
+        },
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const createSpy = vi.spyOn(FileSearchFactory, 'create');
+      const configWithWatcher = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          enableFileWatcher: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+      } as unknown as Config;
+
+      const { result } = await renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', configWithWatcher, testRootDir),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      expect(createSpy).toHaveBeenCalled();
+      const firstCallArg = createSpy.mock.calls[0]?.[0];
+      expect(firstCallArg?.enableFileWatcher).toBe(true);
+    });
+
     it('should reset and re-initialize when the cwd changes', async () => {
       const structure1: FileSystemStructure = { 'file1.txt': '' };
       const rootDir1 = await createTmpDir(structure1);

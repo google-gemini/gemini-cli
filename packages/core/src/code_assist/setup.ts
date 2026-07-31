@@ -36,6 +36,15 @@ export class ProjectIdRequiredError extends Error {
   }
 }
 
+export class InvalidNumericProjectIdError extends Error {
+  constructor(projectId: string) {
+    super(
+      `Invalid Google Cloud Project ID: "${projectId}". The GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) environment variable must be set to your string-based Project ID (e.g., "my-project-123"), not your numeric Project Number. Please update your environment variables.`,
+    );
+    this.name = 'InvalidNumericProjectIdError';
+  }
+}
+
 /**
  * Error thrown when user cancels the validation process.
  * This is a non-recoverable error that should result in auth failure.
@@ -121,6 +130,10 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  if (projectId && /^\d+$/.test(projectId)) {
+    throw new InvalidNumericProjectIdError(projectId);
+  }
 
   const projectCache = userDataCache.getOrCreate(client, () =>
     createCache<string | undefined, Promise<UserData>>({

@@ -19,6 +19,9 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
  * This follows the same pattern as `toolCallContext` and `promptIdContext`.
  */
 const workspaceContextOverride = new AsyncLocalStorage<WorkspaceContext>();
+const memoryInboxAccessOverride = new AsyncLocalStorage<boolean>();
+const autoMemoryExtractionWriteAccessOverride =
+  new AsyncLocalStorage<boolean>();
 
 /**
  * Returns the current workspace context override, if any.
@@ -42,6 +45,42 @@ export function runWithScopedWorkspaceContext<T>(
   fn: () => T,
 ): T {
   return workspaceContextOverride.run(scopedContext, fn);
+}
+
+/**
+ * Returns true when the current async execution is allowed to access the
+ * canonical auto-memory inbox patch files.
+ */
+export function hasScopedMemoryInboxAccess(): boolean {
+  return memoryInboxAccessOverride.getStore() === true;
+}
+
+/**
+ * Runs a function with access to the canonical auto-memory inbox patch files.
+ * This is intended for the background extraction agent only; the main agent
+ * continues to have the inbox carved out of its normal temp-dir access.
+ */
+export function runWithScopedMemoryInboxAccess<T>(fn: () => T): T {
+  return memoryInboxAccessOverride.run(true, fn);
+}
+
+/**
+ * Returns true when the current async execution is using the narrow
+ * auto-memory extraction write allowlist.
+ */
+export function hasScopedAutoMemoryExtractionWriteAccess(): boolean {
+  return autoMemoryExtractionWriteAccessOverride.getStore() === true;
+}
+
+/**
+ * Runs a function with the auto-memory extraction write allowlist active.
+ * This prevents the background extractor from writing active memory files
+ * directly; it may only write extracted skills and canonical inbox patches.
+ */
+export function runWithScopedAutoMemoryExtractionWriteAccess<T>(
+  fn: () => T,
+): T {
+  return autoMemoryExtractionWriteAccessOverride.run(true, fn);
 }
 
 /**

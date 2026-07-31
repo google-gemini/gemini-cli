@@ -151,7 +151,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, renderTime);
+          recordSlowRender(config, Math.round(renderTime));
         }
         profiler.reportFrameRendered();
       },
@@ -179,7 +179,12 @@ export async function startInteractiveUI(
 
   checkForUpdates(settings)
     .then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
+      handleAutoUpdate(
+        info,
+        settings,
+        config.getProjectRoot(),
+        config.getSandboxEnabled(),
+      );
     })
     .catch((err) => {
       // Silently ignore update check errors.
@@ -189,6 +194,17 @@ export async function startInteractiveUI(
     });
 
   const cleanupUnmount = () => instance.unmount();
+  const cleanupNonResumableCurrentSession = async () => {
+    try {
+      await config
+        .getGeminiClient()
+        ?.getChatRecordingService()
+        ?.deleteCurrentSessionIfNotResumableAsync();
+    } catch (e: unknown) {
+      debugLogger.error('Error cleaning up non-resumable session:', e);
+    }
+  };
+  registerCleanup(cleanupNonResumableCurrentSession);
   registerCleanup(cleanupUnmount);
 
   const cleanupTtyCheck = setupTtyCheck();
@@ -205,6 +221,13 @@ export async function startInteractiveUI(
       cleanupConsolePatcher();
     } catch (e: unknown) {
       debugLogger.error('Error cleaning up console patcher:', e);
+    }
+
+    try {
+      removeCleanup(cleanupNonResumableCurrentSession);
+      await cleanupNonResumableCurrentSession();
+    } catch (e: unknown) {
+      debugLogger.error('Error removing non-resumable session cleanup:', e);
     }
 
     try {

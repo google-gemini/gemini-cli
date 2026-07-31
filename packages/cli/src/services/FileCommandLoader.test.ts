@@ -6,7 +6,12 @@
 
 import * as glob from 'glob';
 import * as path from 'node:path';
-import { GEMINI_DIR, Storage, type Config } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  Storage,
+  type Config,
+  homedir,
+} from '@google/gemini-cli-core';
 import mock from 'mock-fs';
 import { FileCommandLoader } from './FileCommandLoader.js';
 import { assert, vi } from 'vitest';
@@ -21,7 +26,7 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-import type { CommandContext } from '../ui/commands/types.js';
+import { CommandKind, type CommandContext } from '../ui/commands/types.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 const mockShellProcess = vi.hoisted(() => vi.fn());
@@ -313,6 +318,34 @@ describe('FileCommandLoader', () => {
     } else {
       assert.fail('Incorrect action type for project command');
     }
+  });
+
+  it('does not duplicate commands when project root is the home directory', async () => {
+    const homeDir = homedir();
+    const userCommandsDir = Storage.getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'test.toml': 'prompt = "User prompt"',
+        'another.toml': 'prompt = "Another prompt"',
+      },
+    });
+
+    const mockConfig = {
+      getProjectRoot: vi.fn(() => homeDir),
+      getExtensions: vi.fn(() => []),
+      getFolderTrust: vi.fn(() => false),
+      isTrustedFolder: vi.fn(() => false),
+    } as unknown as Config;
+    const loader = new FileCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(signal);
+
+    // Should load each command only once (as user commands), not twice
+    expect(commands).toHaveLength(2);
+    const names = commands.map((c) => c.name);
+    expect(names).toContain('test');
+    expect(names).toContain('another');
+    // Verify they are loaded as user commands, not duplicated as workspace commands
+    expect(commands.every((c) => c.kind === CommandKind.USER_FILE)).toBe(true);
   });
 
   it('ignores files with TOML syntax errors', async () => {

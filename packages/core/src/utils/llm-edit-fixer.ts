@@ -103,10 +103,16 @@ async function generateJsonWithTimeout<T>(
       ...params,
       // The operation will be aborted if either the original signal is aborted
       // or if the timeout is reached.
-      abortSignal: AbortSignal.any([
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      abortSignal: (
+        AbortSignal as unknown as {
+          any: (signals: Array<AbortSignal | undefined>) => AbortSignal;
+        }
+      ).any([
         params.abortSignal ?? new AbortController().signal,
         timeoutSignal,
       ]),
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as T;

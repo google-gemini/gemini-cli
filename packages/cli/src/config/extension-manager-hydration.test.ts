@@ -48,11 +48,13 @@ describe('ExtensionManager hydration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     vi.spyOn(coreEvents, 'emitFeedback');
     vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
     mockHomedir.mockReturnValue(tempDir);
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
 
     // Create the extensions directory that ExtensionManager expects
     extensionsDir = path.join(tempDir, '.gemini', EXTENSIONS_DIRECTORY_NAME);

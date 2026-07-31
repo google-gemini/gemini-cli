@@ -41,6 +41,8 @@ export interface UIActions {
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
+  openVoiceModelDialog: () => void;
+  closeVoiceModelDialog: () => void;
   openAgentConfigDialog: (
     name: string,
     displayName: string,
@@ -85,6 +87,7 @@ export interface UIActions {
   setActiveBackgroundTaskPid: (pid: number) => void;
   setIsBackgroundTaskListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
+  dismissLoginRestart: () => void;
   onHintInput: (char: string) => void;
   onHintBackspace: () => void;
   onHintClear: () => void;
@@ -93,6 +96,7 @@ export interface UIActions {
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
   getPreferredEditor: () => EditorType | undefined;
   clearAccountSuspension: () => void;
+  setVoiceModeEnabled: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

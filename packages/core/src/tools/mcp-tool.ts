@@ -23,6 +23,8 @@ import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { McpContext } from './mcp-client.js';
 
+import { wrapUntrusted } from '../utils/textUtils.js';
+
 /**
  * The separator used to qualify MCP tool names with their server prefix.
  * e.g. "mcp_server_name_tool_name"
@@ -448,7 +450,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
 }
 
 function transformTextBlock(block: McpTextBlock): Part {
-  return { text: block.text };
+  return { text: wrapUntrusted(block.text) };
 }
 
 function transformImageAudioBlock(
@@ -476,7 +478,7 @@ function transformResourceBlock(
 ): Part | Part[] | null {
   const resource = block.resource;
   if (resource?.text) {
-    return { text: resource.text };
+    return { text: wrapUntrusted(resource.text) };
   }
   if (resource?.blob) {
     const mimeType = resource.mimeType || 'application/octet-stream';

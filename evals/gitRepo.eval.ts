@@ -78,4 +78,37 @@ describe('git repo eval', () => {
       expect(commitCalls.length).toBeGreaterThanOrEqual(1);
     },
   });
+
+  /**
+   * Ensures that when the agent is prompted to commit its changes, it does not
+   * use `git add .` or `git add -A`.
+   */
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: 'should not stage changes via git add . when prompted to commit',
+    prompt:
+      'Make a targeted fix for the bug in index.ts without building, installing anything, or adding tests. Then, stage and commit your changes.',
+    files: FILES,
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs();
+      const gitAddAllCalls = toolLogs.filter((log) => {
+        if (log.toolRequest.name !== 'run_shell_command') return false;
+        try {
+          const args = JSON.parse(log.toolRequest.args);
+          if (!args.command) return false;
+          const cmd = args.command.toLowerCase();
+          return (
+            cmd.includes('git add .') ||
+            cmd.includes('git add -a') ||
+            cmd.includes('git add --all')
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      expect(gitAddAllCalls.length).toBe(0);
+    },
+  });
 });

@@ -42,6 +42,11 @@ export function getContextManagementConfigSchema(
             description:
               'The absolute maximum token count allowed before synchronous truncation kicks in.',
           },
+          coalescingThresholdTokens: {
+            type: 'number',
+            description:
+              'Only trigger background consolidation (snapshots) when at least this many tokens have aged out. Prevents "turn-by-turn" utility model churn.',
+          },
         },
       },
       processorOptions: {

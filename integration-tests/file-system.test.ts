@@ -134,7 +134,9 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('hello');
+    // Trim to tolerate models that idiomatically append a trailing newline.
+    // This test is about path-with-spaces handling, not whitespace fidelity.
+    expect(newFileContent.trim()).toBe('hello');
   });
 
   it('should perform a read-then-write sequence', async () => {
@@ -170,7 +172,7 @@ describe('file-system', () => {
     ).toBeDefined();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('1.0.1');
+    expect(newFileContent.trimEnd()).toBe('1.0.1');
   });
 
   it.skip('should replace multiple instances of a string', async () => {

@@ -249,6 +249,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       'session-id': (
         <Text color={getColor('session-id', itemColor)}>769992f9</Text>
       ),
+      hostname: (
+        <Text color={getColor('hostname', itemColor)}>dev-machine</Text>
+      ),
       'code-changes': (
         <Box flexDirection="row">
           <Text color={getColor('code-changes', theme.status.success)}>

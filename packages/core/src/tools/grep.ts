@@ -25,7 +25,11 @@ import {
   type ToolConfirmationOutcome,
   type ExecuteOptions,
 } from './tools.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
@@ -146,7 +150,21 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       let searchDirAbs: string | null = null;
       if (pathParam) {
-        searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+        try {
+          searchDirAbs = resolveToRealPath(
+            path.resolve(this.config.getTargetDir(), pathParam),
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          return {
+            llmContent: errMsg,
+            returnDisplay: 'Error: Path resolution failed.',
+            error: {
+              message: errMsg,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
+          };
+        }
         const validationError = this.config.validatePathAccess(
           searchDirAbs,
           'read',
@@ -284,12 +302,24 @@ class GrepToolInvocation extends BaseToolInvocation<
         searchLocationDescription = `in path "${searchDirDisplay}"`;
       }
 
-      return await formatGrepResults(
+      const result = await formatGrepResults(
         allMatches,
         this.params,
         searchLocationDescription,
         totalMaxMatches,
       );
+      return {
+        ...result,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary: result.returnDisplay.summary,
+          result: {
+            type: 'text',
+            text: result.llmContent.split('\n---\n').slice(1).join('\n---\n'),
+          },
+        },
+      };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
@@ -465,7 +495,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E', '-I'];
+        const grepArgs = ['-r', '-n', '-H', '-E', '-I', '-i'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes
@@ -710,10 +740,14 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
 
     // Only validate dir_path if one is provided
     if (params.dir_path) {
-      const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        params.dir_path,
-      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), params.dir_path),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
       const validationError = this.config.validatePathAccess(
         resolvedPath,
         'read',

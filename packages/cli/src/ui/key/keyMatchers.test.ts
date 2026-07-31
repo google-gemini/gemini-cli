@@ -149,23 +149,44 @@ describe('keyMatchers', () => {
     {
       command: Command.UNDO,
       positive: [
-        createKey('z', { shift: false, cmd: true }),
-        createKey('z', { shift: false, alt: true }),
+        ...(process.platform === 'win32'
+          ? [createKey('z', { shift: false, ctrl: true })]
+          : process.platform === 'darwin'
+            ? [createKey('z', { shift: false, cmd: true })]
+            : [
+                createKey('z', { shift: false, alt: true }),
+                createKey('z', { shift: false, cmd: true }),
+                createKey('z', { shift: false, ctrl: true }),
+              ]),
+        ...(process.platform !== 'linux'
+          ? [createKey('z', { shift: false, alt: true })]
+          : []),
       ],
       negative: [
         createKey('z'),
         createKey('z', { shift: true, cmd: true }),
-        createKey('z', { shift: false, ctrl: true }),
+        ...(process.platform === 'darwin'
+          ? [createKey('z', { shift: false, ctrl: true })]
+          : []),
+        ...(process.platform === 'win32'
+          ? [createKey('z', { shift: false, cmd: true })]
+          : []),
       ],
     },
     {
       command: Command.REDO,
       positive: [
-        createKey('z', { shift: true, cmd: true }),
+        ...(process.platform === 'win32'
+          ? []
+          : [createKey('z', { shift: true, cmd: true })]),
         createKey('z', { shift: true, alt: true }),
         createKey('z', { shift: true, ctrl: true }),
       ],
-      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: false, cmd: true }),
+        createKey('y', { shift: false, ctrl: true }),
+      ],
     },
 
     // Screen control

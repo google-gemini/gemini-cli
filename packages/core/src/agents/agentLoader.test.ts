@@ -529,6 +529,59 @@ Body`);
       });
     });
 
+    it('should convert mcp_servers with auth block in local agent (oauth with full fields)', () => {
+      const markdown = {
+        kind: 'local' as const,
+        name: 'oauth-test-agent',
+        description: 'An agent to test OAuth MCP with full fields',
+        mcp_servers: {
+          'test-server': {
+            url: 'https://api.example.com/mcp',
+            type: 'http' as const,
+            auth: {
+              type: 'oauth' as const,
+              client_id: 'my-client-id',
+              client_secret: 'my-client-secret',
+              scopes: ['read', 'write'],
+              authorization_url: 'https://auth.example.com/authorize',
+              token_url: 'https://auth.example.com/token',
+              issuer: 'https://auth.example.com',
+              audiences: ['audience1'],
+              redirect_uri: 'http://localhost:8080/callback',
+              token_param_name: 'access_token',
+              registration_url: 'https://auth.example.com/register',
+            },
+            timeout: 30000,
+          },
+        },
+        system_prompt: 'You are a test agent.',
+      };
+
+      const result = markdownToAgentDefinition(
+        markdown,
+      ) as LocalAgentDefinition;
+      expect(result.kind).toBe('local');
+      expect(result.mcpServers).toBeDefined();
+      expect(result.mcpServers!['test-server']).toMatchObject({
+        url: 'https://api.example.com/mcp',
+        type: 'http',
+        oauth: {
+          enabled: true,
+          clientId: 'my-client-id',
+          clientSecret: 'my-client-secret',
+          scopes: ['read', 'write'],
+          authorizationUrl: 'https://auth.example.com/authorize',
+          tokenUrl: 'https://auth.example.com/token',
+          issuer: 'https://auth.example.com',
+          audiences: ['audience1'],
+          redirectUri: 'http://localhost:8080/callback',
+          tokenParamName: 'access_token',
+          registrationUrl: 'https://auth.example.com/register',
+        },
+        timeout: 30000,
+      });
+    });
+
     it('should pass through unknown model names (e.g. auto)', () => {
       const markdown = {
         kind: 'local' as const,
@@ -886,6 +939,12 @@ auth:
     - profile
   authorization_url: https://auth.example.com/authorize
   token_url: https://auth.example.com/token
+  issuer: https://auth.example.com
+  audiences:
+    - audience1
+  redirect_uri: http://localhost:8080/callback
+  token_param_name: access_token
+  registration_url: https://auth.example.com/register
 ---
 `);
       const result = await parseAgentMarkdown(filePath);
@@ -900,6 +959,11 @@ auth:
           scopes: ['openid', 'profile'],
           authorization_url: 'https://auth.example.com/authorize',
           token_url: 'https://auth.example.com/token',
+          issuer: 'https://auth.example.com',
+          audiences: ['audience1'],
+          redirect_uri: 'http://localhost:8080/callback',
+          token_param_name: 'access_token',
+          registration_url: 'https://auth.example.com/register',
         },
       });
     });

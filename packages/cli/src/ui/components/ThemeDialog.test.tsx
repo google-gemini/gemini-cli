@@ -219,7 +219,7 @@ describe('Hint Visibility', () => {
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
-        uiState: { terminalBackgroundColor: '#FFFFFF' },
+        uiState: { terminalBackgroundColor: '#123456' },
       },
     );
 

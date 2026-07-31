@@ -9,20 +9,32 @@
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
+import {
+  RELAUNCH_EXIT_CODE,
+  getSpawnConfig,
+  getScriptArgs,
+} from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
 
-// Suppress known race condition error in node-pty on Windows
+// Suppress known race condition error in node-pty on Windows and Linux
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
-  if (
-    process.platform === 'win32' &&
-    error instanceof Error &&
-    error.message === 'Cannot resize a pty that has already exited'
-  ) {
-    // This error happens on Windows with node-pty when resizing a pty that has just exited.
-    // It is a race condition in node-pty that we cannot prevent, so we silence it.
-    return;
+  if (error instanceof Error) {
+    const message = error.message || '';
+    const isPtyResizeError =
+      message === 'Cannot resize a pty that has already exited';
+    const isEbadfError =
+      message.includes('EBADF') ||
+      (error as { code?: string }).code === 'EBADF';
+    const isFromNodePty =
+      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
+
+    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
+      // This error happens with node-pty when resizing a pty that has just exited.
+      // It is a race condition in node-pty that we cannot prevent, so we silence it.
+      return;
+    }
   }
 
   // For other errors, we rely on the default behavior, but since we attached a listener,
@@ -74,18 +86,10 @@ async function run() {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-    const nodeArgs: string[] = [...process.execArgv];
-    const scriptArgs = process.argv.slice(2);
-
+    const scriptArgs = getScriptArgs();
     const memoryArgs = await getMemoryNodeArgs();
-    nodeArgs.push(...memoryArgs);
+    const { spawnArgs, env: newEnv } = getSpawnConfig(memoryArgs, scriptArgs);
 
-    const script = process.argv[1];
-    nodeArgs.push(script);
-    nodeArgs.push(...scriptArgs);
-
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
-    const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
     // Prevent the parent process from exiting prematurely on signals.
@@ -97,7 +101,7 @@ async function run() {
     const runner = () => {
       process.stdin.pause();
 
-      const child = spawn(process.execPath, nodeArgs, {
+      const child = spawn(process.execPath, spawnArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
       });
@@ -129,7 +133,7 @@ async function run() {
     while (true) {
       try {
         const exitCode = await runner();
-        if (exitCode !== RELAUNCH_EXIT_CODE) {
+        if (process.platform === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
           process.exit(exitCode);
         }
       } catch (error: unknown) {

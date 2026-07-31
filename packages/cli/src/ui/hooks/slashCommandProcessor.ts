@@ -72,6 +72,7 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openVoiceModelDialog: () => void;
   openAgentConfigDialog: (
     name: string,
     displayName: string,
@@ -81,6 +82,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  toggleVoiceMode: () => void;
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
@@ -232,6 +234,7 @@ export const useSlashCommandProcessor = (
         pendingItem,
         setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
+        toggleVoiceMode: actions.toggleVoiceMode,
         toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         reloadCommands,
@@ -503,6 +506,9 @@ export const useSlashCommandProcessor = (
                     case 'model':
                       actions.openModelDialog();
                       return { type: 'handled' };
+                    case 'voice-model':
+                      actions.openVoiceModelDialog();
+                      return { type: 'handled' };
                     case 'agentConfig': {
                       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                       const props = result.props as Record<string, unknown>;
@@ -551,6 +557,18 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 }
                 case 'quit':
+                  if (result.deleteSession) {
+                    try {
+                      const chatRecordingService = config
+                        ?.getGeminiClient()
+                        ?.getChatRecordingService();
+                      if (chatRecordingService) {
+                        await chatRecordingService.deleteCurrentSessionAsync();
+                      }
+                    } catch {
+                      // Don't let deletion errors prevent exit.
+                    }
+                  }
                   actions.quit(result.messages);
                   return { type: 'handled' };
 

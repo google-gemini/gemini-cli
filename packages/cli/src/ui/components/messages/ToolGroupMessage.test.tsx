@@ -368,6 +368,39 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
+    it('renders update_topic in the middle of other tools', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'read_file',
+          status: CoreToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'topic-tool-middle',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Middle Topic',
+          },
+        }),
+        createToolCall({
+          callId: 'tool-2',
+          name: 'write_file',
+          status: CoreToolCallStatus.Success,
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot('update_topic_middle');
+      unmount();
+    });
+
     it('renders with limited terminal height', async () => {
       const toolCalls = [
         createToolCall({

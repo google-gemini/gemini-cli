@@ -140,7 +140,7 @@ export class KeychainService {
         return keychainModule;
       }
 
-      debugLogger.debug('Keychain functional verification failed');
+      debugLogger.debug('Keychain functional verification failed or timed out');
       return null;
     } catch (error) {
       // Avoid logging full error objects to prevent PII exposure.
@@ -173,18 +173,32 @@ export class KeychainService {
   }
 
   // Performs a set-get-delete cycle to verify keychain functionality.
+  // Capped with a 2s timeout so a non-responsive Secret Service (common on
+  // headless Linux: WSL/SSH/Docker without gnome-keyring or D-Bus) falls back
+  // to FileKeychain instead of hanging the CLI indefinitely.
   private async isKeychainFunctional(keychain: Keychain): Promise<boolean> {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
 
-    await keychain.setPassword(this.serviceName, testAccount, testPassword);
-    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
-    const deleted = await keychain.deletePassword(
-      this.serviceName,
-      testAccount,
-    );
+    const probe = async (): Promise<boolean> => {
+      await keychain.setPassword(this.serviceName, testAccount, testPassword);
+      const retrieved = await keychain.getPassword(
+        this.serviceName,
+        testAccount,
+      );
+      const deleted = await keychain.deletePassword(
+        this.serviceName,
+        testAccount,
+      );
+      return deleted && retrieved === testPassword;
+    };
 
-    return deleted && retrieved === testPassword;
+    return Promise.race([
+      probe(),
+      new Promise<false>((resolve) =>
+        setTimeout(() => resolve(false), 2000).unref(),
+      ),
+    ]);
   }
 
   /**

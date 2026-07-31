@@ -356,4 +356,65 @@ describe('<ShellToolMessage />', () => {
       unmount();
     });
   });
+
+  describe('Header Expansion', () => {
+    const LONG_DESCRIPTION = 'very long '.repeat(20);
+
+    it('truncates header by default', async () => {
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          description={LONG_DESCRIPTION}
+          availableTerminalHeight={10}
+        />,
+        { uiActions },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      // Should be a single line header
+      expect(output.split('\n')[1]).toContain(SHELL_COMMAND_NAME); // name
+      // We check if it's truncated. In our ToolInfo, it's height 1.
+      // The StickyHeader adds some structure, but the ToolInfo Box is inside.
+    });
+
+    it('expands header when availableTerminalHeight is undefined', async () => {
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          description={LONG_DESCRIPTION}
+          availableTerminalHeight={undefined}
+        />,
+        { uiActions },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      // When expanded, the header (ToolInfo) should wrap and take multiple lines.
+      // Since it's at the top, we check if the first few lines contain parts of the description.
+      const lines = output.split('\n');
+      expect(lines.length).toBeGreaterThan(5);
+    });
+
+    it('expands header when isExpanded is true in context', async () => {
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          description={LONG_DESCRIPTION}
+          availableTerminalHeight={10}
+        />,
+        {
+          uiActions,
+          toolActions: {
+            isExpanded: (id: string) => id === baseProps.callId,
+          },
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      // Should be expanded due to context
+      expect(output.split('\n').length).toBeGreaterThan(5);
+    });
+  });
 });

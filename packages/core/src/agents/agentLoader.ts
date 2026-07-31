@@ -79,6 +79,11 @@ const mcpServerSchema = z.object({
         scopes: z.array(z.string()).optional(),
         authorization_url: z.string().url().optional(),
         token_url: z.string().url().optional(),
+        issuer: z.string().url().optional(),
+        audiences: z.array(z.string()).optional(),
+        redirect_uri: z.string().url().optional(),
+        token_param_name: z.string().optional(),
+        registration_url: z.string().url().optional(),
       }),
     ])
     .optional(),
@@ -148,6 +153,11 @@ const oauth2AuthSchema = z.object({
   scopes: z.array(z.string()).optional(),
   authorization_url: z.string().url().optional(),
   token_url: z.string().url().optional(),
+  issuer: z.string().url().optional(),
+  audiences: z.array(z.string()).optional(),
+  redirect_uri: z.string().url().optional(),
+  token_param_name: z.string().optional(),
+  registration_url: z.string().url().optional(),
 });
 
 const authConfigSchema = z
@@ -459,6 +469,11 @@ function convertFrontmatterAuthToConfig(
         scopes: frontmatter.scopes,
         authorization_url: frontmatter.authorization_url,
         token_url: frontmatter.token_url,
+        issuer: frontmatter.issuer,
+        audiences: frontmatter.audiences,
+        redirect_uri: frontmatter.redirect_uri,
+        token_param_name: frontmatter.token_param_name,
+        registration_url: frontmatter.registration_url,
       };
 
     default: {
@@ -552,6 +567,11 @@ export function markdownToAgentDefinition(
             scopes: config.auth.scopes,
             authorizationUrl: config.auth.authorization_url,
             tokenUrl: config.auth.token_url,
+            issuer: config.auth.issuer,
+            audiences: config.auth.audiences,
+            redirectUri: config.auth.redirect_uri,
+            tokenParamName: config.auth.token_param_name,
+            registrationUrl: config.auth.registration_url,
           };
         }
       }

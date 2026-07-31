@@ -265,6 +265,24 @@ describe('TableRenderer', () => {
     unmount();
   });
 
+  it('handles extremely small terminal widths without crashing', async () => {
+    const headers = ['Col 1', 'Col 2'];
+    const rows = [['Data 1', 'Data 2']];
+    // This width is much smaller than the overhead, which could lead to negative column widths
+    const terminalWidth = 1;
+
+    const renderResult = await renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+    const { unmount } = renderResult;
+    // If it didn't throw RangeError: Invalid count value, the test passes
+    unmount();
+  });
+
   it.each([
     {
       name: 'handles non-ASCII characters (emojis and Asian scripts) correctly',

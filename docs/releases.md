@@ -8,7 +8,7 @@
 
 Our release flows support both `dev` and `prod` environments.
 
-The `dev` environment pushes to a private Github-hosted NPM repository, with the
+The `dev` environment pushes to a private GitHub-hosted NPM repository, with the
 package names beginning with `@google-gemini/**` instead of `@google/**`.
 
 The `prod` environment pushes to the public global NPM registry via Wombat
@@ -20,7 +20,7 @@ More information can be found about these systems in the
 
 ### Package scopes
 
-| Package    | `prod` (Wombat Dressing Room) | `dev` (Github Private NPM Repo)           |
+| Package    | `prod` (Wombat Dressing Room) | `dev` (GitHub Private NPM Repo)           |
 | ---------- | ----------------------------- | ----------------------------------------- |
 | CLI        | @google/gemini-cli            | @google-gemini/gemini-cli                 |
 | Core       | @google/gemini-cli-core       | @google-gemini/gemini-cli-core A2A Server |
@@ -475,6 +475,7 @@ This stage happens _after_ the NPM publish and creates the single-file
 executable that enables `npx` usage directly from the GitHub repository.
 
 1.  **The JavaScript bundle is created:**
+
     - **What happens:** The built JavaScript from both `packages/core/dist` and
       `packages/cli/dist`, along with all third-party JavaScript dependencies,
       are bundled by `esbuild` into a single, executable JavaScript file (for
@@ -486,6 +487,7 @@ executable that enables `npx` usage directly from the GitHub repository.
       the `core` package) are included directly.
 
 2.  **The `bundle` directory is assembled:**
+
     - **What happens:** A temporary `bundle` folder is created at the project
       root. The single `gemini.js` executable is placed inside it, along with
       other essential files.

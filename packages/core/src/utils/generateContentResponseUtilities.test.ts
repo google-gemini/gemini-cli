@@ -158,6 +158,57 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
+    it('should filter out audio/video MIME types and add a minimal system note (generic tool)', () => {
+      const llmContent: PartListUnion = [
+        { text: 'Some text' },
+        { inlineData: { mimeType: 'audio/mpeg', data: 'audio_data' } },
+      ];
+
+      const result = convertToFunctionResponse(
+        'other_tool',
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+
+      const frPart = result.find((p) => p.functionResponse);
+      const response: Record<string, unknown> = {};
+      if (frPart?.functionResponse?.response) {
+        Object.assign(response, frPart.functionResponse.response);
+      }
+      const output = response['output'] as string;
+      expect(output).toContain(
+        '[SYSTEM: Binary content (audio/mpeg) stripped from response due to protocol limitations.]',
+      );
+      expect(output).not.toContain('__binary_injection__');
+    });
+
+    it('should use the __binary_injection__ flag for read_file and read_many_files tools', () => {
+      const llmContent: PartListUnion = [
+        { text: 'Reading audio' },
+        { inlineData: { mimeType: 'audio/mpeg', data: 'audio_data' } },
+      ];
+
+      for (const tool of ['read_file', 'read_many_files']) {
+        const result = convertToFunctionResponse(
+          tool,
+          callId,
+          llmContent,
+          PREVIEW_GEMINI_MODEL,
+        );
+
+        const frPart = result.find((p) => p.functionResponse);
+        const response: Record<string, unknown> = {};
+        if (frPart?.functionResponse?.response) {
+          Object.assign(response, frPart.functionResponse.response);
+        }
+        expect(response['output']).toContain('read successfully');
+        expect(response['__binary_injection__']).toBeDefined();
+        const injection = response['__binary_injection__'] as Part[];
+        expect(injection[0].inlineData?.mimeType).toBe('audio/mpeg');
+      }
+    });
+
     it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },

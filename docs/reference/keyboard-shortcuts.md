@@ -39,7 +39,7 @@ available combinations.
 | `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
 | `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
 | `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
-| `edit.undo`            | Undo the most recent text edit.                  | `Cmd/Win+Z`<br />`Alt+Z`                                 |
+| `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z`<br />`Alt+Z`<br />`Cmd/Win+Z`                   |
 | `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
 
 #### Scrolling
@@ -115,6 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+| `app.voiceModePTT`            | Hold to speak in Voice Mode.                                                                                                                       | `Space`            |
 
 #### Background Shell Controls
 
@@ -324,6 +325,29 @@ lines and `3w` moves forward three words.
 
 Counts are also supported for editing commands. For example, `3dd` deletes three
 lines and `2cw` changes two words.
+
+### Find, replace, yank, and paste in NORMAL mode
+
+| Action                                    | Keys        |
+| ----------------------------------------- | ----------- |
+| Find next matching character              | `f{char}`   |
+| Find previous matching character          | `F{char}`   |
+| Move until before next matching character | `t{char}`   |
+| Move until after previous matching char   | `T{char}`   |
+| Repeat latest character find              | `;`         |
+| Repeat latest character find in reverse   | `,`         |
+| Delete character before cursor            | `X`         |
+| Toggle case under cursor                  | `~`         |
+| Replace character under cursor            | `r{char}`   |
+| Yank line                                 | `yy`        |
+| Yank to end of line                       | `Y` or `y$` |
+| Yank word / WORD                          | `yw`, `yW`  |
+| Yank to end of word / WORD                | `ye`, `yE`  |
+| Paste after cursor                        | `p`         |
+| Paste before cursor                       | `P`         |
+
+Delete and change operators also compose with character-find motions, so
+commands such as `dfx`, `dtx`, `cFx`, and `cTx` are supported.
 
 ## Limitations
 

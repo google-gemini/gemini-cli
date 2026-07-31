@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
@@ -30,17 +30,20 @@ describe('Tracker Tools Integration', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-tools-test-'));
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
     config = new Config({
-      sessionId: 'test-session',
+      sessionId: `test-session-${Math.random().toString(36).substring(7)}`,
       targetDir: tempDir,
       cwd: tempDir,
       model: 'gemini-3-flash',
       debugMode: false,
     });
+    await config.initialize();
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -120,8 +123,14 @@ describe('Tracker Tools Integration', () => {
     );
 
     const tasks = await config.getTrackerService().listTasks();
-    const parentId = tasks.find((t) => t.title === 'Parent Task')!.id;
-    const childId = tasks.find((t) => t.title === 'Child Task')!.id;
+    const parentTask = tasks.find((t) => t.title === 'Parent Task');
+    const childTask = tasks.find((t) => t.title === 'Child Task');
+
+    expect(parentTask).toBeDefined();
+    expect(childTask).toBeDefined();
+
+    const parentId = parentTask!.id;
+    const childId = childTask!.id;
 
     // Add Dependency
     const addDepTool = new TrackerAddDependencyTool(config, messageBus);

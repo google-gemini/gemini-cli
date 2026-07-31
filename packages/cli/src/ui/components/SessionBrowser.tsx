@@ -562,6 +562,13 @@ export const useSessionBrowserInput = (
           state.setActiveIndex(0);
           state.setScrollOffset(0);
           return true;
+        } else if (key.name === 'enter') {
+          const selectedSession =
+            state.filteredAndSortedSessions[state.activeIndex];
+          if (selectedSession && !selectedSession.isCurrentSession) {
+            onResumeSession(selectedSession);
+          }
+          return true;
         } else if (
           key.sequence &&
           key.sequence.length === 1 &&

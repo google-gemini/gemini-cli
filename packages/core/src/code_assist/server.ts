@@ -86,6 +86,10 @@ export class CodeAssistServer implements ContentGenerator {
     readonly config?: Config,
   ) {}
 
+  getEffectiveSessionId(): string | undefined {
+    return this.config?.getSessionId() ?? this.sessionId;
+  }
+
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
@@ -117,7 +121,7 @@ export class CodeAssistServer implements ContentGenerator {
           req,
           userPromptId,
           this.projectId,
-          this.sessionId,
+          this.getEffectiveSessionId(),
           enabledCreditTypes,
         ),
         req.config?.abortSignal,
@@ -153,7 +157,7 @@ export class CodeAssistServer implements ContentGenerator {
           translatedResponse,
           streamingLatency,
           req.config?.abortSignal,
-          server.sessionId, // Use sessionId as trajectoryId
+          server.getEffectiveSessionId(), // Use sessionId as trajectoryId
         );
 
         if (response.consumedCredits) {
@@ -204,7 +208,7 @@ export class CodeAssistServer implements ContentGenerator {
         req,
         userPromptId,
         this.projectId,
-        this.sessionId,
+        this.getEffectiveSessionId(),
         undefined,
       ),
       req.config?.abortSignal,
@@ -224,7 +228,7 @@ export class CodeAssistServer implements ContentGenerator {
       translatedResponse,
       streamingLatency,
       req.config?.abortSignal,
-      this.sessionId, // Use sessionId as trajectoryId
+      this.getEffectiveSessionId(), // Use sessionId as trajectoryId
     );
 
     if (response.remainingCredits) {
@@ -273,6 +277,16 @@ export class CodeAssistServer implements ContentGenerator {
         return {
           currentTier: { id: UserTierId.STANDARD },
         };
+      } else if (
+        isPermissionDeniedError(e) &&
+        req.cloudaicompanionProject === 'cloudshell-gca'
+      ) {
+        throw new Error(
+          'Access to the default Cloud Shell Gemini project was denied.\n' +
+            'Please set your own Google Cloud project by running:\n' +
+            'gcloud config set project [PROJECT_ID]\n' +
+            'or setting export GOOGLE_CLOUD_PROJECT=...',
+        );
       } else {
         throw e;
       }
@@ -571,4 +585,16 @@ function isVpcScAffectedUser(error: unknown): boolean {
     );
   }
   return false;
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    !!error.response &&
+    typeof error.response === 'object' &&
+    'status' in error.response &&
+    error.response.status === 403
+  );
 }
