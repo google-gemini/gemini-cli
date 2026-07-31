@@ -41,9 +41,9 @@ export async function handleFallback(
     failureKind === 'not_found' &&
     authType === AuthType.USE_GEMINI &&
     isPreviewModel(failedModel, config) &&
-    config.getHasAccessToPreviewModel()
+    config.getHasAccessToPreviewModel?.()
   ) {
-    config.setHasAccessToPreviewModel(false);
+    config.setHasAccessToPreviewModel?.(false);
   }
 
   const chain = resolvePolicyChain(config);
