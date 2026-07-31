@@ -1822,6 +1822,71 @@ describe('useGeminiStream', () => {
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
 
+    it('should append cancelled tool responses to history when cancelled while a tool call is in progress and completes with response parts', async () => {
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: CoreToolCallStatus.Executing,
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'tool1',
+            description: 'desc1',
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
+          } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
+          startTime: Date.now(),
+          liveOutput: '...',
+        } as TrackedExecutingToolCall,
+      ];
+
+      const { result, client } = await renderTestHook(toolCalls);
+
+      // State is `Responding` because a tool is running
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+      // Try to cancel
+      simulateEscapeKeyPress();
+
+      const expectedResponseParts = [
+        {
+          functionResponse: {
+            name: 'tool1',
+            id: 'call1',
+            response: { error: 'cancelled' },
+          },
+        },
+      ];
+
+      // Trigger the onComplete callback with the cancelled tool call having non-empty response parts
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([
+            {
+              ...toolCalls[0],
+              status: CoreToolCallStatus.Cancelled,
+              response: {
+                callId: 'call1',
+                responseParts: expectedResponseParts,
+              },
+            } as any,
+          ]);
+        }
+      });
+
+      // Assert that addHistory was called with the combined response parts
+      expect(client.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedResponseParts,
+      });
+
+      // The final state should be idle because the cancelled tool call was marked as submitted
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
     it('should cancel a request when a tool is awaiting confirmation', async () => {
       const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
       const toolCalls: TrackedToolCall[] = [

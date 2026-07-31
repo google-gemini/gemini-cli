@@ -1930,15 +1930,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (turnCancelledRef.current) {
-        setIsResponding(false);
-        const callIdsToMarkAsSubmitted = toolCalls.map(
-          (toolCall) => toolCall.request.callId,
-        );
-        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-        return;
-      }
-
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (
@@ -1960,6 +1951,30 @@ export const useGeminiStream = (
             return false;
           },
         );
+
+      if (turnCancelledRef.current) {
+        setIsResponding(false);
+        const geminiTools = completedAndReadyToSubmitTools.filter(
+          (t) => !t.request.isClientInitiated,
+        );
+        if (geminiClient && geminiTools.length > 0) {
+          const combinedParts = geminiTools.flatMap(
+            (toolCall) => toolCall.response.responseParts,
+          );
+          if (combinedParts.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            geminiClient.addHistory({
+              role: 'user',
+              parts: combinedParts,
+            });
+          }
+        }
+        const callIdsToMarkAsSubmitted = toolCalls.map(
+          (toolCall) => toolCall.request.callId,
+        );
+        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+        return;
+      }
 
       // Finalize any client-initiated tools as soon as they are done.
       const clientTools = completedAndReadyToSubmitTools.filter(
