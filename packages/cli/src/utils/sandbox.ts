@@ -56,10 +56,10 @@ export async function start_sandbox(
   });
   patcher.patch();
 
-  let stopProxy: ((signal?: string) => void) | undefined = undefined;
+  let stopProxy: (() => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
 
-  const cleanupTempProfile = () => {
+  const cleanup = () => {
     if (tempProfileFile && fs.existsSync(tempProfileFile)) {
       try {
         fs.unlinkSync(tempProfileFile);
@@ -68,26 +68,30 @@ export async function start_sandbox(
       }
       tempProfileFile = null;
     }
+    if (stopProxy) {
+      try {
+        stopProxy();
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const sigintHandler = () => {
-    cleanupTempProfile();
+    cleanup();
     process.off('SIGINT', sigintHandler);
     process.kill(process.pid, 'SIGINT');
   };
 
   const sigtermHandler = () => {
-    cleanupTempProfile();
+    cleanup();
     process.off('SIGTERM', sigtermHandler);
     process.kill(process.pid, 'SIGTERM');
   };
 
-  const cleanup = () => {
-    cleanupTempProfile();
-    process.off('exit', cleanupTempProfile);
-    process.off('SIGINT', sigintHandler);
-    process.off('SIGTERM', sigtermHandler);
-  };
+  process.on('exit', cleanup);
+  process.on('SIGINT', sigintHandler);
+  process.on('SIGTERM', sigtermHandler);
 
   try {
     if (config.command === 'sandbox-exec') {
@@ -131,11 +135,6 @@ export async function start_sandbox(
                 mode: 0o600,
               });
               profileFile = tempProfileFile;
-
-              // Register cleanups
-              process.on('exit', cleanupTempProfile);
-              process.on('SIGINT', sigintHandler);
-              process.on('SIGTERM', sigtermHandler);
             } catch (err) {
               debugLogger.warn(
                 `Failed to write temporary seatbelt profile: ${err}`,
@@ -223,7 +222,7 @@ export async function start_sandbox(
           '-c',
           [
             `SANDBOX=sandbox-exec`,
-            quote([`NODE_OPTIONS=${nodeOptions}`]),
+            'NODE_OPTIONS=' + quote([nodeOptions]),
             ...finalArgv.map((arg) => quote([arg])),
           ].join(' '),
         );
@@ -254,7 +253,7 @@ export async function start_sandbox(
             detached: true,
           });
           // install handlers to stop proxy on exit/signal
-          stopProxy = (signal?: string) => {
+          stopProxy = () => {
             debugLogger.log('stopping proxy ...');
             if (proxyProcess?.pid) {
               try {
@@ -263,14 +262,7 @@ export async function start_sandbox(
                 // ignore
               }
             }
-            if (signal === 'SIGINT' || signal === 'SIGTERM') {
-              process.off(signal, stopProxy!);
-              process.kill(process.pid, signal);
-            }
           };
-          process.on('exit', stopProxy);
-          process.on('SIGINT', stopProxy);
-          process.on('SIGTERM', stopProxy);
 
           // commented out as it disrupts ink rendering
           // proxyProcess.stdout?.on('data', (data) => {
@@ -834,7 +826,7 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      stopProxy = (signal?: string) => {
+      stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
         try {
           spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
@@ -843,14 +835,7 @@ export async function start_sandbox(
         } catch {
           // ignore
         }
-        if (signal === 'SIGINT' || signal === 'SIGTERM') {
-          process.off(signal, stopProxy!);
-          process.kill(process.pid, signal);
-        }
       };
-      process.on('exit', stopProxy);
-      process.on('SIGINT', stopProxy);
-      process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
       // proxyProcess.stdout?.on('data', (data) => {
@@ -901,12 +886,10 @@ export async function start_sandbox(
       });
     });
   } finally {
-    if (stopProxy) {
-      stopProxy();
-      process.off('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
-    }
+    process.off('exit', cleanup);
+    process.off('SIGINT', sigintHandler);
+    process.off('SIGTERM', sigtermHandler);
+    cleanup();
     patcher.cleanup();
   }
 }
