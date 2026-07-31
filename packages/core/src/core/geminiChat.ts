@@ -221,7 +221,12 @@ export class InvalidStreamError extends Error {
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
     | 'MALFORMED_FUNCTION_CALL'
-    | 'UNEXPECTED_TOOL_CALL';
+    | 'UNEXPECTED_TOOL_CALL'
+    | 'MAX_TOKENS_EXCEEDED'
+    | 'SAFETY_BLOCKED'
+    | 'RECITATION_BLOCKED'
+    | 'OTHER_BLOCKED'
+    | 'THINKING_ONLY_RESPONSE';
 
   constructor(
     message: string,
@@ -229,7 +234,12 @@ export class InvalidStreamError extends Error {
       | 'NO_FINISH_REASON'
       | 'NO_RESPONSE_TEXT'
       | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL',
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -383,6 +393,9 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    const historyLengthBefore = this.agentHistory.length;
+    const baselinePromptTokenCount = this.lastPromptTokenCount;
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -390,6 +403,7 @@ export class GeminiChat {
     this.sendPromise = streamDonePromise;
 
     let userContent = createUserContent(message);
+    const isOriginalFunctionResponse = isFunctionResponse(userContent);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -398,7 +412,7 @@ export class GeminiChat {
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
-    if (!isFunctionResponse(userContent)) {
+    if (!isOriginalFunctionResponse) {
       const userMessageParts = userContent.parts || [];
       const userMessageContent = partListUnionToString(userMessageParts);
 
@@ -515,6 +529,7 @@ export class GeminiChat {
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
+        let lastStreamError: unknown = undefined;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -526,7 +541,7 @@ export class GeminiChat {
             // If this is a retry, update the key with the new context.
             const currentConfigKey =
               attempt > 0
-                ? { ...modelConfigKey, isRetry: true }
+                ? { ...modelConfigKey, isRetry: true, lastStreamError }
                 : modelConfigKey;
 
             isConnectionPhase = true;
@@ -545,6 +560,10 @@ export class GeminiChat {
 
             return;
           } catch (error) {
+            if (error instanceof InvalidStreamError) {
+              lastStreamError = error;
+            }
+
             if (error instanceof AgentExecutionStoppedError) {
               yield {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
@@ -581,8 +600,7 @@ export class GeminiChat {
             );
 
             const isContentError = error instanceof InvalidStreamError;
-            const isRetryableContentError =
-              isContentError && error.type !== 'NO_RESPONSE_TEXT';
+            const isRetryableContentError = isContentError;
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
@@ -644,6 +662,15 @@ export class GeminiChat {
             throw error;
           }
         }
+      } catch (error) {
+        if (!isOriginalFunctionResponse) {
+          this.agentHistory.rollback(historyLengthBefore);
+          this.chatRecordingService.updateMessagesFromHistory(
+            this.agentHistory.get(),
+          );
+          this.lastPromptTokenCount = baselinePromptTokenCount;
+        }
+        throw error;
       } finally {
         streamDoneResolver!();
       }
@@ -765,6 +792,30 @@ export class GeminiChat {
         tools: this.tools,
         abortSignal,
       };
+
+      // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
+      if (
+        modelConfigKey.isRetry &&
+        modelConfigKey.lastStreamError instanceof InvalidStreamError
+      ) {
+        const lastError = modelConfigKey.lastStreamError;
+        let nudgeMessage = '';
+        if (lastError.type === 'THINKING_ONLY_RESPONSE') {
+          nudgeMessage =
+            '\n[System: You previously generated thoughts but failed to provide a final user-facing response. Please ensure you provide your final answer or call a tool now.]';
+        } else if (lastError.type === 'NO_RESPONSE_TEXT') {
+          nudgeMessage =
+            '\n[System: You previously returned an empty response with no text or thoughts. Please ensure you provide your final answer or call a tool now.]';
+        }
+
+        if (nudgeMessage) {
+          if (typeof config.systemInstruction === 'string') {
+            config.systemInstruction += nudgeMessage;
+          } else if (config.systemInstruction === undefined) {
+            config.systemInstruction = nudgeMessage;
+          }
+        }
+      }
 
       let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
         ? [...contentsForPreviewModel]
@@ -1122,6 +1173,13 @@ export class GeminiChat {
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
+    // Buffers to prevent failed stream attempts from polluting telemetry and logs
+    const bufferedThoughts: Array<{ subject: string; description: string }> =
+      [];
+    let bufferedUsageMetadata:
+      | GenerateContentResponse['usageMetadata']
+      | undefined = undefined;
+
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)
     const finalFunctionCallsMap = new Map<string, FunctionCall>();
@@ -1177,7 +1235,10 @@ export class GeminiChat {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
             hasThoughts = true;
-            this.recordThoughtFromContent(content);
+            const thought = this.extractThoughtFromContent(content);
+            if (thought) {
+              bufferedThoughts.push(thought);
+            }
           }
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
@@ -1205,12 +1266,9 @@ export class GeminiChat {
         }
       }
 
-      // Record token usage if this chunk has usageMetadata
+      // Buffer token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
-        }
+        bufferedUsageMetadata = chunk.usageMetadata;
       }
 
       const hookSystem = this.context.config.getHookSystem();
@@ -1297,29 +1355,22 @@ export class GeminiChat {
       }
     }
 
-    const responseText = consolidatedParts
+    const rawResponseText = consolidatedParts
       .filter((part) => part.text)
       .map((part) => part.text)
-      .join('')
-      .trim();
+      .join('');
 
-    let id: string;
-    // Record model response text from the collected parts.
-    // Also flush when there are thoughts or a tool call (even with no text)
-    // so that BeforeTool hooks always see the latest transcript state.
-    if (responseText || hasThoughts || hasToolCall) {
-      id = this.chatRecordingService.recordMessage({
-        model,
-        type: 'gemini',
-        content: responseText,
-      });
-    } else {
-      // Still need a durable ID even if response is empty (e.g. only tool calls)
-      id = this.chatRecordingService.recordSyntheticMessage(
-        'gemini',
-        consolidatedParts,
-      );
-    }
+    // Clean zero-width/invisible characters and HTML comments to determine actual printable/visible content
+    let responseText = rawResponseText.replace(
+      /[\u200B-\u200D\uFEFF\u200E\u200F]/g,
+      '',
+    );
+    let previous: string;
+    do {
+      previous = responseText;
+      responseText = responseText.replace(/<!--[\s\S]*?-->/g, '');
+    } while (responseText !== previous);
+    responseText = responseText.trim();
 
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call OR
@@ -1349,11 +1400,72 @@ export class GeminiChat {
         );
       }
       if (!responseText) {
+        if (finishReason === FinishReason.MAX_TOKENS) {
+          throw new InvalidStreamError(
+            'Model stream ended due to token limit exhaustion (MAX_TOKENS) with empty response text.',
+            'MAX_TOKENS_EXCEEDED',
+          );
+        }
+        if (finishReason === FinishReason.SAFETY) {
+          throw new InvalidStreamError(
+            'Model stream ended due to safety settings (SAFETY) with empty response text.',
+            'SAFETY_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.RECITATION) {
+          throw new InvalidStreamError(
+            'Model stream ended due to recitation settings (RECITATION) with empty response text.',
+            'RECITATION_BLOCKED',
+          );
+        }
+        if (finishReason === FinishReason.OTHER) {
+          throw new InvalidStreamError(
+            'Model stream ended due to other settings (OTHER) with empty response text.',
+            'OTHER_BLOCKED',
+          );
+        }
+        if (hasThoughts) {
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text but contained reasoning thoughts.',
+            'THINKING_ONLY_RESPONSE',
+          );
+        }
         throw new InvalidStreamError(
           'Model stream ended with empty response text.',
           'NO_RESPONSE_TEXT',
         );
       }
+    }
+
+    // Flush buffered thoughts from the successful attempt
+    for (const thought of bufferedThoughts) {
+      this.chatRecordingService.recordThought(thought);
+    }
+
+    // Flush buffered usage metadata and token counts from the successful attempt
+    if (bufferedUsageMetadata) {
+      this.chatRecordingService.recordMessageTokens(bufferedUsageMetadata);
+      if (bufferedUsageMetadata.promptTokenCount !== undefined) {
+        this.lastPromptTokenCount = bufferedUsageMetadata.promptTokenCount;
+      }
+    }
+
+    let id: string;
+    // Record model response text from the collected parts.
+    // Also flush when there are thoughts or a tool call (even with no text)
+    // so that BeforeTool hooks always see the latest transcript state.
+    if (responseText || hasThoughts || hasToolCall) {
+      id = this.chatRecordingService.recordMessage({
+        model,
+        type: 'gemini',
+        content: responseText,
+      });
+    } else {
+      // Still need a durable ID even if response is empty (e.g. only tool calls)
+      id = this.chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        consolidatedParts,
+      );
     }
 
     this.agentHistory.push({
@@ -1410,11 +1522,13 @@ export class GeminiChat {
   }
 
   /**
-   * Extracts and records thought from thought content.
+   * Extracts thought from thought content.
    */
-  private recordThoughtFromContent(content: Content): void {
+  private extractThoughtFromContent(
+    content: Content,
+  ): { subject: string; description: string } | undefined {
     if (!content.parts || content.parts.length === 0) {
-      return;
+      return undefined;
     }
 
     const thoughtPart = content.parts[0];
@@ -1427,11 +1541,12 @@ export class GeminiChat {
         : '';
       const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
 
-      this.chatRecordingService.recordThought({
+      return {
         subject,
         description,
-      });
+      };
     }
+    return undefined;
   }
 }
 
