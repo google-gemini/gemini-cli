@@ -999,6 +999,80 @@ describe('GeminiChat', () => {
       expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
     });
 
+    it('should preserve mixed multimodal function responses during rollback when InvalidStreamError is thrown (regression)', async () => {
+      // 1. Setup history ending with a model turn containing functionCall
+      chat.agentHistory.push({
+        id: 'model-turn-1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'test_tool',
+                args: {},
+              },
+            },
+          ],
+        },
+      });
+
+      const initialHistoryLength = chat.agentHistory.length;
+
+      // Setup: Stream that will throw InvalidStreamError
+      const streamWithNoResponseText = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { role: 'model', parts: [] },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithNoResponseText,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        [
+          {
+            functionResponse: {
+              name: 'test_tool',
+              response: { success: true },
+            },
+          },
+          {
+            fileData: {
+              mimeType: 'image/png',
+              fileUri: 'https://example.com/image.png',
+            },
+          },
+        ],
+        'prompt-id-mixed-multimodal-rollback',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Verify the function response was added
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      // Verify that history was NOT rolled back, i.e., function response and sibling fileData are preserved!
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 1);
+      const lastTurn = chat.agentHistory.get()[chat.agentHistory.length - 1];
+      expect(lastTurn.content.parts?.[0]?.functionResponse).toBeDefined();
+      expect(lastTurn.content.parts?.[1]?.fileData).toBeDefined();
+    });
+
     it('should restore the lastPromptTokenCount baseline on history rollback when InvalidStreamError is thrown', async () => {
       // Establish an initial token count baseline
       const initialBaseline = chat.getLastPromptTokenCount();
