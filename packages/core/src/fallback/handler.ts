@@ -5,6 +5,8 @@
  */
 
 import type { Config } from '../config/config.js';
+import { AuthType } from '../core/contentGenerator.js';
+import { isPreviewModel } from '../config/models.js';
 import { createSessionId } from '../utils/session.js';
 import {
   openBrowserSecurely,
@@ -30,6 +32,19 @@ export async function handleFallback(
   error?: unknown,
 ): Promise<string | boolean | null> {
   const failureKind = classifyFailureKind(error);
+
+  // A 404 for a preview model on the Gemini API key path means the key's
+  // project has no access to preview models. Record that before resolving
+  // the policy chain so the fallback candidates are stable models instead
+  // of another preview model that would also 404.
+  if (
+    failureKind === 'not_found' &&
+    authType === AuthType.USE_GEMINI &&
+    isPreviewModel(failedModel, config) &&
+    config.getHasAccessToPreviewModel()
+  ) {
+    config.setHasAccessToPreviewModel(false);
+  }
 
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(

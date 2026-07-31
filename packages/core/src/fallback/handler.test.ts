@@ -23,10 +23,12 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
+import { ModelNotFoundError } from '../utils/httpErrors.js';
 import type { FallbackModelHandler } from './types.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -420,6 +422,102 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('preview model 404 with Gemini API key auth', () => {
+    let availability: ModelAvailabilityService;
+    let apiKeyHandler: Mock<FallbackModelHandler>;
+    let apiKeyConfig: Config;
+    let setHasAccessToPreviewModel: Mock;
+    const notFoundError = new ModelNotFoundError(
+      'Requested entity was not found.',
+      404,
+    );
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      availability = createAvailabilityServiceMock({
+        selectedModel: DEFAULT_GEMINI_MODEL,
+        skipped: [],
+      });
+      apiKeyHandler = vi.fn().mockResolvedValue('retry_always');
+      // Simulate the assumed preview access flag flipping once disabled.
+      let hasAccessToPreview = true;
+      setHasAccessToPreviewModel = vi.fn((hasAccess: boolean) => {
+        hasAccessToPreview = hasAccess;
+      });
+      apiKeyConfig = createMockConfig({
+        getModel: vi.fn(() => PREVIEW_GEMINI_3_1_MODEL),
+        getActiveModel: vi.fn(() => PREVIEW_GEMINI_3_1_MODEL),
+        getHasAccessToPreviewModel: vi.fn(() => hasAccessToPreview),
+        setHasAccessToPreviewModel,
+      } as unknown as Partial<Config>);
+      vi.mocked(apiKeyConfig.getModelAvailabilityService).mockReturnValue(
+        availability,
+      );
+      vi.mocked(apiKeyConfig.getFallbackModelHandler).mockReturnValue(
+        apiKeyHandler,
+      );
+    });
+
+    it('disables preview access so fallback candidates are stable models', async () => {
+      await handleFallback(
+        apiKeyConfig,
+        PREVIEW_GEMINI_3_1_MODEL,
+        AuthType.USE_GEMINI,
+        notFoundError,
+      );
+
+      expect(setHasAccessToPreviewModel).toHaveBeenCalledWith(false);
+      expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
+        DEFAULT_GEMINI_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      ]);
+      expect(apiKeyHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_3_1_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        notFoundError,
+      );
+    });
+
+    it('does not disable preview access for OAuth users', async () => {
+      await handleFallback(
+        apiKeyConfig,
+        PREVIEW_GEMINI_3_1_MODEL,
+        AUTH_OAUTH,
+        notFoundError,
+      );
+
+      expect(setHasAccessToPreviewModel).not.toHaveBeenCalled();
+    });
+
+    it('does not disable preview access when the failed model is not a preview model', async () => {
+      await handleFallback(
+        apiKeyConfig,
+        DEFAULT_GEMINI_MODEL,
+        AuthType.USE_GEMINI,
+        notFoundError,
+      );
+
+      expect(setHasAccessToPreviewModel).not.toHaveBeenCalled();
+    });
+
+    it('does not disable preview access for non-404 errors', async () => {
+      const terminalError = new TerminalQuotaError('Quota error', {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      });
+
+      await handleFallback(
+        apiKeyConfig,
+        PREVIEW_GEMINI_3_1_MODEL,
+        AuthType.USE_GEMINI,
+        terminalError,
+      );
+
+      expect(setHasAccessToPreviewModel).not.toHaveBeenCalled();
     });
   });
 });
