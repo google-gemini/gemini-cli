@@ -305,6 +305,9 @@ describe('sandbox', () => {
         image: 'some-image',
       });
 
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
       interface MockProcess extends EventEmitter {
         stdout: EventEmitter;
         stderr: EventEmitter;
@@ -324,13 +327,16 @@ describe('sandbox', () => {
 
       await expect(promise).resolves.toBe(0);
 
-      // Verify fs.writeFileSync was called with the temp profile file and content
+      // Verify fs.writeFileSync was called with the temp profile file, content, and 0o600 permissions
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         expect.stringContaining(
           'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
         ),
         expect.stringContaining('deny default'),
-        'utf8',
+        expect.objectContaining({
+          encoding: 'utf8',
+          mode: 0o600,
+        }),
       );
 
       // Verify spawn was called with the temp profile file
@@ -344,6 +350,15 @@ describe('sandbox', () => {
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+
+      // Verify process on/off hooks were called for exit, SIGINT, and SIGTERM cleanups
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
 
       // Verify fs.unlinkSync was called to clean up the temp file
       expect(fs.unlinkSync).toHaveBeenCalledWith(

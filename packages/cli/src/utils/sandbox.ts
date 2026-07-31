@@ -73,6 +73,8 @@ export async function start_sandbox(
   const cleanup = () => {
     cleanupTempProfile();
     process.off('exit', cleanupTempProfile);
+    process.off('SIGINT', cleanupTempProfile);
+    process.off('SIGTERM', cleanupTempProfile);
   };
 
   try {
@@ -112,11 +114,16 @@ export async function start_sandbox(
                 tempDir,
                 `gemini-sandbox-macos-${profile}-${rand}.sb`,
               );
-              fs.writeFileSync(tempProfileFile, content, 'utf8');
+              fs.writeFileSync(tempProfileFile, content, {
+                encoding: 'utf8',
+                mode: 0o600,
+              });
               profileFile = tempProfileFile;
 
               // Register cleanups
               process.on('exit', cleanupTempProfile);
+              process.on('SIGINT', cleanupTempProfile);
+              process.on('SIGTERM', cleanupTempProfile);
             } catch (err) {
               debugLogger.warn(
                 `Failed to write temporary seatbelt profile: ${err}`,
