@@ -1773,6 +1773,55 @@ describe('useGeminiStream', () => {
       expect(mockCancelAllToolCalls).toHaveBeenCalled();
     });
 
+    it('should transition to Idle state when cancelled while a tool call is in progress and completes', async () => {
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: CoreToolCallStatus.Executing,
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'tool1',
+            description: 'desc1',
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
+          } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
+          startTime: Date.now(),
+          liveOutput: '...',
+        } as TrackedExecutingToolCall,
+      ];
+
+      const { result } = await renderTestHook(toolCalls);
+
+      // State is `Responding` because a tool is running
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+      // Try to cancel
+      simulateEscapeKeyPress();
+
+      // Trigger the onComplete callback with the cancelled tool call
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([
+            {
+              ...toolCalls[0],
+              status: CoreToolCallStatus.Cancelled,
+              response: {
+                callId: 'call1',
+                responseParts: [],
+              },
+            } as any,
+          ]);
+        }
+      });
+
+      // The final state should be idle because the cancelled tool call was marked as submitted
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
     it('should cancel a request when a tool is awaiting confirmation', async () => {
       const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
       const toolCalls: TrackedToolCall[] = [

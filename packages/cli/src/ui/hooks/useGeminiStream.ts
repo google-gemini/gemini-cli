@@ -1930,6 +1930,15 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
+      if (turnCancelledRef.current) {
+        setIsResponding(false);
+        const callIdsToMarkAsSubmitted = toolCalls.map(
+          (toolCall) => toolCall.request.callId,
+        );
+        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+        return;
+      }
+
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (
@@ -2132,6 +2141,7 @@ export const useGeminiStream = (
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
       setIsResponding,
+      toolCalls,
     ],
   );
 
