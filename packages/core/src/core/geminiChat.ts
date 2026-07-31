@@ -1194,6 +1194,13 @@ export class GeminiChat {
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
+    // Buffers to prevent failed stream attempts from polluting telemetry and logs
+    const bufferedThoughts: Array<{ subject: string; description: string }> =
+      [];
+    let bufferedUsageMetadata:
+      | GenerateContentResponse['usageMetadata']
+      | undefined = undefined;
+
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)
     const finalFunctionCallsMap = new Map<string, FunctionCall>();
@@ -1249,7 +1256,10 @@ export class GeminiChat {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
             hasThoughts = true;
-            this.recordThoughtFromContent(content);
+            const thought = this.extractThoughtFromContent(content);
+            if (thought) {
+              bufferedThoughts.push(thought);
+            }
           }
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
@@ -1277,12 +1287,9 @@ export class GeminiChat {
         }
       }
 
-      // Record token usage if this chunk has usageMetadata
+      // Buffer token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
-        }
+        bufferedUsageMetadata = chunk.usageMetadata;
       }
 
       const hookSystem = this.context.config.getHookSystem();
@@ -1451,6 +1458,19 @@ export class GeminiChat {
       }
     }
 
+    // Flush buffered thoughts from the successful attempt
+    for (const thought of bufferedThoughts) {
+      this.chatRecordingService.recordThought(thought);
+    }
+
+    // Flush buffered usage metadata and token counts from the successful attempt
+    if (bufferedUsageMetadata) {
+      this.chatRecordingService.recordMessageTokens(bufferedUsageMetadata);
+      if (bufferedUsageMetadata.promptTokenCount !== undefined) {
+        this.lastPromptTokenCount = bufferedUsageMetadata.promptTokenCount;
+      }
+    }
+
     let id: string;
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
@@ -1523,11 +1543,13 @@ export class GeminiChat {
   }
 
   /**
-   * Extracts and records thought from thought content.
+   * Extracts thought from thought content.
    */
-  private recordThoughtFromContent(content: Content): void {
+  private extractThoughtFromContent(
+    content: Content,
+  ): { subject: string; description: string } | undefined {
     if (!content.parts || content.parts.length === 0) {
-      return;
+      return undefined;
     }
 
     const thoughtPart = content.parts[0];
@@ -1540,11 +1562,12 @@ export class GeminiChat {
         : '';
       const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
 
-      this.chatRecordingService.recordThought({
+      return {
         subject,
         description,
-      });
+      };
     }
+    return undefined;
   }
 }
 

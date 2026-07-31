@@ -1134,6 +1134,109 @@ describe('GeminiChat', () => {
       recordSyntheticMessageSpy.mockRestore();
     });
 
+    it('should not record thoughts or usage metadata to chatRecordingService from failed stream attempts', async () => {
+      const recordThoughtSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordThought',
+      );
+      const recordMessageTokensSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordMessageTokens',
+      );
+
+      // Attempt 1: returns invalid stream with thoughts and usage metadata (triggering InvalidStreamError)
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [
+                      {
+                        thought: true,
+                        text: '**Stale subject** Stale description',
+                      },
+                    ],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+              usageMetadata: {
+                promptTokenCount: 1000,
+                candidatesTokenCount: 50,
+                totalTokenCount: 1050,
+              },
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        // Attempt 2: returns a valid response with separate thoughts and usage metadata
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [
+                      {
+                        thought: true,
+                        text: '**Fresh subject** Fresh description',
+                      },
+                      { text: 'successful retry response' },
+                    ],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+              usageMetadata: {
+                promptTokenCount: 2000,
+                candidatesTokenCount: 100,
+                totalTokenCount: 2100,
+              },
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test prompt for metadata deferral',
+        'prompt-id-metadata-deferral',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume stream completely
+      }
+
+      // Verify that recordThought was NOT called with the first (failed) attempt's thoughts
+      expect(recordThoughtSpy).toHaveBeenCalledTimes(1);
+      expect(recordThoughtSpy).toHaveBeenCalledWith({
+        subject: 'Fresh subject',
+        description: 'Fresh description',
+      });
+      expect(recordThoughtSpy).not.toHaveBeenCalledWith({
+        subject: 'Stale subject',
+        description: 'Stale description',
+      });
+
+      // Verify that recordMessageTokens was only called with the second (successful) attempt's metadata
+      expect(recordMessageTokensSpy).toHaveBeenCalledTimes(1);
+      expect(recordMessageTokensSpy).toHaveBeenCalledWith({
+        promptTokenCount: 2000,
+        candidatesTokenCount: 100,
+        totalTokenCount: 2100,
+      });
+
+      // Verify that the prompt token count is correct
+      expect(chat.getLastPromptTokenCount()).toBe(2000);
+
+      recordThoughtSpy.mockRestore();
+      recordMessageTokensSpy.mockRestore();
+    });
+
     it('should sync the chat recording service on history rollback when InvalidStreamError is thrown', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const updateSpy = vi.spyOn(
