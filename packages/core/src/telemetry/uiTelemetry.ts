@@ -56,6 +56,7 @@ export interface ModelMetrics {
     totalRequests: number;
     totalErrors: number;
     totalLatencyMs: number;
+    errorsByType?: Record<string, number>;
   };
   tokens: {
     input: number;
@@ -110,6 +111,7 @@ const createInitialModelMetrics = (): ModelMetrics => ({
     totalRequests: 0,
     totalErrors: 0,
     totalLatencyMs: 0,
+    errorsByType: {},
   },
   tokens: {
     input: 0,
@@ -163,6 +165,23 @@ export class UiTelemetryService extends EventEmitter {
         // We should not emit update for any other event metric.
         return;
     }
+
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  recordSemanticValidationError(model: string, errorType: string): void {
+    const modelMetrics = this.getOrCreateModelMetrics(model);
+    modelMetrics.api.totalErrors++;
+
+    if (!modelMetrics.api.errorsByType) {
+      modelMetrics.api.errorsByType = {};
+    }
+    const type = errorType || 'INVALID_STREAM';
+    modelMetrics.api.errorsByType[type] =
+      (modelMetrics.api.errorsByType[type] || 0) + 1;
 
     this.emit('update', {
       metrics: this.#metrics,
@@ -325,6 +344,13 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.api.totalRequests++;
     modelMetrics.api.totalErrors++;
     modelMetrics.api.totalLatencyMs += event.duration_ms;
+
+    if (!modelMetrics.api.errorsByType) {
+      modelMetrics.api.errorsByType = {};
+    }
+    const errorType = event.error_type || 'UNKNOWN';
+    modelMetrics.api.errorsByType[errorType] =
+      (modelMetrics.api.errorsByType[errorType] || 0) + 1;
 
     if (event.role) {
       if (!modelMetrics.roles[event.role]) {

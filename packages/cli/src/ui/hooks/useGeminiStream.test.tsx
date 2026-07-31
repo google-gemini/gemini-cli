@@ -54,6 +54,7 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   UPDATE_TOPIC_TOOL_NAME,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -1772,6 +1773,120 @@ describe('useGeminiStream', () => {
       expect(mockCancelAllToolCalls).toHaveBeenCalled();
     });
 
+    it('should transition to Idle state when cancelled while a tool call is in progress and completes', async () => {
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: CoreToolCallStatus.Executing,
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'tool1',
+            description: 'desc1',
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
+          } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
+          startTime: Date.now(),
+          liveOutput: '...',
+        } as TrackedExecutingToolCall,
+      ];
+
+      const { result } = await renderTestHook(toolCalls);
+
+      // State is `Responding` because a tool is running
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+      // Try to cancel
+      simulateEscapeKeyPress();
+
+      // Trigger the onComplete callback with the cancelled tool call
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([
+            {
+              ...toolCalls[0],
+              status: CoreToolCallStatus.Cancelled,
+              response: {
+                callId: 'call1',
+                responseParts: [],
+              },
+            } as any,
+          ]);
+        }
+      });
+
+      // The final state should be idle because the cancelled tool call was marked as submitted
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should append cancelled tool responses to history when cancelled while a tool call is in progress and completes with response parts', async () => {
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: CoreToolCallStatus.Executing,
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'tool1',
+            description: 'desc1',
+            build: vi.fn().mockImplementation((_) => ({
+              getDescription: () => `Mock description`,
+            })),
+          } as any,
+          invocation: {
+            getDescription: () => `Mock description`,
+          },
+          startTime: Date.now(),
+          liveOutput: '...',
+        } as TrackedExecutingToolCall,
+      ];
+
+      const { result, client } = await renderTestHook(toolCalls);
+
+      // State is `Responding` because a tool is running
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+      // Try to cancel
+      simulateEscapeKeyPress();
+
+      const expectedResponseParts = [
+        {
+          functionResponse: {
+            name: 'tool1',
+            id: 'call1',
+            response: { error: 'cancelled' },
+          },
+        },
+      ];
+
+      // Trigger the onComplete callback with the cancelled tool call having non-empty response parts
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([
+            {
+              ...toolCalls[0],
+              status: CoreToolCallStatus.Cancelled,
+              response: {
+                callId: 'call1',
+                responseParts: expectedResponseParts,
+              },
+            } as any,
+          ]);
+        }
+      });
+
+      // Assert that addHistory was called with the combined response parts
+      expect(client.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: expectedResponseParts,
+      });
+
+      // The final state should be idle because the cancelled tool call was marked as submitted
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
     it('should cancel a request when a tool is awaiting confirmation', async () => {
       const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
       const toolCalls: TrackedToolCall[] = [
@@ -2303,6 +2418,68 @@ describe('useGeminiStream', () => {
           undefined,
           'gemini-2.5-pro',
           'gemini-2.5-flash',
+        );
+      });
+    });
+
+    it('should use TRUE_EMPTY_RESPONSE_MESSAGE when receiving an invalid stream event of type NO_RESPONSE_TEXT', async () => {
+      mockSendMessageStream.mockClear();
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.InvalidStream,
+            value: {
+              type: 'NO_RESPONSE_TEXT',
+              message: 'empty response text',
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: TRUE_EMPTY_RESPONSE_MESSAGE,
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should use the event message when receiving a non-NO_RESPONSE_TEXT invalid stream event', async () => {
+      mockSendMessageStream.mockClear();
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.InvalidStream,
+            value: {
+              type: 'MALFORMED_FUNCTION_CALL',
+              message: 'Custom malformed function call message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: 'Custom malformed function call message',
+          }),
+          expect.any(Number),
         );
       });
     });
