@@ -148,6 +148,15 @@ export function useQuotaAndFallback({
             `/model to switch models.`,
           ];
           message = messageLines.join('\n');
+        } else if (
+          contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
+          VALID_GEMINI_MODELS.has(failedModel)
+        ) {
+          const messageLines = [
+            `Your API key does not have access to ${getDisplayString(failedModel)}.`,
+            `/model to switch models.`,
+          ];
+          message = messageLines.join('\n');
         } else if (VALID_GEMINI_MODELS.has(failedModel)) {
           const messageLines = [
             `It seems like you don't have access to ${getDisplayString(failedModel)}.`,

@@ -525,6 +525,55 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
         expect(result.current.proQuotaRequest).toBeNull();
       });
 
+      it('should handle ModelNotFoundError with Gemini API key by displaying API key access message', async () => {
+        vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+          authType: AuthType.USE_GEMINI,
+        });
+
+        const { result } = await renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError(
+          'Requested entity was not found.',
+          404,
+        );
+
+        act(() => {
+          promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
+        });
+
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-3-pro-preview');
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `Your API key does not have access to gemini-3-pro-preview.\n` +
+            `/model to switch models.`,
+        );
+
+        act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+      });
+
       it('should handle ModelNotFoundError with Vertex AI by displaying region-specific availability message and documentation link', async () => {
         vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
           authType: AuthType.USE_VERTEX_AI,
