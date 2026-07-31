@@ -793,11 +793,6 @@ export class GeminiChat {
         abortSignal,
       };
 
-<<<<<<< HEAD
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
-        ? [...contentsForPreviewModel]
-        : [...requestContents];
-=======
       // Apply Context-Aware Retries (On-Retry Nudging) to guide the model out of silent loops
       if (
         modelConfigKey.isRetry &&
@@ -822,11 +817,9 @@ export class GeminiChat {
         }
       }
 
-      let contentsToUse: Content[] =
-        supportsModernFeatures(modelToUse) || isGemini2Model(modelToUse)
-          ? [...contentsForPreviewModel]
-          : [...requestContents];
->>>>>>> f47d6c6f7 (fix(core,cli): propagate InvalidStreamError details to UI for specific empty response guidance (#28566))
+      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+        ? [...contentsForPreviewModel]
+        : [...requestContents];
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
