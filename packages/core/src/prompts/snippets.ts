@@ -413,6 +413,16 @@ export function renderOperationalGuidelines(
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
+- **Tool Execution Response Rules:**
+  1. After receiving a \`functionResponse\`, you MUST ALWAYS execute one of the following two actions:
+     a) Call another tool to proceed with the task.
+     b) Provide a user-facing text response explaining the tool output, your analysis, and next steps.
+  2. You MUST NEVER return an empty response with no text and no tool calls.
+- **Post-Edit Response Rules:**
+  1. After an edit tool execution (e.g. ${formatToolName(EDIT_TOOL_NAME)}, ${formatToolName(WRITE_FILE_TOOL_NAME)}), you MUST ALWAYS generate a user-facing text response summarizing:
+     - What changes were made to the file.
+     - Your verification plan or next steps (e.g. running tests).
+  2. You MUST NEVER return an empty response with 0 text tokens after completing an edit.
 - **Parallelism & Sequencing:** Tools execute in parallel by default. Execute multiple independent tool calls in parallel when feasible (e.g., searching, reading files, independent shell commands, or editing *different* files). If a tool depends on the output or side-effects of a previous tool in the same turn (e.g., running a shell command that depends on the success of a previous command), you MUST set the \`wait_for_previous\` parameter to \`true\` on the dependent tool to ensure sequential execution.
 - **File Editing Collisions:** Do NOT make multiple calls to the ${formatToolName(EDIT_TOOL_NAME)} tool for the SAME file in a single turn. To make multiple edits to the same file, you MUST perform them sequentially across multiple conversational turns to prevent race conditions and ensure the file state is accurate before each edit.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
