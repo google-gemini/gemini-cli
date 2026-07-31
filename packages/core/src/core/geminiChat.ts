@@ -1533,11 +1533,34 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       if (!hasThought) return turn;
 
       const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+
+      // The thoughtSignature the API requires on the first functionCall of a
+      // model turn is sometimes only carried by the thought part we just
+      // removed, not by the functionCall part itself. Without it, replaying
+      // this turn in a later request gets rejected with a 400 "missing
+      // thought_signature" error, so inject a synthetic one if needed.
+      let patchedFirstCall = false;
+      const finalParts =
+        turn.content.role === 'model'
+          ? nonThoughtParts.map((p) => {
+              if (!patchedFirstCall && p.functionCall) {
+                patchedFirstCall = true;
+                if (!p.thoughtSignature) {
+                  return {
+                    ...p,
+                    thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                  };
+                }
+              }
+              return p;
+            })
+          : nonThoughtParts;
+
       return {
         ...turn,
         content: {
           ...turn.content,
-          parts: nonThoughtParts,
+          parts: finalParts,
         },
       };
     })
