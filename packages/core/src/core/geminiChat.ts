@@ -407,6 +407,7 @@ export class GeminiChat {
     this.sendPromise = streamDonePromise;
 
     let userContent = createUserContent(message);
+    const isOriginalFunctionResponse = isFunctionResponse(userContent);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -415,7 +416,7 @@ export class GeminiChat {
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
-    if (!isFunctionResponse(userContent)) {
+    if (!isOriginalFunctionResponse) {
       const userMessageParts = userContent.parts || [];
       const userMessageContent = partListUnionToString(userMessageParts);
 
@@ -666,7 +667,7 @@ export class GeminiChat {
           }
         }
       } catch (error) {
-        if (!isFunctionResponse(userContent)) {
+        if (!isOriginalFunctionResponse) {
           this.agentHistory.rollback(historyLengthBefore);
           this.chatRecordingService.updateMessagesFromHistory(
             this.agentHistory.get(),

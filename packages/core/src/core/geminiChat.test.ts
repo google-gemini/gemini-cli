@@ -3723,7 +3723,7 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should roll back all synthetic binary injection turns when the stream fails', async () => {
+    it('should preserve all synthetic binary injection turns when the stream fails', async () => {
       const initialHistoryLength = chat.agentHistory.length;
       const audioParts = [
         {
@@ -3761,9 +3761,8 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow('API error during binary injection stream');
 
-      // Verify that history has been rolled back to its initial state,
-      // and all 3 synthetic binary injection turns have been cleaned up.
-      expect(chat.agentHistory.length).toBe(initialHistoryLength);
+      // Verify that history has been preserved, and all 3 synthetic binary injection turns are kept.
+      expect(chat.agentHistory.length).toBe(initialHistoryLength + 3);
     });
   });
 
