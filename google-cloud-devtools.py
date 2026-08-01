@@ -1,4 +1,4 @@
-from google.cloud import devtools_v1
+from google.cloud import sourcerepo_v1
 
 def connect_repo(project_id: str, repo_url: str):
     client = devtools_v1.SourceRepoClient()
