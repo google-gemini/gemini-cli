@@ -1,7 +1,7 @@
 from google.cloud import sourcerepo_v1
 
 def connect_repo(project_id: str, repo_url: str):
-    client = devtools_v1.SourceRepoClient()
+    client = sourcerepo_v1.SourceRepoClient()
 
     parent = f"projects/{project_id}"
     repo = {
