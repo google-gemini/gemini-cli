@@ -416,6 +416,30 @@ describe('converter', () => {
       ]);
     });
 
+    it('should strip boolean thought property and not convert it to [Thought: true]', () => {
+      const contentWithThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          { text: 'regular text' },
+          {
+            text: 'thinking about the problem',
+            thought: true,
+          } as unknown as Part,
+          { text: 'more text' },
+        ],
+      };
+      expect(toContents(contentWithThought)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            { text: 'regular text' },
+            { text: 'thinking about the problem' },
+            { text: 'more text' },
+          ],
+        },
+      ]);
+    });
+
     it('should combine text and thought for text parts with thoughts', () => {
       const contentWithTextAndThought: ContentListUnion = {
         role: 'model',
