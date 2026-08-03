@@ -657,13 +657,18 @@ export function sanitizeFilenamePart(part: string): string {
 /**
  * Formats a truncated message for tool output.
  * Shows the first 20% and last 80% of the allowed characters with a marker in between.
+ *
+ * A non-positive (or non-finite) `maxChars` disables truncation and returns
+ * `contentStr` unchanged. Without that guard, `String.prototype.slice` treats
+ * negative indices as offsets from the end, which can concatenate nearly the
+ * whole string twice (~2x inflation). `!(maxChars > 0)` also covers `NaN`.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
   maxChars: number,
 ): string {
-  if (contentStr.length <= maxChars) return contentStr;
+  if (!(maxChars > 0) || contentStr.length <= maxChars) return contentStr;
 
   const headChars = Math.floor(maxChars * 0.2);
   const tailChars = maxChars - headChars;
