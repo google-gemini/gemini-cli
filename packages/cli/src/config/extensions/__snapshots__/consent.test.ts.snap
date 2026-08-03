@@ -32,7 +32,7 @@ This extension will run the following MCP servers:
       env: NODE_OPTIONS=--inspect
       cwd: /srv/app
   * remote (remote): https://remote.com
-      header: Authorization: Bearer token
+      header: Authorization: <redacted>
       header: X-Trace: 1
 
 The extension you are about to install may have been created by a third-party developer and sourced

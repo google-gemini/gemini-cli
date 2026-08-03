@@ -12,6 +12,7 @@ import {
   NEVER_ALLOWED_NAME_PATTERNS,
   NEVER_ALLOWED_VALUE_PATTERNS,
   isExecutionOverrideEnvVar,
+  isSensitiveEnvVarName,
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from './environmentSanitization.js';
@@ -473,6 +474,22 @@ describe('isExecutionOverrideEnvVar', () => {
     expect(isExecutionOverrideEnvVar('Dyld_Insert_Libraries')).toBe(true);
   });
 
+  it('should cover loader/interpreter hooks beyond Node.js', () => {
+    // MCP servers can be any interpreter, so the list is not Node-specific.
+    for (const name of [
+      'LD_AUDIT',
+      'BASH_ENV',
+      'PYTHONSTARTUP',
+      'PERL5OPT',
+      'RUBYOPT',
+      'JAVA_TOOL_OPTIONS',
+      '_JAVA_OPTIONS',
+    ]) {
+      expect(isExecutionOverrideEnvVar(name)).toBe(true);
+      expect(isExecutionOverrideEnvVar(name.toLowerCase())).toBe(true);
+    }
+  });
+
   it('should return false for benign variables', () => {
     expect(isExecutionOverrideEnvVar('PATH')).toBe(false);
     expect(isExecutionOverrideEnvVar('FOO')).toBe(false);
@@ -484,6 +501,35 @@ describe('isExecutionOverrideEnvVar', () => {
   it('should ensure all execution-override names are capitalized', () => {
     for (const name of EXECUTION_OVERRIDE_ENV_VAR_NAMES) {
       expect(name).toBe(name.toUpperCase());
+    }
+  });
+});
+
+describe('isSensitiveEnvVarName', () => {
+  it('should return true for names that match sensitive patterns', () => {
+    for (const name of [
+      'AUTHORIZATION',
+      'Authorization',
+      'API_KEY',
+      'GITHUB_TOKEN',
+      'MY_SECRET',
+      'DB_PASSWORD',
+      'AWS_CREDENTIALS',
+      'PrivateThing',
+    ]) {
+      expect(isSensitiveEnvVarName(name)).toBe(true);
+    }
+  });
+
+  it('should return true for explicitly never-allowed variable names', () => {
+    for (const name of NEVER_ALLOWED_ENVIRONMENT_VARIABLES) {
+      expect(isSensitiveEnvVarName(name)).toBe(true);
+    }
+  });
+
+  it('should return false for benign names', () => {
+    for (const name of ['PATH', 'HOME', 'API_BASE', 'X-Trace', 'FOO']) {
+      expect(isSensitiveEnvVarName(name)).toBe(false);
     }
   });
 });

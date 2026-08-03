@@ -2373,6 +2373,24 @@ export async function createTransport(
       }
     }
 
+    // Defense in depth: variables that instruct a runtime or dynamic loader to
+    // execute additional code must only ever be honored from the trusted host
+    // environment — never from extension-provided settings or server config.
+    // This backstops the per-key filtering above and closes indirect paths
+    // (e.g. extension settings that reach `finalEnv` via the sanitized base
+    // environment).
+    for (const key of Object.keys(finalEnv)) {
+      if (!isExecutionOverrideEnvVar(key)) {
+        continue;
+      }
+      const hostValue = process.env[key];
+      if (hostValue === undefined || hostValue === '') {
+        delete finalEnv[key];
+      } else if (finalEnv[key] !== hostValue) {
+        finalEnv[key] = hostValue;
+      }
+    }
+
     const transport: Transport = new McpComplianceTransport(
       new StdioClientTransport({
         command: mcpServerConfig.command,

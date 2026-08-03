@@ -148,9 +148,22 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
  * external configuration into a child's environment.
  */
 export const EXECUTION_OVERRIDE_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
+  // Node.js
   'NODE_OPTIONS',
+  // ELF dynamic linker (Linux)
   'LD_PRELOAD',
   'LD_LIBRARY_PATH',
+  'LD_AUDIT',
+  // Shell non-interactive startup hook
+  'BASH_ENV',
+  // Python
+  'PYTHONSTARTUP',
+  // Perl / Ruby
+  'PERL5OPT',
+  'RUBYOPT',
+  // JVM (agent / option injection)
+  'JAVA_TOOL_OPTIONS',
+  '_JAVA_OPTIONS',
 ]);
 
 /**
@@ -172,6 +185,21 @@ export function isExecutionOverrideEnvVar(key: string): boolean {
   return EXECUTION_OVERRIDE_ENV_VAR_PREFIXES.some((prefix) =>
     upperKey.startsWith(prefix),
   );
+}
+
+/**
+ * Returns true if `key` names a variable whose value is likely to be a secret
+ * (token, password, key, credential, etc.), reusing the same name policy used
+ * to redact the process environment. Intended for masking values that must be
+ * shown to the user (e.g. an extension consent prompt) without disclosing the
+ * secret itself. The comparison is case-insensitive.
+ */
+export function isSensitiveEnvVarName(key: string): boolean {
+  const upperKey = key.toUpperCase();
+  if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(upperKey)) {
+    return true;
+  }
+  return NEVER_ALLOWED_NAME_PATTERNS.some((pattern) => pattern.test(upperKey));
 }
 
 function shouldRedactEnvironmentVariable(

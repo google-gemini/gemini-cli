@@ -11,7 +11,7 @@
     <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">      env: NODE_OPTIONS=--inspect                                                                   </text>
     <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">      cwd: /srv/app                                                                                 </text>
     <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * remote (remote): https://remote.com                                                             </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">      header: Authorization: Bearer token                                                           </text>
+    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">      header: Authorization: &lt;redacted&gt;                                                             </text>
     <text x="0" y="138" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">      header: X-Trace: 1                                                                            </text>
     <text x="0" y="172" fill="#cdcd00" textLength="891" lengthAdjust="spacingAndGlyphs">The extension you are about to install may have been created by a third-party developer and sourced</text>
     <text x="0" y="189" fill="#cdcd00" textLength="882" lengthAdjust="spacingAndGlyphs">from a public repository. Google does not vet, endorse, or guarantee the functionality or security</text>
