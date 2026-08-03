@@ -333,33 +333,39 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: GlobToolParams,
   ): string | null {
-    let searchDirAbsolute: string;
-    try {
-      searchDirAbsolute = resolveToRealPath(
-        path.resolve(this.config.getTargetDir(), params.dir_path || '.'),
+    // When dir_path is omitted, execute() searches every workspace
+    // directory, so validation must cover the same set rather than just
+    // getTargetDir().
+    const dirsToValidate = params.dir_path
+      ? [path.resolve(this.config.getTargetDir(), params.dir_path)]
+      : this.config.getWorkspaceContext().getDirectories();
+
+    for (const dir of dirsToValidate) {
+      let searchDirAbsolute: string;
+      try {
+        searchDirAbsolute = resolveToRealPath(dir);
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+
+      const validationError = this.config.validatePathAccess(
+        searchDirAbsolute,
+        'read',
       );
-    } catch (err) {
-      return err instanceof Error ? err.message : String(err);
-    }
-
-    const validationError = this.config.validatePathAccess(
-      searchDirAbsolute,
-      'read',
-    );
-    if (validationError) {
-      return validationError;
-    }
-
-    const targetDir = searchDirAbsolute || this.config.getTargetDir();
-    try {
-      if (!fs.existsSync(targetDir)) {
-        return `Search path does not exist ${targetDir}`;
+      if (validationError) {
+        return validationError;
       }
-      if (!fs.statSync(targetDir).isDirectory()) {
-        return `Search path is not a directory: ${targetDir}`;
+
+      try {
+        if (!fs.existsSync(searchDirAbsolute)) {
+          return `Search path does not exist ${searchDirAbsolute}`;
+        }
+        if (!fs.statSync(searchDirAbsolute).isDirectory()) {
+          return `Search path is not a directory: ${searchDirAbsolute}`;
+        }
+      } catch (e: unknown) {
+        return `Error accessing search path: ${e}`;
       }
-    } catch (e: unknown) {
-      return `Error accessing search path: ${e}`;
     }
 
     if (

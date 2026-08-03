@@ -336,6 +336,38 @@ describe('GlobTool', () => {
         'Search path is not a directory',
       );
     });
+
+    it('should return an error when dir_path is omitted and a secondary workspace directory does not exist', async () => {
+      // execute() searches every directory returned by getWorkspaceContext()
+      // when dir_path is omitted, so validation must reject a stale
+      // secondary root instead of only checking getTargetDir().
+      const staleDir = path.join(
+        os.tmpdir(),
+        'glob-tool-stale-dir-that-does-not-exist',
+      );
+      const workspaceContext = createMockWorkspaceContext(tempRootDir, [
+        staleDir,
+      ]);
+      const multiRootConfig = {
+        getTargetDir: mockConfig.getTargetDir,
+        getWorkspaceContext: () => workspaceContext,
+        getFileService: mockConfig.getFileService,
+        getFileFilteringOptions: mockConfig.getFileFilteringOptions,
+        getFileExclusions: mockConfig.getFileExclusions,
+        storage: mockConfig.storage,
+        isPathAllowed: mockConfig.isPathAllowed,
+        validatePathAccess: mockConfig.validatePathAccess,
+      } as unknown as Config;
+      const multiRootGlobTool = new GlobTool(
+        multiRootConfig,
+        createMockMessageBus(),
+      );
+
+      const params: GlobToolParams = { pattern: '*' };
+      expect(multiRootGlobTool.validateToolParams(params)).toContain(
+        'Search path does not exist',
+      );
+    });
   });
 
   describe('workspace boundary validation', () => {
