@@ -151,6 +151,24 @@ describe('fetchJson', () => {
     ).resolves.toEqual({ permanent: true });
   });
 
+  it('should reject malformed redirect URLs with context', async () => {
+    const resume = vi.fn();
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 302;
+      res.headers = { location: 'https://[' };
+      res.resume = resume;
+      (callback as (res: IncomingMessage) => void)(res);
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://api.github.com/releases')).rejects.toThrow(
+      'Failed to parse redirect URL from https://api.github.com/releases',
+    );
+    expect(resume).toHaveBeenCalledOnce();
+    expect(getMock).toHaveBeenCalledOnce();
+  });
+
   it('should reject on non-200/30x status code', async () => {
     const resume = vi.fn();
     getMock.mockImplementationOnce((_url, _options, callback) => {

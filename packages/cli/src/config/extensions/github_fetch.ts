@@ -40,8 +40,19 @@ function fetchJsonResponse<T>(
           if (!res.headers.location) {
             return reject(new Error('No location header in redirect response'));
           }
-          const currentUrl = new URL(url);
-          const redirectUrl = new URL(res.headers.location, currentUrl);
+          let currentUrl: URL;
+          let redirectUrl: URL;
+          try {
+            currentUrl = new URL(url);
+            redirectUrl = new URL(res.headers.location, currentUrl);
+          } catch (error) {
+            return reject(
+              new Error(
+                `Failed to parse redirect URL from ${url}: ${error instanceof Error ? error.message : String(error)}`,
+                { cause: error },
+              ),
+            );
+          }
           const redirectHeaders = { ...headers };
           if (currentUrl.origin !== redirectUrl.origin) {
             for (const header of Object.keys(redirectHeaders)) {
