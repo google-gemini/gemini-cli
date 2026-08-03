@@ -907,7 +907,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
     ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 
-  it('should resolve auto to gemini-3.6-flash when useGemini3_5Flash is true and classifier selects flash (dynamic)', () => {
+  it('should resolve auto to gemini-3.5-flash when useGemini3_5Flash is true and classifier selects flash (dynamic)', () => {
     const mockDynamicConfig = {
       getExperimentalDynamicModelConfiguration: () => true,
       modelConfigService,
@@ -1002,7 +1002,7 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
 
-    it('should resolve manual selection of gemini-3-flash-preview to gemini-3.6-flash when useGemini3_5Flash is true but lacks preview access (dynamic)', () => {
+    it('should resolve manual selection of gemini-3-flash-preview to gemini-3.5-flash when useGemini3_5Flash is true but lacks preview access (dynamic)', () => {
       const mockDynamicConfig = {
         getExperimentalDynamicModelConfiguration: () => true,
         modelConfigService,

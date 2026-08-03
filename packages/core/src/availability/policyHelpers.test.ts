@@ -112,10 +112,11 @@ describe('policyHelpers', () => {
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, DEFAULT_GEMINI_FLASH_LITE_MODEL);
-      expect(chain).toHaveLength(3);
+      expect(chain).toHaveLength(4);
       expect(chain[0]?.model).toBe('gemini-3.5-flash-lite');
       expect(chain[1]?.model).toBe('gemini-3.6-flash');
-      expect(chain[2]?.model).toBe('gemini-2.5-pro');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash');
+      expect(chain[3]?.model).toBe('gemini-2.5-pro');
     });
 
     it('returns flash-lite chain when configured model is flash-lite', () => {
@@ -123,10 +124,11 @@ describe('policyHelpers', () => {
         getModel: () => DEFAULT_GEMINI_FLASH_LITE_MODEL,
       });
       const chain = resolvePolicyChain(config);
-      expect(chain).toHaveLength(3);
+      expect(chain).toHaveLength(4);
       expect(chain[0]?.model).toBe('gemini-3.5-flash-lite');
       expect(chain[1]?.model).toBe('gemini-3.6-flash');
-      expect(chain[2]?.model).toBe('gemini-2.5-pro');
+      expect(chain[2]?.model).toBe('gemini-2.5-flash');
+      expect(chain[3]?.model).toBe('gemini-2.5-pro');
     });
 
     it('wraps around the chain when wrapsAround is true', () => {

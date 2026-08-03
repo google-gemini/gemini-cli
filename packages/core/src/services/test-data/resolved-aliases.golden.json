@@ -233,6 +233,13 @@
       "topP": 1
     }
   },
+  "gemini-3.5-flash-lite-base": {
+    "model": "gemini-3.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "classifier": {
     "model": "flash-lite",
     "generateContentConfig": {
@@ -293,7 +300,7 @@
     }
   },
   "web-search": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
@@ -305,7 +312,7 @@
     }
   },
   "web-fetch": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
@@ -317,14 +324,14 @@
     }
   },
   "web-fetch-fallback": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
     }
   },
   "loop-detection": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
@@ -338,21 +345,21 @@
     }
   },
   "llm-edit-fixer": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
     }
   },
   "next-speaker-checker": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
     }
   },
   "context-snapshotter": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
@@ -367,7 +374,7 @@
     "generateContentConfig": {}
   },
   "chat-compression-3-flash": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.5-flash-lite",
     "generateContentConfig": {}
   },
   "chat-compression-3.5-flash-lite": {
