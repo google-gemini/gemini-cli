@@ -295,7 +295,7 @@ export const getAllSessionFiles = async (
             ? cleanMessage(content.firstUserMessage)
             : extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
+            ? content.sessionId === currentSessionId
             : false;
 
           let fullContent: string | undefined;

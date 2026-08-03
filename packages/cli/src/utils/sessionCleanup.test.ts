@@ -489,6 +489,90 @@ describe('Session Cleanup (Refactored)', () => {
       );
     });
 
+    it('should preserve a recent unrelated session with the same shortId', async () => {
+      const now = new Date();
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      const sharedShortId = 'deadbeef';
+      const expiredSessionId = `${sharedShortId}-expired-session`;
+      const recentSessionId = `${sharedShortId}-recent-session`;
+      const expiredFileName = `session-20250110-${sharedShortId}.json`;
+      const recentFileName = `session-20250111-${sharedShortId}.json`;
+
+      await writeSessionFile({
+        id: expiredSessionId,
+        fileName: expiredFileName,
+        lastUpdated: twoWeeksAgo.toISOString(),
+      });
+      await writeArtifacts(expiredSessionId);
+
+      await writeSessionFile({
+        id: recentSessionId,
+        fileName: recentFileName,
+        lastUpdated: now.toISOString(),
+      });
+      await writeArtifacts(recentSessionId);
+
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result).toMatchObject({
+        scanned: 2,
+        deleted: 1,
+        skipped: 1,
+        failed: 0,
+      });
+      expect(existsSync(path.join(chatsDir, expiredFileName))).toBe(false);
+      expect(existsSync(path.join(chatsDir, recentFileName))).toBe(true);
+      expect(
+        existsSync(path.join(logsDir, `session-${expiredSessionId}.jsonl`)),
+      ).toBe(false);
+      expect(
+        existsSync(path.join(logsDir, `session-${recentSessionId}.jsonl`)),
+      ).toBe(true);
+      expect(
+        existsSync(path.join(toolOutputsDir, `session-${recentSessionId}`)),
+      ).toBe(true);
+    });
+
+    it('should identify the current session by full ID after a shortId collision', async () => {
+      const now = new Date();
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      const sharedShortId = 'cafebabe';
+      const currentSessionId = `${sharedShortId}-current-session`;
+      const expiredSessionId = `${sharedShortId}-expired-session`;
+      const currentFileName = `session-20250111-${sharedShortId}.json`;
+      const expiredFileName = `session-20250110-${sharedShortId}.json`;
+
+      await writeSessionFile({
+        id: currentSessionId,
+        fileName: currentFileName,
+        lastUpdated: now.toISOString(),
+      });
+      await writeSessionFile({
+        id: expiredSessionId,
+        fileName: expiredFileName,
+        lastUpdated: twoWeeksAgo.toISOString(),
+      });
+
+      const config = createMockConfig({
+        getSessionId: () => currentSessionId,
+      });
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result.deleted).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect(existsSync(path.join(chatsDir, expiredFileName))).toBe(false);
+      expect(existsSync(path.join(chatsDir, currentFileName))).toBe(true);
+    });
+
     it('should delete corrupted session files', async () => {
       // Write a corrupted file (invalid JSON)
       const corruptPath = path.join(chatsDir, 'session-corrupt.json');
