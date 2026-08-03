@@ -6,6 +6,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { StringDecoder } from 'node:string_decoder';
 import commandExists from 'command-exists';
 import { debugLogger } from '../utils/debugLogger.js';
 import type {
@@ -32,6 +33,8 @@ export class WhisperTranscriptionProvider
 {
   private process: ChildProcessWithoutNullStreams | null = null;
   private currentTranscription = '';
+  private stdoutDecoder = new StringDecoder('utf8');
+  private pendingOutput = '';
 
   constructor(private readonly options: WhisperProviderOptions) {
     super();
@@ -53,6 +56,8 @@ export class WhisperTranscriptionProvider
     const { modelPath, threads = 4, step = 0, length = 5000 } = this.options;
 
     this.currentTranscription = '';
+    this.stdoutDecoder = new StringDecoder('utf8');
+    this.pendingOutput = '';
 
     const available = await WhisperTranscriptionProvider.isAvailable();
     if (!available) {
@@ -88,8 +93,7 @@ export class WhisperTranscriptionProvider
         ]);
 
         this.process.stdout.on('data', (data: Buffer) => {
-          const output = data.toString();
-          this.parseOutput(output);
+          this.consumeOutput(data);
         });
 
         this.process.stderr.on('data', (data: Buffer) => {
@@ -121,6 +125,7 @@ export class WhisperTranscriptionProvider
         });
 
         this.process.on('close', (code) => {
+          this.flushOutput();
           debugLogger.debug(
             `[WhisperTranscription] Process closed with code ${code}`,
           );
@@ -151,33 +156,47 @@ export class WhisperTranscriptionProvider
     });
   }
 
-  private parseOutput(output: string): void {
-    // whisper-stream output format: "[00:00:00.000 --> 00:00:02.000]   Hello world."
+  private consumeOutput(data: Buffer): void {
+    const output = this.pendingOutput + this.stdoutDecoder.write(data);
     const lines = output.split('\n');
+    this.pendingOutput = lines.pop() ?? '';
 
     for (const line of lines) {
-      const match = line.match(/\[.* --> .*\]\s+(.*)/);
-      if (match && match[1]) {
-        let text = match[1].trim();
+      this.parseOutputLine(line);
+    }
+  }
 
-        // Filter out [Silence], [music], (laughter), etc.
-        text = text
-          .replace(/\[[^\]]*\]/g, '')
-          .replace(/\([^)]*\)/g, '')
-          .trim();
+  private flushOutput(): void {
+    this.pendingOutput += this.stdoutDecoder.end();
+    if (this.pendingOutput) {
+      this.parseOutputLine(this.pendingOutput);
+    }
+    this.pendingOutput = '';
+  }
 
-        if (text) {
-          // In VAD mode (step=0), each line is a completed speech block.
-          // Append it to the buffer to ensure it doesn't disappear.
-          this.currentTranscription = this.currentTranscription
-            ? `${this.currentTranscription} ${text}`
-            : text;
+  private parseOutputLine(line: string): void {
+    // whisper-stream output format: "[00:00:00.000 --> 00:00:02.000]   Hello world."
+    const match = line.match(/\[.* --> .*\]\s+(.*)/);
+    if (match && match[1]) {
+      let text = match[1].trim();
 
-          debugLogger.debug(
-            `[WhisperTranscription] Transcription updated (Local-VAD): "${this.currentTranscription}"`,
-          );
-          this.emit('transcription', this.currentTranscription);
-        }
+      // Filter out [Silence], [music], (laughter), etc.
+      text = text
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\([^)]*\)/g, '')
+        .trim();
+
+      if (text) {
+        // In VAD mode (step=0), each line is a completed speech block.
+        // Append it to the buffer to ensure it doesn't disappear.
+        this.currentTranscription = this.currentTranscription
+          ? `${this.currentTranscription} ${text}`
+          : text;
+
+        debugLogger.debug(
+          `[WhisperTranscription] Transcription updated (Local-VAD): "${this.currentTranscription}"`,
+        );
+        this.emit('transcription', this.currentTranscription);
       }
     }
   }
