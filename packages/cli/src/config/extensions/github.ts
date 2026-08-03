@@ -16,6 +16,7 @@ import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
@@ -530,35 +531,58 @@ export async function downloadFile(
     headers['Authorization'] = `token ${token}`;
   }
 
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
-        if (res.statusCode === 302 || res.statusCode === 301) {
-          if (redirectCount >= 10) {
-            return reject(new Error('Too many redirects'));
-          }
+  const temporaryDest = `${dest}.downloading`;
+  await fs.promises.rm(temporaryDest, { force: true });
 
-          if (!res.headers.location) {
-            return reject(
-              new Error('Redirect response missing Location header'),
-            );
-          }
-          downloadFile(res.headers.location, dest, options, redirectCount + 1)
-            .then(resolve)
-            .catch(reject);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          return reject(
-            new Error(`Request failed with status code ${res.statusCode}`),
-          );
-        }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve as () => void));
-      })
-      .on('error', reject);
-  });
+  try {
+    await downloadResponse(url, temporaryDest, headers, redirectCount);
+    await fs.promises.rename(temporaryDest, dest);
+  } catch (error) {
+    try {
+      await fs.promises.rm(temporaryDest, { force: true });
+    } catch (cleanupError) {
+      debugLogger.warn(
+        `Failed to remove incomplete extension download ${temporaryDest}: ${getErrorMessage(cleanupError)}`,
+      );
+    }
+    throw error;
+  }
+}
+
+async function downloadResponse(
+  url: string,
+  temporaryDest: string,
+  headers: Record<string, string>,
+  redirectCount: number,
+): Promise<void> {
+  const response = await new Promise<import('node:http').IncomingMessage>(
+    (resolve, reject) => {
+      https.get(url, { headers }, resolve).once('error', reject);
+    },
+  );
+
+  if (response.statusCode === 302 || response.statusCode === 301) {
+    response.destroy();
+    if (redirectCount >= 10) {
+      throw new Error('Too many redirects');
+    }
+    if (!response.headers.location) {
+      throw new Error('Redirect response missing Location header');
+    }
+    return downloadResponse(
+      response.headers.location,
+      temporaryDest,
+      headers,
+      redirectCount + 1,
+    );
+  }
+
+  if (response.statusCode !== 200) {
+    response.destroy();
+    throw new Error(`Request failed with status code ${response.statusCode}`);
+  }
+
+  await pipeline(response, fs.createWriteStream(temporaryDest));
 }
 
 export async function extractFile(file: string, dest: string): Promise<void> {
