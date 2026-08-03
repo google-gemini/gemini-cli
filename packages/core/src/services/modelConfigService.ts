@@ -101,6 +101,7 @@ export interface ResolutionContext {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
   useGemini3_5Flash?: boolean;
+  useGemini3_6Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
@@ -112,6 +113,7 @@ export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useGemini3_1FlashLite?: boolean;
   useGemini3_5Flash?: boolean;
+  useGemini3_6Flash?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -259,6 +261,8 @@ export class ModelConfigService {
           return value === context.useGemini3_1FlashLite;
         case 'useGemini3_5Flash':
           return value === context.useGemini3_5Flash;
+        case 'useGemini3_6Flash':
+          return value === context.useGemini3_6Flash;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
@@ -582,11 +586,41 @@ export class ModelConfigService {
       );
     }
 
+    const generateContentConfig = this.removeUnsupportedSamplingParameters(
+      resolved.model,
+      resolved.generateContentConfig,
+    );
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       model: resolved.model,
-      generateContentConfig: resolved.generateContentConfig,
+      generateContentConfig,
     } as ResolvedModelConfig;
+  }
+
+  /**
+   * Gemini 3.6 Flash and Gemini 3.5 Flash-Lite reject penalties and ignore
+   * custom sampling values. Remove them after all aliases and overrides have
+   * been merged so settings and agent-specific overrides cannot produce an
+   * invalid request.
+   */
+  private removeUnsupportedSamplingParameters(
+    model: string,
+    config: GenerateContentConfig,
+  ): GenerateContentConfig {
+    if (model !== 'gemini-3.6-flash' && model !== 'gemini-3.5-flash-lite') {
+      return config;
+    }
+
+    const {
+      temperature: _temperature,
+      topP: _topP,
+      topK: _topK,
+      presencePenalty: _presencePenalty,
+      frequencyPenalty: _frequencyPenalty,
+      ...compatibleConfig
+    } = config;
+    return compatibleConfig;
   }
 
   static isObject(item: unknown): item is Record<string, unknown> {

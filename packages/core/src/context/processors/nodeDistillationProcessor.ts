@@ -41,7 +41,7 @@ export function createNodeDistillationProcessor(
     try {
       const response = await env.llmClient.generateContent({
         role: LlmRole.UTILITY_COMPRESSOR,
-        modelConfigKey: { model: 'gemini-3-flash-base' },
+        modelConfigKey: { model: 'gemini-3.6-flash-base' },
         promptId: env.promptId,
         abortSignal: new AbortController().signal,
         contents: [

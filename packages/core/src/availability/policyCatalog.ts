@@ -13,6 +13,7 @@ import type {
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_3_6_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -69,6 +70,10 @@ const AUTO_ROUTING_OVERRIDES = {
 const FLASH_LITE_CHAIN: ModelPolicyChain = [
   definePolicy({
     model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    actions: SILENT_ACTIONS,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_3_6_FLASH_MODEL,
     actions: SILENT_ACTIONS,
   }),
   definePolicy({

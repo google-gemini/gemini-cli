@@ -678,6 +678,18 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3.5-flash"
         }
       },
+      "gemini-3.6-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.6-flash"
+        }
+      },
+      "gemini-3.5-flash-lite": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.5-flash-lite"
+        }
+      },
       "gemma-4-31b-it": {
         "extends": "chat-base-3",
         "modelConfig": {
@@ -706,6 +718,18 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "base",
         "modelConfig": {
           "model": "gemini-3.5-flash"
+        }
+      },
+      "gemini-3.6-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.6-flash"
+        }
+      },
+      "gemini-3.5-flash-lite-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-3.5-flash-lite"
         }
       },
       "classifier": {
@@ -776,7 +800,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-search": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -788,7 +812,7 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {
           "generateContentConfig": {
             "tools": [
@@ -800,11 +824,11 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "web-fetch-fallback": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {}
       },
       "loop-detection-double-check": {
@@ -814,15 +838,15 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "llm-edit-fixer": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {}
       },
       "next-speaker-checker": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {}
       },
       "context-snapshotter": {
-        "extends": "gemini-3-flash-base",
+        "extends": "gemini-3.5-flash-lite-base",
         "modelConfig": {
           "generateContentConfig": {
             "thinkingConfig": {
@@ -841,12 +865,12 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-3-flash": {
         "modelConfig": {
-          "model": "gemini-3-flash-preview"
+          "model": "gemini-3.5-flash-lite"
         }
       },
-      "chat-compression-3.1-flash-lite": {
+      "chat-compression-3.5-flash-lite": {
         "modelConfig": {
-          "model": "gemini-3.1-flash-lite"
+          "model": "gemini-3.5-flash-lite"
         }
       },
       "chat-compression-2.5-pro": {
@@ -871,7 +895,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "agent-history-provider-summarizer": {
         "modelConfig": {
-          "model": "gemini-3-flash-preview"
+          "model": "gemini-3.6-flash"
         }
       }
     }
@@ -961,6 +985,26 @@ their corresponding top-level category object in your `settings.json` file.
         "isVisible": true,
         "features": {
           "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.6-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.5-flash-lite": {
+        "tier": "flash-lite",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
           "multimodalToolUse": true
         }
       },
@@ -1149,6 +1193,12 @@ their corresponding top-level category object in your `settings.json` file.
           }
         ]
       },
+      "gemini-3.6-flash": {
+        "default": "gemini-3.6-flash"
+      },
+      "gemini-3.5-flash-lite": {
+        "default": "gemini-3.5-flash-lite"
+      },
       "gemini-2.5-flash": {
         "default": "gemini-2.5-flash",
         "contexts": [
@@ -1240,6 +1290,12 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
+              "useGemini3_6Flash": true
+            },
+            "target": "gemini-3.6-flash"
+          },
+          {
+            "condition": {
               "useGemini3_5Flash": true
             },
             "target": "gemini-3.5-flash"
@@ -1253,7 +1309,7 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "flash-lite": {
-        "default": "gemini-3.1-flash-lite"
+        "default": "gemini-3.5-flash-lite"
       },
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
@@ -1298,6 +1354,12 @@ their corresponding top-level category object in your `settings.json` file.
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
+          {
+            "condition": {
+              "useGemini3_6Flash": true
+            },
+            "target": "gemini-3.6-flash"
+          },
           {
             "condition": {
               "useGemini3_5Flash": true
@@ -1502,6 +1564,21 @@ their corresponding top-level category object in your `settings.json` file.
       "lite": [
         {
           "model": "flash-lite",
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-3.6-flash",
           "actions": {
             "terminal": "silent",
             "transient": "silent",

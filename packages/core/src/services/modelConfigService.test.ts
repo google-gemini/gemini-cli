@@ -1154,3 +1154,33 @@ describe('ModelConfigService', () => {
     });
   });
 });
+
+describe('ModelConfigService Gemini 3.5+ compatibility', () => {
+  it.each(['gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
+    'removes unsupported sampling parameters for %s',
+    (model) => {
+      const service = new ModelConfigService({
+        aliases: {
+          [model]: {
+            modelConfig: {
+              model,
+              generateContentConfig: {
+                temperature: 0.1,
+                topP: 0.5,
+                topK: 10,
+                presencePenalty: 0.2,
+                frequencyPenalty: 0.3,
+                maxOutputTokens: 1024,
+              },
+            },
+          },
+        },
+      });
+
+      expect(service.getResolvedConfig({ model })).toEqual({
+        model,
+        generateContentConfig: { maxOutputTokens: 1024 },
+      });
+    },
+  );
+});
