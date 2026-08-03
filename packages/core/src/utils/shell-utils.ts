@@ -322,16 +322,22 @@ function collectWordPart(
     case 'ArithmeticExpansion':
       collectArithmeticExpression(part.expression, source, result);
       return;
-    case 'ParameterExpansion':
-      if (part.operator === '@' && part.operand?.value.toLowerCase() === 'p') {
+    case 'ParameterExpansion': {
+      const operand = part.operand;
+      if (
+        part.operator === '@' &&
+        operand !== undefined &&
+        (operand.value === 'P' || operand.value === 'p')
+      ) {
         result.hasPromptCommandTransform = true;
       }
-      collectWord(part.operand, source, result);
+      collectWord(operand, source, result);
       collectWord(part.slice?.offset, source, result);
       collectWord(part.slice?.length, source, result);
       collectWord(part.replace?.pattern, source, result);
       collectWord(part.replace?.replacement, source, result);
       return;
+    }
     case 'DoubleQuoted':
     case 'LocaleString':
       for (const child of part.parts) {
