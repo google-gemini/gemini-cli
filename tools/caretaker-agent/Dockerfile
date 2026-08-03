@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
 
-# 1. Pre-bake target gemini-cli repo clone into container image (0s startup delay)
+# 1. Pre-bake target gemini-cli repo clone into container image
 RUN git clone https://github.com/google-gemini/gemini-cli.git /app/evals/triage/target_repo
 
 # 2. Copy living local application code from root build context
