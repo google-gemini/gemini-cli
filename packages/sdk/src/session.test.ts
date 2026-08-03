@@ -7,12 +7,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GeminiCliSession } from './session.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliAgentOptions } from './types.js';
+import type { ServerGeminiStreamEvent } from '@google/gemini-cli-core';
 
 // Mutable mock client so individual tests can override sendMessageStream
 const mockClient = {
   resumeChat: vi.fn().mockResolvedValue(undefined),
   getHistory: vi.fn().mockReturnValue([]),
-  sendMessageStream: vi.fn().mockReturnValue((async function* () {})()),
+  sendMessageStream: vi
+    .fn(
+      (..._args: unknown[]): AsyncGenerator<ServerGeminiStreamEvent> =>
+        (async function* () {})(),
+    )
+    .mockReturnValue((async function* () {})()),
   updateSystemInstruction: vi.fn(),
 };
 
@@ -31,6 +37,7 @@ const mockConfig = {
   }),
   getMessageBus: vi.fn().mockReturnValue({}),
   getGeminiClient: vi.fn().mockReturnValue(mockClient),
+  geminiClient: mockClient,
   getSessionId: vi.fn().mockReturnValue('mock-session-id'),
   getWorkingDir: vi.fn().mockReturnValue('/tmp'),
   setUserMemory: vi.fn(),
@@ -181,7 +188,72 @@ describe('GeminiCliSession initialize()', () => {
   });
 });
 
-// TODO(#24999): Mock uses getGeminiClient() method but session.ts expects geminiClient property.
+describe('GeminiCliSession malformed tool arguments', () => {
+  it.each([
+    {
+      args: '{"unterminated":',
+      expectedError: 'Failed to parse JSON arguments for tool "testTool"',
+    },
+    {
+      args: '[]',
+      expectedError:
+        'Invalid arguments for tool "testTool": expected a JSON object.',
+    },
+    {
+      args: 'null',
+      expectedError:
+        'Invalid arguments for tool "testTool": expected a JSON object.',
+    },
+  ])(
+    'returns a tool error and continues the loop for $args',
+    async ({ args, expectedError }) => {
+      const { GeminiEventType } = await import('@google/gemini-cli-core');
+      let callCount = 0;
+      mockClient.sendMessageStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return (async function* () {
+            yield {
+              type: GeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'malformed-call',
+                name: 'testTool',
+                args,
+              },
+            } as unknown as ServerGeminiStreamEvent;
+          })();
+        }
+        return (async function* () {})();
+      });
+
+      const session = new GeminiCliSession(
+        baseOptions,
+        'session-malformed-args',
+        mockAgent,
+      );
+      const events = [];
+      for await (const event of session.sendStream('Use the tool')) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(1);
+      expect(events[0]?.type).toBe(GeminiEventType.ToolCallRequest);
+      expect(mockScheduleAgentTools).not.toHaveBeenCalled();
+      expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockClient.sendMessageStream.mock.calls[1]?.[0]).toEqual([
+        {
+          functionResponse: {
+            id: 'malformed-call',
+            name: 'testTool',
+            response: { error: expect.stringContaining(expectedError) },
+          },
+        },
+      ]);
+    },
+  );
+});
+
+// TODO(#24999): Update the remaining sendStream mocks and re-enable this suite.
 describe.skip('GeminiCliSession sendStream()', () => {
   it('auto-initializes if not yet initialized', async () => {
     const session = new GeminiCliSession(
@@ -241,7 +313,7 @@ describe.skip('GeminiCliSession sendStream()', () => {
               name: 'testTool',
               args: { input: 'value' },
             },
-          };
+          } as unknown as ServerGeminiStreamEvent;
         })();
       }
       return (async function* () {})();

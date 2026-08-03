@@ -15,6 +15,7 @@ import {
   type ServerGeminiStreamEvent,
   type GeminiClient,
   type Content,
+  type Part,
   scheduleAgentTools,
   getAuthTypeFromEnv,
   type ToolRegistry,
@@ -34,6 +35,47 @@ import type {
 } from './types.js';
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
+
+interface ParsedToolArguments {
+  args: Record<string, unknown>;
+  error?: string;
+}
+
+function parseToolArguments(
+  toolName: string,
+  rawArgs: unknown,
+): ParsedToolArguments {
+  if (rawArgs === undefined || rawArgs === null) {
+    return { args: {} };
+  }
+
+  let parsedArgs: unknown = rawArgs;
+
+  if (typeof rawArgs === 'string') {
+    try {
+      parsedArgs = JSON.parse(rawArgs) as unknown;
+    } catch {
+      return {
+        args: {},
+        error: `Failed to parse JSON arguments for tool "${toolName}": ${rawArgs}. Ensure you provide a valid JSON object.`,
+      };
+    }
+  }
+
+  if (
+    parsedArgs === null ||
+    typeof parsedArgs !== 'object' ||
+    Array.isArray(parsedArgs)
+  ) {
+    return {
+      args: {},
+      error: `Invalid arguments for tool "${toolName}": expected a JSON object.`,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return { args: parsedArgs as Record<string, unknown> };
+}
 
 /**
  * Represents an interactive conversation session with a Gemini CLI agent.
@@ -246,15 +288,31 @@ export class GeminiCliSession {
       const stream = client.sendMessageStream(request, abortSignal, sessionId);
 
       const toolCallsToSchedule: ToolCallRequestInfo[] = [];
+      const pendingToolResponses: Array<{
+        callId: string;
+        errorResponse?: Part;
+      }> = [];
 
       for await (const event of stream) {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
           const toolCall = event.value;
-          let args = toolCall.args;
-          if (typeof args === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            args = JSON.parse(args);
+          const { args, error } = parseToolArguments(
+            toolCall.name,
+            toolCall.args,
+          );
+          if (error) {
+            pendingToolResponses.push({
+              callId: toolCall.callId,
+              errorResponse: {
+                functionResponse: {
+                  id: toolCall.callId,
+                  name: toolCall.name,
+                  response: { error },
+                },
+              },
+            });
+            continue;
           }
           toolCallsToSchedule.push({
             ...toolCall,
@@ -262,49 +320,62 @@ export class GeminiCliSession {
             isClientInitiated: false,
             prompt_id: sessionId,
           });
+          pendingToolResponses.push({ callId: toolCall.callId });
         }
       }
 
-      if (toolCallsToSchedule.length === 0) {
+      if (pendingToolResponses.length === 0) {
         break;
       }
 
-      const transcript: readonly Content[] = client.getHistory();
-      const context: SessionContext = {
-        sessionId,
-        transcript,
-        cwd: this.config.getWorkingDir(),
-        timestamp: new Date().toISOString(),
-        fs,
-        shell,
-        agent: this.agent,
-        session: this,
-      };
+      const completedResponses = new Map<string, Part[]>();
+      if (toolCallsToSchedule.length > 0) {
+        const transcript: readonly Content[] = client.getHistory();
+        const context: SessionContext = {
+          sessionId,
+          transcript,
+          cwd: this.config.getWorkingDir(),
+          timestamp: new Date().toISOString(),
+          fs,
+          shell,
+          agent: this.agent,
+          session: this,
+        };
 
-      const loopContext: AgentLoopContext = this.config;
-      const originalRegistry = loopContext.toolRegistry;
-      const scopedRegistry: ToolRegistry = originalRegistry.clone();
-      const originalGetTool = scopedRegistry.getTool.bind(scopedRegistry);
-      scopedRegistry.getTool = (name: string) => {
-        const tool = originalGetTool(name);
-        if (tool instanceof SdkTool) {
-          return tool.bindContext(context);
+        const loopContext: AgentLoopContext = this.config;
+        const originalRegistry = loopContext.toolRegistry;
+        const scopedRegistry: ToolRegistry = originalRegistry.clone();
+        const originalGetTool = scopedRegistry.getTool.bind(scopedRegistry);
+        scopedRegistry.getTool = (name: string) => {
+          const tool = originalGetTool(name);
+          if (tool instanceof SdkTool) {
+            return tool.bindContext(context);
+          }
+          return tool;
+        };
+
+        const completedCalls = await scheduleAgentTools(
+          this.config,
+          toolCallsToSchedule,
+          {
+            schedulerId: sessionId,
+            toolRegistry: scopedRegistry,
+            signal: abortSignal,
+          },
+        );
+        for (const call of completedCalls) {
+          completedResponses.set(
+            call.request.callId,
+            call.response.responseParts,
+          );
         }
-        return tool;
-      };
+      }
 
-      const completedCalls = await scheduleAgentTools(
-        this.config,
-        toolCallsToSchedule,
-        {
-          schedulerId: sessionId,
-          toolRegistry: scopedRegistry,
-          signal: abortSignal,
-        },
-      );
-
-      const functionResponses = completedCalls.flatMap(
-        (call) => call.response.responseParts,
+      const functionResponses = pendingToolResponses.flatMap(
+        ({ callId, errorResponse }) =>
+          errorResponse
+            ? [errorResponse]
+            : (completedResponses.get(callId) ?? []),
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
