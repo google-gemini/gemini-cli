@@ -170,8 +170,7 @@ export async function cleanupExpiredSessions(
 
         // A malformed or non-resumable current session may have been classified
         // as corrupted. Always use its persisted full ID as the final safeguard.
-        if (sessionId === config.getSessionId()) {
-          result.skipped++;
+        if (sessionId && sessionId === config.getSessionId()) {
           continue;
         }
 

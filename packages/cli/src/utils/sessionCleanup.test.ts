@@ -363,7 +363,10 @@ describe('Session Cleanup (Refactored)', () => {
 
       await fs.writeFile(filePath, 'completely invalid json');
 
-      const config = createMockConfig();
+      const config = createMockConfig({
+        // Cleanup can run before an active session has been assigned.
+        getSessionId: () => undefined as unknown as string,
+      });
       const settings: Settings = {
         general: { sessionRetention: { enabled: true, maxAge: '10d' } },
       };
