@@ -134,10 +134,13 @@ describe('WhisperModelManager', () => {
   });
 
   it('removes partial output when the response stream fails', async () => {
+    let interruptResponse: () => void = () => {};
     const responseBody = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array([1, 2, 3]));
-        controller.error(new Error('connection interrupted'));
+        interruptResponse = () => {
+          controller.error(new Error('connection interrupted'));
+        };
       },
     });
     vi.stubGlobal(
@@ -145,10 +148,18 @@ describe('WhisperModelManager', () => {
       vi.fn().mockResolvedValue(new Response(responseBody)),
     );
     const manager = new WhisperModelManager();
+    const firstProgress = new Promise<void>((resolve) => {
+      manager.once('progress', () => resolve());
+    });
 
-    await expect(manager.downloadModel(modelName)).rejects.toThrow(
-      'connection interrupted',
-    );
+    const download = manager.downloadModel(modelName);
+    await firstProgress;
+
+    expect(manager.isModelInstalled(modelName)).toBe(false);
+    expect(await listTemporaryDownloads()).toHaveLength(1);
+    interruptResponse();
+
+    await expect(download).rejects.toThrow('connection interrupted');
 
     await expect(fs.stat(modelPath)).rejects.toMatchObject({ code: 'ENOENT' });
     expect(await listTemporaryDownloads()).toEqual([]);
