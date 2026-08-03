@@ -44,7 +44,8 @@ def sync_results_to_gcs() -> None:
 
         print(f"✅ Successfully uploaded {count} result artifact(s) to {run_dest}\n")
     except Exception as e:
-        print(f"⚠️ Warning: Error uploading evaluation results to GCS: {e}")
+        print(f"❌ Error: Failed to upload evaluation results to GCS: {e}")
+        raise
 
 
 if __name__ == "__main__":

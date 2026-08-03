@@ -13,9 +13,8 @@ def main() -> None:
     config_str = os.environ.get("EVAL_CONFIG", "{}")
     try:
         cfg = json.loads(config_str) if config_str else {}
-    except Exception as e:
-        print(f"⚠️ Warning: Invalid EVAL_CONFIG JSON: {e}")
-        cfg = {}
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid EVAL_CONFIG JSON: {e}") from e
 
     print("========================================================")
     print(" 🚀 Running Gemini CLI Triage Evaluation Suite (Cloud Run)")
