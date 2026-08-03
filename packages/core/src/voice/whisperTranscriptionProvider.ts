@@ -20,6 +20,8 @@ export interface WhisperProviderOptions {
   length?: number;
 }
 
+const CONNECTION_TIMEOUT_MS = 10_000;
+
 /**
  * Local transcription provider using `whisper-stream` from whisper.cpp.
  *
@@ -68,7 +70,21 @@ export class WhisperTranscriptionProvider
     );
 
     return new Promise((resolve, reject) => {
-      let isResolved = false;
+      let isSettled = false;
+      let connectionTimeout: NodeJS.Timeout | undefined;
+
+      const settleConnection = (error?: Error) => {
+        if (isSettled) return;
+        isSettled = true;
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+        }
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      };
 
       try {
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
@@ -96,57 +112,52 @@ export class WhisperTranscriptionProvider
           const msg = data.toString();
           if (msg.includes('error')) {
             debugLogger.error(`[WhisperTranscription] stderr: ${msg}`);
-            if (!isResolved) {
-              isResolved = true;
-              reject(new Error(msg));
+            if (!isSettled) {
+              settleConnection(new Error(msg));
             }
           }
 
           // whisper-stream prints "whisper_init_from_file_with_params_no_state: loading model from..."
           // and finally "main: processing, press Ctrl+C to stop" when ready.
-          if (!isResolved && msg.includes('main: processing')) {
+          if (!isSettled && msg.includes('main: processing')) {
             debugLogger.debug('[WhisperTranscription] whisper-stream is ready');
-            isResolved = true;
-            resolve();
+            settleConnection();
           }
         });
 
         this.process.on('error', (err) => {
           debugLogger.error('[WhisperTranscription] Process error:', err);
+          settleConnection(err);
           this.emit('error', err);
-          if (!isResolved) {
-            isResolved = true;
-            reject(err);
-          }
         });
 
         this.process.on('close', (code) => {
           debugLogger.debug(
             `[WhisperTranscription] Process closed with code ${code}`,
           );
-          this.emit('close');
           this.process = null;
+          settleConnection(
+            new Error(
+              `whisper-stream exited before becoming ready (code ${code ?? 'unknown'})`,
+            ),
+          );
+          this.emit('close');
         });
 
-        // Fallback timeout in case "main: processing" is never seen
-        setTimeout(() => {
-          if (!isResolved) {
-            debugLogger.warn(
-              '[WhisperTranscription] Connection timeout (fallback resolve)',
-            );
-            isResolved = true;
-            resolve();
-          }
-        }, 10000);
+        connectionTimeout = setTimeout(() => {
+          const error = new Error(
+            `whisper-stream did not become ready within ${CONNECTION_TIMEOUT_MS / 1000} seconds`,
+          );
+          debugLogger.warn(`[WhisperTranscription] ${error.message}`);
+          settleConnection(error);
+          this.process?.kill('SIGTERM');
+        }, CONNECTION_TIMEOUT_MS);
       } catch (err) {
         debugLogger.error(
           '[WhisperTranscription] Failed to spawn process:',
           err,
         );
-        if (!isResolved) {
-          isResolved = true;
-          reject(err);
-        }
+        settleConnection(err instanceof Error ? err : new Error(String(err)));
       }
     });
   }

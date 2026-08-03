@@ -5,7 +5,7 @@
  */
 
 import WebSocket from 'ws';
-import { EventEmitter, once } from 'node:events';
+import { EventEmitter } from 'node:events';
 import { debugLogger } from '../utils/debugLogger.js';
 import type {
   TranscriptionProvider,
@@ -16,6 +16,14 @@ import { z } from 'zod';
 
 const LiveAPIResponseSchema = z.object({
   setupComplete: z.record(z.unknown()).optional(),
+  error: z
+    .object({
+      code: z.number().optional(),
+      message: z.string().optional(),
+      status: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
   serverContent: z
     .object({
       turnComplete: z.boolean().optional(),
@@ -48,6 +56,8 @@ const LiveAPIResponseSchema = z.object({
     })
     .optional(),
 });
+
+const CONNECTION_TIMEOUT_MS = 10_000;
 
 /**
  * Connects to the Gemini Live API using raw WebSockets to support API Key authentication.
@@ -82,14 +92,56 @@ export class GeminiLiveTranscriptionProvider
       this.ws = new WebSocket(url, {
         maxPayload: 1 << 20, // 1MB limit for safety
       });
+      const socket = this.ws;
+      let isSettled = false;
+      let resolveConnection: () => void = () => {};
+      let rejectConnection: (error: Error) => void = () => {};
+      let handleOpen: () => void = () => {};
+      const connectionReady = new Promise<void>((resolve, reject) => {
+        resolveConnection = resolve;
+        rejectConnection = reject;
+      });
 
-      this.ws.on('message', (data) => {
+      const settleConnection = (error?: Error) => {
+        if (isSettled) return;
+        isSettled = true;
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+        }
+        socket.off('open', handleOpen);
+        if (error) {
+          rejectConnection(error);
+        } else {
+          resolveConnection();
+        }
+      };
+
+      socket.on('message', (data) => {
         try {
           const parsedData: unknown = JSON.parse(data.toString());
           const result = LiveAPIResponseSchema.safeParse(parsedData);
 
           if (result.success) {
             const response = result.data;
+            if (response.error) {
+              const error = new Error(
+                response.error.message ??
+                  response.error.status ??
+                  `Gemini Live setup failed${response.error.code ? ` with code ${response.error.code}` : ''}`,
+              );
+              settleConnection(error);
+              socket.close();
+              this.emit('error', error);
+              return;
+            }
+
+            if (response.setupComplete) {
+              debugLogger.debug(
+                '[GeminiLiveTranscription] Setup complete; ready for audio',
+              );
+              settleConnection();
+            }
+
             if (response.serverContent) {
               const content = response.serverContent;
 
@@ -115,20 +167,26 @@ export class GeminiLiveTranscriptionProvider
         }
       });
 
-      this.ws.on('error', (error) => {
+      socket.on('error', (error) => {
         debugLogger.error('[GeminiLiveTranscription] WebSocket Error:', error);
+        settleConnection(error);
         this.emit('error', error);
       });
 
-      this.ws.on('close', (code, reason) => {
+      socket.on('close', (code, reason) => {
         debugLogger.debug(
           `[GeminiLiveTranscription] Connection Closed. Code: ${code}, Reason: ${reason}`,
         );
+        if (this.ws === socket) {
+          this.ws = null;
+        }
+        settleConnection(
+          new Error(
+            `Gemini Live connection closed before setup completed (code ${code})`,
+          ),
+        );
         this.emit('close');
-        this.ws = null;
       });
-
-      await once(this.ws, 'open');
 
       const setupMessage = {
         setup: {
@@ -140,7 +198,27 @@ export class GeminiLiveTranscriptionProvider
         },
       };
 
-      this.ws.send(JSON.stringify(setupMessage));
+      handleOpen = () => {
+        try {
+          socket.send(JSON.stringify(setupMessage));
+        } catch (error) {
+          settleConnection(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+          socket.close();
+        }
+      };
+      socket.once('open', handleOpen);
+
+      const connectionTimeout = setTimeout(() => {
+        const error = new Error(
+          `Gemini Live setup did not complete within ${CONNECTION_TIMEOUT_MS / 1000} seconds`,
+        );
+        settleConnection(error);
+        socket.close();
+      }, CONNECTION_TIMEOUT_MS);
+
+      await connectionReady;
       this.currentTranscription = '';
     } catch (err) {
       debugLogger.error(

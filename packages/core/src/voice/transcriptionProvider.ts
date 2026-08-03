@@ -22,7 +22,7 @@ export interface TranscriptionEvents {
  */
 export interface TranscriptionProvider
   extends EventEmitter<TranscriptionEvents> {
-  /** Establish connection to the transcription service. */
+  /** Establish a connection and resolve once the service can accept audio. */
   connect(): Promise<void>;
   /** Send a chunk of raw audio data to the service. */
   sendAudioChunk(chunk: Buffer): void;
